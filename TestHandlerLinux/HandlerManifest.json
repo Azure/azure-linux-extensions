@@ -1,0 +1,13 @@
+[{
+  "name": "TestHandlerLinux",
+  "version": 1.1,
+  "handlerManifest": {
+    "installCommand": "installer/install.py",
+    "uninstallCommand": "installer/uninstall.py",
+    "updateCommand": "bin/update.py",
+    "enableCommand": "bin/enable.py",
+    "disableCommand": "bin/disable.py",
+    "rebootAfterInstall": false,
+    "reportHeartbeat": true
+  }
+}]
