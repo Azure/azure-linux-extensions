@@ -29,6 +29,7 @@ import string
 import subprocess
 import sys
 import imp
+import shlex
 from azure.storage import BlobService
 
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
@@ -85,13 +86,11 @@ def enable():
             download_blob(storage_account_name, storage_account_key, blob_uri, seqNo)
         #execute the script
         cmd = public_settings['commandToExecute']
-        cmd = re.sub('\s+',' ', cmd).strip()
         waagent.Log("Command to execute:" + cmd)
-        args = cmd.split(' ')
+        args = shlex.split(cmd)
         hutil.doStatusReport(name,seqNo,version,status_file,'NotReady', '0', 'Executing commands...')
         if len(blob_uris) > 0:
             download_dir = get_download_directory(seqNo)
-            os.chdir(download_dir)
             subprocess.Popen(args, cwd=download_dir)
         else:
             subprocess.Popen(args)
