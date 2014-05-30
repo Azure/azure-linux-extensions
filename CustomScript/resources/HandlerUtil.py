@@ -199,7 +199,22 @@ def doStatusReport(name,seqNo,version,stat_file,status, status_code, status_mess
     # remove  inc.status_sent
     if os.path.exists(stat_file+'_sent') == True:
         os.unlink(stat_file+'_sent')
-        
+
+def exit_if_enabled(seqNo):
+    if(int(seqNo) <= get_most_recent_seq()):
+        waagent.Log("Current sequence number, " + seqNo + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
+        sys.exit(0)
+    set_most_recent_seq(seqNo)
+
+
+def get_most_recent_seq():
+    seq = waagent.GetFileContents('mrseq')
+    if(seq):
+        return int(seq)
+    return -1
+
+def set_most_recent_seq(seq):
+    waagent.SetFileContents('mrseq', str(seq))        
 
 def doHealthReport(heartbeat_file,status,code,message):
     # heartbeat

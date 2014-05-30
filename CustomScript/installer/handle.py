@@ -70,10 +70,7 @@ def enable():
         LoggerInit('/var/log/'+name+'_Install.log','/dev/stdout')
         # Ensure the same configuration is executed only once
         # If the previous enable failed, we do not have retry logic here. Since the custom script may not work in an intermediate state
-        if(int(seqNo) <= get_most_recent_seq()):
-            waagent.Log("Current sequence number, " + seqNo + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
-            sys.exit(0)
-        set_most_recent_seq(seqNo)
+        hutil.exit_if_enabled(seqNo)
         waagent.Log("set most recent sequence number to , " + seqNo + ", done. Start enabling.")        
         protected_settings = config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
         public_settings = config['runtimeSettings'][0]['handlerSettings']['publicSettings']
@@ -115,14 +112,6 @@ def update():
     name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Update')
     hutil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Update','transitioning','0', 'Updating', 'NotReady','0',name+' updating.')
 
-def get_most_recent_seq():
-    seq = waagent.GetFileContents('mrseq')
-    if(seq):
-        return int(seq)
-    return 0
-
-def set_most_recent_seq(seq):
-    waagent.SetFileContents('mrseq', str(seq))
 
 def get_blob_name_from_uri(uri):
     return get_properties_from_uri(uri)['blob_name']
