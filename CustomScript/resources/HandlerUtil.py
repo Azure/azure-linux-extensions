@@ -47,29 +47,7 @@ Example HeartBeat
         "Message": "Sample Handler running. Waiting for a new configuration from user."
     }
 }
-Status uses either non-localized 'message' or localized 'formattedMessage' but not both.
-{
-    "version": 1.0,
-    "timestampUTC": "<current utc time>",
-    "status" : {
-        "name": "<Handler workload name>",
-        "operation": "<name of the operation being performed>",
-        "configurationAppliedTime": "<UTC time indicating when the configuration was last successfully applied>",
-        "status": "<transitioning | error | success | warning>",
-        "code": <Valid integer status code>,
-        "message": {
-            "id": "id of the localized resource",
-            "params": [
-                "MyParam0",
-                "MyParam1"
-            ]
-        },
-        "formattedMessage": {
-            "lang": "Lang[-locale]",
-            "message": "formatted user message"
-        }
-    }
-}
+
 """
 
 
@@ -82,149 +60,160 @@ import time
 
 # waagent has no '.py' therefore create waagent module import manually.
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-def doParse(Log,operation):
-    handler_env=None
-    config=None
-    ctxt=None
-    code=0
-    
-    # get the HandlerEnvironment.json. it should always be in ./
-    waagent.Log('cwd is ' + os.path.realpath(os.path.curdir))
-    handler_env_file='./HandlerEnvironment.json'
-    if not os.path.isfile(handler_env_file):
-        waagent.Error("Unable to locate " + handler_env_file)
-        sys.exit(1)
-    ctxt=waagent.GetFileContents(handler_env_file)
-    if ctxt == None :
-        waagent.Error("Unable to read " + handler_env_file)    
-    try:
-        handler_env=json.loads(ctxt)
-    except:
-        pass
-    if handler_env == None :
-        waagent.Error("JSON error processing " + handler_env_file)    
-        sys.exit(1)
-    if type(handler_env) == list:
-        handler_env = handler_env[0]
-    
-    # parse the dirs
-    name='NULL'
-    seqNo='0'
-    version='0.0'
-    config_dir='./'
-    log_dir='./'
-    status_dir='./'
-    heartbeat_file='NULL.log'
-    
-    name=handler_env['name']
-    seqNo=handler_env['seqNo']
-    version=str(handler_env['version'])
-    config_dir=handler_env['handlerEnvironment']['configFolder']
-    log_dir=handler_env['handlerEnvironment']['logFolder']
-    status_dir=handler_env['handlerEnvironment']['statusFolder']
-    heartbeat_file=handler_env['handlerEnvironment']['heartbeatFile']
-    
-    # always get the newest/with biggest incarnation number
-    incarnation_num = -1
-    for root, dirs, files in os.walk(config_dir):
-        for f in files:
-            if f.find('.settings') > 0:
-                incarnation_tmp = int(f.replace('.settings', ''))
-                if incarnation_tmp > incarnation_num:
-                    incarnation_num = incarnation_tmp
-    if incarnation_num < 0:
-        waagent.Error("Unable to locate a .settings file!")
-        sys.exit(1)
-    incarnation = str(incarnation_num)
-    # get our incarnation # from the number of the .settings file
-    waagent.Log('Incarnation is ' + incarnation)
-    status_file=status_dir+'/'+incarnation+'.status'
-    settings_file = config_dir + '/' + incarnation + '.settings'
-    waagent.Log("setting file path is" + settings_file)
-    ctxt=None
-    ctxt=waagent.GetFileContents(settings_file)
-    if ctxt == None :
-        waagent.Error('Unable to read ' + settings_file + '. ')    
-        doExit(name,seqNo,version,1,status_file,heartbeat_file,operation,'errior','1', operation+' Failed', 'Read .settings', 'error', '1','Unable to read ' + settings_file + '. ','NotReady','1','Exiting')
-    waagent.Log("Read: " + ctxt)
-    # parse json
-    config = None
-    try:
-        config=json.loads(ctxt)
-    except:
-        waagent.Error('JSON exception decoding ' + ctxt)
+from waagent import LoggerInit
+DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
+
+class HandlerContext:
+    def __init__(self,name):
+        self._name = name
+        self._version = '0.0'
+        return
+
+class HandlerUtility:
+    def __init__(self, log, error, short_name):
+        self._log = log
+        self._error = error
+        self._short_name = short_name
         
-    if config == None:
-        waagent.Error("JSON error processing " + settings_file)
-        return (name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config)
+    def _get_log_prefix(self):
+        return '[%s-%s]' %(self._context._name, self._context._version)
 
-    print repr(config)
-    if config['runtimeSettings'][0]['handlerSettings'].has_key('protectedSettings') == True:
-        thumb=config['runtimeSettings'][0]['handlerSettings']['protectedSettingsCertThumbprint']
-        cert=waagent.LibDir+'/'+thumb+'.crt'
-        pkey=waagent.LibDir+'/'+thumb+'.prv'
-        waagent.SetFileContents('/tmp/kk',config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
-        cleartxt=None
-        cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
-        if cleartxt == None:
-            waagent.Error("OpenSSh decode error using  thumbprint " + thumb )
-            doExit(name,seqNo,version,1,status_file,heartbeat_file,operation,'errior','1', operation + ' Failed', 'Parse Config', 'error', '1', 'OpenSsh decode error  using  thumbprint ' + thumb,'NotReady','1','Exiting')
+    def _get_current_seq_no(self, config_folder):
+        seq_no = -1
+        for subdir, dirs, files in os.walk(config_folder):
+            for file in files:
+                try:
+                    cur_seq_no = int(os.path.basename(file).split('.')[0])
+                    if cur_seq_no > seq_no:
+                        seq_no = cur_seq_no
+                except ValueError:
+                    continue
+        return seq_no
+
+    def log(self, message):
+        self._log(self._get_log_prefix() + message)
+
+    def error(self, message):
+        self._error(self._get_log_prefix() + message)
+        
+    def do_parse_context(self,operation):
+        self._context = HandlerContext(self._short_name)
+        handler_env=None
+        config=None
+        ctxt=None
+        code=0
+        # get the HandlerEnvironment.json. it should always be in ./
+        self.log('cwd is ' + os.path.realpath(os.path.curdir))
+        handler_env_file='./HandlerEnvironment.json'
+        if not os.path.isfile(handler_env_file):
+            self.error("Unable to locate " + handler_env_file)
             sys.exit(1)
-        jctxt=''
+        ctxt=waagent.GetFileContents(handler_env_file)
+        if ctxt == None :
+            self.error("Unable to read " + handler_env_file)
         try:
-            jctxt=json.loads(cleartxt)
+            handler_env=json.loads(ctxt)
         except:
-            waagent.Error('JSON exception decoding ' + cleartxt)
-        config['runtimeSettings'][0]['handlerSettings']['protectedSettings']=jctxt
-        waagent.Log('Config decoded correctly.')
-        waagent.Log('name:' + name + ';seqNo:' + seqNo + ';version:' + version
-                + ';config_dir:' + config_dir + ';log_dir:' + log_dir)
+            pass
+        if handler_env == None :
+            self.log("JSON error processing " + handler_env_file)
+            sys.exit(1)
+        if type(handler_env) == list:
+            handler_env = handler_env[0]
+            
+        self._context._name = handler_env['name']
+        self._context._version = str(handler_env['version'])
+        self._context._config_dir=handler_env['handlerEnvironment']['configFolder']
+        self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+        self._change_log_file()
+        self._context._status_dir=handler_env['handlerEnvironment']['statusFolder']
+        self._context._heartbeat_file=handler_env['handlerEnvironment']['heartbeatFile']
+        self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+        if self._context._seq_no < 0:
+            self.error("Unable to locate a .settings file!")
+            sys.exit(1)
+        self._context._seq_no = str(self._context._seq_no)
+        self.log('sequence number is ' + self._context._seq_no)
+        self._context._status_file= os.path.join(self._context._status_dir, self._context._seq_no +'.status')
+        self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
+        self.log("setting file path is" + self._context._settings_file)
+        ctxt=None
+        ctxt=waagent.GetFileContents(self._context._settings_file)
+        if ctxt == None :
+            self.error('Unable to read ' + self._context._settings_file + '. ')
+            self.do_exit(
+                    1,
+                    operation,
+                    'error',
+                    '1', 
+                    'Failed')
+        self.log("JSON config: " + ctxt)
+        # parse json
+        config = None
+        try:
+            config=json.loads(ctxt)
+        except:
+            self.error('JSON exception decoding ' + ctxt)
+        if config == None:
+            self.error("JSON error processing " + settings_file)
+        else:
+            if config['runtimeSettings'][0]['handlerSettings'].has_key('protectedSettings'):
+                thumb=config['runtimeSettings'][0]['handlerSettings']['protectedSettingsCertThumbprint']
+                cert=waagent.LibDir+'/'+thumb+'.crt'
+                pkey=waagent.LibDir+'/'+thumb+'.prv'
+                waagent.SetFileContents('/tmp/kk',config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
+                cleartxt=None
+                cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
+                if cleartxt == None:
+                    self.error("OpenSSh decode error using  thumbprint " + thumb )
+                    do_exit(1,operation,'error','1', operation + ' Failed')
+                jctxt=''
+                try:
+                    jctxt=json.loads(cleartxt)
+                except:
+                    self.error('JSON exception decoding ' + cleartxt)
+                config['runtimeSettings'][0]['handlerSettings']['protectedSettings']=jctxt
+                self.log('Config decoded correctly.')
+            self._context._config = config
+        return self._context
 
-    return (name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config)
+    def _change_log_file(self):
+        self.log("Change log file to " + self._context._log_file)
+        LoggerInit(self._context._log_file,'/dev/stdout')
+        self._log = waagent.Log
+        self._error = waagent.Error
 
+    def exit_if_enabled(self):
+        if(int(self._context._seq_no) <= self._get_most_recent_seq()):
+            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
+            sys.exit(0)
+        self._set_most_recent_seq(self._context._seq_no)
+        self.log("set most recent sequence number to " + self._context._seq_no)
 
-def doStatusReport(name,seqNo,version,stat_file,status, status_code, status_message):
-    #'{"handlerName":"Chef.Bootstrap.WindowsAzure.ChefClient","handlerVersion":"11.12.0.0","status":"NotReady","code":1,"formattedMessage":{"lang":"en-US","message":"Enable command of plugin (name: Chef.Bootstrap.WindowsAzure.ChefClient, version 11.12.0.0) failed with exception Command C:/Packages/Plugins/Chef.Bootstrap.WindowsAzure.ChefClient/11.12.0.0/enable.cmd of Chef.Bootstrap.WindowsAzure.ChefClient has exited with Exit code: 1"}},{"handlerName":"Microsoft.Compute.BGInfo","handlerVersion":"1.1","status":"Ready","formattedMessage":{"lang":"en-US","message":"plugin (name: Microsoft.Compute.BGInfo, version: 1.1) enabled successfully."}}'
+    def _get_most_recent_seq(self):
+        seq = waagent.GetFileContents('mrseq')
+        if(seq):
+            return int(seq)
+        return -1
 
-    stat_rept='{"handlerName":"' + name + '","handlerVersion":"'+version+ '","status":"' +status + '","code":' + status_code + ',"formattedMessage":{"lang":"en-US","message":"' + status_message + '"}}'
-    cur_file=stat_file+'_current'
-    with open(cur_file,'w+') as f:
-        f.write(stat_rept)
-    # if inc.status exists, rename the inc.status to inc.status_sent
-    if os.path.exists(stat_file) == True:
-        os.rename(stat_file,stat_file+'_sent')
-    # rename inc.status_current to inc.status
-    os.rename(cur_file,stat_file)
-    # remove  inc.status_sent
-    if os.path.exists(stat_file+'_sent') == True:
-        os.unlink(stat_file+'_sent')
+    def _set_most_recent_seq(self,seq):
+        waagent.SetFileContents('mrseq', str(seq))
 
-def exit_if_enabled(seqNo):
-    if(int(seqNo) <= get_most_recent_seq()):
-        waagent.Log("Current sequence number, " + seqNo + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
-        sys.exit(0)
-    set_most_recent_seq(seqNo)
+    def do_status_report(self, operation, status, status_code, message):
+        #[{"version":"1.0","timestampUTC":"2014-05-29T04:20:13Z","status":{"name":"Chef Extension Handler","operation":"chef-client-run","status":"success","code":0,"formattedMessage":{"lang":"en-US","message":"Chef-client run success"}}}]
+        tstamp=time.strftime(DateTimeFormat, time.gmtime())
+        stat_rept = '[{"version":"1.0","timestampUTC":"%s","status":{"name":"%s","operation":"%s","status":"%s","code":%s,"formattedMessage":{"lang":"en-US","message":"%s"}}}]' %(tstamp, self._context._name, operation, status, status_code, message)
+        if self._context._status_file:
+            with open(self._context._status_file,'w+') as f:
+                f.write(stat_rept)
 
+    def do_heartbeat_report(self, heartbeat_file,status,code,message):
+        # heartbeat
+        health_report='[{"version":"1.0","heartbeat":{"status":"' + status+ '","code":"'+ code + '","Message":"' + message + '"}}]'
+        if waagent.SetFileContents(heartbeat_file,health_report) == None :
+            self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
-def get_most_recent_seq():
-    seq = waagent.GetFileContents('mrseq')
-    if(seq):
-        return int(seq)
-    return -1
-
-def set_most_recent_seq(seq):
-    waagent.SetFileContents('mrseq', str(seq))        
-
-def doHealthReport(heartbeat_file,status,code,message):
-    # heartbeat
-    health_report='[{"version":"1.0","heartbeat":{"status":"' + status+ '","code":"'+ code + '","Message":"' + message + '"}}]'
-    if waagent.SetFileContents(heartbeat_file,health_report) == None :
-        waagent.Error('Unable to wite heartbeat info to ' + heartbeat_file)    
-
-def doExit(name,seqNo,version,exit_code,status_file,heartbeat_file,operation,status,code,message,health_state,health_code,health_message, require_heartbeat = False):
-    doStatusReport(name,seqNo,version,status_file,status,code,message)
-    if require_heartbeat == True:
-        doHealthReport(heartbeat_file,'NotReady','1','Exiting')
-    sys.exit(exit_code)
+    def do_exit(self,exit_code,operation,status,code,message):
+        self.do_status_report(operation, status,code,message)
+        sys.exit(exit_code)
 

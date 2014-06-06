@@ -30,23 +30,20 @@ import subprocess
 import sys
 import imp
 import shlex
+import traceback
+import urllib
 from azure.storage import BlobService
 
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
 from waagent import LoggerInit
 
 LoggerInit('/var/log/waagent.log','/dev/stdout')
-waagent.Log("CustomScript handler starts.") 
-
-
 #Global Variables definition
-HandlerLogFile = "CustomScriptHandler.log"
-StatusFileSuffix = ".status"
-ConfigFileSuffix = ".settings"
-DownloadDirectory = "download"
-logfile=waagent.Log
-hutil=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+DownloadDirectory = 'download'
+ExtensionShortName = 'CustomScript'
+Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
 
+waagent.Log("%s started to handle." %(ExtensionShortName)) 
 
 def main():
     for a in sys.argv[1:]:        
@@ -60,57 +57,73 @@ def main():
             enable()
         elif re.match("^([-/]*)(update)", a):
             update()
+
 def install():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Uninstall')
-    hutil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Install','Installed','0', 'Install Succeeded', 'NotReady','0',name+' Installed.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Uninstall')
+    hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
 
 def enable():
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     try:
-        name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Install')
-        LoggerInit('/var/log/'+name+'_Install.log','/dev/stdout')
+        hutil.do_parse_context('Install')
         # Ensure the same configuration is executed only once
         # If the previous enable failed, we do not have retry logic here. Since the custom script may not work in an intermediate state
-        hutil.exit_if_enabled(seqNo)
-        waagent.Log("set most recent sequence number to , " + seqNo + ", done. Start enabling.")        
-        protected_settings = config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
-        public_settings = config['runtimeSettings'][0]['handlerSettings']['publicSettings']
+        hutil.exit_if_enabled()
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         #get script in storage blob
-        storage_account_name = protected_settings["storageAccountName"]
-        storage_account_key = protected_settings["storageAccountKey"]
         blob_uris = public_settings['fileUris']
-        hutil.doStatusReport(name,seqNo,version,status_file,'NotReady', '0', 'Downloading files...')
-        for blob_uri in blob_uris:
-            download_blob(storage_account_name, storage_account_key, blob_uri, seqNo)
+        if len(blob_uris) > 0:
+            hutil.do_status_report('Downloading','transitioning', '0', 'Downloading files...')
+            if protected_settings:
+                storage_account_name = protected_settings.get("storageAccountName")
+                storage_account_key = protected_settings.get("storageAccountKey")
+                if (not storage_account_name and storage_account_key) or (storage_account_name and not storage_account_key):
+                    error_msg = "Azure storage account or storage key is not provided"
+                    hutil.error(error_msg)
+                    raise ValueError(error_msg)
+                elif storage_account_name:
+                    hutil.log("downloading scripts from azure storage...")
+                    for blob_uri in blob_uris:
+                        download_blob(storage_account_name, storage_account_key, blob_uri, hutil._context._seq_no)
+                else:       # neither storage account name no key specified in protected settings
+                    hutil.log("No azure storage account and key specified in protected settings. Downloading scripts from external linsks...")
+                    download_external_files(blob_uris, hutil._context._seq_no)
+            else:
+                hutil.log("Downloading scripts from external links...")
+                download_external_files(blob_uris, hutil._context._seq_no)
         #execute the script
         cmd = public_settings['commandToExecute']
-        waagent.Log("Command to execute:" + cmd)
+        hutil.log("Command to execute:" + cmd)
         args = shlex.split(cmd)
-        hutil.doStatusReport(name,seqNo,version,status_file,'NotReady', '0', 'Executing commands...')
+        hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
+        download_dir = os.getcwd()
         if len(blob_uris) > 0:
-            download_dir = get_download_directory(seqNo)
-            subprocess.Popen(args, cwd=download_dir)
-        else:
-            subprocess.Popen(args)
+            download_dir = get_download_directory(hutil._context._seq_no)
+        p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE)
+        out,err = p.communicate()
+        hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
         #report the status
-        hutil.doExit(name,seqNo,version,0,status_file,
-                heartbeat_file,'Enable','Ready','0', 'Enable Succeeded.',
-                'Ready','0',name+' Enable completed.')
+        hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
     except Exception, e:
-        waagent.Log("Failed to enable the extension with error:" + str(e))
-        hutil.doExit(name,seqNo,version,1,status_file,
-                heartbeat_file,'Enable','Error','0', 'Enable failed.',
-                'NotReady','1',name+' enable failed.')
+        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
+
 def uninstall():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Uninstall')
-    hutil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Uninstall','Uninstalled','0', 'Uninstall Succeeded', 'NotReady','0',name+' uninstalled.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Uninstall')
+    hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
 
 def disable():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Disable')
-    hutil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Disable','success','0', 'Disable service.py Succeeded', 'NotReady','0',name+' disabled.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Disable')
+    hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Update')
-    hutil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Update','transitioning','0', 'Updating', 'NotReady','0',name+' updating.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Upadate')
+    hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 
 def get_blob_name_from_uri(uri):
@@ -126,7 +139,7 @@ def get_properties_from_uri(uri):
     uri = uri[:uri.rfind('/')]
     container_name = uri[uri.rfind('/')+1:]
     return {'blob_name': blob_name, 'container_name': container_name}
-    
+
 def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
@@ -137,14 +150,28 @@ def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo):
     try:
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
     except Exception, e:
-        waagent.Log("Failed to download blob with uri:" + blob_uri + "with error:" + str(e))
+        hutil.error("Failed to download blob with uri:" + blob_uri + "with error:" + str(e))
         raise
+
+def download_external_files(uris, seqNo):
+    for uri in uris:
+        download_external_file(uri, seqNo)
+
+def download_external_file(uri, seqNo):
+    download_dir = get_download_directory(seqNo)
+    file_name = uri.split('/')[-1]
+    file_path = os.path.join(download_dir, file_name)
+    try:
+        urllib.urlretrieve(uri, file_path)
+    except Exception, e:
+        hutil.error("Failed to download external file with uri:" + blob_uri + "with error:" + str(e))
+        raise
+
 
 def get_download_directory(seqNo):
     download_dir_main = os.path.join(os.getcwd(), 'download')
     create_directory_if_not_exists(download_dir_main)
     download_dir = os.path.join(download_dir_main, seqNo)
-    print download_dir
     create_directory_if_not_exists(download_dir)
     return download_dir
 
