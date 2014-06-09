@@ -1,8 +1,26 @@
 #!/usr/bin/env python
 
-"""
-Handler library for Linux IaaS
+#
+# Handler library for Linux IaaS
+#
+# Copyright 2014 Microsoft Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Requires Python 2.4+
 
+
+"""
 JSON def:
 HandlerEnvironment.json
 [{
@@ -18,21 +36,6 @@ HandlerEnvironment.json
   }
 }]
 
-{
-   "handlerSettings": 
-  {
-    "protectedSettings": 
-    {
-      "Password": "UserPassword"
-        },
-       "publicSettings": 
-    {	
-      "UserName": "UserName",
-      "Expiration": "Password expiration date in yyy-mm-dd"
-	}
-  }
- }
-
 Example ./config/1.settings
 "{"runtimeSettings":[{"handlerSettings":{"protectedSettingsCertThumbprint":"1BE9A13AA1321C7C515EF109746998BAB6D86FD1","protectedSettings":
 "MIIByAYJKoZIhvcNAQcDoIIBuTCCAbUCAQAxggFxMIIBbQIBADBVMEExPzA9BgoJkiaJk/IsZAEZFi9XaW5kb3dzIEF6dXJlIFNlcnZpY2UgTWFuYWdlbWVudCBmb3IgR+nhc6VHQTQpCiiV2zANBgkqhkiG9w0BAQEFAASCAQCKr09QKMGhwYe+O4/a8td+vpB4eTR+BQso84cV5KCAnD6iUIMcSYTrn9aveY6v6ykRLEw8GRKfri2d6tvVDggUrBqDwIgzejGTlCstcMJItWa8Je8gHZVSDfoN80AEOTws9Fp+wNXAbSuMJNb8EnpkpvigAWU2v6pGLEFvSKC0MCjDTkjpjqciGMcbe/r85RG3Zo21HLl0xNOpjDs/qqikc/ri43Y76E/Xv1vBSHEGMFprPy/Hwo3PqZCnulcbVzNnaXN3qi/kxV897xGMPPC3IrO7Nc++AT9qRLFI0841JLcLTlnoVG1okPzK9w6ttksDQmKBSHt3mfYV+skqs+EOMDsGCSqGSIb3DQEHATAUBggqhkiG9w0DBwQITgu0Nu3iFPuAGD6/QzKdtrnCI5425fIUy7LtpXJGmpWDUA==","publicSettings":{"port":"3000"}}}]}"
@@ -47,6 +50,8 @@ Example HeartBeat
         "Message": "Sample Handler running. Waiting for a new configuration from user."
     }
 }
+Example Status Report:
+[{"version":"1.0","timestampUTC":"2014-05-29T04:20:13Z","status":{"name":"Chef Extension Handler","operation":"chef-client-run","status":"success","code":0,"formattedMessage":{"lang":"en-US","message":"Chef-client run success"}}}]
 
 """
 
@@ -102,7 +107,7 @@ class HandlerUtility:
         config=None
         ctxt=None
         code=0
-        # get the HandlerEnvironment.json. it should always be in ./
+        # get the HandlerEnvironment.json. According to the extension handler spec, it is always in the ./ directory
         self.log('cwd is ' + os.path.realpath(os.path.curdir))
         handler_env_file='./HandlerEnvironment.json'
         if not os.path.isfile(handler_env_file):
@@ -120,7 +125,7 @@ class HandlerUtility:
             sys.exit(1)
         if type(handler_env) == list:
             handler_env = handler_env[0]
-            
+
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir=handler_env['handlerEnvironment']['configFolder']
@@ -148,7 +153,6 @@ class HandlerUtility:
                     '1', 
                     'Failed')
         self.log("JSON config: " + ctxt)
-        # parse json
         config = None
         try:
             config=json.loads(ctxt)
@@ -200,7 +204,6 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
-        #[{"version":"1.0","timestampUTC":"2014-05-29T04:20:13Z","status":{"name":"Chef Extension Handler","operation":"chef-client-run","status":"success","code":0,"formattedMessage":{"lang":"en-US","message":"Chef-client run success"}}}]
         tstamp=time.strftime(DateTimeFormat, time.gmtime())
         stat_rept = '[{"version":"1.0","timestampUTC":"%s","status":{"name":"%s","operation":"%s","status":"%s","code":%s,"formattedMessage":{"lang":"en-US","message":"%s"}}}]' %(tstamp, self._context._name, operation, status, status_code, message)
         if self._context._status_file:

@@ -29,11 +29,12 @@ import json
 # Global variables definition
 # waagent has no '.py' therefore create waagent module import manually.
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
-HandlerUtil=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
 from waagent import LoggerInit
 
 LoggerInit('/var/log/waagent.log','/dev/stdout')
-waagent.Log("VMAccess handler starts.")
+ExtensionShortName = 'VMAccess'
+waagent.Log("%s started to handle." %(ExtensionShortName)) 
 logfile=waagent.Log
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
@@ -54,44 +55,36 @@ def main():
             update()
 
 def install():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Uninstall')
-    HandlerUtil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Install','Installed','0', 'Install Succeeded', 'NotReady','0',name+' Installed.')
-
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Uninstall')
+    hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
 
 def enable():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=HandlerUtil.doParse(logfile,'Install')
-    LoggerInit('/var/log/'+name+'_Install.log','/dev/stdout')
-    waagent.Log(name+" - install.py starting.")
-    waagent.Log('name:' + name + ';seqNo:' + seqNo + ';version:' + version
-            + ';config_dir:' + config_dir + ';log_dir' + log_dir)
-    HandlerUtil.exit_if_enabled(seqNo)
-    protect_settings = config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
-    pub_settings = config['runtimeSettings'][0]['handlerSettings']['publicSettings']
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Install')
+    hutil.exit_if_enabled()
+    protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+    pub_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
     waagent.MyDistro = waagent.GetMyDistro()
     output_msg = ''
-    # if user name is specified in settings, set the user name and password
-    if pub_settings.has_key('UserName'):
+    # Set the user name and password, if user name is specified in settings
+    if pub_settings and pub_settings.has_key('UserName'):
         user_name = pub_settings['UserName']
-        user_pass = None
-        if protect_settings.has_key('Password'):
-            user_pass = protect_settings['Password']
-        expire_date = None
-        if pub_settings.has_key('Expiration'):
-            expire_date = pub_settings['Expiration']
+        user_pass = protect_settings.get('Password')
+        expire_date = pub_settings.get('Expiration')
         error_string= waagent.MyDistro.CreateAccount(user_name,user_pass, expire_date, None)
         if error_string != None:
             temp_output = "VMAccess failed to create the account or set the password: " + error_string
-            waagent.Error(temp_output)
+            hutil.error(temp_output)
             output_msg += temp_output + OutputSplitter
         else:
             temp_output = "VMAccess succeeded in creating the account or set the password for " + user_name 
-            waagent.Log(temp_output)
+            hutil.log(temp_output)
             output_msg += temp_output + OutputSplitter
 
     # if certificate is specified in settings, set the new host public key
-    cert_txt = None
-    if(protect_settings.has_key('Certificate')):
-        cert_txt = protect_settings['Certificate']
+    cert_txt = protect_settings.get('Certificate')
+    if not (cert_txt == None):
         # save the certificate string as a crt file
         cert_txt = cert_txt.replace(BeginCertificateTag, '').replace(EndCertificateTag,'').replace(' ', '\n')
         cert_txt = BeginCertificateTag + cert_txt + EndCertificateTag + '\n'
@@ -115,47 +108,47 @@ def enable():
                 if pkey[1]:
                     pub_path = pkey[1]
                     pub_path = re.sub(r'^/home/\w+/','/home/'+ssh_user_name+'/', pub_path)
-                    waagent.Log('public key path: ' + pub_path)
+                    hutil.log('public key path: ' + pub_path)
                     if not cert_txt:
                         waagent.Run('mv ' + pkey[0] + '.crt ./temp.crt')
                     break
             pub_path = ovf_env.PrepareDir(pub_path)
             if pub_path == None:
                 temp_output = "VMAccess failed to set public key as the public key path is invalid:" + pub_path
-                waagent.Error(temp_output)
+                hutil.error(temp_output)
                 output_msg += temp_output + OutputSplitter
             else:
                 waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
                 waagent.MyDistro.setSelinuxContext('temp.pub','unconfined_u:object_r:ssh_home_t:s0')
                 waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
                 waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
-                waagent.Log("VMAccess succeeded in configuring the SSH public key.")
+                hutil.log("VMAccess succeeded in configuring the SSH public key.")
                 waagent.ChangeOwner(pub_path, ssh_user_name)
                 temp_output = "VMAccess succeeded in setting public key for user: " + ssh_user_name
-                waagent.Log(temp_output)
+                hutil.log(temp_output)
                 output_msg += temp_output + OutputSplitter
-    open_ssh_port = None
-    if pub_settings.has_key('OpenSshPort'):
-        open_ssh_port = pub_settings['OpenSshPort']
+
+    open_ssh_port = pub_settings.get('OpenSshPort')
     if open_ssh_port and open_ssh_port.lower() == 'true':
         waagent.Run("iptables -t filter -I INPUT -p tcp --dport 22 -j ACCEPT")
-        waagent.Log("VMAccess succeeded in opening ssh port.")
+        hutil.log("VMAccess succeeded in opening ssh port.")
     # TODO: Reset the sshd config and restart ssh service.
-    HandlerUtil.doExit(name,seqNo,version,0,status_file,
-            heartbeat_file,'Enable','Ready','0', 'Enable Succeeded.',
-            'Ready','0',name+' Enable completed.')
+    hutil.do_exit(0, 'Enable', 'success','0', output_msg)
     
 def uninstall():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Uninstall')
-    HandlerUtil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Uninstall','Uninstalled','0', 'Uninstall Succeeded', 'NotReady','0',name+' uninstalled.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Uninstall')
+    hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
 
 def disable():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Disable')
-    HandlerUtil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Disable','success','0', 'Disable service.py Succeeded', 'NotReady','0',name+' disabled.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Disable')
+    hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    name,seqNo,version,config_dir,log_dir,settings_file,status_file,heartbeat_file,config=hutil.doParse(logfile,'Update')
-    HandlerUtil.doExit(name,seqNo,version,0,status_file,heartbeat_file,'Update','transitioning','0', 'Updating', 'NotReady','0',name+' updating.')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context('Upadate')
+    hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 if __name__ == '__main__' :
     main()
