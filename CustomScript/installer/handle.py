@@ -60,21 +60,22 @@ def main():
 
 def install():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Uninstall')
+    hutil.do_parse_context('Install')
     hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
 
 def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     try:
-        hutil.do_parse_context('Install')
+        hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
         # If the previous enable failed, we do not have retry logic here. Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         #get script in storage blob
-        blob_uris = public_settings['fileUris']
-        if len(blob_uris) > 0:
+        blob_uris = public_settings.get('fileUris')
+        cmd = public_settings.get('commandToExecute')
+        if blob_uris and len(blob_uris) > 0:
             hutil.do_status_report('Downloading','transitioning', '0', 'Downloading files...')
             if protected_settings:
                 storage_account_name = protected_settings.get("storageAccountName")
@@ -84,17 +85,16 @@ def enable():
                     hutil.error(error_msg)
                     raise ValueError(error_msg)
                 elif storage_account_name:
-                    hutil.log("downloading scripts from azure storage...")
+                    hutil.log("Downloading scripts from azure storage...")
                     for blob_uri in blob_uris:
-                        download_blob(storage_account_name, storage_account_key, blob_uri, hutil._context._seq_no)
+                        download_blob(storage_account_name, storage_account_key, blob_uri, hutil._context._seq_no, cmd)
                 else:       # neither storage account name no key specified in protected settings
                     hutil.log("No azure storage account and key specified in protected settings. Downloading scripts from external linsks...")
-                    download_external_files(blob_uris, hutil._context._seq_no)
+                    download_external_files(blob_uris, hutil._context._seq_no, cmd)
             else:
                 hutil.log("Downloading scripts from external links...")
-                download_external_files(blob_uris, hutil._context._seq_no)
+                download_external_files(blob_uris, hutil._context._seq_no, cmd)
         #execute the script
-        cmd = public_settings['commandToExecute']
         hutil.log("Command to execute:" + cmd)
         args = shlex.split(cmd)
         hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
@@ -140,7 +140,7 @@ def get_properties_from_uri(uri):
     container_name = uri[uri.rfind('/')+1:]
     return {'blob_name': blob_name, 'container_name': container_name}
 
-def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo):
+def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, command):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
     download_dir = get_download_directory(seqNo)
@@ -152,12 +152,14 @@ def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo):
     except Exception, e:
         hutil.error("Failed to download blob with uri:" + blob_uri + "with error:" + str(e))
         raise
+    if blob_name in command:
+        os.chmod(download_path, 0100)
 
-def download_external_files(uris, seqNo):
+def download_external_files(uris, seqNo,command):
     for uri in uris:
-        download_external_file(uri, seqNo)
+        download_external_file(uri, seqNo, command)
 
-def download_external_file(uri, seqNo):
+def download_external_file(uri, seqNo, command):
     download_dir = get_download_directory(seqNo)
     file_name = uri.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
@@ -166,6 +168,8 @@ def download_external_file(uri, seqNo):
     except Exception, e:
         hutil.error("Failed to download external file with uri:" + blob_uri + "with error:" + str(e))
         raise
+    if file_name in command:
+        os.chmod(file_path, 0100)
 
 
 def get_download_directory(seqNo):
