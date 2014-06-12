@@ -13,14 +13,16 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
   * the execution output of the scripts is logged in the log directory specified in HandlerEnvironment.json
   * status of the extension is reported back to Azure so that user can see the status on Azure Portal
   * PowerShell script to deploy the extension on VM	
-	$VmName = '<vm_name>'
-	Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-	$vm = get-azurevm $VmName	
-	$ExtensionName = '<extension_name>'	
-	$Publisher = '<publisher_name>'	
-	$Version = '<version>'
-	Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-	Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration '{"storageAccountName": "<storage_account_name>","storageAccountKey":"<storage_account_key>"}' -PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "<command>" }' | Update-AzureVM
+```powershell
+$VmName = '<vm_name>'
+Write-Host ('Retrieving the VM ' + $VmName + '.....................')
+$vm = get-azurevm $VmName	
+$ExtensionName = '<extension_name>'	
+$Publisher = '<publisher_name>'	
+$Version = '<version>'
+Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration '{"storageAccountName": "<storage_account_name>","storageAccountKey":"<storage_account_key>"}' -PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "<command>" }' | Update-AzureVM
+```
 	 
   
 * VM Access Extension
@@ -30,21 +32,22 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
   * it can reset the password of the original sudo user 
   * it can create a new sudo user with the password specified
   * it can set the public host key with the key given or it can reset the public host key provided during VM provisioning if host key not provided
-  * it can open the SSH port which is disabled in iptables by mistake  
+  * it can open the SSH port(22) and restore the sshd_config if reset_ssh is set to True  
   * status of the extension is reported back to Azure so that you can see the status on Azure Portal
   * PowerShell script to deploy the extension on VM	
-	$VmName = '<vm_name>'
-	Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-	$vm = get-azurevm $VmName
-	$UserName = "<user_name>"
-	$Password = "<password>"
-	$ExtensionName = '<extension_name>'
-	$Publisher = '<publisher_name>'
-	$Version =  '<version>'
-	$PrivateConfig = '{"Password": "' +  $Password + '", "Certificate":"' + $cert + '"}'
-	$PublicConfig = '{"UserName":"' + $UserName + '", "Expiration": "<expire_date>", "OpenSshPort":"<true_or_false>" }'
-	Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-	Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM	
-  
+```powershell
+$VmName = '<vm_name>'
+Write-Host ('Retrieving the VM ' + $VmName + '.....................')
+$vm = get-azurevm $VmName
+$UserName = "<user_name>"
+$Password = "<password>"
+$ExtensionName = '<extension_name>'
+$Publisher = '<publisher_name>'
+$Version =  '<version>'
+$cert = Get-Content "<cert_path>"
+$PrivateConfig = '{"username":"' + $UserName + '", "password": "' +  $Password + '", "ssh_key":"' + $cert + '","reset_ssh":"True"}'	
+Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM	
+``` 
 * Test Handler Extension
   This extension is an extension example  
