@@ -31,7 +31,7 @@ import sys
 import imp
 import shlex
 import traceback
-import urllib
+import urllib2
 from azure.storage import BlobService
 
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
@@ -75,7 +75,7 @@ def enable():
         #get script in storage blob
         blob_uris = public_settings.get('fileUris')
         cmd = public_settings.get('commandToExecute')
-        if blob_uris and len(blob_uris) > 0:
+        if blob_uris and blob_uris and isinstance(blob_uris, list) and len(blob_uris) > 0:
             hutil.do_status_report('Downloading','transitioning', '0', 'Downloading files...')
             if protected_settings:
                 storage_account_name = protected_settings.get("storageAccountName")
@@ -87,25 +87,37 @@ def enable():
                 elif storage_account_name:
                     hutil.log("Downloading scripts from azure storage...")
                     for blob_uri in blob_uris:
-                        download_blob(storage_account_name, storage_account_key, blob_uri, hutil._context._seq_no, cmd)
+                        download_blob(storage_account_name, storage_account_key, blob_uri, hutil._context._seq_no, cmd, hutil)
                 else:       # neither storage account name no key specified in protected settings
-                    hutil.log("No azure storage account and key specified in protected settings. Downloading scripts from external linsks...")
-                    download_external_files(blob_uris, hutil._context._seq_no, cmd)
+                    hutil.log("No azure storage account and key specified in protected settings. Downloading scripts from external links...")
+                    download_external_files(blob_uris, hutil._context._seq_no, cmd, hutil)
             else:
                 hutil.log("Downloading scripts from external links...")
-                download_external_files(blob_uris, hutil._context._seq_no, cmd)
-        #execute the script
-        hutil.log("Command to execute:" + cmd)
-        args = shlex.split(cmd)
-        hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
-        download_dir = os.getcwd()
-        if len(blob_uris) > 0:
-            download_dir = get_download_directory(hutil._context._seq_no)
-        p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE)
-        out,err = p.communicate()
-        hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
-        #report the status
-        hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
+                download_external_files(blob_uris, hutil._context._seq_no, cmd, hutil)
+        else:
+            hutil.log("fileUris value provided is empty or invalid. Continue with executing command...")
+        #execute the command
+        if cmd:
+            hutil.log("Command to execute:" + cmd)
+            args = shlex.split(cmd)
+            # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like '\x00\x00a'
+            # temp workaround is to replace \x00 assuming the file name are all ASCII char
+            # so from python 2.6 to python 2.7.2, only ASCII char file name supported
+            for idx, val in enumerate(args):
+                if '\x00' in args[idx]:
+                    args[idx] = args[idx].replace('\x00', '')
+            hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
+            download_dir = os.getcwd()
+            if len(blob_uris) > 0:
+                download_dir = get_download_directory(hutil._context._seq_no)
+                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE)
+                out,err = p.communicate()
+                hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
+                hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
+        else:
+            hutil.log("commandToExecute is not specified in the configuration")
+            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded, but commandToExecute is not provided')
+
     except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
@@ -140,7 +152,7 @@ def get_properties_from_uri(uri):
     container_name = uri[uri.rfind('/')+1:]
     return {'blob_name': blob_name, 'container_name': container_name}
 
-def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, command):
+def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, command, hutil):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
     download_dir = get_download_directory(seqNo)
@@ -155,20 +167,22 @@ def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, co
     if blob_name in command:
         os.chmod(download_path, 0100)
 
-def download_external_files(uris, seqNo,command):
+def download_external_files(uris, seqNo,command, hutil):
     for uri in uris:
-        download_external_file(uri, seqNo, command)
+        download_external_file(uri, seqNo, command, hutil)
 
-def download_external_file(uri, seqNo, command):
+def download_external_file(uri, seqNo, command, hutil):
     download_dir = get_download_directory(seqNo)
     file_name = uri.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
     try:
-        urllib.urlretrieve(uri, file_path)
+        response = urllib2.urlopen(uri)
+        content = response.read()
+        waagent.SetFileContents(file_path, content)
     except Exception, e:
-        hutil.error("Failed to download external file with uri:" + blob_uri + "with error:" + str(e))
+        hutil.error("Failed to download external file with uri:" + uri + "with error:" + str(e))
         raise
-    if file_name in command:
+    if command and file_name in command:
         os.chmod(file_path, 0100)
 
 
