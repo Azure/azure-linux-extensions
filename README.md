@@ -5,7 +5,7 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
 # Extension List
 
 * Custom Script Extension
-  Allow the owner of the Azure VM to run script Azure storage during or after VM provisioning
+  Allow the owner of the Azure VM to run script stored in Azure storage during or after VM provisioning
   * it can be installed through Azure RESTFUL API for extension
   * it supports major Linux and FreeBSD distro
   * the scripts can be located on Azure Storage    
