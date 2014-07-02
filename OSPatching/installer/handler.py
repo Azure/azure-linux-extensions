@@ -56,7 +56,7 @@ class AbstractPatching(object):
     AbstractPatching defines a skeleton neccesary for a concrete Patching class.
     """
     def __init__(self):
-        pass
+        self.configFile = None
 
     def enable(self, settings):
         pass
@@ -81,7 +81,20 @@ class AbstractPatching(object):
 ############################################################
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
+        self.unattended_upgrade_configfile = '/etc/apt/apt.conf.d/50unattended-upgrades'
+        self.mail = 't-binxia@microsoft.com'
+
+    def enable(self):
+        self._sendMail()
+
+    def _checkOnly(self):
         pass
+
+    def _sendMail(self):
+        modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + self.mail + '\"')
+        retcode,output = waagent.RunGetOutput('apt-get install heirloom-mailx')
+        if retcode > 0:
+            waagent.Error(output)
 
 ############################################################
 #	CentOSPatching
@@ -125,13 +138,24 @@ def install():
     hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
 
 def enable():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Install')
+    #hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    #hutil.do_parse_context('Install')
     try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        #protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        global LinuxDistro
+        LinuxDistro=waagent.DistInfo()[0]
+        LinuxDistro=LinuxDistro.strip('"')
+        LinuxDistro=LinuxDistro.strip(' ')
+        patching_class_name=LinuxDistro+'Patching'
+        if not globals().has_key(patching_class_name):
+            print LinuxDistro+' is not a supported distribution.'
+            sys.exit(1)
+        MyPatching = globals()[patching_class_name]()
+        MyPatching.enable()
     except Exception, e:
-        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
+        print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
+        #hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        #hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
 
 def uninstall():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -148,7 +172,16 @@ def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
+def modify_file(filename, src, dst):
+    """
+      Modify the configuration file using regular expression.
+      src should be regular expression.
+    """
+    fileContents = waagent.GetFileContents(filename)
+    pattern = re.compile(src)
+    newFileContents = pattern.sub(dst, fileContents)
+    waagent.SetFileContents(filename, newFileContents)
+    
 
 if __name__ == '__main__' :
     main()
-
