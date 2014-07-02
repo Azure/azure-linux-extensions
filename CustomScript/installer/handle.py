@@ -116,7 +116,7 @@ def enable():
             download_dir = os.getcwd()
             if len(blob_uris) > 0:
                 download_dir = get_download_directory(hutil._context._seq_no)
-                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE)
+                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out,err = p.communicate()
                 hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
                 hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
