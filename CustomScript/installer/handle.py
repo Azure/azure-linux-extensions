@@ -32,20 +32,26 @@ import imp
 import shlex
 import traceback
 import urllib2
+import urlparse
 from azure.storage import BlobService
 
-waagent=imp.load_source('waagent','/usr/sbin/waagent')
-from waagent import LoggerInit
-
-LoggerInit('/var/log/waagent.log','/dev/stdout')
-#Global Variables definition
-DownloadDirectory = 'download'
-ExtensionShortName = 'CustomScript'
-Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
-
-waagent.Log("%s started to handle." %(ExtensionShortName)) 
-
+#Main function is the only entrence to this extension handler
 def main():
+    #Global Variables definition
+    global waagent
+    waagent=imp.load_source('waagent','/usr/sbin/waagent')
+    from waagent import LoggerInit
+
+    LoggerInit('/var/log/waagent.log','/dev/stdout')
+    global DownloadDirectory  
+    DownloadDirectory = 'download'
+    global ExtensionShortName 
+    ExtensionShortName = 'CustomScript'
+    global Util
+    Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+
+    waagent.Log("%s started to handle." %(ExtensionShortName)) 
+
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -145,12 +151,17 @@ def get_container_name_from_uri(uri):
     return get_properties_from_uri(uri)['container_name']
 
 def get_properties_from_uri(uri):
-    if uri.endswith('/'):
-        uri = uri[:-1]
-    blob_name = uri[uri.rfind('/')+1:]
-    uri = uri[:uri.rfind('/')]
-    container_name = uri[uri.rfind('/')+1:]
+    path = get_path_from_uri(uri)
+    if path.endswith('/'):
+        path = path[:-1]
+    blob_name = path[path.rfind('/')+1:]
+    path = path[:path.rfind('/')]
+    container_name = path[path.rfind('/')+1:]
     return {'blob_name': blob_name, 'container_name': container_name}
+
+def get_path_from_uri(uriStr):
+    uri = urlparse.urlparse(uriStr)
+    return uri.path
 
 def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, command, hutil):
     container_name = get_container_name_from_uri(blob_uri)
