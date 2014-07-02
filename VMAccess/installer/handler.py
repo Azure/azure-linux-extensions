@@ -168,16 +168,14 @@ def _open_ssh_port():
     _insert_rule_if_not_exists('OUTPUT -p tcp -m tcp --dport 22 -j ACCEPT')
 
 def _del_rule_if_exists(rule_string):
-    match_string = '-A %s' %rule_string
     cmd_result = waagent.RunGetOutput("iptables-save")
     while cmd_result[0] == 0 and (rule_string in cmd_result[1]):
         waagent.Run("iptables -D %s" %rule_string)
         cmd_result = waagent.RunGetOutput("iptables-save")
 
 def _insert_rule_if_not_exists(rule_string):
-    match_string = '-A %s' %rule_string
     cmd_result = waagent.RunGetOutput("iptables-save")
-    if cmd_result[0] == 0 and (rule_string in cmd_result[1]):
+    if cmd_result[0] == 0 and (rule_string not in cmd_result[1]):
         waagent.Run("iptables -I %s" %rule_string)
 
 
