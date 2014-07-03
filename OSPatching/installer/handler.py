@@ -82,7 +82,7 @@ class AbstractPatching(object):
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
         self.unattended_upgrade_configfile = '/etc/apt/apt.conf.d/50unattended-upgrades'
-        self.mail = 't-binxia@microsoft.com'
+        self.mail = 'g.bin.xia@gmail.com'
 
     def enable(self):
         self._sendMail()
