@@ -188,15 +188,21 @@ def download_external_file(uri, seqNo, command, hutil):
     file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
     try:
-        response = urllib2.urlopen(uri)
-        content = response.read()
-        waagent.SetFileContents(file_path, content)
+        download_and_save_file(uri, file_path)
     except Exception, e:
         hutil.error("Failed to download external file with uri:" + uri + "with error:" + str(e))
         raise
     if command and file_name in command:
         os.chmod(file_path, 0100)
 
+def download_and_save_file(uri, file_path):
+    src = urllib2.urlopen(uri)
+    dest = open(file_path, 'wb')
+    buf_size = 1024
+    buf = src.read(buf_size)
+    while(buf):
+        dest.write(buf)
+        buf = src.read(buf_size)
 
 def get_download_directory(seqNo):
     download_dir_main = os.path.join(os.getcwd(), 'download')
