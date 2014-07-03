@@ -184,7 +184,8 @@ def download_external_files(uris, seqNo,command, hutil):
 
 def download_external_file(uri, seqNo, command, hutil):
     download_dir = get_download_directory(seqNo)
-    file_name = uri.split('/')[-1]
+    path = get_path_from_uri(uri)
+    file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
     try:
         response = urllib2.urlopen(uri)
