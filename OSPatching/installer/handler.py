@@ -82,13 +82,55 @@ class AbstractPatching(object):
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
         self.unattended_upgrade_configfile = '/etc/apt/apt.conf.d/50unattended-upgrades'
+        self.periodic_configfile = '/etc/apt/apt.conf.d/10periodic'
+        self.upgrade_log_dir = '/var/log/unattended-upgrades/'
         self.mail = 'g.bin.xia@gmail.com'
 
     def enable(self):
-        self._sendMail()
+        #self._sendMail()
+
+        #self._securityUpdate()
+
+        #retcode,output = self._checkOnly()
+        #if (retcode == 0):
+        #    print output
+
+        #self._setBlacklist(['vim', 'libc6'])
+
+        self._setPeriodic(1)
 
     def _checkOnly(self):
-        pass
+        return waagent.RunGetOutput('apt-get -s upgrade')
+
+    def _setBlacklist(self, packageList):
+        contents = waagent.GetFileContents(self.unattended_upgrade_configfile)
+        start = contents.find('Unattended-Upgrade::Package-Blacklist {')
+        start = contents.find('\n',start)
+        end = contents.find('};',start)
+        lines = contents[start:end].split('\n')
+        waagent.SetFileContents(self.unattended_upgrade_configfile, contents[0:start+1] + '\n'.join(['\t\"'+p+'\";' for p in packageList]) + contents[end-1:None])
+
+
+    def _securityUpdate(self):
+        contents = waagent.GetFileContents(self.unattended_upgrade_configfile)
+        start = contents.find('Unattended-Upgrade::Allowed-Origins {')
+        start = contents.find('\n',start)
+        end = contents.find('};',start)
+        lines = contents[start:end].split('\n')
+        newlines = list()
+        for line in lines:
+            if 'security' in line.strip():
+                line = line.lstrip('//')
+            else:
+                if line.strip() and (not line.strip().startswith('//')):
+                    line = '//' + line
+            newlines.append(line)
+        waagent.SetFileContents(self.unattended_upgrade_configfile, contents[0:start] + '\n'.join(newlines) + contents[end:None])
+
+    def _setPeriodic(self, upgrade_periodic):
+        contents = 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Download-Upgradeable-Packages "1";\nAPT::Periodic::AutocleanInterval "7";\n'
+        contents += 'APT::Periodic::Unattended-Upgrade "' + str(upgrade_periodic) + '";\n';
+        waagent.SetFileContents(self.periodic_configfile, contents)
 
     def _sendMail(self):
         modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + self.mail + '\"')
