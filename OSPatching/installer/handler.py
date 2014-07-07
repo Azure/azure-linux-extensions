@@ -228,8 +228,59 @@ class OraclePatching(centosPatching):
 ############################################################
 class SuSEPatching(AbstractPatching):
     def __init__(self):
+        super(SuSEPatching,self).__init__()
+        self.patch_cmd = 'zypper --non-interactive patch --auto-agree-with-licenses --with-interactive'
+        self.cron_restart_cmd = 'service cron restart'
+        self.cron_chkconfig_cmd = 'chkconfig cron on'
+        self.crontab = '/etc/crontab'
+        self.patching_cron = '/tmp/patching_cron'
+
+    def enable(self):
+        self._install()
+        self._setPeriodic(1)
+
+        #mail = 'g.bin.xia@gmail.com'
+        #self._sendMail(mail)
+
+        #self._securityUpdate()
+
+        #self._checkOnly(valid='yes')
+
+        #self._setBlacklist(['kernel*', 'php*'])
+
+        retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
+        if retcode > 0:
+            waagent.Error(output)
+
+        retcode,output = waagent.RunGetOutput(self.cron_chkconfig_cmd)
+        if retcode > 0:
+            waagent.Error(output)
+        
+    def _install(self):
+        waagent.SetFileContents(self.patching_cron, self.patch_cmd)
+
+    def _checkOnly(self,valid='no'):
         pass
 
+    def _setBlacklist(self, packageList):
+        pass
+        
+    def _securityUpdate(self):
+        pass
+
+    def _setPeriodic(self, upgrade_periodic=1):
+        periodic_dict = {1:'/etc/cron.daily', 7:'/etc/cron.weekly', 30:'/etc/cron.monthly'}
+        for cron_dir in periodic_dict.values():
+            periodic_file = os.path.join(cron_dir, os.path.basename(self.patching_cron))
+            if os.path.exists(periodic_file):
+                os.remove(periodic_file)
+        retcode,output = waagent.RunGetOutput(' '.join(['cp', self.patching_cron, periodic_dict[upgrade_periodic]]))
+
+    def _sendMail(self,mail=''):
+        contents = waagent.GetFileContents(self.crontab)
+        start = contents.find('\nMAILTO=') + 1
+        end = contents.find('\n',start)
+        waagent.SetFileContents(self.crontab, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
 
 
 def main():
