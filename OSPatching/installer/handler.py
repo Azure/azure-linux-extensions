@@ -81,13 +81,15 @@ class AbstractPatching(object):
 ############################################################
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
+        super(UbuntuPatching,self).__init__()
         self.unattended_upgrade_configfile = '/etc/apt/apt.conf.d/50unattended-upgrades'
         self.periodic_configfile = '/etc/apt/apt.conf.d/10periodic'
         self.upgrade_log_dir = '/var/log/unattended-upgrades/'
-        self.mail = 'g.bin.xia@gmail.com'
+
 
     def enable(self):
-        #self._sendMail()
+        #mail = 'g.bin.xia@gmail.com'
+        #self._sendMail(mail)
 
         #self._securityUpdate()
 
@@ -132,8 +134,8 @@ class UbuntuPatching(AbstractPatching):
         contents += 'APT::Periodic::Unattended-Upgrade "' + str(upgrade_periodic) + '";\n';
         waagent.SetFileContents(self.periodic_configfile, contents)
 
-    def _sendMail(self):
-        modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + self.mail + '\"')
+    def _sendMail(self,mail):
+        modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + mail + '\"')
         retcode,output = waagent.RunGetOutput('apt-get install heirloom-mailx')
         if retcode > 0:
             waagent.Error(output)
