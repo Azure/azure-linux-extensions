@@ -139,18 +139,87 @@ class UbuntuPatching(AbstractPatching):
             waagent.Error(output)
 
 ############################################################
-#	CentOSPatching
+#	centosPatching
 ############################################################
-class CentOSPatching(AbstractPatching):
+class centosPatching(AbstractPatching):
     def __init__(self):
-        pass
+        super(centosPatching,self).__init__()
+        self.yum_cron_configfile = '/etc/sysconfig/yum-cron'
+        
+    def enable(self):
+        #self._install()
+
+        #mail = 'g.bin.xia@gmail.com'
+        #self._sendMail(mail)
+
+        #self._securityUpdate()
+
+        #self._checkOnly(valid='yes')
+
+        #self._setBlacklist(['kernel*', 'php*'])
+
+        self._setPeriodic(1)
+
+        # Enable the automatic updates
+        retcode,output = waagent.RunGetOutput('service yum-cron restart')
+        if retcode > 0:
+            waagent.Error(output)
+
+        # Enable the daemon at boot time
+        retcode,output = waagent.RunGetOutput('chkconfig yum-cron on')
+        if retcode > 0:
+            waagent.Error(output)
+
+    def _install(self):
+        retcode,output = waagent.RunGetOutput('yum -y install yum-cron')
+        if retcode > 0:
+            waagent.Error(output)
+
+    def _checkOnly(self,valid='no'):
+        contents = waagent.GetFileContents(self.yum_cron_configfile)
+        start = contents.find('\nCHECK_ONLY=') + 1
+        end = contents.find('\n',start)
+        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'CHECK_ONLY=' + valid + contents[end:None])
+
+    def _setBlacklist(self, packageList):
+        contents = waagent.GetFileContents(self.yum_cron_configfile)
+        start = contents.find('\nYUM_PARAMETER=') + 1
+        end = contents.find('\n',start)
+        parameter = ' '.join(['-x ' + package for package in packageList])
+        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'YUM_PARAMETER="' + parameter + '"' + contents[end:None])
+
+    def _securityUpdate(self):
+        # Install the yum-plugin-security package to enable "yum --security update" commond
+        retcode,output = waagent.RunGetOutput('yum -y install yum-plugin-security')
+        retcode,output = waagent.RunGetOutput('yum --security update')
+
+    def _setPeriodic(self, upgrade_periodic=1):
+        contents = waagent.GetFileContents(self.yum_cron_configfile)
+        start = contents.find('\nDAYS_OF_WEEK')
+        if start > -1:
+            start = start + 1
+        else:
+            start = contents.find('\n#DAYS_OF_WEEK') + 1
+        end = contents.find('\n',start)
+        # default is everyday
+        periodic = '0123456'
+        if upgrade_periodic == 7:
+            periodic = '0'
+        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'DAYS_OF_WEEK="' + periodic + '"' + contents[end:None])
+
+    def _sendMail(self,mail=''):
+        contents = waagent.GetFileContents(self.yum_cron_configfile)
+        start = contents.find('\nMAILTO=') + 1
+        end = contents.find('\n',start)
+        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
+    
 
 ############################################################
 #	OraclePatching
 ############################################################
-class OraclePatching(CentOSPatching):
+class OraclePatching(centosPatching):
     def __init__(self):
-        pass
+        super(OraclePathing,self).__init__()
 
 ############################################################
 #	SuSEPatching
