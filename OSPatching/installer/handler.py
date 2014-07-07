@@ -141,11 +141,11 @@ class UbuntuPatching(AbstractPatching):
             waagent.Error(output)
 
 ############################################################
-#	centosPatching
+#	redhatPatching
 ############################################################
-class centosPatching(AbstractPatching):
+class redhatPatching(AbstractPatching):
     def __init__(self):
-        super(centosPatching,self).__init__()
+        super(redhatPatching,self).__init__()
         self.yum_cron_configfile = '/etc/sysconfig/yum-cron'
         
     def enable(self):
@@ -156,7 +156,7 @@ class centosPatching(AbstractPatching):
 
         #self._securityUpdate()
 
-        #self._checkOnly(valid='yes')
+        #self._checkOnly(valid='no')
 
         #self._setBlacklist(['kernel*', 'php*'])
 
@@ -217,11 +217,11 @@ class centosPatching(AbstractPatching):
     
 
 ############################################################
-#	OraclePatching
+#	centosPatching
 ############################################################
-class OraclePatching(centosPatching):
+class centosPatching(redhatPatching):
     def __init__(self):
-        super(OraclePathing,self).__init__()
+        super(centosPatching,self).__init__()
 
 ############################################################
 #	SuSEPatching
