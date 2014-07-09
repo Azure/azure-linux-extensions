@@ -46,10 +46,10 @@ OutputSplitter = ';'
 
 
 ###########################################################
-# BEGIN PATCHING CLASS DEFS
+#                  PATCHING CLASS DEFS                    #
 ###########################################################
 ###########################################################
-#       AbstractPatching
+#                    AbstractPatching                     #
 ###########################################################
 class AbstractPatching(object):
     """
@@ -77,7 +77,7 @@ class AbstractPatching(object):
         pass
 
 ############################################################
-#	UbuntuPatching
+#	                UbuntuPatching                     #
 ############################################################
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
@@ -93,16 +93,17 @@ class UbuntuPatching(AbstractPatching):
 
         #self._securityUpdate()
 
-        #retcode,output = self._checkOnly()
-        #if (retcode == 0):
-        #    print output
-
+        self._checkOnly()
+        
         #self._setBlacklist(['vim', 'libc6'])
 
-        self._setPeriodic(1)
+        #self._setPeriodic(1)
 
     def _checkOnly(self):
-        return waagent.RunGetOutput('apt-get -s upgrade')
+        retcode,output = waagent.RunGetOutput('apt-get -s upgrade')
+        if (retcode == 0):
+            print output
+        return retcode
 
     def _setBlacklist(self, packageList):
         contents = waagent.GetFileContents(self.unattended_upgrade_configfile)
@@ -141,7 +142,7 @@ class UbuntuPatching(AbstractPatching):
             waagent.Error(output)
 
 ############################################################
-#	redhatPatching
+#	                redhatPatching                     #
 ############################################################
 class redhatPatching(AbstractPatching):
     def __init__(self):
@@ -217,14 +218,14 @@ class redhatPatching(AbstractPatching):
     
 
 ############################################################
-#	centosPatching
+#	                centosPatching                     #
 ############################################################
 class centosPatching(redhatPatching):
     def __init__(self):
         super(centosPatching,self).__init__()
 
 ############################################################
-#	SuSEPatching
+#	                 SuSEPatching                      #
 ############################################################
 class SuSEPatching(AbstractPatching):
     def __init__(self):
@@ -283,18 +284,9 @@ class SuSEPatching(AbstractPatching):
         waagent.SetFileContents(self.crontab, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
 
 
-def main():
-    for a in sys.argv[1:]:        
-        if re.match("^([-/]*)(disable)", a):
-            disable()
-        elif re.match("^([-/]*)(uninstall)", a):
-            uninstall()
-        elif re.match("^([-/]*)(install)", a):
-            install()
-        elif re.match("^([-/]*)(enable)", a):
-            enable()
-        elif re.match("^([-/]*)(update)", a):
-            update()
+###########################################################
+#                     FUNCTION DEFS                       #
+###########################################################
 
 def install():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -306,15 +298,6 @@ def enable():
     #hutil.do_parse_context('Install')
     try:
         #protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-        global LinuxDistro
-        LinuxDistro=waagent.DistInfo()[0]
-        LinuxDistro=LinuxDistro.strip('"')
-        LinuxDistro=LinuxDistro.strip(' ')
-        patching_class_name=LinuxDistro+'Patching'
-        if not globals().has_key(patching_class_name):
-            print LinuxDistro+' is not a supported distribution.'
-            sys.exit(1)
-        MyPatching = globals()[patching_class_name]()
         MyPatching.enable()
     except Exception, e:
         print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
@@ -345,6 +328,44 @@ def modify_file(filename, src, dst):
     pattern = re.compile(src)
     newFileContents = pattern.sub(dst, fileContents)
     waagent.SetFileContents(filename, newFileContents)
+
+def GetMyPatching(patching_class_name=''):
+    """
+    Return MyPatching object.
+    NOTE: Logging is not initialized at this point.
+    """
+    if patching_class_name == '':
+        if 'Linux' in platform.system():
+            Distro=waagent.DistInfo()[0]
+        else : # I know this is not Linux!
+            if 'FreeBSD' in platform.system():
+                Distro=platform.system()
+        Distro=Distro.strip('"')
+        Distro=Distro.strip(' ')
+        patching_class_name=Distro+'Patching'
+    else:
+        Distro=patching_class_name
+    if not globals().has_key(patching_class_name):
+        print Distro+' is not a supported distribution.'
+        return None
+    return globals()[patching_class_name]()
+
+def main():
+    global MyPatching
+    MyPatching=GetMyPatching()
+    if MyPatching == None :
+        sys.exit(1)
+    for a in sys.argv[1:]:        
+        if re.match("^([-/]*)(disable)", a):
+            disable()
+        elif re.match("^([-/]*)(uninstall)", a):
+            uninstall()
+        elif re.match("^([-/]*)(install)", a):
+            install()
+        elif re.match("^([-/]*)(enable)", a):
+            enable()
+        elif re.match("^([-/]*)(update)", a):
+            update()
     
 
 if __name__ == '__main__' :
