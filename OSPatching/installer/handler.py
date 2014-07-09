@@ -46,10 +46,10 @@ OutputSplitter = ';'
 
 
 ###########################################################
-#                  PATCHING CLASS DEFS                    #
+# BEGIN PATCHING CLASS DEFS
 ###########################################################
 ###########################################################
-#                    AbstractPatching                     #
+#       AbstractPatching
 ###########################################################
 class AbstractPatching(object):
     """
@@ -77,7 +77,7 @@ class AbstractPatching(object):
         pass
 
 ############################################################
-#	                UbuntuPatching                     #
+#	UbuntuPatching
 ############################################################
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
@@ -87,17 +87,37 @@ class UbuntuPatching(AbstractPatching):
         self.upgrade_log_dir = '/var/log/unattended-upgrades/'
 
 
-    def enable(self):
-        #mail = 'g.bin.xia@gmail.com'
-        #self._sendMail(mail)
+    def enable(self, protect_settings):
+        blacklist = protect_settings.get('blacklist')
+        if blacklist is not None: 
+            self._setBlacklist(blacklist)
+            print "Succeeded in setting blacklist"
 
-        #self._securityUpdate()
+        check_only = protect_settings.get('check_only')
+        if check_only:
+            self._checkOnly()
+            print "Succeeded in checking upgrades only and not really upgrading"
 
-        self._checkOnly()
+        mail = protect_settings.get('mail')
+        if mail is not None:
+            self._sendMail(mail)
+            print "Succeeded in setting mail %s" % mail
         
-        #self._setBlacklist(['vim', 'libc6'])
+        periodic = protect_settings.get('periodic')
+        if periodic in [1, 7, 30]:
+            self._setPeriodic(periodic)
+            print "Succeeded in setting upgrade-periodic %s" % periodic
 
-        #self._setPeriodic(1)
+        security_update = protect_settings.get('security_update')
+        if security_update:
+            self._securityUpdate()
+
+        # restart unattended-upgrades service
+        retcode,output = waagent.RunGetOutput('service unattended-upgrades restart')
+        if retcode == 0:
+            print "Succeeded in restarting unattended-upgrades"
+        else:
+            print "Failed to restart unattended-upgrades with output:\n %s" % output
 
     def _checkOnly(self):
         retcode,output = waagent.RunGetOutput('apt-get -s upgrade')
@@ -137,12 +157,13 @@ class UbuntuPatching(AbstractPatching):
 
     def _sendMail(self,mail):
         modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + mail + '\"')
+        # TODO: mailx or exim4 ???
         retcode,output = waagent.RunGetOutput('apt-get install heirloom-mailx')
         if retcode > 0:
             waagent.Error(output)
 
 ############################################################
-#	                redhatPatching                     #
+#	redhatPatching
 ############################################################
 class redhatPatching(AbstractPatching):
     def __init__(self):
@@ -218,14 +239,14 @@ class redhatPatching(AbstractPatching):
     
 
 ############################################################
-#	                centosPatching                     #
+#	centosPatching
 ############################################################
 class centosPatching(redhatPatching):
     def __init__(self):
         super(centosPatching,self).__init__()
 
 ############################################################
-#	                 SuSEPatching                      #
+#	SuSEPatching
 ############################################################
 class SuSEPatching(AbstractPatching):
     def __init__(self):
@@ -283,10 +304,21 @@ class SuSEPatching(AbstractPatching):
         end = contents.find('\n',start)
         waagent.SetFileContents(self.crontab, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
 
+###########################################################
+# END PATCHING CLASS DEFS
+###########################################################
 
 ###########################################################
-#                     FUNCTION DEFS                       #
+# BEGIN FUNCTION DEFS
 ###########################################################
+
+protect_settings = {
+    'blacklist': [],
+    'check_only': False, 
+    'mail': '',
+    'periodic': 7,
+    'security_update': True
+}
 
 def install():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -298,7 +330,7 @@ def enable():
     #hutil.do_parse_context('Install')
     try:
         #protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-        MyPatching.enable()
+        MyPatching.enable(protect_settings)
     except Exception, e:
         print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
         #hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -350,6 +382,10 @@ def GetMyPatching(patching_class_name=''):
         return None
     return globals()[patching_class_name]()
 
+###########################################################
+# END FUNCTION DEFS
+###########################################################
+
 def main():
     global MyPatching
     MyPatching=GetMyPatching()
@@ -366,7 +402,7 @@ def main():
             enable()
         elif re.match("^([-/]*)(update)", a):
             update()
-    
+
 
 if __name__ == '__main__' :
     main()
