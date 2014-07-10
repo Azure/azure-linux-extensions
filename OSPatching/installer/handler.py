@@ -57,9 +57,9 @@ class AbstractPatching(object):
     """
     def __init__(self, settings):
         self.patched = []
-        self.toPatch = []
+        self.to_patch = []
         self.downloaded = []
-        self.toDownload = []
+        self.to_download = []
 
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
@@ -71,35 +71,35 @@ class AbstractPatching(object):
             self.disabled = False
 
         if self.disabled is False:
-            dayOfWeek = settings.get('dayOfWeek')
-            if dayOfWeek is None:
-                dayOfWeek = 'Everyday'
+            day_of_week = settings.get('dayOfWeek')
+            if day_of_week is None:
+                day_of_week = 'Everyday'
             day2num = {'Sunday':'0', 'Monday':'1', 'Tuesday':'2', 'Wednesday':'3', 'Thursday':'4', 'Friday':'5', 'Saturday':'6'}
-            if 'Everyday' in dayOfWeek:
-                self.dayOfWeek = '0-6'
+            if 'Everyday' in day_of_week:
+                self.day_of_week = '0-6'
             else:
-                self.dayOfWeek = ','.join([day2num[day] for day in dayOfWeek.split('|')])
+                self.day_of_week = ','.join([day2num[day] for day in day_of_week.split('|')])
 
-            startTime = settings.get('startTime')
-            if startTime is None:
-                self.startTime = '3'
+            start_time = settings.get('startTime')
+            if start_time is None:
+                self.start_time = '3'
             else:
-                self.startTime = startTime.split(':')[0].lstrip('0')
-                if self.startTime == '':
-                    self.startTime = '0'
+                self.start_time = start_time.split(':')[0].lstrip('0')
+                if self.start_time == '':
+                    self.start_time = '0'
 
-            self.downloadTime = str(int(self.startTime) - 1)
+            self.download_time = str(int(self.start_time) - 1)
 
-            installDuration = settings.get('installDuration')
-            if installDuration is None:
-                self.installDuration = '1'
+            install_duration = settings.get('installDuration')
+            if install_duration is None:
+                self.install_duration = '1'
             else:
-                hrMin = installDuration.split(':')
-                self.installDuration = hrMin[0].lstrip('0')
-                if hrMin[1] == '30':
-                    if self.installDuration == '':
-                        self.installDuration = '0'
-                    self.installDuration += '.5'
+                hr_min = install_duration.split(':')
+                self.install_duration = hr_min[0].lstrip('0')
+                if hr_min[1] == '30':
+                    if self.install_duration == '':
+                        self.install_duration = '0'
+                    self.install_duration += '.5'
 
             category = settings.get('category')
             if category is None:
@@ -107,7 +107,7 @@ class AbstractPatching(object):
             else:
                 self.category = category
 
-            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, self.dayOfWeek, self.startTime, self.downloadTime, self.installDuration, self.category)
+            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, self.day_of_week, self.start_time, self.download_time, self.install_duration, self.category)
 
             self.enable()
         else:
@@ -147,15 +147,34 @@ class UbuntuPatching(AbstractPatching):
 
     def check(self):
         """
-        Check valid updates
+        Check valid upgrades,
+        Return the package list to download & upgrade
         """
         retcode,output = waagent.RunGetOutput(self.check_cmd)
         if retcode > 0:
-            Error("Failed to check valid updates")
-        print output
+            print "Failed to check valid upgrades"
+        start = output.find('The following packages will be upgraded')
+        start = output.find('\n', start)
+        end = output.find('upgraded', start)
+        output = re.split(r'\s+', output[start:end].strip())
+        output.pop()
+        return output
+
+    def download(self):
+        for package_to_download in self.to_download:
+            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
+            if retcode > 0:
+                print "Failed to download the package: " + package_to_download
+                continue
+            self.to_download.remove(package_to_download)
+            self.downloaded.append(package_to_download)
 
     def enable(self):
-        self.check()
+        self.to_download = self.check()
+        print self.to_download
+        self.download()
+        print self.to_download
+        print self.downloaded
         
     def disable(self):
         pass
