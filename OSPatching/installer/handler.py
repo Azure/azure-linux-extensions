@@ -55,10 +55,68 @@ class AbstractPatching(object):
     """
     AbstractPatching defines a skeleton neccesary for a concrete Patching class.
     """
-    def __init__(self):
-        self.configFile = None
+    def __init__(self, settings):
+        self.patched = []
+        self.toPatch = []
+        self.downloaded = []
+        self.toDownload = []
 
-    def enable(self, settings):
+        self.crontab = '/etc/crontab'
+        self.cron_restart_cmd = 'service cron restart'
+        self.cron_chkconfig_cmd = 'chkconfig cron on'
+
+        self.disabled = settings.get('disabled')
+        if self.disabled is None:
+            print "WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default"
+            self.disabled = False
+
+        if self.disabled is False:
+            dayOfWeek = settings.get('dayOfWeek')
+            if dayOfWeek is None:
+                dayOfWeek = 'Everyday'
+            day2num = {'Sunday':'0', 'Monday':'1', 'Tuesday':'2', 'Wednesday':'3', 'Thursday':'4', 'Friday':'5', 'Saturday':'6'}
+            if 'Everyday' in dayOfWeek:
+                self.dayOfWeek = '0-6'
+            else:
+                self.dayOfWeek = ','.join([day2num[day] for day in dayOfWeek.split('|')])
+
+            startTime = settings.get('startTime')
+            if startTime is None:
+                self.startTime = '3'
+            else:
+                self.startTime = startTime.split(':')[0].lstrip('0')
+                if self.startTime == '':
+                    self.startTime = '0'
+
+            self.downloadTime = str(int(self.startTime) - 1)
+
+            installDuration = settings.get('installDuration')
+            if installDuration is None:
+                self.installDuration = '1'
+            else:
+                hrMin = installDuration.split(':')
+                self.installDuration = hrMin[0].lstrip('0')
+                if hrMin[1] == '30':
+                    if self.installDuration == '':
+                        self.installDuration = '0'
+                    self.installDuration += '.5'
+
+            category = settings.get('category')
+            if category is None:
+                self.category = ''
+            else:
+                self.category = category
+
+            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, self.dayOfWeek, self.startTime, self.downloadTime, self.installDuration, self.category)
+
+            self.enable()
+        else:
+            self.disable()
+
+    def enable(self):
+        pass
+
+    def disable(self):
         pass
 
     def _checkOnly(self):
@@ -80,87 +138,27 @@ class AbstractPatching(object):
 #	UbuntuPatching
 ############################################################
 class UbuntuPatching(AbstractPatching):
-    def __init__(self):
-        super(UbuntuPatching,self).__init__()
-        self.unattended_upgrade_configfile = '/etc/apt/apt.conf.d/50unattended-upgrades'
-        self.periodic_configfile = '/etc/apt/apt.conf.d/10periodic'
-        self.upgrade_log_dir = '/var/log/unattended-upgrades/'
+    def __init__(self, settings):
+        super(UbuntuPatching,self).__init__(settings)
+        self.check_cmd = 'apt-get -s upgrade'
+        self.download_cmd = 'apt-get -d install'
+        self.patch_cmd = 'apt-get install'
+        self.status_cmd = 'apt-cache show'
 
-
-    def enable(self, protect_settings):
-        blacklist = protect_settings.get('blacklist')
-        if blacklist is not None: 
-            self._setBlacklist(blacklist)
-            print "Succeeded in setting blacklist"
-
-        check_only = protect_settings.get('check_only')
-        if check_only:
-            self._checkOnly()
-            print "Succeeded in checking upgrades only and not really upgrading"
-
-        mail = protect_settings.get('mail')
-        if mail is not None:
-            self._sendMail(mail)
-            print "Succeeded in setting mail %s" % mail
-        
-        periodic = protect_settings.get('periodic')
-        if periodic in [1, 7, 30]:
-            self._setPeriodic(periodic)
-            print "Succeeded in setting upgrade-periodic %s" % periodic
-
-        security_update = protect_settings.get('security_update')
-        if security_update:
-            self._securityUpdate()
-
-        # restart unattended-upgrades service
-        retcode,output = waagent.RunGetOutput('service unattended-upgrades restart')
-        if retcode == 0:
-            print "Succeeded in restarting unattended-upgrades"
-        else:
-            print "Failed to restart unattended-upgrades with output:\n %s" % output
-
-    def _checkOnly(self):
-        retcode,output = waagent.RunGetOutput('apt-get -s upgrade')
-        if (retcode == 0):
-            print output
-        return retcode
-
-    def _setBlacklist(self, packageList):
-        contents = waagent.GetFileContents(self.unattended_upgrade_configfile)
-        start = contents.find('Unattended-Upgrade::Package-Blacklist {')
-        start = contents.find('\n',start)
-        end = contents.find('};',start)
-        lines = contents[start:end].split('\n')
-        waagent.SetFileContents(self.unattended_upgrade_configfile, contents[0:start+1] + '\n'.join(['\t\"'+p+'\";' for p in packageList]) + contents[end-1:None])
-
-
-    def _securityUpdate(self):
-        contents = waagent.GetFileContents(self.unattended_upgrade_configfile)
-        start = contents.find('Unattended-Upgrade::Allowed-Origins {')
-        start = contents.find('\n',start)
-        end = contents.find('};',start)
-        lines = contents[start:end].split('\n')
-        newlines = list()
-        for line in lines:
-            if 'security' in line.strip():
-                line = line.lstrip('//')
-            else:
-                if line.strip() and (not line.strip().startswith('//')):
-                    line = '//' + line
-            newlines.append(line)
-        waagent.SetFileContents(self.unattended_upgrade_configfile, contents[0:start] + '\n'.join(newlines) + contents[end:None])
-
-    def _setPeriodic(self, upgrade_periodic):
-        contents = 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Download-Upgradeable-Packages "1";\nAPT::Periodic::AutocleanInterval "7";\n'
-        contents += 'APT::Periodic::Unattended-Upgrade "' + str(upgrade_periodic) + '";\n';
-        waagent.SetFileContents(self.periodic_configfile, contents)
-
-    def _sendMail(self,mail):
-        modify_file(self.unattended_upgrade_configfile, '(//)?Unattended-Upgrade::Mail ".*"', 'Unattended-Upgrade::Mail \"' + mail + '\"')
-        # TODO: mailx or exim4 ???
-        retcode,output = waagent.RunGetOutput('apt-get install heirloom-mailx')
+    def check(self):
+        """
+        Check valid updates
+        """
+        retcode,output = waagent.RunGetOutput(self.check_cmd)
         if retcode > 0:
-            waagent.Error(output)
+            Error("Failed to check valid updates")
+        print output
+
+    def enable(self):
+        self.check()
+        
+    def disable(self):
+        pass
 
 ############################################################
 #	redhatPatching
@@ -312,12 +310,25 @@ class SuSEPatching(AbstractPatching):
 # BEGIN FUNCTION DEFS
 ###########################################################
 
+# Template for configuring Patching
+# protect_settings = {
+#     "disabled" : "true|false",
+#     "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
+#     "startTime" : "hr:min",                                                            # UTC time
+#     "category" : "Important | ImportantAndRecommended",
+#     "installDuration" : "hr:min"                                                       # in 30 minute increments
+# }
+
+protect_settings_disabled = {
+    "disabled":"true",
+}
+
 protect_settings = {
-    'blacklist': [],
-    'check_only': False, 
-    'mail': '',
-    'periodic': 7,
-    'security_update': True
+    "disabled" : "false",
+    "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
+    "startTime" : "03:00",                                                            # UTC time
+    "category" : "Important",
+    "installDuration" : "00:30"                                                       # in 30 minute increments
 }
 
 def install():
@@ -330,7 +341,7 @@ def enable():
     #hutil.do_parse_context('Install')
     try:
         #protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-        MyPatching.enable(protect_settings)
+        MyPatching.enable()
     except Exception, e:
         print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
         #hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -361,7 +372,7 @@ def modify_file(filename, src, dst):
     newFileContents = pattern.sub(dst, fileContents)
     waagent.SetFileContents(filename, newFileContents)
 
-def GetMyPatching(patching_class_name=''):
+def GetMyPatching(settings, patching_class_name=''):
     """
     Return MyPatching object.
     NOTE: Logging is not initialized at this point.
@@ -380,7 +391,7 @@ def GetMyPatching(patching_class_name=''):
     if not globals().has_key(patching_class_name):
         print Distro+' is not a supported distribution.'
         return None
-    return globals()[patching_class_name]()
+    return globals()[patching_class_name](settings)
 
 ###########################################################
 # END FUNCTION DEFS
@@ -388,7 +399,7 @@ def GetMyPatching(patching_class_name=''):
 
 def main():
     global MyPatching
-    MyPatching=GetMyPatching()
+    MyPatching=GetMyPatching(settings = protect_settings)
     if MyPatching == None :
         sys.exit(1)
     for a in sys.argv[1:]:        
