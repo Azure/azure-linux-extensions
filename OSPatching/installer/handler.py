@@ -30,6 +30,31 @@ import shutil
 import time
 import traceback
 
+#####################################################################################
+# Will be deleted after release
+#
+# Template for configuring Patching
+# protect_settings = {
+#     "disabled" : "true|false",
+#     "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
+#     "startTime" : "hr:min",                                                            # UTC time
+#     "category" : "Important | ImportantAndRecommended",
+#     "installDuration" : "hr:min"                                                       # in 30 minute increments
+# }
+
+protect_settings_disabled = {
+    "disabled":"true",
+}
+
+protect_settings = {
+    "disabled" : "false",
+    "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
+    "startTime" : "05:00",                                                            # UTC time
+    "category" : "Important",
+    "installDuration" : "00:30"                                                       # in 30 minute increments
+}
+#####################################################################################
+
 # Global variables definition
 # waagent has no '.py' therefore create waagent module import manually.
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
@@ -131,10 +156,13 @@ class AbstractPatching(object):
 class UbuntuPatching(AbstractPatching):
     def __init__(self, settings):
         super(UbuntuPatching,self).__init__(settings)
+        self.clean_cmd = 'apt-get clean'
         self.check_cmd = 'apt-get -s upgrade'
         self.download_cmd = 'apt-get -d -y install'
         self.patch_cmd = 'apt-get -y install'
         self.status_cmd = 'apt-cache show'
+        waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
+        self.security_update_download_cmd = self.download_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
 
     def check(self):
         """
@@ -151,11 +179,21 @@ class UbuntuPatching(AbstractPatching):
         output.pop()
         self.to_download = output
 
+    def clean(self):
+        retcode,output = waagent.RunGetOutput(self.clean_cmd)
+        if retcode > 0:
+            print "Failed to erase downloaded archive files"
+
     def download(self):
         start_download_time = time.time()
         self.check()
+        self.clean()
         for package_to_download in self.to_download:
-            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
+            if self.category == 'Important':
+                download_cmd = self.security_update_download_cmd
+            else:
+                download_cmd = self.download_cmd
+            retcode = waagent.Run(download_cmd + ' ' + package_to_download)
             if retcode > 0:
                 print "Failed to download the package: " + package_to_download
                 continue
@@ -380,27 +418,6 @@ class SuSEPatching(AbstractPatching):
 ###########################################################
 # BEGIN FUNCTION DEFS
 ###########################################################
-
-# Template for configuring Patching
-# protect_settings = {
-#     "disabled" : "true|false",
-#     "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
-#     "startTime" : "hr:min",                                                            # UTC time
-#     "category" : "Important | ImportantAndRecommended",
-#     "installDuration" : "hr:min"                                                       # in 30 minute increments
-# }
-
-protect_settings_disabled = {
-    "disabled":"true",
-}
-
-protect_settings = {
-    "disabled" : "false",
-    "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
-    "startTime" : "04:00",                                                            # UTC time
-    "category" : "Important",
-    "installDuration" : "00:30"                                                       # in 30 minute increments
-}
 
 def install():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
