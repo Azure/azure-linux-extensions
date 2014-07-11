@@ -141,8 +141,8 @@ class UbuntuPatching(AbstractPatching):
     def __init__(self, settings):
         super(UbuntuPatching,self).__init__(settings)
         self.check_cmd = 'apt-get -s upgrade'
-        self.download_cmd = 'apt-get -d install'
-        self.patch_cmd = 'apt-get install'
+        self.download_cmd = 'apt-get -d -y install'
+        self.patch_cmd = 'apt-get -y install'
         self.status_cmd = 'apt-cache show'
 
     def check(self):
@@ -166,15 +166,27 @@ class UbuntuPatching(AbstractPatching):
             if retcode > 0:
                 print "Failed to download the package: " + package_to_download
                 continue
-            self.to_download.remove(package_to_download)
             self.downloaded.append(package_to_download)
+        for package_downloaded in self.downloaded:
+            self.to_download.remove(package_downloaded)
+            self.to_patch.append(package_downloaded)
+
+    def patch(self):
+        for package_to_patch in self.to_patch:
+            retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
+            if retcode > 0:
+                print "Failed to patch the package:" + package_to_patch
+                continue
+            self.patched.append(package_to_patch)
+        for package_patched in self.patched:
+            self.to_patch.remove(package_patched)
 
     def enable(self):
         self.to_download = self.check()
-        print self.to_download
         self.download()
-        print self.to_download
-        print self.downloaded
+        print self.to_patch
+        self.patch()
+        print self.patched
         
     def disable(self):
         pass
