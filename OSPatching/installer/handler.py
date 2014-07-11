@@ -173,6 +173,9 @@ class UbuntuPatching(AbstractPatching):
         if retcode > 0:
             print "Failed to check valid upgrades"
         start = output.find('The following packages will be upgraded')
+        if start == -1:
+            print "No package to upgrade"
+            sys.exit(0)
         start = output.find('\n', start)
         end = output.find('upgraded', start)
         output = re.split(r'\s+', output[start:end].strip())
@@ -227,6 +230,14 @@ class UbuntuPatching(AbstractPatching):
             f.write(package_patched + '\n')
         f.close()
 
+    def report(self):
+        status = {}
+        package_patched = 'update-manager-core'
+        status[package_patched] = {}
+        retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
+        output = output.split('\n\n')[0]
+        print output
+
     def set_download_cron(self):
         if self.download_time == -1:
             hr = '23'
@@ -255,10 +266,9 @@ class UbuntuPatching(AbstractPatching):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
         if retcode > 0:
             print output
-        else:
-            print 'restarted'
 
     def enable(self):
+        self.report()
         if self.disabled == 'false':
             self.set_download_cron()
             self.set_patch_cron()
