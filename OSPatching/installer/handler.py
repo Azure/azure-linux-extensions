@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # OSPatching extension
 #
@@ -61,6 +61,8 @@ class AbstractPatching(object):
         self.downloaded = []
         self.to_download = []
 
+        self.download_duration = 3600
+
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
         self.cron_chkconfig_cmd = 'chkconfig cron on'
@@ -68,38 +70,31 @@ class AbstractPatching(object):
         self.disabled = settings.get('disabled')
         if self.disabled is None:
             print "WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default"
-            self.disabled = False
-
-        if self.disabled is False:
+            self.disabled = 'false'
+        self.disabled = self.disabled.lower()
+        if self.disabled == 'false':
             day_of_week = settings.get('dayOfWeek')
             if day_of_week is None:
                 day_of_week = 'Everyday'
-            day2num = {'Sunday':'0', 'Monday':'1', 'Tuesday':'2', 'Wednesday':'3', 'Thursday':'4', 'Friday':'5', 'Saturday':'6'}
+            day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
             if 'Everyday' in day_of_week:
-                self.day_of_week = '0-6'
+                self.day_of_week = range(1,8)
             else:
-                self.day_of_week = ','.join([day2num[day] for day in day_of_week.split('|')])
+                self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
 
             start_time = settings.get('startTime')
             if start_time is None:
-                self.start_time = '3'
-            else:
-                self.start_time = start_time.split(':')[0].lstrip('0')
-                if self.start_time == '':
-                    self.start_time = '0'
+                start_time = '03:00'
+            self.start_time = time.strptime(start_time, '%H:%M')
 
-            self.download_time = str(int(self.start_time) - 1)
+            self.download_time = self.start_time.tm_hour - 1
 
             install_duration = settings.get('installDuration')
             if install_duration is None:
-                self.install_duration = '1'
+                self.install_duration = 3600
             else:
                 hr_min = install_duration.split(':')
-                self.install_duration = hr_min[0].lstrip('0')
-                if hr_min[1] == '30':
-                    if self.install_duration == '':
-                        self.install_duration = '0'
-                    self.install_duration += '.5'
+                self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
 
             category = settings.get('category')
             if category is None:
@@ -107,11 +102,7 @@ class AbstractPatching(object):
             else:
                 self.category = category
 
-            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, self.day_of_week, self.start_time, self.download_time, self.install_duration, self.category)
-
-            self.enable()
-        else:
-            self.disable()
+            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, ','.join([str(dow) for dow in self.day_of_week]), str(self.start_time.tm_hour), str(self.download_time), str(self.install_duration), self.category)
 
     def enable(self):
         pass
@@ -158,35 +149,84 @@ class UbuntuPatching(AbstractPatching):
         end = output.find('upgraded', start)
         output = re.split(r'\s+', output[start:end].strip())
         output.pop()
-        return output
+        self.to_download = output
 
     def download(self):
+        start_download_time = time.time()
+        self.check()
         for package_to_download in self.to_download:
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:
                 print "Failed to download the package: " + package_to_download
                 continue
             self.downloaded.append(package_to_download)
+            current_download_time = time.time()
+            if current_download_time - start_download_time > self.download_duration:
+                break
+        f = open('/run/package.downloaded', 'w')
         for package_downloaded in self.downloaded:
             self.to_download.remove(package_downloaded)
-            self.to_patch.append(package_downloaded)
+            f.write(package_downloaded + '\n')
+        f.close()        
 
     def patch(self):
+        start_patch_time = time.time()
+        f = open('/run/package.downloaded', 'r')
+        self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
+        f.close()
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
                 print "Failed to patch the package:" + package_to_patch
                 continue
             self.patched.append(package_to_patch)
+            current_patch_time = time.time()
+            if current_patch_time - start_patch_time > self.install_duration:
+                break
+        f = open('/run/package.patched', 'w')
         for package_patched in self.patched:
             self.to_patch.remove(package_patched)
+            f.write(package_patched + '\n')
+        f.close()
+
+    def set_download_cron(self):
+        if self.download_time == -1:
+            hr = '23'
+            dow = ','.join([str(day - 1) for day in self.day_of_week])
+        else:
+            hr = str(self.download_time)
+            dow = ','.join([str(day) for day in self.day_of_week])
+        contents = waagent.GetFileContents(self.crontab)
+        script_file = os.path.realpath(__file__)
+        [script_dir, script_file] = script_file.split('OSPatching/')
+        new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-download']) + '\n'
+        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -download'
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: old_line_end not in a, waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+
+    def set_patch_cron(self):
+        contents = waagent.GetFileContents(self.crontab)
+        script_file = os.path.realpath(__file__)
+        [script_dir, script_file] = script_file.split('OSPatching/')
+        hr = str(self.start_time.tm_hour)
+        dow = ','.join([str(day) for day in self.day_of_week])
+        new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-patch']) + '\n'
+        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -patch'
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: old_line_end not in a, waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+
+    def restart_cron(self):
+        retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
+        if retcode > 0:
+            print output
+        else:
+            print 'restarted'
 
     def enable(self):
-        self.to_download = self.check()
-        self.download()
-        print self.to_patch
-        self.patch()
-        print self.patched
+        if self.disabled == 'false':
+            self.set_download_cron()
+            self.set_patch_cron()
+            self.restart_cron()
+        else:
+            print "the disabled option in configuration is set to true, can not enable OSPatching"
         
     def disable(self):
         pass
@@ -356,8 +396,8 @@ protect_settings_disabled = {
 
 protect_settings = {
     "disabled" : "false",
-    "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
-    "startTime" : "03:00",                                                            # UTC time
+    "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
+    "startTime" : "04:00",                                                            # UTC time
     "category" : "Important",
     "installDuration" : "00:30"                                                       # in 30 minute increments
 }
@@ -377,6 +417,12 @@ def enable():
         print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
         #hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         #hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
+
+def download():
+    MyPatching.download()
+
+def patch():
+    MyPatching.patch()
 
 def uninstall():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -444,6 +490,10 @@ def main():
             enable()
         elif re.match("^([-/]*)(update)", a):
             update()
+        elif re.match("^([-/]*)(download)", a):
+            download()
+        elif re.match("^([-/]*)(patch)", a):
+            patch()
 
 
 if __name__ == '__main__' :
