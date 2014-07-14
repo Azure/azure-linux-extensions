@@ -86,7 +86,7 @@ class AbstractPatching(object):
         self.downloaded = []
         self.to_download = []
 
-        self.download_duration = 3600
+        self.download_duration = 3600 - 10
 
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
@@ -233,6 +233,7 @@ class UbuntuPatching(AbstractPatching):
             for package_patched in self.patched:
                 self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
+        self.report()
         self.reboot_if_required()
 
     def report(self):
