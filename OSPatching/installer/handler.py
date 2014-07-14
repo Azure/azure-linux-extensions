@@ -204,17 +204,22 @@ class UbuntuPatching(AbstractPatching):
             current_download_time = time.time()
             if current_download_time - start_download_time > self.download_duration:
                 break
-        f = open('/run/package.downloaded', 'w')
-        for package_downloaded in self.downloaded:
-            self.to_download.remove(package_downloaded)
-            f.write(package_downloaded + '\n')
-        f.close()        
+        with open('/run/package.downloaded', 'w') as f:
+            for package_downloaded in self.downloaded:
+                self.to_download.remove(package_downloaded)
+                f.write(package_downloaded + '\n')
+
+    def reboot_if_required(self):
+        reboot_required = '/var/run/reboot-required'
+        if os.path.isfile(reboot_required):
+            retcode = waagent.Run('reboot')
+            if retcode > 0:
+                print "Failed to reboot"
 
     def patch(self):
         start_patch_time = time.time()
-        f = open('/run/package.downloaded', 'r')
-        self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
-        f.close()
+        with open('/run/package.downloaded', 'r') as f:
+            self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
@@ -224,11 +229,11 @@ class UbuntuPatching(AbstractPatching):
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 break
-        f = open('/run/package.patched', 'w')
-        for package_patched in self.patched:
-            self.to_patch.remove(package_patched)
-            f.write(package_patched + '\n')
-        f.close()
+        with open('/run/package.patched', 'w') as f:
+            for package_patched in self.patched:
+                self.to_patch.remove(package_patched)
+                f.write(package_patched + '\n')
+        self.reboot_if_required()
 
     def report(self):
         status = {}
