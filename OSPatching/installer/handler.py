@@ -56,8 +56,8 @@ protect_settings = {
 #####################################################################################
 
 # waagent has no '.py' therefore create waagent module import manually.
-waagent=imp.load_source('waagent','/usr/sbin/waagent')
-Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+from Utils.WAAgentUtil import waagent
+import Utils.HandlerUtil as Util
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
