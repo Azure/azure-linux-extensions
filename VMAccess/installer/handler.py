@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.4+
+# Requires Python 2.7+
 
 
 import os
@@ -30,22 +30,19 @@ import shutil
 import time
 import traceback
 
-# Global variables definition
-# waagent has no '.py' therefore create waagent module import manually.
-waagent=imp.load_source('waagent','/usr/sbin/waagent')
-Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
-from waagent import LoggerInit
+from Utils.WAAgentUtil import waagent
+import Utils.HandlerUtil as Util
 
-LoggerInit('/var/log/waagent.log','/dev/stdout')
+#Define global variables
 ExtensionShortName = 'VMAccess'
-waagent.Log("%s started to handle." %(ExtensionShortName)) 
-logfile=waagent.Log
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
 
-
 def main():
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    waagent.Log("%s started to handle." %(ExtensionShortName)) 
+
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
             disable()
