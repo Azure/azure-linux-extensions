@@ -49,7 +49,7 @@ protect_settings_disabled = {
 protect_settings = {
     "disabled" : "false",
     "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
-    "startTime" : "05:00",                                                            # UTC time
+    "startTime" : "00:00",                                                            # UTC time
     "category" : "Important",
     "installDuration" : "00:30"                                                       # in 30 minute increments
 }
@@ -92,12 +92,11 @@ class AbstractPatching(object):
         self.cron_restart_cmd = 'service cron restart'
         self.cron_chkconfig_cmd = 'chkconfig cron on'
 
-        self.disabled = settings.get('disabled')
-        if self.disabled is None:
+        disabled = settings.get('disabled')
+        if disabled is None:
             print "WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default"
-            self.disabled = 'false'
-        self.disabled = self.disabled.lower()
-        if self.disabled == 'false':
+        self.disabled = True if disabled in ['True', 'true'] else False
+        if not self.disabled:
             day_of_week = settings.get('dayOfWeek')
             if day_of_week is None:
                 day_of_week = 'Everyday'
@@ -129,26 +128,48 @@ class AbstractPatching(object):
 
             print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, ','.join([str(dow) for dow in self.day_of_week]), str(self.start_time.tm_hour), str(self.download_time), str(self.install_duration), self.category)
 
+    def set_download_cron(self):
+        contents = waagent.GetFileContents(self.crontab)
+        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -download'
+        if self.disabled:
+            new_line = '\n'
+        else:
+            if self.download_time == -1:
+                hr = '23'
+                dow = ','.join([str(day - 1) for day in self.day_of_week])
+            else:
+                hr = str(self.download_time)
+                dow = ','.join([str(day) for day in self.day_of_week])
+            script_file = os.path.realpath(__file__)
+            [script_dir, script_file] = script_file.split('OSPatching/')
+            new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-download']) + '\n'
+        waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+
+    def set_patch_cron(self):
+        contents = waagent.GetFileContents(self.crontab)
+        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -patch'
+        if self.disabled:
+            new_line = '\n'
+        else:
+            script_file = os.path.realpath(__file__)
+            [script_dir, script_file] = script_file.split('OSPatching/')
+            hr = str(self.start_time.tm_hour)
+            dow = ','.join([str(day) for day in self.day_of_week])
+            new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-patch']) + '\n'
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+
+    def restart_cron(self):
+        if self.disabled:
+            return
+        retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
+        if retcode > 0:
+            print output
+
     def enable(self):
-        pass
+        self.set_download_cron()
+        self.set_patch_cron()
+        self.restart_cron()
 
-    def disable(self):
-        pass
-
-    def _checkOnly(self):
-        pass
-
-    def _setBlacklist(self):
-        pass
-
-    def _securityUpdate(self):
-        pass
-
-    def _setPeriodic(self):
-        pass
-
-    def _sendMail(self):
-        pass
 
 ############################################################
 #	UbuntuPatching
@@ -244,45 +265,6 @@ class UbuntuPatching(AbstractPatching):
         output = output.split('\n\n')[0]
         print output
 
-    def set_download_cron(self):
-        if self.download_time == -1:
-            hr = '23'
-            dow = ','.join([str(day - 1) for day in self.day_of_week])
-        else:
-            hr = str(self.download_time)
-            dow = ','.join([str(day) for day in self.day_of_week])
-        contents = waagent.GetFileContents(self.crontab)
-        script_file = os.path.realpath(__file__)
-        [script_dir, script_file] = script_file.split('OSPatching/')
-        new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-download']) + '\n'
-        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -download'
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: old_line_end not in a, waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
-
-    def set_patch_cron(self):
-        contents = waagent.GetFileContents(self.crontab)
-        script_file = os.path.realpath(__file__)
-        [script_dir, script_file] = script_file.split('OSPatching/')
-        hr = str(self.start_time.tm_hour)
-        dow = ','.join([str(day) for day in self.day_of_week])
-        new_line = '\n' + ' '.join(['*/1', hr, '* *', dow, 'root cd', script_dir + 'OSPatching', '&& python', script_file, '-patch']) + '\n'
-        old_line_end = 'azure-linux-extensions/OSPatching && python installer/handler.py -patch'
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: old_line_end not in a, waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
-
-    def restart_cron(self):
-        retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
-        if retcode > 0:
-            print output
-
-    def enable(self):
-        if self.disabled == 'false':
-            self.set_download_cron()
-            self.set_patch_cron()
-            self.restart_cron()
-        else:
-            print "the disabled option in configuration is set to true, can not enable OSPatching"
-        
-    def disable(self):
-        pass
 
 ############################################################
 #	redhatPatching
