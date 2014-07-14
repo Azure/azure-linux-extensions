@@ -55,16 +55,12 @@ protect_settings = {
 }
 #####################################################################################
 
-# Global variables definition
 # waagent has no '.py' therefore create waagent module import manually.
 waagent=imp.load_source('waagent','/usr/sbin/waagent')
 Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
-from waagent import LoggerInit
 
-LoggerInit('/var/log/waagent.log','/dev/stdout')
+# Global variables definition
 ExtensionShortName = 'OSPatching'
-waagent.Log("%s started to handle." %(ExtensionShortName)) 
-logfile=waagent.Log
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
@@ -486,6 +482,9 @@ def GetMyPatching(settings, patching_class_name=''):
 ###########################################################
 
 def main():
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    waagent.Log("%s started to handle." %(ExtensionShortName)) 
+
     global MyPatching
     MyPatching=GetMyPatching(settings = protect_settings)
     if MyPatching == None :
