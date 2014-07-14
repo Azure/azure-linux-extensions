@@ -274,7 +274,6 @@ class UbuntuPatching(AbstractPatching):
             print output
 
     def enable(self):
-        self.report()
         if self.disabled == 'false':
             self.set_download_cron()
             self.set_patch_cron()
@@ -457,6 +456,9 @@ def download():
 def patch():
     MyPatching.patch()
 
+def report():
+    MyPatching.report()
+
 def uninstall():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Uninstall')
@@ -472,16 +474,6 @@ def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
-def modify_file(filename, src, dst):
-    """
-      Modify the configuration file using regular expression.
-      src should be regular expression.
-    """
-    fileContents = waagent.GetFileContents(filename)
-    pattern = re.compile(src)
-    newFileContents = pattern.sub(dst, fileContents)
-    waagent.SetFileContents(filename, newFileContents)
-
 def GetMyPatching(settings, patching_class_name=''):
     """
     Return MyPatching object.
@@ -527,6 +519,8 @@ def main():
             download()
         elif re.match("^([-/]*)(patch)", a):
             patch()
+        elif re.match("^([-/]*)(report)", a):
+            report()
 
 
 if __name__ == '__main__' :
