@@ -498,6 +498,19 @@ def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
+# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
+def DistInfo(fullname=0):
+    if 'FreeBSD' in platform.system():
+        release = re.sub('\-.*\Z', '', str(platform.release()))
+        distinfo = ['FreeBSD', release]
+        return distinfo
+    if 'linux_distribution' in dir(platform):
+        distinfo = list(platform.linux_distribution(full_distribution_name=fullname))
+        distinfo[0] = distinfo[0].strip() # remove trailing whitespace in distro name
+        return distinfo
+    else:
+        return platform.dist()
+
 def GetMyPatching(settings, patching_class_name=''):
     """
     Return MyPatching object.
@@ -505,7 +518,7 @@ def GetMyPatching(settings, patching_class_name=''):
     """
     if patching_class_name == '':
         if 'Linux' in platform.system():
-            Distro=waagent.DistInfo()[0]
+            Distro=DistInfo()[0]
         else : # I know this is not Linux!
             if 'FreeBSD' in platform.system():
                 Distro=platform.system()
