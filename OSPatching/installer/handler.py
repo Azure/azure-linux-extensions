@@ -225,7 +225,7 @@ class UbuntuPatching(AbstractPatching):
             current_download_time = time.time()
             if current_download_time - start_download_time > self.download_duration:
                 break
-        with open('/run/package.downloaded', 'w') as f:
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             for package_downloaded in self.downloaded:
                 self.to_download.remove(package_downloaded)
                 f.write(package_downloaded + '\n')
@@ -238,9 +238,13 @@ class UbuntuPatching(AbstractPatching):
                 print "Failed to reboot"
 
     def patch(self):
-        start_patch_time = time.time()
-        with open('/run/package.downloaded', 'r') as f:
-            self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
+        start_patch_tim = time.time()
+        try:
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
+                self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
+        except IOError, e:
+            print str(e)
+            self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
@@ -250,7 +254,7 @@ class UbuntuPatching(AbstractPatching):
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 break
-        with open('/run/package.patched', 'w') as f:
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
                 self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
