@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.4+
+# Requires Python 2.7+
 #
 
 
@@ -32,20 +32,26 @@ import imp
 import shlex
 import traceback
 import urllib2
+import urlparse
 from azure.storage import BlobService
 
-waagent=imp.load_source('waagent','/usr/sbin/waagent')
-from waagent import LoggerInit
-
-LoggerInit('/var/log/waagent.log','/dev/stdout')
-#Global Variables definition
-DownloadDirectory = 'download'
-ExtensionShortName = 'CustomScript'
-Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
-
-waagent.Log("%s started to handle." %(ExtensionShortName)) 
-
+#Main function is the only entrence to this extension handler
 def main():
+    #Global Variables definition
+    global waagent
+    waagent=imp.load_source('waagent','/usr/sbin/waagent')
+    from waagent import LoggerInit
+
+    LoggerInit('/var/log/waagent.log','/dev/stdout')
+    global DownloadDirectory  
+    DownloadDirectory = 'download'
+    global ExtensionShortName 
+    ExtensionShortName = 'CustomScript'
+    global Util
+    Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+
+    waagent.Log("%s started to handle." %(ExtensionShortName)) 
+
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -110,7 +116,7 @@ def enable():
             download_dir = os.getcwd()
             if len(blob_uris) > 0:
                 download_dir = get_download_directory(hutil._context._seq_no)
-                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE)
+                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out,err = p.communicate()
                 hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
                 hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
@@ -145,12 +151,17 @@ def get_container_name_from_uri(uri):
     return get_properties_from_uri(uri)['container_name']
 
 def get_properties_from_uri(uri):
-    if uri.endswith('/'):
-        uri = uri[:-1]
-    blob_name = uri[uri.rfind('/')+1:]
-    uri = uri[:uri.rfind('/')]
-    container_name = uri[uri.rfind('/')+1:]
+    path = get_path_from_uri(uri)
+    if path.endswith('/'):
+        path = path[:-1]
+    blob_name = path[path.rfind('/')+1:]
+    path = path[:path.rfind('/')]
+    container_name = path[path.rfind('/')+1:]
     return {'blob_name': blob_name, 'container_name': container_name}
+
+def get_path_from_uri(uriStr):
+    uri = urlparse.urlparse(uriStr)
+    return uri.path
 
 def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, command, hutil):
     container_name = get_container_name_from_uri(blob_uri)
@@ -173,18 +184,25 @@ def download_external_files(uris, seqNo,command, hutil):
 
 def download_external_file(uri, seqNo, command, hutil):
     download_dir = get_download_directory(seqNo)
-    file_name = uri.split('/')[-1]
+    path = get_path_from_uri(uri)
+    file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
     try:
-        response = urllib2.urlopen(uri)
-        content = response.read()
-        waagent.SetFileContents(file_path, content)
+        download_and_save_file(uri, file_path)
     except Exception, e:
         hutil.error("Failed to download external file with uri:" + uri + "with error:" + str(e))
         raise
     if command and file_name in command:
         os.chmod(file_path, 0100)
 
+def download_and_save_file(uri, file_path):
+    src = urllib2.urlopen(uri)
+    dest = open(file_path, 'wb')
+    buf_size = 1024
+    buf = src.read(buf_size)
+    while(buf):
+        dest.write(buf)
+        buf = src.read(buf_size)
 
 def get_download_directory(seqNo):
     download_dir_main = os.path.join(os.getcwd(), 'download')

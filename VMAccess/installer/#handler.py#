@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.7+
+# Requires Python 2.4+
 
 
 import os
@@ -30,19 +30,22 @@ import shutil
 import time
 import traceback
 
-from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
+# Global variables definition
+# waagent has no '.py' therefore create waagent module import manually.
+waagent=imp.load_source('waagent','/usr/sbin/waagent')
+Util=imp.load_source('HandlerUtil','./resources/HandlerUtil.py')
+from waagent import LoggerInit
 
-#Define global variables
+LoggerInit('/var/log/waagent.log','/dev/stdout')
 ExtensionShortName = 'VMAccess'
+waagent.Log("%s started to handle." %(ExtensionShortName)) 
+logfile=waagent.Log
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
 
-def main():
-    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    waagent.Log("%s started to handle." %(ExtensionShortName)) 
 
+def main():
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -73,7 +76,7 @@ def enable():
         hutil.exit_if_enabled()
         _set_user_account_pub_key(protect_settings, hutil)
         if reset_ssh:
-            _reset_sshd_config()
+            _reset_sshd_config()       
             hutil.log("Succeeded in reset sshd_config.")
         hutil.do_exit(0, 'Enable', 'success','0', 'Enable succeeded.')
     except Exception, e:

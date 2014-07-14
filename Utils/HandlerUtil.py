@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #
 # Handler library for Linux IaaS
 #
@@ -17,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.4+
+# Requires Python 2.7+
 
 
 """
@@ -62,10 +60,9 @@ import imp
 import base64
 import json
 import time
-
-# waagent has no '.py' therefore create waagent module import manually.
-waagent=imp.load_source('waagent','/usr/sbin/waagent')
+from utils.waagentutil import waagent
 from waagent import LoggerInit
+
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 class HandlerContext:

@@ -4,6 +4,7 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
 
 # Extension List
 
+<<<<<<< HEAD
 ## OS Patching
 Allow the owner of the Azure VM to patch the Linux VM
 
@@ -22,6 +23,8 @@ Allow the owner of the Azure VM to patch the Linux VM
 ### Usage
 PowerShell script to deploy the extension on VM
 
+=======
+>>>>>>> upstream/master
 ## Custom Script Extension
 Allow the owner of the Azure VM to run script stored in Azure storage during or after VM provisioning
 ### Features
@@ -88,4 +91,8 @@ Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Ve
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM 
 ``` 
 ## Test Handler Extension
+<<<<<<< HEAD
 This extension is an extension example  
+=======
+This extension is an extension example  
+>>>>>>> upstream/master
