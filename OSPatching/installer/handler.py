@@ -115,6 +115,8 @@ class AbstractPatching(object):
             else:
                 hr_min = install_duration.split(':')
                 self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
+            # 5 min for reboot
+            self.install_duration -= 300
 
             category = settings.get('category')
             if category is None:
@@ -176,10 +178,11 @@ class UbuntuPatching(AbstractPatching):
         self.clean_cmd = 'apt-get clean'
         self.check_cmd = 'apt-get -s upgrade'
         self.download_cmd = 'apt-get -d -y install'
+        if self.category == 'Important':
+            waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
+            self.download_cmd = self.download_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
         self.patch_cmd = 'apt-get -y install'
         self.status_cmd = 'apt-cache show'
-        waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
-        self.security_update_download_cmd = self.download_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
 
     def check(self):
         """
@@ -209,11 +212,7 @@ class UbuntuPatching(AbstractPatching):
         self.check()
         self.clean()
         for package_to_download in self.to_download:
-            if self.category == 'Important':
-                download_cmd = self.security_update_download_cmd
-            else:
-                download_cmd = self.download_cmd
-            retcode = waagent.Run(download_cmd + ' ' + package_to_download)
+            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:
                 print "Failed to download the package: " + package_to_download
                 continue
@@ -270,84 +269,123 @@ class UbuntuPatching(AbstractPatching):
 #	redhatPatching
 ############################################################
 class redhatPatching(AbstractPatching):
-    def __init__(self):
-        super(redhatPatching,self).__init__()
-        self.yum_cron_configfile = '/etc/sysconfig/yum-cron'
-        
-    def enable(self):
-        #self._install()
+    def __init__(self, settings):
+        super(redhatPatching,self).__init__(settings)
+        self.cron_restart_cmd = 'service crond restart'
+        self.check_cmd = 'yum -q check-update'
+        self.clean_cmd = 'yum clean packages'
+        self.download_cmd = 'yum -q -y --downloadonly update'
+        if self.category == 'Important':
+            self.download_cmd = 'yum -q -y --downloadonly --security update'
+        self.patch_cmd = 'yum -y update'
+        self.status_cmd = 'yum -q info'
+        # self.cache_dir = '/var/cache/yum/'
+        # retcode,output = waagent.RunGetOutput('cd '+self.cache_dir+';find . -name "updates"')
+        # self.download_dir = os.path.join(self.cache_dir, output.strip('.\n/') + '/packages')
 
-        #mail = 'g.bin.xia@gmail.com'
-        #self._sendMail(mail)
+    def check(self):
+        """
+        Check valid upgrades,
+        Return the package list to download & upgrade
+        """
+        retcode,output = waagent.RunGetOutput(self.check_cmd)
+        output = re.split(r'\s+', output.strip())
+        self.to_download = output[0::3]
 
-        #self._securityUpdate()
-
-        #self._checkOnly(valid='no')
-
-        #self._setBlacklist(['kernel*', 'php*'])
-
-        self._setPeriodic(1)
-
-        # Enable the automatic updates
-        retcode,output = waagent.RunGetOutput('service yum-cron restart')
+    def clean(self):
+        """
+        Remove downloaded package.
+        Option "keepcache" in /etc/yum.conf is set to 0 by default,
+        which deletes the downloaded package after installed.
+        This function cleans the cache just in case.
+        """
+        retcode,output = waagent.RunGetOutput(self.clean_cmd)
         if retcode > 0:
-            waagent.Error(output)
+            print "Failed to erase downloaded archive files"
 
-        # Enable the daemon at boot time
-        retcode,output = waagent.RunGetOutput('chkconfig yum-cron on')
+    def download(self):
+        start_download_time = time.time()
+        self.check()
+        self.clean()
+        count = 0
+        for package_to_download in self.to_download:
+            count += 1
+            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
+            self.downloaded.append(package_to_download)
+            current_download_time = time.time()
+            if count > 2:
+                break
+            if current_download_time - start_download_time > self.download_duration:
+                break
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+            for package_downloaded in self.downloaded:
+                self.to_download.remove(package_downloaded)
+                f.write(package_downloaded + '\n')
+
+    def install(self):
+        """
+        Install for dependencies.
+        """
+        # For yum --downloadonly option
+        retcode = waagent.Run('yum -y install yum-downloadonly')
         if retcode > 0:
-            waagent.Error(output)
+            print "Failed to install yum-downloadonly"
 
-    def _install(self):
-        retcode,output = waagent.RunGetOutput('yum -y install yum-cron')
+        # For yum --security option
+        retcode = waagent.Run('yum -y install yum-plugin-security')
         if retcode > 0:
-            waagent.Error(output)
+            print "Failed to install yum-plugin-security"
 
-    def _checkOnly(self,valid='no'):
-        contents = waagent.GetFileContents(self.yum_cron_configfile)
-        start = contents.find('\nCHECK_ONLY=') + 1
-        end = contents.find('\n',start)
-        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'CHECK_ONLY=' + valid + contents[end:None])
+    def patch(self):
+        start_patch_time = time.time()
+        try:
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
+                self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
+        except IOError, e:
+            print str(e)
+            self.to_patch = []
+        for package_to_patch in self.to_patch:
+            retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
+            if retcode > 0:
+                print "Failed to patch the package:" + package_to_patch
+                continue
+            self.patched.append(package_to_patch)
+            current_patch_time = time.time()
+            if current_patch_time - start_patch_time > self.install_duration:
+                break
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            for package_patched in self.patched:
+                self.to_patch.remove(package_patched)
+                f.write(package_patched + '\n')
+        self.report()
+        self.reboot_if_required()
 
-    def _setBlacklist(self, packageList):
-        contents = waagent.GetFileContents(self.yum_cron_configfile)
-        start = contents.find('\nYUM_PARAMETER=') + 1
-        end = contents.find('\n',start)
-        parameter = ' '.join(['-x ' + package for package in packageList])
-        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'YUM_PARAMETER="' + parameter + '"' + contents[end:None])
+    def reboot_if_required(self):
+        """
+        A reboot should be only necessary when kernel has been upgraded.
+        """
+        retcode,last_kernel = waagent.RunGetOutput('rpm -q --last kernel | perl -pe \'s/^kernel-(\S+).*/$1/\' | head -1')
+        retcode,current_kernel = waagent.RunGetOutput('uname -r')
+        if last_kernel == current_kernel:
+            retcode = waagent.Run('reboot')
+            if retcode > 0:
+                print "Failed to reboot"
 
-    def _securityUpdate(self):
-        # Install the yum-plugin-security package to enable "yum --security update" commond
-        retcode,output = waagent.RunGetOutput('yum -y install yum-plugin-security')
-        retcode,output = waagent.RunGetOutput('yum --security update')
+    def report(self):
+        status = {}
+        for package_patched in self.patched:
+            status[package_patched] = {}
+            retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
+            print output
 
-    def _setPeriodic(self, upgrade_periodic=1):
-        contents = waagent.GetFileContents(self.yum_cron_configfile)
-        start = contents.find('\nDAYS_OF_WEEK')
-        if start > -1:
-            start = start + 1
-        else:
-            start = contents.find('\n#DAYS_OF_WEEK') + 1
-        end = contents.find('\n',start)
-        # default is everyday
-        periodic = '0123456'
-        if upgrade_periodic == 7:
-            periodic = '0'
-        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'DAYS_OF_WEEK="' + periodic + '"' + contents[end:None])
-
-    def _sendMail(self,mail=''):
-        contents = waagent.GetFileContents(self.yum_cron_configfile)
-        start = contents.find('\nMAILTO=') + 1
-        end = contents.find('\n',start)
-        waagent.SetFileContents(self.yum_cron_configfile, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
-    
 
 ############################################################
 #	centosPatching
 ############################################################
 class centosPatching(redhatPatching):
-    def __init__(self):
-        super(centosPatching,self).__init__()
+    def __init__(self, settings):
+        super(centosPatching,self).__init__(settings)
+
 
 ############################################################
 #	SuSEPatching
@@ -417,9 +455,13 @@ class SuSEPatching(AbstractPatching):
 ###########################################################
 
 def install():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
+    # hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    # hutil.do_parse_context('Uninstall')
+    # hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
+    try:
+        MyPatching.install()
+    except Exception, e:
+        print "Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
 
 def enable():
     #hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
