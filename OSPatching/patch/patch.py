@@ -56,7 +56,8 @@ class AbstractPatching(object):
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
         if disabled is None:
-            self.hutil.log("WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default")
+            self.hutil.log("WARNING: the value of option \"disabled\" not \
+                            specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
         if not self.disabled:
             day_of_week = settings.get('dayOfWeek')
@@ -97,7 +98,9 @@ class AbstractPatching(object):
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)
         script_file_path = os.path.realpath(sys.argv[0])
-        old_line_end = ' '.join([script_file_path, '-download'])
+        script_dir = os.path.dirname(script_file_path)
+        script_file = os.path.basename(script_file_path)
+        old_line_end = ' '.join([script_file, '-download'])
         if self.disabled:
             new_line = '\n'
         else:
@@ -106,20 +109,21 @@ class AbstractPatching(object):
                 dow = ','.join([str(day - 1) for day in self.day_of_week])
             else:
                 dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n*/1', hr, '* *', dow, 'root', script_file_path, '-download > /dev/null 2>&1'])
+            new_line = ' '.join(['\n0', hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
         contents = waagent.GetFileContents(self.crontab)
         script_file_path = os.path.realpath(sys.argv[0])
-        old_line_end = ' '.join([script_file_path, '-patch'])
+        script_dir = os.path.dirname(script_file_path)
+        script_file = os.path.basename(script_file_path)
+        old_line_end = ' '.join([script_file, '-patch'])
         if self.disabled:
             new_line = '\n'
         else:
             hr = str(self.start_time.hour)
             dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n*/1', hr, '* *', dow, 'root', script_file_path, '-patch > /dev/nul\
-l 2>&1\n'])
+            new_line = ' '.join(['\n0', hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
@@ -132,8 +136,7 @@ l 2>&1\n'])
     def install(self):
         pass
 
-    def enable(self, settings):
-        self.parse_settings(settings)
+    def enable(self):
         self.set_download_cron()
         self.set_patch_cron()
         self.restart_cron()
