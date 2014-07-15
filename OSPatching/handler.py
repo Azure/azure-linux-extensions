@@ -30,6 +30,8 @@ import shutil
 import time
 import traceback
 
+from Utils.WAAgentUtil import waagent
+import Utils.HandlerUtil as Util
 from patch.patch import *
 
 #####################################################################################
@@ -65,49 +67,38 @@ ExtensionShortName = 'OSPatching'
 ###########################################################
 
 def install():
-    # hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    # hutil.do_parse_context('Uninstall')
-    # hutil.do_exit(0,'Install','Installed','0', 'Install Succeeded')
-    try:
-        MyPatching.install()
-    except Exception, e:
-        print "Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
-
-def enable():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Install')
     try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-        MyPatching.enable(protect_settings)
+        MyPatching.install()
+        hutil.do_exit(0,'Install','success','0', 'Install Succeeded')
     except Exception, e:
-        #print "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc())
+        hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1,'Install','error','0', 'Install Failed')
+
+
+def enable():
+    hutil.do_parse_context('Enable')
+    try:
+        protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        hutil.exit_if_enabled()
+        MyPatching.enable(protect_settings)
+        hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
+    except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
-
-def download():
-    MyPatching.download()
-
-def patch():
-    MyPatching.patch()
-
-def report():
-    MyPatching.report()
+        hutil.do_exit(1, 'Enable','error','0', 'Enable Failed.')
 
 def uninstall():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
+    hutil.do_exit(0,'Uninstall','success','0', 'Uninstall Succeeded')
 
 def disable():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Disable')
     hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
-    
+
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
@@ -121,7 +112,7 @@ def DistInfo(fullname=0):
     else:
         return platform.dist()
 
-def GetMyPatching(patching_class_name=''):
+def GetMyPatching(hutil, patching_class_name=''):
     """
     Return MyPatching object.
     NOTE: Logging is not initialized at this point.
@@ -140,7 +131,7 @@ def GetMyPatching(patching_class_name=''):
     if not globals().has_key(patching_class_name):
         print Distro+' is not a supported distribution.'
         return None
-    return globals()[patching_class_name]()
+    return globals()[patching_class_name](hutil)
 
 ###########################################################
 # END FUNCTION DEFS
@@ -150,10 +141,14 @@ def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName)) 
 
+    global hutil
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+
     global MyPatching
-    MyPatching=GetMyPatching()
+    MyPatching=GetMyPatching(hutil)
     if MyPatching == None :
         sys.exit(1)
+
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -166,11 +161,9 @@ def main():
         elif re.match("^([-/]*)(update)", a):
             update()
         elif re.match("^([-/]*)(download)", a):
-            download()
+            MyPatching.download()
         elif re.match("^([-/]*)(patch)", a):
-            patch()
-        elif re.match("^([-/]*)(report)", a):
-            report()
+            MyPatching.patch()
 
 
 if __name__ == '__main__' :

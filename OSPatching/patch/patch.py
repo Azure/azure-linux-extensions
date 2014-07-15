@@ -34,17 +34,12 @@ import datetime
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
-###########################################################
-# BEGIN PATCHING CLASS DEFS
-###########################################################
-###########################################################
-#       AbstractPatching
-###########################################################
+
 class AbstractPatching(object):
     """
     AbstractPatching defines a skeleton neccesary for a concrete Patching class.
     """
-    def __init__(self):
+    def __init__(self, hutil):
         self.patched = []
         self.to_patch = []
         self.downloaded = []
@@ -56,10 +51,12 @@ class AbstractPatching(object):
         self.cron_restart_cmd = 'service cron restart'
         self.cron_chkconfig_cmd = 'chkconfig cron on'
 
+        self.hutil = hutil
+
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
         if disabled is None:
-            print "WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default"
+            self.hutil.log("WARNING: the value of option \"disabled\" not specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
         if not self.disabled:
             day_of_week = settings.get('dayOfWeek')
@@ -95,7 +92,7 @@ class AbstractPatching(object):
             else:
                 self.category = category
 
-            print "Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, ','.join([str(dow) for dow in self.day_of_week]), str(self.start_time.strftime('%H:%M')), str(self.download_time.hour), str(self.install_duration), self.category)
+            self.hutil.log("Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, ','.join([str(dow) for dow in self.day_of_week]), str(self.start_time.strftime('%H:%M')), str(self.download_time.hour), str(self.install_duration), self.category))
 
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)
@@ -130,7 +127,7 @@ l 2>&1\n'])
             return
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
         if retcode > 0:
-            print output
+            self.hutil.error(output)
 
     def install(self):
         pass
@@ -142,12 +139,9 @@ l 2>&1\n'])
         self.restart_cron()
 
 
-############################################################
-#	UbuntuPatching
-############################################################
 class UbuntuPatching(AbstractPatching):
-    def __init__(self):
-        super(UbuntuPatching,self).__init__()
+    def __init__(self, hutil):
+        super(UbuntuPatching,self).__init__(hutil)
         self.clean_cmd = 'apt-get clean'
         self.check_cmd = 'apt-get -s upgrade'
         self.download_cmd = 'apt-get -d -y install'
@@ -167,10 +161,10 @@ class UbuntuPatching(AbstractPatching):
         """
         retcode,output = waagent.RunGetOutput(self.check_cmd)
         if retcode > 0:
-            print "Failed to check valid upgrades"
+            self.hutil.error("Failed to check valid upgrades")
         start = output.find('The following packages will be upgraded')
         if start == -1:
-            print "No package to upgrade"
+            self.hutil.log("No package to upgrade")
             sys.exit(0)
         start = output.find('\n', start)
         end = output.find('upgraded', start)
@@ -181,7 +175,7 @@ class UbuntuPatching(AbstractPatching):
     def clean(self):
         retcode,output = waagent.RunGetOutput(self.clean_cmd)
         if retcode > 0:
-            print "Failed to erase downloaded archive files"
+            self.hutil.error("Failed to erase downloaded archive files")
 
     def download(self):
         start_download_time = time.time()
@@ -190,7 +184,7 @@ class UbuntuPatching(AbstractPatching):
         for package_to_download in self.to_download:
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:
-                print "Failed to download the package: " + package_to_download
+                self.hutil.error("Failed to download the package: " + package_to_download)
                 continue
             self.downloaded.append(package_to_download)
             current_download_time = time.time()
@@ -206,7 +200,7 @@ class UbuntuPatching(AbstractPatching):
         if os.path.isfile(reboot_required):
             retcode = waagent.Run('reboot')
             if retcode > 0:
-                print "Failed to reboot"
+                self.hutil.error("Failed to reboot")
 
     def patch(self):
         start_patch_tim = time.time()
@@ -214,12 +208,12 @@ class UbuntuPatching(AbstractPatching):
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         except IOError, e:
-            print str(e)
+            self.hutil.error(str(e))
             self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
-                print "Failed to patch the package:" + package_to_patch
+                self.hutil.error("Failed to patch the package:" + package_to_patch)
                 continue
             self.patched.append(package_to_patch)
             current_patch_time = time.time()
@@ -238,14 +232,18 @@ class UbuntuPatching(AbstractPatching):
         status[package_patched] = {}
         retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
         output = output.split('\n\n')[0]
-        print output
+        self.hutil.log(output)
 
     def install(self):
-        pass
+        """
+        Install for dependencies.
+        """
+        # /var/run/reboot-required is not created unless the update-notifier-common package is installed
+        retcode = waagent.Run('apt-get -y install update-notifier-common')
+        if retcode > 0:
+            self.hutil.error("Failed to install update-notifier-common")
 
-############################################################
-#	redhatPatching
-############################################################
+
 class redhatPatching(AbstractPatching):
     def __init__(self):
         super(redhatPatching,self).__init__()
@@ -360,17 +358,11 @@ class redhatPatching(AbstractPatching):
             print output
 
 
-############################################################
-#	centosPatching
-############################################################
 class centosPatching(redhatPatching):
     def __init__(self):
         super(centosPatching,self).__init__()
 
 
-############################################################
-#	SuSEPatching
-############################################################
 class SuSEPatching(AbstractPatching):
     def __init__(self):
         super(SuSEPatching,self).__init__()
@@ -379,54 +371,3 @@ class SuSEPatching(AbstractPatching):
         self.cron_chkconfig_cmd = 'chkconfig cron on'
         self.crontab = '/etc/crontab'
         self.patching_cron = '/tmp/patching_cron'
-
-    def enable(self):
-        self._install()
-        self._setPeriodic(1)
-
-        #mail = 'g.bin.xia@gmail.com'
-        #self._sendMail(mail)
-
-        #self._securityUpdate()
-
-        #self._checkOnly(valid='yes')
-
-        #self._setBlacklist(['kernel*', 'php*'])
-
-        retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
-        if retcode > 0:
-            waagent.Error(output)
-
-        retcode,output = waagent.RunGetOutput(self.cron_chkconfig_cmd)
-        if retcode > 0:
-            waagent.Error(output)
-        
-    def _install(self):
-        waagent.SetFileContents(self.patching_cron, self.patch_cmd)
-
-    def _checkOnly(self,valid='no'):
-        pass
-
-    def _setBlacklist(self, packageList):
-        pass
-        
-    def _securityUpdate(self):
-        pass
-
-    def _setPeriodic(self, upgrade_periodic=1):
-        periodic_dict = {1:'/etc/cron.daily', 7:'/etc/cron.weekly', 30:'/etc/cron.monthly'}
-        for cron_dir in periodic_dict.values():
-            periodic_file = os.path.join(cron_dir, os.path.basename(self.patching_cron))
-            if os.path.exists(periodic_file):
-                os.remove(periodic_file)
-        retcode,output = waagent.RunGetOutput(' '.join(['cp', self.patching_cron, periodic_dict[upgrade_periodic]]))
-
-    def _sendMail(self,mail=''):
-        contents = waagent.GetFileContents(self.crontab)
-        start = contents.find('\nMAILTO=') + 1
-        end = contents.find('\n',start)
-        waagent.SetFileContents(self.crontab, contents[0:start] + 'MAILTO=' + mail + contents[end:None])
-
-###########################################################
-# END PATCHING CLASS DEFS
-###########################################################
