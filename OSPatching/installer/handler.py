@@ -288,7 +288,7 @@ class redhatPatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        retcode,output = waagent.RunGetOutput(self.check_cmd)
+        retcode,output = waagent.RunGetOutput(self.check_cmd, chk_err=False)
         output = re.split(r'\s+', output.strip())
         self.to_download = output[0::3]
 
@@ -310,7 +310,7 @@ class redhatPatching(AbstractPatching):
         count = 0
         for package_to_download in self.to_download:
             count += 1
-            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
+            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download, chk_err=False)
             self.downloaded.append(package_to_download)
             current_download_time = time.time()
             if count > 2:
