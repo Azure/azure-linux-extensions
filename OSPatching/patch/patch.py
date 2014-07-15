@@ -226,7 +226,7 @@ class UbuntuPatching(AbstractPatching):
             for package_patched in self.patched:
                 self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
-        self.report()
+        #self.report()
         self.reboot_if_required()
 
     def report(self):
@@ -339,7 +339,7 @@ class redhatPatching(AbstractPatching):
             for package_patched in self.patched:
                 self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
-        self.report()
+        #self.report()
         self.reboot_if_required()
 
     def reboot_if_required(self):
@@ -367,10 +367,87 @@ class centosPatching(redhatPatching):
 
 
 class SuSEPatching(AbstractPatching):
-    def __init__(self):
-        super(SuSEPatching,self).__init__()
-        self.patch_cmd = 'zypper --non-interactive patch --auto-agree-with-licenses --with-interactive'
-        self.cron_restart_cmd = 'service cron restart'
-        self.cron_chkconfig_cmd = 'chkconfig cron on'
-        self.crontab = '/etc/crontab'
-        self.patching_cron = '/tmp/patching_cron'
+    def __init__(self, hutil):
+        super(SuSEPatching,self).__init__(hutil)
+        self.clean_cmd = 'zypper clean'
+        self.check_cmd = 'zypper --non-interactive list-patches'
+        self.download_cmd = 'zypper --non-interactive install -d --auto-agree-with-licenses -t patch '
+        self.patch_cmd = 'zypper --non-interactive install --auto-agree-with-licenses -t patch '
+    
+    def parse_settings(self, settings):
+        super(SuSEPatching, self).parse_settings(settings)
+        if self.category == 'Important':
+            self.check_cmd = self.check_cmd + ' --category security'
+    
+    def clean(self):
+        retcode, output = waagent.RunGetOutput(self.clean_cmd)
+        if retcode > 0:
+            self.hutil.error("Failed to erase downloaded archive files")
+
+    def check(self):
+        """
+        Check valid upgrades,
+        Return the package list to upgrade
+        """
+        waagent.Run('zypper --non-interactive refresh', False)
+        retcode, output = waagent.RunGetOutput(self.check_cmd)
+        if retcode > 0:
+            self.hutil.error("Faild to check valid upgrades")
+        output_lines = output.split('\n')
+        self.to_download = []
+        name_position = 1
+        for line in output_lines:
+            properties = [elem.strip() for elem in line.split('|')]
+            if len(properties) > 1:
+                if 'Name' in properties:
+                    name_position = properties.index('Name')
+                elif not properties[name_position] in self.to_patch:
+                    self.to_download.append(properties[name_position])
+        if len(self.to_download) == 0:
+            self.hutil.log("No package to upgrade")
+            sys.exit(0)
+
+    def download(self):
+        start_download_time = time.time()
+        self.clean()
+        self.check()
+        self.downloaded = []
+        for package_to_download in self.to_download:
+            retcode, output = waagent.RunGetOutput(self.download_cmd + package_to_download, False)
+            self.downloaded.append(package_to_download)
+            current_download_time = time.time()
+            if current_download_time - start_download_time > self.download_duration:
+                break
+        with open(os.path.join(waagent.LibDir, 'package.download'), 'w') as f:
+            for package_downloaded in self.downloaded:
+                self.to_download.remove(package_downloaded)
+                f.write(package_downloaded + '\n')
+
+    def patch(self):
+        self.reboot_required = False;
+        start_patch_time = time.time()
+        try:
+            with open(os.path.join(waagent.LibDir, 'package.download'), 'r') as f:
+                self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
+        except IOError, e:
+            print str(e)
+            self.to_patch = []
+        for package_to_patch in self.to_patch:
+            retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
+            if output.find('Reboot as soon as possible.') != -1:
+                self.reboot_required = True
+            self.patched.append(package_to_patch)
+            current_patch_time = time.time()
+            if current_patch_time - start_patch_time > self.install_duration:
+                break
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            for package_patched in self.patched:
+                self.to_patch.remove(package_patched)
+                f.write(package_patched + '\n')
+        self.reboot_if_required()
+
+    def reboot_if_required(self):
+        if self.reboot_required:
+                retcode = waagent.Run('reboot')
+            if retcode > 0:
+                print "Failed to reboot"
