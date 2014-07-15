@@ -1,12 +1,12 @@
 [{
   "name": "OSPatching",
-  "version": 1.0,
+  "version": 1.1,
   "handlerManifest": {
-    "installCommand": "./installer/handler.py -install",
-    "uninstallCommand": "./installer/handler.py -uninstall",
-    "updateCommand": "./installer/handler.py -update",
-    "enableCommand": "./installer/handler.py -enable",
-    "disableCommand": "./installer/handler.py -disable",
+    "installCommand": "./handler.py -install",
+    "uninstallCommand": "./handler.py -uninstall",
+    "updateCommand": "./handler.py -update",
+    "enableCommand": "./handler.py -enable",
+    "disableCommand": "./handler.py -disable",
     "rebootAfterInstall": false,
     "reportHeartbeat": false
   }
