@@ -4,27 +4,6 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
 
 # Extension List
 
-<<<<<<< HEAD
-## OS Patching
-Allow the owner of the Azure VM to patch the Linux VM
-
-### Features
-* it can be installed through Azure RESTFUL API for extension
-* it supports major Linux distro (FreeBSD supported ???)
-* it supports both gallery and user provided images
-* The user can opt in or opt out from auto patching solution
-* it allows per user configuration of the updates
-* A patching window can be specified, including the day of the week, the time and the patching duration
-* The patching will be completed within the specified duration and any pending patches should be applied in the next cycle
-* status of the extension is reported back to Azure so that user can see the status on Azure Portal
-
-### Requirement
-
-### Usage
-PowerShell script to deploy the extension on VM
-
-=======
->>>>>>> upstream/master
 ## Custom Script Extension
 Allow the owner of the Azure VM to run script stored in Azure storage during or after VM provisioning
 ### Features
@@ -42,9 +21,9 @@ PowerShell script to deploy the extension on VM
 ```powershell
 $VmName = '<vm_name>'
 Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-$vm = get-azurevm $VmName   
+$vm = get-azurevm $VmName	
 $ExtensionName = '<extension_name>'	
-$Publisher = '<publisher_name>'		
+$Publisher = '<publisher_name>'	
 $Version = '<version>'
 Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration '{"storageAccountName": "<storage_account_name>","storageAccountKey":"<storage_account_key>"}' -PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "<command>" }' | Update-AzureVM
@@ -86,13 +65,9 @@ $ExtensionName = '<extension_name>'
 $Publisher = '<publisher_name>'
 $Version =  '<version>'
 $cert = Get-Content "<cert_path>"
-$PrivateConfig = '{"username":"' + $UserName + '", "password": "' +  $Password + '", "ssh_key":"' + $cert + '","reset_ssh":"True"}' 
+$PrivateConfig = '{"username":"' + $UserName + '", "password": "' +  $Password + '", "ssh_key":"' + $cert + '","reset_ssh":"True"}'	
 Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM 
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM	
 ``` 
 ## Test Handler Extension
-<<<<<<< HEAD
 This extension is an extension example  
-=======
-This extension is an extension example  
->>>>>>> upstream/master
