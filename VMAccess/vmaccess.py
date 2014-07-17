@@ -62,7 +62,7 @@ def install():
 
 def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Install')
+    hutil.do_parse_context('Enable')
     try:
         protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         reset_ssh = protect_settings.get('reset_ssh')

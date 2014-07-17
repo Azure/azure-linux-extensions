@@ -2,11 +2,11 @@
   "name": "VMAccess",
   "version": 1.0,
   "handlerManifest": {
-    "installCommand": "./installer/handler.py -install",
-    "uninstallCommand": "./installer/handler.py -uninstall",
-    "updateCommand": "./installer/handler.py -update",
-    "enableCommand": "./installer/handler.py -enable",
-    "disableCommand": "./installer/handler.py -disable",
+    "installCommand": "./vmaccess.py -install",
+    "uninstallCommand": "./vmaccess.py -uninstall",
+    "updateCommand": "./vmaccess.py -update",
+    "enableCommand": "./vmaccess.py -enable",
+    "disableCommand": "./vmaccess.py -disable",
     "rebootAfterInstall": false,
     "reportHeartbeat": false
   }

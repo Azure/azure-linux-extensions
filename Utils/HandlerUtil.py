@@ -60,7 +60,7 @@ import imp
 import base64
 import json
 import time
-from utils.waagentutil import waagent
+from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
