@@ -9,8 +9,7 @@ Allow the owner of the Azure VM to run script stored in Azure storage during or 
 ### Features
 * it can be installed through Azure RESTFUL API for extension
 * it supports major Linux and FreeBSD distro
-* the scripts can be located on Azure Storage    
-* bash and python script are supported
+* the scripts can be located on Azure Storage 
 * the execution output of the scripts is logged in the log directory specified in HandlerEnvironment.json
 * status of the extension is reported back to Azure so that user can see the status on Azure Portal
 
