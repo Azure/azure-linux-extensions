@@ -24,7 +24,6 @@ import re
 import platform
 import shutil
 import traceback
-import argparse
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -169,34 +168,21 @@ def main():
         sys.exit(1)
     MyPatching.parse_settings(protect_settings)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-install", action="store_true",
-                        help="install os patching extension")
-    parser.add_argument("-enable", action="store_true",
-                        help="enable os patching extension")
-    parser.add_argument("-disable", action="store_true",
-                        help="disable os patching extension")
-    parser.add_argument("-uninstall", action="store_true",
-                        help="uninstall os patching extension")
-    parser.add_argument("-update", action="store_true",
-                        help="update os patching extension")
-    parser.add_argument("-download", action="store_true",
-                        help="download os patching extension")
-    parser.add_argument("-patch", action="store_true",
-                        help="patch os patching extension")
-    args = parser.parse_args()
-    if args.install:
-        install()
-    elif args.enable:
-        enable()
-    elif args.disable:
-        disable()
-    elif args.uninstall:
-        uninstall()
-    elif args.download:
-        download()
-    elif args.patch:
-        patch()
+    for a in sys.argv[1:]:
+        if re.match("^([-/]*)(disable)", a):
+            disable()
+        elif re.match("^([-/]*)(uninstall)", a):
+            uninstall()
+        elif re.match("^([-/]*)(install)", a):
+            install()
+        elif re.match("^([-/]*)(enable)", a):
+            enable()
+        elif re.match("^([-/]*)(update)", a):
+            update()
+        elif re.match("^([-/]*)(download)", a):
+            download()
+        elif re.match("^([-/]*)(patch)", a):
+            patch()
 
 
 if __name__ == '__main__':

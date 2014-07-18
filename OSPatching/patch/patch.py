@@ -248,8 +248,8 @@ class UbuntuPatching(AbstractPatching):
 
 
 class redhatPatching(AbstractPatching):
-    def __init__(self):
-        super(redhatPatching,self).__init__()
+    def __init__(self, hutil):
+        super(redhatPatching,self).__init__(hutil)
         self.cron_restart_cmd = 'service crond restart'
         self.check_cmd = 'yum -q check-update'
         self.clean_cmd = 'yum clean packages'
@@ -362,8 +362,8 @@ class redhatPatching(AbstractPatching):
 
 
 class centosPatching(redhatPatching):
-    def __init__(self):
-        super(centosPatching,self).__init__()
+    def __init__(self, hutil):
+        super(centosPatching,self).__init__(hutil)
 
 
 class SuSEPatching(AbstractPatching):
@@ -448,6 +448,6 @@ class SuSEPatching(AbstractPatching):
 
     def reboot_if_required(self):
         if self.reboot_required:
-                retcode = waagent.Run('reboot')
+            retcode = waagent.Run('reboot')
             if retcode > 0:
                 print "Failed to reboot"
