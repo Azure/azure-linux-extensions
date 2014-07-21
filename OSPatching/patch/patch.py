@@ -139,6 +139,10 @@ class AbstractPatching(object):
         self.set_patch_cron()
         self.restart_cron()
 
+    def disable(self):
+        self.disabled = True
+        self.enable()
+
 
 class UbuntuPatching(AbstractPatching):
     def __init__(self, hutil):

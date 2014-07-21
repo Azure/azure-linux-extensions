@@ -63,7 +63,13 @@ def uninstall():
 
 def disable():
     hutil.do_parse_context('Disable')
-    hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
+    try:
+        MyPatching.disable()
+        hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
+    except Exception, e:
+        hutil.error("Failed to disable the extension with error: %s, \
+                     stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed')
 
 def update():
     hutil.do_parse_context('Upadate')
