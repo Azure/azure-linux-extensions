@@ -19,6 +19,7 @@
 # Requires Python 2.4+
 
 
+import os
 import sys
 import re
 import platform
@@ -27,7 +28,7 @@ import traceback
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
-from patch.patch import *
+from patch import *
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
@@ -100,46 +101,6 @@ def patch():
         hutil.error("Failed to patch with error: %s, stack trace: %s"
                     %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
-
-# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
-def DistInfo(fullname=0):
-    if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['FreeBSD', release]
-        return distinfo
-    if os.path.isfile('/etc/oracle-release'):
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['Oracle', release]
-        return distinfo
-    if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(\
-                        full_distribution_name=fullname))
-        # remove trailing whitespace in distro name
-        distinfo[0] = distinfo[0].strip()
-        return distinfo
-    else:
-        return platform.dist()
-
-def GetMyPatching(hutil, patching_class_name=''):
-    """
-    Return MyPatching object.
-    NOTE: Logging is not initialized at this point.
-    """
-    if patching_class_name == '':
-        if 'Linux' in platform.system():
-            Distro = DistInfo()[0]
-        else: # I know this is not Linux!
-            if 'FreeBSD' in platform.system():
-                Distro = platform.system()
-        Distro = Distro.strip('"')
-        Distro = Distro.strip(' ')
-        patching_class_name = Distro + 'Patching'
-    else:
-        Distro = patching_class_name
-    if not globals().has_key(patching_class_name):
-        print Distro+' is not a supported distribution.'
-        return None
-    return globals()[patching_class_name](hutil)
 
 # Main function is the only entrance to this extension handler
 def main():
