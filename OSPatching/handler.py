@@ -107,6 +107,10 @@ def DistInfo(fullname=0):
         release = re.sub('\-.*\Z', '', str(platform.release()))
         distinfo = ['FreeBSD', release]
         return distinfo
+    if os.path.isfile('/etc/oracle-release'):
+        release = re.sub('\-.*\Z', '', str(platform.release()))
+        distinfo = ['Oracle', release]
+        return distinfo
     if 'linux_distribution' in dir(platform):
         distinfo = list(platform.linux_distribution(\
                         full_distribution_name=fullname))

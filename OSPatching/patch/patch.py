@@ -371,6 +371,11 @@ class centosPatching(redhatPatching):
         super(centosPatching,self).__init__(hutil)
 
 
+class OraclePatching(redhatPatching):
+    def __init__(self, hutil):
+        super(OraclePatching,self).__init__(hutil)
+
+
 class SuSEPatching(AbstractPatching):
     def __init__(self, hutil):
         super(SuSEPatching,self).__init__(hutil)
