@@ -93,8 +93,6 @@ class AbstractPatching(object):
             else:
                 self.category = category
 
-            self.hutil.log("Configurations:\ndisabled: %s\ndayOfWeek: %s\nstartTime: %s\ndownloadTime: %s\ninstallDuration: %s\ncategory: %s\n" % (self.disabled, ','.join([str(dow) for dow in self.day_of_week]), str(self.start_time.strftime('%H:%M')), str(self.download_time.hour), str(self.install_duration), self.category))
-
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)
         script_file_path = os.path.realpath(sys.argv[0])
@@ -192,6 +190,8 @@ class UbuntuPatching(AbstractPatching):
             self.downloaded.append(package_to_download)
             current_download_time = time.time()
             if current_download_time - start_download_time > self.download_duration:
+                self.hutil.log("Download time exceeded. The pending package will be \
+                                downloaded in the next cycle")
                 break
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             for package_downloaded in self.downloaded:
@@ -211,7 +211,8 @@ class UbuntuPatching(AbstractPatching):
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         except IOError, e:
-            self.hutil.error(str(e))
+            self.hutil.error("Failed to open package.downloaded with error: %s, \
+                             stack trace: %s" %(str(e), traceback.format_exc()))
             self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
@@ -221,6 +222,8 @@ class UbuntuPatching(AbstractPatching):
             self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
+                self.hutil.log("Patching time exceeded. The pending package will be \
+                                patched in the next cycle")
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
@@ -230,12 +233,10 @@ class UbuntuPatching(AbstractPatching):
         self.reboot_if_required()
 
     def report(self):
-        status = {}
-        package_patched = 'update-manager-core'
-        status[package_patched] = {}
-        retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
-        output = output.split('\n\n')[0]
-        self.hutil.log(output)
+        for package_patched in self.patched:
+            retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
+            output = output.split('\n\n')[0]
+            self.hutil.log(output)
 
     def install(self):
         """
@@ -256,9 +257,6 @@ class redhatPatching(AbstractPatching):
         self.download_cmd = 'yum -q -y --downloadonly update'
         self.patch_cmd = 'yum -y update'
         self.status_cmd = 'yum -q info'
-        # self.cache_dir = '/var/cache/yum/'
-        # retcode,output = waagent.RunGetOutput('cd '+self.cache_dir+';find . -name "updates"')
-        # self.download_dir = os.path.join(self.cache_dir, output.strip('.\n/') + '/packages')
 
     def parse_settings(self, settings):
         super(redhatPatching,self).parse_settings(settings)
@@ -283,7 +281,7 @@ class redhatPatching(AbstractPatching):
         """
         retcode,output = waagent.RunGetOutput(self.clean_cmd)
         if retcode > 0:
-            print "Failed to erase downloaded archive files"
+            self.hutil.error("Failed to erase downloaded archive files")
 
     def download(self):
         start_download_time = time.time()
@@ -298,6 +296,8 @@ class redhatPatching(AbstractPatching):
             if count > 2:
                 break
             if current_download_time - start_download_time > self.download_duration:
+                self.hutil.log("Download time exceeded. The pending package will be \
+                                downloaded in the next cycle")
                 break
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             for package_downloaded in self.downloaded:
@@ -311,12 +311,12 @@ class redhatPatching(AbstractPatching):
         # For yum --downloadonly option
         retcode = waagent.Run('yum -y install yum-downloadonly')
         if retcode > 0:
-            print "Failed to install yum-downloadonly"
+            self.hutil.error("Failed to install yum-downloadonly")
 
         # For yum --security option
         retcode = waagent.Run('yum -y install yum-plugin-security')
         if retcode > 0:
-            print "Failed to install yum-plugin-security"
+            self.hutil.error("Failed to install yum-plugin-security")
 
     def patch(self):
         start_patch_time = time.time()
@@ -324,16 +324,19 @@ class redhatPatching(AbstractPatching):
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         except IOError, e:
-            print str(e)
+            self.hutil.error("Failed to open package.downloaded with error: %s, \
+                             stack trace: %s" %(str(e), traceback.format_exc()))
             self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
-                print "Failed to patch the package:" + package_to_patch
+                self.hutil.error("Failed to patch the package:" + package_to_patch)
                 continue
             self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
+                self.hutil.log("Patching time exceeded. The pending package will be \
+                                patched in the next cycle")
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
@@ -346,19 +349,17 @@ class redhatPatching(AbstractPatching):
         """
         A reboot should be only necessary when kernel has been upgraded.
         """
-        retcode,last_kernel = waagent.RunGetOutput('rpm -q --last kernel | perl -pe \'s/^kernel-(\S+).*/$1/\' | head -1')
+        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
-        if last_kernel == current_kernel:
+        if last_kernel != current_kernel:
             retcode = waagent.Run('reboot')
             if retcode > 0:
-                print "Failed to reboot"
+                self.hutil.error("Failed to reboot")
 
     def report(self):
-        status = {}
         for package_patched in self.patched:
-            status[package_patched] = {}
             retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
-            print output
+            self.hutil.log(output)
 
 
 class centosPatching(redhatPatching):
@@ -430,7 +431,8 @@ class SuSEPatching(AbstractPatching):
             with open(os.path.join(waagent.LibDir, 'package.download'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         except IOError, e:
-            print str(e)
+            self.hutil.error("Failed to open package.downloaded with error: %s, \
+                             stack trace: %s" %(str(e), traceback.format_exc()))
             self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
@@ -450,4 +452,4 @@ class SuSEPatching(AbstractPatching):
         if self.reboot_required:
             retcode = waagent.Run('reboot')
             if retcode > 0:
-                print "Failed to reboot"
+                self.hutil.error("Failed to reboot")

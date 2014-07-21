@@ -29,38 +29,8 @@ from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 from patch.patch import *
 
-###############################################################################
-# Will be deleted after release
-#
-# Template for configuring Patching
-# protect_settings = {
-#     "disabled" : "true|false",
-#     "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|\
-#                    Saturday|Everyday",
-#     "startTime" : "hr:min",
-#     "category" : "Important | ImportantAndRecommended",
-#     "installDuration" : "hr:min"
-# }
-
-# protect_settings_disabled = {
-#     "disabled":"true",
-# }
-
-# protect_settings = {
-#     "disabled" : "false",
-#     "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
-#     "startTime" : "00:00",
-#     "category" : "Important",
-#     "installDuration" : "00:30"
-# }
-###############################################################################
-
 # Global variables definition
 ExtensionShortName = 'OSPatching'
-
-###########################################################
-# BEGIN FUNCTION DEFS
-###########################################################
 
 def install():
     hutil.do_parse_context('Install')
@@ -75,6 +45,10 @@ def install():
 def enable():
     hutil.do_parse_context('Enable')
     try:
+        protect_settings = hutil._context._config['runtimeSettings'][0]\
+                           ['handlerSettings'].get('protectedSettings')
+        MyPatching.parse_settings(protect_settings)
+        # Ensure the same configuration is executed only once
         hutil.exit_if_enabled()
         MyPatching.enable()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded.')
@@ -98,19 +72,27 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
+        protect_settings = hutil._context._config['runtimeSettings'][0]\
+                           ['handlerSettings'].get('protectedSettings')
+        MyPatching.parse_settings(protect_settings)
         MyPatching.download()
         hutil.do_exit(0,'Download','success','0', 'Download Succeeded')
     except Exception, e:
-        hutil.error("Failed to download updates with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to download updates with error: %s, \
+                     stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Download','error','0', 'Download Failed')
 
 def patch():
     hutil.do_parse_context('Patch')
     try:
+        protect_settings = hutil._context._config['runtimeSettings'][0]\
+                           ['handlerSettings'].get('protectedSettings')
+        MyPatching.parse_settings(protect_settings)
         MyPatching.patch()
         hutil.do_exit(0,'Patch','success','0', 'Patch Succeeded')
     except Exception, e:
-        hutil.error("Failed to patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to patch with error: %s, stack trace: %s"
+                    %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
@@ -149,24 +131,18 @@ def GetMyPatching(hutil, patching_class_name=''):
         return None
     return globals()[patching_class_name](hutil)
 
-###########################################################
-# END FUNCTION DEFS
-###########################################################
-
+# Main function is the only entrance to this extension handler
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
     global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Initial')
-    protect_settings = hutil._context._config['runtimeSettings'][0]\
-                       ['handlerSettings'].get('protectedSettings')
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
+                                ExtensionShortName)
     global MyPatching
     MyPatching = GetMyPatching(hutil)
     if MyPatching == None:
         sys.exit(1)
-    MyPatching.parse_settings(protect_settings)
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
