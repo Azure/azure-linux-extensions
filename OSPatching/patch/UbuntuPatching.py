@@ -79,8 +79,8 @@ class UbuntuPatching(AbstractPatching):
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:
                 self.hutil.error("Failed to download the package: " + package_to_download)
-                continue
-            self.downloaded.append(package_to_download)
+            else:
+                self.downloaded.append(package_to_download)
             current_download_time = time.time()
             if current_download_time - start_download_time > self.download_duration:
                 self.hutil.log("Download time exceeded. The pending package will be \
@@ -88,7 +88,6 @@ class UbuntuPatching(AbstractPatching):
                 break
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             for package_downloaded in self.downloaded:
-                self.to_download.remove(package_downloaded)
                 f.write(package_downloaded + '\n')
 
     def reboot_if_required(self):
@@ -99,7 +98,7 @@ class UbuntuPatching(AbstractPatching):
                 self.hutil.error("Failed to reboot")
 
     def patch(self):
-        start_patch_tim = time.time()
+        start_patch_time = time.time()
         try:
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
@@ -111,8 +110,8 @@ class UbuntuPatching(AbstractPatching):
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
-                continue
-            self.patched.append(package_to_patch)
+            else:
+                self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -120,9 +119,35 @@ class UbuntuPatching(AbstractPatching):
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
-                self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
-        #self.report()
+        # TODO: Report the detail status of patching
+        # self.report()
+        self.reboot_if_required()
+
+    def patch_one_off(self):
+        start_patch_time = time.time()
+        self.check()
+        self.to_patch = self.to_download
+        for package_to_patch in self.to_patch:
+            retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
+            if retcode > 0:
+                self.hutil.error("Failed to patch the package:" + package_to_patch)
+            else:
+                self.downloaded.append(package_to_patch)
+                self.patched.append(package_to_patch)
+            current_patch_time = time.time()
+            if current_patch_time - start_patch_time > self.install_duration:
+                self.hutil.log("Patching time exceeded. The pending package will be \
+                                patched in the next cycle")
+                break
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+            for package_downloaded in self.downloaded:
+                f.write(package_downloaded + '\n')
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            for package_patched in self.patched:
+                f.write(package_patched + '\n')
+        # TODO: Report the detail status of patching
+        # self.report()
         self.reboot_if_required()
 
     def report(self):

@@ -48,6 +48,14 @@ def enable():
     try:
         protect_settings = hutil._context._config['runtimeSettings'][0]\
                            ['handlerSettings'].get('protectedSettings')
+        # TEST
+        protect_settings = {
+            "disabled" : "false",
+            "dayOfWeek" : "Sunday|Monday|Wednesday|Thursday|Friday|Saturday",
+            "startTime" : "",
+            "category" : "ImportantAndRecommended",
+            "installDuration" : "00:30"
+        }
         MyPatching.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_enabled()

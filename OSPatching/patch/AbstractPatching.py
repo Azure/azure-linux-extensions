@@ -45,8 +45,6 @@ class AbstractPatching(object):
         self.downloaded = []
         self.to_download = []
 
-        self.download_duration = 3600
-
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
         self.cron_chkconfig_cmd = 'chkconfig cron on'
@@ -59,27 +57,31 @@ class AbstractPatching(object):
             self.hutil.log("WARNING: the value of option \"disabled\" not \
                             specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
-        if not self.disabled:
-            day_of_week = settings.get('dayOfWeek')
-            if day_of_week is None:
-                day_of_week = 'Everyday'
-            day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
-            if 'Everyday' in day_of_week:
-                self.day_of_week = range(1,8)
-            else:
-                self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
-
+        if not self.disabled: 
             start_time = settings.get('startTime')
-            if start_time is None:
-                start_time = '03:00'
-            self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
-
-            self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
-            # Stop downloading 10s before patching
-            self.download_duration -= 10
+            if start_time is None or start_time == '':
+                self.patch_now = True
+            else:
+                self.patch_now = False
+                self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
+                self.download_duration = 3600
+                self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
+                # Stop downloading 10s before patching
+                self.download_duration -= 10
+ 
+                day_of_week = settings.get('dayOfWeek')
+                if day_of_week is None or day_of_week == '':
+                    self.hutil.log('dayOfWeek defaults to Everyday')
+                    day_of_week = 'Everyday'
+                day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
+                if 'Everyday' in day_of_week:
+                    self.day_of_week = range(1,8)
+                else:
+                    self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
 
             install_duration = settings.get('installDuration')
-            if install_duration is None:
+            if install_duration is None or install_duration == '':
+                self.hutil.log('install_duration defaults to 3600s')
                 self.install_duration = 3600
             else:
                 hr_min = install_duration.split(':')
@@ -88,8 +90,9 @@ class AbstractPatching(object):
             self.install_duration -= 300
 
             category = settings.get('category')
-            if category is None:
-                self.category = ''
+            if category is None or category == '':
+                self.hutil.log('category defaults to ImportantAndRecommended')
+                self.category = 'ImportantAndRecommended'
             else:
                 self.category = category
 
@@ -125,8 +128,6 @@ class AbstractPatching(object):
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
-        if self.disabled:
-            return
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
         if retcode > 0:
             self.hutil.error(output)
@@ -135,9 +136,12 @@ class AbstractPatching(object):
         pass
 
     def enable(self):
-        self.set_download_cron()
-        self.set_patch_cron()
-        self.restart_cron()
+        if not self.disabled and self.patch_now:
+            self.patch_one_off()
+        else:
+            self.set_download_cron()
+            self.set_patch_cron()
+            self.restart_cron()
 
     def disable(self):
         self.disabled = True
