@@ -82,7 +82,7 @@ class SuSEPatching(AbstractPatching):
         self.check()
         self.downloaded = []
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
-             f.write('')
+            f.write('')
         for package_to_download in self.to_download:
             retcode, output = waagent.RunGetOutput(self.download_cmd + package_to_download, False)
             if 0 < retcode and retcode < 100:

@@ -72,10 +72,12 @@ class UbuntuPatching(AbstractPatching):
             self.hutil.error("Failed to erase downloaded archive files")
 
     def download(self):
+        while True:
+            pass
         self.check()
         self.clean()
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
-             f.write('')
+            f.write('')
         for package_to_download in self.to_download:
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:

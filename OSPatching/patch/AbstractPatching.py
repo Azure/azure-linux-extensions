@@ -108,8 +108,8 @@ class AbstractPatching(object):
             if retcode > 0:
                 self.hutil.error(output2)
             if output2 != '':
-                waagent.Run('kill -9 ' + output2.strip())
-            waagent.Run('kill -9 ' + output.strip())
+                waagent.Run('kill -15 ' + output2.strip())
+            waagent.Run('kill -15 ' + output.strip())
             self.hutil.error("Download time exceeded. The pending package will be \
                                 downloaded in the next cycle")
 
