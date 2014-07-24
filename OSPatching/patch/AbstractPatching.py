@@ -95,12 +95,20 @@ class AbstractPatching(object):
                 self.category = category
 
     def kill_exceeded_download(self):
+        '''
+        kill the process of exceeded downloading and its subprocess.
+        '''
         script_file_path = os.path.realpath(sys.argv[0])
         script_file = os.path.basename(script_file_path)
         retcode, output = waagent.RunGetOutput('ps -ef | grep "' + script_file + ' -download" | grep -v grep | grep -v sh | awk \'{print $2}\'')
         if retcode > 0:
             self.hutil.error(output)
         if output != '':
+            retcode, output2 = waagent.RunGetOutput("ps -ef | awk '{if($3==" + output.strip() + ") {print $2}}'")
+            if retcode > 0:
+                self.hutil.error(output2)
+            if output2 != '':
+                waagent.Run('kill -9 ' + output2.strip())
             waagent.Run('kill -9 ' + output.strip())
             self.hutil.error("Download time exceeded. The pending package will be \
                                 downloaded in the next cycle")
