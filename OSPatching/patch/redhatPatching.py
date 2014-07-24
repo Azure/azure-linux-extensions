@@ -43,6 +43,9 @@ class redhatPatching(AbstractPatching):
         self.download_cmd = 'yum -q -y --downloadonly update'
         self.patch_cmd = 'yum -y update'
         self.status_cmd = 'yum -q info'
+        self.cache_dir = '/var/cache/yum/'
+        retcode,output = waagent.RunGetOutput('cd '+self.cache_dir+';find . -name "updates"')
+        self.download_dir = os.path.join(self.cache_dir, output.strip('.\n/') + '/packages')
 
     def parse_settings(self, settings):
         super(redhatPatching,self).parse_settings(settings)
@@ -55,18 +58,30 @@ class redhatPatching(AbstractPatching):
         Return the package list to download & upgrade
         """
         retcode,output = waagent.RunGetOutput(self.check_cmd, chk_err=False)
-        output = re.split(r'\s+', output.strip())
-        self.to_download = output[0::3]
+        if retcode == 0:
+            self.to_download = []
+            self.hutil.log("No packages are available for update.")
+        elif retcode == 100:
+            output = re.split(r'\s+', output.strip())
+            self.to_download = zip(output[0::3], output[1::3])
+            self.hutil.log("There are packages available for an update.")
+        elif retcode == 1:
+            self.hutil.error("Failed to check updates with error: " + output)
 
     def download(self):
         self.check()
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             f.write('')
-        for package_to_download in self.to_download:
-            retcode = waagent.Run(self.download_cmd + ' ' + package_to_download, chk_err=False)
-            self.downloaded.append(package_to_download)
+        for (pkg_name, pkg_version) in self.to_download:
+            retcode = waagent.Run(self.download_cmd + ' ' + pkg_name, chk_err=False)
+            # Yum exit code is not 0 even if succeed, so check if the package rpm exsits to verify that downloading succeeds.
+            package = pkg_name.rpartition('.')[0] + '-' + pkg_version + '.' +  pkg_name.rpartition('.')[2] + '.rpm'
+            if not os.path.isfile(os.path.join(self.download_dir, package)):
+                self.hutil.error("Failed to download the package: " + pkg_name)
+                continue
+            self.downloaded.append(pkg_name)
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
-                f.write(package_to_download + '\n')
+                f.write(pkg_name + '\n')
 
     def install(self):
         """
