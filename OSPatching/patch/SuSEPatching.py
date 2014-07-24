@@ -48,6 +48,9 @@ class SuSEPatching(AbstractPatching):
             self.check_cmd = self.check_cmd + ' --category security'
     
     def clean(self):
+        """
+        Clean local caches in /var/cache/zypp/packages.
+        """
         retcode, output = waagent.RunGetOutput(self.clean_cmd)
         if retcode > 0:
             self.hutil.error("Failed to erase downloaded archive files")
@@ -76,26 +79,23 @@ class SuSEPatching(AbstractPatching):
             sys.exit(0)
 
     def download(self):
-        start_download_time = time.time()
-        self.clean()
+        #self.clean()
         self.check()
         self.downloaded = []
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+             f.write('')
         for package_to_download in self.to_download:
             retcode, output = waagent.RunGetOutput(self.download_cmd + package_to_download, False)
             self.downloaded.append(package_to_download)
-            current_download_time = time.time()
-            if current_download_time - start_download_time > self.download_duration:
-                break
-        with open(os.path.join(waagent.LibDir, 'package.download'), 'w') as f:
-            for package_downloaded in self.downloaded:
-                self.to_download.remove(package_downloaded)
-                f.write(package_downloaded + '\n')
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
+                f.write(package_to_download + '\n')
 
     def patch(self):
-        self.reboot_required = False;
+        self.kill_exceeded_download()
+        self.reboot_required = False
         start_patch_time = time.time()
         try:
-            with open(os.path.join(waagent.LibDir, 'package.download'), 'r') as f:
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
                 self.to_patch = [package_downloaded.strip() for package_downloaded in f.readlines()]
         except IOError, e:
             self.hutil.error("Failed to open package.downloaded with error: %s, \
@@ -108,6 +108,29 @@ class SuSEPatching(AbstractPatching):
             self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
+                self.hutil.log("Patching time exceeded. The pending package will be \
+                                patch in the next cycle")
+                break
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            for package_patched in self.patched:
+                self.to_patch.remove(package_patched)
+                f.write(package_patched + '\n')
+        self.reboot_if_required()
+
+    def patch_one_off(self):
+        self.reboot_required = False
+        start_patch_time = time.time()
+        self.check()
+        self.to_patch = self.to_download
+        for package_to_patch in self.to_patch:
+            retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
+            if output.find('Reboot as soon as possible.') != -1:
+                self.reboot_required = True
+            self.patched.append(package_to_patch)
+            current_patch_time = time.time()
+            if current_patch_time - start_patch_time > self.install_duration:
+                self.hutil.log("Patching time exceeded. The pending package will be \
+                                patch in the next cycle")
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
