@@ -66,8 +66,6 @@ class AbstractPatching(object):
                 self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
                 self.download_duration = 3600
                 self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
-                # Stop downloading 10s before patching
-                self.download_duration -= 10
  
                 day_of_week = settings.get('dayOfWeek')
                 if day_of_week is None or day_of_week == '':
@@ -95,6 +93,17 @@ class AbstractPatching(object):
                 self.category = 'ImportantAndRecommended'
             else:
                 self.category = category
+
+    def kill_exceeded_download(self):
+        script_file_path = os.path.realpath(sys.argv[0])
+        script_file = os.path.basename(script_file_path)
+        retcode, output = waagent.RunGetOutput('ps -ef | grep "' + script_file + ' -download" | grep -v grep | grep -v sh | awk \'{print $2}\'')
+        if retcode > 0:
+            self.hutil.error(output)
+        if output != '':
+            waagent.Run('kill -9 ' + output.strip())
+            self.hutil.error("Download time exceeded. The pending package will be \
+                                downloaded in the next cycle")
 
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)

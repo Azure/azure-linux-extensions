@@ -72,23 +72,18 @@ class UbuntuPatching(AbstractPatching):
             self.hutil.error("Failed to erase downloaded archive files")
 
     def download(self):
-        start_download_time = time.time()
         self.check()
         self.clean()
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+             f.write('')
         for package_to_download in self.to_download:
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download)
             if retcode > 0:
                 self.hutil.error("Failed to download the package: " + package_to_download)
-            else:
-                self.downloaded.append(package_to_download)
-            current_download_time = time.time()
-            if current_download_time - start_download_time > self.download_duration:
-                self.hutil.log("Download time exceeded. The pending package will be \
-                                downloaded in the next cycle")
-                break
-        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
-            for package_downloaded in self.downloaded:
-                f.write(package_downloaded + '\n')
+                continue
+            self.downloaded.append(package_to_download)
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
+                 f.write(package_to_download + '\n')
 
     def reboot_if_required(self):
         reboot_required = '/var/run/reboot-required'
@@ -98,6 +93,7 @@ class UbuntuPatching(AbstractPatching):
                 self.hutil.error("Failed to reboot")
 
     def patch(self):
+        self.kill_exceeded_download()
         start_patch_time = time.time()
         try:
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
