@@ -79,13 +79,15 @@ class SuSEPatching(AbstractPatching):
             sys.exit(0)
 
     def download(self):
-        #self.clean()
         self.check()
         self.downloaded = []
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
              f.write('')
         for package_to_download in self.to_download:
             retcode, output = waagent.RunGetOutput(self.download_cmd + package_to_download, False)
+            if 0 < retcode and retcode < 100:
+                self.hutil.error("Failed to download the package: " + package_to_patch)
+                continue
             self.downloaded.append(package_to_download)
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
                 f.write(package_to_download + '\n')
@@ -103,9 +105,12 @@ class SuSEPatching(AbstractPatching):
             self.to_patch = []
         for package_to_patch in self.to_patch:
             retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
-            if output.find('Reboot as soon as possible.') != -1:
+            if 0 < retcode and retcode < 100:
+                self.hutil.error("Failed to patch the package:" + package_to_patch)
+            else:
+                self.patched.append(package_to_patch)
+            if retcode == 102:
                 self.reboot_required = True
-            self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -113,7 +118,6 @@ class SuSEPatching(AbstractPatching):
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
-                self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
         self.reboot_if_required()
 
@@ -124,9 +128,12 @@ class SuSEPatching(AbstractPatching):
         self.to_patch = self.to_download
         for package_to_patch in self.to_patch:
             retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
-            if output.find('Reboot as soon as possible.') != -1:
+            if 0 < retcode and retcode < 100:
+                self.hutil.error("Failed to patch the package:" + package_to_patch)
+            else:
+                self.patched.append(package_to_patch)
+            if retcode == 102:
                 self.reboot_required = True
-            self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -134,7 +141,6 @@ class SuSEPatching(AbstractPatching):
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
-                self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
         self.reboot_if_required()
 
