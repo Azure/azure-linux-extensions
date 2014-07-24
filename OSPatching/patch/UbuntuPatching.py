@@ -43,6 +43,11 @@ class UbuntuPatching(AbstractPatching):
         self.status_cmd = 'apt-cache show'
 
     def parse_settings(self, settings):
+        """
+        Category is specific in each distro.
+        TODO:
+            Refactor this method if more category is added.
+        """
         super(UbuntuPatching,self).parse_settings(settings)
         if self.category == 'Important':
             waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
@@ -72,8 +77,11 @@ class UbuntuPatching(AbstractPatching):
             self.hutil.error("Failed to erase downloaded archive files")
 
     def download(self):
-        while True:
-            pass
+        """
+        Check any update.
+        Clean the cache to save disk space.
+        Download new updates.
+        """
         self.check()
         self.clean()
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
@@ -88,6 +96,10 @@ class UbuntuPatching(AbstractPatching):
                  f.write(package_to_download + '\n')
 
     def reboot_if_required(self):
+        """Check if reboot is required.
+        TODO:
+            Set reboot an option ???
+        """
         reboot_required = '/var/run/reboot-required'
         if os.path.isfile(reboot_required):
             retcode = waagent.Run('reboot')
@@ -95,6 +107,12 @@ class UbuntuPatching(AbstractPatching):
                 self.hutil.error("Failed to reboot")
 
     def patch(self):
+        """
+        Check if downloading process exceeds. If yes, kill it. 
+        Patch the downloaded package.
+        If the last patch installing time exceeds, it won't be killed. Just log.
+        Reboot if the installed patch requires.
+        """
         self.kill_exceeded_download()
         start_patch_time = time.time()
         try:
@@ -123,6 +141,9 @@ class UbuntuPatching(AbstractPatching):
         self.reboot_if_required()
 
     def patch_one_off(self):
+        """
+        Called when startTime is empty string, which means a on-demand patch.
+        """
         start_patch_time = time.time()
         self.check()
         self.to_patch = self.to_download
@@ -149,6 +170,9 @@ class UbuntuPatching(AbstractPatching):
         self.reboot_if_required()
 
     def report(self):
+        """
+        TODO
+        """
         for package_patched in self.patched:
             retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
             output = output.split('\n\n')[0]
