@@ -58,37 +58,15 @@ class redhatPatching(AbstractPatching):
         output = re.split(r'\s+', output.strip())
         self.to_download = output[0::3]
 
-    def clean(self):
-        """
-        Remove downloaded package.
-        Option "keepcache" in /etc/yum.conf is set to 0 by default,
-        which deletes the downloaded package after installed.
-        This function cleans the cache just in case.
-        """
-        retcode,output = waagent.RunGetOutput(self.clean_cmd)
-        if retcode > 0:
-            self.hutil.error("Failed to erase downloaded archive files")
-
     def download(self):
-        start_download_time = time.time()
         self.check()
-        self.clean()
-        count = 0
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+            f.write('')
         for package_to_download in self.to_download:
-            count += 1
             retcode = waagent.Run(self.download_cmd + ' ' + package_to_download, chk_err=False)
             self.downloaded.append(package_to_download)
-            current_download_time = time.time()
-            if count > 2:
-                break
-            if current_download_time - start_download_time > self.download_duration:
-                self.hutil.log("Download time exceeded. The pending package will be \
-                                downloaded in the next cycle")
-                break
-        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
-            for package_downloaded in self.downloaded:
-                self.to_download.remove(package_downloaded)
-                f.write(package_downloaded + '\n')
+            with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
+                f.write(package_to_download + '\n')
 
     def install(self):
         """
@@ -105,6 +83,7 @@ class redhatPatching(AbstractPatching):
             self.hutil.error("Failed to install yum-plugin-security")
 
     def patch(self):
+        self.kill_exceeded_download()
         start_patch_time = time.time()
         try:
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'r') as f:
@@ -117,8 +96,8 @@ class redhatPatching(AbstractPatching):
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
-                continue
-            self.patched.append(package_to_patch)
+            else:
+                self.patched.append(package_to_patch)
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -126,7 +105,6 @@ class redhatPatching(AbstractPatching):
                 break
         with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
             for package_patched in self.patched:
-                self.to_patch.remove(package_patched)
                 f.write(package_patched + '\n')
         #self.report()
         self.reboot_if_required()
