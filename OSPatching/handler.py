@@ -55,7 +55,7 @@ def enable():
         #     "startTime" : "02:00",
         #     "category" : "ImportantAndRecommended",
         #     "installDuration" : "00:30"
-        }
+        # }
         MyPatching.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_enabled()
