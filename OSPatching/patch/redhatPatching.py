@@ -53,7 +53,7 @@ class redhatPatching(AbstractPatching):
         """
         super(redhatPatching,self).parse_settings(settings)
         if self.category == 'Important':
-            self.download_cmd = 'yum -q -y --downloadonly --security update'
+            self.check_cmd = 'yum -q --security check-update'
 
     def check(self):
         """
