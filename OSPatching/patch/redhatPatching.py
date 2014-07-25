@@ -44,8 +44,6 @@ class redhatPatching(AbstractPatching):
         self.patch_cmd = 'yum -y update'
         self.status_cmd = 'yum -q info'
         self.cache_dir = '/var/cache/yum/'
-        retcode,output = waagent.RunGetOutput('cd '+self.cache_dir+';find . -name "updates"')
-        self.download_dir = os.path.join(self.cache_dir, output.strip('.\n/') + '/packages')
 
     def parse_settings(self, settings):
         """
@@ -68,7 +66,7 @@ class redhatPatching(AbstractPatching):
             self.hutil.log("No packages are available for update.")
         elif retcode == 100:
             output = re.split(r'\s+', output.strip())
-            self.to_download = zip(output[0::3], output[1::3])
+            self.to_download = output[0::3]
             self.hutil.log("There are packages available for an update.")
         elif retcode == 1:
             self.hutil.error("Failed to check updates with error: " + output)
@@ -81,11 +79,10 @@ class redhatPatching(AbstractPatching):
         self.check()
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
             f.write('')
-        for (pkg_name, pkg_version) in self.to_download:
+        for pkg_name in self.to_download:
             retcode = waagent.Run(self.download_cmd + ' ' + pkg_name, chk_err=False)
             # Yum exit code is not 0 even if succeed, so check if the package rpm exsits to verify that downloading succeeds.
-            package = pkg_name.rpartition('.')[0] + '-' + pkg_version + '.' +  pkg_name.rpartition('.')[2] + '.rpm'
-            if not os.path.isfile(os.path.join(self.download_dir, package)):
+            if not self.check_download(pkg_name):
                 self.hutil.error("Failed to download the package: " + pkg_name)
                 continue
             self.downloaded.append(pkg_name)
@@ -186,5 +183,36 @@ class redhatPatching(AbstractPatching):
         TODO: Report the detail status of patching
         """
         for package_patched in self.patched:
-            retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + package_patched)
-            self.hutil.log(output)
+            self.info_pkg(package_patched)
+
+    def info_pkg(self, pkg_name):
+        """
+        Return details about a package        
+        """
+        retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + pkg_name)
+        if retcode == 0:
+            return output
+        else:
+            self.hutil.error(output)
+
+    def check_download(self, pkg_name):
+        pkg_info = self.info_pkg(pkg_name)
+        pkg_info_list = pkg_info.rpartition('Available Packages')[-1].strip().split('\n')
+        for item in pkg_info_list:
+            if item.startswith('Name'):
+                name = item.split(':')[-1].strip()
+            elif item.startswith('Arch'):
+                arch = item.split(':')[-1].strip()
+            elif item.startswith('Version'):
+                version = item.split(':')[-1].strip()
+            elif item.startswith('Release'):
+                release = item.split(':')[-1].strip()
+        package = '.'.join(['-'.join([name, version, release]), arch, 'rpm'])
+        retcode,output = waagent.RunGetOutput('cd ' + self.cache_dir + ';find . -name "'+ package + '"')
+        if retcode != 0:
+            self.hutil.error("Unable to check whether the downloading secceeds")
+        else:
+            if output == '':
+                return False
+            else:
+                return True
