@@ -190,23 +190,40 @@ class redhatPatching(AbstractPatching):
         Return details about a package        
         """
         retcode,output = waagent.RunGetOutput(self.status_cmd + ' ' + pkg_name)
-        if retcode == 0:
-            return output
-        else:
+        if retcode != 0:
             self.hutil.error(output)
+            return None
+        installed_pkg_info_list = output.rpartition('Available Packages')[0].strip().split('\n')
+        available_pkg_info_list = output.rpartition('Available Packages')[-1].strip().split('\n')
+        pkg_info = dict()
+        pkg_info['installed'] = dict()
+        pkg_info['available'] = dict()
+        for item in installed_pkg_info_list:
+            if item.startswith('Name'):
+                pkg_info['installed']['name'] = item.split(':')[-1].strip()
+            elif item.startswith('Arch'):
+                pkg_info['installed']['arch'] = item.split(':')[-1].strip()
+            elif item.startswith('Version'):
+                pkg_info['installed']['version'] = item.split(':')[-1].strip()
+            elif item.startswith('Release'):
+                pkg_info['installed']['release'] = item.split(':')[-1].strip()
+        for item in available_pkg_info_list:
+            if item.startswith('Name'):
+                pkg_info['available']['name'] = item.split(':')[-1].strip()
+            elif item.startswith('Arch'):
+                pkg_info['available']['arch'] = item.split(':')[-1].strip()
+            elif item.startswith('Version'):
+                pkg_info['available']['version'] = item.split(':')[-1].strip()
+            elif item.startswith('Release'):
+                pkg_info['available']['release'] = item.split(':')[-1].strip()
+        return pkg_info
 
     def check_download(self, pkg_name):
         pkg_info = self.info_pkg(pkg_name)
-        pkg_info_list = pkg_info.rpartition('Available Packages')[-1].strip().split('\n')
-        for item in pkg_info_list:
-            if item.startswith('Name'):
-                name = item.split(':')[-1].strip()
-            elif item.startswith('Arch'):
-                arch = item.split(':')[-1].strip()
-            elif item.startswith('Version'):
-                version = item.split(':')[-1].strip()
-            elif item.startswith('Release'):
-                release = item.split(':')[-1].strip()
+        name = pkg_info['available']['name']
+        arch = pkg_info['available']['arch']
+        version = pkg_info['available']['version']
+        release = pkg_info['available']['release']
         package = '.'.join(['-'.join([name, version, release]), arch, 'rpm'])
         retcode,output = waagent.RunGetOutput('cd ' + self.cache_dir + ';find . -name "'+ package + '"')
         if retcode != 0:
