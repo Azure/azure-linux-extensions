@@ -71,7 +71,7 @@ class UbuntuPatching(AbstractPatching):
         output = re.split(r'\s+', output[start:end].strip())
         output.pop()
         self.to_download = output
-        self.hutil.log("There are " + len(self.to_download) + " packages to upgrade.")
+        self.hutil.log("There are " + str(len(self.to_download)) + " packages to upgrade.")
 
     def clean(self):
         retcode,output = waagent.RunGetOutput(self.clean_cmd)

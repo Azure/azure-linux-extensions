@@ -72,6 +72,7 @@ class redhatPatching(AbstractPatching):
                     break
                 self.to_download.append(line[0])
             self.hutil.log("There are packages available for an update.")
+            self.hutil.log("There are " + str(len(self.to_download)) + " packages to upgrade.")
         elif retcode == 1:
             self.hutil.error("Failed to check updates with error: " + output)
 
@@ -90,6 +91,7 @@ class redhatPatching(AbstractPatching):
                 self.hutil.error("Failed to download the package: " + pkg_name)
                 continue
             self.downloaded.append(pkg_name)
+            self.hutil.log("Package " + pkg_name + " is downloaded.")
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
                 f.write(pkg_name + '\n')
 
@@ -130,6 +132,7 @@ class redhatPatching(AbstractPatching):
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
             else:
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -145,6 +148,7 @@ class redhatPatching(AbstractPatching):
         """
         Called when startTime is empty string, which means a on-demand patch.
         """
+        self.hutil.log("Going to patch one-off")
         start_patch_time = time.time()
         self.check()
         self.to_patch = self.to_download
@@ -155,6 +159,7 @@ class redhatPatching(AbstractPatching):
             else:
                 self.downloaded.append(package_to_patch)
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -178,6 +183,7 @@ class redhatPatching(AbstractPatching):
         retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
         if last_kernel != current_kernel:
+            self.hutil.log("System going to reboot...")
             retcode = waagent.Run('reboot')
             if retcode > 0:
                 self.hutil.error("Failed to reboot")
