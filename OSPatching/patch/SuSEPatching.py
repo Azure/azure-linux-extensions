@@ -44,6 +44,8 @@ class SuSEPatching(AbstractPatching):
     
     def parse_settings(self, settings):
         super(SuSEPatching, self).parse_settings(settings)
+        if self.disabled:
+            return
         if self.category == 'Important':
             self.check_cmd = self.check_cmd + ' --category security'
     

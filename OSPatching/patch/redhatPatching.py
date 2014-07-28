@@ -52,6 +52,8 @@ class redhatPatching(AbstractPatching):
             Refactor this method if more category is added.
         """
         super(redhatPatching,self).parse_settings(settings)
+        if self.disabled:
+            return
         if self.category == 'Important':
             self.check_cmd = 'yum -q --security check-update'
 

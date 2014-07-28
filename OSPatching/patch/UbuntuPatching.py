@@ -49,6 +49,8 @@ class UbuntuPatching(AbstractPatching):
             Refactor this method if more category is added.
         """
         super(UbuntuPatching,self).parse_settings(settings)
+        if self.disabled:
+            return
         if self.category == 'Important':
             waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
             self.download_cmd = self.download_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
