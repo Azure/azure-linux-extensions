@@ -38,7 +38,7 @@ class SuSEPatching(AbstractPatching):
     def __init__(self, hutil):
         super(SuSEPatching,self).__init__(hutil)
         self.clean_cmd = 'zypper clean'
-        self.check_cmd = 'zypper --non-interactive list-patches'
+        self.check_cmd = 'zypper -q --non-interactive list-patches'
         self.download_cmd = 'zypper --non-interactive install -d --auto-agree-with-licenses -t patch '
         self.patch_cmd = 'zypper --non-interactive install --auto-agree-with-licenses -t patch '
     
