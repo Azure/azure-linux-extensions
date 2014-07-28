@@ -58,6 +58,7 @@ class UbuntuPatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
+        waagent.Run('apt-get update', False)
         retcode,output = waagent.RunGetOutput(self.check_cmd)
         if retcode > 0:
             self.hutil.error("Failed to check valid upgrades")
@@ -93,7 +94,7 @@ class UbuntuPatching(AbstractPatching):
                 continue
             self.downloaded.append(package_to_download)
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
-                 f.write(package_to_download + '\n')
+                f.write(package_to_download + '\n')
 
     def reboot_if_required(self):
         """Check if reboot is required.
@@ -122,20 +123,21 @@ class UbuntuPatching(AbstractPatching):
             self.hutil.error("Failed to open package.downloaded with error: %s, \
                              stack trace: %s" %(str(e), traceback.format_exc()))
             self.to_patch = []
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            f.write('')
         for package_to_patch in self.to_patch:
             retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
             if retcode > 0:
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
             else:
                 self.patched.append(package_to_patch)
+                with open(os.path.join(waagent.LibDir, 'package.patched'), 'a') as f:
+                    f.write(package_to_patch + '\n')
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
                                 patched in the next cycle")
                 break
-        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
-            for package_patched in self.patched:
-                f.write(package_patched + '\n')
         # TODO: Report the detail status of patching
         # self.report()
         self.reboot_if_required()
