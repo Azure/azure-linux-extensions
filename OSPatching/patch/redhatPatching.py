@@ -65,8 +65,12 @@ class redhatPatching(AbstractPatching):
             self.to_download = []
             self.hutil.log("No packages are available for update.")
         elif retcode == 100:
-            output = re.split(r'\s+', output.strip())
-            self.to_download = output[0::3]
+            lines = output.strip().split('\n')
+            for line in lines:
+                line = re.split(r'\s+', line.strip())
+                if len(line) != 3:
+                    break
+                self.to_download.append(line[0])
             self.hutil.log("There are packages available for an update.")
         elif retcode == 1:
             self.hutil.error("Failed to check updates with error: " + output)
