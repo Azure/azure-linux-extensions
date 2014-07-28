@@ -71,6 +71,7 @@ class UbuntuPatching(AbstractPatching):
         output = re.split(r'\s+', output[start:end].strip())
         output.pop()
         self.to_download = output
+        self.hutil.log("There are " + len(self.to_download) + " packages to upgrade.")
 
     def clean(self):
         retcode,output = waagent.RunGetOutput(self.clean_cmd)
@@ -93,6 +94,7 @@ class UbuntuPatching(AbstractPatching):
                 self.hutil.error("Failed to download the package: " + package_to_download)
                 continue
             self.downloaded.append(package_to_download)
+            self.hutil.log("Package " + package_to_download + " is downloaded.")
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
                 f.write(package_to_download + '\n')
 
@@ -103,6 +105,7 @@ class UbuntuPatching(AbstractPatching):
         """
         reboot_required = '/var/run/reboot-required'
         if os.path.isfile(reboot_required):
+            self.hutil.log("System going to reboot...")
             retcode = waagent.Run('reboot')
             if retcode > 0:
                 self.hutil.error("Failed to reboot")
@@ -131,6 +134,7 @@ class UbuntuPatching(AbstractPatching):
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
             else:
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
                 with open(os.path.join(waagent.LibDir, 'package.patched'), 'a') as f:
                     f.write(package_to_patch + '\n')
             current_patch_time = time.time()
@@ -146,6 +150,7 @@ class UbuntuPatching(AbstractPatching):
         """
         Called when startTime is empty string, which means a on-demand patch.
         """
+        self.hutil.log("Going to patch one-off")
         start_patch_time = time.time()
         self.check()
         self.to_patch = self.to_download
@@ -156,6 +161,7 @@ class UbuntuPatching(AbstractPatching):
             else:
                 self.downloaded.append(package_to_patch)
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
