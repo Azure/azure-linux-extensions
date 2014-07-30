@@ -45,7 +45,6 @@ class AbstractPatching(object):
         self.patched = []
         self.to_patch = []
         self.downloaded = []
-        self.to_download = []
 
         self.disabled = None
         self.stop = None
