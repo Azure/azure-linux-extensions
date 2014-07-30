@@ -68,5 +68,32 @@ $PrivateConfig = '{"username":"' + $UserName + '", "password": "' +  $Password +
 Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM	
 ``` 
+
+## OS Patching Extension
+Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle and the actual patching operation is automated based on the pre-configured schedule.
+### Features
+* it can be installed through Azure RESTFUL API for extension
+* it supports major Linux
+* it can be configured by the user
+* it can patch the os automatically as a scheduled task
+* it can patch the os automatically as a one-off
+* status of the extension is reported back to Azure so that you can see the status on Azure Portal
+
+### Usage
+PowerShell script to deploy the extension on VM	
+```powershell
+$VmName = '<vm_name>'
+Write-Host ('Retrieving the VM ' + $VmName + '.....................')
+$vm = get-azurevm $VmName
+$ExtensionName = '<extension_name>'
+$Publisher = '<publisher_name>'
+$Version =  '<version>'
+$PrivateConfig = '{"disabled": "true|false", "dayOfWeek": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday", "startTime": "hr:min", "category": "Important|ImportantAndRecommended", "installDuration": "hr:min"}'	
+Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
+$PublicConfig = '{ }'
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM
+Write-Host 'Deploy done!'
+``` 
+
 ## Test Handler Extension
 This extension is an extension example  
