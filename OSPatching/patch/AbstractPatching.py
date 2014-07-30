@@ -57,7 +57,18 @@ class AbstractPatching(object):
             self.hutil.log("WARNING: the value of option \"disabled\" not \
                             specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
-        if not self.disabled: 
+        if not self.disabled:
+            stop = settings.get('stop')
+            self.stop = True if stop in ['True', 'true'] else False
+            if self.stop:
+                return
+
+            rebootAfterPatch = settings.get('rebootAfterPatch')
+            if rebootAfterPatch is None or rebootAfterPatch == '':
+                self.rebootAfterPatch = 'Auto'
+            else:
+                self.rebootAfterPatch = rebootAfterPatch
+
             start_time = settings.get('startTime')
             if start_time is None or start_time == '':
                 self.patch_now = True
@@ -123,11 +134,12 @@ class AbstractPatching(object):
             new_line = '\n'
         else:
             hr = str(self.download_time.hour)
+            minute = str(self.download_time.minute)
             if self.download_time.day != self.start_time.day:
                 dow = ','.join([str(day - 1) for day in self.day_of_week])
             else:
                 dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n0', hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download >/dev/null 2>&1\n'])
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
@@ -140,8 +152,9 @@ class AbstractPatching(object):
             new_line = '\n'
         else:
             hr = str(self.start_time.hour)
+            minute = str(self.start_time.minute)
             dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n0', hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
