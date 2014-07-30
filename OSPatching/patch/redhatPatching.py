@@ -134,7 +134,14 @@ class redhatPatching(AbstractPatching):
         If the last patch installing time exceeds, it won't be killed. Just log.
         Reboot if the installed patch requires.
         """
-        self.kill_exceeded_download()
+        if self.exists_stop_flag():
+            self.hutil.log("Installing patches is stopped/canceled")
+            self.delete_stop_flag()
+            return
+        retcode = self.stop_download()
+        if retcode == 100:
+            self.hutil.error("Download time exceeded. The pending package will be \
+                                downloaded in the next cycle")
         global start_patch_time
         start_patch_time = time.time()
         patchlist = get_pkg_to_patch(self.category_required)

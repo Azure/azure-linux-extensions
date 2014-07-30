@@ -124,9 +124,12 @@ class AbstractPatching(object):
         else:
             self.category = category
 
-    def kill_exceeded_download(self):
+    def stop_download(self):
         '''
-        kill the process of exceeded downloading and its subprocess.
+        kill the process of downloading and its subprocess.
+        return code:
+            0   - There are no downloading process to stop
+            100 - The downloading process is stopped
         '''
         script_file_path = os.path.realpath(sys.argv[0])
         script_file = os.path.basename(script_file_path)
@@ -140,8 +143,8 @@ class AbstractPatching(object):
             if output2 != '':
                 waagent.Run('kill -15 ' + output2.strip())
             waagent.Run('kill -15 ' + output.strip())
-            self.hutil.error("Download time exceeded. The pending package will be \
-                                downloaded in the next cycle")
+            return 100
+        return 0
 
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)
@@ -186,7 +189,7 @@ class AbstractPatching(object):
 
     def enable(self):
         if self.stop:
-            self.kill_exceeded_download()
+            self.stop_download()
             self.create_stop_flag()
             return
         self.delete_stop_flag()
