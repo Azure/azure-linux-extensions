@@ -79,6 +79,7 @@ Allow the owner of the Azure VM to configure the Linux VM patching schedule cycl
 * it can patch the os automatically as a scheduled task
 * it can patch the os automatically as a one-off
 * status of the extension is reported back to Azure so that you can see the status on Azure Portal
+
 ### Usage
 PowerShell script to deploy the extension on VM	
 ```powershell
