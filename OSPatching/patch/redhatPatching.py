@@ -184,17 +184,23 @@ class redhatPatching(AbstractPatching):
 
     def reboot_if_required(self):
         """
-        A reboot should be only necessary when kernel has been upgraded.
-        TODO:
-            Set reboot an option ???
+        In auto mode, a reboot should be only necessary when kernel has been upgraded.
         """
-        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
-        retcode,current_kernel = waagent.RunGetOutput('uname -r')
-        if last_kernel != current_kernel:
+        if self.rebootAfterPatch == 'NotRequired':
+            return
+        if self.rebootAfterPatch == 'Required':
             self.hutil.log("System going to reboot...")
             retcode = waagent.Run('reboot')
             if retcode > 0:
                 self.hutil.error("Failed to reboot")
+        elif self.rebootAfterPatch == 'Auto':
+            retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
+            retcode,current_kernel = waagent.RunGetOutput('uname -r')
+            if last_kernel != current_kernel:
+                self.hutil.log("System going to reboot...")
+                retcode = waagent.Run('reboot')
+                if retcode > 0:
+                    self.hutil.error("Failed to reboot")
 
     def report(self):
         """
