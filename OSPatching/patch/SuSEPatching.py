@@ -43,20 +43,17 @@ class SuSEPatching(AbstractPatching):
         self.patch_cmd = 'zypper --non-interactive install --auto-agree-with-licenses -t patch '
     
     def parse_settings(self, settings):
+        """
+        Category is specific in each distro.
+        TODO:
+            Refactor this method if more category is added.
+        """
         super(SuSEPatching, self).parse_settings(settings)
         if self.disabled:
             return
         if self.category == 'Important':
             self.check_cmd = self.check_cmd + ' --category security'
     
-    def clean(self):
-        """
-        Clean local caches in /var/cache/zypp/packages.
-        """
-        retcode, output = waagent.RunGetOutput(self.clean_cmd)
-        if retcode > 0:
-            self.hutil.error("Failed to erase downloaded archive files")
-
     def check(self):
         """
         Check valid upgrades,
@@ -81,6 +78,10 @@ class SuSEPatching(AbstractPatching):
             sys.exit(0)
 
     def download(self):
+        """
+        Check any update.
+        Download new updates.
+        """
         self.check()
         self.downloaded = []
         with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
@@ -91,10 +92,17 @@ class SuSEPatching(AbstractPatching):
                 self.hutil.error("Failed to download the package: " + package_to_patch)
                 continue
             self.downloaded.append(package_to_download)
+            self.hutil.log("Package " + package_to_download + " is downloaded.")
             with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
                 f.write(package_to_download + '\n')
 
     def patch(self):
+        """
+        Check if downloading process exceeds. If yes, kill it.
+        Patch the downloaded package.
+        If the last patch installing time exceeds, it won't be killed. Just log.
+        Reboot if the installed patch requires.
+        """
         self.kill_exceeded_download()
         self.reboot_required = False
         start_patch_time = time.time()
@@ -105,12 +113,17 @@ class SuSEPatching(AbstractPatching):
             self.hutil.error("Failed to open package.downloaded with error: %s, \
                              stack trace: %s" %(str(e), traceback.format_exc()))
             self.to_patch = []
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            f.write('')
         for package_to_patch in self.to_patch:
             retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
             if 0 < retcode and retcode < 100:
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
             else:
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
+                with open(os.path.join(waagent.LibDir, 'package.patched'), 'a') as f:
+                    f.write(package_to_patch + '\n')
             if retcode == 102:
                 self.reboot_required = True
             current_patch_time = time.time()
@@ -118,22 +131,33 @@ class SuSEPatching(AbstractPatching):
                 self.hutil.log("Patching time exceeded. The pending package will be \
                                 patch in the next cycle")
                 break
-        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
-            for package_patched in self.patched:
-                f.write(package_patched + '\n')
         self.reboot_if_required()
 
     def patch_one_off(self):
+        """
+        Called when startTime is empty string, which means a on-demand patch.
+        """
+        self.hutil.log("Going to patch one-off")
         self.reboot_required = False
         start_patch_time = time.time()
         self.check()
         self.to_patch = self.to_download
+        with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'w') as f:
+            f.write('')
+        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
+            f.write('')
         for package_to_patch in self.to_patch:
             retcode, output = waagent.RunGetOutput(self.patch_cmd + package_to_patch, False)
             if 0 < retcode and retcode < 100:
                 self.hutil.error("Failed to patch the package:" + package_to_patch)
             else:
+                self.downloaded.append(package_to_patch)
                 self.patched.append(package_to_patch)
+                self.hutil.log("Package " + package_to_patch + " is patched.")
+                with open(os.path.join(waagent.LibDir, 'package.downloaded'), 'a') as f:
+                    f.write(package_to_patch + '\n')
+                with open(os.path.join(waagent.LibDir, 'package.patched'), 'a') as f:
+                    f.write(package_to_patch + '\n')
             if retcode == 102:
                 self.reboot_required = True
             current_patch_time = time.time()
@@ -141,13 +165,15 @@ class SuSEPatching(AbstractPatching):
                 self.hutil.log("Patching time exceeded. The pending package will be \
                                 patch in the next cycle")
                 break
-        with open(os.path.join(waagent.LibDir, 'package.patched'), 'w') as f:
-            for package_patched in self.patched:
-                f.write(package_patched + '\n')
         self.reboot_if_required()
 
     def reboot_if_required(self):
+        """Check if reboot is required.
+        TODO:
+            Set reboot an option ???
+        """
         if self.reboot_required:
+            self.hutil.log("System going to reboot...")
             retcode = waagent.Run('reboot')
             if retcode > 0:
                 self.hutil.error("Failed to reboot")
