@@ -144,12 +144,12 @@ class redhatPatching(AbstractPatching):
                                 downloaded in the next cycle")
         global start_patch_time
         start_patch_time = time.time()
-        patchlist = get_pkg_to_patch(self.category_required)
+        patchlist = self.get_pkg_to_patch(self.category_required)
         self._patch(self.category_required, patchlist)
         if not self.exists_stop_flag():
             self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
             time.sleep(self.gap_between_stage)
-            patchlist = get_pkg_to_patch(self.category_all)
+            patchlist = self.get_pkg_to_patch(self.category_all)
             self._patch(self.category_all, patchlist)
         else:
             self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
@@ -161,8 +161,7 @@ class redhatPatching(AbstractPatching):
         if self.exists_stop_flag():
             self.hutil.log("Installing patches (Category:" + category + ") is stopped/canceled")
             return
-        if patchlist:
-            self.hutil.log("Start to install patches (Category:" + category + ")")
+        self.hutil.log("Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
         for package_to_patch in patchlist:
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:

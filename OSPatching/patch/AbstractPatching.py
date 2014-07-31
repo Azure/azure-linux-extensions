@@ -68,7 +68,7 @@ class AbstractPatching(object):
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
 
-        self.gap_between_stage = 120
+        self.gap_between_stage = 60
 
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
