@@ -46,14 +46,6 @@ class redhatPatching(AbstractPatching):
         self.status_cmd = 'yum -q info'
         self.cache_dir = '/var/cache/yum/'
 
-    def parse_settings(self, settings):
-        """
-        Category is specific in each distro.
-        TODO:
-            Refactor this method if more category is added.
-        """
-        super(redhatPatching,self).parse_settings(settings)
-
     def install(self):
         """
         Install for dependencies.
@@ -96,128 +88,18 @@ class redhatPatching(AbstractPatching):
             self.hutil.error("Failed to check updates with error: " + output)
             sys.exit(1)
 
-    def download(self):
-        """
-        Check any update.
-        Download new updates.
-        """
-        if self.exists_stop_flag():
-            self.hutil.log("Downloading patches is stopped/canceled")
-            return
-        waagent.SetFileContents(self.package_downloaded_path, '')
-        waagent.SetFileContents(self.package_patched_path, '')
-        # Installing security patches is mandatory
-        self._download(self.category_required)
-        if self.category == self.category_all:
-            self._download(self.category_all)
+    def download_package(self, package):
+        retcode = waagent.Run(self.download_cmd + ' ' + package, chk_err=False)
+        # Yum exit code is not 0 even if succeed, so check if the package rpm exsits to verify that downloading succeeds.
+        return self.check_download(package)
 
-    def _download(self, category):
-        self.hutil.log("Start to check&download patches (Category:" + category + ")")
-        pkg_to_download = self.check(category)
-        for pkg_name in pkg_to_download:
-            if pkg_name in self.downloaded:
-                continue
-            retcode = waagent.Run(self.download_cmd + ' ' + pkg_name, chk_err=False)
-            # Yum exit code is not 0 even if succeed, so check if the package rpm exsits to verify that downloading succeeds.
-            if not self.check_download(pkg_name):
-                self.hutil.error("Failed to download the package: " + pkg_name)
-                continue
-            self.downloaded.append(pkg_name)
-            self.hutil.log("Package " + pkg_name + " is downloaded.")
-            waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
+    def patch_package(self, package):
+        return waagent.Run(self.patch_cmd + ' ' + package)
 
-    def patch(self):
-        """
-        Check if downloading process exceeds. If yes, kill it. 
-        Patch the downloaded package.
-        The cache will be deleted automatically after installation.
-        If the last patch installing time exceeds, it won't be killed. Just log.
-        Reboot if the installed patch requires.
-        """
-        if self.exists_stop_flag():
-            self.hutil.log("Installing patches is stopped/canceled")
-            self.delete_stop_flag()
-            return
-        retcode = self.stop_download()
-        if retcode == 100:
-            self.hutil.error("Download time exceeded. The pending package will be \
-                                downloaded in the next cycle")
-        global start_patch_time
-        start_patch_time = time.time()
-        patchlist = self.get_pkg_to_patch(self.category_required)
-        self._patch(self.category_required, patchlist)
-        if not self.exists_stop_flag():
-            self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
-            time.sleep(self.gap_between_stage)
-            patchlist = self.get_pkg_to_patch(self.category_all)
-            self._patch(self.category_all, patchlist)
-        else:
-            self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
-        self.delete_stop_flag()
-        #self.report()
-        self.reboot_if_required()
-
-    def _patch(self, category, patchlist):
-        if self.exists_stop_flag():
-            self.hutil.log("Installing patches (Category:" + category + ") is stopped/canceled")
-            return
-        self.hutil.log("Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
-        for package_to_patch in patchlist:
-            current_patch_time = time.time()
-            if current_patch_time - start_patch_time > self.install_duration:
-                self.hutil.log("Patching time exceeded. The pending package will be \
-                                patched in the next cycle")
-                break
-            retcode = waagent.Run(self.patch_cmd + ' ' + package_to_patch)
-            if retcode > 0:
-                self.hutil.error("Failed to patch the package:" + package_to_patch)
-            else:
-                self.patched.append(package_to_patch)
-                self.hutil.log("Package " + package_to_patch + " is patched.")
-                waagent.AppendFileContents(self.package_patched_path, package_to_patch + ' ' + category + '\n')
-
-    def patch_one_off(self):
-        """
-        Called when startTime is empty string, which means a on-demand patch.
-        """
-        global start_patch_time
-        start_patch_time = time.time()
-        self.hutil.log("Going to patch one-off")
-        waagent.SetFileContents(self.package_downloaded_path, '')
-        waagent.SetFileContents(self.package_patched_path, '')
-        patchlist = self.check(self.category_required)
-        self._patch(self.category_required, patchlist)
-        if not self.exists_stop_flag():
-            self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
-            time.sleep(self.gap_between_stage)
-            patchlist = self.check(self.category_all)
-            self._patch(self.category_all, patchlist)
-        else:
-            self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
-        shutil.copy2(self.package_patched_path, self.package_downloaded_path)
-        self.delete_stop_flag()
-        #self.report()
-        self.reboot_if_required()
-
-    def reboot_if_required(self):
-        """
-        In auto mode, a reboot should be only necessary when kernel has been upgraded.
-        """
-        if self.reboot_after_patch == 'NotRequired':
-            return
-        if self.reboot_after_patch == 'Required':
-            self.hutil.log("System going to reboot...")
-            retcode = waagent.Run('reboot')
-            if retcode > 0:
-                self.hutil.error("Failed to reboot")
-        elif self.reboot_after_patch == 'Auto':
-            retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
-            retcode,current_kernel = waagent.RunGetOutput('uname -r')
-            if last_kernel != current_kernel:
-                self.hutil.log("System going to reboot...")
-                retcode = waagent.Run('reboot')
-                if retcode > 0:
-                    self.hutil.error("Failed to reboot")
+    def check_reboot(self):
+        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
+        retcode,current_kernel = waagent.RunGetOutput('uname -r')
+        return last_kernel != current_kernel
 
     def report(self):
         """
@@ -271,10 +153,6 @@ class redhatPatching(AbstractPatching):
             self.hutil.error("Unable to check whether the downloading secceeds")
         else:
             if output == '':
-                return False
+                return 1
             else:
-                return True
-
-    def get_pkg_to_patch(self, category):
-        patchlist = [line.split()[0] for line in waagent.GetFileContents(self.package_downloaded_path).split('\n') if line.endswith(category)]
-        return patchlist
+                return 0
