@@ -58,23 +58,14 @@ class UbuntuPatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        self.hutil.log("Start to check patches (Category:" + category + ")")
         waagent.Run(self.update_cmd, False)
         if category == self.category_all:
             check_cmd = self.check_cmd
         elif category == self.category_required:
             check_cmd = self.check_security_cmd
-        to_download = []
-        retcode,output = waagent.RunGetOutput(check_cmd)
-        if retcode > 0:
-            self.hutil.error("Failed to check valid upgrades")
-            sys.exit(1)
+        retcode, output = waagent.RunGetOutput(check_cmd)
         to_download = [line.split()[1] for line in output.split('\n') if line.startswith('Inst')]
-        self.hutil.log("There are " + str(len(to_download)) + " packages to upgrade.")
-        if not to_download:
-            self.hutil.log("No packages are available for update.")
-            sys.exit(0)
-        return to_download
+        return retcode, to_download
 
     def download_package(self, package):
         return waagent.Run(self.download_cmd + ' ' + package)

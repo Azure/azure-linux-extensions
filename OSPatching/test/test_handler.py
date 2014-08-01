@@ -145,9 +145,7 @@ class Test(unittest.TestCase):
             patch()
         self.assertEqual(cm.exception.code, 0)
 
-
-if __name__ == '__main__':
-    #main()
+def unit_test_main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
@@ -159,3 +157,7 @@ if __name__ == '__main__':
     if MyPatching == None:
         sys.exit(1)
     unittest.main()
+
+if __name__ == '__main__':
+    main()
+    #unit_test_main()

@@ -65,7 +65,6 @@ class redhatPatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        self.hutil.log("Start to check patches (Category:" + category + ")")
         if category == self.category_all:
             check_cmd = self.check_cmd
         elif category == self.category_required:
@@ -73,8 +72,7 @@ class redhatPatching(AbstractPatching):
         to_download = []
         retcode,output = waagent.RunGetOutput(check_cmd, chk_err=False)
         if retcode == 0:
-            self.hutil.log("No packages are available for update.")
-            return to_download
+            return 0, to_download
         elif retcode == 100:
             lines = output.strip().split('\n')
             for line in lines:
@@ -82,11 +80,9 @@ class redhatPatching(AbstractPatching):
                 if len(line) != 3:
                     break
                 to_download.append(line[0])
-            self.hutil.log("There are " + str(len(to_download)) + " packages to upgrade.")
-            return to_download
+            return 0, to_download
         elif retcode == 1:
-            self.hutil.error("Failed to check updates with error: " + output)
-            sys.exit(1)
+            return 1, to_download
 
     def download_package(self, package):
         retcode = waagent.Run(self.download_cmd + ' ' + package, chk_err=False)

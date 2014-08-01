@@ -148,8 +148,8 @@ class AbstractPatching(object):
         '''
         kill the process of downloading and its subprocess.
         return code:
-            0   - There are no downloading process to stop
-            100 - The downloading process is stopped
+            100  - There are no downloading process to stop
+            0    - The downloading process is stopped
         '''
         script_file_path = os.path.realpath(sys.argv[0])
         script_file = os.path.basename(script_file_path)
@@ -163,8 +163,8 @@ class AbstractPatching(object):
             if output2 != '':
                 waagent.Run('kill -15 ' + output2.strip())
             waagent.Run('kill -15 ' + output.strip())
-            return 100
-        return 0
+            return 0
+        return 100
 
     def set_download_cron(self):
         contents = waagent.GetFileContents(self.crontab)
@@ -219,7 +219,14 @@ class AbstractPatching(object):
 
     def _download(self, category):
         self.hutil.log("Start to check&download patches (Category:" + category + ")")
-        downloadlist = self.check(category)
+        retcode, downloadlist = self.check(category)
+        if retcode > 0:
+            self.hutil.error("Failed to check valid upgrades")
+            sys.exit(1)
+        if not downloadlist:
+            self.hutil.log("No packages are available for update.")
+            return
+        self.hutil.log("There are " + str(len(downloadlist)) + " packages to upgrade.")
         self.hutil.log("download list: " + ' '.join(downloadlist))
         for pkg_name in downloadlist:
             if pkg_name in self.downloaded:
@@ -239,7 +246,7 @@ class AbstractPatching(object):
             return
 
         retcode = self.stop_download()
-        if retcode == 100:
+        if retcode == 0:
             self.hutil.error("Download time exceeded. The pending package will be \
                                 downloaded in the next cycle")
 
@@ -263,6 +270,9 @@ class AbstractPatching(object):
     def _patch(self, category, patchlist):
         if self.exists_stop_flag():
             self.hutil.log("Installing patches (Category:" + category + ") is stopped/canceled")
+            return
+        if not patchlist:
+            self.hutil.log("No packages are available for update.")
             return
         self.hutil.log("Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
         self.hutil.log("patch list: " + ' '.join(patchlist))

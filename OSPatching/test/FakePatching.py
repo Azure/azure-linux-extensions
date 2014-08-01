@@ -35,7 +35,7 @@ class FakePatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        return []
+        return 0, []
 
     def download_package(self, package):
         return 0
