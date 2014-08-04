@@ -35,15 +35,19 @@ sys.path.append('..')
 from patch import *
 from FakePatching import FakePatching
 
+
 # Global variables definition
 ExtensionShortName = 'OSPatching'
 
-contents = waagent.GetFileContents('100.settings')
+contents = waagent.GetFileContents('default.settings')
 protect_settings = json.loads(contents)
+status_file = '/var/lib/waagent/Microsoft.OSTCExtensions.OSPatchingForLinuxTest-1.0/status/3.status'
 
 def install():
     hutil.do_parse_context('Install')
     try:
+        # Ensure the same configuration is executed only once
+        hutil.exit_if_seq_smaller()
         MyPatching.install()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
     except Exception, e:
@@ -56,7 +60,7 @@ def enable():
     try:
         MyPatching.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
-        hutil.exit_if_enabled()
+        hutil.exit_if_seq_smaller()
         MyPatching.enable()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded.')
     except Exception, e:
@@ -71,6 +75,8 @@ def uninstall():
 def disable():
     hutil.do_parse_context('Disable')
     try:
+        # Ensure the same configuration is executed only once
+        hutil.exit_if_seq_smaller()
         MyPatching.disable()
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
     except Exception, e:
@@ -135,6 +141,62 @@ def main():
 
 
 class Test(unittest.TestCase):
+    def setUp(self):
+        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
+        waagent.Log("%s started to handle." %(ExtensionShortName))
+
+        global hutil
+        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
+                                    ExtensionShortName)
+        global MyPatching
+        MyPatching = FakePatching(hutil)
+        if MyPatching == None:
+            sys.exit(1)
+
+        try:
+            os.remove('mrseq')
+        except:
+            pass
+
+    def test_parse_settings(self):
+        protect_settings = {
+            "disabled" : "false",
+            "stop" : "false",
+            "rebootAfterPatch" : "Auto",
+            "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
+            "startTime" : "02:00",
+            "category" : "ImportantAndRecommended",
+            "installDuration" : "00:30"
+        }
+        MyPatching.parse_settings(protect_settings)
+        self.assertFalse(MyPatching.disabled)
+        self.assertFalse(MyPatching.stop)
+        self.assertEqual(MyPatching.reboot_after_patch, "Auto")
+        self.assertEqual(MyPatching.day_of_week, [7, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(MyPatching.category, "ImportantAndRecommended")
+        import datetime
+        self.assertEqual(MyPatching.start_time, datetime.datetime.strptime("02:00", '%H:%M'))
+
+    def test_install(self):
+        with self.assertRaises(SystemExit) as cm:
+            install()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Install"), 'success')
+
+    def test_enable(self):
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Enable"), 'success')
+        # TODO: check /etc/crontab
+
+    def test_disable(self):
+        with self.assertRaises(SystemExit) as cm:
+            disable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Disable"), 'success')
+        # TODO: check /etc/crontab
+
     def test_download(self):
         with self.assertRaises(SystemExit) as cm:
             download()
@@ -145,19 +207,16 @@ class Test(unittest.TestCase):
             patch()
         self.assertEqual(cm.exception.code, 0)
 
-def unit_test_main():
-    waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-    waagent.Log("%s started to handle." %(ExtensionShortName))
+def get_status(operation, retkey='status'):
+    contents = waagent.GetFileContents(status_file)
+    status = json.loads(contents)[0]['status']
+    if status['operation'] == operation:
+        return status[retkey]
+    return ''
 
-    global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
-                                ExtensionShortName)
-    global MyPatching
-    MyPatching = FakePatching(hutil)
-    if MyPatching == None:
-        sys.exit(1)
+def unit_test_main():
     unittest.main()
 
 if __name__ == '__main__':
-    main()
-    #unit_test_main()
+    #main()
+    unit_test_main()

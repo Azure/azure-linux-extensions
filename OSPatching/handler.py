@@ -52,7 +52,7 @@ def enable():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
-        hutil.exit_if_enabled()
+        hutil.exit_if_seq_smaller()
         MyPatching.enable()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded.')
     except Exception, e:

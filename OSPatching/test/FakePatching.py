@@ -23,6 +23,7 @@ from AbstractPatching import AbstractPatching
 class FakePatching(AbstractPatching):
     def __init__(self, hutil=None):
         super(FakePatching,self).__init__(hutil)
+        self.gap_between_stage = 5
 
     def install(self):
         """
