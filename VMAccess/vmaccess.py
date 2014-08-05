@@ -174,7 +174,7 @@ def _del_rule_if_exists(rule_string):
 def _insert_rule_if_not_exists(rule_string):
     match_string = '-A %s' %rule_string
     cmd_result = waagent.RunGetOutput("iptables-save")
-    if cmd_result[0] == 0 and (rule_string in cmd_result[1]):
+    if cmd_result[0] == 0 and (rule_string not in cmd_result[1]):
         waagent.Run("iptables -I %s" %rule_string)
 
 

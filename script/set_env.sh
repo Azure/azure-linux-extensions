@@ -31,8 +31,8 @@ if [ ! `echo $PYTHONPATH | grep $root` ] ; then
 fi
 
 if [ $lib_path != "." ] ; then
-    echo "echo \"export PYTHONPATH=\$PYTHONPATH:$lib_path\" >> ~/.bashrc"
-    echo "export PYTHONPATH=\$PYTHONPATH:$lib_path" >> ~/.bashrc
+    echo "echo \"export PYTHONPATH=\$PYTHONPATH:$lib_path\" >> /etc/bash.bashrc"
+    echo "export PYTHONPATH=\$PYTHONPATH:$lib_path" >> /etc/bash.bashrc
     echo "Enviroment variable PYTHONPATH has been set."
     echo "Run \"bash\" to reload bash."
 else
