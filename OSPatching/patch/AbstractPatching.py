@@ -333,11 +333,12 @@ class AbstractPatching(object):
         In auto mode, a reboot should be only necessary when kernel has been upgraded.
         """
         if self.reboot_after_patch == 'NotRequired':
-            return
+            if self.check_reboot():
+                self.hutil.do_exit(0, 'Enable', 'success', '0', 'Pending Reboot')
         if self.reboot_after_patch == 'Required' or (self.reboot_after_patch == 'Auto' and self.check_reboot()):
             self.hutil.log("System going to reboot...")
             retcode = waagent.Run('reboot')
-            if retcode > 0:
+            if retcode != 0:
                 self.hutil.error("Failed to reboot")
 
     def create_stop_flag(self):
