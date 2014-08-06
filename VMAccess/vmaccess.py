@@ -99,34 +99,44 @@ def _set_user_account_pub_key(protect_settings, hutil):
     waagent.MyDistro = waagent.GetMyDistro()
     ovf_xml = waagent.GetFileContents('/var/lib/waagent/ovf-env.xml')
     ovf_env = waagent.OvfEnv().Parse(ovf_xml)
+
     # user name must be provided if set ssh key or password
-    if protect_settings and protect_settings.has_key('username'):
-        user_name = protect_settings['username']
-        user_pass = protect_settings.get('password')
-        cert_txt = protect_settings.get('ssh_key')
-        if user_pass or cert_txt or len(ovf_env.SshPublicKeys) > 0:
-            error_string= waagent.MyDistro.CreateAccount(user_name,user_pass,None, None)
-            if error_string != None:
-                raise Exception("Failed to create the account or set the password: " + error_string)
-            hutil.log("Succeeded in create the account or set the password.")
-            if cert_txt or not(user_pass) and len(ovf_env.SshPublicKeys)> 0:
-                pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
-                ovf_env.UserName = user_name
-                if cert_txt:
-                    _save_cert_str_as_file(cert_txt, 'temp.crt')
-                else :
-                    for pkey in ovf_env.SshPublicKeys:
-                        if pkey[1]:
-                            os.rename(pkey[0] + '.crt', os.path.join(os.getcwd(),'temp.crt'))
-                            break
-                pub_path = ovf_env.PrepareDir(pub_path)
-                retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
-                if retcode > 0:
-                    raise Exception("Failed to generate public key file.")
-                waagent.MyDistro.setSelinuxContext('temp.pub','unconfined_u:object_r:ssh_home_t:s0')
-                waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
-                waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
-                waagent.ChangeOwner(pub_path, user_name)
+    if not protect_settings and protect_settings.has_key('username'):
+        raise Exception("No user name is specified")
+    
+    user_name = protect_settings['username']
+    user_pass = protect_settings.get('password')
+    cert_txt = protect_settings.get('ssh_key')
+    
+    if(not(user_pass) and not(cert_txt) and not(ovf_env.SshPublicKeys)):
+        raise Exception("No password or ssh_key is specified.")
+
+    #Reset user account and password, password could be empty
+    error_string= waagent.MyDistro.CreateAccount(user_name, user_pass, None, None)
+    if error_string != None:
+        raise Exception("Failed to create the account or set the password: " + error_string)
+    hutil.log("Succeeded in create the account or set the password.")
+
+    #Reset ssh key with the new public key passed in or reuse old public key.
+    if cert_txt or len(ovf_env.SshPublicKeys) > 0:
+        pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
+        ovf_env.UserName = user_name
+        if cert_txt:
+            _save_cert_str_as_file(cert_txt, 'temp.crt')
+        else :
+            for pkey in ovf_env.SshPublicKeys:
+                if pkey[1]:
+                    shutil.copy(os.path.join(waagent.LibDir, pkey[0] + '.crt'), os.path.join(os.getcwd(),'temp.crt'))
+                    break
+        pub_path = ovf_env.PrepareDir(pub_path)
+        retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
+        if retcode > 0:
+            raise Exception("Failed to generate public key file.")
+        waagent.MyDistro.setSelinuxContext('temp.pub','unconfined_u:object_r:ssh_home_t:s0')
+        waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
+        waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
+        waagent.ChangeOwner(pub_path, user_name)
+        hutil.log("Succeeded in resetting ssh_key.")
 
 def _reset_sshd_config():
     distro = platform.dist()
