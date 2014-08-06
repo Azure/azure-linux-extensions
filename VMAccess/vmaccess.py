@@ -132,10 +132,11 @@ def _set_user_account_pub_key(protect_settings, hutil):
         retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
         if retcode > 0:
             raise Exception("Failed to generate public key file.")
-        waagent.MyDistro.setSelinuxContext('temp.pub','unconfined_u:object_r:ssh_home_t:s0')
         waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
         waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
         waagent.ChangeOwner(pub_path, user_name)
+        os.remove('temp.pub')
+        os.remove('temp.crt')
         hutil.log("Succeeded in resetting ssh_key.")
 
 def _reset_sshd_config():
