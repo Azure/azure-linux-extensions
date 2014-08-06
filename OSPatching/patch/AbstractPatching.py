@@ -53,9 +53,10 @@ class AbstractPatching(object):
         self.start_time = None
         self.download_time = None
         self.install_duration = None
-        self.download_duration = None
         self.patch_now = None
         self.category = None
+        self.download_duration = 3600
+        self.gap_between_stage = 60
 
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
@@ -67,8 +68,6 @@ class AbstractPatching(object):
 
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
-
-        self.gap_between_stage = 60
 
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
@@ -94,7 +93,6 @@ class AbstractPatching(object):
         else:
             self.patch_now = False
             self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
-            self.download_duration = 3600
             self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
  
             day_of_week = settings.get('dayOfWeek')
@@ -181,7 +179,7 @@ class AbstractPatching(object):
                 dow = ','.join([str(day - 1) for day in self.day_of_week])
             else:
                 dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download >/dev/null 2>&1\n'])
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download > /dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
@@ -227,7 +225,7 @@ class AbstractPatching(object):
             self.hutil.log("No packages are available for update.")
             return
         self.hutil.log("There are " + str(len(downloadlist)) + " packages to upgrade.")
-        self.hutil.log("download list: " + ' '.join(downloadlist))
+        self.hutil.log("Download list: " + ' '.join(downloadlist))
         for pkg_name in downloadlist:
             if pkg_name in self.downloaded:
                 continue
@@ -275,7 +273,7 @@ class AbstractPatching(object):
             self.hutil.log("No packages are available for update.")
             return
         self.hutil.log("Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
-        self.hutil.log("patch list: " + ' '.join(patchlist))
+        self.hutil.log("Patch list: " + ' '.join(patchlist))
         for pkg_name in patchlist:
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
@@ -301,15 +299,29 @@ class AbstractPatching(object):
         waagent.SetFileContents(self.package_downloaded_path, '')
         waagent.SetFileContents(self.package_patched_path, '')
 
-        patchlist = self.check(self.category_required)
-        self._patch(self.category_required, patchlist)
-        if not self.exists_stop_flag():
-            self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
-            time.sleep(self.gap_between_stage)
-            patchlist = self.check(self.category_all)
-            self._patch(self.category_all, patchlist)
+        retcode, patchlist_required = self.check(self.category_required)
+        if retcode > 0:
+            self.hutil.error("Failed to check valid upgrades")
+            sys.exit(1)
+        if not patchlist_required:
+            self.hutil.log("No packages are available for update.")
         else:
-            self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
+            self._patch(self.category_required, patchlist_required)
+        if self.category == self.category_all:
+            if not self.exists_stop_flag():
+                self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
+                time.sleep(self.gap_between_stage)
+                retcode, patchlist_other = self.check(self.category_all)
+                if retcode > 0:
+                    self.hutil.error("Failed to check valid upgrades")
+                    sys.exit(1)
+                patchlist_other = [pkg for pkg in patchlist_other if pkg not in patchlist_required]
+                if not patchlist_other:
+                    self.hutil.log("No packages are available for update.")
+                else:
+                    self._patch(self.category_all, patchlist_other)
+            else:
+                self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
         shutil.copy2(self.package_patched_path, self.package_downloaded_path)
 
         self.delete_stop_flag()

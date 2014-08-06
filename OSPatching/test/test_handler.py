@@ -27,6 +27,7 @@ import shutil
 import traceback
 import json
 import unittest
+import time
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -110,8 +111,368 @@ def patch():
                     %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
 
+
+class Test(unittest.TestCase):
+    def setUp(self):
+        print '\n\n============================================================================================'
+        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
+        waagent.Log("%s started to handle." %(ExtensionShortName))
+
+        global protect_settings
+        protect_settings = json.loads(contents)
+        global hutil
+        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
+                                    ExtensionShortName)
+        global MyPatching
+        MyPatching = FakePatching(hutil)
+        if MyPatching == None:
+            sys.exit(1)
+
+        try:
+            os.remove('mrseq')
+        except:
+            pass
+
+        waagent.SetFileContents(MyPatching.package_downloaded_path, '')
+        waagent.SetFileContents(MyPatching.package_patched_path, '')
+
+    def test_parse_settings(self):
+        print 'test_parse_settings'
+
+        protect_settings = {
+            "disabled" : "false",
+            "stop" : "false",
+            "rebootAfterPatch" : "Auto",
+            "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
+            "startTime" : "02:00",
+            "category" : "ImportantAndRecommended",
+            "installDuration" : "00:30"
+        }
+        MyPatching.parse_settings(protect_settings)
+
+        self.assertFalse(MyPatching.disabled)
+        self.assertFalse(MyPatching.stop)
+        self.assertEqual(MyPatching.reboot_after_patch, "Auto")
+        self.assertEqual(MyPatching.day_of_week, [7, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(MyPatching.category, "ImportantAndRecommended")
+        import datetime
+        self.assertEqual(MyPatching.start_time, datetime.datetime.strptime("02:00", '%H:%M'))
+
+    def test_install(self):
+        """
+        Each Distro has different dependencies for OSPatching Extension.
+        It is MANUAL to check whether they are installed or not.
+        Ubuntu        : update-notifier-common
+        CentOS/Oracle : yum-downloadonly
+                        yum-plugin-security
+        SuSE          : None
+        """
+        print 'test_install'
+
+        with self.assertRaises(SystemExit) as cm:
+            install()
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Install"), 'success')
+
+    def test_enable(self):
+        print 'test_enable'
+
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Enable"), 'success')
+        download_cmd = 'python test_handler.py -download'
+        patch_cmd = 'python test_handler.py -patch'
+        crontab_content = waagent.GetFileContents('/etc/crontab')
+        self.assertTrue(download_cmd in crontab_content)
+        self.assertTrue(patch_cmd in crontab_content)
+
+    def test_disable(self):
+        print 'test_disable'
+
+        with self.assertRaises(SystemExit) as cm:
+            disable()
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Disable"), 'success')
+        download_cmd = 'python test_handler.py -download'
+        patch_cmd = 'python test_handler.py -patch'
+        crontab_content = waagent.GetFileContents('/etc/crontab')
+        self.assertTrue(download_cmd not in crontab_content)
+        self.assertTrue(patch_cmd not in crontab_content)
+        
+    def test_download(self):
+        """
+        Check file package.downloaded after download
+        """
+        print 'test_download'
+
+        with self.assertRaises(SystemExit) as cm:
+            download()
+
+        self.assertEqual(cm.exception.code, 0)
+        download_content = waagent.GetFileContents(MyPatching.package_downloaded_path)
+        security_download_list = get_patch_list(MyPatching.package_downloaded_path, 'Important')
+        self.assertTrue(set(security_download_list) == set(MyPatching.security_download_list))
+        all_download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertTrue(set(all_download_list) == set(MyPatching.all_download_list))
+
+    def test_download_security(self):
+        """
+        check file package.downloaded after download
+        """
+        print 'test_download_security'
+        protect_settings['category'] = 'Important'
+
+        with self.assertRaises(SystemExit) as cm:
+            download()
+
+        self.assertEqual(cm.exception.code, 0)
+        security_download_list = get_patch_list(MyPatching.package_downloaded_path, 'Important')
+        self.assertTrue(set(security_download_list) == set(MyPatching.security_download_list))
+        all_download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertTrue(set(all_download_list) == set(MyPatching.security_download_list))
+
+    def _test_download_time_exceed(self):
+        '''
+        Manually add time.sleep(11) in download_package() 
+        check package.downloaded and package.patched
+        '''
+        print 'test_download_time_exceed'
+
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        MyPatching.download_duration = 60
+
+        all_download_list = get_patch_list(MyPatching.package_downloaded_path)
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+
+        self.assertEqual(cm.exception.code, 0)
+        time.sleep(180)
+        self.assertTrue(all_download_list == ['a', 'b', 'c', 'd', 'e'])
+        # Check extension.log
+
+    def test_patch(self):
+        '''
+        check file package.patched when patch successful
+        '''
+        print 'test_patch'
+        
+        with self.assertRaises(SystemExit) as cm:
+            download()
+        self.assertEqual(cm.exception.code, 0)
+        with self.assertRaises(SystemExit) as cm:
+            patch()
+        self.assertEqual(cm.exception.code, 0)
+
+        download_content = waagent.GetFileContents(MyPatching.package_downloaded_path)
+        patch_content = waagent.GetFileContents(MyPatching.package_patched_path)
+        self.assertEqual(download_content, patch_content)
+        
+
+    def test_patch_failed(self):
+        '''
+        check file package.patched when patch fail
+        '''
+        print 'test_patch_failed'
+
+        def patch_package(self):
+            return 1
+        MyPatching.patch_package = patch_package
+
+        with self.assertRaises(SystemExit) as cm:
+            download()
+        self.assertEqual(cm.exception.code, 0)
+        with self.assertRaises(SystemExit) as cm:
+            patch()
+
+        self.assertEqual(cm.exception.code, 0)
+        patch_content = waagent.GetFileContents(MyPatching.package_patched_path)
+        self.assertFalse(patch_content)
+        
+    def test_patch_one_off(self):
+        '''
+        check package.downloaded and package.patched when patch_one_off successful
+        '''
+        print 'test_patch_one_off'
+        protect_settings['startTime'] = ''
+
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertEqual(get_status("Enable"), 'success')
+        security_download_list = get_patch_list(MyPatching.package_downloaded_path, 'Important')
+        self.assertTrue(set(security_download_list) == set(MyPatching.security_download_list))
+        all_download_list = get_patch_list(MyPatching.package_patched_path)
+        self.assertTrue(set(all_download_list) == set(MyPatching.all_download_list))
+        download_content = waagent.GetFileContents(MyPatching.package_downloaded_path)
+        patch_content = waagent.GetFileContents(MyPatching.package_patched_path)
+        self.assertEqual(patch_content, download_content)
+
+    def test_patch_time_exceed(self):
+        '''
+        check package.patched when patch time exceed
+        '''
+        print 'test_patch_time_exceed'
+
+        def patch_package(self):
+            time.sleep(11)
+            return 0
+        MyPatching.patch_package = patch_package
+        # 5 minutes reserved for reboot
+        protect_settings['installDuration'] = '00:06'
+        
+        with self.assertRaises(SystemExit) as cm:
+            download()
+        self.assertEqual(cm.exception.code, 0)
+        with self.assertRaises(SystemExit) as cm:
+            patch()
+        self.assertEqual(cm.exception.code, 0)
+
+        patch_list = get_patch_list(MyPatching.package_patched_path)
+        self.assertEqual(patch_list, ['a', 'b', 'c', 'd', 'e', '1'])
+
+    def test_stop_before_download(self):
+        '''
+        check stop flag before download and after patch
+        '''
+        print 'test_stop_before_download'
+
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        MyPatching.download_duration = 60
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        os.remove('mrseq')
+        protect_settings['stop'] = 'true'
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        time.sleep(180 + 5)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_downloaded_path))
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
+
+    def _test_stop_while_download(self):
+        """
+        Manually add time.sleep(11) in download_package()
+        """
+        print 'test_stop_while_download'
+
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        delta_time = int(time.strftime('%S', time.localtime(current_time + 120)))
+        MyPatching.download_duration = 60
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        # set stop flag after downloaded 40 seconds
+        time.sleep(160 - delta_time)
+        os.remove('mrseq')
+        protect_settings['stop'] = 'true'
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        # Make sure the total sleep time is greater than 180s
+        time.sleep(20 + delta_time + 5)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertEqual(download_list, ['a', 'b', 'c'])
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
+
+    def test_stop_between_download_and_stage1(self):
+        print 'test_stop_between_download_and_stage1'
+
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        delta_time = int(time.strftime('%S', time.localtime(current_time + 120)))
+        MyPatching.download_duration = 60
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        # set stop flag after downloaded 40 seconds
+        time.sleep(160 - delta_time)
+        os.remove('mrseq')
+        protect_settings['stop'] = 'true'
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        # Make sure the total sleep time is greater than 180s
+        time.sleep(20 + delta_time + 5)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertEqual(download_list, ['a', 'b', 'c', 'd', 'e', '1', '2', '3', '4'])
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
+
+    def _test_stop_between_stage1_and_stage2(self):
+        """
+        Manually add MyPathing.gap_between_stage = 20
+        """
+        print 'test_stop_between_stage1_and_stage2'
+
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        delta_time = int(time.strftime('%S', time.localtime(current_time + 120)))
+        MyPatching.download_duration = 60
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        # Set stop flag after patched 10 seconds
+        # Meanwhile the extension is sleeping between stage 1 & 2
+        time.sleep(190 - delta_time)
+        os.remove('mrseq')
+        protect_settings['stop'] = 'true'
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        # The patching (stage 1 & 2) has ended
+        time.sleep(20)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertEqual(download_list, ['a', 'b', 'c', 'd', 'e', '1', '2', '3', '4'])
+        patch_list = get_patch_list(MyPatching.package_patched_path)
+        self.assertEqual(patch_list, ['a', 'b', 'c', 'd', 'e'])
+
+
+def get_patch_list(file_path, category = None):
+    content = waagent.GetFileContents(file_path)
+    if category != None:
+        result = [line.split()[0] for line in content.split('\n') if line.endswith(category)]
+    else:
+        result = [line.split()[0] for line in content.split('\n') if ' ' in line]
+    return result
+    
+
+def get_status(operation, retkey='status'):
+    contents = waagent.GetFileContents(status_file)
+    status = json.loads(contents)[0]['status']
+    if status['operation'] == operation:
+        return status[retkey]
+    return ''
+
 # Main function is the only entrance to this extension handler
 def main():
+    if len(sys.argv) == 1:
+        unittest.main()
+        return
+
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
@@ -119,7 +480,8 @@ def main():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
                                 ExtensionShortName)
     global MyPatching
-    MyPatching = GetMyPatching(hutil)
+    MyPatching = FakePatching(hutil)
+
     if MyPatching == None:
         sys.exit(1)
 
@@ -140,83 +502,5 @@ def main():
             patch()
 
 
-class Test(unittest.TestCase):
-    def setUp(self):
-        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-        waagent.Log("%s started to handle." %(ExtensionShortName))
-
-        global hutil
-        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
-                                    ExtensionShortName)
-        global MyPatching
-        MyPatching = FakePatching(hutil)
-        if MyPatching == None:
-            sys.exit(1)
-
-        try:
-            os.remove('mrseq')
-        except:
-            pass
-
-    def test_parse_settings(self):
-        protect_settings = {
-            "disabled" : "false",
-            "stop" : "false",
-            "rebootAfterPatch" : "Auto",
-            "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
-            "startTime" : "02:00",
-            "category" : "ImportantAndRecommended",
-            "installDuration" : "00:30"
-        }
-        MyPatching.parse_settings(protect_settings)
-        self.assertFalse(MyPatching.disabled)
-        self.assertFalse(MyPatching.stop)
-        self.assertEqual(MyPatching.reboot_after_patch, "Auto")
-        self.assertEqual(MyPatching.day_of_week, [7, 1, 2, 3, 4, 5, 6])
-        self.assertEqual(MyPatching.category, "ImportantAndRecommended")
-        import datetime
-        self.assertEqual(MyPatching.start_time, datetime.datetime.strptime("02:00", '%H:%M'))
-
-    def test_install(self):
-        with self.assertRaises(SystemExit) as cm:
-            install()
-        self.assertEqual(cm.exception.code, 0)
-        self.assertEqual(get_status("Install"), 'success')
-
-    def test_enable(self):
-        with self.assertRaises(SystemExit) as cm:
-            enable()
-        self.assertEqual(cm.exception.code, 0)
-        self.assertEqual(get_status("Enable"), 'success')
-        # TODO: check /etc/crontab
-
-    def test_disable(self):
-        with self.assertRaises(SystemExit) as cm:
-            disable()
-        self.assertEqual(cm.exception.code, 0)
-        self.assertEqual(get_status("Disable"), 'success')
-        # TODO: check /etc/crontab
-
-    def test_download(self):
-        with self.assertRaises(SystemExit) as cm:
-            download()
-        self.assertEqual(cm.exception.code, 0)
-
-    def test_patch(self):
-        with self.assertRaises(SystemExit) as cm:
-            patch()
-        self.assertEqual(cm.exception.code, 0)
-
-def get_status(operation, retkey='status'):
-    contents = waagent.GetFileContents(status_file)
-    status = json.loads(contents)[0]['status']
-    if status['operation'] == operation:
-        return status[retkey]
-    return ''
-
-def unit_test_main():
-    unittest.main()
-
 if __name__ == '__main__':
-    #main()
-    unit_test_main()
+    main()
