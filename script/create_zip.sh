@@ -82,6 +82,7 @@ cd $tmp_dir
 echo "Remove test dir..."
 rm -r test
 rm -r */test
+rm *.pyc
 
 echo "Create zip..."
 zip -r $cur_dir/$ext_full_name.zip .

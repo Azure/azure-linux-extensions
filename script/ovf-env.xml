@@ -1,0 +1,29 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<Environment xmlns='http://schemas.dmtf.org/ovf/environment/1' xmlns:oe='http://schemas.dmtf.org/ovf/environment/1' xmlns:wa='http://schemas.microsoft.com/windowsazure' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>
+  <wa:ProvisioningSection>
+    <wa:Version>1.0</wa:Version>
+    <LinuxProvisioningConfigurationSet xmlns='http://schemas.microsoft.com/windowsazure' xmlns:i='http://www.w3.org/2001/XMLSchema-instance'>
+      <ConfigurationSetType>LinuxProvisioningConfiguration</ConfigurationSetType>
+      <HostName>test-ext</HostName>
+      <UserName>azureuser</UserName>
+      <UserPassword>User@123</UserPassword>
+      <DisableSshPasswordAuthentication>false</DisableSshPasswordAuthentication>
+      <SSH>
+        <PublicKeys>
+          <PublicKey>
+            <Fingerprint>test</Fingerprint>
+            <Path>/home/azureuser/.ssh/authorized_keys</Path>
+          </PublicKey>
+        </PublicKeys>
+      </SSH>
+    </LinuxProvisioningConfigurationSet>
+  </wa:ProvisioningSection>
+  <wa:PlatformSettingsSection>
+    <wa:Version>1.0</wa:Version>
+    <PlatformSettings xmlns='http://schemas.microsoft.com/windowsazure' xmlns:i='http://www.w3.org/2001/XMLSchema-instance'>
+      <KmsServerHostname>kms.core.windows.net</KmsServerHostname>
+      <ProvisionGuestAgent>true</ProvisionGuestAgent>
+      <GuestAgentPackageName>Win7_Win8_IaaS_rd_art_stable_140703-0050_GuestAgentPackage.zip</GuestAgentPackageName>
+    </PlatformSettings>
+  </wa:PlatformSettingsSection>
+</Environment>
