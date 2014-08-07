@@ -47,6 +47,7 @@ cd $root
 root=`pwd`
 waagent_path='/usr/sbin/waagent'
 waagent_lib_dir='/var/lib/waagent'
+ext_log_dir='/var/log/azure'
 
 ext_name=`grep 'name' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
 ext_version=`grep 'version' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
@@ -56,20 +57,8 @@ ext_dir=$waagent_lib_dir/$ext_full_name
 ext_status_dir=$ext_dir/status
 ext_config_dir=$ext_dir/config
 ext_env_json=$ext_dir/HandlerEnvironment.json
-default_env="[{ \n\
-        'name': '$ext_name', \n\
-        'seqNo': '0', \n\
-        'version': 1.0, \n\
-        'handlerEnvironment': { \n\
-            'logFolder': '/var/log/azure/$ext_full_name', \n\
-            'configFolder': '/var/lib/waagent/$ext_full_name/config', \n\
-            'statusFolder': '/var/lib/waagent/$ext_full_name/status', \n\
-            'heartbeatFile': '/var/lib/waagent/$ext_full_name/heartbeat.log' \n\
-        } \n\
-    }]\n\
-"
-test_cert_file=$waagent_lib_dir/test.crt
-test_pk_file=$waagent_lib_dir/test.prv
+test_cert_file=$waagent_lib_dir/TEST.crt
+test_pk_file=$waagent_lib_dir/TEST.prv
 ovf_env_file=$waagent_lib_dir/ovf-env.xml
 
 if [ ! -f $waagent_path ] ; then
@@ -100,7 +89,7 @@ fi
 
 if [ ! -f $ext_env_json ] ; then
     echo "Create HandlerEnvironment.json file"
-    echo $default_env > $ext_env_json
+    cp $script/HandlerEnvironment.json $ext_env_json
 fi
 
 if [ ! -f $test_cert_file ] ; then
@@ -118,4 +107,25 @@ if [ ! -f $ovf_env_file ] ; then
     cp $script/ovf-env.xml $ovf_env_file
 fi
 
+if [ ! -f $ext_config_dir/0.settings ] ; then
+    echo "Create 0.settings"
+    cp $script/0.settings $ext_config_dir/0.settings
+fi
 
+if [ ! -d $ext_log_dir ] ; then
+    echo "Create ext log dir"
+    mkdir $ext_log_dir
+fi
+
+if [ ! -d $ext_log_dir/$ext_name ] ; then
+    echo "Create ext log dir for $ext_name"
+    mkdir $ext_log_dir/$ext_name
+fi
+
+if [ ! -d $ext_log_dir/$ext_name/$ext_version ] ; then
+    echo "Create ext log dir for $ext_name $ext_version"
+    mkdir $ext_log_dir/$ext_name/$ext_version
+fi
+
+echo "Change permission of waagent lib dir"
+chmod -R 600 $waagent_lib_dir

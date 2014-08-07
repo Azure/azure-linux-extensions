@@ -1,0 +1,11 @@
+[{
+    "name": "VMAccess", 
+    "seqNo": "1", 
+    "version": 1.0,
+    "handlerEnvironment": {    
+        "logFolder": "/var/log/azure/VMAccess/1.0",
+        "configFolder": "/var/lib/waagent/VMAccess-1.0/config",
+        "statusFolder": "/var/lib/waagent/VMAccess-1.0/status",
+        "heartbeatFile": "/var/lib/waagent/VMAccess-1.0/heartbeat.log"
+    }
+}]

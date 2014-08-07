@@ -42,6 +42,7 @@ OutputSplitter = ';'
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName)) 
+    waagent.MyDistro = waagent.GetMyDistro()
 
     for a in sys.argv[1:]:        
         if re.match("^([-/]*)(disable)", a):
@@ -73,7 +74,7 @@ def enable():
         hutil.exit_if_enabled()
         _set_user_account_pub_key(protect_settings, hutil)
         if reset_ssh:
-            _reset_sshd_config()
+            _reset_sshd_config("/etc/ssh/sshd_config")
             hutil.log("Succeeded in reset sshd_config.")
         hutil.do_exit(0, 'Enable', 'success','0', 'Enable succeeded.')
     except Exception, e:
@@ -96,7 +97,6 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
 def _set_user_account_pub_key(protect_settings, hutil):
-    waagent.MyDistro = waagent.GetMyDistro()
     ovf_xml = waagent.GetFileContents('/var/lib/waagent/ovf-env.xml')
     ovf_env = waagent.OvfEnv().Parse(ovf_xml)
 
@@ -139,11 +139,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
         os.remove('temp.crt')
         hutil.log("Succeeded in resetting ssh_key.")
 
-def _reset_sshd_config():
+def _reset_sshd_config(sshd_file_path):
     distro = platform.dist()
     distro_name = distro[0]
     version = distro[1]
-    sshd_file_path = "/etc/ssh/sshd_config"
     config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' %(distro_name,version))
     if not(os.path.exists(config_file_path)):
         config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' %(distro_name,'default'))
@@ -154,12 +153,19 @@ def _reset_sshd_config():
     waagent.MyDistro.restartSshService()
 
 def _backup_sshd_config(sshd_file_path):
-    backup_file_name = '%s_%s' %(sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
-    shutil.copyfile(sshd_file_path, backup_file_name)
+    if(os.path.exists(sshd_file_path)):
+        backup_file_name = '%s_%s' %(sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+        shutil.copyfile(sshd_file_path, backup_file_name)
 
 def _save_cert_str_as_file(cert_txt, file_name):
-    cert_txt = cert_txt.replace(BeginCertificateTag, '').replace(EndCertificateTag,'').replace(' ', '\n')
-    cert_txt = BeginCertificateTag + cert_txt + EndCertificateTag + '\n'
+    cert_start = cert_txt.index(BeginCertificateTag)
+    if(cert_txt >= 0):
+        cert_txt = cert_txt[cert_start + len(BeginCertificateTag):]
+    cert_end =  cert_txt.index(EndCertificateTag)
+    if(cert_end >= 0):
+        cert_txt = cert_txt[:cert_end]
+    cert_txt = cert_txt.strip()
+    cert_txt = "{0}\n{1}\n{2}\n".format(BeginCertificateTag, cert_txt, EndCertificateTag)
     waagent.SetFileContents(file_name, cert_txt)
 
 def _open_ssh_port():

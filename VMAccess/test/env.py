@@ -24,3 +24,18 @@ import os
 #append installer directory to sys.path
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(root)
+
+manifestFile = os.path.join(root, 'HandlerManifest.json')
+if os.path.exists(manifestFile):
+    import json 
+    jsonData = open(manifestFile)
+    manifest = json.load(jsonData)
+    jsonData.close()
+    extName="{0}-{1}".format(manifest[0]["name"], manifest[0]["version"])
+    print "Start test: %s" %extName
+    
+    extDir=os.path.join("/var/lib/waagent", extName)
+    if(os.path.isdir(extDir)):
+        os.chdir(extDir)
+        print "Switching to dir: %s" %os.getcwd()
+
