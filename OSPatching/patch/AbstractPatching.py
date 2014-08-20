@@ -68,9 +68,6 @@ class AbstractPatching(object):
         self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
         self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
 
-        waagent.SetFileContents(self.package_downloaded_path, '')
-        waagent.SetFileContents(self.package_patched_path, '')
-
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
 
@@ -138,8 +135,8 @@ class AbstractPatching(object):
             return
         self.delete_stop_flag()
         if not self.disabled and self.patch_now:
-            self.set_one_off_cron()
-            self.restart_cron()
+            script_file_path = os.path.realpath(sys.argv[0])
+            waagent.Run('python ' + script_file_path + ' -oneoff &')
         else:
             self.set_download_cron()
             self.set_patch_cron()
@@ -201,17 +198,6 @@ class AbstractPatching(object):
             dow = ','.join([str(day) for day in self.day_of_week])
             new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
-
-    def set_one_off_cron(self):
-        script_file_path = os.path.realpath(sys.argv[0])
-        script_dir = os.path.dirname(script_file_path)
-        script_file = os.path.basename(script_file_path)
-        old_line_end = ' '.join([script_file, '-oneoff'])
-        oneoff_start_time = time.localtime(time.time() + 120)
-        hr = str(oneoff_start_time.tm_hour)
-        minute = str(oneoff_start_time.tm_min)
-        new_line = ' '.join(['\n' + minute, hr, '* * * root cd', script_dir, '&& python', script_file, '-oneoff >/dev/null 2>&1\n'])
-        waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
@@ -290,6 +276,7 @@ class AbstractPatching(object):
             return
         self.hutil.log("Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
         self.hutil.log("Patch list: " + ' '.join(patchlist))
+        pkg_failed = []
         for pkg_name in patchlist:
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
@@ -299,19 +286,12 @@ class AbstractPatching(object):
             retcode = self.patch_package(pkg_name)
             if retcode != 0:
                 self.hutil.error("Failed to patch the package:" + pkg_name)
+                pkg_failed.append(' '.join([pkg_name, category]))
                 continue
             self.patched.append(pkg_name)
             self.hutil.log("Package " + pkg_name + " is patched.")
             waagent.AppendFileContents(self.package_patched_path, pkg_name + ' ' + category + '\n')
-
-    def oneoff(self):
-        script_file_path = os.path.realpath(sys.argv[0])
-        script_dir = os.path.dirname(script_file_path)
-        script_file = os.path.basename(script_file_path)
-        old_line_end = ' '.join([script_file, '-oneoff'])
-        contents = waagent.GetFileContents(self.crontab)
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), contents.split('\n'))))
-        self.patch_one_off()
+        return pkg_failed
 
     def patch_one_off(self):
         """
@@ -324,6 +304,7 @@ class AbstractPatching(object):
         waagent.SetFileContents(self.package_downloaded_path, '')
         waagent.SetFileContents(self.package_patched_path, '')
 
+        pkg_failed = []
         retcode, patchlist_required = self.check(self.category_required)
         if retcode > 0:
             self.hutil.error("Failed to check valid upgrades")
@@ -331,7 +312,8 @@ class AbstractPatching(object):
         if not patchlist_required:
             self.hutil.log("No packages are available for update. (Category:" + self.category_required + ")")
         else:
-            self._patch(self.category_required, patchlist_required)
+            pkg_required_failed = self._patch(self.category_required, patchlist_required)
+            pkg_failed.extend(pkg_required_failed)
         if self.category == self.category_all:
             if not self.exists_stop_flag():
                 self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
@@ -345,10 +327,13 @@ class AbstractPatching(object):
                 if not patchlist_other:
                     self.hutil.log("No packages are available for update. (Category:" + self.category_all + ")")
                 else:
-                    self._patch(self.category_all, patchlist_other)
+                    pkg_other_failed = self._patch(self.category_all, patchlist_other)
+                    pkg_failed.extend(pkg_other_failed)
             else:
                 self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
         shutil.copy2(self.package_patched_path, self.package_downloaded_path)
+        for pkg in pkg_failed:
+            waagent.AppendFileContents(self.package_downloaded_path, pkg + '\n')
 
         self.delete_stop_flag()
         #self.report()
@@ -381,6 +366,8 @@ class AbstractPatching(object):
             return False
 
     def get_pkg_to_patch(self, category):
+        if not os.path.isfile(self.package_download_path):
+            return []
         pkg_to_patch = waagent.GetFileContents(self.package_downloaded_path)
         if not pkg_to_patch:
             return []

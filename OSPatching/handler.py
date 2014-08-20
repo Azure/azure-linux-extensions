@@ -85,11 +85,11 @@ def download():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.download()
-        hutil.do_exit(0,'Download','success','0', 'Download Succeeded')
+        hutil.do_exit(0,'Enable','success','0', 'Download Succeeded')
     except Exception, e:
         hutil.error("Failed to download updates with error: %s, \
                      stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Download','error','0', 'Download Failed')
+        hutil.do_exit(1, 'Enable','error','0', 'Download Failed')
 
 def patch():
     hutil.do_parse_context('Patch')
@@ -98,11 +98,11 @@ def patch():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.patch()
-        hutil.do_exit(0,'Patch','success','0', 'Patch Succeeded')
+        hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded')
     except Exception, e:
         hutil.error("Failed to patch with error: %s, stack trace: %s"
                     %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
+        hutil.do_exit(1, 'Enable','error','0', 'Patch Failed')
 
 def oneoff():
     hutil.do_parse_context('Oneoff')
@@ -110,12 +110,12 @@ def oneoff():
         protect_settings = hutil._context._config['runtimeSettings'][0]\
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
-        MyPatching.oneoff()
-        hutil.do_exit(0,'Oneoff','success','0', 'Oneoff Patch Succeeded')
+        MyPatching.patch_one_off()
+        hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded')
     except Exception, e:
         hutil.error("Failed to one-off patch with error: %s, stack trace: %s"
                     %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Oneoff','error','0', 'Oneoff Patch Failed')
+        hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed')
 
 # Main function is the only entrance to this extension handler
 def main():
