@@ -104,6 +104,19 @@ def patch():
                     %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
 
+def oneoff():
+    hutil.do_parse_context('Oneoff')
+    try:
+        protect_settings = hutil._context._config['runtimeSettings'][0]\
+                           ['handlerSettings'].get('protectedSettings')
+        MyPatching.parse_settings(protect_settings)
+        MyPatching.oneoff()
+        hutil.do_exit(0,'Oneoff','success','0', 'Oneoff Patch Succeeded')
+    except Exception, e:
+        hutil.error("Failed to one-off patch with error: %s, stack trace: %s"
+                    %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Oneoff','error','0', 'Oneoff Patch Failed')
+
 # Main function is the only entrance to this extension handler
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
@@ -132,6 +145,8 @@ def main():
             download()
         elif re.match("^([-/]*)(patch)", a):
             patch()
+        elif re.match("^([-/]*)(oneoff)", a):
+            oneoff()
 
 
 if __name__ == '__main__':

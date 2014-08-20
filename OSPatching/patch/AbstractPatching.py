@@ -34,6 +34,8 @@ import datetime
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
+# Global variables definition
+ExtensionShortName = 'OSPatching'
 
 class AbstractPatching(object):
     """
@@ -66,6 +68,9 @@ class AbstractPatching(object):
         self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
         self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
 
+        waagent.SetFileContents(self.package_downloaded_path, '')
+        waagent.SetFileContents(self.package_patched_path, '')
+
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
 
@@ -76,6 +81,7 @@ class AbstractPatching(object):
                             specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
         if self.disabled:
+            self.hutil.log("The extension " + ExtensionShortName+ "is disabled")
             return
 
         stop = settings.get('stop')
@@ -132,7 +138,8 @@ class AbstractPatching(object):
             return
         self.delete_stop_flag()
         if not self.disabled and self.patch_now:
-            self.patch_one_off()
+            self.set_one_off_cron()
+            self.restart_cron()
         else:
             self.set_download_cron()
             self.set_patch_cron()
@@ -165,7 +172,6 @@ class AbstractPatching(object):
         return 100
 
     def set_download_cron(self):
-        contents = waagent.GetFileContents(self.crontab)
         script_file_path = os.path.realpath(sys.argv[0])
         script_dir = os.path.dirname(script_file_path)
         script_file = os.path.basename(script_file_path)
@@ -183,7 +189,6 @@ class AbstractPatching(object):
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
-        contents = waagent.GetFileContents(self.crontab)
         script_file_path = os.path.realpath(sys.argv[0])
         script_dir = os.path.dirname(script_file_path)
         script_file = os.path.basename(script_file_path)
@@ -196,6 +201,17 @@ class AbstractPatching(object):
             dow = ','.join([str(day) for day in self.day_of_week])
             new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+
+    def set_one_off_cron(self):
+        script_file_path = os.path.realpath(sys.argv[0])
+        script_dir = os.path.dirname(script_file_path)
+        script_file = os.path.basename(script_file_path)
+        old_line_end = ' '.join([script_file, '-oneoff'])
+        oneoff_start_time = time.localtime(time.time() + 120)
+        hr = str(oneoff_start_time.tm_hour)
+        minute = str(oneoff_start_time.tm_min)
+        new_line = ' '.join(['\n' + minute, hr, '* * * root cd', script_dir, '&& python', script_file, '-oneoff >/dev/null 2>&1\n'])
+        waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
@@ -288,6 +304,15 @@ class AbstractPatching(object):
             self.hutil.log("Package " + pkg_name + " is patched.")
             waagent.AppendFileContents(self.package_patched_path, pkg_name + ' ' + category + '\n')
 
+    def oneoff(self):
+        script_file_path = os.path.realpath(sys.argv[0])
+        script_dir = os.path.dirname(script_file_path)
+        script_file = os.path.basename(script_file_path)
+        old_line_end = ' '.join([script_file, '-oneoff'])
+        contents = waagent.GetFileContents(self.crontab)
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), contents.split('\n'))))
+        self.patch_one_off()
+
     def patch_one_off(self):
         """
         Called when startTime is empty string, which means a on-demand patch.
@@ -304,20 +329,21 @@ class AbstractPatching(object):
             self.hutil.error("Failed to check valid upgrades")
             sys.exit(1)
         if not patchlist_required:
-            self.hutil.log("No packages are available for update.")
+            self.hutil.log("No packages are available for update. (Category:" + self.category_required + ")")
         else:
             self._patch(self.category_required, patchlist_required)
         if self.category == self.category_all:
             if not self.exists_stop_flag():
                 self.hutil.log("Going to sleep for " + str(self.gap_between_stage) + "s")
                 time.sleep(self.gap_between_stage)
+                self.hutil.log("Going to patch one-off (Category:" + self.category_all + ")")
                 retcode, patchlist_other = self.check(self.category_all)
                 if retcode > 0:
                     self.hutil.error("Failed to check valid upgrades")
                     sys.exit(1)
                 patchlist_other = [pkg for pkg in patchlist_other if pkg not in patchlist_required]
                 if not patchlist_other:
-                    self.hutil.log("No packages are available for update.")
+                    self.hutil.log("No packages are available for update. (Category:" + self.category_all + ")")
                 else:
                     self._patch(self.category_all, patchlist_other)
             else:
@@ -355,5 +381,8 @@ class AbstractPatching(object):
             return False
 
     def get_pkg_to_patch(self, category):
-        patchlist = [line.split()[0] for line in waagent.GetFileContents(self.package_downloaded_path).split('\n') if line.endswith(category)]
+        pkg_to_patch = waagent.GetFileContents(self.package_downloaded_path)
+        if not pkg_to_patch:
+            return []
+        patchlist = [line.split()[0] for line in pkg_to_patch.split('\n') if line.endswith(category)]
         return patchlist
