@@ -93,7 +93,7 @@ class redhatPatching(AbstractPatching):
         return waagent.Run(self.patch_cmd + ' ' + package)
 
     def check_reboot(self):
-        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1")
+        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | awk '{print substr($1,8)}' | head -1")
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
         return last_kernel != current_kernel
 
