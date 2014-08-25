@@ -41,7 +41,7 @@ class UbuntuPatching(AbstractPatching):
         waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
         self.check_security_cmd = self.check_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
         self.download_cmd = 'apt-get -d -y install'
-        self.patch_cmd = 'apt-get -y install'
+        self.patch_cmd = 'apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install'
         self.status_cmd = 'apt-cache show'
         # Avoid a config prompt
         waagent.Run("DEBIAN_FRONTEND=noninteractive", False)
