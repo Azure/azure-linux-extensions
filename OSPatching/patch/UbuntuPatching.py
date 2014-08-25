@@ -43,7 +43,6 @@ class UbuntuPatching(AbstractPatching):
         self.download_cmd = 'apt-get -d -y install'
         self.patch_cmd = 'apt-get -y install'
         self.status_cmd = 'apt-cache show'
-        waagent.Run(self.update_cmd, False)
         # Avoid a config prompt
         waagent.Run("DEBIAN_FRONTEND=noninteractive", False)
 
@@ -51,6 +50,8 @@ class UbuntuPatching(AbstractPatching):
         """
         Install for dependencies.
         """
+        # Update source.list
+        waagent.Run(self.update_cmd, False)
         # /var/run/reboot-required is not created unless the update-notifier-common package is installed
         retcode = waagent.Run('apt-get -y install update-notifier-common')
         if retcode > 0:

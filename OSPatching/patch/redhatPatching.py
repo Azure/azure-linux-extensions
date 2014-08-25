@@ -60,6 +60,18 @@ class redhatPatching(AbstractPatching):
         if retcode > 0:
             self.hutil.error("Failed to install yum-plugin-security")
 
+        # For package-cleanup
+        retcode = waagent.Run('yum -y install yum-utils')
+        if retcode > 0:
+            self.hutil.error("Failed to install yum-utils")
+
+        # Install missing dependencies
+        missing_dependency_list = self.check_missing_dependencies()
+        for pkg in missing_dependency_list:
+            retcode = waagent.Run('yum -y install ' + pkg)
+            if retcode > 0:
+                self.hutil.error("Failed to install missing dependency: " + pkg)
+
     def check(self, category):
         """
         Check valid upgrades,
@@ -93,7 +105,8 @@ class redhatPatching(AbstractPatching):
         return waagent.Run(self.patch_cmd + ' ' + package)
 
     def check_reboot(self):
-        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel | awk '{print substr($1,8)}' | head -1")
+        retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel")
+        last_kernel = last_kernel.split()[0][7:]
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
         return last_kernel != current_kernel
 
@@ -152,3 +165,15 @@ class redhatPatching(AbstractPatching):
                 return 1
             else:
                 return 0
+
+    def check_missing_dependencies(self):
+        retcode, output = waagent.RunGetOutput('package-cleanup --problems', chk_err=False)
+        missing_dependency_list = []
+        for line in output.split('\n'):
+            if 'requires' not in line:
+                continue
+            words = line.split()
+            missing_dependency = words[words.index('requires') + 1]
+            if missing_dependency not in missing_dependency_list:
+                missing_dependency_list.append(missing_dependency)
+        return missing_dependency_list
