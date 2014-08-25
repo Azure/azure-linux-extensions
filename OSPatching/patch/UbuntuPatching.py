@@ -43,6 +43,9 @@ class UbuntuPatching(AbstractPatching):
         self.download_cmd = 'apt-get -d -y install'
         self.patch_cmd = 'apt-get -y install'
         self.status_cmd = 'apt-cache show'
+        waagent.Run(self.update_cmd, False)
+        # Avoid a config prompt
+        waagent.Run("DEBIAN_FRONTEND=noninteractive", False)
 
     def install(self):
         """
@@ -58,7 +61,6 @@ class UbuntuPatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        waagent.Run(self.update_cmd, False)
         if category == self.category_all:
             check_cmd = self.check_cmd
         elif category == self.category_required:
