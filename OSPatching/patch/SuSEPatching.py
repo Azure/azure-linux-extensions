@@ -43,6 +43,7 @@ class SuSEPatching(AbstractPatching):
         self.download_cmd = 'zypper --non-interactive install -d --auto-agree-with-licenses -t patch '
         self.patch_cmd = 'zypper --non-interactive install --auto-agree-with-licenses -t patch '
         self.reboot_required = False
+        waagent.Run('zypper -q --gpg-auto-import-keys --non-interactive refresh', False)
     
     def check(self, category):
         """
@@ -53,7 +54,6 @@ class SuSEPatching(AbstractPatching):
             check_cmd = self.check_cmd
         elif category == self.category_required:
             check_cmd = self.check_security_cmd
-        waagent.Run('zypper --non-interactive refresh', False)
         retcode, output = waagent.RunGetOutput(check_cmd)
         output_lines = output.split('\n')
         patch_list = []
@@ -85,4 +85,3 @@ class SuSEPatching(AbstractPatching):
 
     def check_reboot(self):
         return self.reboot_required
-
