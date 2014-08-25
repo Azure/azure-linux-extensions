@@ -112,6 +112,17 @@ def patch():
                     %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
 
+def oneoff():
+    hutil.do_parse_context('Oneoff')
+    try:
+        MyPatching.parse_settings(protect_settings)
+        MyPatching.patch_one_off()
+        hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded')
+    except Exception, e:
+        hutil.error("Failed to one-off patch with error: %s, stack trace: %s"
+                    %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed')
+
 
 class Test(unittest.TestCase):
     def setUp(self):
@@ -331,9 +342,10 @@ class Test(unittest.TestCase):
 
         with self.assertRaises(SystemExit) as cm:
             enable()
-
+        
         self.assertEqual(cm.exception.code, 0)
         self.assertEqual(get_status("Enable"), 'success')
+        time.sleep(3)
         security_download_list = get_patch_list(MyPatching.package_downloaded_path, 'Important')
         self.assertTrue(set(security_download_list) == set(MyPatching.security_download_list))
         all_download_list = get_patch_list(MyPatching.package_patched_path)
@@ -476,7 +488,8 @@ def main():
             download()
         elif re.match("^([-/]*)(patch)", a):
             patch()
-
+        elif re.match("^([-/]*)(oneoff)", a):
+            oneoff()
 
 if __name__ == '__main__':
     main()

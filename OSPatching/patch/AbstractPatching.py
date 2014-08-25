@@ -136,7 +136,7 @@ class AbstractPatching(object):
         self.delete_stop_flag()
         if not self.disabled and self.patch_now:
             script_file_path = os.path.realpath(sys.argv[0])
-            waagent.Run('python ' + script_file_path + ' -oneoff &')
+            os.system(' '.join(['python', script_file_path, '-oneoff', '>/dev/null 2>&1 &']))
         else:
             self.set_download_cron()
             self.set_patch_cron()
@@ -366,7 +366,7 @@ class AbstractPatching(object):
             return False
 
     def get_pkg_to_patch(self, category):
-        if not os.path.isfile(self.package_download_path):
+        if not os.path.isfile(self.package_downloaded_path):
             return []
         pkg_to_patch = waagent.GetFileContents(self.package_downloaded_path)
         if not pkg_to_patch:
