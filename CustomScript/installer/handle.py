@@ -154,9 +154,13 @@ def get_properties_from_uri(uri):
     path = get_path_from_uri(uri)
     if path.endswith('/'):
         path = path[:-1]
-    blob_name = path[path.rfind('/')+1:]
-    path = path[:path.rfind('/')]
-    container_name = path[path.rfind('/')+1:]
+    if path[0] == '/':
+        path = path[1:]
+    first_sep = path.find('/')
+    if first_sep == -1:
+        hutil.error("Failed to extract container, blob, from {}".format(path))
+    blob_name = path[first_sep+1:]
+    container_name = path[:first_sep]
     return {'blob_name': blob_name, 'container_name': container_name}
 
 def get_path_from_uri(uriStr):
@@ -167,7 +171,13 @@ def download_blob(storage_account_name, storage_account_key, blob_uri, seqNo, co
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
     download_dir = get_download_directory(seqNo)
-    download_path = os.path.join(download_dir, blob_name)
+    # if blob_name is a path, extract the file_name
+    last_sep = blob_name.rfind('/')
+    if last_sep != -1:
+        file_name = blob_name[last_sep+1:]
+    else:
+        file_name = blob_name
+    download_path = os.path.join(download_dir, file_name)
     # Guest agent already ensure the plugin is enabled one after another. The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
