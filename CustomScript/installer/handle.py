@@ -140,7 +140,7 @@ def disable():
 
 def update():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context('Upadate')
+    hutil.do_parse_context('Update')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 
