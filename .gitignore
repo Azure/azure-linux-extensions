@@ -51,3 +51,16 @@ docs/_build/
 
 # PyBuilder
 target/*
+
+# VMBackup package ignors
+VMBackup/Utils
+VMBackup/Utils/*
+VMBackup/dist
+VMBackup/dist/*
+VMBackup/azure-sdk
+VMBackup/azure-sdk/*
+VMBackup/main/azure/*
+VMBackup/MANIFEST
+VMBackup/*.pyproj
+VMBackup/*.pyproj.user
+VMBackup/*.suo

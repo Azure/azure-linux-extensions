@@ -33,13 +33,15 @@ import shlex
 import traceback
 import urllib2
 import urlparse
-from azure.storage import BlobService
+import httplib
+#from azure.storage import BlobService
 from main.mounts import Mounts
 from main.mounts import Mount
 from main.fsfreezer import FsFreezer
 
 #Main function is the only entrence to this extension handler
 def main():
+    snapshotall('')
     global Common
     Common = imp.load_source('CommonVariables','./main/common.py')
     global Util
@@ -64,6 +66,13 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
 
+def snapshotall(protected_settings):
+    connection =  httplib.HTTPSConnection('andliu.blob.core.windows.net')
+    body_content = ''
+    connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
+    result = connection.getresponse()
+    print(result)
+
 def enable():
     hutil = Util.HandlerUtility(Util.waagent.Log, Util.waagent.Error, Common.CommonVariables.extension_name)
     try:
@@ -80,15 +89,16 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
-        storage_account_name = protected_settings.get("storageAccountName")
-        storage_account_key = protected_settings.get("storageAccountKey")
-        container_name = protected_settings.get("containerName")
-        blob_name = protected_settings.get("blobName")
+        #storage_account_name = protected_settings.get("storageAccountName")
+        #storage_account_key = protected_settings.get("storageAccountKey")
+        #container_name = protected_settings.get("containerName")
+        #blob_name = protected_settings.get("blobName")
 
         freezer = FsFreezer()
         freezer.freezeall()
-        bs = BlobService(storage_account_name, storage_account_key)
-        bs.snapshot_blob(container_name, blob_name)
+        snapshotall(protected_settings)
+        #bs = BlobService(storage_account_name, storage_account_key)
+        #bs.snapshot_blob(container_name, blob_name)
         freezer.unfreezeall()
 
     except Exception, e:
