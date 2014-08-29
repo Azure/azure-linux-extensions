@@ -34,6 +34,9 @@ import traceback
 import urllib2
 import urlparse
 from azure.storage import BlobService
+from main.mounts import Mounts
+from main.mounts import Mount
+from main.fsfreezer import FsFreezer
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -69,6 +72,8 @@ def enable():
         # If the previous enable failed, we do not have retry logic here.
         # Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
+        # we need to freeze the file system first
+       
         """
         protectedSettings is the privateConfig passed from Powershell.
         """
@@ -80,8 +85,11 @@ def enable():
         container_name = protected_settings.get("containerName")
         blob_name = protected_settings.get("blobName")
 
+        freezer = FsFreezer()
+        freezer.freezeall()
         bs = BlobService(storage_account_name, storage_account_key)
         bs.snapshot_blob(container_name, blob_name)
+        freezer.unfreezeall()
 
     except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
