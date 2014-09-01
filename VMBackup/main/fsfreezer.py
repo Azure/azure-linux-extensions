@@ -15,43 +15,48 @@
 # limitations under the License.
 #--------------------------------------------------------------------------
 import subprocess
-from main.mounts import Mounts
+from mounts import Mounts
 class FsFreezer:
     def __init__(self):
         """
         """
+        self.mounts = Mounts()
 
     def freeze(self, path):
-        #print('freeze...' + path);
-        subprocess.call(['fsfreeze', '-f', path])
+        print('freeze...' + path);
+        freeze_result = subprocess.call(['fsfreeze', '-f', path])
+        print('freeze_result...' + str(freeze_result));
 
     def unfreeze(self, path):
-        #print('unfreeze...' + path);
-        subprocess.call(['fsfreeze', '-u', path])
+        print('unfreeze...' + path);
+        unfreeze_result = subprocess.call(['fsfreeze', '-u', path])
+        print('unfreeze_result...' +  str(unfreeze_result))
 
     def freezeall(self):
-            self.root_seen = False
-            mounts = Mounts()
-            for mount in mounts.mounts:
-                #print(mount.device + ' ' + mount.type + ' ' + mount.dir + ' ' + mount.opts + ' '+ str(mount.dir.startswith('/dev')))
+            self.root_seen = False            
+            for mount in self.mounts.mounts:
                 if(mount.dir!='/'):
                     self.root_seen = True
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
-                    self.freeze(mount.dir)
+                    try:
+                        self.freeze(mount.dir)
+                    except Exception, e:
+                        pass
 
             if(self.root_seen):
                 self.freeze('/')
 
     def unfreezeall(self):
             self.root_seen = False
-            mounts = Mounts()
-            for mount in mounts.mounts:
-                #print(mount.device + ' ' + mount.type + ' ' + mount.dir + ' ' + mount.opts)
+            
+            for mount in self.mounts.mounts:
                 if(mount.dir!='/'):
                     self.root_seen = True
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
-                    self.unfreeze(mount.dir)
-
+                    try:
+                        self.unfreeze(mount.dir)
+                    except Exception,e:
+                        pass
             if(self.root_seen):
                 self.unfreeze('/')
 

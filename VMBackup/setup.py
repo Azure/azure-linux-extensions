@@ -32,13 +32,14 @@ import os
 import shutil
 import tempfile
 import json
+import sys
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
 
 packages_array = []
 main_folder = 'main'
-main_entry = './' + main_folder + '/handle.py'
+main_entry = main_folder + '/handle.py'
 packages_array.append(main_folder)
 
 """
@@ -60,11 +61,13 @@ packages_array.append(CommonVariables.azure_path + '/storage')
 """
 copy the utils lib to local
 """
-if os.path.isdir(CommonVariables.utils_path):
-    shutil.rmtree(CommonVariables.utils_path)
-
-shutil.copytree ('../' + CommonVariables.utils_path, CommonVariables.utils_path)
-packages_array.append(CommonVariables.utils_path)
+target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
+if os.path.isdir(target_utils_path):
+    shutil.rmtree(target_utils_path)
+print('copying')
+shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
+print('copying end')
+packages_array.append(target_utils_path)
 
 
 """
@@ -84,7 +87,7 @@ manifest_obj = [{
   }
 }]
 
-manifest_str = json.dumps(manifest_obj, sort_keys=True, indent=4)
+manifest_str = json.dumps(manifest_obj, sort_keys = True, indent = 4)
 manifest_file = open("HandlerManifest.json", "w") 
 manifest_file.write(manifest_str)
 manifest_file.close()
@@ -139,7 +142,8 @@ setup(name = CommonVariables.extension_name,
 unzip the package files and re-package it.
 """
 target_zip_file_location = './dist/'
-target_zip_file_path = target_zip_file_location + CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.zip'
+target_folder_name = CommonVariables.extension_name + '-' + str(CommonVariables.extension_version)
+target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
@@ -156,4 +160,6 @@ def zip(src, dst):
             zf.write(absname, arcname)
     zf.close()
 
-zip(target_zip_file_location + CommonVariables.extension_name + '-' + str(CommonVariables.extension_version), target_zip_file_path)
+final_folder_path = target_zip_file_location + target_folder_name
+zip(final_folder_path, target_zip_file_path)
+

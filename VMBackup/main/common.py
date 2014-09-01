@@ -16,8 +16,8 @@
 #--------------------------------------------------------------------------
 class CommonVariables:
     azure_path = 'main/azure'
-    utils_path = 'Utils'
-    extension_name = 'VMBackupForLinux5'
+    utils_path_name = 'Utils'
+    extension_name = 'VMBackupForLinux6'
     extension_version = 1.0
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
