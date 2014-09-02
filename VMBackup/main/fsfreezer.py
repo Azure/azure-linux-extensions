@@ -26,41 +26,57 @@ class FsFreezer:
         """
         self.mounts = Mounts()
 
-    def freeze(self, path):
-        print('freeze...' + path);
-        freeze_result = subprocess.call(['fsfreeze', '-f', path])
+    def freeze(self, mount):
+        """
+        for xfs we should use the xfs_freeze
+        """
+        path = mount.dir
+        print('freeze...' + path + ' type '+ mount.type)
+        if(mount.type=='xfs'):
+            unfreeze_result = subprocess.call(['xfs_freeze', '-u', path])
+        else:
+            freeze_result = subprocess.call(['fsfreeze', '-f', path])
         print('freeze_result...' + str(freeze_result));
 
-    def unfreeze(self, path):
-        print('unfreeze...' + path);
-        unfreeze_result = subprocess.call(['fsfreeze', '-u', path])
+    def unfreeze(self, mount):
+        """
+        for xfs we should use the xfs_freeze -u 
+        """
+        path = mount.dir
+        print('unfreeze...' + path + ' type '+ mount.type)
+        if(mount.type=='xfs'):
+            unfreeze_result = subprocess.call(['xfs_freeze', '-u', path])
+        else:
+            unfreeze_result = subprocess.call(['fsfreeze', '-u', path])
         print('unfreeze_result...' +  str(unfreeze_result))
 
     def freezeall(self):
             self.root_seen = False
             for mount in self.mounts.mounts:
-                if(mount.dir!='/'):
+                if(mount.dir=='/'):
                     self.root_seen = True
+                    self.root_mount = mount
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
                     try:
-                        self.freeze(mount.dir)
+                        self.freeze(mount)
                     except Exception, e:
                         pass
 
             if(self.root_seen):
-                self.freeze('/')
+                self.freeze(root_mount)
 
     def unfreezeall(self):
             self.root_seen = False
             
             for mount in self.mounts.mounts:
-                if(mount.dir!='/'):
+                if(mount.dir=='/'):
                     self.root_seen = True
+                    self.root_mount = mount
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
                     try:
-                        self.unfreeze(mount.dir)
+                        self.unfreeze(mount)
                     except Exception,e:
                         pass
             if(self.root_seen):
-                self.unfreeze('/')
+                self.unfreeze(self.root_mount)
 

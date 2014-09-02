@@ -75,28 +75,9 @@ def snapshotall(blobs):
     try:
         for blob in blobs:
             snapshot(blob)
-        #connection =  httplib.HTTPSConnection('andliu.blob.core.windows.net')
-        #body_content = ''
-        #connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
-        #result = connection.getresponse()
-        #print(result.read())
     except Exception, e:
         print(e)
     print('snapshotall')
-
-#    Public Configuration Object:
-#{
-#TaskId:"<taskid>", // This will be a string identifying the backup job, this needs to be put as metadata on the blob snapshot. And will also be used while reporting status back as part of  the operation name.
-#CommandToExecute:"<Backup >", // There can be multiple commands which the agent extn will need to support, for V1 only ¡°Backup¡± is the valid command.
-#Locale:"en-us", ¡°// (Currently unused ¨C reserved for future) We will use it to format the localized status object, as localization is not supported by current azure extension infra, hence it is not be used for V1¡±
-#SerObjStr:<Serialized object string> // (Currently unused ¨C reserved for future) This will be empty string for backup command, this object is meant to be passed unencrypted by the service, this object is contains a serialized xml containing the input for the command (it is not required for Backup.)
-#}
- 
-#Private Configuration Object:
-#{
-#SerObjStrInput: //This is an encrypted string, post decryption by the agent, this contains the input xml for the command. For Backup command, the xml contains the list of Blob SAS Uri for the vm vhds to be snapshotted. The SAS Uri will be valid for 1 hr only. 
-#LogsBlobUri: //This is an encrypted string, post decryption by the agent, this contains the blobSASUri for the blob which can be used for logging. It is assumed by the service that the blob contains a single text file which it reads and then copies the log into the service logs. The blob size is preset by the service as 10MB.
-#}
 
 def enable():
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
