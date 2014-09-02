@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# VM Backup extension
 #
 # Copyright 2014 Microsoft Corporation
 #

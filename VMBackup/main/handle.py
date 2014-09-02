@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# VM Backup extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -19,7 +19,6 @@
 # Requires Python 2.7+
 #
 
-
 import array
 import base64
 import os
@@ -34,18 +33,18 @@ import traceback
 import urllib2
 import urlparse
 import httplib
+import xml.parsers.expat
 from mounts import Mounts
 from mounts import Mount
 from fsfreezer import FsFreezer
 from common import CommonVariables
+from parameterparser import ParameterParser
 from Utils import HandlerUtil
 
 #Main function is the only entrence to this extension handler
 def main():
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
-    #global Common
-    #Common = imp.load_source('CommonVariables','./main/common.py')
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -59,19 +58,45 @@ def main():
         elif re.match("^([-/]*)(update)", a):
             update()
 
-connection =  httplib.HTTPSConnection('andliu.blob.core.windows.net')
+
 def install():
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
 
-def snapshotall(protected_settings):
+def snapshot(sasuri):
+    connection = httplib.HTTPSConnection('andliu.blob.core.windows.net')
+    body_content = ''
+    connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
+    result = connection.getresponse()
+    connection.close()
+
+def snapshotall(blobs):
     try:
-        connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
-        result = connection.getresponse()
+        for blob in blobs:
+            snapshot(blob)
+        #connection =  httplib.HTTPSConnection('andliu.blob.core.windows.net')
+        #body_content = ''
+        #connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
+        #result = connection.getresponse()
+        #print(result.read())
     except Exception, e:
-        pass
+        print(e)
     print('snapshotall')
+
+#    Public Configuration Object:
+#{
+#TaskId:"<taskid>", // This will be a string identifying the backup job, this needs to be put as metadata on the blob snapshot. And will also be used while reporting status back as part of  the operation name.
+#CommandToExecute:"<Backup >", // There can be multiple commands which the agent extn will need to support, for V1 only ¡°Backup¡± is the valid command.
+#Locale:"en-us", ¡°// (Currently unused ¨C reserved for future) We will use it to format the localized status object, as localization is not supported by current azure extension infra, hence it is not be used for V1¡±
+#SerObjStr:<Serialized object string> // (Currently unused ¨C reserved for future) This will be empty string for backup command, this object is meant to be passed unencrypted by the service, this object is contains a serialized xml containing the input for the command (it is not required for Backup.)
+#}
+ 
+#Private Configuration Object:
+#{
+#SerObjStrInput: //This is an encrypted string, post decryption by the agent, this contains the input xml for the command. For Backup command, the xml contains the list of Blob SAS Uri for the vm vhds to be snapshotted. The SAS Uri will be valid for 1 hr only. 
+#LogsBlobUri: //This is an encrypted string, post decryption by the agent, this contains the blobSASUri for the blob which can be used for logging. It is assumed by the service that the blob contains a single text file which it reads and then copies the log into the service logs. The blob size is preset by the service as 10MB.
+#}
 
 def enable():
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -91,16 +116,22 @@ def enable():
         """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+        para_parser = ParameterParser(protected_settings, public_settings)
 
-        freezer.freezeall()
-        snapshotall(protected_settings)
-        freezer.unfreezeall()
-        hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
+        commandToExecute = para_parser.commandToExecute
+        taskId = public_settings.get('TaskId')
+        if(commandToExecute.lower() == 'backup'):
+            freezer.freezeall()
+            snapshotall(para_parser.blobs)
+            freezer.unfreezeall()
+            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
+        else:
+            hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not right.')
 
     except Exception, e:
         print(str(e))
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
+        hutil.do_exit(1, 'Enable','error','1', 'Enable failed.')
     finally:
         freezer.unfreezeall()
 
