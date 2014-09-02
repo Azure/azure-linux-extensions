@@ -139,7 +139,7 @@ class Test(unittest.TestCase):
             sys.exit(1)
 
         distro = DistInfo()[0]
-        if 'centos' in distro or 'redhat' in distro:
+        if 'centos' in distro or 'Oracle' in distro or 'redhat' in distro:
             MyPatching.cron_restart_cmd = 'service crond restart'
 
         try:
