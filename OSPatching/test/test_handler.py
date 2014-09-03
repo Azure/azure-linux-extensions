@@ -138,6 +138,10 @@ class Test(unittest.TestCase):
         if MyPatching == None:
             sys.exit(1)
 
+        distro = DistInfo()[0]
+        if 'centos' in distro or 'redhat' in distro:
+            MyPatching.cron_restart_cmd = 'service crond restart'
+
         try:
             os.remove('mrseq')
         except:
