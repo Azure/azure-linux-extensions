@@ -241,14 +241,9 @@ class Test(unittest.TestCase):
         else:
             find_cron = 'cat /var/log/cron'
     
-        if 'SuSE' in distro:
-            find_download_time = "grep '" + time.strftime('%Y-%m-%dT%H:%M', time.localtime(enable_time + 120)) + "'"
-            find_patch_time = "grep '" + time.strftime('%Y-%m-%dT%H:%M', time.localtime(enable_time + 180)) + "'"
-
-        else:
-            day = int(time.strftime('%d', time.localtime(enable_time)))
-            find_download_time = "grep '" + str(day) + time.strftime(' %H:%M', time.localtime(enable_time + 120)) + "'"
-            find_patch_time = "grep '" + str(day) + time.strftime(' %H:%M', time.localtime(enable_time + 180)) + "'"
+        day = int(time.strftime('%d', time.localtime(enable_time)))
+        find_download_time = "grep '" + str(day) + time.strftime(' %H:%M', time.localtime(enable_time + 120)) + "'"
+        find_patch_time = "grep '" + str(day) + time.strftime(' %H:%M', time.localtime(enable_time + 180)) + "'"
 
         find_download = "grep 'python test_handler.py -download'"
         find_patch = "grep 'python test_handler.py -patch'"
