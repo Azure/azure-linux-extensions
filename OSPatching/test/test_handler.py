@@ -42,14 +42,12 @@ ExtensionShortName = 'OSPatching'
 
 contents = waagent.GetFileContents('default.settings')
 protect_settings = json.loads(contents)
-status_file = '/var/lib/waagent/Microsoft.OSTCExtensions.OSPatchingForLinuxTest-1.0/status/3.status'
-log_file = '/var/log/azure/Microsoft.OSTCExtensions.OSPatchingForLinuxTest/1.0/extension.log'
+status_file = './status/0.status'
+log_file = './extension.log'
 
 def install():
     hutil.do_parse_context('Install')
     try:
-        # Ensure the same configuration is executed only once
-        hutil.exit_if_seq_smaller()
         MyPatching.install()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
     except Exception, e:
