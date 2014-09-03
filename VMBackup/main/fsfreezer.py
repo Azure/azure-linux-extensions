@@ -63,7 +63,7 @@ class FsFreezer:
                         pass
 
             if(self.root_seen):
-                self.freeze(root_mount)
+                self.freeze(self.root_mount)
 
     def unfreezeall(self):
             self.root_seen = False

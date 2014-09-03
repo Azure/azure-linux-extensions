@@ -40,6 +40,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
+from urlparse import urlparse
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -65,9 +66,10 @@ def install():
     hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
 
 def snapshot(sasuri):
-    connection = httplib.HTTPSConnection('andliu.blob.core.windows.net')
+    sasuri_obj = urlparse(sasuri)
+    connection = httplib.HTTPSConnection(sasuri_obj.hostname)
     body_content = ''
-    connection.request('PUT', '/extensions/VMBackupForLinux5-1.0.zip?sv=2014-02-14&sr=c&sig=wuoL15FvNEIWiimN9BMQNmDiqt36kuzKy1JIX0EaMYo%3D&st=2014-08-28T16%3A00%3A00Z&se=2014-09-05T16%3A00%3A00Z&sp=rwdl&comp=snapshot', body_content)
+    connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content)
     result = connection.getresponse()
     connection.close()
 

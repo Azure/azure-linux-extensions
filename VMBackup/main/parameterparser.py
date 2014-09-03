@@ -19,6 +19,8 @@
 # Requires Python 2.7+
 #
 import xml.parsers.expat
+from Utils import HandlerUtil
+from common import CommonVariables
 
 class ParameterParser(object):
     def start_element(self, name, attrs):
@@ -34,14 +36,13 @@ class ParameterParser(object):
         """
         TODO: we should validate the parameter first
         """
-        hutil.log('###############protected_settings:' + protected_settings)
-        
         self.blobs = []
         self.logsBlobUri = protected_settings.get('LogsBlobUri')
-        SerObjStrInput = protected_settings.get('SerObjStrInput')
+        self.serObjStrInput = protected_settings.get('SerObjStrInput')
+        
         self.commandToExecute = public_settings.get('CommandToExecute')
         p = xml.parsers.expat.ParserCreate()
         p.StartElementHandler = self.start_element
         p.EndElementHandler = self.end_element
         p.CharacterDataHandler = self.char_data
-        p.Parse(SerObjStrInput)
+        p.Parse(self.serObjStrInput)
