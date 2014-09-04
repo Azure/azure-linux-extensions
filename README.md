@@ -89,7 +89,8 @@ $vm = get-azurevm $VmName
 $ExtensionName = '<extension_name>'
 $Publisher = '<publisher_name>'
 $Version =  '<version>'
-$PrivateConfig = '{"disabled": "true|false", "dayOfWeek": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday", "startTime": "hr:min", "category": "Important|ImportantAndRecommended", "installDuration": "hr:min"}'	
+$PrivateConfig = '{"disabled": "true|false", "stop" : "true|false",
+	"rebootAfterPatch" : "Required|NotRequired|Auto","dayOfWeek": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday", "startTime": "hr:min", "category": "Important|ImportantAndRecommended", "installDuration": "hr:min"}'	
 Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
 $PublicConfig = '{ }'
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM
