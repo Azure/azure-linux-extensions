@@ -36,6 +36,7 @@ EXTENSION_SHORT_NAME = 'SteppingStone'
 def install():
     hutil.do_parse_context('Install')
     try:
+        guacamole_installer.install_guacamole()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
     except Exception, e:
         hutil.error('Failed to install the extension with error: %s, '
