@@ -398,7 +398,7 @@ class Test(unittest.TestCase):
         self.assertEqual(cm.exception.code, 0)
         self.assertTrue(MyPatching.exists_stop_flag())
 
-        time.sleep(180 + 5)
+        time.sleep(180 + 5 + 60)
         self.assertFalse(MyPatching.exists_stop_flag())
         self.assertFalse(waagent.GetFileContents(MyPatching.package_downloaded_path))
         self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
@@ -427,7 +427,7 @@ class Test(unittest.TestCase):
         self.assertTrue(MyPatching.exists_stop_flag())
 
         # Make sure the total sleep time is greater than 180s
-        time.sleep(20 + delta_time + 5)
+        time.sleep(20 + delta_time + 5 + 60)
         self.assertFalse(MyPatching.exists_stop_flag())
         download_list = get_patch_list(MyPatching.package_downloaded_path)
         self.assertEqual(download_list, ['a', 'b', 'c', 'd', 'e', '1', '2', '3', '4'])

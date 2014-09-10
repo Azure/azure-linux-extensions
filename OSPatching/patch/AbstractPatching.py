@@ -112,7 +112,6 @@ class AbstractPatching(object):
 
             interval_of_weeks = settings.get('intervalOfWeeks')
             if interval_of_weeks is None or interval_of_weeks == '':
-                self.hutil.log('intervalOfWeeks defaults to 1')
                 self.interval_of_weeks = '1'
             else:
                 self.interval_of_weeks = interval_of_weeks
@@ -205,9 +204,11 @@ class AbstractPatching(object):
         else:
             hr = str(self.start_time.hour)
             minute = str(self.start_time.minute)
+            minute_cleanup = str(self.start_time.minute + 1)
             dow = ','.join([str(day) for day in self.day_of_week])
             new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+            new_line += ' '.join([minute_cleanup, hr, '* *', dow, 'root rm -f', self.stop_flag_path, '\n'])
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a) and (self.stop_flag_path not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
