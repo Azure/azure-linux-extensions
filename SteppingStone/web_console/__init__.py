@@ -20,7 +20,7 @@ import os
 import re
 import platform
 
-from installer.ubuntu_installer import UbuntuInstaller
+from ubuntu_installer import UbuntuInstaller
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo(fullname=0):
