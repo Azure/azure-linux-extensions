@@ -44,3 +44,4 @@ MYSQLAUTH_CONF = """
 
 # Maybe Change
 SRC_URI = 'https://binxia.blob.core.windows.net/stepping-stones-services/'
+AZURE_VM_DOMAIN = '.cloudapp.net'

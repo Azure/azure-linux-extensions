@@ -21,6 +21,7 @@
 
 import os
 import sys
+import socket
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -45,7 +46,7 @@ class BaseInstaller(object):
             self.build_guacamole_server_from_source()
             self.build_guacamole_client_from_source()
         else:
-            self.install_guacamole_from_packages()
+            self.install_guacamole_from_packages(['ssh', 'rdp'])
 
     def download_src(self):
         guac_server_src = GUAC_SERVER_NAME + '-' + GUAC_VERSION + '.tar.gz'
@@ -111,3 +112,9 @@ class BaseInstaller(object):
         auth_handler.configure()
         self.hutil.log('Configure auth: SUCCESS')
         
+
+    def get_web_console_uri(self, protocol='SSH'):
+        host_name = socket.getfqdn(socket.gethostname())
+        dns_name = host_name + AZURE_VM_DOMAIN
+        web_console_uri = dns_name + ':8080/guacamole/client.xhtml?id=c%2FWEB%20' + protocol.upper()
+        return web_console_uri

@@ -58,12 +58,12 @@ class UbuntuInstaller(BaseInstaller):
             sys.exit(1)
         #self.install_vnc()
         if 'ssh' in category:
-            retcode_libssh = install_pkg('libguac-client-ssh0')
+            retcode_libssh = self.install_pkg('libguac-client-ssh0')
             if retcode_libssh != 0:
                 self.hutil.log('SSH is not supported')
         if 'rdp' in category:
-            retcode_xrdp = install_pkg('xrdp')
-            retcode_librdp = install_pkg('libguac-client-rdp0')
+            retcode_xrdp = self.install_pkg('xrdp')
+            retcode_librdp = self.install_pkg('libguac-client-rdp0')
             if retcode_xrdp != 0 or retcode_librdp != 0:
                 self.hutil.log('RDP is not supported')
         self.hutil.log('Installing guacamole: SUCCESS')

@@ -36,12 +36,11 @@ EXTENSION_SHORT_NAME = 'SteppingStone'
 def install():
     hutil.do_parse_context('Install')
     try:
-        guacamole_installer.install_guacamole()
-        guacamole_installer.configure_auth()
+        script_file_path = os.path.realpath(sys.argv[0])
+        os.system(' '.join(['python', script_file_path, '-web_console', '>/dev/null 2>&1 &']))
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
     except Exception, e:
-        hutil.error('Failed to install the extension with error: %s, '
-                    'stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.error('Failed to install the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed')
 
 def enable():
@@ -51,8 +50,7 @@ def enable():
         hutil.exit_if_seq_smaller()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded.')
     except Exception, e:
-        hutil.error('Failed to enable the extension with error: %s, '
-                    'stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable Failed.')
 
 def uninstall():
@@ -64,13 +62,23 @@ def disable():
     try:
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
     except Exception, e:
-        hutil.error('Failed to disable the extension with error: %s, '
-                    'stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.error('Failed to disable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed')
 
 def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
+
+def web_console():
+    hutil.do_parse_context('Install Web Console')
+    try:
+        guacamole_installer.install_guacamole()
+        guacamole_installer.configure_auth()
+        web_ssh_uri = guacamole_installer.get_web_console_uri('SSH')
+        hutil.do_exit(0, 'Install Web Console', 'success', '0', web_ssh_uri)
+    except Exception, e:
+        hutil.error('Failed to install the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Install Web Console', 'error', '0', 'Install Failed')
 
 # Main function is the only entrance to this extension handler
 def main():
@@ -96,6 +104,8 @@ def main():
             enable()
         elif re.match("^([-/]*)(update)", a):
             update()
+        elif re.match("^([-/]*)(web_console)", a):
+            web_console()
 
 
 if __name__ == '__main__':
