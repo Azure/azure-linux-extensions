@@ -73,30 +73,37 @@ class AbstractPatching(object):
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
 
+        self.current_config_list = list()
+
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
         if disabled is None:
             self.hutil.log("WARNING: the value of option \"disabled\" not \
                             specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
+        self.current_config_list.append('disabled=' + str(self.disabled))
         if self.disabled:
             self.hutil.log("The extension " + ExtensionShortName+ "is disabled")
             return
 
         stop = settings.get('stop')
         self.stop = True if stop in ['True', 'true'] else False
+        self.current_config_list.append('stop=' + str(self.stop))
 
         reboot_after_patch = settings.get('rebootAfterPatch')
         if reboot_after_patch is None or reboot_after_patch == '':
             self.reboot_after_patch = 'Auto'
         else:
             self.reboot_after_patch = reboot_after_patch
+        self.current_config_list.append('rebootAfterPatch=' + self.reboot_after_patch)
 
         start_time = settings.get('startTime')
         if start_time is None or start_time == '':
             self.patch_now = True
+            self.current_config_list.append('startTime=Now')
         else:
             self.patch_now = False
+            self.current_config_list.append('startTime=' + start_time)            
             self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
             self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
  
@@ -104,6 +111,7 @@ class AbstractPatching(object):
             if day_of_week is None or day_of_week == '':
                 self.hutil.log('dayOfWeek defaults to Everyday')
                 day_of_week = 'Everyday'
+            self.current_config_list.append('dayOfWeek=' + day_of_week)
             day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
             if 'Everyday' in day_of_week:
                 self.day_of_week = range(1,8)
@@ -115,6 +123,7 @@ class AbstractPatching(object):
                 self.interval_of_weeks = '1'
             else:
                 self.interval_of_weeks = interval_of_weeks
+            self.current_config_list.append('intervalOfWeeks=' + self.interval_of_weeks)
 
         install_duration = settings.get('installDuration')
         if install_duration is None or install_duration == '':
@@ -123,6 +132,7 @@ class AbstractPatching(object):
         else:
             hr_min = install_duration.split(':')
             self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
+        self.current_config_list.append('installDuration=' + str(self.install_duration))
         # 5 min for reboot
         self.install_duration -= 300
 
@@ -132,6 +142,7 @@ class AbstractPatching(object):
             self.category = self.category_all
         else:
             self.category = category
+        self.current_config_list.append('category=' + self.category)        
 
     def install(self):
         pass
@@ -386,3 +397,7 @@ class AbstractPatching(object):
             return []
         patchlist = [line.split()[0] for line in pkg_to_patch.split('\n') if line.endswith(category)]
         return patchlist
+
+    def get_current_config(self):
+        return ','.join(self.current_config_list)
+        

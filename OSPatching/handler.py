@@ -37,11 +37,10 @@ def install():
     hutil.do_parse_context('Install')
     try:
         MyPatching.install()
-        hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
+        hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception, e:
-        hutil.error("Failed to install the extension with error: %s, \
-                     stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed')
+        hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed.')
 
 def enable():
     hutil.do_parse_context('Enable')
@@ -52,15 +51,16 @@ def enable():
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
         MyPatching.enable()
-        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded.')
+        current_config = MyPatching.get_current_config()
+        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
-        hutil.error("Failed to enable the extension with error: %s, \
-                     stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable', 'error', '0', 'Enable Failed.')
+        current_config = MyPatching.get_current_config()
+        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable', 'error', '0', 'Enable Failed. Current Configuation: ' + current_config)
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded')
+    hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded.')
 
 def disable():
     hutil.do_parse_context('Disable')
@@ -68,15 +68,14 @@ def disable():
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
         MyPatching.disable()
-        hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
+        hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded.')
     except Exception, e:
-        hutil.error("Failed to disable the extension with error: %s, \
-                     stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed')
+        hutil.error("Failed to disable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed.')
 
 def update():
     hutil.do_parse_context('Upadate')
-    hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
+    hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded.')
 
 def download():
     hutil.do_parse_context('Download')
@@ -85,11 +84,12 @@ def download():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.download()
-        hutil.do_exit(0,'Enable','success','0', 'Download Succeeded')
+        current_config = MyPatching.get_current_config()
+        hutil.do_exit(0,'Enable','success','0', 'Download Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
-        hutil.error("Failed to download updates with error: %s, \
-                     stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Download Failed')
+        current_config = MyPatching.get_current_config()
+        hutil.error("Failed to download updates with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable','error','0', 'Download Failed. Current Configuation: ' + current_config)
 
 def patch():
     hutil.do_parse_context('Patch')
@@ -98,11 +98,12 @@ def patch():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.patch()
-        hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded')
+        current_config = MyPatching.get_current_config()
+        hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
-        hutil.error("Failed to patch with error: %s, stack trace: %s"
-                    %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Patch Failed')
+        current_config = MyPatching.get_current_config()
+        hutil.error("Failed to patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable','error','0', 'Patch Failed. Current Configuation: ' + current_config)
 
 def oneoff():
     hutil.do_parse_context('Oneoff')
@@ -111,11 +112,12 @@ def oneoff():
                            ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.patch_one_off()
-        hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded')
+        current_config = MyPatching.get_current_config()
+        hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
-        hutil.error("Failed to one-off patch with error: %s, stack trace: %s"
-                    %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed')
+        current_config = MyPatching.get_current_config()
+        hutil.error("Failed to one-off patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed. Current Configuation: ' + current_config)
 
 # Main function is the only entrance to this extension handler
 def main():
