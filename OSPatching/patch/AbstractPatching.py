@@ -51,6 +51,7 @@ class AbstractPatching(object):
         self.disabled = None
         self.stop = None
         self.reboot_after_patch = None
+        self.interval_of_weeks = None
         self.day_of_week = None
         self.start_time = None
         self.download_time = None
@@ -67,6 +68,7 @@ class AbstractPatching(object):
         self.package_downloaded_path = os.path.join(waagent.LibDir, 'package.downloaded')
         self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
         self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
+        self.history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'history/scheduled')
 
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
@@ -108,6 +110,12 @@ class AbstractPatching(object):
             else:
                 self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
 
+            interval_of_weeks = settings.get('intervalOfWeeks')
+            if interval_of_weeks is None or interval_of_weeks == '':
+                self.interval_of_weeks = '1'
+            else:
+                self.interval_of_weeks = interval_of_weeks
+
         install_duration = settings.get('installDuration')
         if install_duration is None or install_duration == '':
             self.hutil.log('install_duration defaults to 3600s')
@@ -138,6 +146,7 @@ class AbstractPatching(object):
             script_file_path = os.path.realpath(sys.argv[0])
             os.system(' '.join(['python', script_file_path, '-oneoff', '>/dev/null 2>&1 &']))
         else:
+            waagent.SetFileContents(self.history_scheduled, '')
             self.set_download_cron()
             self.set_patch_cron()
             self.restart_cron()
@@ -182,7 +191,7 @@ class AbstractPatching(object):
                 dow = ','.join([str(day - 1) for day in self.day_of_week])
             else:
                 dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download > /dev/null 2>&1\n'])
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-download > /dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
@@ -195,9 +204,11 @@ class AbstractPatching(object):
         else:
             hr = str(self.start_time.hour)
             minute = str(self.start_time.minute)
+            minute_cleanup = str(self.start_time.minute + 1)
             dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
+            new_line += ' '.join([minute_cleanup, hr, '* *', dow, 'root rm -f', self.stop_flag_path, '\n'])
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a) and (self.stop_flag_path not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
@@ -244,6 +255,8 @@ class AbstractPatching(object):
             self.hutil.log("Installing patches is stopped/canceled")
             self.delete_stop_flag()
             return
+
+        waagent.AppendFileContents(self.history_scheduled, time.strftime("%Y-%m-%d %a", time.localtime()) + '\n' )
 
         retcode = self.stop_download()
         if retcode == 0:
