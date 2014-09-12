@@ -25,13 +25,25 @@ import re
 import platform
 import shutil
 import traceback
+import json
+import unittest
+import time
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+
+sys.path.append('..')
 from patch import *
+from FakePatching3 import FakePatching
+
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
+
+contents = waagent.GetFileContents('default.settings')
+protect_settings = json.loads(contents)
+status_file = './status/0.status'
+log_file = './extension.log'
 
 def install():
     hutil.do_parse_context('Install')
@@ -46,8 +58,6 @@ def install():
 def enable():
     hutil.do_parse_context('Enable')
     try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]\
-                           ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
@@ -81,44 +91,112 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]\
-                           ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.download()
-        hutil.do_exit(0,'Enable','success','0', 'Download Succeeded')
+        hutil.do_exit(0,'Download','success','0', 'Download Succeeded')
     except Exception, e:
         hutil.error("Failed to download updates with error: %s, \
                      stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Download Failed')
+        hutil.do_exit(1, 'Download','error','0', 'Download Failed')
 
 def patch():
     hutil.do_parse_context('Patch')
     try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]\
-                           ['handlerSettings'].get('protectedSettings')
         MyPatching.parse_settings(protect_settings)
         MyPatching.patch()
-        hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded')
+        hutil.do_exit(0,'Patch','success','0', 'Patch Succeeded')
     except Exception, e:
         hutil.error("Failed to patch with error: %s, stack trace: %s"
                     %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Patch Failed')
+        hutil.do_exit(1, 'Patch','error','0', 'Patch Failed')
 
-def oneoff():
-    hutil.do_parse_context('Oneoff')
-    try:
-        protect_settings = hutil._context._config['runtimeSettings'][0]\
-                           ['handlerSettings'].get('protectedSettings')
-        MyPatching.parse_settings(protect_settings)
-        MyPatching.patch_one_off()
-        hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded')
-    except Exception, e:
-        hutil.error("Failed to one-off patch with error: %s, stack trace: %s"
-                    %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed')
+
+class Test(unittest.TestCase):
+    def setUp(self):
+        print '\n\n============================================================================================'
+        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
+        waagent.Log("%s started to handle." %(ExtensionShortName))
+
+        global protect_settings
+        protect_settings = json.loads(contents)
+        global hutil
+        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
+                                    ExtensionShortName)
+        global MyPatching
+        MyPatching = FakePatching(hutil)
+        if MyPatching == None:
+            sys.exit(1)
+
+        distro = DistInfo()[0]
+        if 'centos' in distro or 'Oracle' in distro or 'redhat' in distro:
+            MyPatching.cron_restart_cmd = 'service crond restart'
+
+        try:
+            os.remove('mrseq')
+        except:
+            pass
+
+        waagent.SetFileContents(MyPatching.package_downloaded_path, '')
+        waagent.SetFileContents(MyPatching.package_patched_path, '')
+
+    def test_stop_between_stage1_and_stage2(self):
+        """
+        Manually add MyPathing.gap_between_stage = 20
+        """
+        print 'test_stop_between_stage1_and_stage2'
+
+        old_log_len = len(waagent.GetFileContents(log_file))
+        current_time = time.time()
+        protect_settings['startTime'] = time.strftime('%H:%M', time.localtime(current_time + 180))
+        delta_time = int(time.strftime('%S', time.localtime(current_time)))
+        MyPatching.download_duration = 60
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        # Set stop flag after patched 10 seconds
+        # Meanwhile the extension is sleeping between stage 1 & 2
+        time.sleep(180 - delta_time + 10)
+        os.remove('mrseq')
+        protect_settings['stop'] = 'true'
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        # The patching (stage 1 & 2) has ended
+        time.sleep(20)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertEqual(download_list, ['a', 'b', 'c', 'd', 'e', '1', '2', '3', '4'])
+        patch_list = get_patch_list(MyPatching.package_patched_path)
+        self.assertEqual(patch_list, ['a', 'b', 'c', 'd', 'e'])
+        log_contents = waagent.GetFileContents(log_file)[old_log_len:]
+        self.assertTrue("Installing patches (Category:" + MyPatching.category_all + ") is stopped/canceled" in log_contents)
+
+
+def get_patch_list(file_path, category = None):
+    content = waagent.GetFileContents(file_path)
+    if category != None:
+        result = [line.split()[0] for line in content.split('\n') if line.endswith(category)]
+    else:
+        result = [line.split()[0] for line in content.split('\n') if ' ' in line]
+    return result
+    
+
+def get_status(operation, retkey='status'):
+    contents = waagent.GetFileContents(status_file)
+    status = json.loads(contents)[0]['status']
+    if status['operation'] == operation:
+        return status[retkey]
+    return ''
 
 # Main function is the only entrance to this extension handler
 def main():
+    if len(sys.argv) == 1:
+        unittest.main()
+        return
+
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
@@ -126,7 +204,8 @@ def main():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
                                 ExtensionShortName)
     global MyPatching
-    MyPatching = GetMyPatching(hutil)
+    MyPatching = FakePatching(hutil)
+
     if MyPatching == None:
         sys.exit(1)
 
@@ -145,8 +224,6 @@ def main():
             download()
         elif re.match("^([-/]*)(patch)", a):
             patch()
-        elif re.match("^([-/]*)(oneoff)", a):
-            oneoff()
 
 
 if __name__ == '__main__':

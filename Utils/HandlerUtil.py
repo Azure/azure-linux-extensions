@@ -185,6 +185,9 @@ class HandlerUtility:
         self._error = waagent.Error
 
     def exit_if_enabled(self):
+        self.exit_if_seq_smaller()
+
+    def exit_if_seq_smaller(self):
         if(int(self._context._seq_no) <= self._get_most_recent_seq()):
             self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
             sys.exit(0)

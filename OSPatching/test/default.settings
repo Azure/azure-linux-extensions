@@ -1,0 +1,9 @@
+{
+    "disabled" : "false",
+    "stop" : "false",
+    "rebootAfterPatch" : "Auto",
+    "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
+    "startTime" : "02:00",
+    "category" : "ImportantAndRecommended",
+    "installDuration" : "00:30"
+}
