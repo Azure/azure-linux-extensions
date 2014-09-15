@@ -24,13 +24,12 @@ from common import CommonVariables
 
 class ParameterParser(object):
     def start_element(self, name, attrs):
-        print 'Start element:', name, attrs
         if(name.lower()=='blob'):
             self.blobs.append(attrs['address'])
     def end_element(self, name):
-        print 'End element:', name
+        pass
     def char_data(self, data):
-        print 'Character data:', repr(data)
+        pass
 
     def __init__(self, protected_settings, public_settings):
         """
@@ -41,6 +40,7 @@ class ParameterParser(object):
         self.serObjStrInput = protected_settings.get('SerObjStrInput')
         
         self.commandToExecute = public_settings.get('CommandToExecute')
+        self.TaskId = public_settings.get('TaskId')
         p = xml.parsers.expat.ParserCreate()
         p.StartElementHandler = self.start_element
         p.EndElementHandler = self.end_element

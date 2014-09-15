@@ -21,34 +21,34 @@
 import subprocess
 from mounts import Mounts
 class FsFreezer:
-    def __init__(self):
+    def __init__(self, logger):
         """
         """
         self.mounts = Mounts()
-
+        self.logger = logger
     def freeze(self, mount):
         """
         for xfs we should use the xfs_freeze
         """
         path = mount.dir
-        print('freeze...' + path + ' type '+ mount.type)
-        if(mount.type=='xfs'):
+        self.logger.log('freeze...' + path + ' type ' + mount.type)
+        if(mount.type == 'xfs'):
             unfreeze_result = subprocess.call(['xfs_freeze', '-u', path])
         else:
             freeze_result = subprocess.call(['fsfreeze', '-f', path])
-        print('freeze_result...' + str(freeze_result));
+        self.logger.log('freeze_result...' + str(freeze_result))
 
     def unfreeze(self, mount):
         """
         for xfs we should use the xfs_freeze -u 
         """
         path = mount.dir
-        print('unfreeze...' + path + ' type '+ mount.type)
-        if(mount.type=='xfs'):
+        self.logger.log('unfreeze...' + path + ' type ' + mount.type)
+        if(mount.type == 'xfs'):
             unfreeze_result = subprocess.call(['xfs_freeze', '-u', path])
         else:
             unfreeze_result = subprocess.call(['fsfreeze', '-u', path])
-        print('unfreeze_result...' +  str(unfreeze_result))
+        self.logger.log('unfreeze_result...' + str(unfreeze_result))
 
     def freezeall(self):
             self.root_seen = False
