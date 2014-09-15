@@ -21,6 +21,9 @@
 
 class Snapshotter(object):
     """description of class"""
+    def __init__(self,logger):
+        self.logger = logger
+
     def snapshot(self, sasuri):
         sasuri_obj = urlparse(sasuri)
         connection = httplib.HTTPSConnection(sasuri_obj.hostname)
@@ -32,8 +35,7 @@ class Snapshotter(object):
     def snapshotall(self, blobs):
         try:
             for blob in blobs:
-                snapshot(blob)
+                self.snapshot(blob)
         except Exception, e:
-            print(e)
-        print('snapshotall')
+            self.logger.log(str(e))
 

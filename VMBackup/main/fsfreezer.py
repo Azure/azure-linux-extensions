@@ -26,6 +26,7 @@ class FsFreezer:
         """
         self.mounts = Mounts()
         self.logger = logger
+
     def freeze(self, mount):
         """
         for xfs we should use the xfs_freeze
