@@ -19,9 +19,13 @@
 # Requires Python 2.7+
 #
 
+class SnapshotResult(object):
+    def __init__(self):
+        pass
+
 class Snapshotter(object):
     """description of class"""
-    def __init__(self,logger):
+    def __init__(self, logger):
         self.logger = logger
 
     def snapshot(self, sasuri):

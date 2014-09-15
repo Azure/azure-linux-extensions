@@ -44,14 +44,14 @@ from urlparse import urlparse
 from snapshotter import Snapshotter
 from backuplogger import Backuplogger
 
-global backupLogger, hutil
-
 #Main function is the only entrence to this extension handler
 def main():
+    global backup_logger
+    global hutil
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-    backupLogger = Backuplogger(hutil)
+    backup_logger = Backuplogger(hutil)
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -70,7 +70,9 @@ def install():
     hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
 
 def enable():
-    freezer = FsFreezer(backupLogger)
+    freezer = FsFreezer(backup_logger)
+    unfreezeResult = None
+    snapshotResult = None
     try:
         hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
@@ -78,8 +80,8 @@ def enable():
         # Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
         # we need to freeze the file system first
-       
-        backupLogger.log('starting to enable', True)
+
+        backup_logger.log('starting to enable', True)
         """
         protectedSettings is the privateConfig passed from Powershell.
         """
@@ -89,21 +91,22 @@ def enable():
 
         commandToExecute = para_parser.commandToExecute
         if(commandToExecute.lower() == 'backup'):
-            freezer.freezeall()
-            snapshotter = Snapshotter()
-            snapshotter.snapshotall(para_parser.blobs)
-            freezer.unfreezeall()
+            freezeResult = freezer.freezeall()
+            snapshotter = Snapshotter(backup_logger)
+            snapshotResult = snapshotter.snapshotall(para_parser.blobs)
+            unfreezeResult = freezer.unfreezeall()
             hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
         else:
             hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not right.')
 
     except Exception, e:
-        freezer.unfreezeall()
-        self.logger.log(str(e))
+        unfreezeResult = freezer.unfreezeall()
+        backup_logger.log(str(e))
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','1', 'Enable failed.')
     finally:
-        freezer.unfreezeall()
+        if(unfreezeResult==None):
+            freezer.unfreezeall()
 
 def uninstall():
     hutil.do_parse_context('Uninstall')

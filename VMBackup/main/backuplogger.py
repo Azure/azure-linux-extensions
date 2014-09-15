@@ -20,7 +20,7 @@
 #
 
 class Backuplogger(object):
-    def __init__(self,hutil):
+    def __init__(self, hutil):
         self.msg = ''
         self.hutil = hutil
 
