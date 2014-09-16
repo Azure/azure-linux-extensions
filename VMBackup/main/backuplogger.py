@@ -25,18 +25,23 @@ class Backuplogger(object):
         self.hutil = hutil
 
     """description of class"""
-    def log(self, msg, local=False):
+    def log(self, msg, local = False):
         self.msg+=msg
         if(local):
             self.hutil.log(msg)
 
     def commit(self, logbloburi):
-        sasuri_obj = urlparse(logbloburi)
-        connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-        body_content = self.msg
-        connection.request('PUT', logbloburi, body_content)
-        result = connection.getresponse()
-        connection.close()
+        try:
+            sasuri_obj = urlparse(logbloburi)
+            connection = httplib.HTTPSConnection(sasuri_obj.hostname)
+            body_content = self.msg
+            connection.request('PUT', logbloburi, body_content)
+            result = connection.getresponse()
+            connection.close()
+            return True
+        except Exception, e:
+            return False
+
 
 
 

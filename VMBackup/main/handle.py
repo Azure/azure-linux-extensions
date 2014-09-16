@@ -30,8 +30,6 @@ import sys
 import imp
 import shlex
 import traceback
-import urllib2
-import urlparse
 import httplib
 import xml.parsers.expat
 from mounts import Mounts
@@ -71,8 +69,10 @@ def install():
 
 def enable():
     freezer = FsFreezer(backup_logger)
-    unfreezeResult = None
-    snapshotResult = None
+    unfreeze_result = None
+    snapshot_result = None
+    freeze_result = None
+    global_result = None
     try:
         hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
@@ -80,7 +80,6 @@ def enable():
         # Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
         # we need to freeze the file system first
-
         backup_logger.log('starting to enable', True)
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -91,22 +90,43 @@ def enable():
 
         commandToExecute = para_parser.commandToExecute
         if(commandToExecute.lower() == 'backup'):
-            freezeResult = freezer.freezeall()
-            snapshotter = Snapshotter(backup_logger)
-            snapshotResult = snapshotter.snapshotall(para_parser.blobs)
-            unfreezeResult = freezer.unfreezeall()
-            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
+            """
+            make sure the log is not do when the file system is freezed.
+            """
+            backup_logger.log("doing freeze now...", True)
+            freeze_result = freezer.freezeall()
+            backup_logger.log("doing snapshot now...")
+            snap_shotter = Snapshotter(backup_logger)
+            snapshot_result = snap_shotter.snapshotall(para_parser.blobs)
+            backup_logger.log("snapshotall ends...")
         else:
-            hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not right.')
+            hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not supported.')
 
     except Exception, e:
-        unfreezeResult = freezer.unfreezeall()
-        backup_logger.log(str(e))
-        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','1', 'Enable failed.')
+        backup_logger.log("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        global_result = e
     finally:
-        if(unfreezeResult==None):
-            freezer.unfreezeall()
+        backup_logger.log("doing unfreeze now...")
+        unfreeze_result = freezer.unfreezeall()
+        backup_logger.log("unfreeze ends...")
+
+    backup_logger.log("freeze result"+str(freeze_result))
+    backup_logger.log("unfreeze result"+str(unfreeze_result))
+    if(para_parser.logsBlobUri != None):
+        backup_logger.commit(para_parser.logsBlobUri)
+    """
+    we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
+    """
+    if(global_result != None):
+        hutil.do_exit(1, 'Enable','error','1', 'Enable failed.' + str(global_result))
+    if(snapshot_result == None or len(snapshot_result.errors) > 0):
+        backup_logger.log("snapshot result: "+str(snapshot_result),True)
+        hutil.do_exit(1,'Enable','failed','1','Enabled failed')
+    else:
+        if(len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0):
+            hutil.do_exit(0,'Enable','warning','1','Enable Succeeded with error' + str(unfreeze_result.errors))
+        else:
+            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
 
 def uninstall():
     hutil.do_parse_context('Uninstall')

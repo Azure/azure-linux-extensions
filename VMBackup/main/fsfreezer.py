@@ -28,9 +28,10 @@ class FreezeError(object):
         self.path = None
 
 class FreezeResult(object):
-    self.errors = []
     def __init__(self):
-        pass
+        self.errors = []
+    def __str__(self):
+        return 'errors' + str(self.errors)
 
 class FsFreezer:
     def __init__(self, logger):
@@ -41,8 +42,9 @@ class FsFreezer:
 
     def freeze(self, mount):
         """
-        for xfs we should use the xfs_freeze
+        for xfs we should use the xfs_freeze, or we just use fsfreeze
         """
+        freeze_error = FreezeError()
         path = mount.dir
         self.logger.log('freeze...' + path + ' type ' + mount.type)
         freeze_return_code = 0
@@ -51,12 +53,16 @@ class FsFreezer:
         else:
             freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
         self.logger.log('freeze_result...' + str(freeze_return_code))
-        return freeze_return_code
+        freeze_error.errorcode = freeze_return_code
+        if(freeze_return_code!=0):
+            freeze_error.path=path
+        return freeze_error
 
     def unfreeze(self, mount):
         """
-        for xfs we should use the xfs_freeze -u 
+        for xfs we should use the xfs_freeze -u, or we just use fsfreeze -u
         """
+        freeze_error = FreezeError()
         path = mount.dir
         self.logger.log('unfreeze...' + path + ' type ' + mount.type)
         unfreeze_return_code = 0 
@@ -65,64 +71,56 @@ class FsFreezer:
         else:
             unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
         self.logger.log('unfreeze_result...' + str(unfreeze_return_code))
-        return unfreeze_return_code
+        freeze_error.errorcode = unfreeze_return_code
+        if(unfreeze_return_code!=0):
+            freeze_error.path=path
+        return freeze_error
 
     def freezeall(self):
             self.root_seen = False
-            freezeResult = FreezeResult()
+            freeze_result = FreezeResult()
             for mount in self.mounts.mounts:
                 if(mount.dir == '/'):
                     self.root_seen = True
                     self.root_mount = mount
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
                     try:
-                        freeze_return_code = self.freeze(mount)
-                        if(freeze_return_code != 0):
-                            freezeError = FreezeError()
-                            freezeError.errorcode = freeze_return_code
-                            freezeError.path = mount.dir
-                            freezeResult.errors.append(freezeError)
+                        freezeError = self.freeze(mount)
+                        if(freezeError.errorcode != 0):
+                            freeze_result.errors.append(freezeError)
                     except Exception, e:
                         freezeError = FreezeError()
                         freezeError.errorcode = -1
                         freezeError.path = mount.dir
-                        freezeResult.errors.append(freezeError)
+                        freeze_result.errors.append(freezeError)
                         self.logger.log(str(e))
 
             if(self.root_seen):
-                freeze_return_code = self.freeze(self.root_mount)
-                if(freeze_return_code != 0):
-                    freezeError = FreezeError()
-                    freezeError.errorcode = freeze_return_code
-                    freezeError.path = mount.dir
-                    freezeResult.errors.append(freezeError)
+                freezeError = self.freeze(self.root_mount)
+                if(freezeError.errorcode != 0):
+                    freeze_result.errors.append(freezeError)
+            return freeze_result
 
     def unfreezeall(self):
             self.root_seen = False
-            unfreezeResult = FreezeResult()
+            unfreeze_result = FreezeResult()
             for mount in self.mounts.mounts:
                 if(mount.dir == '/'):
                     self.root_seen = True
                     self.root_mount = mount
                 elif(mount.dir and mount.dir.startswith('/dev') and mount.type != 'iso9660' and mount.type != 'vfat'):
                     try:
-                        unfreeze_return_code = self.unfreeze(mount)
-                        if(unfreeze_return_code != 0):
-                            unfreezeError = FreezeError()
-                            unfreezeError.errorcode = unfreeze_return_code
-                            unfreezeError.path = mount.dir
-                            unfreezeResult.errors.append(unfreezeError)
+                        freezeError = self.unfreeze(mount)
+                        if(freezeError.errorcode != 0):
+                            unfreeze_result.errors.append(freezeError)
                     except Exception,e:
-                        unfreezeError = FreezeError()
-                        unfreezeError.errorcode = -1
-                        unfreezeError.path = mount.dir
-                        unfreezeResult.errors.append(unfreezeError)
-                        self.logger.log(str(e))
+                        freezeError = FreezeError()
+                        freezeError.errorcode = -1
+                        freezeError.path = mount.dir
+                        unfreeze_result.errors.append(freezeError)
             if(self.root_seen):
-                unfreeze_return_code = self.unfreeze(self.root_mount)
-                if(unfreeze_return_code != 0):
-                    unfreezeError = FreezeError()
-                    unfreezeError.errorcode = unfreeze_return_code
-                    unfreezeError.path = mount.dir
-                    unfreezeResult.errors.append(unfreezeError)
+                freezeError = self.unfreeze(self.root_mount)
+                if(freezeError.errorcode != 0):
+                    unfreeze_result.errors.append(freezeError)
+            return unfreeze_result
 

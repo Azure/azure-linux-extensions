@@ -18,10 +18,24 @@
 #
 # Requires Python 2.7+
 #
+import urlparse
+import httplib
+import traceback
+
+class SnapshotError(object):
+    def __init__(self):
+        self.errorcode = 0
+        self.path = None
+    def __str__(self):
+        return 'errorcode:'+self.errorcode+'path:'+self.path
+        pass
 
 class SnapshotResult(object):
     def __init__(self):
-        pass
+        self.errors = []
+
+    def __str__(self):
+        return 'errors' + str(self.errors)
 
 class Snapshotter(object):
     """description of class"""
@@ -29,17 +43,28 @@ class Snapshotter(object):
         self.logger = logger
 
     def snapshot(self, sasuri):
-        sasuri_obj = urlparse(sasuri)
-        connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-        body_content = ''
-        connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content)
-        result = connection.getresponse()
-        connection.close()
+        result = None
+        snapshot_error = SnapshotError()
+        try:
+            sasuri_obj = urlparse.urlparse(sasuri)
+            connection = httplib.HTTPSConnection(sasuri_obj.hostname)
+            body_content = ''
+            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content)
+            result = connection.getresponse()
+            connection.close()
+            if(result.status != 201):
+                snapshot_error.errorcode = result.status
+                snapshot_error.sasuri = sasuri
+        except Exception, e:
+            self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            snapshot_error.errorcode = -1
+            snapshot_error.sasuri = sasuri
+        return snapshot_error
 
     def snapshotall(self, blobs):
-        try:
-            for blob in blobs:
-                self.snapshot(blob)
-        except Exception, e:
-            self.logger.log(str(e))
-
+        snapshot_result = SnapshotResult()
+        for blob in blobs:
+            snapshotError = self.snapshot(blob)
+            if(snapshotError.errorcode != 0):
+                snapshot_result.errors.append(snapshotError)
+        return snapshot_result
