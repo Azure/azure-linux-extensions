@@ -123,7 +123,7 @@ class AbstractPatching(object):
                 self.interval_of_weeks = '1'
             else:
                 self.interval_of_weeks = interval_of_weeks
-            self.current_config_list.append('intervalOfWeeks=' + self.interval_of_weeks)
+            self.current_config_list.append('intervalOfWeeks=' + str(self.interval_of_weeks))
 
         install_duration = settings.get('installDuration')
         if install_duration is None or install_duration == '':
