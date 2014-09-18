@@ -1,6 +1,6 @@
 [{
   "name": "OSPatching",
-  "version": 2.1,
+  "version": 2.2,
   "handlerManifest": {
     "installCommand": "./handler.py -install",
     "uninstallCommand": "./handler.py -uninstall",
