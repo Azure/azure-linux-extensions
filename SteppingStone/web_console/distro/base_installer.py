@@ -16,17 +16,6 @@
 #
 # Requires Python 2.4+
 
-
-import os
-import sys
-
-from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
-from base_installer import BaseInstaller
-
-
-class SuseInstaller(BaseInstaller):
-    def __init__(self, hutil):
-        super(SuseInstaller, self).__init__(hutil)
-        self.install_cmd = 'zypper --non-interactive install --auto-agree-with-licenses'
-        print 'SuSEInstaller'
+class BaseInstaller(object):
+    def __init__(self):
+        pass

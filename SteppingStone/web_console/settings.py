@@ -2,7 +2,18 @@
 
 import os
 
-ROOT_DIR = '/root/azuredata'
+ROOT_DIR = os.path.join('/root/azuredata')
+
+# ------------------------- SHELLINABOX ----------------------------- #
+SHELLINABOX_DOWNLOAD_URI = 'https://shellinabox.googlecode.com/files/'
+SHELLINABOX_SRC = 'shellinabox-2.14'
+SHELLINABOX_PREFIX = '/usr/local/shellinabox'
+SHELLINABOX_CERT_DIR = '-c /var/lib/shellinabox'
+SHELLINABOX_CERT_OWNER = '-u shellinabox -g shellinabox'
+SHELLINABOX_DEFAULT_OPTS = '--user-css "Black on White:+/etc/shellinabox/options-enabled/00+Black on White.css,White On Black:-/etc/shellinabox/options-enabled/00_White On Black.css;Color Terminal:+/etc/shellinabox/options-enabled/01+Color Terminal.css,Monochrome:-/etc/shellinabox/options-enabled/01_Monochrome.css" --no-beep'
+SHELLINABOX_PORT_RANGE = range(4200, 4204)
+
+# ------------------------- GUACAMOLE ----------------------------- #
 GUAC_CONF_DIR = '/etc/guacamole'
 GUAC_LIB_DIR = '/var/lib/guacamole'
 GUAC_CLASSPATH = os.path.join(GUAC_LIB_DIR, 'classpath')

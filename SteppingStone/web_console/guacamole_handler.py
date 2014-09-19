@@ -1,7 +1,5 @@
 #!/usr/bin/python
 #
-# AbstractPatching is the base patching class of all the linux distros
-#
 # Copyright 2014 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,18 +25,27 @@ from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
 from settings import *
+from distro import *
 from no_auth import NoAuth
 
-class BaseInstaller(object):
+class GuacamoleHandler(object):
     def __init__(self, hutil):
+        self.PROTOCOL_SUPPORT = ['SSH', 'VNC', 'RDP']
+
         self.hutil = hutil
+        self.installer = get_installer()
 
         self.curdir = os.getcwd()
         if not os.path.isdir(ROOT_DIR):
             os.mkdir(ROOT_DIR)
 
+    def get_web_console_uri(self, protocol='SSH'):
+        host_name = socket.getfqdn(socket.gethostname())
+        dns_name = host_name + AZURE_VM_DOMAIN
+        web_console_uri = dns_name + ':8080/guacamole/client.xhtml?id=c%2FWEB%20' + protocol.upper()
+        return web_console_uri
 
-    def install_guacamole(self, from_source=False):
+    def install(self, from_source=False):
         # TODO
         os.chdir(ROOT_DIR)
         if from_source:
@@ -46,8 +53,46 @@ class BaseInstaller(object):
             self.build_guacamole_server_from_source()
             self.build_guacamole_client_from_source()
         else:
-            self.install_guacamole_from_packages(['ssh', 'rdp'])
+            self.install_guacamole_from_packages(['ssh'])
 
+    def enable(self):
+        # TODO
+        pass
+
+    def install_guacamole_from_packages(self, category=[]):
+        """
+        By default, VNC support will be installed as a dependency of the guacamole package.
+        if you want SSH or RDP support, you can set the parameter.
+        Args:
+            category - 'ssh', 'rdp'
+        """
+        self.hutil.log('Start to install guacamole from packages')
+        waagent.Run('add-apt-repository -y ppa:guacamole/stable')
+        retcode = self.installer.install_pkg('guacamole-tomcat')
+        if retcode == 0:
+            self.hutil.log('gucacmole-tomcat is installed')
+        else:
+            self.hutil.error('Failed to install guacamole-tomcat')
+            sys.exit(1)
+        #self.install_vnc()
+        if 'ssh' in category:
+            retcode_libssh = self.installer.install_pkg('libguac-client-ssh0')
+            if retcode_libssh != 0:
+                self.hutil.log('SSH is not supported')
+        if 'rdp' in category:
+            retcode_xrdp = self.installer.install_pkg('xrdp')
+            retcode_librdp = self.installer.install_pkg('libguac-client-rdp0')
+            if retcode_xrdp != 0 or retcode_librdp != 0:
+                self.hutil.log('RDP is not supported')
+        self.hutil.log('Installing guacamole: SUCCESS')
+
+    def configure_auth(self):
+        auth_handler = NoAuth()
+        auth_handler.install_extension()
+        auth_handler.configure()
+        self.hutil.log('Configure auth: SUCCESS')
+
+    # Install from source
     def download_src(self):
         guac_server_src = GUAC_SERVER_NAME + '-' + GUAC_VERSION + '.tar.gz'
         guac_client_src = GUAC_CLIENT_NAME + '-' + GUAC_VERSION + '.tar.gz'
@@ -86,7 +131,7 @@ class BaseInstaller(object):
         os.chdir(ROOT_DIR)
 
     def build_guacamole_client_from_source(self):
-        retcode = install_pkg('tomcat7')
+        retcode = self.installer.install_pkg('tomcat7')
         if retcode != 0:
             sys.exit(1)
         os.chdir(os.path.join(ROOT_DIR, GUAC_CLIENT_NAME))
@@ -94,9 +139,6 @@ class BaseInstaller(object):
         # TODO
         self.hutil.log('Building guacamole client: SUCCESS')
         os.chdir(ROOT_DIR)
-
-    def install_guacamole_from_packages(self):
-        pass
 
     def restart_guacamole_server(self):
         retcode = waagent.Run('service guacd restart')
@@ -106,15 +148,37 @@ class BaseInstaller(object):
             self.hutil.error('Failed to restart guacamole server')
             sys.exit(1)
 
-    def configure_auth(self):
-        auth_handler = NoAuth()
-        auth_handler.install_extension()
-        auth_handler.configure()
-        self.hutil.log('Configure auth: SUCCESS')
-        
+    def install_lib(self, category=['ssh']):
+        """Install libraries in order to build guacamole-server.
+        Args:
+            category - 'telnet', 'ssh', 'vnc', 'rdp', 'all'
+        """
+        # Update source.list
+        waagent.Run(self.update_cmd, False)
 
-    def get_web_console_uri(self, protocol='SSH'):
-        host_name = socket.getfqdn(socket.gethostname())
-        dns_name = host_name + AZURE_VM_DOMAIN
-        web_console_uri = dns_name + ':8080/guacamole/client.xhtml?id=c%2FWEB%20' + protocol.upper()
-        return web_console_uri
+        lib_list = self.required_lib
+        if 'all' in category:
+            lib_list.extend(self.telnet_lib)
+            lib_list.extend(self.ssh_lib)
+            lib_list.extend(self.vnc_lib)
+            lib_list.extend(self.rdp_lib)
+            lib_list.extend(self.other_lib)
+        else:
+            if 'telnet' in category:
+                lib_list.extend(self.telnet_lib)
+            if 'ssh' in category:
+                lib_list.extend(self.ssh_lib)
+            if 'vnc' in category:
+                lib_list.extend(self.vnc_lib)
+            if 'rdp' in category:
+                lib_list.extend(self.rdp_lib)
+        for lib_name in lib_list:
+            retcode = self.install.install_pkg(lib_name)
+            if retcode == 0:
+                self.hutil.log('Installed library: ' + lib_name)
+            else:
+                self.hutil.error('Failed to install ' + lib_name)
+                if lib_name in self.required_lib:
+                    self.hutil.error('Can not build guacamole without the library' + lib_name)
+                    sys.exit(1)
+        self.hutil.log('Succeed in installing libraries to support ' + ' '.join(category))

@@ -16,23 +16,24 @@
 #
 # Requires Python 2.4+
 
-
-import os
-import sys
+import platform
 
 from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
-from base_installer import BaseInstaller
+from ubuntu_installer import UbuntuInstaller
 
+def get_installer():
+    """
+    Returns:
+        distro-based installer object.
+    """
+    if 'Linux' in platform.system():
+        distro = waagent.DistInfo()[0]
+    else: # I know this is not Linux!
+        if 'FreeBSD' in platform.system():
+            distro = platform.system()
+    distro = distro.strip('"').strip().capitalize()
+    installer_name = distro + 'Installer'
+    if not globals().has_key(installer_name):
+        return None
+    return globals()[installer_name]()
 
-class RedhatInstaller(BaseInstaller):
-    def __init__(self, hutil):
-        super(RedhatInstaller, self).__init__(hutil)
-        self.install_cmd = 'yum -y install'
-        print 'RedhatInstaller'
-
-    def install(self):
-        """
-        Install for dependencies.
-        """
-        pass
