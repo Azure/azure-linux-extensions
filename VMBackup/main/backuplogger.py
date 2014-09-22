@@ -18,6 +18,7 @@
 #
 # Requires Python 2.7+
 #
+import datetime
 
 class Backuplogger(object):
     def __init__(self, hutil):
@@ -25,10 +26,11 @@ class Backuplogger(object):
         self.hutil = hutil
 
     """description of class"""
-    def log(self, msg, local = False):
-        self.msg+=msg
+    def log(self, msg, local = False, level = 'Info'):
+        log_msg = (str(datetime.datetime.now())+'   ' + level + '   '+ msg + '\n')
+        self.msg += log_msg
         if(local):
-            self.hutil.log(msg)
+            self.hutil.log(log_msg)
 
     def commit(self, logbloburi):
         try:
@@ -41,7 +43,3 @@ class Backuplogger(object):
             return True
         except Exception, e:
             return False
-
-
-
-

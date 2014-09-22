@@ -18,31 +18,32 @@
 #
 # Requires Python 2.7+
 #
-import xml.parsers.expat
 from Utils import HandlerUtil
 from common import CommonVariables
+import base64
 
 class ParameterParser(object):
-    def start_element(self, name, attrs):
-        if(name.lower()=='blob'):
-            self.blobs.append(attrs['address'])
-    def end_element(self, name):
-        pass
-    def char_data(self, data):
-        pass
-
     def __init__(self, protected_settings, public_settings):
         """
         TODO: we should validate the parameter first
         """
         self.blobs = []
-        self.logsBlobUri = protected_settings.get('LogsBlobUri')
-        self.serObjStrInput = protected_settings.get('SerObjStrInput')
-        
-        self.commandToExecute = public_settings.get('CommandToExecute')
-        self.TaskId = public_settings.get('TaskId')
-        p = xml.parsers.expat.ParserCreate()
-        p.StartElementHandler = self.start_element
-        p.EndElementHandler = self.end_element
-        p.CharacterDataHandler = self.char_data
-        p.Parse(self.serObjStrInput)
+
+        """
+        get the public configuration
+        """
+        self.commandToExecute = public_settings.get(CommonVariables.command_to_execute)
+        self.taskId = public_settings.get(CommonVariables.task_id)
+        self.locale = public_settings.get(CommonVariables.locale)
+        self.publicObjectStr = public_settings.get(CommonVariables.object_str)
+        decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
+        self.public_config_obj = json.load(decoded_public_obj_string)
+        self.backup_metadata = self.public_config_obj.backupMetadata
+        """
+        first get the protected configuration
+        """
+        self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
+        self.privateObjectStr = protected_settings.get(CommonVariables.object_str)
+        decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
+        self.private_config_obj = json.load(decoded_private_obj_string)
+        self.blobs = self.private_config_obj.blobSASUri

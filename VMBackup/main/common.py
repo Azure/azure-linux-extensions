@@ -21,9 +21,16 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    extension_name = 'AgentBackupExtension2'
+    extension_name = 'ZAgentBackupExtension5'
     extension_version = 1.0
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
     extension_description = extension_label
+    object_str = 'objectStr'
+    logs_blob_uri = 'logsBlobUri'
+    task_id = 'taskId'
+    command_to_execute = 'commandToExecute'
+    iaas_vmbackup_command = 'IaaSVMBackup'
+    iaas_install_command = 'Install'
+    locale = 'locale'

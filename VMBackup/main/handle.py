@@ -89,7 +89,9 @@ def enable():
         para_parser = ParameterParser(protected_settings, public_settings)
 
         commandToExecute = para_parser.commandToExecute
-        if(commandToExecute.lower() == 'backup'):
+        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+            pass;
+        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
             """
             make sure the log is not do when the file system is freezed.
             """
@@ -97,7 +99,7 @@ def enable():
             freeze_result = freezer.freezeall()
             backup_logger.log("doing snapshot now...")
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result = snap_shotter.snapshotall(para_parser.blobs)
+            snapshot_result = snap_shotter.snapshotall(para_parser)
             backup_logger.log("snapshotall ends...")
         else:
             hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not supported.')

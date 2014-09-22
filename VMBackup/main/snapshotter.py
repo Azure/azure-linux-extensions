@@ -42,7 +42,7 @@ class Snapshotter(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def snapshot(self, sasuri):
+    def snapshot(self, sasuri, meta_data):
         result = None
         snapshot_error = SnapshotError()
         try:
@@ -61,10 +61,11 @@ class Snapshotter(object):
             snapshot_error.sasuri = sasuri
         return snapshot_error
 
-    def snapshotall(self, blobs):
+    def snapshotall(self, paras):
         snapshot_result = SnapshotResult()
+        blobs = paras.blobs
         for blob in blobs:
-            snapshotError = self.snapshot(blob)
+            snapshotError = self.snapshot(blob, paras.backup_metadata)
             if(snapshotError.errorcode != 0):
                 snapshot_result.errors.append(snapshotError)
         return snapshot_result
