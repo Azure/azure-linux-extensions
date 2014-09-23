@@ -49,8 +49,15 @@ class Snapshotter(object):
             sasuri_obj = urlparse.urlparse(sasuri)
             connection = httplib.HTTPSConnection(sasuri_obj.hostname)
             body_content = ''
-            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content)
+            headers={}
+            for meta in meta_data:
+                key=meta['Key']
+                value=meta['Value']
+                headers["x-ms-meta-" + key] = value
+            #print(str(headers))
+            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers=headers)
             result = connection.getresponse()
+            #print(str(result.getheaders()))
             connection.close()
             if(result.status != 201):
                 snapshot_error.errorcode = result.status
