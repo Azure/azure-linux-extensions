@@ -57,11 +57,13 @@ class Snapshotter(object):
                 snapshot_error.sasuri = sasuri
         except Exception, e:
             self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            #print("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             snapshot_error.errorcode = -1
             snapshot_error.sasuri = sasuri
         return snapshot_error
 
     def snapshotall(self, paras):
+        #print("doing snapshotall now...")
         snapshot_result = SnapshotResult()
         blobs = paras.blobs
         for blob in blobs:
