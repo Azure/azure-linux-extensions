@@ -54,23 +54,23 @@ class Snapshotter(object):
                 key=meta['Key']
                 value=meta['Value']
                 headers["x-ms-meta-" + key] = value
-            #print(str(headers))
+            backup_logger.log(str(headers))
             connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers=headers)
             result = connection.getresponse()
-            #print(str(result.getheaders()))
+            backup_logger.log(str(result.getheaders()))
             connection.close()
             if(result.status != 201):
                 snapshot_error.errorcode = result.status
                 snapshot_error.sasuri = sasuri
         except Exception, e:
             self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-            #print("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            backup_logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             snapshot_error.errorcode = -1
             snapshot_error.sasuri = sasuri
         return snapshot_error
 
     def snapshotall(self, paras):
-        #print("doing snapshotall now...")
+        backup_logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
         blobs = paras.blobs
         for blob in blobs:

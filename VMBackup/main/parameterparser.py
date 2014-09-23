@@ -38,10 +38,10 @@ class ParameterParser(object):
         self.locale = public_settings.get(CommonVariables.locale)
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
-        #print('decoded_public_obj_string=='+decoded_public_obj_string)
+        backup_logger.log('decoded_public_obj_string=='+decoded_public_obj_string)
         decoded_public_obj_string = decoded_public_obj_string.strip()
         decoded_public_obj_string = decoded_public_obj_string.strip('\'')
-        #print('decoded_public_obj_string'+decoded_public_obj_string)
+        backup_logger.log('decoded_public_obj_string'+decoded_public_obj_string)
         self.public_config_obj = json.loads(decoded_public_obj_string)
         self.backup_metadata = self.public_config_obj['backupMetadata']
         """
@@ -50,7 +50,7 @@ class ParameterParser(object):
         self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
         self.privateObjectStr = protected_settings.get(CommonVariables.object_str)
         decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
-        #print('decoded_private_obj_string=='+decoded_private_obj_string)
+        backup_logger.log('decoded_private_obj_string=='+decoded_private_obj_string)
         decoded_private_obj_string = decoded_private_obj_string.strip()
         decoded_private_obj_string = decoded_private_obj_string.strip('\'')
         self.private_config_obj = json.loads(decoded_private_obj_string)

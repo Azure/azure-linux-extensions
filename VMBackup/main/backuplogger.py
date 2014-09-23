@@ -19,6 +19,9 @@
 # Requires Python 2.7+
 #
 import datetime
+import traceback
+import urlparse
+import httplib
 
 class Backuplogger(object):
     def __init__(self, hutil):
@@ -28,18 +31,27 @@ class Backuplogger(object):
     """description of class"""
     def log(self, msg, local = False, level = 'Info'):
         log_msg = (str(datetime.datetime.now())+'   ' + level + '   '+ msg + '\n')
+        #print(log_msg);
         self.msg += log_msg
         if(local):
             self.hutil.log(log_msg)
 
     def commit(self, logbloburi):
         try:
-            sasuri_obj = urlparse(logbloburi)
+            self.log("committing the log")
+            sasuri_obj = urlparse.urlparse(logbloburi)
             connection = httplib.HTTPSConnection(sasuri_obj.hostname)
             body_content = self.msg
-            connection.request('PUT', logbloburi, body_content)
+            #print('logbloburi==' + logbloburi)
+            headers={}
+            headers["x-ms-blob-type" ] = 'BlockBlob'
+            self.log(str(headers))
+            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
+
             result = connection.getresponse()
+            #print('result=='+str(result.status));
             connection.close()
             return True
         except Exception, e:
+            self.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             return False
