@@ -81,11 +81,11 @@ manifest_obj = [{
   "name": CommonVariables.extension_name,
   "version": CommonVariables.extension_version,
   "handlerManifest": {
-    "installCommand": main_entry + " -install",
-    "uninstallCommand": main_entry + " -uninstall",
-    "updateCommand": main_entry + " -update",
-    "enableCommand": main_entry + " -enable",
-    "disableCommand": main_entry + " -disable",
+    "installCommand": "python " + main_entry + " -install",
+    "uninstallCommand": "python " + main_entry + " -uninstall",
+    "updateCommand": "python " + main_entry + " -update",
+    "enableCommand": "python " + main_entry + " -enable",
+    "disableCommand": "python " + main_entry + " -disable",
     "rebootAfterInstall": False,
     "reportHeartbeat": False
   }
