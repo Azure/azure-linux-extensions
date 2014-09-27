@@ -129,7 +129,7 @@ def enable():
         hutil.do_exit(1,'Enable','failed','1','Enabled failed')
     else:
         if(len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0):
-            hutil.do_exit(0,'Enable','warning','1','Enable Succeeded with error' + str(unfreeze_result.errors))
+            hutil.do_exit(0,'Enable','warning', '1', 'Enable Succeeded with error' + str(unfreeze_result.errors))
         else:
             hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
 

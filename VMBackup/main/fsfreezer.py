@@ -48,7 +48,9 @@ class FsFreezer:
         path = mount.dir
         self.logger.log('freeze...' + path + ' type ' + mount.type)
         freeze_return_code = 0
-        if(mount.type == 'xfs'):
+        if(mount.type=='devtmpfs' or mount.type=='devpts'):
+            self.logger.log('skip for devtmpfs and devpts '+str(mount.type))
+        elif(mount.type == 'xfs'):
             freeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
         else:
             freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
@@ -66,7 +68,9 @@ class FsFreezer:
         path = mount.dir
         self.logger.log('unfreeze...' + path + ' type ' + mount.type)
         unfreeze_return_code = 0 
-        if(mount.type == 'xfs'):
+        if(mount.type=='devtmpfs' or mount.type=='devpts'):
+            self.logger.log('skip for devtmpfs and devpts '+str(mount.type))
+        elif(mount.type == 'xfs'):
             unfreeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
         else:
             unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
