@@ -74,9 +74,19 @@ class ShellinaboxHandler(object):
     def enable_stepping_stone(self, connections):
         for con in connections:
             if con['disabled']:
-                port = self.stop(con['hostname'])
+                self.stop(con['hostname'])
             else:
                 self.start(con['disableSSL'], con['hostname'])
+
+    def disable(self):
+        file_list = os.listdir('/var/run')
+        pid_file_suffix = 'shellinaboxd.pid'
+        pid_file = [f for f in file_list if f.endswith(pid_file_suffix)]
+        if len(pid_file) == 0:
+            return
+        hostname_list = [f.split('_')[0] for f in pid_file]
+        for hostname in hostname_list:
+            self.stop(hostname)
 
     def start(self, disable_ssl=False, hostname='localhost', port=-1):
         old_port = None
@@ -95,12 +105,16 @@ class ShellinaboxHandler(object):
         cmds = [self.SHELLINABOX_CMD]
         pid_file = '/var/run/' + '_'.join([hostname, 'http' if disable_ssl else 'https', str(port), 'shellinaboxd.pid'])
         cmds.extend(['-q', '--background='+pid_file, '-t' if disable_ssl else SHELLINABOX_CERT_DIR, '-p '+str(port), SHELLINABOX_CERT_OWNER, '-s /:SSH:'+hostname, SHELLINABOX_DEFAULT_OPTS])
-        self.port_pool.remove(port)
-        os.system(' '.join(cmds))
-        self.hutil.log('Starting shellinabox on ' + hostname + ': SUCCESS')
+        self.hutil.log('Starting shellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): ')
+        retcode = os.system(' '.join(cmds))
+        if retcode == 0:
+            self.port_pool.remove(port)
+            self.hutil.log('OK')
+        else:
+            self.hutil.log('FAILED')
 
     def stop(self, hostname='localhost'):
-        pid_file = self.status(hostname)
+        pid_file = self.status(hostname)[0]
         if pid_file is None:
             return None
         with open(pid_file) as f:
@@ -111,18 +125,18 @@ class ShellinaboxHandler(object):
             pass
         if os.path.isfile(pid_file):
             os.remove(pid_file)
-        self.hutil.log('Stopping shellinabox on ' + hostname + ': SUCCESS')
         port = int(pid_file.split('_')[-2])
         self.port_pool.append(port)
+        self.hutil.log('Stopping hellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): OK')
         return port
 
-    def status(self, hostname='localhost'):
+    def status(self, hostname=''):
         file_list = os.listdir('/var/run')
         pid_file_suffix = 'shellinaboxd.pid'
         pid_file = [f for f in file_list if f.endswith(pid_file_suffix) and f.startswith(hostname)]
         if len(pid_file) == 0:
             return None
-        return os.path.join('/var/run', pid_file[0])
+        return [os.path.join('/var/run', f) for f in pid_file]
         
     def get_web_console_uri(self):
         file_list = os.listdir('/var/run')

@@ -36,6 +36,53 @@ from web_console.web_console_handler import WebConsoleHandler
 # Global variables definition
 EXTENSION_SHORT_NAME = 'SteppingStone'
 
+DEFAULT_SETTINGS_SHELLINABOX_LOCAL = {
+    "webConsoleTool" : "shellinabox",
+    "isSteppingStone" : False,
+    "disabled" : False,
+    "disableSSL" : False,
+    "port" : 4200
+}
+
+DEFAULT_SETTINGS_SHELLINABOX_SSS = {
+    "webConsoleTool" : "shellinabox",
+    "isSteppingStone" : True,
+    "disabled" : False,
+    "connections" : [
+        {
+            "disableSSL" : False,
+            "hostname" : "localhost",
+            "disabled" : False
+        },
+        {
+            "disableSSL" : False,
+            "hostname" : "sss-demo.cloudapp.net",
+            "disabled" : False
+        },
+        {
+            "disableSSL" : True,
+            "hostname" : "docker-sss.cloudapp.net",
+            "disabled" : False
+        },
+        {
+            "disableSSL" : True,
+            "hostname" : "ubuntu-ext-17.cloudapp.net",
+            "disabled" : True
+        }
+    ]
+}
+
+DEFAULT_SETTINGS_GUAC = {
+    "webConsoleTool" : "guacamole",
+    "isSteppingStone" : False,
+    "disableSSL" : False,
+    "hostname" : "localhost",
+    "port" : 8080
+}
+
+DEFAULT_SETTINGS = DEFAULT_SETTINGS_SHELLINABOX_SSS
+#DEFAULT_SETTINGS = DEFAULT_SETTINGS_GUAC
+
 def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
@@ -45,6 +92,7 @@ def enable():
     try:
         protect_settings = hutil._context._config['runtimeSettings'][0]\
                            ['handlerSettings'].get('protectedSettings')
+        protect_settings = DEFAULT_SETTINGS
         web_console_handler.parse_settings(protect_settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
@@ -76,6 +124,7 @@ def web_console():
     try:
         protect_settings = hutil._context._config['runtimeSettings'][0]\
                            ['handlerSettings'].get('protectedSettings')
+        protect_settings = DEFAULT_SETTINGS
         web_console_handler.parse_settings(protect_settings)
         web_console_handler.install()
         web_console_handler.enable()

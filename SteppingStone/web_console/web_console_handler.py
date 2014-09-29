@@ -42,6 +42,7 @@ class WebConsoleHandler(object):
         self.current_config_list = list()
         self.web_console_tool = None
         self.is_stepping_stone = None
+        self.disabled = None
         self.tool_handler = None
 
     def parse_settings(self, settings):
@@ -57,6 +58,14 @@ class WebConsoleHandler(object):
             else:
                 self.is_stepping_stone = False
         self.current_config_list.append('isSteppingStone=' + str(self.is_stepping_stone))
+
+        self.disabled = settings.get('disabled', False)
+        if type(self.disabled) is str:
+            if self.disabled in ['True', 'true']:
+                self.disabled = True
+            else:
+                self.disabled = False
+        self.current_config_list.append('disabled=' + str(self.disabled))
 
         if not self.is_stepping_stone:
             self.disable_ssl = settings.get('disableSSL', False)
@@ -84,6 +93,9 @@ class WebConsoleHandler(object):
 
     def enable(self):
         if self.web_console_tool == 'guacamole':
+            return
+        if self.disabled:
+            self.tool_handler.disable()
             return
         if not self.is_stepping_stone:
             self.tool_handler.enable_local(self.disable_ssl, self.port)
