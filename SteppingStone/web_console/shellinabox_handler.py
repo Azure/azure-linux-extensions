@@ -35,7 +35,7 @@ class ShellinaboxHandler(object):
         self.hutil = hutil
         self.installer = get_installer()
         self.from_pkg = True
-        self.SHELLINABOX_CMD = '/usr/bin/shellinaboxd' if self.from_pkg else os.path.join(SHELLINABOX_PREFIX, 'bin/shellinaboxd')
+        self.SHELLINABOX_CMD = 'shellinaboxd' if self.from_pkg else os.path.join(SHELLINABOX_PREFIX, 'bin/shellinaboxd')
         self.web_console_uri = dict()
         self.port_pool = self.get_available_ports()
 
@@ -46,8 +46,12 @@ class ShellinaboxHandler(object):
             self.install_from_source()
 
     def install_from_pkg(self):
-        self.installer.install_shellinabox()
-        self.installer.stop_shellinabox()
+        if self.installer is not None:
+            self.installer.install_shellinabox()
+            self.installer.stop_shellinabox()
+        else:
+            self.hutil.error('Current distribution is not supported.')
+            sys.exit(1)
 
     def install_from_source(self):
         if not os.path.isfile(self.SHELLINABOX_CMD):
@@ -101,14 +105,15 @@ class ShellinaboxHandler(object):
                     return
         cmds = [self.SHELLINABOX_CMD]
         pid_file = '/var/run/' + '_'.join([hostname, 'http' if disable_ssl else 'https', str(port), 'shellinaboxd.pid'])
-        cmds.extend(['-q', '--background='+pid_file, '-t' if disable_ssl else SHELLINABOX_CERT_DIR, '-p '+str(port), SHELLINABOX_CERT_OWNER, '-s /:SSH:'+hostname, SHELLINABOX_DEFAULT_OPTS])
-        self.hutil.log('Starting shellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): ')
+        cmds.extend(['-q', '--background='+pid_file, '-t' if disable_ssl else SHELLINABOX_CERT_DIR, '-p '+str(port), SHELLINABOX_CERT_OWNER, '-s /:SSH:'+hostname])
         retcode = os.system(' '.join(cmds))
         if retcode == 0:
             self.port_pool.remove(port)
-            self.hutil.log('OK')
+            if isinstance(self.installer, RedhatInstaller):
+                self.iptables_add_port(port)
+            self.hutil.log('Starting shellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): OK')
         else:
-            self.hutil.log('FAILED')
+            self.hutil.log('Starting shellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): FAILED')
 
     def stop(self, hostname='localhost'):
         pid_file = self.status(hostname)
@@ -125,6 +130,8 @@ class ShellinaboxHandler(object):
             os.remove(pid_file)
         port = int(pid_file.split('_')[-2])
         self.port_pool.append(port)
+        if isinstance(self.installer, RedhatInstaller):
+            self.iptables_del_port(port)
         self.hutil.log('Stopping hellinabox (0.0.0.0:' + str(port) + ' -> ' + hostname + '): OK')
         return port
 
@@ -153,3 +160,14 @@ class ShellinaboxHandler(object):
         for pid_file in pid_file_list:
             port_pool.remove(int(pid_file.split('_')[2]))
         return port_pool
+
+    def iptables_add_port(self, port):
+        if waagent.Run('iptables -L -n | grep -w ' + str(port)):
+            waagent.Run('iptables -I INPUT 1 -p tcp --dport ' + str(port) + ' -j ACCEPT', False)
+            waagent.Run('iptables -I OUTPUT 1 -p tcp --sport ' + str(port) + ' -j ACCEPT', False)
+
+    def iptables_del_port(self, port):
+        for chain in ['INPUT', 'OUTPUT']:
+            retcode, output = waagent.RunGetOutput(' '.join(['iptables -L', chain, '-n --line-number | grep -w', str(port)]))
+            if retcode == 0:
+                waagent.Run(' '.join(['iptables -D', chain, output.split()[0]]), False)

@@ -16,27 +16,13 @@
 #
 # Requires Python 2.4+
 
-import platform
+
+import os
 
 from Utils.WAAgentUtil import waagent
-from ubuntu_installer import UbuntuInstaller
+import Utils.HandlerUtil as Util
 from redhat_installer import RedhatInstaller
-from centos_installer import CentosInstaller
-from oracle_installer import OracleInstaller
 
-def get_installer():
-    """
-    Returns:
-        distro-based installer object.
-    """
-    if 'Linux' in platform.system():
-        distro = waagent.DistInfo()[0]
-    else: # I know this is not Linux!
-        if 'FreeBSD' in platform.system():
-            distro = platform.system()
-    distro = distro.strip('"').strip().capitalize()
-    installer_name = distro + 'Installer'
-    if not globals().has_key(installer_name):
-        return None
-    return globals()[installer_name]()
-
+class OracleInstaller(RedhatInstaller):
+    def __init__(self):
+        super(OracleInstaller, self).__init__()
