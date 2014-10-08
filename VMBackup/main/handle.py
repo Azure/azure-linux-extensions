@@ -76,10 +76,7 @@ def enable():
     para_parser = None
     try:
         hutil.do_parse_context('Enable')
-        # Ensure the same configuration is executed only once
-        # If the previous enable failed, we do not have retry logic here.
-        # Since the custom script may not work in an intermediate state
-        hutil.exit_if_enabled()
+        
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
         """
