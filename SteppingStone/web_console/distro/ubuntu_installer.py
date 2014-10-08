@@ -40,6 +40,12 @@ class UbuntuInstaller(BaseInstaller):
         self.ssh_libguac = ['libguac-client-ssh0']
         self.rdp_libguac = ['libguac-client-rdp0']
 
+    def install_shellinabox(self):
+        if waagent.Run('which shellinaboxd', False):
+            self.install_pkg('build-essential')
+            self.install_pkg('openssl')
+            self.install_pkg('shellinabox')
+
     def install_pkg(self, pkg):
         return waagent.Run(' '.join([self.install_cmd, pkg]))
 

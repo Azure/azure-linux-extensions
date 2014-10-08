@@ -39,9 +39,6 @@ class ShellinaboxHandler(object):
         self.web_console_uri = dict()
         self.port_pool = self.get_available_ports()
 
-        self.installer.install_pkg('build-essential')
-        self.installer.install_pkg('openssl')
-
     def install(self):
         if self.from_pkg:
             self.install_from_pkg()
@@ -49,7 +46,7 @@ class ShellinaboxHandler(object):
             self.install_from_source()
 
     def install_from_pkg(self):
-        self.installer.install_pkg('shellinabox') # ubuntu 14.04
+        self.installer.install_shellinabox()
         self.installer.stop_shellinabox()
 
     def install_from_source(self):
@@ -114,9 +111,10 @@ class ShellinaboxHandler(object):
             self.hutil.log('FAILED')
 
     def stop(self, hostname='localhost'):
-        pid_file = self.status(hostname)[0]
+        pid_file = self.status(hostname)
         if pid_file is None:
             return None
+        pid_file = pid_file[0]
         with open(pid_file) as f:
             pid = f.read()
         try:
