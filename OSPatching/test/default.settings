@@ -2,6 +2,7 @@
     "disabled" : "false",
     "stop" : "false",
     "rebootAfterPatch" : "Auto",
+    "intervalOfWeeks" : "2",
     "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
     "startTime" : "02:00",
     "category" : "ImportantAndRecommended",

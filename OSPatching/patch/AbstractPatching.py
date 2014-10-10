@@ -51,6 +51,7 @@ class AbstractPatching(object):
         self.disabled = None
         self.stop = None
         self.reboot_after_patch = None
+        self.interval_of_weeks = None
         self.day_of_week = None
         self.start_time = None
         self.download_time = None
@@ -67,9 +68,12 @@ class AbstractPatching(object):
         self.package_downloaded_path = os.path.join(waagent.LibDir, 'package.downloaded')
         self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
         self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
+        self.history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'history/scheduled')
 
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
+
+        self.current_config_list = list()
 
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
@@ -77,24 +81,29 @@ class AbstractPatching(object):
             self.hutil.log("WARNING: the value of option \"disabled\" not \
                             specified in configuration\n Set it False by default")
         self.disabled = True if disabled in ['True', 'true'] else False
+        self.current_config_list.append('disabled=' + str(self.disabled))
         if self.disabled:
             self.hutil.log("The extension " + ExtensionShortName+ "is disabled")
             return
 
         stop = settings.get('stop')
         self.stop = True if stop in ['True', 'true'] else False
+        self.current_config_list.append('stop=' + str(self.stop))
 
         reboot_after_patch = settings.get('rebootAfterPatch')
         if reboot_after_patch is None or reboot_after_patch == '':
             self.reboot_after_patch = 'Auto'
         else:
             self.reboot_after_patch = reboot_after_patch
+        self.current_config_list.append('rebootAfterPatch=' + self.reboot_after_patch)
 
         start_time = settings.get('startTime')
         if start_time is None or start_time == '':
             self.patch_now = True
+            self.current_config_list.append('startTime=Now')
         else:
             self.patch_now = False
+            self.current_config_list.append('startTime=' + start_time)            
             self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
             self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
  
@@ -102,11 +111,19 @@ class AbstractPatching(object):
             if day_of_week is None or day_of_week == '':
                 self.hutil.log('dayOfWeek defaults to Everyday')
                 day_of_week = 'Everyday'
+            self.current_config_list.append('dayOfWeek=' + day_of_week)
             day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
             if 'Everyday' in day_of_week:
                 self.day_of_week = range(1,8)
             else:
                 self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
+
+            interval_of_weeks = settings.get('intervalOfWeeks')
+            if interval_of_weeks is None or interval_of_weeks == '':
+                self.interval_of_weeks = '1'
+            else:
+                self.interval_of_weeks = interval_of_weeks
+            self.current_config_list.append('intervalOfWeeks=' + str(self.interval_of_weeks))
 
         install_duration = settings.get('installDuration')
         if install_duration is None or install_duration == '':
@@ -115,6 +132,7 @@ class AbstractPatching(object):
         else:
             hr_min = install_duration.split(':')
             self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
+        self.current_config_list.append('installDuration=' + str(self.install_duration))
         # 5 min for reboot
         self.install_duration -= 300
 
@@ -124,6 +142,7 @@ class AbstractPatching(object):
             self.category = self.category_all
         else:
             self.category = category
+        self.current_config_list.append('category=' + self.category)        
 
     def install(self):
         pass
@@ -138,6 +157,7 @@ class AbstractPatching(object):
             script_file_path = os.path.realpath(sys.argv[0])
             os.system(' '.join(['python', script_file_path, '-oneoff', '>/dev/null 2>&1 &']))
         else:
+            waagent.SetFileContents(self.history_scheduled, '')
             self.set_download_cron()
             self.set_patch_cron()
             self.restart_cron()
@@ -182,7 +202,7 @@ class AbstractPatching(object):
                 dow = ','.join([str(day - 1) for day in self.day_of_week])
             else:
                 dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-download > /dev/null 2>&1\n'])
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-download > /dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def set_patch_cron(self):
@@ -195,9 +215,11 @@ class AbstractPatching(object):
         else:
             hr = str(self.start_time.hour)
             minute = str(self.start_time.minute)
+            minute_cleanup = str(self.start_time.minute + 1)
             dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
-        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
+            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
+            new_line += ' '.join([minute_cleanup, hr, '* *', dow, 'root rm -f', self.stop_flag_path, '\n'])
+        waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a) and (self.stop_flag_path not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
@@ -244,6 +266,8 @@ class AbstractPatching(object):
             self.hutil.log("Installing patches is stopped/canceled")
             self.delete_stop_flag()
             return
+
+        waagent.AppendFileContents(self.history_scheduled, time.strftime("%Y-%m-%d %a", time.localtime()) + '\n' )
 
         retcode = self.stop_download()
         if retcode == 0:
@@ -373,3 +397,7 @@ class AbstractPatching(object):
             return []
         patchlist = [line.split()[0] for line in pkg_to_patch.split('\n') if line.endswith(category)]
         return patchlist
+
+    def get_current_config(self):
+        return ','.join(self.current_config_list)
+        

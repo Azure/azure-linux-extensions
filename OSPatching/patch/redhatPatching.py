@@ -108,6 +108,7 @@ class redhatPatching(AbstractPatching):
         retcode,last_kernel = waagent.RunGetOutput("rpm -q --last kernel")
         last_kernel = last_kernel.split()[0][7:]
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
+        current_kernel = current_kernel.strip()
         return last_kernel != current_kernel
 
     def report(self):
