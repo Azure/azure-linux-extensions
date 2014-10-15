@@ -149,8 +149,48 @@ def _reset_sshd_config(sshd_file_path):
         if not(os.path.exists(config_file_path)):
             config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
     _backup_sshd_config(sshd_file_path)
-    shutil.copyfile(config_file_path, sshd_file_path)
-    waagent.MyDistro.restartSshService()
+    
+    if distro_name == "CoreOS":
+        # Parse sshd port from config_file_path
+        sshd_port = 22        
+        regex = re.compile(r"^Port\s+(\d+)", re.VERBOSE)
+        with open(config_file_path) as f:
+            for line in f:
+                match = regex.match(line)
+                if match:
+                    sshd_port = match.group(1)
+                    break                
+        
+        # Prepare cloud init config for coreos-cloudinit
+        cfg_tempfile = "/tmp/cloudinit.cfg"
+        cfg_content = "#cloud-config\n\n"
+        
+        # Overwrite /etc/ssh/sshd_config
+        cfg_content += "write_files:\n"
+        cfg_content += "  - path: {0}\n".format(sshd_file_path)
+        cfg_content += "    permissions: 0600\n"
+        cfg_content += "    owner: root:root\n"
+        cfg_content += "    content: |\n"
+        for line in GetFileContents(config_file_path).split('\n'):
+            cfg_content += "      {0}\n".format(line)
+        
+        # Change the sshd port in /etc/systemd/system/sshd.socket
+        cfg_content += "\ncoreos:\n"
+        cfg_content += "  units:\n"
+        cfg_content += "  - name: sshd.socket\n"
+        cfg_content += "    command: restart\n"
+        cfg_content += "    content: |\n"
+        cfg_content += "      [Socket]\n"
+        cfg_content += "      ListenStream={0}\n".format(sshd_port)
+        cfg_content += "      Accept=yes\n"
+        
+        SetFileContents(cfg_tempfile, cfg_content)
+        
+        Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
+        Run("rm -f " + cfg_tempfile, chk_err=False)
+    else:
+        shutil.copyfile(config_file_path, sshd_file_path)
+        waagent.MyDistro.restartSshService()
 
 def _backup_sshd_config(sshd_file_path):
     if(os.path.exists(sshd_file_path)):
