@@ -187,7 +187,7 @@ def _reset_sshd_config(sshd_file_path):
         SetFileContents(cfg_tempfile, cfg_content)
         
         Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
-        Run("rm -f " + cfg_tempfile, chk_err=False)
+        os.remove(cfg_tempfile)
     else:
         shutil.copyfile(config_file_path, sshd_file_path)
         waagent.MyDistro.restartSshService()
