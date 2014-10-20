@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.7+
+# Requires Python 2.6+
 #
 
 
@@ -74,7 +74,8 @@ def enable():
     try:
         hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
-        # If the previous enable failed, we do not have retry logic here. Since the custom script may not work in an intermediate state
+        # If the previous enable failed, we do not have retry logic here. 
+        #Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -104,28 +105,22 @@ def enable():
             hutil.log("fileUris value provided is empty or invalid. Continue with executing command...")
         #execute the command
         if cmd:
-            hutil.log("Command to execute:" + cmd)
-            args = shlex.split(cmd)
-            # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like '\x00\x00a'
-            # temp workaround is to replace \x00 assuming the file name are all ASCII char
-            # so from python 2.6 to python 2.7.2, only ASCII char file name supported
-            for idx, val in enumerate(args):
-                if '\x00' in args[idx]:
-                    args[idx] = args[idx].replace('\x00', '')
-            hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
-            download_dir = os.getcwd()
-            if len(blob_uris) > 0:
-                download_dir = get_download_directory(hutil._context._seq_no)
-                p = subprocess.Popen(args, cwd=download_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                out,err = p.communicate()
-                hutil.log('The custom script is executed with the output %s and error(if applied) %s.' %(out,err))
-                hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
+            args = parse_args(cmd)
+            args.insert(0, 'install/nohup.py')
+
+            #The main thread will invoke nohup.py to execute custom script in
+            #backgroud. The main thread will return immediatelly.
+            p = subprocess.Popen(args)
+            hutil.do_exit(0, 'Enable', 'success', '0', 
+                          'Script started successfully')
         else:
             hutil.log("commandToExecute is not specified in the configuration")
-            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded, but commandToExecute is not provided')
+            hutil.do_exit(0, 'Enable', 'failed','0',
+                          'commandToExecute is not provided')
 
     except Exception, e:
-        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error(("Failed to enable the extension with error:{0},"
+                     "stacktrace:{1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
 
 def uninstall():
@@ -143,6 +138,17 @@ def update():
     hutil.do_parse_context('Update')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
+def parse_args(cmd):
+    hutil.log("Command to execute:" + cmd)
+    args = shlex.split(cmd)
+    # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like '\x00\x00a'
+    # temp workaround is to replace \x00 assuming the file name are all ASCII char
+    # so from python 2.6 to python 2.7.2, only ASCII char file name supported
+    for idx, val in enumerate(args):
+        if '\x00' in args[idx]:
+            args[idx] = args[idx].replace('\x00', '')
+    hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
+    pass
 
 def get_blob_name_from_uri(uri):
     return get_properties_from_uri(uri)['blob_name']
