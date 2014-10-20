@@ -105,14 +105,17 @@ def enable():
             hutil.log("fileUris value provided is empty or invalid. Continue with executing command...")
         #execute the command
         if cmd:
+            hutil.log("Command to execute:" + cmd)
             args = parse_args(cmd)
             args.insert(0, 'install/nohup.py')
 
             #The main thread will invoke nohup.py to execute custom script in
-            #backgroud. The main thread will return immediatelly.
-            p = subprocess.Popen(args)
-            hutil.do_exit(0, 'Enable', 'success', '0', 
-                          'Script started successfully')
+            #backgroud. The main thread will exit immediatelly.
+
+            download_dir = get_download_directory(hutil._context._seq_no)
+            child = subprocess.Popen(args, cwd=download_dir)
+            hutil.do_exit('Executing', 'transitioning', '0', 
+                                   'Launching the script...')
         else:
             hutil.log("commandToExecute is not specified in the configuration")
             hutil.do_exit(0, 'Enable', 'failed','0',
@@ -139,16 +142,14 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def parse_args(cmd):
-    hutil.log("Command to execute:" + cmd)
+    cmd = cmd.encode("ascii", "ignore")
     args = shlex.split(cmd)
-    # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like '\x00\x00a'
-    # temp workaround is to replace \x00 assuming the file name are all ASCII char
-    # so from python 2.6 to python 2.7.2, only ASCII char file name supported
+    # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like 
+    #'\x00\x00a'. Temp workaround is to replace \x00
     for idx, val in enumerate(args):
         if '\x00' in args[idx]:
             args[idx] = args[idx].replace('\x00', '')
-    hutil.do_status_report('Executing', 'transitioning', '0', 'Executing commands...')
-    pass
+    return args
 
 def get_blob_name_from_uri(uri):
     return get_properties_from_uri(uri)['blob_name']

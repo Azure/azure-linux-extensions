@@ -18,22 +18,60 @@
 #
 # Requires Python 2.6+
 
+import os
+import string
+import subprocess
+import time
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
 ExtensionShortName = 'CustomScript'
+StdoutFile = "stdout"
+ErroutFile = "errout"
+OutputSize = 4 * 1024
 
-def StartTask(hutil, args):
-    download_dir = get_download_directory(hutil._context._seq_no)
-    p = subprocess.Popen(args, cwd=download_dir, 
-                         stdout=subprocess.PIPE, 
-                         stderr=subprocess.PIPE)
-    out,err = p.communicate()
-    hutil.log(('The custom script is executed with the output {0}'
-               'and error(if applied) {1}.').format(out,err))
-    hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded.')
+def start_task(hutil, args, interval = 10):
+    log_dir = hutil.get_log_dir()
+    std_out_file = os.path.join(log_dir, StdoutFile)
+    err_out_file = os.path.join(log_dir, ErroutFile)
+    std_out = open(std_out_file, "w")
+    err_out = open(err_out_file, "w")
+
+    child = subprocess.Popen(args,
+                             stdout=std_out, 
+                             stderr=err_out)
+    while child.poll() == None:
+        msg = get_formatted_log("Script is running...", 
+                              tail(std_out_file), tail(err_out_file))
+        hutil.do_status_report('Enable', 'success', '0', msg)
+        time.sleep(interval)
+
+    if child.returncode and child.returncode != 0:
+        msg = get_formatted_log("Script returned an error.", 
+                              tail(std_out_file), tail(err_out_file))
+        hutil.do_exit(0, 'Enable', 'success', '0', msg)
+    else:
+        msg = get_formatted_log("Script is finished.", 
+                              tail(std_out_file), tail(err_out_file))
+        hutil.do_exit(0, 'Enable', 'success','0', msg)
+
+def tail(log_file, output_size = OutputSize):
+    pos = min(output_size, os.path.getsize(log_file))
+    with open(log_file, "r") as log:
+        log.seek(-pos, 2)
+        buf = log.read(output_size)
+        buf = filter(lambda x: x in string.printable, buf)
+        return buf.decode("ascii", "ignore")
+
+def get_formatted_log(summary, stdout, stderr):
+    msg_format = ("{0}\n"
+                  "---stdout---\n"
+                  "{1}\n"
+                  "---errout---\n"
+                  "{2}\n")
+    return msg_format.format(summary, stdout, stderr)
 
 if __name__ == '__main__':
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    StartTask(hutil, system.args)
+    start_task(hutil, system.args)

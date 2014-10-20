@@ -220,3 +220,5 @@ class HandlerUtility:
         self.do_status_report(operation, status,code,message)
         sys.exit(exit_code)
 
+    def get_log_dir(self):
+        return handler_env['handlerEnvironment']['logFolder']
