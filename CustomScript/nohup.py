@@ -23,6 +23,7 @@ import string
 import subprocess
 import time
 import sys
+import traceback
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
@@ -40,10 +41,12 @@ def start_task(hutil, args, interval = 30):
     try:
         std_out = open(std_out_file, "w")
         err_out = open(err_out_file, "w")
-
+        download_dir = os.path.join(os.getcwd(), 'download', hutil.get_seq_no())
         child = subprocess.Popen(args,
+                                 cwd = download_dir,
                                  stdout=std_out, 
                                  stderr=err_out)
+        time.sleep(1)
         while child.poll() == None:
             msg = get_formatted_log("Script is running...", 
                                     tail(std_out_file), tail(err_out_file))
@@ -89,4 +92,4 @@ if __name__ == '__main__':
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context("Enable")
-    start_task(hutil, sys.argv)
+    start_task(hutil, sys.argv[1:])

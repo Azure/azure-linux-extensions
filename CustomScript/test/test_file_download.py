@@ -21,15 +21,15 @@
 
 import unittest
 import env
-import handle
 import os
 import tempfile
+import customscript as cs
 
 class TestFileDownload(unittest.TestCase):
     def download_to_tmp(self, uri):
         tmpFile = tempfile.TemporaryFile()
         file_path = os.path.abspath(tmpFile.name)
-        handle.download_and_save_file(uri, file_path)
+        cs.download_and_save_file(uri, file_path)
         file_size = os.path.getsize(file_path)
         self.assertNotEqual(file_size, 0)
         tmpFile.close()

@@ -75,6 +75,7 @@ def enable(hutil):
         # If the previous enable failed, we do not have retry logic here. 
         #Since the custom script may not work in an intermediate state
         hutil.exit_if_enabled()
+        prepare_download_dir(hutil.get_seq_no())
         download_files(hutil)
         execute_cmd(hutil)
     except Exception, e:
@@ -86,6 +87,7 @@ def enable(hutil):
 def download_files(hutil):
     protected_settings = hutil.get_protected_settings()
     public_settings = hutil.get_public_settings()
+    cmd = public_settings.get('commandToExecute')
 
     blob_uris = public_settings.get('fileUris')
     storage_account_name = None
@@ -111,7 +113,7 @@ def download_files(hutil):
                           hutil.get_seq_no(), 
                           cmd, 
                           hutil)
-    elif not(storage_account_name or storageAccountKey):
+    elif not(storage_account_name or storage_account_key):
         hutil.log("No azure storage account and key specified in protected "
                   "settings. Downloading scripts from external links...")
         download_external_files(blob_uris, hutil.get_seq_no(), cmd, hutil)
@@ -132,8 +134,7 @@ def execute_cmd(hutil):
         #The main thread will invoke nohup.py to execute custom script in
         #backgroud. The main thread will exit immediatelly.
 
-        download_dir = get_download_directory(hutil.get_seq_no())
-        child = subprocess.Popen(args, cwd=download_dir)
+        child = subprocess.Popen(args)
         hutil.do_exit(0, 'Enable', 'transitioning', '0', 
                       'Launching the script...')
     else:
@@ -169,7 +170,7 @@ def download_blob(storage_account_name, storage_account_key,
                   blob_uri, seqNo, command, hutil):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
-    download_dir = get_download_directory(seqNo)
+    download_dir = prepare_download_dir(seqNo)
     # if blob_name is a path, extract the file_name
     last_sep = blob_name.rfind('/')
     if last_sep != -1:
@@ -194,7 +195,7 @@ def download_external_files(uris, seqNo,command, hutil):
         download_external_file(uri, seqNo, command, hutil)
 
 def download_external_file(uri, seqNo, command, hutil):
-    download_dir = get_download_directory(seqNo)
+    download_dir = prepare_download_dir(seqNo)
     path = get_path_from_uri(uri)
     file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
@@ -216,7 +217,7 @@ def download_and_save_file(uri, file_path):
         dest.write(buf)
         buf = src.read(buf_size)
 
-def get_download_directory(seqNo):
+def prepare_download_dir(seqNo):
     download_dir_main = os.path.join(os.getcwd(), 'download')
     create_directory_if_not_exists(download_dir_main)
     download_dir = os.path.join(download_dir_main, seqNo)
