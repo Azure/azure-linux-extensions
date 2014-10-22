@@ -22,6 +22,7 @@ import os
 import string
 import subprocess
 import time
+import sys
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
@@ -30,30 +31,43 @@ StdoutFile = "stdout"
 ErroutFile = "errout"
 OutputSize = 4 * 1024
 
-def start_task(hutil, args, interval = 10):
+def start_task(hutil, args, interval = 30):
     log_dir = hutil.get_log_dir()
     std_out_file = os.path.join(log_dir, StdoutFile)
     err_out_file = os.path.join(log_dir, ErroutFile)
-    std_out = open(std_out_file, "w")
-    err_out = open(err_out_file, "w")
+    std_out = None
+    err_out = None
+    try:
+        std_out = open(std_out_file, "w")
+        err_out = open(err_out_file, "w")
 
-    child = subprocess.Popen(args,
-                             stdout=std_out, 
-                             stderr=err_out)
-    while child.poll() == None:
-        msg = get_formatted_log("Script is running...", 
-                              tail(std_out_file), tail(err_out_file))
-        hutil.do_status_report('Enable', 'success', '0', msg)
-        time.sleep(interval)
+        child = subprocess.Popen(args,
+                                 stdout=std_out, 
+                                 stderr=err_out)
+        while child.poll() == None:
+            msg = get_formatted_log("Script is running...", 
+                                    tail(std_out_file), tail(err_out_file))
+            hutil.do_status_report('Enable', 'success', '0', msg)
+            time.sleep(interval)
 
-    if child.returncode and child.returncode != 0:
-        msg = get_formatted_log("Script returned an error.", 
-                              tail(std_out_file), tail(err_out_file))
-        hutil.do_exit(0, 'Enable', 'success', '0', msg)
-    else:
-        msg = get_formatted_log("Script is finished.", 
-                              tail(std_out_file), tail(err_out_file))
-        hutil.do_exit(0, 'Enable', 'success','0', msg)
+        if child.returncode and child.returncode != 0:
+            msg = get_formatted_log("Script returned an error.", 
+                                    tail(std_out_file), tail(err_out_file))
+            hutil.do_exit(1, 'Enable', 'failed', '1', msg)
+        else:
+            msg = get_formatted_log("Script is finished.", 
+                                    tail(std_out_file), tail(err_out_file))
+            hutil.do_exit(0, 'Enable', 'success','0', msg)
+    except Exception, e:
+        hutil.error(("Failed to launch script with error:{0},"
+                     "stacktrace:{1}").format(e, traceback.format_exc()))
+        hutil.do_exit(1, 'Enable', 'failed', '1', 
+                      'Lanch script failed:{0}'.format(e))
+    finally:
+        if std_out:
+            std_out.close()
+        if err_out:
+            err_out.close()
 
 def tail(log_file, output_size = OutputSize):
     pos = min(output_size, os.path.getsize(log_file))
@@ -73,5 +87,6 @@ def get_formatted_log(summary, stdout, stderr):
 
 if __name__ == '__main__':
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    start_task(hutil, system.args)
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context("Enable")
+    start_task(hutil, sys.argv)

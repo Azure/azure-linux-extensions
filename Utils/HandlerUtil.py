@@ -219,6 +219,19 @@ class HandlerUtility:
     def do_exit(self,exit_code,operation,status,code,message):
         self.do_status_report(operation, status,code,message)
         sys.exit(exit_code)
+    
+    def get_seq_no(self):
+        return self._context._seq_no
 
     def get_log_dir(self):
         return handler_env['handlerEnvironment']['logFolder']
+
+    def get_handler_settings(self):
+        return self._context._config['runtimeSettings'][0]['handlerSettings']
+
+    def get_protected_settings(self):
+        return self.get_handler_settings().get('protectedSettings')
+
+    def get_public_settings(self):
+        return self.get_handler_settings().get('publicSettings')
+
