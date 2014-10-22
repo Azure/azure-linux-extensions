@@ -51,6 +51,8 @@ class TestCommandExecution(unittest.TestCase):
         cmd = u'sh foo.bar.sh -af bar --foo=bar | more \u6211'
         args = cs.parse_args(cmd.encode('utf-8'))
         self.assertNotEquals(None, args)
+        self.assertNotEquals(0, len(args))
+        print args
     
     def test_tail(self):
         with open("/tmp/testtail", "w+") as F:

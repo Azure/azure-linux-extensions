@@ -61,17 +61,10 @@ def main():
                 dummy_command("Install", "success", "Install succeeded")
             elif re.match("^([-/]*)(enable)", a):
                 hutil = parse_context("Enable")
-                # Ensure the same configuration is executed only once
-                # If the previous enable failed, we do not have retry logic here. 
-                #Since the custom script may not work in an intermediate state
-                hutil.exit_if_enabled()
-                prepare_download_dir(hutil.get_seq_no())
-                download_files(hutil)
-                start_daemon(hutil)
+                enable(hutil)
             elif re.match("^([-/]*)(daemon)", a):
                 hutil = parse_context("Executing")
-                args = parse_args(cmd)
-                run_script(hutil, args)
+                daemon(hutil)
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
@@ -88,7 +81,23 @@ def parse_context(operation):
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context(operation)
     return hutil
-   
+
+def enable(hutil):
+    # Ensure the same configuration is executed only once
+    # If the previous enable failed, we do not have retry logic here. 
+    #Since the custom script may not work in an intermediate state
+    hutil.exit_if_enabled()
+    prepare_download_dir(hutil.get_seq_no())
+    download_files(hutil)
+    start_daemon(hutil)
+
+def daemon(hutil):
+    public_settings = hutil.get_public_settings()
+    cmd = public_settings.get('commandToExecute')
+    args = parse_args(cmd)
+    run_script(hutil, args)
+
+
 def download_files(hutil):
     protected_settings = hutil.get_protected_settings()
     public_settings = hutil.get_public_settings()
@@ -272,8 +281,8 @@ def create_directory_if_not_exists(directory):
         os.makedirs(directory)
 
 def parse_args(cmd):
-    cmd = filter(lambda x : x is string.printable, cmd)
-    cmd = cmd.encode("ascii", "ignore")
+    cmd = filter(lambda x : x in string.printable, cmd)
+    cmd = cmd.decode("ascii", "ignore")
     args = shlex.split(cmd)
     # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like 
     #'\x00\x00a'. Temp workaround is to replace \x00
