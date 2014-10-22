@@ -23,7 +23,6 @@ import unittest
 import env
 import os
 import tempfile
-import nohup
 import customscript as cs
 
 class MockUtil():
@@ -48,26 +47,26 @@ class MockUtil():
 
 class TestCommandExecution(unittest.TestCase):
     def test_parse_cmd(self):
+        print __file__
         cmd = u'sh foo.bar.sh -af bar --foo=bar | more \u6211'
-        args = cs.parse_args(cmd)
+        args = cs.parse_args(cmd.encode('utf-8'))
         self.assertNotEquals(None, args)
-        args.insert(0, 'install/nohup.py')
     
     def test_tail(self):
         with open("/tmp/testtail", "w+") as F:
             F.write(u"abcdefghijklmnopqrstu\u6211vwxyz".encode("utf-8"))
-        tail = nohup.tail("/tmp/testtail", 2)
+        tail = cs.tail("/tmp/testtail", 2)
         self.assertEquals("yz", tail)
 
-        tail = nohup.tail("/tmp/testtail")
+        tail = cs.tail("/tmp/testtail")
         self.assertEquals("abcdefghijklmnopqrstuvwxyz", tail)
 
-    def test_start_task(self):
+    def test_run_script(self):
         hutil = MockUtil(self)
         test_script = "mock.sh"
         os.chdir(os.path.join(env.root, "test"))
-        nohup.start_task(hutil, ["sh", test_script, "0"], 0.1)
-        nohup.start_task(hutil, ["sh", test_script, "1"], 0.1)
+        cs.run_script(hutil, ["sh", test_script, "0"], 0.1)
+        cs.run_script(hutil, ["sh", test_script, "1"], 0.1)
 
 if __name__ == '__main__':
     unittest.main()

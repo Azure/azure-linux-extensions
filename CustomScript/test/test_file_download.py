@@ -26,6 +26,9 @@ import tempfile
 import customscript as cs
 
 class TestFileDownload(unittest.TestCase):
+    def test_download_blob(self):
+        pass
+
     def download_to_tmp(self, uri):
         tmpFile = tempfile.TemporaryFile()
         file_path = os.path.abspath(tmpFile.name)
