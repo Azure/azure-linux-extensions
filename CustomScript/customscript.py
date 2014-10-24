@@ -148,7 +148,10 @@ def start_daemon(hutil):
         #    customscript.py -daemon 
         #to run the script and will exit itself immediatelly.
 
-        child = subprocess.Popen(args)
+        #Redirect stdout and stderr to /dev/null. Otherwise daemon process will
+        #throw Broke pipe exeception when parent process exit.
+        devnull = open(os.devnull, 'w')
+        child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
         hutil.do_exit(0, 'Enable', 'transitioning', '0', 
                       'Launching the script...')
     else:
@@ -171,16 +174,19 @@ def run_script(hutil, args, interval = 30):
         while child.poll() == None:
             msg = get_formatted_log("Script is running...", 
                                     tail(std_out_file), tail(err_out_file))
-            hutil.do_status_report('Enable', 'success', '0', msg)
+            hutil.log(msg)
+            hutil.do_status_report('Enable', 'running', '0', msg)
             time.sleep(interval)
 
         if child.returncode and child.returncode != 0:
             msg = get_formatted_log("Script returned an error.", 
                                     tail(std_out_file), tail(err_out_file))
+            hutil.error(msg)
             hutil.do_exit(1, 'Enable', 'failed', '1', msg)
         else:
             msg = get_formatted_log("Script is finished.", 
                                     tail(std_out_file), tail(err_out_file))
+            hutil.log(msg)
             hutil.do_exit(0, 'Enable', 'success','0', msg)
     except Exception, e:
         hutil.error(("Failed to launch script with error:{0},"
