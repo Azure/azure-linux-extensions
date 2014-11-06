@@ -46,20 +46,23 @@ main_folder = 'main'
 main_entry = main_folder + '/handle.py'
 packages_array.append(main_folder)
 
+patch_folder = main_folder + '/patch'
+packages_array.append(patch_folder)
+
 """
 copy the dependency to the local
 """
-#azure_sdk_path = 'azure-sdk'
-#call(["git", "clone", "https://github.com/Azure/azure-sdk-for-python.git", azure_sdk_path])
-##delete the azure
-#if os.path.isdir(CommonVariables.azure_path):
-#    shutil.rmtree(CommonVariables.azure_path)
+azure_sdk_path = 'azure-sdk'
+call(["git", "clone", "https://github.com/Azure/azure-sdk-for-python.git", azure_sdk_path])
+#delete the azure
+if os.path.isdir(CommonVariables.azure_path):
+    shutil.rmtree(CommonVariables.azure_path)
 
-#shutil.copytree(azure_sdk_path + '/azure' , CommonVariables.azure_path)
-#packages_array.append(CommonVariables.azure_path + '/http')
-#packages_array.append(CommonVariables.azure_path + '/servicebus')
-#packages_array.append(CommonVariables.azure_path + '/servicemanagement')
-#packages_array.append(CommonVariables.azure_path + '/storage')
+shutil.copytree(azure_sdk_path + '/azure' , CommonVariables.azure_path)
+packages_array.append(CommonVariables.azure_path + '/http')
+packages_array.append(CommonVariables.azure_path + '/servicebus')
+packages_array.append(CommonVariables.azure_path + '/servicemanagement')
+packages_array.append(CommonVariables.azure_path + '/storage')
 
 
 """

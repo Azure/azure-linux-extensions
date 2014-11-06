@@ -24,17 +24,9 @@ from common import CommonVariables
 
 
 # parameter format should be like this:
-# {"command":"disk","path":"/dev/xvdc","filesystem":"ext4","mountpoint":"/mnt/xvdc","password":"password1"}
+# {"command":"disk","path":"/dev/xvdc","filesystem":"ext4","mountname":"mountname","mountpoint":"/mnt/","password":"password1"}
 # {"command":"folder","path":"/home/andy/Private","password":"password1"}
 class ParameterParser(object):
-    #def start_element(self, name, attrs):
-    #    print 'Start element:', name, attrs
-    #    if(name.lower()=='blob'):
-    #        self.blobs.append(attrs['address'])
-    #def end_element(self, name):
-    #    print 'End element:', name
-    #def char_data(self, data):
-    #    print 'Character data:', repr(data)
 
     def __init__(self, protected_settings, public_settings):
         """
@@ -42,6 +34,9 @@ class ParameterParser(object):
         """
         self.command = protected_settings.get('command')
         self.path = protected_settings.get('path')
-        self.password = protected_settings.get('password')
         self.filesystem = protected_settings.get('filesystem')
+        self.mountname = protected_settings.get('mountname')
         self.mountpoint = protected_settings.get('mountpoint')
+        #password is the password of the pfx file.
+        self.password = protected_settings.get('password')
+        self.keyaddess = protected_settings.get('key_address')
