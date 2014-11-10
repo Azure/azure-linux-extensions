@@ -40,15 +40,10 @@ from encryption import Encryption
 
 #Main function is the only entrence to this extension handler
 def main():
-    protected_settings=    {"command":"folder","path":"/dev/sdb","filesystem":"ext4","mountpoint":"/mnt/shit/xvdc","password":"password1"}
-    public_settings = ''
-    
-    para_parser = ParameterParser(protected_settings, public_settings)
-    encryption = Encryption(para_parser)
-    encryption.encrypt()
-
-    HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+    #global hutil
+    #HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    #HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+   # hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -62,29 +57,26 @@ def main():
         elif re.match("^([-/]*)(update)", a):
             update()
 
-
 def install():
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
 
 def enable():
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-
     try:
-        hutil.do_parse_context('Enable')
+        #hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
         # If the previous enable failed, we do not have retry logic here.
         # Since the custom script may not work in an intermediate state
-        hutil.exit_if_enabled()
+        # hutil.exit_if_enabled()
         # we need to freeze the file system first
-       
-        hutil.log('starting to enable')
+
         """
         protectedSettings is the privateConfig passed from Powershell.
         """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+
+        
         para_parser = ParameterParser(protected_settings, public_settings)
         encryption = Encryption(para_parser)
         encryption.encrypt()
@@ -97,7 +89,6 @@ def enable():
         hutil.do_exit(1, 'Enable','error','1', 'Enable failed.')
     finally:
         pass
-        #freezer.unfreezeall()
 
 def uninstall():
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)

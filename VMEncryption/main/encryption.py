@@ -22,6 +22,7 @@ import subprocess
 import sys  
 from subprocess import *  
 from patch import *
+from keymanager import *
 
 class Encryption(object):
     """
@@ -40,12 +41,44 @@ class Encryption(object):
 
     def encrypt(self):
         self.install_extras()
+        keyManager = KeyManager(self.paras.keyaddess, self.paras.password);
+        print(self.paras.command)
+
         if(self.paras.command == 'disk'):
-            commandToExecute = '/bin/bash -c "cryptsetup -y luksFormat ' + self.paras.path + ' <<< ' + self.paras.password + ' 2> /dev/null"' 
+            #self.paras.path = /dev/sdb
+            commandToExecute = '/bin/bash -c "cryptsetup -y luksFormat ' + self.paras.path + ' <<< ' + keyManager.key + ' 2> /dev/null"'
+            print(commandToExecute)
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
+            commandToExecute = '/bin/bash -c "cryptsetup luksOpen ' + self.paras.path +' ' + self.paras.mountname + ' <<< ' + keyManager.key + ' 2> /dev/null"'
+            print(commandToExecute)
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
+            commandToExecute = '/bin/bash -c "mkfs.ext4 /dev/mapper/' + self.paras.mountname + ' <<< ' + self.paras.mountname + ' 2> /dev/null"'
+            print(commandToExecute)
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
+            commandToExecute = '/bin/bash -c "mkdir ' + (self.paras.mountpoint + self.paras.mountname) + ' 2> /dev/null"'
+            print(commandToExecute)
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
+            commandToExecute = '/bin/bash -c "mount /dev/mapper/' + self.paras.mountname + ' ' + (self.paras.mountpoint + self.paras.mountname) + ' 2> /dev/null"'
+            print(commandToExecute)
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
         elif(self.paras.command == 'folder'):
             commandToExecute = 'ecryptfs-setup-private'
-           
-        print(commandToExecute)
-        proc = Popen(commandToExecute, shell=True)
-        returnCode = proc.wait()
-        print("returnCode" + str(returnCode))
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            print('returnCode'+str(returnCode));
+
