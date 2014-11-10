@@ -49,6 +49,6 @@ class Backuplogger(object):
             result = connection.getresponse()
             connection.close()
             return True
-        except Exception, e:
+        except Exception as e:
             self.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             return False

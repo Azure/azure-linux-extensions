@@ -46,26 +46,28 @@ class Snapshotter(object):
         result = None
         snapshot_error = SnapshotError()
         try:
-            sasuri_obj = urlparse.urlparse(sasuri)
-            connection = httplib.HTTPSConnection(sasuri_obj.hostname)
+            sasuri_obj   = urlparse.urlparse(sasuri)
+            connection   = httplib.HTTPSConnection(sasuri_obj.hostname)
             body_content = ''
-            headers={}
+            headers      = {}
+            headers["Content-Length"] = 0
             for meta in meta_data:
-                key=meta['Key']
-                value=meta['Value']
+                key   = meta['Key']
+                value = meta['Value']
                 headers["x-ms-meta-" + key] = value
             self.logger.log(str(headers))
-            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers=headers)
+            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
             result = connection.getresponse()
             self.logger.log(str(result.getheaders()))
             connection.close()
             if(result.status != 201):
                 snapshot_error.errorcode = result.status
                 snapshot_error.sasuri = sasuri
-        except Exception, e:
+        except Exception as e:
+            print("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             snapshot_error.errorcode = -1
-            snapshot_error.sasuri = sasuri
+            snapshot_error.sasuri    = sasuri
         return snapshot_error
 
     def snapshotall(self, paras):
