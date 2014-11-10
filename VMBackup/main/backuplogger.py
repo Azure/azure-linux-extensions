@@ -31,7 +31,6 @@ class Backuplogger(object):
     """description of class"""
     def log(self, msg, local = False, level = 'Info'):
         log_msg = (str(datetime.datetime.now())+'   ' + level + '   '+ msg + '\n')
-        #print(log_msg);
         self.msg += log_msg
         if(local):
             self.hutil.log(log_msg)
@@ -42,14 +41,12 @@ class Backuplogger(object):
             sasuri_obj = urlparse.urlparse(logbloburi)
             connection = httplib.HTTPSConnection(sasuri_obj.hostname)
             body_content = self.msg
-            #print('logbloburi==' + logbloburi)
             headers={}
             headers["x-ms-blob-type" ] = 'BlockBlob'
             self.log(str(headers))
             connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
 
             result = connection.getresponse()
-            #print('result=='+str(result.status));
             connection.close()
             return True
         except Exception, e:

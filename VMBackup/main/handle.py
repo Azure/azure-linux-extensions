@@ -72,8 +72,11 @@ def enable():
     unfreeze_result = None
     snapshot_result = None
     freeze_result = None
-    global_result = None
+    global_error_result = None
     para_parser = None
+    run_result = 1
+    error_msg = None
+    run_status = None
     try:
         hutil.do_parse_context('Enable')
         
@@ -86,49 +89,59 @@ def enable():
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
+        #validate all the required parameter here
         commandToExecute = para_parser.commandToExecute
-
-        backup_logger.log('commandToExecute==' + commandToExecute)
-        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
-            pass;
-        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
-            """
-            make sure the log is not do when the file system is freezed.
-            """
-            backup_logger.log("doing freeze now...", True)
-            freeze_result = freezer.freezeall()
-            backup_logger.log("doing snapshot now...")
-            snap_shotter = Snapshotter(backup_logger)
-            snapshot_result = snap_shotter.snapshotall(para_parser)
-            backup_logger.log("snapshotall ends...")
+        if(para_parser.backup_metadata == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
+            run_result = 1
+            error_msg = 'The backup metadata is empty or the command not support'
         else:
-            hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed since the command to execute is not supported.')
+            backup_logger.log('commandToExecute==' + commandToExecute)
+            if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+                """
+                make sure the log is not doing when the file system is freezed.
+                """
+                backup_logger.log("doing freeze now...", True)
+                freeze_result   = freezer.freezeall()
+                backup_logger.log("freeze result " + str(freeze_result))
+                backup_logger.log("doing snapshot now...")
+                snap_shotter    = Snapshotter(backup_logger)
+                snapshot_result = snap_shotter.snapshotall(para_parser)
+                backup_logger.log("snapshotall ends...")
+                if(snapshot_result != None and len(snapshot_result.errors) > 0):
+                    backup_logger.log("snapshot result: " + str(snapshot_result.errors))
+                    run_result = 1
+                    run_status = 'error'
+                    error_msg  = 'Enabled failed'
+                else:
+                    if(freeze_result!= None and (len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0)):
+                        run_result = 0
+                        run_status = 'warning'
+                        error_msg  = 'Enable Succeeded with error' + str(unfreeze_result.errors)
+                    else:
+                        run_result = 0
+                        run_status = 'success'
+                        error_msg  = 'Enable Succeeded'
 
-    except Exception, e:
+    except Exception as e:
         backup_logger.log("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-        global_result = e
+        global_error_result = e
     finally:
         backup_logger.log("doing unfreeze now...")
         unfreeze_result = freezer.unfreezeall()
+        backup_logger.log("unfreeze result " + str(unfreeze_result))
         backup_logger.log("unfreeze ends...")
 
-    backup_logger.log("freeze result " + str(freeze_result))
-    backup_logger.log("unfreeze result " + str(unfreeze_result))
     if(para_parser!= None and para_parser.logsBlobUri != None):
         backup_logger.commit(para_parser.logsBlobUri)
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
-    if(global_result != None):
-        hutil.do_exit(1, 'Enable','error','1', 'Enable failed.' + str(global_result))
-    if(snapshot_result == None or len(snapshot_result.errors) > 0):
-        backup_logger.log("snapshot result: " + str(snapshot_result), True)
-        hutil.do_exit(1,'Enable', 'error','1','Enabled failed')
-    else:
-        if(len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0):
-            hutil.do_exit(0,'Enable', 'warning', '1', 'Enable Succeeded with error' + str(unfreeze_result.errors))
-        else:
-            hutil.do_exit(0, 'Enable', 'success','0', 'Enable Succeeded')
+    if(global_error_result != None):
+        run_result = 1
+        run_status = 'error'
+        error_msg  = 'Enable failed.' + str(global_error_result)
+
+    hutil.do_exit(run_result, 'Enable', run_status, str(run_result), error_msg)
 
 def uninstall():
     hutil.do_parse_context('Uninstall')

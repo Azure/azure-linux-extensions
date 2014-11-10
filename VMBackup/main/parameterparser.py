@@ -29,7 +29,10 @@ class ParameterParser(object):
         TODO: we should validate the parameter first
         """
         self.blobs = []
-
+        self.backup_metadata = None
+        self.public_config_obj = None
+        self.private_config_obj = None
+        self.blobs = None
         """
         get the public configuration
         """
@@ -37,21 +40,20 @@ class ParameterParser(object):
         self.taskId = public_settings.get(CommonVariables.task_id)
         self.locale = public_settings.get(CommonVariables.locale)
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
-        decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
-        #backup_logger.log('decoded_public_obj_string=='+decoded_public_obj_string)
-        decoded_public_obj_string = decoded_public_obj_string.strip()
-        decoded_public_obj_string = decoded_public_obj_string.strip('\'')
-        #backup_logger.log('decoded_public_obj_string'+decoded_public_obj_string)
-        self.public_config_obj = json.loads(decoded_public_obj_string)
-        self.backup_metadata = self.public_config_obj['backupMetadata']
+        if(self.publicObjectStr != None and self.publicObjectStr != ""):
+            decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
+            decoded_public_obj_string = decoded_public_obj_string.strip()
+            decoded_public_obj_string = decoded_public_obj_string.strip('\'')
+            self.public_config_obj = json.loads(decoded_public_obj_string)
+            self.backup_metadata = self.public_config_obj['backupMetadata']
         """
         first get the protected configuration
         """
         self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
         self.privateObjectStr = protected_settings.get(CommonVariables.object_str)
-        decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
-        #backup_logger.log('decoded_private_obj_string=='+decoded_private_obj_string)
-        decoded_private_obj_string = decoded_private_obj_string.strip()
-        decoded_private_obj_string = decoded_private_obj_string.strip('\'')
-        self.private_config_obj = json.loads(decoded_private_obj_string)
-        self.blobs = self.private_config_obj['blobSASUri']
+        if(self.privateObjectStr!=None and self.privateObjectStr != ""):
+            decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
+            decoded_private_obj_string = decoded_private_obj_string.strip()
+            decoded_private_obj_string = decoded_private_obj_string.strip('\'')
+            self.private_config_obj = json.loads(decoded_private_obj_string)
+            self.blobs = self.private_config_obj['blobSASUri']
