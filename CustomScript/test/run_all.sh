@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/bin/bash
 #
-#CustomScript extension
+# This script is used to set up a test env for extensions
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -16,11 +16,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.7+
-#
-import sys
-import os
 
-#append installer directory to sys.path
-root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(root)
+script=$(dirname $0)
+root=$script
+cd $root
+root=`pwd`
+
+echo "Run unit test:"
+ls test_*.py
+ls test_*.py | sed -e 's/\.py//'|xargs python -m unittest

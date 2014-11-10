@@ -1,6 +1,7 @@
 led / optimized / DLL files
 __pycache__/
 *.py[cod]
+*/.py[cod]
 
 # C extensions
 *.so
@@ -64,3 +65,7 @@ VMBackup/MANIFEST
 VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
+
+# CustomScript ignors
+CustomScript/test/download/0/stdout
+CustomScript/test/download/0/errout

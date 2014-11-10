@@ -126,6 +126,7 @@ class HandlerUtility:
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir=handler_env['handlerEnvironment']['configFolder']
+        self._context._log_dir= handler_env['handlerEnvironment']['logFolder']
         self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
         self._change_log_file()
         self._context._status_dir=handler_env['handlerEnvironment']['statusFolder']
@@ -195,9 +196,10 @@ class HandlerUtility:
         self.log("set most recent sequence number to " + self._context._seq_no)
 
     def _get_most_recent_seq(self):
-        seq = waagent.GetFileContents('mrseq')
-        if(seq):
-            return int(seq)
+        if(os.path.isfile('mrseq')):
+            seq = waagent.GetFileContents('mrseq')
+            if(seq):
+                return int(seq)
         return -1
 
     def _set_most_recent_seq(self,seq):
@@ -205,7 +207,21 @@ class HandlerUtility:
 
     def do_status_report(self, operation, status, status_code, message):
         tstamp=time.strftime(DateTimeFormat, time.gmtime())
-        stat_rept = '[{"version":"1.0","timestampUTC":"%s","status":{"name":"%s","operation":"%s","status":"%s","code":%s,"formattedMessage":{"lang":"en-US","message":"%s"}}}]' %(tstamp, self._context._name, operation, status, status_code, message)
+        stat = [{
+            "version" : self._context._version,
+            "timestampUTC" : tstamp,
+            "status" : {
+                "name" : self._context._name,
+                "operation" : operation,
+                "status" : status,
+                "code" : status_code,
+                "formattedMessage" : {
+                    "lang" : "en-US",
+                    "message" : message
+                }
+            }
+        }]
+        stat_rept = json.dumps(stat)
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
@@ -219,4 +235,19 @@ class HandlerUtility:
     def do_exit(self,exit_code,operation,status,code,message):
         self.do_status_report(operation, status,code,message)
         sys.exit(exit_code)
+    
+    def get_seq_no(self):
+        return self._context._seq_no
+
+    def get_log_dir(self):
+        return self._context._log_dir
+
+    def get_handler_settings(self):
+        return self._context._config['runtimeSettings'][0]['handlerSettings']
+
+    def get_protected_settings(self):
+        return self.get_handler_settings().get('protectedSettings')
+
+    def get_public_settings(self):
+        return self.get_handler_settings().get('publicSettings')
 

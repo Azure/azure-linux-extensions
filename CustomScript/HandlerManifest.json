@@ -1,12 +1,12 @@
 [{
   "name": "CustomScript",
-  "version": 1.1,
+  "version": 1.2,
   "handlerManifest": {
-    "installCommand": "installer/handle.py -install",
-    "uninstallCommand": "installer/handle.py -uninstall",
-    "updateCommand": "installer/handle.py -update",
-    "enableCommand": "installer/handle.py -enable",
-    "disableCommand": "installer/handle.py -disable",
+    "installCommand": "customscript.py -install",
+    "uninstallCommand": "customscript.py -uninstall",
+    "updateCommand": "customscript.py -update",
+    "enableCommand": "customscript.py -enable",
+    "disableCommand": "customscript.py -disable",
     "rebootAfterInstall": false,
     "reportHeartbeat": false
   }
