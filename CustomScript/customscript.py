@@ -34,6 +34,10 @@ import traceback
 import urllib2
 import urlparse
 import time
+import codecs
+import chardet
+import shutil
+import tempfile
 from azure.storage import BlobService
 
 from Utils.WAAgentUtil import waagent
@@ -83,20 +87,38 @@ def parse_context(operation):
     return hutil
 
 def enable(hutil):
-    # Ensure the same configuration is executed only once
-    # If the previous enable failed, we do not have retry logic here. 
-    #Since the custom script may not work in an intermediate state
+    """
+    Ensure the same configuration is executed only once
+    If the previous enable failed, we do not have retry logic here,
+    since the custom script may not work in an intermediate state.
+    But if download_files fails, we will retry it for maxRetry times.
+    """
     hutil.exit_if_enabled()
     prepare_download_dir(hutil.get_seq_no())
-    download_files(hutil)
+    maxRetry = 2
+    for retry in range(0, maxRetry + 1):
+        try:
+            download_files(hutil)
+            break
+        except Exception, e:
+            hutil.error("Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
+            if retry != maxRetry:
+                hutil.log("Sleep 10 seconds")
+                time.sleep(10)
+            else:
+                raise
     start_daemon(hutil)
 
 def daemon(hutil):
     public_settings = hutil.get_public_settings()
     cmd = public_settings.get('commandToExecute')
     args = parse_args(cmd)
-    run_script(hutil, args)
-
+    if args:
+        run_script(hutil, args)
+    else:
+        error_msg = "CommandToExecute is empty or invalid."
+        hutil.error(error_msg)
+        raise ValueError(error_msg)
 
 def download_files(hutil):
     protected_settings = hutil.get_protected_settings()
@@ -107,8 +129,8 @@ def download_files(hutil):
     storage_account_name = None
     storage_account_key = None
     if protected_settings:
-        storage_account_name = protected_settings.get("storageAccountName")
-        storage_account_key = protected_settings.get("storageAccountKey")
+        storage_account_name = protected_settings.get("storageAccountName").strip()
+        storage_account_key = protected_settings.get("storageAccountKey").strip()
 
     if (not blob_uris or not isinstance(blob_uris, list) or len(blob_uris) == 0):
         hutil.log("fileUris value provided is empty or invalid. "
@@ -244,10 +266,11 @@ def download_blob(storage_account_name, storage_account_key,
         hutil.error(("Failed to download blob with uri:{0}"
                      "with error{1}").format(blob_uri,e))
         raise
+    preprocess_files(download_path, hutil)
     if blob_name in command:
         os.chmod(download_path, 0100)
 
-def download_external_files(uris, seqNo,command, hutil):
+def download_external_files(uris, seqNo, command, hutil):
     for uri in uris:
         download_external_file(uri, seqNo, command, hutil)
 
@@ -262,8 +285,57 @@ def download_external_file(uri, seqNo, command, hutil):
         hutil.error(("Failed to download external file with uri:{0}"
                      "with error{1}").format(uri, e))
         raise
+    preprocess_files(file_path, hutil)
     if command and file_name in command:
         os.chmod(file_path, 0100)
+
+def preprocess_files(file_path, hutil):
+    """
+        Preprocess the text file. If it is a binary file, skip it.
+    """
+    is_text, code_type = is_text_file(file_path)
+    if is_text:
+        dos2unix(file_path)
+        hutil.log("Converting text files from DOS to Unix formats: Done")
+        if code_type in ['UTF-8', 'UTF-16LE', 'UTF-16BE']:
+            remove_bom(file_path)
+            hutil.log("Removing BOM: Done")
+
+def is_text_file(file_path):
+    with open(file_path, 'rb') as f:
+        contents = f.read(512)
+    return is_text(contents)
+
+def is_text(contents):
+    supported_encoding = ['ascii', 'UTF-8', 'UTF-16LE', 'UTF-16BE']
+    code_type = chardet.detect(contents)['encoding']
+    if code_type in supported_encoding:
+        return True, code_type
+    else:
+        return False, code_type
+
+def dos2unix(file_path):
+    temp_file_path = tempfile.mkstemp()[1]
+    f_temp = open(temp_file_path, 'wb')
+    with open(file_path, 'rU') as f:
+        contents = f.read()
+    f_temp.write(contents)
+    f_temp.close()
+    shutil.move(temp_file_path, file_path)
+
+def remove_bom(file_path):
+    temp_file_path = tempfile.mkstemp()[1]
+    f_temp = open(temp_file_path, 'wb')
+    with open(file_path, 'rb') as f:
+        contents = f.read()
+    for encoding in ["utf-8-sig", "utf-16"]:
+        try:
+            f_temp.write(contents.decode(encoding).encode('utf-8'))
+            break
+        except UnicodeDecodeError:
+            continue
+    f_temp.close()
+    shutil.move(temp_file_path, file_path)
 
 def download_and_save_file(uri, file_path):
     src = urllib2.urlopen(uri)
@@ -275,7 +347,7 @@ def download_and_save_file(uri, file_path):
         buf = src.read(buf_size)
 
 def prepare_download_dir(seqNo):
-    download_dir_main = os.path.join(os.getcwd(), 'download')
+    download_dir_main = os.path.join(os.getcwd(), DownloadDirectory)
     create_directory_if_not_exists(download_dir_main)
     download_dir = os.path.join(download_dir_main, seqNo)
     create_directory_if_not_exists(download_dir)
