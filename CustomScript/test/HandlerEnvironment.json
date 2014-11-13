@@ -1,0 +1,1 @@
+[{  "name": "Microsoft.OSTCExtensions.CustomScriptForLinuxTest", "seqNo": "0", "version": 1.0,  "handlerEnvironment": {    "logFolder": "/root/CustomScriptForLinuxTest",    "configFolder": "/root/CustomScriptForLinuxTest/config",    "statusFolder": "/root/CustomScriptForLinuxTest/status",    "heartbeatFile": "/root/CustomScriptForLinuxTest/heartbeat.log"}}]
