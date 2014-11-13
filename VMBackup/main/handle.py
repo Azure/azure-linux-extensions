@@ -108,22 +108,24 @@ def enable():
                 snapshot_result = snap_shotter.snapshotall(para_parser)
                 backup_logger.log("snapshotall ends...")
                 if(snapshot_result != None and len(snapshot_result.errors) > 0):
-                    backup_logger.log("snapshot result: " + str(snapshot_result.errors))
+                    error_msg = "snapshot result: " + str(snapshot_result.errors)
                     run_result = 1
                     run_status = 'error'
-                    error_msg  = 'Enabled failed'
+                    backup_logger.log(error_msg, False, 'Error')
                 else:
                     if(freeze_result!= None and (len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0)):
                         run_result = 0
                         run_status = 'warning'
                         error_msg  = 'Enable Succeeded with error' + str(unfreeze_result.errors)
+                        backup_logger.log(error_msg, False, 'Warning')
                     else:
                         run_result = 0
                         run_status = 'success'
                         error_msg  = 'Enable Succeeded'
+                        backup_logger.log(error_msg)
 
     except Exception as e:
-        backup_logger.log("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        backup_logger.log("Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()), False, 'Error')
         global_error_result = e
     finally:
         backup_logger.log("doing unfreeze now...")
