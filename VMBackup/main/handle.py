@@ -93,6 +93,7 @@ def enable():
         commandToExecute = para_parser.commandToExecute
         if(para_parser.backup_metadata == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
             run_result = 1
+            run_status = 'error'
             error_msg = 'The backup metadata is empty or the command not support'
         else:
             backup_logger.log('commandToExecute==' + commandToExecute)
