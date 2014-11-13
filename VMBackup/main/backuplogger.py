@@ -38,6 +38,7 @@ class Backuplogger(object):
     def commit(self, logbloburi):
         try:
             self.log("committing the log")
+            self.hutil.log(self.msg)
             sasuri_obj = urlparse.urlparse(logbloburi)
             connection = httplib.HTTPSConnection(sasuri_obj.hostname)
             body_content = self.msg
