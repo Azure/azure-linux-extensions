@@ -114,10 +114,10 @@ def enable():
                     run_status = 'error'
                     backup_logger.log(error_msg, False, 'Error')
                 else:
-                    if(freeze_result!= None and (len(freeze_result.errors) > 0 or len(unfreeze_result.errors) > 0)):
+                    if(freeze_result != None and len(freeze_result.errors) > 0 ):
                         run_result = 0
                         run_status = 'warning'
-                        error_msg  = 'Enable Succeeded with error' + str(unfreeze_result.errors)
+                        error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
                         backup_logger.log(error_msg, False, 'Warning')
                     else:
                         run_result = 0
@@ -132,6 +132,11 @@ def enable():
         backup_logger.log("doing unfreeze now...")
         unfreeze_result = freezer.unfreezeall()
         backup_logger.log("unfreeze result " + str(unfreeze_result))
+        if(unfreeze_result != None and len(unfreeze_result.errors) > 0):
+            run_result = 0
+            run_status = 'warning'
+            error_msg  = 'Enable Succeeded with error' + str(unfreeze_result.errors)
+            backup_logger.log(error_msg, False, 'Warning')
         backup_logger.log("unfreeze ends...")
 
     if(para_parser!= None and para_parser.logsBlobUri != None):
