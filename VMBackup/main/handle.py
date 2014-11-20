@@ -69,14 +69,14 @@ def install():
 
 def enable():
     freezer = FsFreezer(backup_logger)
-    unfreeze_result = None
-    snapshot_result = None
-    freeze_result = None
+    unfreeze_result     = None
+    snapshot_result     = None
+    freeze_result       = None
     global_error_result = None
-    para_parser = None
-    run_result = 1
-    error_msg = None
-    run_status = None
+    para_parser         = None
+    run_result          = 1
+    error_msg           = None
+    run_status          = None
     try:
         hutil.do_parse_context('Enable')
         
@@ -94,7 +94,7 @@ def enable():
         if(para_parser.backup_metadata == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
             run_result = 1
             run_status = 'error'
-            error_msg = 'The backup metadata is empty or the command not support'
+            error_msg  = 'The backup metadata is empty or the command not support'
         else:
             backup_logger.log('commandToExecute==' + commandToExecute)
             if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
@@ -104,12 +104,14 @@ def enable():
                 backup_logger.log("doing freeze now...", True)
                 freeze_result   = freezer.freezeall()
                 backup_logger.log("freeze result " + str(freeze_result))
+                
                 backup_logger.log("doing snapshot now...")
                 snap_shotter    = Snapshotter(backup_logger)
                 snapshot_result = snap_shotter.snapshotall(para_parser)
                 backup_logger.log("snapshotall ends...")
+
                 if(snapshot_result != None and len(snapshot_result.errors) > 0):
-                    error_msg = "snapshot result: " + str(snapshot_result.errors)
+                    error_msg  = "snapshot result: " + str(snapshot_result.errors)
                     run_result = 1
                     run_status = 'error'
                     backup_logger.log(error_msg, False, 'Error')
@@ -132,10 +134,8 @@ def enable():
         backup_logger.log("doing unfreeze now...")
         unfreeze_result = freezer.unfreezeall()
         backup_logger.log("unfreeze result " + str(unfreeze_result))
+        error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
         if(unfreeze_result != None and len(unfreeze_result.errors) > 0):
-            run_result = 0
-            run_status = 'warning'
-            error_msg  = 'Enable Succeeded with error' + str(unfreeze_result.errors)
             backup_logger.log(error_msg, False, 'Warning')
         backup_logger.log("unfreeze ends...")
 
@@ -147,7 +147,7 @@ def enable():
     if(global_error_result != None):
         run_result = 1
         run_status = 'error'
-        error_msg  = 'Enable failed.' + str(global_error_result)
+        error_msg  += ('Enable failed.' + str(global_error_result))
 
     hutil.do_exit(run_result, 'Enable', run_status, str(run_result), error_msg)
 
