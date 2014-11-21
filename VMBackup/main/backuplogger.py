@@ -39,17 +39,21 @@ class Backuplogger(object):
         try:
             self.log("committing the log")
             self.hutil.log(self.msg)
-            sasuri_obj = urlparse.urlparse(logbloburi)
-            connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-            body_content = self.msg
-            headers={}
-            headers["x-ms-blob-type" ] = 'BlockBlob'
-            self.log(str(headers))
-            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
+            if(logbloburi != None):
+                sasuri_obj = urlparse.urlparse(logbloburi)
+                connection = httplib.HTTPSConnection(sasuri_obj.hostname)
+                body_content = self.msg
+                headers={}
+                headers["x-ms-blob-type" ] = 'BlockBlob'
+                self.log(str(headers))
+                connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
 
-            result = connection.getresponse()
-            connection.close()
-            return True
+                result = connection.getresponse()
+                connection.close()
+                return True
+            else:
+                self.hutil.log("logbloburi is None");
+                return False
         except Exception as e:
-            self.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             return False

@@ -65,7 +65,7 @@ class Snapshotter(object):
                 snapshot_error.sasuri = sasuri
         except Exception as e:
             print("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-            self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()),'Error')
             snapshot_error.errorcode = -1
             snapshot_error.sasuri    = sasuri
         return snapshot_error

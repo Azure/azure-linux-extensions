@@ -79,7 +79,7 @@ def enable():
     run_status          = None
     try:
         hutil.do_parse_context('Enable')
-        
+        hutil.exit_if_enabled()
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
         """
@@ -89,14 +89,15 @@ def enable():
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
-        #validate all the required parameter here
         commandToExecute = para_parser.commandToExecute
-        if(para_parser.backup_metadata == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
+        #validate all the required parameter here
+        if(para_parser.backup_metadata == None or para_parser.public_config_obj == None or para_parser.private_config_obj == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
+            backup_logger.log('required field empty or not correct', True, 'Error')
             run_result = 1
             run_status = 'error'
-            error_msg  = 'The backup metadata is empty or the command not support'
+            error_msg  = 'required field empty or not correct'
         else:
-            backup_logger.log('commandToExecute==' + commandToExecute)
+            backup_logger.log('commandToExecute is ' + commandToExecute, True)
             if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
                 """
                 make sure the log is not doing when the file system is freezed.
@@ -139,7 +140,7 @@ def enable():
             backup_logger.log(error_msg, False, 'Warning')
         backup_logger.log("unfreeze ends...")
 
-    if(para_parser!= None and para_parser.logsBlobUri != None):
+    if(para_parser!= None):
         backup_logger.commit(para_parser.logsBlobUri)
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
