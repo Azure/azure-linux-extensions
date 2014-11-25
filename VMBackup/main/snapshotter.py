@@ -45,27 +45,38 @@ class Snapshotter(object):
     def snapshot(self, sasuri, meta_data):
         result = None
         snapshot_error = SnapshotError()
+        if(sasuri is None):
+            self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
+            snapshot_error.errorcode = -1
+            snapshot_error.sasuri    = sasuri
         try:
             sasuri_obj   = urlparse.urlparse(sasuri)
-            connection   = httplib.HTTPSConnection(sasuri_obj.hostname)
-            body_content = ''
-            headers      = {}
-            headers["Content-Length"] = 0
-            for meta in meta_data:
-                key   = meta['Key']
-                value = meta['Value']
-                headers["x-ms-meta-" + key] = value
-            self.logger.log(str(headers))
-            connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
-            result = connection.getresponse()
-            self.logger.log(str(result.getheaders()))
-            connection.close()
-            if(result.status != 201):
-                snapshot_error.errorcode = result.status
-                snapshot_error.sasuri = sasuri
+
+            if(sasuri_obj is None or sasuri_obj.hostname is None):
+                self.logger.log("Failed to parse the sasuri",False,'Error')
+                snapshot_error.errorcode = -1
+                snapshot_error.sasuri    = sasuri
+            else:
+                connection   = httplib.HTTPSConnection(sasuri_obj.hostname)
+                body_content = ''
+                headers      = {}
+                headers["Content-Length"] = 0
+                if(meta_data is not None):
+                    for meta in meta_data:
+                        key   = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
+                self.logger.log(str(headers))
+                connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
+                result = connection.getresponse()
+                self.logger.log(str(result.getheaders()))
+                connection.close()
+                if(result.status != 201):
+                    snapshot_error.errorcode = result.status
+                    snapshot_error.sasuri = sasuri
         except Exception as e:
-            print("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-            self.logger.log("Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc()),'Error')
+            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, False, 'Error')
             snapshot_error.errorcode = -1
             snapshot_error.sasuri    = sasuri
         return snapshot_error

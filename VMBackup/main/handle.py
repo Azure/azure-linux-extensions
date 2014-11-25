@@ -91,7 +91,7 @@ def enable():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
-        if(para_parser.backup_metadata == None or para_parser.public_config_obj == None or para_parser.private_config_obj == None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
+        if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
             backup_logger.log('required field empty or not correct', True, 'Error')
             run_result = 1
             run_status = 'error'
@@ -110,7 +110,6 @@ def enable():
                 snap_shotter    = Snapshotter(backup_logger)
                 snapshot_result = snap_shotter.snapshotall(para_parser)
                 backup_logger.log("snapshotall ends...")
-
                 if(snapshot_result != None and len(snapshot_result.errors) > 0):
                     error_msg  = "snapshot result: " + str(snapshot_result.errors)
                     run_result = 1
