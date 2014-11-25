@@ -31,6 +31,6 @@ class CommonVariables:
     logs_blob_uri = 'logsBlobUri'
     task_id = 'taskId'
     command_to_execute = 'commandToExecute'
-    iaas_vmbackup_command = 'iaasvmbackup'
+    iaas_vmbackup_command = 'snapshot'
     iaas_install_command = 'install'
     locale = 'locale'
