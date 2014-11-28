@@ -91,42 +91,46 @@ def enable():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
-
-        if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None or (commandToExecute.lower() != CommonVariables.iaas_install_command and commandToExecute.lower() != CommonVariables.iaas_vmbackup_command)):
-            backup_logger.log('required field empty or not correct', True, 'Error')
-            run_result = 1
-            run_status = 'error'
-            error_msg  = 'required field empty or not correct'
-        else:
-            backup_logger.log('commandToExecute is ' + commandToExecute, True)
-            if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
-                """
-                make sure the log is not doing when the file system is freezed.
-                """
-                backup_logger.log("doing freeze now...", True)
-                freeze_result   = freezer.freezeall()
-                backup_logger.log("freeze result " + str(freeze_result))
+        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+            backup_logger.log("install succeed.",True)
+            run_status = 'success'
+            error_msg  = 'Install Succeeded'
+            backup_logger.log(error_msg)
+        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+                run_result = 1
+                run_status = 'error'
+                error_msg  = 'required field empty or not correct'
+            else:
+                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+                    """
+                    make sure the log is not doing when the file system is freezed.
+                    """
+                    backup_logger.log("doing freeze now...", True)
+                    freeze_result   = freezer.freezeall()
+                    backup_logger.log("freeze result " + str(freeze_result))
                 
-                backup_logger.log("doing snapshot now...")
-                snap_shotter    = Snapshotter(backup_logger)
-                snapshot_result = snap_shotter.snapshotall(para_parser)
-                backup_logger.log("snapshotall ends...")
-                if(snapshot_result != None and len(snapshot_result.errors) > 0):
-                    error_msg  = "snapshot result: " + str(snapshot_result.errors)
-                    run_result = 1
-                    run_status = 'error'
-                    backup_logger.log(error_msg, False, 'Error')
-                else:
-                    if(freeze_result != None and len(freeze_result.errors) > 0 ):
-                        run_result = 0
-                        run_status = 'warning'
-                        error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
-                        backup_logger.log(error_msg, False, 'Warning')
+                    backup_logger.log("doing snapshot now...")
+                    snap_shotter    = Snapshotter(backup_logger)
+                    snapshot_result = snap_shotter.snapshotall(para_parser)
+                    backup_logger.log("snapshotall ends...")
+                    if(snapshot_result != None and len(snapshot_result.errors) > 0):
+                        error_msg  = "snapshot result: " + str(snapshot_result.errors)
+                        run_result = 1
+                        run_status = 'error'
+                        backup_logger.log(error_msg, False, 'Error')
                     else:
-                        run_result = 0
-                        run_status = 'success'
-                        error_msg  = 'Enable Succeeded'
-                        backup_logger.log(error_msg)
+                        if(freeze_result != None and len(freeze_result.errors) > 0 ):
+                            run_result = 0
+                            run_status = 'warning'
+                            error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
+                            backup_logger.log(error_msg, False, 'Warning')
+                        else:
+                            run_result = 0
+                            run_status = 'success'
+                            error_msg  = 'Enable Succeeded'
+                            backup_logger.log(error_msg)
 
     except Exception as e:
         errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
