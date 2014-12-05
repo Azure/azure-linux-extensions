@@ -72,10 +72,14 @@ def enable():
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
         hutil.exit_if_enabled()
-        _set_user_account_pub_key(protect_settings, hutil)
+        remove_user = protect_settings.get('remove_user')
         if reset_ssh:
             _reset_sshd_config("/etc/ssh/sshd_config")
             hutil.log("Succeeded in reset sshd_config.")
+        if remove_user:
+            _remove_user_account(remove_user, hutil)
+        else:
+            _set_user_account_pub_key(protect_settings, hutil)
         hutil.do_exit(0, 'Enable', 'success','0', 'Enable succeeded.')
     except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -96,13 +100,18 @@ def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
+def _remove_user_account(user_name, hutil):
+    sudoers = _get_other_sudoers(user_name)
+    waagent.MyDistro.DeleteAccount(user_name)
+    _save_other_sudoers(sudoers)
+
 def _set_user_account_pub_key(protect_settings, hutil):
     ovf_xml = waagent.GetFileContents('/var/lib/waagent/ovf-env.xml')
     ovf_env = waagent.OvfEnv().Parse(ovf_xml)
 
     # user name must be provided if set ssh key or password
-    if not protect_settings and protect_settings.has_key('username'):
-        raise Exception("No user name is specified")
+    if not protect_settings or not protect_settings.has_key('username'):
+        return
     
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
@@ -112,10 +121,17 @@ def _set_user_account_pub_key(protect_settings, hutil):
         raise Exception("No password or ssh_key is specified.")
 
     #Reset user account and password, password could be empty
+    sudoers = _get_other_sudoers(user_name)
     error_string= waagent.MyDistro.CreateAccount(user_name, user_pass, None, None)
+    _save_other_sudoers(sudoers)
+
     if error_string != None:
         raise Exception("Failed to create the account or set the password: " + error_string)
     hutil.log("Succeeded in create the account or set the password.")
+
+    #Allow password authentication if user_pass is provided
+    if user_pass is not None:
+        _allow_password_auth()
 
     #Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt or len(ovf_env.SshPublicKeys) > 0:
@@ -138,6 +154,41 @@ def _set_user_account_pub_key(protect_settings, hutil):
         os.remove('temp.pub')
         os.remove('temp.crt')
         hutil.log("Succeeded in resetting ssh_key.")
+
+def _get_other_sudoers(userName):
+    sudoersFile = '/etc/sudoers.d/waagent'
+    if not os.path.isfile(sudoersFile):
+        return None
+    sudoers = waagent.GetFileContents(sudoersFile).split("\n")
+    sudoers = filter(lambda x : userName not in x, sudoers)
+    return sudoers
+
+def _save_other_sudoers(sudoers):
+    sudoersFile = '/etc/sudoers.d/waagent'
+    if sudoers is None:
+        return
+    waagent.AppendFileContents(sudoersFile, "\n".join(sudoers))
+
+def _allow_password_auth():
+    configPath = '/etc/ssh/sshd_config'
+    config = waagent.GetFileContents(configPath).split("\n")
+    _set_sshd_config(config, "PasswordAuthentication", "yes")
+    _set_sshd_config(config, "ChallengeResponseAuthentication", "yes")
+    waagent.ReplaceFileContentsAtomic(configPath, "\n".join(config))
+
+def _set_sshd_config(config, name, val):
+    notfound = True
+    for i in range(0, len(config)):
+        if config[i].startswith(name):
+            config[i] = "{0} {1}".format(name, val)
+            notfound = False
+        elif config[i].startswith("Match"):
+            #Match block must be put in the end of sshd config
+            break
+    if notfound:
+        config.insert(i, "{0} {1}".format(name, val))
+    return config
+
 
 def _reset_sshd_config(sshd_file_path):
     distro = platform.dist()
