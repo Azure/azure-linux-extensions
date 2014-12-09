@@ -168,6 +168,7 @@ def _save_other_sudoers(sudoers):
     if sudoers is None:
         return
     waagent.AppendFileContents(sudoersFile, "\n".join(sudoers))
+    os.chmod("/etc/sudoers.d/waagent", 0440)
 
 def _allow_password_auth():
     configPath = '/etc/ssh/sshd_config'
