@@ -202,6 +202,15 @@ class HandlerUtility:
                 return int(seq)
         return -1
 
+    def is_current_config_seq_greater_inused(self):
+        return int(self._context._seq_no) > self._get_most_recent_seq()
+
+    def get_inused_config_seq(self):
+        return self._get_most_recent_seq()
+
+    def set_inused_config_seq(self,seq):
+        self._set_most_recent_seq(seq)
+
     def _set_most_recent_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
