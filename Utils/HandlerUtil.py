@@ -247,7 +247,10 @@ class HandlerUtility:
             self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
     def do_exit(self,exit_code,operation,status,code,message):
-        self.do_status_report(operation, status,code,message)
+        try:
+            self.do_status_report(operation, status,code,message)
+        except Exception as e:
+            self.log("Can't update status: "+str(e))
         sys.exit(exit_code)
     
     def get_seq_no(self):
