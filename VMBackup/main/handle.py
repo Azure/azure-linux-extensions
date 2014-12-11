@@ -77,26 +77,28 @@ def enable():
     run_result          = 1
     error_msg           = None
     run_status          = None
-    try:
-        hutil.do_parse_context('Enable')
-        hutil.exit_if_enabled()
-        # we need to freeze the file system first
-        backup_logger.log('starting to enable', True)
-        """
-        protectedSettings is the privateConfig passed from Powershell.
-        """
-        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-        public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+    
+    hutil.do_parse_context('Enable')
+    hutil.exit_if_enabled()
+    # we need to freeze the file system first
+    backup_logger.log('starting to enable', True)
+    """
+    protectedSettings is the privateConfig passed from Powershell.
+    """
+    protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+    public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+    para_parser = ParameterParser(protected_settings, public_settings)
 
-        commandToExecute = para_parser.commandToExecute
-        #validate all the required parameter here
-        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
-            backup_logger.log("install succeed.",True)
-            run_status = 'success'
-            error_msg  = 'Install Succeeded'
-            backup_logger.log(error_msg)
-        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+    commandToExecute = para_parser.commandToExecute
+    #validate all the required parameter here
+    if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+        backup_logger.log("install succeed.",True)
+        run_status = 'success'
+        error_msg  = 'Install Succeeded'
+        run_result = 0 
+        backup_logger.log(error_msg)
+    elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+        try:
             if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
                 run_result = 1
                 run_status = 'error'
@@ -132,25 +134,25 @@ def enable():
                             error_msg  = 'Enable Succeeded'
                             backup_logger.log(error_msg)
 
-    except Exception as e:
-        errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-        backup_logger.log(errMsg, False, 'Error')
-        global_error_result = e
-    finally:
-        backup_logger.log("doing unfreeze now...")
-        unfreeze_result = freezer.unfreezeall()
-        backup_logger.log("unfreeze result " + str(unfreeze_result))
-        error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
-        if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
-            backup_logger.log(error_msg, False, 'Warning')
-        backup_logger.log("unfreeze ends...")
+        except Exception as e:
+            errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            global_error_result = e
+        finally:
+            backup_logger.log("doing unfreeze now...")
+            unfreeze_result = freezer.unfreezeall()
+            backup_logger.log("unfreeze result " + str(unfreeze_result))
+            error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
+            if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
+                backup_logger.log(error_msg, False, 'Warning')
+            backup_logger.log("unfreeze ends...")
 
-    if(para_parser!= None):
+    if(para_parser is not None):
         backup_logger.commit(para_parser.logsBlobUri)
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
-    if(global_error_result != None):
+    if(global_error_result is not None):
         run_result = 1
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
