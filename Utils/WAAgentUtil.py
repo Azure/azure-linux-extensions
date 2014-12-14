@@ -45,3 +45,25 @@ if(agentPath):
     waagent = imp.load_source('waagent', agentPath)
 else:
     raise Exception("Can't load waagent.")
+
+if not hasattr(waagent, "AddExtensionEvent"):
+    """
+    If AddExtensionEvent is not defined, provide a dummy impl.
+    """
+    def _AddExtensionEvent(*args, **kwargs):
+        pass
+    waagent.AddExtensionEvent = _AddExtensionEvent
+
+if not hasattr(waagent, "WALAEventOperation"):
+    class _WALAEventOperation:
+        HeartBeat="HeartBeat"
+        Provision = "Provision"
+        Install = "Install"
+        UnIsntall = "UnInstall"
+        Disable = "Disable"
+        Enable = "Enable"
+        Download = "Download"
+        Upgrade = "Upgrade"
+        Update = "Update"           
+    waagent.WALAEventOperation = _WALAEventOperation
+

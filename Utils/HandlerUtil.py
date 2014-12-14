@@ -235,6 +235,9 @@ class HandlerUtility:
     def do_exit(self,exit_code,operation,status,code,message):
         self.do_status_report(operation, status,code,message)
         sys.exit(exit_code)
+
+    def get_name(self):
+        return self._context._name
     
     def get_seq_no(self):
         return self._context._seq_no

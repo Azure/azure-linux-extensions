@@ -78,8 +78,7 @@ def enable():
             hutil.log("Succeeded in reset sshd_config.")
         if remove_user:
             _remove_user_account(remove_user, hutil)
-        else:
-            _set_user_account_pub_key(protect_settings, hutil)
+        _set_user_account_pub_key(protect_settings, hutil)
         hutil.do_exit(0, 'Enable', 'success','0', 'Enable succeeded.')
     except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -101,9 +100,16 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
     
 def _remove_user_account(user_name, hutil):
-    sudoers = _get_other_sudoers(user_name)
-    waagent.MyDistro.DeleteAccount(user_name)
-    _save_other_sudoers(sudoers)
+    try:
+        sudoers = _get_other_sudoers(user_name)
+        waagent.MyDistro.DeleteAccount(user_name)
+        _save_other_sudoers(sudoers)
+    except Exception, e:
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=False,
+                                  message="(02102)Failed to remove user.")
+        raise Exception("Failed to remove user {0}".format(e))
 
 def _set_user_account_pub_key(protect_settings, hutil):
     ovf_xml = waagent.GetFileContents('/var/lib/waagent/ovf-env.xml')
@@ -126,6 +132,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
     _save_other_sudoers(sudoers)
 
     if error_string != None:
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=False,
+                                  message="(02101)Failed to create the account or set the password.")
         raise Exception("Failed to create the account or set the password: " + error_string)
     hutil.log("Succeeded in create the account or set the password.")
 
@@ -135,25 +145,31 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     #Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt or len(ovf_env.SshPublicKeys) > 0:
-        pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
-        ovf_env.UserName = user_name
-        if cert_txt:
-            _save_cert_str_as_file(cert_txt, 'temp.crt')
-        else :
-            for pkey in ovf_env.SshPublicKeys:
-                if pkey[1]:
-                    shutil.copy(os.path.join(waagent.LibDir, pkey[0] + '.crt'), os.path.join(os.getcwd(),'temp.crt'))
-                    break
-        pub_path = ovf_env.PrepareDir(pub_path)
-        retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
-        if retcode > 0:
-            raise Exception("Failed to generate public key file.")
-        waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
-        waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
-        waagent.ChangeOwner(pub_path, user_name)
-        os.remove('temp.pub')
-        os.remove('temp.crt')
-        hutil.log("Succeeded in resetting ssh_key.")
+        try:
+            pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
+            ovf_env.UserName = user_name
+            if cert_txt:
+                _save_cert_str_as_file(cert_txt, 'temp.crt')
+            else :
+                for pkey in ovf_env.SshPublicKeys:
+                    if pkey[1]:
+                        shutil.copy(os.path.join(waagent.LibDir, pkey[0] + '.crt'), os.path.join(os.getcwd(),'temp.crt'))
+                        break
+            pub_path = ovf_env.PrepareDir(pub_path)
+            retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
+            if retcode > 0:
+                raise Exception("Failed to generate public key file.")
+            waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
+            waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
+            waagent.ChangeOwner(pub_path, user_name)
+            os.remove('temp.pub')
+            os.remove('temp.crt')
+            hutil.log("Succeeded in resetting ssh_key.")
+        except:
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=False,
+                                      message="(02100)Failed to reset ssh key.")
 
 def _get_other_sudoers(userName):
     sudoersFile = '/etc/sudoers.d/waagent'
