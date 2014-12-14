@@ -97,8 +97,14 @@ class HandlerUtility:
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
-        
+ 
     def do_parse_context(self,operation):
+        _context = self.try_parse_context()
+        if not _context:
+            self.do_exit(1,operation,'error','1', operation + ' Failed')
+        return _context
+            
+    def try_parse_context(self):
         self._context = HandlerContext(self._short_name)
         handler_env=None
         config=None
@@ -109,7 +115,7 @@ class HandlerUtility:
         handler_env_file='./HandlerEnvironment.json'
         if not os.path.isfile(handler_env_file):
             self.error("Unable to locate " + handler_env_file)
-            sys.exit(1)
+            return None
         ctxt=waagent.GetFileContents(handler_env_file)
         if ctxt == None :
             self.error("Unable to read " + handler_env_file)
@@ -119,7 +125,7 @@ class HandlerUtility:
             pass
         if handler_env == None :
             self.log("JSON error processing " + handler_env_file)
-            sys.exit(1)
+            return None
         if type(handler_env) == list:
             handler_env = handler_env[0]
 
@@ -134,7 +140,7 @@ class HandlerUtility:
         self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
         if self._context._seq_no < 0:
             self.error("Unable to locate a .settings file!")
-            sys.exit(1)
+            return None
         self._context._seq_no = str(self._context._seq_no)
         self.log('sequence number is ' + self._context._seq_no)
         self._context._status_file= os.path.join(self._context._status_dir, self._context._seq_no +'.status')
@@ -143,13 +149,10 @@ class HandlerUtility:
         ctxt=None
         ctxt=waagent.GetFileContents(self._context._settings_file)
         if ctxt == None :
-            self.error('Unable to read ' + self._context._settings_file + '. ')
-            self.do_exit(
-                    1,
-                    operation,
-                    'error',
-                    '1', 
-                    'Failed')
+            error_msg = 'Unable to read ' + self._context._settings_file + '. '
+            self.error(error_msg)
+            return None
+
         self.log("JSON config: " + ctxt)
         config = None
         try:
@@ -167,8 +170,10 @@ class HandlerUtility:
                 cleartxt=None
                 cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
                 if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb )
-                    do_exit(1,operation,'error','1', operation + ' Failed')
+                    error_msg = "OpenSSh decode error using  thumbprint " + thumb
+                    self.error(error_msg)
+                    return None
+
                 jctxt=''
                 try:
                     jctxt=json.loads(cleartxt)
@@ -202,6 +207,15 @@ class HandlerUtility:
                 return int(seq)
         return -1
 
+    def is_current_config_seq_greater_inused(self):
+        return int(self._context._seq_no) > self._get_most_recent_seq()
+
+    def get_inused_config_seq(self):
+        return self._get_most_recent_seq()
+
+    def set_inused_config_seq(self,seq):
+        self._set_most_recent_seq(seq)
+
     def _set_most_recent_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
@@ -233,7 +247,10 @@ class HandlerUtility:
             self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
     def do_exit(self,exit_code,operation,status,code,message):
-        self.do_status_report(operation, status,code,message)
+        try:
+            self.do_status_report(operation, status,code,message)
+        except Exception as e:
+            self.log("Can't update status: "+str(e))
         sys.exit(exit_code)
 
     def get_name(self):
