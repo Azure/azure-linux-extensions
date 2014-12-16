@@ -1,0 +1,13 @@
+[{
+  "name": "AzureEnhancedMonitoring",
+  "version": 1.0,
+  "handlerManifest": {
+    "installCommand": "aem.py -install",
+    "uninstallCommand": "aem.py -uninstall",
+    "updateCommand": "aem.py -update",
+    "enableCommand": "aem.py -enable",
+    "disableCommand": "aem.py -disable",
+    "rebootAfterInstall": false,
+    "reportHeartbeat": false
+  }
+}]

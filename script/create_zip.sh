@@ -74,7 +74,11 @@ mkdir $tmp_dir
 
 echo "Copy files..."
 cp -r $ext_dir/* $tmp_dir
-cp -r $util_dir $tmp_dir
+rm $tmp_dir/references
+
+echo "Copy dependecies..."
+cat $ext_dir/references
+cat $ext_dir/references | xargs cp -r -t $tmp_dir
 
 echo "Switch to tmp dir..."
 cd $tmp_dir
