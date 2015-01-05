@@ -19,22 +19,60 @@
 # Requires Python 2.6+
 #
 
+import os
+import subprocess
+
 from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
+import Utils.HandlerUtil as util
 
-ExtensionShortName = 'AzureEnhancedMonitoring'
-
-def installService(hutil):
-    pass
-
-def uninstallService(hutil):
-    pass
+ExtensionShortName = 'AzureEnhancedMonitor'
 
 def enable(hutil):
-    pass
+    pid = None
+    baseDir = hutil.get_base_dir()
+    pidFile = os.path.join(baseDir, "pid")
+   
+    #Check whether monitor process is running.
+    #If it does, return. Otherwise clear pid file
+    if os.path.isfile(pidFile):
+        pid = waagent.GetFileContents(pidFile)
+        if os.path.isfile(os.path.join("/proc", pid)):
+            hutil.do_exit(0, 'Enable', 'success', '0', 
+                          'Azure Enhanced Monitor is already running')
+            return
+        else:
+            os.remove(pidFile)
+
+    aemFile = os.path.join(baseDir, "aem.py")
+    devnull = open(os.devnull, 'w')
+    child = subprocess.Popen([aemFile], stdout=devnull, stderr=devnull)
+    if child.pid == None or child.pid < 1:
+        hutil.do_exit(1, 'Enable', 'error', '1', 
+                      'Enable failed')
+    else:
+        waagent.SetFileContents(pidFile, str(child.pid))
+        hutil.do_exit(0, 'Enable', 'success', '0', 
+                      'Azure Enhanced Monitor is enabled')
 
 def disable(hutil):
-    pass
+    pid = None
+    baseDir = hutil.get_base_dir()
+    pidFile = os.path.join(baseDir, "pid")
+   
+    #Check whether monitor process is running.
+    #If it does, kill it. Otherwise clear pid file
+    if os.path.isfile(pidFile):
+        pid = waagent.GetFileContents(pidFile)
+        if os.path.isfile(os.path.join("/proc", pid)):
+            os.kill(pid, 9)
+            hutil.do_exit(0, 'Disable', 'success', '0', 
+                          'Azure Enhanced Monitor is disabled')
+            return
+        else:
+            os.remove(pidFile)
+
+    hutil.do_exit(0, 'Disable', 'success', '0', 
+                  'Azure Enhanced Monitor is not running')
 
 def dummy_command(operation, status, msg):
     hutil = parse_context(operation)
@@ -63,6 +101,11 @@ def main():
                      "{1}").format(e, traceback.format_exc()))
         hutil.do_exit(1, 'Enable','failed','0', 
                       'Enable failed:{0}'.format(e))
+
+def parse_context(operation):
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context(operation)
+    return hutil
 
 if __name__ == '__main__':
     main()

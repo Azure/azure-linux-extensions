@@ -74,6 +74,7 @@ class StaticDataSource(object):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Last Hardware Change",
+                           value = time.time(),
                            unit="posixtime")
 
     def getInstanceType(self):
@@ -250,17 +251,16 @@ class EnhancedMonitorConfig(object):
 
 def main():
     hutil = parse_context("Enable")
-    waagent.Log("Monitoring service started.")
+    waagent.Log("Monitor service started.")
     monitor = EnhancedMonitor()
-    switchFile = os.path.join(hutil.get_base_dir(), "enabled")
+    writer = PerfCounterWriter()
     while True:
-        if os.path.isfile(switchFile):
-            waagent.Log("Collecting performance counter.")
-            try:
-                counters = monitor.run()
-                PerfCounterWriter().write(counters)
-                #TODO do status report
-            except Exception, e:
-                waagent.Error("{0} {1}".format(e, traceback.format_exc()))
-            waagent.Log("Finished collection.")
+        waagent.Log("Collecting performance counter.")
+        try:
+            counters = monitor.run()
+            writer.write(counters)
+            #TODO do status report
+        except Exception, e:
+            waagent.Error("{0} {1}".format(e, traceback.format_exc()))
+        waagent.Log("Finished collection.")
         time.sleep(MonitoringInterval)
