@@ -23,27 +23,8 @@ import unittest
 import env
 import os
 import tempfile
+from MockUtil import MockUtil
 import customscript as cs
-
-class MockUtil():
-    def __init__(self, test):
-        self.test = test
-
-    def get_log_dir(self):
-        return "/tmp"
-
-    def error(self, msg):
-        print msg
-        pass
-
-    def get_seq_no(self):
-        return "0"
-
-    def do_status_report(self, operation, status, status_code, message):
-        self.test.assertNotEqual(None, message)
-
-    def do_exit(self,exit_code,operation,status,code,message):
-        self.test.assertNotEqual(None, message)
 
 class TestCommandExecution(unittest.TestCase):
     def test_parse_cmd(self):
