@@ -18,6 +18,7 @@
 #
 # Requires Python 2.6+
 #
+import re
 import socket
 import traceback
 import time
@@ -26,16 +27,67 @@ from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
-MonitoringInterval = 10 * 60 #Ten minutes
+MonitoringInterval = 60 #One minute
 
 class AzureDiagnosticMetric(object):
     def __init__(self, config):
         self.config = config
 
+class CPUInfo(object):
+    def __init__(self, cpuinfo):
+        self.cpuinfo = cpuinfo
+        self.lines = cpuinfo.split("\n")
+
+    def getNumOfLogicalProcessor(self):
+        lps = filter(lambda x : re.match("processor\s+:\s+\d+$", x), 
+                       self.lines)
+        return len(lps)
+    
+    def getNumOfCoresPerCPU(self):
+        numOfCoresPerCPU = re.match("cpu cores\s+:\s+(.*)$", self.cpuinfo)
+        return int(numOfCoresPerCPU.group(1))
+    
+    def getNumOfPhysCPUs(self):
+        cpus = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
+                      self.lines)
+        return len(set(cpus))
+
+    def getModel(self):
+        model = re.match("model name\s+:\s+(.*)\s", self.cpuinfo)
+        return model.group(1)
+    
+    def getVendorId(self):
+        vendorId = re.match("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
+        return vendorId.group(1)
+
+    def getFrequency(self):
+        freq = re.match("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
+        return float(freq.group(1))
+
+    def isHyperThreadingOn(self):
+        freq = re.match("flags\s.*\sht\s", self.cpuinfo)
+        return freq is not None
+ 
 class LinuxMetric(object):
+
+    def getCPUInfo():
+        return waagent.GetFileContents("/proc/cpuinfo") 
+
     def __init__(self, config):
         self.config = config
-    
+        cpuInfo = CPUInfo(getCPUInfo())
+        self.numOfLogicalProcessors = cpuInfo.getNumOfLogicalProcessor()
+        self.numOfCoresPerCPU = cpuInfo.getNumOfCoresPerCPU()
+        self.numOfPhysCPUs = cpuInfo.getNumOfPhysCPUs()
+        self.numOfCores = self.numOfCoresPerCPU() * self.numOfPhysCPUs()
+        self.numOfLPPerCore = self.numOfLogicalProcessors / self.numOfCores
+        self.processorType = "{0}, {1}".format(cpuInfo.getModel(),
+                                               cpuInfo.getVendorId())
+        if cpuInfo.isHyperThreadingOn():
+            self.vCPUMapping = "thread"
+        else:
+            self.vCPUMapping = "core"
+
     def getNetworkAdapterMetrics(self):
         pass
 
