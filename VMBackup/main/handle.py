@@ -95,10 +95,11 @@ def enable():
             backup_logger.log("install succeed.",True)
             run_status = 'success'
             error_msg  = 'Install Succeeded'
+            run_result = 0
             backup_logger.log(error_msg)
         elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
             if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
-                run_result = 1
+                run_result = 11
                 run_status = 'error'
                 error_msg  = 'required field empty or not correct'
             else:
@@ -117,17 +118,17 @@ def enable():
                     backup_logger.log("snapshotall ends...")
                     if(snapshot_result != None and len(snapshot_result.errors) > 0):
                         error_msg  = "snapshot result: " + str(snapshot_result.errors)
-                        run_result = 1
+                        run_result = 2
                         run_status = 'error'
                         backup_logger.log(error_msg, False, 'Error')
                     else:
                         if(freeze_result != None and len(freeze_result.errors) > 0 ):
-                            run_result = 0
+                            run_result = 1
                             run_status = 'warning'
                             error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
                             backup_logger.log(error_msg, False, 'Warning')
                         else:
-                            run_result = 0
+                            run_result = 1
                             run_status = 'success'
                             error_msg  = 'Enable Succeeded'
                             backup_logger.log(error_msg)
@@ -151,7 +152,7 @@ def enable():
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
     if(global_error_result != None):
-        run_result = 1
+        run_result = 2
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
