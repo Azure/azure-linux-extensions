@@ -28,6 +28,7 @@ from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
 MonitoringInterval = 60 #One minute
+AzureEnhancedMonitorVersion = "1.0.0"
 
 class AzureDiagnosticMetric(object):
     def __init__(self, config):
@@ -67,15 +68,14 @@ class CPUInfo(object):
     def isHyperThreadingOn(self):
         freq = re.match("flags\s.*\sht\s", self.cpuinfo)
         return freq is not None
- 
-class LinuxMetric(object):
 
-    def getCPUInfo():
-        return waagent.GetFileContents("/proc/cpuinfo") 
+class LinuxMetric(object):
 
     def __init__(self, config):
         self.config = config
+        #CPU
         cpuInfo = CPUInfo(getCPUInfo())
+        self.frequency = cpuInfo.getFrequency()
         self.numOfLogicalProcessors = cpuInfo.getNumOfLogicalProcessor()
         self.numOfCoresPerCPU = cpuInfo.getNumOfCoresPerCPU()
         self.numOfPhysCPUs = cpuInfo.getNumOfPhysCPUs()
@@ -87,10 +87,156 @@ class LinuxMetric(object):
             self.vCPUMapping = "thread"
         else:
             self.vCPUMapping = "core"
+    
+        #Memory
+        self.cpuPercent = psutil.cpu_percent() * 100
+        self.memInfo = psutil.virtual_memory()
+        self.memSize = memInfo[0] / 1024 /1024 #MB
+        self.memPercent =  memInfo[2] #%
 
-    def getNetworkAdapterMetrics(self):
-        pass
+        #Network
+        self.nics = psutil.net_io_counters()
+        self.nicNames = []
+        self.readBytes = 0
+        self.writeBytes = 0
+        for nicName, stat in self.nics.iteritems():
+            if nicName != 'lo':
+                self.nicNames.append(nicName)
+                self.readBytes = self.readBytes + stat[1] #bytes_recv
+                self.writeBytes = self.writeBytes + stat[0] #bytes_sent
 
+    def getCPUInfo():
+        return waagent.GetFileContents("/proc/cpuinfo") 
+
+    def getMacAddress(adapterId):
+        nicAddrPath = os.path.join("/sys/class/net", adapterId, "address")
+        mac = waagent.GetFileContents(nicAddrPath)
+        return mac
+
+    def getNetstat():
+        retCode, output = waagent.RunGetOutput("netstat -s")
+        if retCode == 0:
+            return output
+        else:
+            waagent.Error("Can't get netstat output: {0}, {1}".format(retCode,
+                                                                      output))
+            return None
+   
+    HwInfoFile = "/var/lib/waagent/HwInfo"
+    def getHwInfo():
+        if not os.path.isfile(HwInfoFile):
+            return None, None
+        hwInfo = waagent.GetFileContents(HwInfoFile).split("\n")
+        return int(hwInfo[0]), hwInfo[1:]
+
+    def setHwInfo(timestamp, hwInfo):
+        content = str(timestamp)
+        content = content + "\n".join(hwInfo)
+        waagent.SetFileContents(HwInfoFile, content)
+
+    def sameList(l1, l2):
+        if l1 is None or l2 is None:
+            return l1 == l2
+        if len(l1) != len(l2):
+            return False
+        for i in range(0, len(l1)):
+            if l1[i] != l2[i]:
+                return False
+        return True
+
+    def getLastHardwareChange(self):
+        oldTime, oldMacs = getHwInfo()
+        newMacs = map(lambda x : getMacAddress(x), self.nicNames)
+        newTime = time.utctime()
+        newMacs.sort()
+        if not sameList(newMacs, oldMacs):
+            #Hardware changed
+            if newTime < oldTime:
+                waagent.Error(("Hardware change detected. But the old timestamp "
+                               "is greater than now, {0}>{1}.").format(oldTime, 
+                                                                       newTime))
+            setHwInfo(newTime, newMacs)
+            return newTime
+        else:
+            return None
+
+    def getCurrHwFrequency(self):
+        return self.frequency
+
+    def getMaxHwFrequency(self):
+        return self.frequency
+
+    def getMaxVMProcessingPower(self):
+        return self.numOfCores
+
+    def getCurrVMProcessingPower(self):
+        return self.numOfCores if self.config.isCpuOverCommitted() else None
+
+    def getGuaranteedMemAssigned(self):
+        return self.getCurrMemAssigned()
+
+    def getNumOfCoresPerCPU(self):
+        return self.numOfCoresPerCPU
+
+    def getNumOfThreadsPerCore(self):
+        return self.numOfLPPerCore
+
+    def getPhysProcessingPowerPerVCPU(self):
+        return float(self.numOfCores) / self.numOfLogicalProcessors
+
+    def getProcessorType(self):
+        return self.processorType
+
+    def getReferenceComputeUnit(self):
+        return self.processorType
+
+    def getVCPUMapping(self):
+        return self.vCPUMapping()
+    
+    def getVMProcessingPowerConsumption(self):
+        return self.memPercent
+    
+    def getCurrMemAssigned(self):
+        return memSize if self.config.isMemoryOverCommitted() else None
+
+    def getMaxMemAssigned(self):
+        return memSize
+
+    def getGuaranteedMemAssigned(self):
+        return self.getCurrMemAssigned()
+
+    def getVMMemConsumption(self):
+        return self.memPercent
+
+    def getAdapterIds(self):
+        return self.nicNames
+
+    def getAdapterMapping(self, adapterId):
+        mac = getMacAddress(adapterId)
+        mac = mac.replace(":", "-")
+        return mac
+
+    def getMaxNetworkBandwidth(self, adapterId):
+        return 1000 #Mbit/s 
+
+    def getMinNetworkBandwidth(self, adapterId):
+        return 1000 #Mbit/s 
+
+    def getNetworkReadBytes(self):
+        return self.readBytes
+
+    def getNetworkWriteBytes(self):
+        return self.writeBytes
+
+    def getNetworkPacketRetransmitted(self):
+        netstat = getNetstat()
+        match = re.match("(\d)+\s*segments retransmited")
+        if match != None:
+            return int(match.group(1))
+        else:
+            waagent.Error("Failed to parse netstat output: {0}".format(netstat))
+            return None
+  
 class StorageMetric(object):
 
     def isUserRead(op):
@@ -125,8 +271,8 @@ class StorageMetric(object):
         tableService = TableService(account_name = account, account_key = key)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
                    "").format(startKey, endKey)
-        oselect = "TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
-                  "AverageServerLatency"
+        oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
+                   "AverageServerLatency")
         metrics = tableService.query_entities(table, ofilter, oselect)
         self.account = account
         self.rStat = stat(metrics, isUserRead)
@@ -176,6 +322,8 @@ class VMDataSource(object):
         else:
             metrics = LinuxMetric(self.config)
 
+        counters.append(self.createCounterLastHardwareChange(metrics))
+
         #CPU
         counters.append(self.createCounterCurrHwFrequency(metrics))
         counters.append(self.createCounterMaxHwFrequency(metrics))
@@ -197,18 +345,27 @@ class VMDataSource(object):
         counters.append(self.createCounterVMMemConsumption(metrics))
 
         #Network
-        adapters = metrics.getNetworkAdapterMetrics()
-        for adapter in adapters:
-            counters.append(self.createCounterAdapterId(adapter))
-            counters.append(self.createCounterNetworkMapping(adapter))
-            counters.append(self.createCounterMinNetworkBandwidth(adapter))
-            counters.append(self.createCounterMaxNetworkBandwidth(adapter))
-            counters.append(self.createCounterNetworkReadBytes(adapter))
-            counters.append(self.createCounterNetworkWriteBytes(adapter))
-            counters.append(self.createCounterNetworkPacketRetransmitted(adapter))
+        adapterIds = metrics.getNetworkAdapterIds()
+        for adapterId in adapterIds:
+            counters.append(self.createCounterAdapterId(adapterId))
+            counters.append(self.createCounterNetworkMapping(metrics, adapterId))
+            counters.append(self.createCounterMinNetworkBandwidth(metrics, 
+                                                                  adapterId))
+            counters.append(self.createCounterMaxNetworkBandwidth(metrics,
+                                                                  adapterId))
+        counters.append(self.createCounterNetworkReadBytes(metrics))
+        counters.append(self.createCounterNetworkWriteBytes(metrics))
+        counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
 
         return counters
     
+    def createCounterLastHardwareChange(self, metrics):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
+                           category = "config",
+                           name = "Last Hardware Change",
+                           value = metrics.getLastHardwareChange(),
+                           unit="posixtime")
+
     def createCounterCurrHwFrequency(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "cpu",
@@ -228,21 +385,21 @@ class VMDataSource(object):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "cpu",
                            name = "Current VM Processing Power",
-                           value = metrics.getCurrHwFrequency(),
+                           value = metrics.getCurrVMProcessingPower(),
                            unit = "compute unit")
 
     def createCounterMaxVMProcessingPower(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "cpu",
                            name = "Max VM Processing Power",
-                           value = metrics.getMaxHwFrequency(),
+                           value = metrics.getMaxVMProcessingPower(),
                            unit = "compute unit")
 
     def createCounterGuaranteedVMProcessingPower(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "cpu",
                            name = "Guaranteed VM Processing Power",
-                           value = metrics.getGuaranteedHwFrequency(),
+                           value = metrics.getGuaranteedVMProcessingPower(),
                            unit = "compute unit")
 
     def createCounterNumOfCoresPerCPU(self, metrics):
@@ -258,7 +415,7 @@ class VMDataSource(object):
                            value = metrics.getNumOfThreadsPerCore())
 
     def createCounterPhysProcessingPowerPerVCPU(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "cpu",
                            name = "Phys. Processing Power per vCPU",
                            value = metrics.getPhysProcessingPowerPerVCPU())
@@ -318,58 +475,55 @@ class VMDataSource(object):
                            unit = "%",
                            refreshInterval = 60)
 
-    def createCounterAdapterId(self, adapter):
+    def createCounterAdapterId(self, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Adapter Id",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getAdapterId())
+                           instance = adapterId,
+                           value = adapterId)
 
-    def createCounterNetworkMapping(self, adapter):
+    def createCounterNetworkMapping(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Mapping",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getAdapterId())
+                           instance = adapterId,
+                           value = metrics.getAdapterMapping(adapterId))
 
-    def createCounterMaxNetworkBandwidth(self, adapter):
+    def createCounterMaxNetworkBandwidth(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Maximum Network Bandwidth",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getMaxNetworkBandwidth(),
+                           instance = adapterId,
+                           value = metrics.getMaxNetworkBandwidth(adapterId),
                            unit = "Mbit/s")
 
-    def createCounterMinNetworkBandwidth(self, adapter):
+    def createCounterMinNetworkBandwidth(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Minimum Network Bandwidth",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getMinNetworkBandwidth(),
+                           instance = adapterId,
+                           value = metrics.getMinNetworkBandwidth(adapterId),
                            unit = "Mbit/s")
 
-    def createCounterNetworkReadBytes(self, adapter):
+    def createCounterNetworkReadBytes(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Network Read Bytes",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getNetworkReadBytes(),
+                           value = metrics.getNetworkReadBytes(),
                            unit = "byte/s")
 
-    def createCounterNetworkWriteBytes(self, adapter):
+    def createCounterNetworkWriteBytes(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Network Write Bytes",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getNetworkWriteBytes(),
+                           value = metrics.getNetworkWriteBytes(),
                            unit = "byte/s")
 
-    def createCounterNetworkPacketRetransmitted(self, adapter):
+    def createCounterNetworkPacketRetransmitted(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Packets Retransmitted",
-                           instance = adapter.getAdapterId(),
-                           value = adapter.getNetworkPacketRetransmitted(),
+                           value = metrics.getNetworkPacketRetransmitted(),
                            unit = "packets/min")
 
 class StorageDataSource(object):
@@ -406,7 +560,7 @@ class StorageDataSource(object):
         }
 
         dataDisks = {}
-        for root, path, dev in self.getBlockDevices()
+        for root, path, dev in self.getBlockDevices():
             if re.match("sd[c-z]", dev):
                 lun = self.getFirstLun(dev)
                 dataDisks[lun] = dev
@@ -476,7 +630,7 @@ class StorageDataSource(object):
                            name = "Storage Read Op Latency E2E msec",
                            instance = metrics.getAccount(),
                            value = metrics.getReadOpE2ELatency(),
-                           unit = 'ms'
+                           unit = 'ms',
                            refreshInterval = 60)
 
     def createCounterReadOpServerLatency(self, metrics):
@@ -485,7 +639,7 @@ class StorageDataSource(object):
                            name = "Storage Read Op Latency Server msec",
                            instance = metrics.getAccount(),
                            value = metrics.getReadOpServerLatency(),
-                           unit = 'ms'
+                           unit = 'ms',
                            refreshInterval = 60)
 
     def createCounterReadOpThroughput(self, metrics):
@@ -494,7 +648,7 @@ class StorageDataSource(object):
                            name = "Storage Read Throughput E2E MB/sec",
                            instance = metrics.getAccount(),
                            value = metrics.getReadOpThroughput(),
-                           unit = 'MB/s'
+                           unit = 'MB/s',
                            refreshInterval = 60)
 
     def createCounterWriteBytes(self, metrics):
@@ -520,7 +674,7 @@ class StorageDataSource(object):
                            name = "Storage Write Op Latency E2E msec",
                            instance = metrics.getAccount(),
                            value = metrics.getWriteOpE2ELatency(),
-                           unit = 'ms'
+                           unit = 'ms',
                            refreshInterval = 60)
 
     def createCounterWriteOpServerLatency(self, metrics):
@@ -529,7 +683,7 @@ class StorageDataSource(object):
                            name = "Storage Write Op Latency Server msec",
                            instance = metrics.getAccount(),
                            value = metrics.getWriteOpServerLatency(),
-                           unit = 'ms'
+                           unit = 'ms',
                            refreshInterval = 60)
 
     def createCounterWriteOpThroughput(self, metrics):
@@ -538,7 +692,7 @@ class StorageDataSource(object):
                            name = "Storage Write Throughput E2E MB/sec",
                            instance = metrics.getAccount(),
                            value = metrics.getWriteOpThroughput(),
-                           unit = 'MB/s'
+                           unit = 'MB/s',
                            refreshInterval = 60)
 
 
@@ -562,12 +716,12 @@ class StaticDataSource(object):
 
     def collect(self):
         counters = [];
+        counters.append(self.createCounterCloudProvider())
         counters.append(self.createCounterCpuOverCommitted())
         counters.append(self.createCounterMemoryOverCommitted())
         counters.append(self.createCounterDataProviderVersion())
         counters.append(self.createCounterDataSources())
         counters.append(self.createCounterInstanceType())
-        counters.append(self.createCounterLastHardwareChange())
         counters.append(self.createCounterVirtualizationSolution())
         counters.append(self.createCounterVirtualizationSolutionVersion())
         return counters
@@ -590,14 +744,7 @@ class StaticDataSource(object):
                            category = "config",
                            name = "Virtualization Solution",
                            value = "")
-
-    def createCounterLastHardwareChange(self):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
-                           category = "config",
-                           name = "Last Hardware Change",
-                           value = time.time(),
-                           unit="posixtime")
-
+  
     def createCounterInstanceType(self):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
@@ -618,14 +765,14 @@ class StaticDataSource(object):
                            value = AzureEnhancedMonitorVersion)
 
     def createCounterMemoryOverCommitted(self):
-        value = "yes" if self.config.isMemoryOverCommitted() else "no",
+        value = "yes" if self.config.isMemoryOverCommitted() else "no"
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Memory Over-Provisioning",
                            value = value)
 
     def createCounterCpuOverCommitted(self):
-        value = "yes" if self.config.isCpuOverCommitted() else "no",
+        value = "yes" if self.config.isCpuOverCommitted() else "no"
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "CPU Over-Provisioning",
@@ -646,7 +793,7 @@ class PerfCounter(object):
                  value, 
                  instance="",
                  unit="none", 
-                 refreshInverval=0):
+                 refreshInterval=0):
         self.counterType = counterType
         self.category = category
         self.name = name
@@ -654,23 +801,26 @@ class PerfCounter(object):
         self.value = value
         self.unit = unit
         self.refreshInterval = refreshInterval
+
         self.timestamp = int(time.time())
         self.machine = socket.gethostname()
 
     def __str__(self):
-        return u(";{0};{1};{2};{3};{4};{5};{6};{7};{8};"
-                 "").format(counterType,
-                            source,
-                            name,
-                            instance,
-                            value,
-                            unit,
-                            refreshInterval,
-                            timestamp,
-                            machine)
+        return (u";{0};{1};{2};{3};{4};{5};{6};{7};{8};"
+                 "").format(self.counterType,
+                            self.category,
+                            self.name,
+                            self.instance,
+                            self.value,
+                            self.unit,
+                            self.refreshInterval,
+                            self.timestamp,
+                            self.machine)
 
     __repr__ = __str__
-        
+
+
+
 
 class EnhancedMonitor(object):
     def __init__(self, config):
@@ -678,15 +828,13 @@ class EnhancedMonitor(object):
         self.dataSources.append(VMDataSource(config))
         self.dataSources.append(StorageDataSource(config))
         self.dataSources.append(StaticDataSource(config))
+        self.writer = PerfCounterWriter()
 
     def run(self):
         counters = []
         for dataSource in self.dataSource:
-            try:
-                counters.extend(counters, dataSource.collect())
-            except Exception, e:
-                waagent.Error("{0} {1}".format(e, traceback.format_exc()))
-        return counters
+            counters.extend(counters, dataSource.collect())
+            writer.write(counters)
 
 class PerfCounterWriter(object):
     def write(self, counters):
@@ -773,14 +921,11 @@ class EnhancedMonitorConfig(object):
 
 def main():
     hutil = parse_context("Enable")
-    waagent.Log("Monitor service started.")
     monitor = EnhancedMonitor()
-    writer = PerfCounterWriter()
     while True:
         waagent.Log("Collecting performance counter.")
         try:
-            counters = monitor.run()
-            writer.write(counters)
+            monitor.run()
             #TODO do status report
         except Exception, e:
             waagent.Error("{0} {1}".format(e, traceback.format_exc()))

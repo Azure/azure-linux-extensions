@@ -1,5 +1,5 @@
 [{
-  "name": "AzureEnhancedMonitoring",
+  "name": "AzureEnhancedMonitor",
   "version": 1.0,
   "handlerManifest": {
     "installCommand": "handler.py -install",

@@ -48,7 +48,7 @@ def enable(hutil):
     child = subprocess.Popen([aemFile], stdout=devnull, stderr=devnull)
     if child.pid == None or child.pid < 1:
         hutil.do_exit(1, 'Enable', 'error', '1', 
-                      'Enable failed')
+                      'Failed to launch Azure Enhanced Monitor')
     else:
         waagent.SetFileContents(pidFile, str(child.pid))
         hutil.do_exit(0, 'Enable', 'success', '0', 
@@ -65,11 +65,10 @@ def disable(hutil):
         pid = waagent.GetFileContents(pidFile)
         if os.path.isfile(os.path.join("/proc", pid)):
             os.kill(pid, 9)
+            os.remove(pidFile)
             hutil.do_exit(0, 'Disable', 'success', '0', 
                           'Azure Enhanced Monitor is disabled')
-            return
-        else:
-            os.remove(pidFile)
+        os.remove(pidFile)
 
     hutil.do_exit(0, 'Disable', 'success', '0', 
                   'Azure Enhanced Monitor is not running')
@@ -82,25 +81,31 @@ def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("{0} started to handle.".format(ExtensionShortName))
 
+    operation = None
     try:
         for a in sys.argv[1:]:        
             if re.match("^([-/]*)(disable)", a):
+                operation = "Disable"
                 hutil = parse_context("Disable")
                 disable(hutil)
             elif re.match("^([-/]*)(uninstall)", a):
+                operation = "Uninstall"
                 dummy_command("Uninstall", "success", "Uninstall succeeded")
             elif re.match("^([-/]*)(install)", a):
+                operation = "Install"
                 dummy_command("Install", "success", "Install succeeded")
             elif re.match("^([-/]*)(enable)", a):
+                operation = "Enable"
                 hutil = parse_context("Enable")
                 enable(hutil)
             elif re.match("^([-/]*)(update)", a):
+                operation = "Update"
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
-        hutil.error(("Failed to enable the extension with error:{0}, "
-                     "{1}").format(e, traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','failed','0', 
-                      'Enable failed:{0}'.format(e))
+        hutil.error(("Extension has run into an error:{0}, {1}, "
+                     "{2}").format(operation, e, traceback.format_exc()))
+        hutil.do_exit(1, operation,'failed','0', 
+                      '{0} failed:{1}'.format(operation, e))
 
 def parse_context(operation):
     hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)

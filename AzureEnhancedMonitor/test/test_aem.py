@@ -30,9 +30,9 @@ TestConfig="""{
         "vm.roleinstance" : "haha",
         "vm.role" : "hehe",
         "vm.deploymentid" : "should-be-a-guid",
-        "vm.memory.isovercommitted" : 1,
-        "vm.cpu.isovercommitted" :  1,
-        "script.version" : "1.0",
+        "vm.memory.isovercommitted" : 0,
+        "vm.cpu.isovercommitted" :  0,
+        "script.version" : "1.0.0",
         "verbose" : 0,
         "osdisk.name" : "test-aem",
         "osdisk.connminute":"",
@@ -63,6 +63,57 @@ class TestAEM(unittest.TestCase):
         config = aem.EnhancedMonitorConfig(configData)
         self.assertNotEquals(None, config)
         return config
+
+    def test_static_datasource(self):
+        config = self.test_config()
+        dataSource = aem.StaticDataSource(config)
+        counters = dataSource.collect()
+        self.assertNotEquals(None, counters)
+        self.assertNotEquals(0, len(counters))
+
+        name = "Cloud Provider"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("Microsoft Azure", counter.value)
+        
+        name = "Virtualization Solution Version"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("", counter.value)
+
+        name = "Virtualization Solution"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("", counter.value)
+
+        name = "Instance Type"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("Small (A1)", counter.value)
+
+        name = "Data Sources"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("lad", counter.value)
+
+        name = "Data Provider Version"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("1.0.0", counter.value)
+
+        name = "Memory Over-Provisioning"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("no", counter.value)
+
+        name = "CPU Over-Provisioning"
+        counter = next((c for c in counters if c.name == name))
+        self.assertNotEquals(None, counter)
+        self.assertEquals("no", counter.value)
+
+    def test_linux_metric(self):
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()

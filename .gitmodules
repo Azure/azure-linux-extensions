@@ -1,3 +1,6 @@
 [submodule "Common/azure-sdk-for-python"]
 	path = Common/azure-sdk-for-python
 	url = https://github.com/Azure/azure-sdk-for-python.git
+[submodule "Common/psutil"]
+	path = Common/psutil
+	url = https://github.com/giampaolo/psutil.git
