@@ -77,6 +77,7 @@ def enable():
     run_result          = 1
     error_msg           = None
     run_status          = None
+    # precheck 
     try:
         hutil.do_parse_context('Enable')
         hutil.exit_if_enabled()
@@ -152,7 +153,10 @@ def enable():
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
     if(global_error_result != None):
-        run_result = 2
+        if(global_error_result.errno==2):
+            run_result = 12
+        else:
+            run_result = 2
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
