@@ -18,11 +18,13 @@
 #
 # Requires Python 2.6+
 #
+import os
 import re
 import socket
 import traceback
 import time
 import platform
+import psutil
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -35,67 +37,101 @@ class AzureDiagnosticMetric(object):
         self.config = config
 
 class CPUInfo(object):
+
+    @staticmethod
+    def getCPUInfo():
+        return CPUInfo(waagent.GetFileContents("/proc/cpuinfo"))
+
     def __init__(self, cpuinfo):
         self.cpuinfo = cpuinfo
         self.lines = cpuinfo.split("\n")
 
-    def getNumOfLogicalProcessor(self):
         lps = filter(lambda x : re.match("processor\s+:\s+\d+$", x), 
-                       self.lines)
-        return len(lps)
+                              self.lines)
+        self.numOfLogicalProcessors = len(lps)
+
+        coresPerCPU = re.search("cpu cores\s+:\s+(\d+)", self.cpuinfo)
+        self.numOfCoresPerCPU = int(coresPerCPU.group(1))
+
+        cpuIds = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
+                        self.lines)
+        self.physCPUs = len(set(cpuIds))
+        self.numOfCores = self.physCPUs * self.numOfCoresPerCPU
+
+        model = re.search("model name\s+:\s+(.*)\s", self.cpuinfo)
+        vendorId = re.search("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
+        self.processorType = "{0}, {1}".format(model.group(1), vendorId.group(1))
+        
+        freq = re.search("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
+        self.frequency = float(freq.group(1))
+
+        ht = re.match("flags\s.*\sht\s", self.cpuinfo)
+        self.isHTon = ht is not None
+
+    def getNumOfLogicalProcessors(self):
+        return self.numOfLogicalProcessors
     
     def getNumOfCoresPerCPU(self):
-        numOfCoresPerCPU = re.match("cpu cores\s+:\s+(.*)$", self.cpuinfo)
-        return int(numOfCoresPerCPU.group(1))
+        return self.numOfCoresPerCPU
+    
+    def getNumOfCores(self):
+        return self.numOfCores
     
     def getNumOfPhysCPUs(self):
-        cpus = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
-                      self.lines)
-        return len(set(cpus))
+        return self.physCPUs
 
-    def getModel(self):
-        model = re.match("model name\s+:\s+(.*)\s", self.cpuinfo)
-        return model.group(1)
-    
-    def getVendorId(self):
-        vendorId = re.match("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
-        return vendorId.group(1)
-
+    def getProcessorType(self):
+        return self.processorType
+   
     def getFrequency(self):
-        freq = re.match("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
-        return float(freq.group(1))
+        return self.frequency
 
     def isHyperThreadingOn(self):
-        freq = re.match("flags\s.*\sht\s", self.cpuinfo)
-        return freq is not None
+        return self.isHTon
 
-class LinuxMetric(object):
+    def getCPUPercent(self):
+        return psutil.cpu_percent()
 
-    def __init__(self, config):
-        self.config = config
-        #CPU
-        cpuInfo = CPUInfo(getCPUInfo())
-        self.frequency = cpuInfo.getFrequency()
-        self.numOfLogicalProcessors = cpuInfo.getNumOfLogicalProcessor()
-        self.numOfCoresPerCPU = cpuInfo.getNumOfCoresPerCPU()
-        self.numOfPhysCPUs = cpuInfo.getNumOfPhysCPUs()
-        self.numOfCores = self.numOfCoresPerCPU() * self.numOfPhysCPUs()
-        self.numOfLPPerCore = self.numOfLogicalProcessors / self.numOfCores
-        self.processorType = "{0}, {1}".format(cpuInfo.getModel(),
-                                               cpuInfo.getVendorId())
-        if cpuInfo.isHyperThreadingOn():
-            self.vCPUMapping = "thread"
-        else:
-            self.vCPUMapping = "core"
-    
-        #Memory
-        self.cpuPercent = psutil.cpu_percent() * 100
+    def __str__(self):
+        return "Phys CPUs    : {0}\n".format(self.getNumOfPhysCPUs())+\
+               "Cores / CPU  : {0}\n".format(self.getNumOfCoresPerCPU())+\
+               "Cores        : {0}\n".format(self.getNumOfCores())+\
+               "Threads      : {0}\n".format(self.getNumOfLogicalProcessors())+\
+               "Model        : {0}\n".format(self.getProcessorType())+\
+               "Frequency    : {0}\n".format(self.getFrequency())+\
+               "Hyper Thread : {0}\n".format(self.isHyperThreadingOn())+\
+               "CPU Usage    : {0}\n".format(self.getCPUPercent())
+
+class MemoryInfo(object):
+    def __init__(self):
         self.memInfo = psutil.virtual_memory()
-        self.memSize = memInfo[0] / 1024 /1024 #MB
-        self.memPercent =  memInfo[2] #%
 
-        #Network
-        self.nics = psutil.net_io_counters()
+    def getMemSize(self):
+        return self.memInfo[0]  / 1024 / 1024 #MB
+
+    def getMemPercent(self):
+        return self.memInfo[2] #%
+
+def getMacAddress(adapterId):
+    nicAddrPath = os.path.join("/sys/class/net", adapterId, "address")
+    mac = waagent.GetFileContents(nicAddrPath)
+    mac = mac.strip()
+    mac = mac.replace(":", "-")
+    return mac
+
+def sameList(l1, l2):
+    if l1 is None or l2 is None:
+        return l1 == l2
+    if len(l1) != len(l2):
+        return False
+    for i in range(0, len(l1)):
+        if l1[i] != l2[i]:
+            return False
+    return True
+
+class NetworkInfo(object):
+    def __init__(self):
+        self.nics = psutil.net_io_counters(pernic=True)
         self.nicNames = []
         self.readBytes = 0
         self.writeBytes = 0
@@ -105,116 +141,142 @@ class LinuxMetric(object):
                 self.readBytes = self.readBytes + stat[1] #bytes_recv
                 self.writeBytes = self.writeBytes + stat[0] #bytes_sent
 
-    def getCPUInfo():
-        return waagent.GetFileContents("/proc/cpuinfo") 
-
-    def getMacAddress(adapterId):
-        nicAddrPath = os.path.join("/sys/class/net", adapterId, "address")
-        mac = waagent.GetFileContents(nicAddrPath)
-        return mac
-
-    def getNetstat():
-        retCode, output = waagent.RunGetOutput("netstat -s")
-        if retCode == 0:
-            return output
-        else:
-            waagent.Error("Can't get netstat output: {0}, {1}".format(retCode,
-                                                                      output))
-            return None
-   
-    HwInfoFile = "/var/lib/waagent/HwInfo"
-    def getHwInfo():
-        if not os.path.isfile(HwInfoFile):
-            return None, None
-        hwInfo = waagent.GetFileContents(HwInfoFile).split("\n")
-        return int(hwInfo[0]), hwInfo[1:]
-
-    def setHwInfo(timestamp, hwInfo):
-        content = str(timestamp)
-        content = content + "\n".join(hwInfo)
-        waagent.SetFileContents(HwInfoFile, content)
-
-    def sameList(l1, l2):
-        if l1 is None or l2 is None:
-            return l1 == l2
-        if len(l1) != len(l2):
-            return False
-        for i in range(0, len(l1)):
-            if l1[i] != l2[i]:
-                return False
-        return True
-
-    def getLastHardwareChange(self):
-        oldTime, oldMacs = getHwInfo()
-        newMacs = map(lambda x : getMacAddress(x), self.nicNames)
-        newTime = time.utctime()
-        newMacs.sort()
-        if not sameList(newMacs, oldMacs):
-            #Hardware changed
-            if newTime < oldTime:
-                waagent.Error(("Hardware change detected. But the old timestamp "
-                               "is greater than now, {0}>{1}.").format(oldTime, 
-                                                                       newTime))
-            setHwInfo(newTime, newMacs)
-            return newTime
-        else:
-            return None
-
-    def getCurrHwFrequency(self):
-        return self.frequency
-
-    def getMaxHwFrequency(self):
-        return self.frequency
-
-    def getMaxVMProcessingPower(self):
-        return self.numOfCores
-
-    def getCurrVMProcessingPower(self):
-        return self.numOfCores if self.config.isCpuOverCommitted() else None
-
-    def getGuaranteedMemAssigned(self):
-        return self.getCurrMemAssigned()
-
-    def getNumOfCoresPerCPU(self):
-        return self.numOfCoresPerCPU
-
-    def getNumOfThreadsPerCore(self):
-        return self.numOfLPPerCore
-
-    def getPhysProcessingPowerPerVCPU(self):
-        return float(self.numOfCores) / self.numOfLogicalProcessors
-
-    def getProcessorType(self):
-        return self.processorType
-
-    def getReferenceComputeUnit(self):
-        return self.processorType
-
-    def getVCPUMapping(self):
-        return self.vCPUMapping()
-    
-    def getVMProcessingPowerConsumption(self):
-        return self.memPercent
-    
-    def getCurrMemAssigned(self):
-        return memSize if self.config.isMemoryOverCommitted() else None
-
-    def getMaxMemAssigned(self):
-        return memSize
-
-    def getGuaranteedMemAssigned(self):
-        return self.getCurrMemAssigned()
-
-    def getVMMemConsumption(self):
-        return self.memPercent
-
     def getAdapterIds(self):
         return self.nicNames
 
-    def getAdapterMapping(self, adapterId):
-        mac = getMacAddress(adapterId)
-        mac = mac.replace(":", "-")
-        return mac
+    def getNetworkReadBytes(self):
+        return self.readBytes
+
+    def getNetworkWriteBytes(self):
+        return self.writeBytes
+
+    def getNetstat(self):
+        retCode, output = waagent.RunGetOutput("netstat -s", chk_err=False)
+        return output
+
+    def getNetworkPacketRetransmitted(self):
+        netstat = self.getNetstat()
+        match = re.search("(\d+)\s*segments retransmited", netstat)
+        if match != None:
+            return int(match.group(1))
+        else:
+            waagent.Error("Failed to parse netstat output: {0}".format(netstat))
+            return None
+
+
+HwInfoFile = "/var/lib/waagent/HwInfo"
+class HardwareChangeInfo(object):
+    def __init__(self, networkInfo):
+        self.networkInfo = networkInfo
+
+    def getHwInfo(self):
+        if not os.path.isfile(HwInfoFile):
+            return None, None
+        hwInfo = waagent.GetFileContents(HwInfoFile).split("\n")
+        return float(hwInfo[0]), hwInfo[1:]
+
+    def setHwInfo(self, timestamp, hwInfo):
+        content = str(timestamp)
+        content = content + "\n" + "\n".join(hwInfo)
+        waagent.SetFileContents(HwInfoFile, content)
+
+    def getLastHardwareChange(self):
+        oldTime, oldMacs = self.getHwInfo()
+        newMacs = map(lambda x : getMacAddress(x), 
+                      self.networkInfo.getAdapterIds())
+        newTime = time.time()
+        newMacs.sort()
+        if oldMacs is None or not sameList(newMacs, oldMacs):
+            #Hardware changed
+            if newTime < oldTime:
+                waagent.Warn(("Hardware change detected. But the old timestamp "
+                               "is greater than now, {0}>{1}.").format(oldTime, 
+                                                                       newTime))
+            self.setHwInfo(newTime, newMacs)
+            return newTime
+        else:
+            return oldTime
+
+class LinuxMetric(object):
+    def __init__(self, config):
+        self.config = config
+
+        #CPU
+        self.cpuInfo = CPUInfo.getCPUInfo()
+   
+        #Memory
+        self.memInfo = MemoryInfo()
+
+        #Network
+        self.networkInfo = NetworkInfo()
+
+        #Detect hardware change
+        self.hwChangeInfo = HardwareChangeInfo(self.networkInfo)
+
+
+    def getCurrHwFrequency(self):
+        return self.cpuInfo.getFrequency()
+
+    def getMaxHwFrequency(self):
+        return self.getCurrHwFrequency()
+
+    def getCurrVMProcessingPower(self):
+        if self.config.isCpuOverCommitted():
+            return None
+        else:
+            return self.cpuInfo.getNumOfCores()
+
+    def getGuaranteedVMProcessingPower(self):
+        return self.getCurrVMProcessingPower()
+
+    def getMaxVMProcessingPower(self):
+        return self.getCurrVMProcessingPower()
+
+    def getNumOfCoresPerCPU(self):
+        return self.cpuInfo.getNumOfCoresPerCPU()
+
+    def getNumOfThreadsPerCore(self):
+        lps = self.cpuInfo.getNumOfLogicalProcessors()
+        cores = self.cpuInfo.getNumOfCores()
+        return lps / cores
+
+    def getPhysProcessingPowerPerVCPU(self):
+        cores = self.cpuInfo.getNumOfCores()
+        lps = self.cpuInfo.getNumOfLogicalProcessors()
+        return float(cores) / lps
+
+    def getProcessorType(self):
+        return self.cpuInfo.getProcessorType()
+
+    def getReferenceComputeUnit(self):
+        return self.getProcessorType()
+
+    def getVCPUMapping(self):
+        return "thread" if self.cpuInfo.isHyperThreadingOn() else "core"
+    
+    def getVMProcessingPowerConsumption(self):
+        return self.memInfo.getMemPercent()
+    
+    def getCurrMemAssigned(self):
+        if self.config.isMemoryOverCommitted():
+            return None
+        else:
+            return self.memInfo.getMemSize()
+        
+    def getGuaranteedMemAssigned(self):
+        return self.getCurrMemAssigned()
+
+    def getMaxMemAssigned(self):
+        return self.getCurrMemAssigned()
+
+    def getVMMemConsumption(self):
+        return self.memInfo.getMemPercent()
+
+    def getNetworkAdapterIds(self):
+        return self.networkInfo.getAdapterIds()
+
+    def getNetworkAdapterMapping(self, adapterId):
+        return getMacAddress(adapterId)
 
     def getMaxNetworkBandwidth(self, adapterId):
         return 1000 #Mbit/s 
@@ -223,63 +285,62 @@ class LinuxMetric(object):
         return 1000 #Mbit/s 
 
     def getNetworkReadBytes(self):
-        return self.readBytes
+        return self.networkInfo.getNetworkReadBytes()
 
     def getNetworkWriteBytes(self):
-        return self.writeBytes
+        return self.networkInfo.getNetworkWriteBytes()
 
     def getNetworkPacketRetransmitted(self):
-        netstat = getNetstat()
-        match = re.match("(\d)+\s*segments retransmited")
-        if match != None:
-            return int(match.group(1))
-        else:
-            waagent.Error("Failed to parse netstat output: {0}".format(netstat))
-            return None
+        return self.networkInfo.getNetworkPacketRetransmitted()
   
-class StorageMetric(object):
+    def getLastHardwareChange(self):
+        return self.hwChangeInfo.getLastHardwareChange()
 
-    def isUserRead(op):
-        if not op.startswith("user;"):
-            return False
-        op = op[5:]
-        return op in {"Get", "List", "Preflight"}            
 
-    def isUserWrite(op):
-        if not op.startswith("user;"):
-            return False
-        op = op[5:]
-        return op in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}    
+def isUserRead(op):
+    if not op.startswith("user;"):
+        return False
+    op = op[5:]
+    for prefix in {"Get", "List", "Preflight"}:
+        if op.startswith(prefix):
+            return True
+    return False
 
-    def stat(metrics, opFilter):
-        metrics = filter(lambda x : opFilter(x), metrics)
-        stat = {}
-        stat['bytes'] = sum(map(lambda x : x.TotalIngress + x.TotalEgress, 
-                                metrics))
-        stat['ops'] = sum(map(lambda x : x.TotalRequests, readOps))
+def isUserWrite(op):
+    if not op.startswith("user;"):
+        return False
+    op = op[5:]
+    for prefix in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}:    
+        if op.startswith(prefix):
+            return True
+    return False
+
+def storageStat(metrics, opFilter):
+    metrics = filter(lambda x : opFilter(x.RowKey), metrics)
+    stat = {}
+    stat['bytes'] = sum(map(lambda x : x.TotalIngress + x.TotalEgress, 
+                            metrics))
+    stat['ops'] = sum(map(lambda x : x.TotalRequests, metrics))
+    if stat['ops'] == 0:
+        stat['e2eLatency'] = None
+        stat['serverLatency'] = None
+    else:
         stat['e2eLatency'] = sum(map(lambda x : x.TotalRequests * \
                                                 x.AverageE2ELatency, 
                                      metrics)) / stat['ops']
         stat['serverLatency'] = sum(map(lambda x : x.TotalRequests * \
                                                    x.AverageServerLatency, 
                                         metrics)) / stat['ops']
-        #Convert to MB/s
-        stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
-        return stat
+    #Convert to MB/s
+    stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
+    return stat
 
-    def __init__(self, account, key, table, startKey, endKey):
-        tableService = TableService(account_name = account, account_key = key)
-        ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
-                   "").format(startKey, endKey)
-        oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
-                   "AverageServerLatency")
-        metrics = tableService.query_entities(table, ofilter, oselect)
-        self.account = account
-        self.rStat = stat(metrics, isUserRead)
-        self.wStat = stat(metrics, isUserWrite)
+class AzureStorageStat(object):
 
-    def getAccount(self):
-        return self.account
+    def __init__(self, metrics):
+        self.metrics = metrics
+        self.rStat = storageStat(metrics, isUserRead)
+        self.wStat = storageStat(metrics, isUserWrite)
 
     def getReadBytes(self):
         return self.rStat['bytes']
@@ -322,8 +383,6 @@ class VMDataSource(object):
         else:
             metrics = LinuxMetric(self.config)
 
-        counters.append(self.createCounterLastHardwareChange(metrics))
-
         #CPU
         counters.append(self.createCounterCurrHwFrequency(metrics))
         counters.append(self.createCounterMaxHwFrequency(metrics))
@@ -356,7 +415,9 @@ class VMDataSource(object):
         counters.append(self.createCounterNetworkReadBytes(metrics))
         counters.append(self.createCounterNetworkWriteBytes(metrics))
         counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
-
+        
+        #Hardware change
+        counters.append(self.createCounterLastHardwareChange(metrics))
         return counters
     
     def createCounterLastHardwareChange(self, metrics):
@@ -391,7 +452,7 @@ class VMDataSource(object):
     def createCounterMaxVMProcessingPower(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "cpu",
-                           name = "Max VM Processing Power",
+                           name = "Max. VM Processing Power",
                            value = metrics.getMaxVMProcessingPower(),
                            unit = "compute unit")
 
@@ -487,7 +548,7 @@ class VMDataSource(object):
                            category = "network",
                            name = "Mapping",
                            instance = adapterId,
-                           value = metrics.getAdapterMapping(adapterId))
+                           value = metrics.getNetworkAdapterMapping(adapterId))
 
     def createCounterMaxNetworkBandwidth(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
@@ -525,31 +586,42 @@ class VMDataSource(object):
                            name = "Packets Retransmitted",
                            value = metrics.getNetworkPacketRetransmitted(),
                            unit = "packets/min")
+def getKeyRange():
+    now = time.gmtime()
+    keyFormat = "{0:0>4d}{1:0>2d}{2:0>2d}T{3:0>2d}{4:0>2d}"
+    startKey = keyFormat.format(now.tm_year, 
+                                now.tm_mon, 
+                                now.tm_mday,
+                                now.tm_hour,
+                                now.tm_min - 1)
+    endKey = keyFormat.format(now.tm_year, 
+                              now.tm_mon, 
+                              now.tm_mday,
+                              now.tm_hour,
+                              now.tm_min)
 
-class StorageDataSource(object):
+def getStorageMetrics(account, key, table, startKey, endKey):
+    tableService = TableService(account_name = account, account_key = key)
+    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
+               "").format(startKey, endKey)
+    oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
+               "AverageServerLatency")
+    metrics = tableService.query_entities(table, ofilter, oselect)
+    return metrics
+
+def getDataDisks():
+    blockDevs = os.listdir('/sys/block')
+    dataDisks = filter(lambda d : re.match("sd[c-z]", d), blockDevs)
+    return dataDisks
+
+def getFirstLun(dev):
+    path = os.path.join("/sys/block", dev, "device/scsi_disk")
+    for lun in os.listdir(path):
+        return lun
+
+class DiskInfo(object):
     def __init__(self, config):
         self.config = config
-
-    def collect(self):
-        counters = []
-        diskMapping = self.getDiskMapping()
-        for dev, vhd in diskMapping.iteritems():
-            counters.append(self.createCounterDiskMappingCounter(dev, vhd)) 
-        accounts = self.config.getStorageAccountNames()
-        for account in accounts:
-            metrics = self.getStorageMetrics(account)
-            counters.append(self.createCounterStorageId(account))
-            counters.append(self.createCounterReadBytes(metrics))
-            counters.append(self.createCounterReadOps(metrics))
-            counters.append(self.createCounterReadOpE2ELatency(metrics))
-            counters.append(self.createCounterReadOpServerLatency(metrics))
-            counters.append(self.createCounterReadOpThroughput(metrics))
-            counters.append(self.createCounterWriteBytes(metrics))
-            counters.append(self.createCounterWriteOps(metrics))
-            counters.append(self.createCounterWriteOpE2ELatency(metrics))
-            counters.append(self.createCounterWriteOpServerLatency(metrics))
-            counters.append(self.createCounterWriteOpThroughput(metrics))
-        return counters
 
     def getDiskMapping(self):
         osdiskVhd = "{0} {1}".format(self.config.getOSDiskAccount(),
@@ -559,53 +631,63 @@ class StorageDataSource(object):
                 "/dev/sdb": "not mapped to vhd"
         }
 
-        dataDisks = {}
-        for root, path, dev in self.getBlockDevices():
-            if re.match("sd[c-z]", dev):
-                lun = self.getFirstLun(dev)
-                dataDisks[lun] = dev
+        dataDisks = getDataDisks()
+        if dataDisks is None or len(dataDisks) == 0:
+            return diskMapping
+        
+        lunToDevMap = {}
+        for dev in dataDisks:
+            lun = getFirstLun(dev)
+            lunToDevMap[lun] = dev
 
         diskCount = self.config.getDataDiskCount()
         for i in range(0, diskCount):
             lun = self.config.getDataDiskLun(i)
             vhd = "{0} {1}".format(self.config.getDataDiskAccount(i),
                                    self.config.getDataDiskName(i))
-            if lun in dataDisks:
-                dev = dataDisks[lun]
+            if lun in lunToDevMap:
+                dev = lunToDevMap[lun]
                 diskMapping[dev] = vhd
+            else:
+                waagent.Warn("Couldn't find disk with lun: {0}".format(lun))
 
         return diskMapping 
 
-    def getBlockDevices(self):
-        return os.walk("/sys/block")
 
-    def getFirstLun(self, dev):
-        path = os.path.join("/sys/block", dev, "device/scsi_disk")
-        for lun in os.listdir(path):
-            return lun
+class StorageDataSource(object):
+    def __init__(self, config):
+        self.config = config
 
-    def getStorageMetrics(self, account):
-        uri = self.config.getStorageAccountMinuteUri()
-        pos = uri.rfind('/')
-        tableName = uri[pos+1:]
+    def collect(self):
+        counters = []
+        diskMapping = DiskInfo(self.config).getDiskMapping()
+        for dev, vhd in diskMapping.iteritems():
+            counters.append(self.createCounterDiskMappingCounter(dev, vhd)) 
 
-        now = time.gmtime()
-        keyFormat = "{0:0>4d}{1:0>2d}{2:0>2d}T{3:0>2d}{4:0>2d}"
-        startKey = keyFormat.format(now.tm_year, 
-                                    now.tm_mon, 
-                                    now.tm_mday,
-                                    now.tm_hour,
-                                    now.tm_min - 1)
-        endKey = keyFormat.format(now.tm_year, 
-                                  now.tm_mon, 
-                                  now.tm_mday,
-                                  now.tm_hour,
-                                  now.tm_min)
-        return StorageMetric(account, 
-                             self.config.getStorageAccountKey(account),
-                             tableName,
-                             startKey,
-                             endKey)
+        accounts = self.config.getStorageAccountNames()
+        startKey, endKey = getKeyRange()
+        for account in accounts:
+            tableName = self.config.getStorageAccountMinuteTable(account)
+            accountKey = self.config.getStorageAccountKey(account)
+            metrics = getStorageMetrics(account, 
+                                        accountKey,
+                                        tableName,
+                                        startKey,
+                                        endKey)
+            stat = AzureStorageStat(metrics)
+            counters.append(self.createCounterStorageId(account))
+            counters.append(self.createCounterReadBytes(stat))
+            counters.append(self.createCounterReadOps(stat))
+            counters.append(self.createCounterReadOpE2ELatency(stat))
+            counters.append(self.createCounterReadOpServerLatency(stat))
+            counters.append(self.createCounterReadOpThroughput(stat))
+            counters.append(self.createCounterWriteBytes(stat))
+            counters.append(self.createCounterWriteOps(stat))
+            counters.append(self.createCounterWriteOpE2ELatency(stat))
+            counters.append(self.createCounterWriteOpServerLatency(stat))
+            counters.append(self.createCounterWriteOpThroughput(stat))
+        return counters
+
 
     def createCounterReadBytes(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
@@ -903,6 +985,12 @@ class EnhancedMonitorConfig(object):
 
     def getStorageAccountMinuteUri(self, name):
         return self.configData["{0}.minute.uri".format(name)]
+
+    def getStorageAccountMinuteTable(self, name):
+        uri = self.getStorageAccountMinuteUri()
+        pos = uri.rfind('/')
+        tableName = uri[pos+1:]
+        return tableName
 
     def getStorageAccountHourUri(self, name):
         return self.configData["{0}.hour.uri".format(name)]

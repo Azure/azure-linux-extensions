@@ -24,6 +24,7 @@ import env
 import os
 import aem
 import json
+from Utils.WAAgentUtil import waagent
 
 TestConfig="""{
         "vm.size" : "Small (A1)",
@@ -35,15 +36,18 @@ TestConfig="""{
         "script.version" : "1.0.0",
         "verbose" : 0,
         "osdisk.name" : "test-aem",
+        "osdisk.account" : "test-aem",
         "osdisk.connminute":"",
         "osdisk.connhour":"",
         "disk.count" : 2,
         "disk.lun.1" : 1,
         "disk.name.1" : "test-aem-dd1",
+        "disk.account.1" : "test-aem-dd1",
         "disk.connminute.1" : "",
         "disk.connhour.1" : "",
         "disk.lun.2" : 1,
         "disk.name.2" : "test-aem-dd2",
+        "disk.account.2" : "test-aem-dd2",
         "disk.connminute.2" : "",
         "disk.connhour.2" : "",
         "account.names" :["testaemstorage"],
@@ -58,6 +62,9 @@ TestConfig="""{
 """
 
 class TestAEM(unittest.TestCase):
+    def setUp(self):
+        waagent.LoggerInit("/dev/null", "/dev/stdout")
+
     def test_config(self):
         configData = json.loads(TestConfig)
         config = aem.EnhancedMonitorConfig(configData)
@@ -111,9 +118,170 @@ class TestAEM(unittest.TestCase):
         self.assertNotEquals(None, counter)
         self.assertEquals("no", counter.value)
 
-    def test_linux_metric(self):
-        pass
+    def test_cpuinfo(self):
+        cpuinfo = aem.CPUInfo.getCPUInfo()
+        self.assertNotEquals(None, cpuinfo)
+        self.assertNotEquals(0, cpuinfo.getNumOfPhysCPUs())
+        self.assertNotEquals(0, cpuinfo.getNumOfCoresPerCPU())
+        self.assertNotEquals(0, cpuinfo.getNumOfCores())
+        self.assertNotEquals(0, cpuinfo.getNumOfLogicalProcessors())
+        self.assertNotEquals(None, cpuinfo.getProcessorType())
+        self.assertEquals(float, type(cpuinfo.getFrequency()))
+        self.assertEquals(bool, type(cpuinfo.isHyperThreadingOn()))
+        percent = cpuinfo.getCPUPercent()
+        self.assertEquals(float, type(percent))
+        self.assertTrue(percent >= 0 and percent <= 100)
 
+    def test_meminfo(self):
+        meminfo = aem.MemoryInfo()
+        self.assertNotEquals(None, meminfo.getMemSize())
+        self.assertEquals(long, type(meminfo.getMemSize()))
+        percent = meminfo.getMemPercent()
+        self.assertEquals(float, type(percent))
+        self.assertTrue(percent >= 0 and percent <= 100)
+
+    def test_networkinfo(self):
+        netinfo = aem.NetworkInfo()
+        adapterIds = netinfo.getAdapterIds()
+        self.assertNotEquals(None, adapterIds)
+        self.assertNotEquals(0, len(adapterIds))
+        adapterId = adapterIds[0]
+        self.assertNotEquals(None, aem.getMacAddress(adapterId))
+        self.assertNotEquals(None, netinfo.getNetworkReadBytes())
+        self.assertNotEquals(None, netinfo.getNetworkWriteBytes())
+        self.assertNotEquals(None, netinfo.getNetworkPacketRetransmitted())
+
+    def test_hwchangeinfo(self):
+        netinfo = aem.NetworkInfo()
+        testHwInfoFile = "/tmp/HwInfo"
+        aem.HwInfoFile = testHwInfoFile
+        if os.path.isfile(testHwInfoFile):
+            os.remove(testHwInfoFile)
+        hwChangeInfo = aem.HardwareChangeInfo(netinfo)
+        self.assertNotEquals(None, hwChangeInfo.getLastHardwareChange())
+        self.assertTrue(os.path.isfile, aem.HwInfoFile)
+
+        #No hardware change
+        lastChange = hwChangeInfo.getLastHardwareChange()
+        hwChangeInfo = aem.HardwareChangeInfo(netinfo)
+        self.assertEquals(lastChange, hwChangeInfo.getLastHardwareChange())
+
+        #Create mock hardware
+        waagent.SetFileContents(testHwInfoFile, ("0\nma-ca-sa-ds-02"))
+        hwChangeInfo = aem.HardwareChangeInfo(netinfo)
+        self.assertNotEquals(None, hwChangeInfo.getLastHardwareChange())
+
+        
+    def test_linux_metric(self):
+        config = self.test_config()
+        metric = aem.LinuxMetric(config)
+        self.validate_cnm_metric(metric)
+
+    #Metric for CPU, network and memory
+    def validate_cnm_metric(self, metric):
+        self.assertNotEquals(None, metric.getCurrHwFrequency())
+        self.assertNotEquals(None, metric.getMaxHwFrequency())
+        self.assertNotEquals(None, metric.getCurrVMProcessingPower())
+        self.assertNotEquals(None, metric.getGuaranteedMemAssigned())
+        self.assertNotEquals(None, metric.getMaxVMProcessingPower())
+        self.assertNotEquals(None, metric.getNumOfCoresPerCPU())
+        self.assertNotEquals(None, metric.getNumOfThreadsPerCore())
+        self.assertNotEquals(None, metric.getPhysProcessingPowerPerVCPU())
+        self.assertNotEquals(None, metric.getProcessorType())
+        self.assertNotEquals(None, metric.getReferenceComputeUnit())
+        self.assertNotEquals(None, metric.getVCPUMapping())
+        self.assertNotEquals(None, metric.getVMProcessingPowerConsumption())
+        self.assertNotEquals(None, metric.getCurrMemAssigned())
+        self.assertNotEquals(None, metric.getGuaranteedMemAssigned())
+        self.assertNotEquals(None, metric.getMaxMemAssigned())
+        self.assertNotEquals(None, metric.getVMMemConsumption())
+        adapterIds = metric.getNetworkAdapterIds()
+        self.assertNotEquals(None, adapterIds)
+        self.assertNotEquals(0, len(adapterIds))
+        adapterId = adapterIds[0]
+        self.assertNotEquals(None, metric.getNetworkAdapterMapping(adapterId))
+        self.assertNotEquals(None, metric.getMaxNetworkBandwidth(adapterId))
+        self.assertNotEquals(None, metric.getMinNetworkBandwidth(adapterId))
+        self.assertNotEquals(None, metric.getNetworkReadBytes())
+        self.assertNotEquals(None, metric.getNetworkWriteBytes())
+        self.assertNotEquals(None, metric.getNetworkPacketRetransmitted())
+        self.assertNotEquals(None, metric.getLastHardwareChange())
+
+    def test_vm_datasource(self):
+        config = self.test_config()
+        config.configData["lad.isenable"] = 0
+        dataSource = aem.VMDataSource(config)
+        counters = dataSource.collect()
+        self.assertNotEquals(None, counters)
+        self.assertNotEquals(0, len(counters))
+
+        counterNames = [
+            "Current Hw Frequency",
+            "Current VM Processing Power",
+            "Guaranteed VM Processing Power",
+            "Max Hw Frequency",
+            "Max. VM Processing Power",
+            "Number of Cores per CPU",
+            "Number of Threads per Core",
+            "Phys. Processing Power per vCPU",
+            "Processor Type",
+            "Reference Compute Unit",
+            "vCPU Mapping",
+            "VM Processing Power Consumption",
+            "Current Memory assigned",
+            "Guaranteed Memory assigned",
+            "Max Memory assigned",
+            "VM Memory Consumption",
+            "Adapter Id",
+            "Mapping",
+            "Maximum Network Bandwidth",
+            "Minimum Network Bandwidth",
+            "Network Read Bytes",
+            "Network Write Bytes",
+            "Packets Retransmitted"
+        ]
+        #print "\n".join(map(lambda c: str(c), counters))
+        for name in counterNames:
+            #print name
+            counter = next((c for c in counters if c.name == name))
+            self.assertNotEquals(None, counter)
+            self.assertNotEquals(None, counter.value)
+
+    def test_storagemetric(self):
+        metrics = mock_getStorageMetrics()
+        self.assertNotEquals(None, metrics)
+        stat = aem.AzureStorageStat(metrics)
+        self.assertNotEquals(None, stat.getReadBytes())
+        self.assertNotEquals(None, stat.getReadOps())
+        self.assertNotEquals(None, stat.getReadOpE2ELatency())
+        self.assertNotEquals(None, stat.getReadOpServerLatency())
+        self.assertNotEquals(None, stat.getReadOpThroughput())
+        self.assertNotEquals(None, stat.getWriteBytes())
+        self.assertNotEquals(None, stat.getWriteOps())
+        self.assertNotEquals(None, stat.getWriteOpE2ELatency())
+        self.assertNotEquals(None, stat.getWriteOpServerLatency())
+        self.assertNotEquals(None, stat.getWriteOpThroughput())
+
+    def test_disk_info(self):
+        config = self.test_config()
+        mapping = aem.DiskInfo(config).getDiskMapping()
+        self.assertNotEquals(None, mapping)
+
+    def test_storage_datasource(self):
+        aem.getStorageMetrics = mock_getStorageMetrics
+        config = self.test_config()
+        dataSource = aem.StorageDataSource(config)
+        #counters = dataSource.collect()
+
+def mock_getStorageMetrics(*args, **kwargs):
+        with open(os.path.join(env.test_dir, "storage_metrics")) as F:
+            test_data = F.read()
+        jsonObjs = json.loads(test_data)  
+        class ObjectView(object):
+            def __init__(self, data):
+                self.__dict__ = data
+        metrics = map(lambda x : ObjectView(x), jsonObjs)
+        return metrics
 
 if __name__ == '__main__':
     unittest.main()

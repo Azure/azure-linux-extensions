@@ -22,7 +22,8 @@ import sys
 import os
 
 #append installer directory to sys.path
-root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+test_dir = os.path.dirname(os.path.abspath(__file__))
+root = os.path.dirname(test_dir)
 sys.path.append(root)
 
 azure_sdk = os.path.join(root, "Common/azure-sdk-for-python") 
