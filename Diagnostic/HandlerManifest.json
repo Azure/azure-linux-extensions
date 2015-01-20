@@ -1,0 +1,14 @@
+[{
+  "name": "LinuxAzureDiagnostic",
+  "version": 1.0,
+  "handlerManifest": {
+   "installCommand": "diagnostic.py -install",
+    "uninstallCommand": "diagnostic.py -uninstall",
+    "updateCommand": "diagnostic.py -update",
+    "enableCommand": "diagnostic.py -enable",
+    "disableCommand": "diagnostic.py -disable",
+    "rebootAfterInstall": false,
+    "reportHeartbeat": false
+  }
+}]
+
