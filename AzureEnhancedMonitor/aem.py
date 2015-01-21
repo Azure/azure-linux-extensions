@@ -23,18 +23,158 @@ import re
 import socket
 import traceback
 import time
+import datetime
 import platform
 import psutil
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
-MonitoringInterval = 60 #One minute
+MonitoringIntervalInMinute = 1 #One minute
+MonitoringInterval = 60 * MonitoringIntervalInMinute
+
 AzureEnhancedMonitorVersion = "1.0.0"
+
+def getAzureDiagnosticKeyRange():
+    msInOneMin = 60 * 1000
+    queryInterval = MonitoringIntervalInMinute * msInOneMin
+
+    tickInOneMS = 10000 # 1 ms = 10000 ticks
+    #Round to minute
+    endTime = (int(time.time()) % msInOneMin) * msInOneMin
+    startTime = endTime - queryInterval
+
+    startKey = startTime * tickInOneMS
+    endKey = endTime * tickInOneMS
+    return startKey, endKey
+
+def parseTimestamp(timeStr):
+    timeStr = timeStr[:-2] #Drop the time zone part, since utc is always used
+    timeFormat = "%Y-%m-%dT%H:%M:%S.%f"
+    timestamp = datetime.datetime.strptime(timeStr, timeFormat)
+    return timestamp.strftime("%s")
+
+def getAzureDiagnosticCPUData(accountName, accountKey, startKey, endKey):
+    table = "TuxTestCputable1Ver2v0"
+    tableService = TableService(account_name = accountName, 
+                                account_key = accountKey)
+    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
+               "").format(startKey, endKey)
+    oselect = ("PercentProcessorTime", "PreciseTimeStamp")
+    data = tableService.query_entities(table, ofilter, oselect, 1)
+    cpuPercent = float(data[0].PercentProcessorTime)
+    timestamp = parseTimestamp(data[0].PreciseTimeStamp)
+    return cpuPercent, timestamp
+
+def getAzureDiagnosticMemoryData(accountName, accountKey, startKey, endKey):
+    table = "TuxTestMemtable1Ver2v0"
+    tableService = TableService(account_name = accountName, 
+                                account_key = accountKey)
+    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
+               "").format(startKey, endKey)
+    oselect = ("PercentAvailableMemory", "PreciseTimeStamp")
+    data = tableService.query_entities(table, ofilter, oselect, 1)
+    memoryPercent = 100 - float(data[0].PercentAvailableMemory)
+    timestamp = parseTimestamp(data[0].PreciseTimeStamp)
+    return memoryPercent, timestamp
+
+class AzureDiagnosticData(object):
+    def __init__(self, config):
+        self.config = config
+        accountName = config.getLADName()
+        accountKey = config.getLADKey()
+        self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
+                                                    accountKey,
+                                                    startKey,
+                                                    endKey)
+        self.memoryPercent = getAzureDiagnosticMemoryData(accountName, 
+                                                          accountKey,
+                                                          startKey,
+                                                          endKey)
+
+    def getCPUPercent(self):
+        return self.cpuPercent
+
+    def getMemPercent(self):
+        return self.memoryPercent
 
 class AzureDiagnosticMetric(object):
     def __init__(self, config):
         self.config = config
+        self.linux = LinuxMetric(self.config)
+        self.azure = AzureDiagnosticMetric(self.config)
+
+    def getCurrHwFrequency(self):
+        return self.linux.getCurrHwFrequency()
+
+    def getMaxHwFrequency(self):
+        return self.linux.getMaxHwFrequency()
+
+    def getCurrVMProcessingPower(self):
+        return self.linux.getCurrVMProcessingPower()
+
+    def getGuaranteedVMProcessingPower(self):
+        return self.linux.getGuaranteedVMProcessingPower()
+
+    def getMaxVMProcessingPower(self):
+        return self.linux.getMaxVMProcessingPower()
+
+    def getNumOfCoresPerCPU(self):
+        return self.linux.getNumOfCoresPerCPU()
+
+    def getNumOfThreadsPerCore(self):
+        return self.linux.getNumOfThreadsPerCore()
+
+    def getPhysProcessingPowerPerVCPU(self):
+        return self.linux.getPhysProcessingPowerPerVCPU()
+
+    def getProcessorType(self):
+        return self.linux.getProcessorType()
+
+    def getReferenceComputeUnit(self):
+        return self.linux.getReferenceComputeUnit()
+
+    def getVCPUMapping(self):
+        return self.linux.getVCPUMapping()
+    
+    def getVMProcessingPowerConsumption(self):
+        return self.azure.CPUPercent()
+    
+    def getCurrMemAssigned(self):
+        return self.linux.getCurrMemAssigned()
+        
+    def getGuaranteedMemAssigned(self):
+        return self.linux.getGuaranteedMemAssigned()
+
+    def getMaxMemAssigned(self):
+        return self.linux.getMaxMemAssigned()
+
+    def getVMMemConsumption(self):
+        return self.azure.MemoryPercent()
+
+    def getNetworkAdapterIds(self):
+        return self.linux.getNetworkAdapterIds()
+
+    def getNetworkAdapterMapping(self, adapterId):
+        return self.linux.getNetworkAdapterMapping()
+
+    def getMaxNetworkBandwidth(self, adapterId):
+        return self.linux.getMaxNetworkBandwidth()
+
+    def getMinNetworkBandwidth(self, adapterId):
+        return self.linux.getMinNetworkBandwidth()
+
+    def getNetworkReadBytes(self):
+        return self.linux.getNetworkReadBytes()
+
+    def getNetworkWriteBytes(self):
+        return self.linux.getNetworkWriteBytes()
+
+    def getNetworkPacketRetransmitted(self):
+        return self.linux.getNetworkPacketRetransmitted()
+  
+    def getLastHardwareChange(self):
+        return self.linux.getLastHardwareChange()
 
 class CPUInfo(object):
 
@@ -213,7 +353,6 @@ class LinuxMetric(object):
         #Detect hardware change
         self.hwChangeInfo = HardwareChangeInfo(self.networkInfo)
 
-
     def getCurrHwFrequency(self):
         return self.cpuInfo.getFrequency()
 
@@ -295,82 +434,6 @@ class LinuxMetric(object):
   
     def getLastHardwareChange(self):
         return self.hwChangeInfo.getLastHardwareChange()
-
-
-def isUserRead(op):
-    if not op.startswith("user;"):
-        return False
-    op = op[5:]
-    for prefix in {"Get", "List", "Preflight"}:
-        if op.startswith(prefix):
-            return True
-    return False
-
-def isUserWrite(op):
-    if not op.startswith("user;"):
-        return False
-    op = op[5:]
-    for prefix in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}:    
-        if op.startswith(prefix):
-            return True
-    return False
-
-def storageStat(metrics, opFilter):
-    metrics = filter(lambda x : opFilter(x.RowKey), metrics)
-    stat = {}
-    stat['bytes'] = sum(map(lambda x : x.TotalIngress + x.TotalEgress, 
-                            metrics))
-    stat['ops'] = sum(map(lambda x : x.TotalRequests, metrics))
-    if stat['ops'] == 0:
-        stat['e2eLatency'] = None
-        stat['serverLatency'] = None
-    else:
-        stat['e2eLatency'] = sum(map(lambda x : x.TotalRequests * \
-                                                x.AverageE2ELatency, 
-                                     metrics)) / stat['ops']
-        stat['serverLatency'] = sum(map(lambda x : x.TotalRequests * \
-                                                   x.AverageServerLatency, 
-                                        metrics)) / stat['ops']
-    #Convert to MB/s
-    stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
-    return stat
-
-class AzureStorageStat(object):
-
-    def __init__(self, metrics):
-        self.metrics = metrics
-        self.rStat = storageStat(metrics, isUserRead)
-        self.wStat = storageStat(metrics, isUserWrite)
-
-    def getReadBytes(self):
-        return self.rStat['bytes']
-
-    def getReadOps(self):
-        return self.rStat['ops']
-
-    def getReadOpE2ELatency(self):
-        return self.rStat['e2eLatency']
-
-    def getReadOpServerLatency(self):
-        return self.rStat['serverLatency']
-
-    def getReadOpThroughput(self):
-        return self.rStat['throughput']
-
-    def getWriteBytes(self):
-        return self.wStat['bytes']
-
-    def getWriteOps(self):
-        return self.wStat['ops']
-
-    def getWriteOpE2ELatency(self):
-        return self.wStat['e2eLatency']
-
-    def getWriteOpServerLatency(self):
-        return self.wStat['serverLatency']
-
-    def getWriteOpThroughput(self):
-        return self.wStat['throughput']
 
 class VMDataSource(object):
     def __init__(self, config):
@@ -586,7 +649,8 @@ class VMDataSource(object):
                            name = "Packets Retransmitted",
                            value = metrics.getNetworkPacketRetransmitted(),
                            unit = "packets/min")
-def getKeyRange():
+
+def getStorageTableKeyRange():
     now = time.gmtime()
     keyFormat = "{0:0>4d}{1:0>2d}{2:0>2d}T{3:0>2d}{4:0>2d}"
     startKey = keyFormat.format(now.tm_year, 
@@ -599,6 +663,7 @@ def getKeyRange():
                               now.tm_mday,
                               now.tm_hour,
                               now.tm_min)
+    return startKey, endKey
 
 def getStorageMetrics(account, key, table, startKey, endKey):
     tableService = TableService(account_name = account, account_key = key)
@@ -653,6 +718,81 @@ class DiskInfo(object):
 
         return diskMapping 
 
+def isUserRead(op):
+    if not op.startswith("user;"):
+        return False
+    op = op[5:]
+    for prefix in {"Get", "List", "Preflight"}:
+        if op.startswith(prefix):
+            return True
+    return False
+
+def isUserWrite(op):
+    if not op.startswith("user;"):
+        return False
+    op = op[5:]
+    for prefix in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}:    
+        if op.startswith(prefix):
+            return True
+    return False
+
+def storageStat(metrics, opFilter):
+    metrics = filter(lambda x : opFilter(x.RowKey), metrics)
+    stat = {}
+    stat['bytes'] = sum(map(lambda x : x.TotalIngress + x.TotalEgress, 
+                            metrics))
+    stat['ops'] = sum(map(lambda x : x.TotalRequests, metrics))
+    if stat['ops'] == 0:
+        stat['e2eLatency'] = None
+        stat['serverLatency'] = None
+    else:
+        stat['e2eLatency'] = sum(map(lambda x : x.TotalRequests * \
+                                                x.AverageE2ELatency, 
+                                     metrics)) / stat['ops']
+        stat['serverLatency'] = sum(map(lambda x : x.TotalRequests * \
+                                                   x.AverageServerLatency, 
+                                        metrics)) / stat['ops']
+    #Convert to MB/s
+    stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
+    return stat
+
+class AzureStorageStat(object):
+
+    def __init__(self, metrics):
+        self.metrics = metrics
+        self.rStat = storageStat(metrics, isUserRead)
+        self.wStat = storageStat(metrics, isUserWrite)
+
+    def getReadBytes(self):
+        return self.rStat['bytes']
+
+    def getReadOps(self):
+        return self.rStat['ops']
+
+    def getReadOpE2ELatency(self):
+        return self.rStat['e2eLatency']
+
+    def getReadOpServerLatency(self):
+        return self.rStat['serverLatency']
+
+    def getReadOpThroughput(self):
+        return self.rStat['throughput']
+
+    def getWriteBytes(self):
+        return self.wStat['bytes']
+
+    def getWriteOps(self):
+        return self.wStat['ops']
+
+    def getWriteOpE2ELatency(self):
+        return self.wStat['e2eLatency']
+
+    def getWriteOpServerLatency(self):
+        return self.wStat['serverLatency']
+
+    def getWriteOpThroughput(self):
+        return self.wStat['throughput']
+
 
 class StorageDataSource(object):
     def __init__(self, config):
@@ -662,10 +802,10 @@ class StorageDataSource(object):
         counters = []
         diskMapping = DiskInfo(self.config).getDiskMapping()
         for dev, vhd in diskMapping.iteritems():
-            counters.append(self.createCounterDiskMappingCounter(dev, vhd)) 
+            counters.append(self.createCounterDiskMapping(dev, vhd)) 
 
         accounts = self.config.getStorageAccountNames()
-        startKey, endKey = getKeyRange()
+        startKey, endKey = getStorageTableKeyRange()
         for account in accounts:
             tableName = self.config.getStorageAccountMinuteTable(account)
             accountKey = self.config.getStorageAccountKey(account)
@@ -676,104 +816,105 @@ class StorageDataSource(object):
                                         endKey)
             stat = AzureStorageStat(metrics)
             counters.append(self.createCounterStorageId(account))
-            counters.append(self.createCounterReadBytes(stat))
-            counters.append(self.createCounterReadOps(stat))
-            counters.append(self.createCounterReadOpE2ELatency(stat))
-            counters.append(self.createCounterReadOpServerLatency(stat))
-            counters.append(self.createCounterReadOpThroughput(stat))
-            counters.append(self.createCounterWriteBytes(stat))
-            counters.append(self.createCounterWriteOps(stat))
-            counters.append(self.createCounterWriteOpE2ELatency(stat))
-            counters.append(self.createCounterWriteOpServerLatency(stat))
-            counters.append(self.createCounterWriteOpThroughput(stat))
+            counters.append(self.createCounterReadBytes(account, stat))
+            counters.append(self.createCounterReadOps(account, stat))
+            counters.append(self.createCounterReadOpE2ELatency(account, stat))
+            counters.append(self.createCounterReadOpServerLatency(account, 
+                                                                  stat))
+            counters.append(self.createCounterReadOpThroughput(account, stat))
+            counters.append(self.createCounterWriteBytes(account, stat))
+            counters.append(self.createCounterWriteOps(account, stat))
+            counters.append(self.createCounterWriteOpE2ELatency(account, stat))
+            counters.append(self.createCounterWriteOpServerLatency(account, 
+                                                                   stat))
+            counters.append(self.createCounterWriteOpThroughput(account, stat))
         return counters
 
-
-    def createCounterReadBytes(self, metrics):
+    def createCounterReadBytes(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "storage",
                            name = "Storage Read Bytes",
-                           instance = metrics.getAccount(),
-                           value = metrics.getReadBytes(),
+                           instance = account,
+                           value = stat.getReadBytes(),
                            unit = 'byte',
                            refreshInterval = 60)
 
-    def createCounterReadOps(self, metrics):
+    def createCounterReadOps(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "storage",
                            name = "Storage Read Ops",
-                           instance = metrics.getAccount(),
-                           value = metrics.getReadOps(),
+                           instance = account,
+                           value = stat.getReadOps(),
                            refreshInterval = 60)
 
-    def createCounterReadOpE2ELatency(self, metrics):
+    def createCounterReadOpE2ELatency(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Read Op Latency E2E msec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getReadOpE2ELatency(),
+                           instance = account,
+                           value = stat.getReadOpE2ELatency(),
                            unit = 'ms',
                            refreshInterval = 60)
 
-    def createCounterReadOpServerLatency(self, metrics):
+    def createCounterReadOpServerLatency(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Read Op Latency Server msec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getReadOpServerLatency(),
+                           instance = account,
+                           value = stat.getReadOpServerLatency(),
                            unit = 'ms',
                            refreshInterval = 60)
 
-    def createCounterReadOpThroughput(self, metrics):
+    def createCounterReadOpThroughput(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Read Throughput E2E MB/sec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getReadOpThroughput(),
+                           instance = account,
+                           value = stat.getReadOpThroughput(),
                            unit = 'MB/s',
                            refreshInterval = 60)
 
-    def createCounterWriteBytes(self, metrics):
+    def createCounterWriteBytes(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "storage",
                            name = "Storage Write Bytes",
-                           instance = metrics.getAccount(),
-                           value = metrics.getWriteBytes(),
+                           instance = account,
+                           value = stat.getWriteBytes(),
                            unit = 'byte',
                            refreshInterval = 60)
 
-    def createCounterWriteOps(self, metrics):
+    def createCounterWriteOps(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "storage",
                            name = "Storage Write Ops",
-                           instance = metrics.getAccount(),
-                           value = metrics.getWriteOps(),
+                           instance = account,
+                           value = stat.getWriteOps(),
                            refreshInterval = 60)
 
-    def createCounterWriteOpE2ELatency(self, metrics):
+    def createCounterWriteOpE2ELatency(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Write Op Latency E2E msec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getWriteOpE2ELatency(),
+                           instance = account,
+                           value = stat.getWriteOpE2ELatency(),
                            unit = 'ms',
                            refreshInterval = 60)
 
-    def createCounterWriteOpServerLatency(self, metrics):
+    def createCounterWriteOpServerLatency(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Write Op Latency Server msec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getWriteOpServerLatency(),
+                           instance = account,
+                           value = stat.getWriteOpServerLatency(),
                            unit = 'ms',
                            refreshInterval = 60)
 
-    def createCounterWriteOpThroughput(self, metrics):
+    def createCounterWriteOpThroughput(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "storage",
                            name = "Storage Write Throughput E2E MB/sec",
-                           instance = metrics.getAccount(),
-                           value = metrics.getWriteOpThroughput(),
+                           instance = account,
+                           value = stat.getWriteOpThroughput(),
                            unit = 'MB/s',
                            refreshInterval = 60)
 
@@ -783,7 +924,7 @@ class StorageDataSource(object):
                            category = "storage",
                            name = "Storage ID",
                            instance = account,
-                           value = value)
+                           value = account)
 
     def createCounterDiskMapping(self, dev, vhd):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
@@ -916,11 +1057,27 @@ class EnhancedMonitor(object):
         counters = []
         for dataSource in self.dataSource:
             counters.extend(counters, dataSource.collect())
-            writer.write(counters)
+        writer.write(counters)
 
+EventFile="Events"
 class PerfCounterWriter(object):
-    def write(self, counters):
-        pass
+    def write(self, counters, maxRetry = 3, eventFile=EventFile):
+        for i in range(0, maxRetry):
+            try:
+                self._write(counters, eventFile)
+                waagent.Log(("Write {0} counters to event file."
+                             "").format(len(counters)))
+                return
+            except IOError, e:
+                waagent.Warn("Write to event file failed: {0}".format(e))
+                waagent.Log("Retry: {0}".format(i))
+        
+        raise IOError(("Couldn't serialize event to event file:{0}"
+                         "").format(eventFile))
+
+    def _write(self, counters, eventFile):
+        with open(eventFile, "w+") as F:
+            F.write("\n".join(map(lambda c : str(c), counters)))
 
 class EnhancedMonitorConfig(object):
     def __init__(self, configData):
@@ -987,7 +1144,7 @@ class EnhancedMonitorConfig(object):
         return self.configData["{0}.minute.uri".format(name)]
 
     def getStorageAccountMinuteTable(self, name):
-        uri = self.getStorageAccountMinuteUri()
+        uri = self.getStorageAccountMinuteUri(name)
         pos = uri.rfind('/')
         tableName = uri[pos+1:]
         return tableName

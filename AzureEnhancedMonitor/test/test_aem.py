@@ -267,11 +267,74 @@ class TestAEM(unittest.TestCase):
         mapping = aem.DiskInfo(config).getDiskMapping()
         self.assertNotEquals(None, mapping)
 
+    def test_get_storage_key_range(self):
+        startKey, endKey = aem.getStorageTableKeyRange()
+        self.assertNotEquals(None, startKey)
+        self.assertEquals(13, len(startKey))
+        self.assertNotEquals(None, endKey)
+        self.assertEquals(13, len(endKey))
+
     def test_storage_datasource(self):
         aem.getStorageMetrics = mock_getStorageMetrics
         config = self.test_config()
         dataSource = aem.StorageDataSource(config)
-        #counters = dataSource.collect()
+        counters = dataSource.collect()
+
+        self.assertNotEquals(None, counters)
+        self.assertNotEquals(0, len(counters))
+
+        counterNames = [
+            "Phys. Disc to Storage Mapping",
+            "Phys. Disc to Storage Mapping",
+            "Storage ID",
+            "Storage Read Bytes",
+            "Storage Read Op Latency E2E msec",
+            "Storage Read Op Latency Server msec",
+            "Storage Read Ops",
+            "Storage Read Throughput E2E MB/sec",
+            "Storage Write Bytes",
+            "Storage Write Op Latency E2E msec",
+            "Storage Write Op Latency Server msec",
+            "Storage Write Ops",
+            "Storage Write Throughput E2E MB/sec"
+        ]
+
+        #print "\n".join(map(lambda c: str(c), counters))
+        for name in counterNames:
+            #print name
+            counter = next((c for c in counters if c.name == name))
+            self.assertNotEquals(None, counter)
+            self.assertNotEquals(None, counter.value)
+
+    def test_writer(self):
+        testEventFile = "/tmp/Event"
+        if os.path.isfile(testEventFile):
+            os.remove(testEventFile)
+        writer = aem.PerfCounterWriter()
+        counters = [aem.PerfCounter(counterType = 0,
+                                    category = "test",
+                                    name = "test",
+                                    value = "test",
+                                    unit = "test")]
+
+        writer.write(counters, eventFile = testEventFile)
+        with open(testEventFile) as F:
+            content = F.read()
+            self.assertEquals(str(counters[0]), content)
+
+        testEventFile = "/dev/console"
+        print "=============================="
+        print "The warning below is expected."
+        self.assertRaises(IOError, writer.write, counters, 2, testEventFile)
+        print "=============================="
+
+    def test_parse_timestamp(self):
+        date = aem.parseTimestamp("2015-01-15T03:39:01.2105360Z")
+        self.assertEquals('1421264341', date)
+
+    def test_get_ad_key_range(self):
+        startKey, endKey = aem.getAzureDiagnosticKeyRange()
+        self.assertEquals(60 * 1000 * 10000, endKey - startKey)
 
 def mock_getStorageMetrics(*args, **kwargs):
         with open(os.path.join(env.test_dir, "storage_metrics")) as F:
