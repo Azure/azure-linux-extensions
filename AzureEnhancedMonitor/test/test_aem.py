@@ -331,10 +331,21 @@ class TestAEM(unittest.TestCase):
     def test_parse_timestamp(self):
         date = aem.parseTimestamp("2015-01-15T03:39:01.2105360Z")
         self.assertEquals('1421264341', date)
-
+    
+    def test_easyHash(self):
+        hashVal = aem.easyHash('a')
+        self.assertEquals(97, hashVal)
+        hashVal = aem.easyHash('ab')
+        self.assertEquals(87, hashVal)
+        hashVal = aem.easyHash(("ciextension-SUSELinuxEnterpriseServer11SP3"
+                                "___role1___"
+                                "ciextension-SUSELinuxEnterpriseServer11SP3"))
+        self.assertEquals(5, hashVal)
+    
     def test_get_ad_key_range(self):
         startKey, endKey = aem.getAzureDiagnosticKeyRange()
-        self.assertEquals(60 * 1000 * 10000, endKey - startKey)
+        print startKey
+        print endKey
 
 def mock_getStorageMetrics(*args, **kwargs):
         with open(os.path.join(env.test_dir, "storage_metrics")) as F:

@@ -20,6 +20,7 @@
 #
 import os
 import re
+import sys
 import socket
 import traceback
 import time
@@ -35,17 +36,44 @@ MonitoringInterval = 60 * MonitoringIntervalInMinute
 
 AzureEnhancedMonitorVersion = "1.0.0"
 
-def getAzureDiagnosticKeyRange():
-    msInOneMin = 60 * 1000
-    queryInterval = MonitoringIntervalInMinute * msInOneMin
+def easyHash(s):
+    """
+    MDSD used the following hash algorithm to cal a first part of partition key
+    """
+    strHash = 0
+    multiplier = 37
+    for c in s:
+        strHash = strHash * multiplier + ord(c)
+        #Only keep the last 64bit, since the mod base is 100
+        strHash = strHash % (1<<64) 
+    return strHash % 100 #Assume eventVolume is Large
 
-    tickInOneMS = 10000 # 1 ms = 10000 ticks
+Epoch = datetime.datetime(1, 1, 1)
+tickInOneSecond = 1000 * 10000 # 1s = 1000 * 10000 ticks
+def getMDSTimestamp(unixTimestamp):
+    unixTime = datetime.datetime.fromtimestamp(unixTimestamp)
+    startTimestamp = int((unixTime - Epoch).total_seconds())
+    return startTimestamp * tickInOneSecond
+
+def getIdentity():
+    identity = socket.gethostname()
+    return identity
+
+def getMDSPartitionKey(identity, timestamp):
+    hashVal = easyHash(identity)
+    return "{0:0>19d}___{1:0>19d}".format(hashVal, timestamp)
+
+def getAzureDiagnosticKeyRange():
+    secInOneMin = 60
+    queryInterval = MonitoringIntervalInMinute * secInOneMin
+
     #Round to minute
-    endTime = (int(time.time()) % msInOneMin) * msInOneMin
+    endTime = (int(time.time())% secInOneMin) * secInOneMin
     startTime = endTime - queryInterval
 
-    startKey = startTime * tickInOneMS
-    endKey = endTime * tickInOneMS
+    identity = getIdentity()
+    startKey = getMDSPartitionKey(identity, getMDSTimestamp(startTime))
+    endKey = getMDSPartitionKey(identity, getMDSTimestamp(endTime))
     return startKey, endKey
 
 def parseTimestamp(timeStr):
