@@ -201,8 +201,9 @@ def start_mdsd():
     if EnableSyslog and not is_rsylogom_installed():
         install_rsyslogom()
     
-    if EnableSyslog and distConfig.has_key("restartrsyslog"):
-        RunGetOutput(distConfig["restartrsyslog"])   
+    #if EnableSyslog and distConfig.has_key("restartrsyslog"):
+    # sometimes after the mdsd is killed port 29131 is accopied by sryslog, don't know why
+    #    RunGetOutput(distConfig["restartrsyslog"])   
  
     if os.path.exists("/usr/sbin/semanage"):
         RunGetOutput('semanage port -a -t syslogd_port_t -p tcp 29131;echo ignore already added')
@@ -233,13 +234,16 @@ def start_mdsd():
 
     with open(xml_file,'w') as hfile:
         hfile.write(xmlContent)
-   
+
     if len(settings['storageAccountName']) >0:
-        from azure.storage import TableService
-        ts = TableService(settings['storageAccountName'], settings['storageAccountKey'])
-        for t in (settings['perftable']+'Cpu',settings['perftable']+'Disk',settings['perftable']+'Mem',settings['logtable']):
-            ts.create_table(settings['namespace']+t+'Ver'+settings['version']+'v0')   
- 
+        try:
+            from azure.storage import TableService
+            ts = TableService(settings['storageAccountName'], settings['storageAccountKey'])
+            for t in (settings['perftable']+'Cpu',settings['perftable']+'Disk',settings['perftable']+'Mem',settings['logtable']):
+                ts.create_table(settings['namespace']+t+'Ver'+settings['version']+'v0')
+        except Exception,e:
+            hutil.error(("Failed to create azure tables (And CONTINUE)with error:{0},"
+                     "stacktrace:{1}").format(e, traceback.format_exc()))
  
     default_port = RSYSLOG_OM_PORT
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
@@ -269,7 +273,7 @@ def start_mdsd():
                 time.sleep(30)  
                 if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 :
                     mdsd.kill()
-                    hutil.log("Another process is started")
+                    hutil.log("Another process is started, now exit")
                     return                      
                 if not (mdsd.poll() is None):
                     time.sleep(60)
