@@ -132,7 +132,7 @@ class AzureDiagnosticMetric(object):
     def __init__(self, config):
         self.config = config
         self.linux = LinuxMetric(self.config)
-        self.azure = AzureDiagnosticMetric(self.config)
+        self.azure = AzureDiagnosticData(self.config)
 
     def getCurrHwFrequency(self):
         return self.linux.getCurrHwFrequency()
@@ -712,7 +712,7 @@ def getDataDisks():
 def getFirstLun(dev):
     path = os.path.join("/sys/block", dev, "device/scsi_disk")
     for lun in os.listdir(path):
-        return lun
+        return int(lun[-1])
 
 class DiskInfo(object):
     def __init__(self, config):
@@ -1085,8 +1085,8 @@ class EnhancedMonitor(object):
 
     def run(self):
         counters = []
-        for dataSource in self.dataSource:
-            counters.extend(counters, dataSource.collect())
+        for dataSource in self.dataSources:
+            counters.extend(dataSource.collect())
         writer.write(counters)
 
 EventFile=os.path.join(LibDir, "Events")
@@ -1183,7 +1183,7 @@ class EnhancedMonitorConfig(object):
         return self.configData["{0}.hour.uri".format(name)]
 
     def isLADEnabled(self):
-        return self.configData["lad.isenable"]
+        return self.configData["lad.isenabled"]
 
     def getLADKey(self):
         return self.configData["lad.key"]
@@ -1195,7 +1195,10 @@ class EnhancedMonitorConfig(object):
         return self.configData["lad.uri"]
 
 def main():
-    hutil = parse_context("Enable")
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context(operation)
     monitor = EnhancedMonitor()
     if not os.path.isdir(LibDir):
         os.mkdirs(LibDir)
@@ -1208,3 +1211,6 @@ def main():
             waagent.Error("{0} {1}".format(e, traceback.format_exc()))
         waagent.Log("Finished collection.")
         time.sleep(MonitoringInterval)
+
+if __name__ == '__main__':
+    main()

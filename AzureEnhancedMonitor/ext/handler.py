@@ -19,6 +19,8 @@
 # Requires Python 2.6+
 #
 
+import sys
+import re
 import os
 import subprocess
 
@@ -29,8 +31,7 @@ ExtensionShortName = 'AzureEnhancedMonitor'
 
 def enable(hutil):
     pid = None
-    baseDir = hutil.get_base_dir()
-    pidFile = os.path.join(baseDir, "pid")
+    pidFile = "pid"
    
     #Check whether monitor process is running.
     #If it does, return. Otherwise clear pid file
@@ -43,7 +44,7 @@ def enable(hutil):
         else:
             os.remove(pidFile)
 
-    aemFile = os.path.join(baseDir, "aem.py")
+    aemFile = "aem.py"
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen([aemFile], stdout=devnull, stderr=devnull)
     if child.pid == None or child.pid < 1:
@@ -56,8 +57,7 @@ def enable(hutil):
 
 def disable(hutil):
     pid = None
-    baseDir = hutil.get_base_dir()
-    pidFile = os.path.join(baseDir, "pid")
+    pidFile = "pid"
    
     #Check whether monitor process is running.
     #If it does, kill it. Otherwise clear pid file
