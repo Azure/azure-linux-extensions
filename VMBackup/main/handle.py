@@ -41,6 +41,7 @@ from Utils import HandlerUtil
 from urlparse import urlparse
 from snapshotter import Snapshotter
 from backuplogger import Backuplogger
+from machineidentity import MachineIdentity
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -75,12 +76,30 @@ def enable():
     global_error_result = None
     para_parser         = None
     run_result          = 1
-    error_msg           = None
+    error_msg           = ''
     run_status          = None
     # precheck 
+    
     try:
         hutil.do_parse_context('Enable')
-        hutil.exit_if_enabled()
+
+        # handle the restoring scenario.
+        mi = MachineIdentity()
+        stored_identity = mi.stored_identity()
+        if(stored_identity is None):
+            mi.save_identity()
+            hutil.exit_if_enabled()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = hutil.get_seq_no();
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + stored_identity + " " + current_identity, True)
+                hutil.set_inused_config_seq(current_seq_no)
+                mi.save_identity()
+                hutil.exit_if_enabled()
+            else:
+                hutil.exit_if_enabled()
+
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
         """
@@ -137,6 +156,7 @@ def enable():
     except Exception as e:
         errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
+        print(errMsg)
         global_error_result = e
     finally:
         backup_logger.log("doing unfreeze now...")
@@ -153,7 +173,7 @@ def enable():
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
     if(global_error_result != None):
-        if(global_error_result.errno==2):
+        if(hasattr(global_error_result,'errno') and global_error_result.errno==2):
             run_result = 12
         else:
             run_result = 2
@@ -172,6 +192,9 @@ def disable():
 
 def update():
     hutil.do_parse_context('Upadate')
+    current_seq_no = hutil.get_seq_no();
+    backup_logger.log("update scenario, set current_seq_no to " + str(current_seq_no), True)
+    hutil.set_inused_config_seq(current_seq_no)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 if __name__ == '__main__' :
