@@ -35,6 +35,7 @@ MonitoringIntervalInMinute = 1 #One minute
 MonitoringInterval = 60 * MonitoringIntervalInMinute
 
 AzureEnhancedMonitorVersion = "1.0.0"
+LibDir = "/var/lib/AzureEnhancedMonitor"
 
 def easyHash(s):
     """
@@ -50,6 +51,7 @@ def easyHash(s):
 
 Epoch = datetime.datetime(1, 1, 1)
 tickInOneSecond = 1000 * 10000 # 1s = 1000 * 10000 ticks
+
 def getMDSTimestamp(unixTimestamp):
     unixTime = datetime.datetime.fromtimestamp(unixTimestamp)
     startTimestamp = int((unixTime - Epoch).total_seconds())
@@ -332,7 +334,7 @@ class NetworkInfo(object):
             return None
 
 
-HwInfoFile = "/var/lib/waagent/HwInfo"
+HwInfoFile = os.path.join(LibDir, "HwInfo")
 class HardwareChangeInfo(object):
     def __init__(self, networkInfo):
         self.networkInfo = networkInfo
@@ -1087,7 +1089,7 @@ class EnhancedMonitor(object):
             counters.extend(counters, dataSource.collect())
         writer.write(counters)
 
-EventFile="Events"
+EventFile=os.path.join(LibDir, "Events")
 class PerfCounterWriter(object):
     def write(self, counters, maxRetry = 3, eventFile=EventFile):
         for i in range(0, maxRetry):
@@ -1195,6 +1197,8 @@ class EnhancedMonitorConfig(object):
 def main():
     hutil = parse_context("Enable")
     monitor = EnhancedMonitor()
+    if not os.path.isdir(LibDir):
+        os.mkdirs(LibDir)
     while True:
         waagent.Log("Collecting performance counter.")
         try:
