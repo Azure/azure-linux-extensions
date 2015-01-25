@@ -64,7 +64,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_dpkg_name+" --install --force
                  "packages":('libglibmm-2.4-1c2a',),
                   "restartrsyslog":"service rsyslog restart",
                   "syslogpackages":(),
-                 'distlibs':'','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                 'distrolibs':'debian','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
                 }
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_rpm_name+" --install --force;",
@@ -98,7 +98,7 @@ CentosConfig = dict(RedhatConfig.items()+
                   .items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'SuSE:11':SuseConfig11,'SuSE':SuseConfig12,'Ubuntu':UbuntuConfig,'SuSE:12':SuseConfig12,'redhat':RedhatConfig,'centos':CentosConfig}
+All_Dist= {'SuSE:11':SuseConfig11,'debian':DebianConfig,'SuSE':SuseConfig12,'Ubuntu':UbuntuConfig,'SuSE:12':SuseConfig12,'redhat':RedhatConfig,'centos':CentosConfig}
 distConfig = None  
 dist = platform.dist()
 if All_Dist.has_key(dist[0]+":"+dist[1]):
@@ -289,7 +289,12 @@ def start_mdsd():
                 if len(last_error) > 0 and (datetime.datetime.now()- last_error_time) < datetime.timedelta(minutes=30):
                     hutil.log("Error in MDSD:"+last_error)
                     hutil.do_status_report("Enable","running",'1',"WARNING: error happens at:"+str(last_error_time)+":"+last_error)
-                
+                if len(last_error) >0 and last_error.find("Error: EnumerateInstances failed") >=0:
+                    hutil.error("Error: EnumerateInstances means mdsd is now in busy loop:")
+                    mdsd.kill()
+                    os.remove(monitor_file_path)
+            
+                                    
             if mdsd_log:
                 mdsd_log.close()
                 mdsd_log = None
