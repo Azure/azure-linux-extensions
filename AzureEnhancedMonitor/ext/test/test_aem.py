@@ -54,7 +54,7 @@ TestConfig="""{
         "testaemstorage.key" : "1sdf209unljnlfjahsdlfh===",
         "testaemstorage.hour.uri" : "http://foo.bar/",
         "testaemstorage.minute.uri" : "http://foo.bar/",
-        "lad.isenable" : 1,
+        "lad.isenabled" : 0,
         "lad.key" : "23rsdf2fzcvf=+12",
         "lad.name" : "asdf",
         "lad.uri": "http://foo.bar/"
@@ -101,7 +101,7 @@ class TestAEM(unittest.TestCase):
         name = "Data Sources"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("lad", counter.value)
+        self.assertEquals("local", counter.value)
 
         name = "Data Provider Version"
         counter = next((c for c in counters if c.name == name))
@@ -242,7 +242,7 @@ class TestAEM(unittest.TestCase):
         ]
         #print "\n".join(map(lambda c: str(c), counters))
         for name in counterNames:
-            #print name
+            print name
             counter = next((c for c in counters if c.name == name))
             self.assertNotEquals(None, counter)
             self.assertNotEquals(None, counter.value)
@@ -328,10 +328,6 @@ class TestAEM(unittest.TestCase):
         self.assertRaises(IOError, writer.write, counters, 2, testEventFile)
         print "=============================="
 
-    def test_parse_timestamp(self):
-        date = aem.parseTimestamp("2015-01-15T03:39:01.2105360Z")
-        self.assertEquals('1421264341', date)
-    
     def test_easyHash(self):
         hashVal = aem.easyHash('a')
         self.assertEquals(97, hashVal)

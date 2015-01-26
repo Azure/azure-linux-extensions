@@ -82,54 +82,79 @@ def getAzureDiagnosticKeyRange():
     endKey = getMDSPartitionKey(identity, getMDSTimestamp(endTime))
     return startKey, endKey
 
-def parseTimestamp(timeStr):
-    timeStr = timeStr[:-2] #Drop the time zone part, since utc is always used
-    timeFormat = "%Y-%m-%dT%H:%M:%S.%f"
-    timestamp = datetime.datetime.strptime(timeStr, timeFormat)
-    return timestamp.strftime("%s")
+def getAzureDiagnosticCPUData(accountName, accountKey, 
+                              startKey, endKey, hostname):
+    try:
+        waagent.Log("Retrieve diagnostic data(CPU).")
+        #TODO remove verbose log
+        waagent.Log("Account:{0}".format(accountName))
+        waagent.Log("StartKey:{0}".format(startKey))
+        waagent.Log("EndKey:{0}".format(endKey))
+        table = "LinuxPerfCpuVer1v0"
+        tableService = TableService(account_name = accountName, 
+                                    account_key = accountKey)
+        #TODO add hostname filter
+        ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
+                   "and Host eq '{2}'").format(startKey, endKey, hostname)
+        oselect = ("PercentProcessorTime", "PreciseTimeStamp")
+        data = tableService.query_entities(table, ofilter, oselect, 1)
+        if data is None or len(data) == 0:
+            return None
+        cpuPercent = float(data[0].PercentProcessorTime)
+        return cpuPercent
+    except Exception, e:
+        waagent.Error(("Failed to retrieve diagnostic data(CPU): {0}"
+                       "").format(e))
+        return None
+    
 
-def getAzureDiagnosticCPUData(accountName, accountKey, startKey, endKey):
-    table = "LinuxPerfCpuVer1v0"
-    tableService = TableService(account_name = accountName, 
-                                account_key = accountKey)
-    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
-               "").format(startKey, endKey)
-    oselect = ("PercentProcessorTime", "PreciseTimeStamp")
-    data = tableService.query_entities(table, ofilter, oselect, 1)
-    cpuPercent = float(data[0].PercentProcessorTime)
-    timestamp = parseTimestamp(data[0].PreciseTimeStamp)
-    return cpuPercent, timestamp
-
-def getAzureDiagnosticMemoryData(accountName, accountKey, startKey, endKey):
-    table = "LinuxPerfCpuVer1v0"
-    tableService = TableService(account_name = accountName, 
-                                account_key = accountKey)
-    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
-               "").format(startKey, endKey)
-    oselect = ("PercentAvailableMemory", "PreciseTimeStamp")
-    data = tableService.query_entities(table, ofilter, oselect, 1)
-    memoryPercent = 100 - float(data[0].PercentAvailableMemory)
-    timestamp = parseTimestamp(data[0].PreciseTimeStamp)
-    return memoryPercent, timestamp
+def getAzureDiagnosticMemoryData(accountName, accountKey, 
+                                 startKey, endKey, hostname):
+    try:
+        waagent.Log("Retrieve diagnostic data: Memory")
+        #TODO remove verbose log
+        waagent.Log("Account:{0}".format(accountName))
+        waagent.Log("StartKey:{0}".format(startKey))
+        waagent.Log("EndKey:{0}".format(endKey))
+        table = "LinuxPerfCpuVer1v0"
+        tableService = TableService(account_name = accountName, 
+                                    account_key = accountKey)
+        #TODO add hostname filter
+        ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
+                   "and Host eq '{2}'").format(startKey, endKey, hostname)
+        oselect = ("PercentAvailableMemory", "PreciseTimeStamp")
+        data = tableService.query_entities(table, ofilter, oselect, 1)
+        if data is None or len(data) == 0:
+            return None
+        memoryPercent = 100 - float(data[0].PercentAvailableMemory)
+        return memoryPercent
+    except Exception, e:
+        waagent.Error(("Failed to retrieve diagnostic data(Memory): {0}"
+                       "").format(e))
+        return None
 
 class AzureDiagnosticData(object):
     def __init__(self, config):
         self.config = config
         accountName = config.getLADName()
         accountKey = config.getLADKey()
+        hostname = socket.gethostname()
+        startKey, endKey = getAzureDiagnosticKeyRange()
         self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
                                                     accountKey,
                                                     startKey,
-                                                    endKey)
+                                                    endKey,
+                                                    hostname)
         self.memoryPercent = getAzureDiagnosticMemoryData(accountName, 
                                                           accountKey,
                                                           startKey,
-                                                          endKey)
+                                                          endKey,
+                                                          hostname)
 
     def getCPUPercent(self):
         return self.cpuPercent
 
-    def getMemPercent(self):
+    def getMemoryPercent(self):
         return self.memoryPercent
 
 class AzureDiagnosticMetric(object):
@@ -137,6 +162,10 @@ class AzureDiagnosticMetric(object):
         self.config = config
         self.linux = LinuxMetric(self.config)
         self.azure = AzureDiagnosticData(self.config)
+        self.timestamp = int(time.time()) - AzureTableDelay
+
+    def getTimestamp(self):
+        return self.timestamp
 
     def getCurrHwFrequency(self):
         return self.linux.getCurrHwFrequency()
@@ -172,7 +201,7 @@ class AzureDiagnosticMetric(object):
         return self.linux.getVCPUMapping()
     
     def getVMProcessingPowerConsumption(self):
-        return self.azure.CPUPercent()
+        return self.azure.getCPUPercent()
     
     def getCurrMemAssigned(self):
         return self.linux.getCurrMemAssigned()
@@ -184,19 +213,19 @@ class AzureDiagnosticMetric(object):
         return self.linux.getMaxMemAssigned()
 
     def getVMMemConsumption(self):
-        return self.azure.MemoryPercent()
+        return self.azure.getMemoryPercent()
 
     def getNetworkAdapterIds(self):
         return self.linux.getNetworkAdapterIds()
 
     def getNetworkAdapterMapping(self, adapterId):
-        return self.linux.getNetworkAdapterMapping()
+        return self.linux.getNetworkAdapterMapping(adapterId)
 
     def getMaxNetworkBandwidth(self, adapterId):
-        return self.linux.getMaxNetworkBandwidth()
+        return self.linux.getMaxNetworkBandwidth(adapterId)
 
     def getMinNetworkBandwidth(self, adapterId):
-        return self.linux.getMinNetworkBandwidth()
+        return self.linux.getMinNetworkBandwidth(adapterId)
 
     def getNetworkReadBytes(self):
         return self.linux.getNetworkReadBytes()
@@ -374,18 +403,18 @@ class HardwareChangeInfo(object):
 class LinuxMetric(object):
     def __init__(self, config):
         self.config = config
-
         #CPU
         self.cpuInfo = CPUInfo.getCPUInfo()
-   
         #Memory
         self.memInfo = MemoryInfo()
-
         #Network
         self.networkInfo = NetworkInfo()
-
         #Detect hardware change
         self.hwChangeInfo = HardwareChangeInfo(self.networkInfo)
+        self.timestamp = int(time.time())
+
+    def getTimestamp(self):
+        return self.timestamp
 
     def getCurrHwFrequency(self):
         return self.cpuInfo.getFrequency()
@@ -602,6 +631,7 @@ class VMDataSource(object):
                            name = "VM Processing Power Consumption",
                            value = metrics.getVMProcessingPowerConsumption(),
                            unit = "%",
+                           timestamp = metrics.getTimestamp(),
                            refreshInterval = 60)
 
     def createCounterCurrMemAssigned(self, metrics):
@@ -631,6 +661,7 @@ class VMDataSource(object):
                            name = "VM Memory Consumption",
                            value = metrics.getVMMemConsumption(),
                            unit = "%",
+                           timestamp = metrics.getTimestamp(),
                            refreshInterval = 60)
 
     def createCounterAdapterId(self, adapterId):
@@ -700,13 +731,24 @@ def getStorageTableKeyRange():
     return startKey, endKey
 
 def getStorageMetrics(account, key, table, startKey, endKey):
-    tableService = TableService(account_name = account, account_key = key)
-    ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
-               "").format(startKey, endKey)
-    oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
-               "AverageServerLatency")
-    metrics = tableService.query_entities(table, ofilter, oselect)
-    return metrics
+    try:
+        waagent.Log("Retrieve storage metrics data.")
+        #TODO remove verbose log
+        waagent.Log("Account:{0}".format(account))
+        waagent.Log("StartKey:{0}".format(startKey))
+        waagent.Log("EndKey:{0}".format(endKey))
+        tableService = TableService(account_name = account, account_key = key)
+        ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
+                   "").format(startKey, endKey)
+        oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
+                   "AverageServerLatency")
+        metrics = tableService.query_entities(table, ofilter, oselect)
+        waagent.Log("{0} records returned.".format(len()))
+        return metrics
+    except Exception, e:
+        waagent.Error(("Failed to retrieve storage metrics data: {0}"
+                       "").format(e))
+        return None
 
 def getDataDisks():
     blockDevs = os.listdir('/sys/block')
@@ -771,15 +813,20 @@ def isUserWrite(op):
     return False
 
 def storageStat(metrics, opFilter):
-    metrics = filter(lambda x : opFilter(x.RowKey), metrics)
     stat = {}
+    stat['bytes'] = None
+    stat['ops'] = None
+    stat['e2eLatency'] = None
+    stat['serverLatency'] = None
+    stat['throughput'] = None
+    if metrics is None:
+        return stat
+
+    metrics = filter(lambda x : opFilter(x.RowKey), metrics)
     stat['bytes'] = sum(map(lambda x : x.TotalIngress + x.TotalEgress, 
                             metrics))
     stat['ops'] = sum(map(lambda x : x.TotalRequests, metrics))
-    if stat['ops'] == 0:
-        stat['e2eLatency'] = None
-        stat['serverLatency'] = None
-    else:
+    if stat['ops'] != 0:
         stat['e2eLatency'] = sum(map(lambda x : x.TotalRequests * \
                                                 x.AverageE2ELatency, 
                                      metrics)) / stat['ops']
@@ -1049,7 +1096,8 @@ class PerfCounter(object):
                  name, 
                  value, 
                  instance="",
-                 unit="none", 
+                 unit="none",
+                 timestamp = int(time.time()),
                  refreshInterval=0):
         self.counterType = counterType
         self.category = category
@@ -1058,8 +1106,7 @@ class PerfCounter(object):
         self.value = value
         self.unit = unit
         self.refreshInterval = refreshInterval
-
-        self.timestamp = int(time.time())
+        self.timestamp = timestamp
         self.machine = socket.gethostname()
 
     def __str__(self):
