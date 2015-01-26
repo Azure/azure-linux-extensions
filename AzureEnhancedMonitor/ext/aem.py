@@ -25,7 +25,6 @@ import socket
 import traceback
 import time
 import datetime
-import platform
 import psutil
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
@@ -33,6 +32,10 @@ import Utils.HandlerUtil as Util
 
 MonitoringIntervalInMinute = 1 #One minute
 MonitoringInterval = 60 * MonitoringIntervalInMinute
+
+#It takes sometime before the performance date reaches azure table.
+AzureTableDelayInMinute = 5 #Five minute
+AzureTableDelay = 60 * AzureTableDelayInMinute
 
 AzureEnhancedMonitorVersion = "1.0.0"
 LibDir = "/var/lib/AzureEnhancedMonitor"
@@ -71,6 +74,7 @@ def getAzureDiagnosticKeyRange():
 
     #Round to minute
     endTime = (int(time.time())% secInOneMin) * secInOneMin
+    endTime = endTime - AzureTableDelay
     startTime = endTime - queryInterval
 
     identity = getIdentity()
@@ -85,7 +89,7 @@ def parseTimestamp(timeStr):
     return timestamp.strftime("%s")
 
 def getAzureDiagnosticCPUData(accountName, accountKey, startKey, endKey):
-    table = "TuxTestCputable1Ver2v0"
+    table = "LinuxPerfCpuVer1v0"
     tableService = TableService(account_name = accountName, 
                                 account_key = accountKey)
     ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
@@ -97,7 +101,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, startKey, endKey):
     return cpuPercent, timestamp
 
 def getAzureDiagnosticMemoryData(accountName, accountKey, startKey, endKey):
-    table = "TuxTestMemtable1Ver2v0"
+    table = "LinuxPerfCpuVer1v0"
     tableService = TableService(account_name = accountName, 
                                 account_key = accountKey)
     ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
@@ -687,12 +691,12 @@ def getStorageTableKeyRange():
                                 now.tm_mon, 
                                 now.tm_mday,
                                 now.tm_hour,
-                                now.tm_min - 1)
+                                now.tm_min - 1 - AzureTableDelayInMinute)
     endKey = keyFormat.format(now.tm_year, 
                               now.tm_mon, 
                               now.tm_mday,
                               now.tm_hour,
-                              now.tm_min)
+                              now.tm_min - AzureTableDelayInMinute)
     return startKey, endKey
 
 def getStorageMetrics(account, key, table, startKey, endKey):
@@ -1071,9 +1075,6 @@ class PerfCounter(object):
                             self.machine)
 
     __repr__ = __str__
-
-
-
 
 class EnhancedMonitor(object):
     def __init__(self, config):

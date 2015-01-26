@@ -23,6 +23,8 @@ import sys
 import re
 import os
 import subprocess
+import traceback
+import time
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
@@ -44,9 +46,9 @@ def enable(hutil):
         else:
             os.remove(pidFile)
 
-    aemFile = "aem.py"
+    args = [os.path.join(os.getcwd(), __file__), "daemon"]
     devnull = open(os.devnull, 'w')
-    child = subprocess.Popen([aemFile], stdout=devnull, stderr=devnull)
+    child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
     if child.pid == None or child.pid < 1:
         hutil.do_exit(1, 'Enable', 'error', '1', 
                       'Failed to launch Azure Enhanced Monitor')
@@ -73,39 +75,54 @@ def disable(hutil):
     hutil.do_exit(0, 'Disable', 'success', '0', 
                   'Azure Enhanced Monitor is not running')
 
-def dummy_command(operation, status, msg):
+def daemon(hutil):
+    #TODO change to private_settings
+    public_settings = hutil.get_public_settings()
+    config = aem.EnhancedMonitorConfig(public_settings)
+    monitor = aem.EnhancedMonitor(config)
+    if not os.path.isdir(aem.LibDir):
+        os.mkdirs(aem.LibDir)
+    while True:
+        waagent.Log("Collecting performance counter.")
+        try:
+            monitor.run()
+            #TODO do status report
+        except Exception, e:
+            waagent.Error("{0} {1}".format(e, traceback.format_exc()))
+        waagent.Log("Finished collection.")
+        time.sleep(aem.MonitoringInterval)
+
+def grace_exit(operation, status, msg):
     hutil = parse_context(operation)
     hutil.do_exit(0, operation, status, '0', msg)
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("{0} started to handle.".format(ExtensionShortName))
+    
+    for command in sys.argv[1:]:
+        if re.match("^([-/]*)(install)", command):
+            grace_exit("install", "success", "Install succeeded")
+        if re.match("^([-/]*)(uninstall)", command):
+            grace_exit("uninstall", "success", "Uninstall succeeded")
+        if re.match("^([-/]*)(update)", command):
+            grace_exit("update", "success", "Update succeeded")
 
-    operation = None
-    try:
-        for a in sys.argv[1:]:        
-            if re.match("^([-/]*)(disable)", a):
-                operation = "Disable"
-                hutil = parse_context("Disable")
-                disable(hutil)
-            elif re.match("^([-/]*)(uninstall)", a):
-                operation = "Uninstall"
-                dummy_command("Uninstall", "success", "Uninstall succeeded")
-            elif re.match("^([-/]*)(install)", a):
-                operation = "Install"
-                dummy_command("Install", "success", "Install succeeded")
-            elif re.match("^([-/]*)(enable)", a):
-                operation = "Enable"
-                hutil = parse_context("Enable")
+        try:
+            if re.match("^([-/]*)(enable)", command):
+                hutil = parse_context("enable")
                 enable(hutil)
-            elif re.match("^([-/]*)(update)", a):
-                operation = "Update"
-                dummy_command("Update", "success", "Update succeeded")
-    except Exception, e:
-        hutil.error(("Extension has run into an error:{0}, {1}, "
-                     "{2}").format(operation, e, traceback.format_exc()))
-        hutil.do_exit(1, operation,'failed','0', 
-                      '{0} failed:{1}'.format(operation, e))
+            elif re.match("^([-/]*)(disable)", command):
+                hutil = parse_context("disable")
+                disable(hutil)
+            elif re.match("^([-/]*)(daemon)", command):
+                hutil = parse_context("enable")
+                daemon(hutil)
+        except Exception, e:
+            hutil.error(("Extension has run into an error:{0}, {1}, "
+                         "{2}").format(command, e, traceback.format_exc()))
+            hutil.do_exit(1, command, 'failed','0', 
+                          '{0} failed:{1}'.format(command, e))
 
 def parse_context(operation):
     hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
