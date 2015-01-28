@@ -56,7 +56,7 @@ Epoch = datetime.datetime(1, 1, 1)
 tickInOneSecond = 1000 * 10000 # 1s = 1000 * 10000 ticks
 
 def getMDSTimestamp(unixTimestamp):
-    unixTime = datetime.datetime.fromtimestamp(unixTimestamp)
+    unixTime = datetime.datetime.utcfromtimestamp(unixTimestamp)
     startTimestamp = int((unixTime - Epoch).total_seconds())
     return startTimestamp * tickInOneSecond
 
@@ -69,13 +69,10 @@ def getMDSPartitionKey(identity, timestamp):
     return "{0:0>19d}___{1:0>19d}".format(hashVal, timestamp)
 
 def getAzureDiagnosticKeyRange():
-    secInOneMin = 60
-    queryInterval = MonitoringIntervalInMinute * secInOneMin
-
-    #Round to minute
-    endTime = (int(time.time())% secInOneMin) * secInOneMin
+    #Round down by MonitoringInterval
+    endTime = (int(time.time()) / MonitoringInterval) * MonitoringInterval
     endTime = endTime - AzureTableDelay
-    startTime = endTime - queryInterval
+    startTime = endTime - MonitoringInterval
 
     identity = getIdentity()
     startKey = getMDSPartitionKey(identity, getMDSTimestamp(startTime))
@@ -93,18 +90,17 @@ def getAzureDiagnosticCPUData(accountName, accountKey,
         table = "LinuxPerfCpuVer1v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey)
-        #TODO add hostname filter
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
                    "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentProcessorTime", "PreciseTimeStamp")
+        oselect = ("PercentProcessorTime,Host")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
         cpuPercent = float(data[0].PercentProcessorTime)
         return cpuPercent
     except Exception, e:
-        waagent.Error(("Failed to retrieve diagnostic data(CPU): {0}"
-                       "").format(e))
+        waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
+                       "").format(e, traceback.format_exc()))
         return None
     
 
@@ -116,21 +112,20 @@ def getAzureDiagnosticMemoryData(accountName, accountKey,
         waagent.Log("Account:{0}".format(accountName))
         waagent.Log("StartKey:{0}".format(startKey))
         waagent.Log("EndKey:{0}".format(endKey))
-        table = "LinuxPerfCpuVer1v0"
+        table = "LinuxPerfMemVer1v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey)
-        #TODO add hostname filter
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
                    "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentAvailableMemory", "PreciseTimeStamp")
+        oselect = ("PercentAvailableMemory,Host")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
         memoryPercent = 100 - float(data[0].PercentAvailableMemory)
         return memoryPercent
     except Exception, e:
-        waagent.Error(("Failed to retrieve diagnostic data(Memory): {0}"
-                       "").format(e))
+        waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
+                       "").format(e, traceback.format_exc()))
         return None
 
 class AzureDiagnosticData(object):
@@ -715,20 +710,22 @@ class VMDataSource(object):
                            value = metrics.getNetworkPacketRetransmitted(),
                            unit = "packets/min")
 
+def getStorageTimestamp(unixTimestamp):
+    tformat = "{0:0>4d}{1:0>2d}{2:0>2d}T{3:0>2d}{4:0>2d}"
+    ts = time.gmtime(unixTimestamp)
+    return tformat.format(ts.tm_year,
+                          ts.tm_mon,
+                          ts.tm_mday,
+                          ts.tm_hour,
+                          ts.tm_min)
+    
+
 def getStorageTableKeyRange():
-    now = time.gmtime()
-    keyFormat = "{0:0>4d}{1:0>2d}{2:0>2d}T{3:0>2d}{4:0>2d}"
-    startKey = keyFormat.format(now.tm_year, 
-                                now.tm_mon, 
-                                now.tm_mday,
-                                now.tm_hour,
-                                now.tm_min - 1 - AzureTableDelayInMinute)
-    endKey = keyFormat.format(now.tm_year, 
-                              now.tm_mon, 
-                              now.tm_mday,
-                              now.tm_hour,
-                              now.tm_min - AzureTableDelayInMinute)
-    return startKey, endKey
+    #Round down by MonitoringInterval
+    endTime = int(time.time()) / MonitoringInterval * MonitoringInterval 
+    endTime = endTime - AzureTableDelay
+    startTime = endTime - MonitoringInterval
+    return getStorageTimestamp(startTime), getStorageTimestamp(endTime)
 
 def getStorageMetrics(account, key, table, startKey, endKey):
     try:
@@ -741,13 +738,13 @@ def getStorageMetrics(account, key, table, startKey, endKey):
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
                    "").format(startKey, endKey)
         oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
-                   "AverageServerLatency")
+                   "AverageServerLatency,RowKey")
         metrics = tableService.query_entities(table, ofilter, oselect)
-        waagent.Log("{0} records returned.".format(len()))
+        waagent.Log("{0} records returned.".format(len(metrics)))
         return metrics
     except Exception, e:
-        waagent.Error(("Failed to retrieve storage metrics data: {0}"
-                       "").format(e))
+        waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
+                       "").format(e, traceback.format_exc()))
         return None
 
 def getDataDisks():
@@ -1135,7 +1132,7 @@ class EnhancedMonitor(object):
         counters = []
         for dataSource in self.dataSources:
             counters.extend(dataSource.collect())
-        writer.write(counters)
+        self.writer.write(counters)
 
 EventFile=os.path.join(LibDir, "Events")
 class PerfCounterWriter(object):
@@ -1216,7 +1213,7 @@ class EnhancedMonitorConfig(object):
         return self.configData["account.names"]
 
     def getStorageAccountKey(self, name):
-        return self.configData["{0}.key".format(name)]
+        return self.configData["{0}.minute.key".format(name)]
 
     def getStorageAccountMinuteUri(self, name):
         return self.configData["{0}.minute.uri".format(name)]

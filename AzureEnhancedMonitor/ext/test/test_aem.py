@@ -24,6 +24,7 @@ import env
 import os
 import aem
 import json
+import datetime
 from Utils.WAAgentUtil import waagent
 
 TestConfig="""{
@@ -51,7 +52,7 @@ TestConfig="""{
         "disk.connminute.2" : "",
         "disk.connhour.2" : "",
         "account.names" :["testaemstorage"],
-        "testaemstorage.key" : "1sdf209unljnlfjahsdlfh===",
+        "testaemstorage.minute.key" : "1sdf209unljnlfjahsdlfh===",
         "testaemstorage.hour.uri" : "http://foo.bar/",
         "testaemstorage.minute.uri" : "http://foo.bar/",
         "lad.isenabled" : 0,
@@ -242,7 +243,7 @@ class TestAEM(unittest.TestCase):
         ]
         #print "\n".join(map(lambda c: str(c), counters))
         for name in counterNames:
-            print name
+            #print name
             counter = next((c for c in counters if c.name == name))
             self.assertNotEquals(None, counter)
             self.assertNotEquals(None, counter.value)
@@ -342,6 +343,20 @@ class TestAEM(unittest.TestCase):
         startKey, endKey = aem.getAzureDiagnosticKeyRange()
         print startKey
         print endKey
+
+    def test_get_mds_timestamp(self):
+        date = datetime.datetime(2015, 1, 26, 3, 54)
+        epoch = datetime.datetime.utcfromtimestamp(0)
+        unixTimestamp = (int((date - epoch).total_seconds()))
+        mdsTimestamp = aem.getMDSTimestamp(unixTimestamp)
+        self.assertEquals(635578412400000000, mdsTimestamp)
+    
+    def test_get_storage_timestamp(self):
+        date = datetime.datetime(2015, 1, 26, 3, 54)
+        epoch = datetime.datetime.utcfromtimestamp(0)
+        unixTimestamp = (int((date - epoch).total_seconds()))
+        storageTimestamp = aem.getStorageTimestamp(unixTimestamp)
+        self.assertEquals("20150126T0354", storageTimestamp)
 
 def mock_getStorageMetrics(*args, **kwargs):
         with open(os.path.join(env.test_dir, "storage_metrics")) as F:

@@ -25,7 +25,7 @@ import os
 import subprocess
 import traceback
 import time
-
+import aem
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
@@ -65,8 +65,8 @@ def disable(hutil):
     #If it does, kill it. Otherwise clear pid file
     if os.path.isfile(pidFile):
         pid = waagent.GetFileContents(pidFile)
-        if os.path.isfile(os.path.join("/proc", pid)):
-            os.kill(pid, 9)
+        if os.path.isdir(os.path.join("/proc", pid)):
+            os.kill(int(pid), 9)
             os.remove(pidFile)
             hutil.do_exit(0, 'Disable', 'success', '0', 
                           'Azure Enhanced Monitor is disabled')
@@ -81,7 +81,7 @@ def daemon(hutil):
     config = aem.EnhancedMonitorConfig(public_settings)
     monitor = aem.EnhancedMonitor(config)
     if not os.path.isdir(aem.LibDir):
-        os.mkdirs(aem.LibDir)
+        os.makedirs(aem.LibDir)
     while True:
         waagent.Log("Collecting performance counter.")
         try:
