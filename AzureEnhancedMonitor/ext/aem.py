@@ -1107,11 +1107,12 @@ class PerfCounter(object):
         self.machine = socket.gethostname()
 
     def __str__(self):
-        return (u";{0};{1};{2};{3};{4};{5};{6};{7};{8};"
+        return (u";{0};{1};{2};{3};{4};{5};{6};{7};{8};{9}"
                  "").format(self.counterType,
                             self.category,
                             self.name,
                             self.instance,
+                            1 if self.value is None else 0,
                             self.value,
                             self.unit,
                             self.refreshInterval,
@@ -1251,9 +1252,10 @@ def main():
         waagent.Log("Collecting performance counter.")
         try:
             monitor.run()
-            #TODO do status report
+            hutil.do_status_report("Enable", "success", 0, "")
         except Exception, e:
             waagent.Error("{0} {1}".format(e, traceback.format_exc()))
+            hutil.do_status_report("Enable", "error", 0, "{0}".format(e))
         waagent.Log("Finished collection.")
         time.sleep(MonitoringInterval)
 
