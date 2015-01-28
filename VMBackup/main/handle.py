@@ -79,7 +79,7 @@ def enable():
     error_msg           = ''
     run_status          = None
     # precheck 
-    
+    freeze_called       = False
     try:
         hutil.do_parse_context('Enable')
 
@@ -93,7 +93,7 @@ def enable():
             current_identity = mi.current_identity()
             if(current_identity != stored_identity):
                 current_seq_no = hutil.get_seq_no();
-                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + stored_identity + " " + current_identity, True)
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 hutil.set_inused_config_seq(current_seq_no)
                 mi.save_identity()
                 hutil.exit_if_enabled()
@@ -129,6 +129,7 @@ def enable():
                     make sure the log is not doing when the file system is freezed.
                     """
                     backup_logger.log("doing freeze now...", True)
+                    freeze_called = True
                     freeze_result   = freezer.freezeall()
                     backup_logger.log("freeze result " + str(freeze_result))
                 
@@ -136,13 +137,13 @@ def enable():
                     snap_shotter    = Snapshotter(backup_logger)
                     snapshot_result = snap_shotter.snapshotall(para_parser)
                     backup_logger.log("snapshotall ends...")
-                    if(snapshot_result != None and len(snapshot_result.errors) > 0):
+                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                         error_msg  = "snapshot result: " + str(snapshot_result.errors)
                         run_result = 2
                         run_status = 'error'
                         backup_logger.log(error_msg, False, 'Error')
                     else:
-                        if(freeze_result != None and len(freeze_result.errors) > 0 ):
+                        if(freeze_result is not None and len(freeze_result.errors) > 0 ):
                             run_result = 1
                             run_status = 'warning'
                             error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
@@ -160,19 +161,20 @@ def enable():
         global_error_result = e
     finally:
         backup_logger.log("doing unfreeze now...")
-        unfreeze_result = freezer.unfreezeall()
-        backup_logger.log("unfreeze result " + str(unfreeze_result))
-        error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
-        if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
-            backup_logger.log(error_msg, False, 'Warning')
-        backup_logger.log("unfreeze ends...")
+        if(freeze_called):
+            unfreeze_result = freezer.unfreezeall()
+            backup_logger.log("unfreeze result " + str(unfreeze_result))
+            error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
+            if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
+                backup_logger.log(error_msg, False, 'Warning')
+            backup_logger.log("unfreeze ends...")
 
-    if(para_parser!= None):
+    if(para_parser is not None):
         backup_logger.commit(para_parser.logsBlobUri)
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
-    if(global_error_result != None):
+    if(global_error_result  is not None):
         if(hasattr(global_error_result,'errno') and global_error_result.errno==2):
             run_result = 12
         else:

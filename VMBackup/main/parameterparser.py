@@ -40,7 +40,7 @@ class ParameterParser(object):
         self.taskId = public_settings.get(CommonVariables.task_id)
         self.locale = public_settings.get(CommonVariables.locale)
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
-        if(self.publicObjectStr != None and self.publicObjectStr != ""):
+        if(self.publicObjectStr  is not None and self.publicObjectStr != ""):
             decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
             decoded_public_obj_string = decoded_public_obj_string.strip()
             decoded_public_obj_string = decoded_public_obj_string.strip('\'')

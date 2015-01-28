@@ -39,7 +39,7 @@ class Backuplogger(object):
         try:
             self.log("committing the log")
             self.hutil.log(self.msg)
-            if(logbloburi != None):
+            if(logbloburi  is not None):
                 sasuri_obj = urlparse.urlparse(logbloburi)
                 connection = httplib.HTTPSConnection(sasuri_obj.hostname)
                 body_content = self.msg

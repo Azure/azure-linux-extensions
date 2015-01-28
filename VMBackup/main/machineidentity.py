@@ -20,6 +20,7 @@
 #
 
 import os
+import subprocess
 
 class MachineIdentity:
     def __init__(self):
@@ -33,11 +34,18 @@ class MachineIdentity:
             file = open(self.machine_identity_file, 'r')
             identity = file.read()
             file.close()
+        else:
+            p = subprocess.Popen(['dbus-uuidgen'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            identity, err = p.communicate()
+            file = open(self.machine_identity_file, 'w')
+            file.write(identity);
+            file.close()
         return identity
 
     def save_identity(self):
         file = open(self.store_identity_file,'w')
         machine_identity = self.current_identity()
+        print(machine_identity)
         file.write(machine_identity)
         file.close()
 
