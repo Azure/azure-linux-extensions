@@ -25,7 +25,7 @@ import subprocess
 class MachineIdentity:
     def __init__(self):
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
-        self.machine_identity_file = '/var/lib/dbus/machine-id'
+        self.machine_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C-origin'
 
     def current_identity(self):
         #/var/lib/dbus/machine-id
@@ -35,7 +35,7 @@ class MachineIdentity:
             identity = file.read()
             file.close()
         else:
-            p = subprocess.Popen(['dbus-uuidgen'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.Popen(['uuidgen'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             identity, err = p.communicate()
             file = open(self.machine_identity_file, 'w')
             file.write(identity);
