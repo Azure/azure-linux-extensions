@@ -286,7 +286,6 @@ class TestAEM(unittest.TestCase):
 
         counterNames = [
             "Phys. Disc to Storage Mapping",
-            "Phys. Disc to Storage Mapping",
             "Storage ID",
             "Storage Read Bytes",
             "Storage Read Op Latency E2E msec",
