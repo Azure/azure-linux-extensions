@@ -37,7 +37,7 @@ class FsFreezer:
     def __init__(self, logger):
         """
         """
-        self.mounts = Mounts()
+        self.mounts = Mounts('/','/etc/fstab')
         self.logger = logger
 
     def freeze(self, mount):
@@ -69,7 +69,7 @@ class FsFreezer:
         self.logger.log('unfreeze...' + path + ' type ' + mount.type)
         unfreeze_return_code = 0 
         if(self.should_skip(mount)):
-            self.logger.log('skip for devtmpfs and devpts '+str(mount.type))
+            self.logger.log('skip for '+str(mount.type))
         elif(mount.type == 'xfs'):
             unfreeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
         else:
@@ -82,7 +82,8 @@ class FsFreezer:
 
     def should_skip(self,mount):
         if(mount.type == 'devtmpfs' or mount.type == 'devpts' or mount.type=='tmpfs' or mount.type=='cgroup' or mount.type=='selinuxfs' or mount.type=='autofs' or mount.type=='debugfs'
-           or mount.type=='iso9660' or mount.type=='vfat' or mount.type=='hugetlbfs' or mount.type=='binfmt_misc' or mount.type=='rpc_pipefs' or mount.type=='nfsd' or mount.type=='mqueue'):
+           or mount.type=='iso9660' or mount.type=='vfat' or mount.type=='hugetlbfs' or mount.type=='binfmt_misc' or mount.type=='rpc_pipefs' or mount.type=='nfsd' or mount.type=='mqueue'
+           or mount.type=='sysfs' or mount.type=='proc'):
             return True
         else:
             return False
@@ -94,7 +95,7 @@ class FsFreezer:
                 if(mount.dir == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.dir and mount.dir.startswith('/dev')):
+                elif(mount.dir):
                     try:
                         freezeError = self.freeze(mount)
                         if(freezeError.errorcode != 0):
@@ -119,7 +120,7 @@ class FsFreezer:
                 if(mount.dir == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.dir and mount.dir.startswith('/dev')):
+                elif(mount.dir):
                     try:
                         freezeError = self.unfreeze(mount)
                         if(freezeError.errorcode != 0):

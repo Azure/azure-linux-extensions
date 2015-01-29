@@ -132,22 +132,23 @@ def enable():
                     freeze_called = True
                     freeze_result   = freezer.freezeall()
                     backup_logger.log("freeze result " + str(freeze_result))
-                
-                    backup_logger.log("doing snapshot now...")
-                    snap_shotter    = Snapshotter(backup_logger)
-                    snapshot_result = snap_shotter.snapshotall(para_parser)
-                    backup_logger.log("snapshotall ends...")
-                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                        error_msg  = "snapshot result: " + str(snapshot_result.errors)
-                        run_result = 2
-                        run_status = 'error'
-                        backup_logger.log(error_msg, False, 'Error')
-                    else:
-                        if(freeze_result is not None and len(freeze_result.errors) > 0 ):
-                            run_result = 1
-                            run_status = 'warning'
-                            error_msg  = 'Enable Succeeded with error' + str(freeze_result.errors)
+                    
+                    # check whether we freeze succeed first?
+                    if(freeze_result is not None and len(freeze_result.errors) > 0 ):
+                            run_result = 2
+                            run_status = 'error'
+                            error_msg  = 'Enable failed with error' + str(freeze_result.errors)
                             backup_logger.log(error_msg, False, 'Warning')
+                    else:
+                        backup_logger.log("doing snapshot now...")
+                        snap_shotter    = Snapshotter(backup_logger)
+                        snapshot_result = snap_shotter.snapshotall(para_parser)
+                        backup_logger.log("snapshotall ends...")
+                        if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                            error_msg  = "snapshot result: " + str(snapshot_result.errors)
+                            run_result = 2
+                            run_status = 'error'
+                            backup_logger.log(error_msg, False, 'Error')
                         else:
                             run_result = 1
                             run_status = 'success'
