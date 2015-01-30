@@ -21,36 +21,30 @@ var fs = require('fs');
 var path = require('path');
 var Promise = require('promise');
 var common = require('azure-common');
-var storage = require('azure-storage')
+var storage = require('azure-storage');
 var storageMgmt = require('azure-mgmt-storage');
 var computeMgmt = require('azure-mgmt-compute');
-var rl = require('readline');
-
-var readline = rl.createInterface({
-      input: process.stdin,
-      output: process.stdout
-});
-
 var readFile = Promise.denodeify(fs.readFile); 
 
+var debug = 0;
+
 /*Const*/
-var CurrentScriptVersion = "1.0.0.0"
+var CurrentScriptVersion = "1.0.0.0";
 
-var aemExtPublisher = "Microsoft.OSTCExtensions"
+var aemExtPublisher = "Microsoft.OSTCExtensions";
 //TODO change to AzureEnhacnedMonitroForLinux
-var aemExtName = "AzureEnhancedMonitorForLinux.Test"
-var aemExtVersion = "1.*"
+var aemExtName = "AzureEnhancedMonitorForLinux.Test";
+var aemExtVersion = "1.0";
 
-var ladExtName = "LinuxDiagnosticTest3"
-var ladExtPublisher = "Microsoft.OSTCExtensions"
-var ladExtVersion = "1.0"
+var ladExtName = "LinuxDiagnosticTest3";
+var ladExtPublisher = "Microsoft.OSTCExtensions";
+var ladExtVersion = "1.1";
 
-var ROLECONTENT = "IaaS"
-var AzureEndpoint = "windows.net"
-var BlobMetricsTable= "$MetricsMinutePrimaryTransactionsBlob"
+var ROLECONTENT = "IaaS";
+var AzureEndpoint = "windows.net";
+var BlobMetricsTable= "$MetricsMinutePrimaryTransactionsBlob";
+var ladMetricesTable= "";
 /*End of Const*/
-
-
 
 var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
     var azureProfile;
@@ -58,6 +52,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
     var computeClient;
     var storageClient;
     var selectedVM;
+    var osdiskAccount;
     var accounts = {};
     var aemConfig = {};
 
@@ -65,8 +60,13 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         azureProfile = profile;
         return getDefaultSubscription(profile);
     }).then(function(subscription){
-        console.log("[INFO]Found Subscription:");
-        console.log(JSON.stringify(subscription, null, 4));
+        console.log("[INFO]Using subscription: " + subscription.name);
+        console.log("[INFO]You could use the following command to select " + 
+                    "another subscription.");
+        console.log("");
+        console.log("    azure account set [<subscript_id>|<subscript_name>]");
+        console.log("");
+        debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
         computeClient = computeMgmt.createComputeManagementClient(cred);
@@ -74,10 +74,10 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
     }).then(function(){
         return getVirtualMachine(computeClient, svcName, vmName);
     }).then(function(vm){
-        console.log("[INFO]Found VM:");
-        console.log(JSON.stringify(vm, null, 4));
+        //Set vm role basic config
+        console.log("[INFO]Found VM: " + vm.roleName);
+        debug && console.log(JSON.stringify(vm, null, 4));
         selectedVM = vm;
-
         var cpuOverCommitted = 0;
         if(selectedVM.roleSize === 'ExtralSmall'){
             cpuOverCommitted = 1
@@ -85,77 +85,260 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         aemConfig['vm.size'] = selectedVM.roleSize;
         aemConfig['vm.roleinstance'] = selectedVM.roleName;
         aemConfig['vm.role'] = 'IaaS';
-        //TODO really need this one?
-        //aemConfig['vm.deploymentid'] = selectedVM.deploymentId;
         aemConfig['vm.memory.isovercommitted'] = 0;
         aemConfig['vm.cpu.isovercommitted'] = cpuOverCommitted;
         aemConfig['script.version'] = CurrentScriptVersion;
         aemConfig['verbose'] = 0;
     }).then(function(){
+        //Set vm disk config
         var osdisk = selectedVM.oSVirtualHardDisk;
-        var osdiskAccount = getStorageAccountFromUri(osdisk.mediaLink);
+        osdiskAccount = getStorageAccountFromUri(osdisk.mediaLink);
+        console.log("[INFO]Adding configure for OS disk.");
         aemConfig['osdisk.account'] = osdiskAccount;
         aemConfig['osdisk.name'] = selectedVM.oSVirtualHardDisk.name;
-        accounts[osdiskAccount] = null;
+        accounts[osdiskAccount] = {};
         for(var i = 0; i < selectedVM.dataVirtualHardDisks.length; i++){
             var dataDisk = selectedVM.dataVirtualHardDisks[i];
+            console.log("[INFO]Adding configure for data disk: " + 
+                        dataDisk.name);
             var datadiskAccount = getStorageAccountFromUri(dataDisk.mediaLink);
-            accounts[datadiskAccount] = null;
+            accounts[datadiskAccount] = {};
             //The default lun value is 0
             var lun = dataDisk.logicalUnitNumber || 0;
             aemConfig['disk.lun.' + i] = lun;
             aemConfig['disk.name.' + i] = dataDisk.name;
             aemConfig['disk.account.' + i] = datadiskAccount;
         }
+    }).then(function(){
+        //Set storage account config
         var promises = [];
+        var accountNames = Object.keys(accounts);
+        aemConfig["account.names"] = accountNames;
+
         Object.keys(accounts).forEach(function(accountName){
-            var promise = getStorageKey(accountName).then(function(accountKey){
-                //TODO not implemented
-                accounts[accountName]=accountKey;
+            var promise = getStorageAccountKey(storageClient, accountName)
+              .then(function(accountKey){
+                accounts[accountName].key = accountKey;
+                aemConfig[accountName + "minute.key"] = accountKey;
+                return getStorageAccountEndpoints(storageClient, accountName);
+            }).then(function(endpoints){
+                var tableEndpoint;
+                endpoints.every(function(endpoint){
+                    if(endpoint.match(/.*table.*/)){
+                        tableEndpoint = endpoint;
+                        return false;
+                    }else{
+                        return true;
+                    }
+                });
+                accounts[accountName].tableEndpoint = tableEndpoint;
+                var minuteUri = tableEndpoint + BlobMetricsTable;
+                aemConfig[accountName + ".minute.uri"] = minuteUri;
             }).then(function(){
-                return setStorageStorageAnalytics(accountName);
+                return checkStorageAccountAnalytics(accountName,
+                                                    accounts[accountName].key);
             });
             promises.push(promise);
         });
         return Promise.all(promises);
     }).then(function(){
-        //TODO remove debug output
-        console.log(JSON.stringify(aemConfig, null, 4)) 
+        //Set Linux diagnostic config
+        aemConfig["lad.isenabled"] = 1;
+        aemConfig["lad.name"] = osdiskAccount;
+        aemConfig["lad.key"] = accounts[osdiskAccount].key;
+        var ladUri = accounts[osdiskAccount].tableEndpoint + ladMetricesTable;
+        aemConfig["lad.uri"] = ladUri;
+    }).then(function(){
+        //Update vm
+        var extensions = [];
+        var ladExtConfig = {
+            'name' : ladExtName,
+            'referenceName' : ladExtName,
+            'publisher' : ladExtPublisher,
+            'version' : ladExtVersion,
+            'state': 'Enable',
+            'resourceExtensionParameterValues' : [{
+                'key' : ladExtName + "PrivateConfigParameter",
+                'value' : JSON.stringify({
+                    'storageAccountName' : osdiskAccount,
+                    'storageAccountKey' : accounts[osdiskAccount].key
+                }),
+                'type':'Private'
+            }]
+        };
+        var aemExtConfig = {
+            'name' : aemExtName,
+            'referenceName' : aemExtName,
+            'publisher' : aemExtPublisher,
+            'version' : aemExtVersion,
+            'state': 'Enable',
+            'resourceExtensionParameterValues' : [{
+                'key' : aemExtName + "PrivateConfigParameter",
+                'value' : JSON.stringify(aemConfig),
+                'type':'Private'
+            },{//TODO remove public config
+                'key' : aemExtName + "PublicConfigParameter",
+                'value' : JSON.stringify(aemConfig),
+                'type':'Public'
+            }]
+        };
+        extensions.push(ladExtConfig);
+        extensions.push(aemExtConfig);
+        selectedVM.provisionGuestAgent = true;
+        selectedVM.resourceExtensionReferences = extensions;
+        console.log("[INFO]Update configuration for VM: " + selectedVM.roleName);
+        debug && console.log(JSON.stringify(selectedVM, null, 4)) 
+        //return updateVirtualMachine(computeClient, svcName, vmName, selectedVM);
     });
 }
 
-var getStorageKey = function(accountName){
+var updateVirtualMachine = function (client, svcName, vmName, parameters){
     return new Promise(function(fullfill, reject){
-        //TODO not implemented
-        fullfill(null);
+        client.virtualMachines.update(svcName, vmName, vmName, parameters, 
+                                      function(err, ret){
+            if(err){
+                reject(err)
+            } else {
+                fullfill(ret);
+            } 
+        });
+    });
+}
+
+var getDeployment = function(computeClient, svcName){
+    return  new Promise(function(fullfill, reject){
+        computeClient.deployments.getBySlot(svcName, "Production", 
+                                            function(err, ret){
+            if(err){
+                reject(err)
+            } else {
+                fullfill(ret);
+            }
+        });
     });
 };
 
-var setStorageStorageAnalytics = function(accountName){
+var getStorageAccountEndpoints = function(storageClient, accountName){
     return new Promise(function(fullfill, reject){
-        //TODO not implemented
-        fullfill(null);
+        storageClient.storageAccounts.get(accountName, function(err, account){
+            if(err){
+                reject(err);
+            } else {
+                fullfill(account.storageAccount.properties.endpoints);
+            }
+        });
+    });
+};
+
+var getStorageAccountKey = function(storageClient, accountName){
+    return new Promise(function(fullfill, reject){
+        storageClient.storageAccounts.getKeys(accountName, function(err, keys){
+            if(err){
+                reject(err);
+            } else {
+                fullfill(keys.primaryKey);
+            } 
+        });
+    });
+};
+
+var getStorageAccountAnalytics = function(accountName, accountKey){
+    return new Promise(function(fullfill, reject){
+        var blobService = storage.createBlobService(accountName, accountKey); 
+        blobService.getServiceProperties(null, function(err, properties, resp){
+            if(err){
+                reject(err)
+            } else {
+                fullfill(properties);
+            }
+        });
+    });
+};
+
+var analyticsSettings = {
+    Logging:{ 
+        Version: '1.0',
+        Delete: true,
+        Read: true,
+        Write: true,
+        RetentionPolicy: { Enabled: true, Days: 13 } },
+    HourMetrics:{ 
+        Version: '1.0',
+        Enabled: true,
+        IncludeAPIs: true,
+        RetentionPolicy: { Enabled: true, Days: 13 } },
+    MinuteMetrics:{ 
+        Version: '1.0',
+        Enabled: true,
+        IncludeAPIs: true,
+        RetentionPolicy: { Enabled: true, Days: 13 } 
+    } 
+};
+
+var checkStorageAccountAnalytics = function(accountName, accountKey){
+   return getStorageAccountAnalytics(accountName, accountKey)
+     .then(function(properties){
+        if(!properties 
+                || !properties.Logging
+                || !properties.Logging.Read 
+                || !properties.Logging.Write
+                || !properties.Logging.Delete
+                || !properties.MinuteMetrics
+                || !properties.MinuteMetrics.Enabled
+                || !properties.MinuteMetrics.RetentionPolicy
+                || !properties.MinuteMetrics.RetentionPolicy.Enabled
+                || !properties.MinuteMetrics.RetentionPolicy.Days
+                || properties.MinuteMetrics.RetentionPolicy.Days == 0
+                ){
+            console.log("[INFO] Turn on storage analytics for: " + accountName)
+            return setStorageAccountAnalytics(accountName, accountKey, 
+                                              analyticsSettings);
+        }
+   });
+}
+
+var setStorageAccountAnalytics = function(accountName, accountKey, properties){
+    return new Promise(function(fullfill, reject){
+        var blobService = storage.createBlobService(accountName, accountKey); 
+        blobService.setServiceProperties(properties, null, 
+                                         function(err, properties, resp){
+            if(err){
+                reject(err)
+            } else {
+                fullfill(properties);
+            }
+        });
     });
 };
 
 var getStorageAccountFromUri = function(uri){
-    var match = /http:\/\/(.*)\..*/.exec(uri);
+    var match = /https:\/\/(.+?)\..*/.exec(uri);
     if(match){
         return match[1];
     }
 }
 
-var updateVirtualMachine = function (client, vm){
-
-}
-
-var getVirtualMachine = function(client, svcName, vmName){
+var getVirtualMachine = function(computeClient, svcName, vmName){
     return new Promise(function(fullfill, reject){
-        client.virtualMachines.get(svcName, vmName, vmName, function(err, vm){
+        computeClient.deployments.getBySlot(svcName, "Production", 
+                                            function(err, deployments){
             if(err){
                 reject(err);
             } else {
-                fullfill(vm);
+                var vm;
+                deployments.roles.every(function(role){
+                    if(role.roleName == vmName){
+                        vm = role;
+                        return false; 
+                    }else{
+                        return true; 
+                    }
+                });
+                if(vm){
+                    fullfill(vm);
+                }else{
+                    reject("VM not found."); 
+                }
             }
         });
     });
@@ -166,7 +349,8 @@ var getCloudCredential = function(subscription){
     if(subscription.credential.type === 'cert'){
         cred = compute.createCertificateCloudCredentials({
             subscriptionId:subscription.id ,
-            pem:subscription.credential.cert.key + subscription.cert.cert
+            cert:subscription.cert.cert,
+            key:subscription.cert.key,
         });
     }else{//if(subscription.credential.type === 'token'){
        cred = new common.TokenCloudCredentials({
@@ -181,16 +365,24 @@ var getAzureProfile = function(){
     var profileJSON = path.join(getUserHome(), ".azure/azureProfile.json");
     return readFile(profileJSON).then(function(result){
         var profile = JSON.parse(result);
-        var defaultSubscription = null;
-        if(profile == null || profile.subscriptions == null 
-                || profile.subscriptions.length == 0){
-            throw "No subscriptions found."
-        }
         return profile;
     });
 }
 
 var getDefaultSubscription = function(profile){
+    debug && console.log(JSON.stringify(profile, null, 4))
+    if(profile == null || profile.subscriptions == null 
+            || profile.subscriptions.length == 0){
+        throw "No subscription found."
+    }
+    console.log("[INFO]Found available subscriptions:");
+    console.log("");
+    console.log("    Id\t\t\t\t\t\tName");
+    console.log("    --------------------------------------------------------");
+    profile.subscriptions.forEach(function(subscription){
+        console.log("    " + subscription.id + "\t" + subscription.name);
+    });
+    console.log("");
     var defaultSubscription;
     profile.subscriptions.every(function(subscription, index, arr){
         if(subscription.isDefault){
@@ -202,12 +394,13 @@ var getDefaultSubscription = function(profile){
     });
 
     if(defaultSubscription == null){
-        throw "Not subscription is selected."
+        console.log("[WARN]No subscription is selected.");
+        defaultSubscription = profile.subscriptions[0];
+        console.log("[INFO]The first subscription will be used.");
     }
-
-    if(defaultSubscription.username){
+    if(defaultSubscription.user){
         return getTokenCredential(defaultSubscription);
-    } else if(subscription.managementCertificate){
+    } else if(defaultSubscription.managementCertificate){
         return getCertCredential(defaultSubscription);
     } else {
         throw "Unknown subscription type.";
@@ -219,7 +412,7 @@ var getTokenCredential = function(subscription){
     return readFile(tokensJSON).then(function(result){
         var tokens = JSON.parse(result);
         tokens.every(function(token, index, arr){
-            if(token.userId === subscription.username){
+            if(token.userId === subscription.user.name){
                 subscription.credential = {
                     type : 'token',
                     token : token.accessToken
@@ -258,9 +451,9 @@ var main = function(){
     }
 
     setAzureVMEnhancedMonitorForLinux(svcName, vmName).done(function(){
-        console.log("[INFO] Azure Enhanced Monitoring Extension " + 
+        console.log("[INFO]Azure Enhanced Monitoring Extension " + 
                     "configuration updated.");
-        console.log("[INFO] It can take up to 15 Minutes for the " + 
+        console.log("[INFO]It can take up to 15 Minutes for the " + 
                     "monitoring data to appear in the  system.");
         process.exit(0);
     }, function(err){
