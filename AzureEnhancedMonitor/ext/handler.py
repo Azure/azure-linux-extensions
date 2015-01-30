@@ -82,15 +82,22 @@ def daemon(hutil):
     monitor = aem.EnhancedMonitor(config)
     if not os.path.isdir(aem.LibDir):
         os.makedirs(aem.LibDir)
+
     while True:
         waagent.Log("Collecting performance counter.")
+        startTime = time.time()
         try:
             monitor.run()
-            #TODO do status report
+            hutil.do_status_report("Enable", "success", 0, "")
         except Exception, e:
             waagent.Error("{0} {1}".format(e, traceback.format_exc()))
+            hutil.do_status_report("Enable", "error", 0, "{0}".format(e))
         waagent.Log("Finished collection.")
-        time.sleep(aem.MonitoringInterval)
+        timeElapsed = time.time() - startTime
+        timeToWait = (aem.MonitoringInterval - timeElapsed)
+        #Make sure timeToWait is in the range(0, aem.MonitoringInterval)
+        timeToWait = timeToWait % aem.MonitoringInterval
+        time.sleep(timeToWait)
 
 def grace_exit(operation, status, msg):
     hutil = parse_context(operation)

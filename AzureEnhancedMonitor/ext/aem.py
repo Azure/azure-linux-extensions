@@ -1240,24 +1240,3 @@ class EnhancedMonitorConfig(object):
     def getLADUri(self):
         return self.configData["lad.uri"]
 
-def main():
-    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context(operation)
-    monitor = EnhancedMonitor()
-    if not os.path.isdir(LibDir):
-        os.mkdirs(LibDir)
-    while True:
-        waagent.Log("Collecting performance counter.")
-        try:
-            monitor.run()
-            hutil.do_status_report("Enable", "success", 0, "")
-        except Exception, e:
-            waagent.Error("{0} {1}".format(e, traceback.format_exc()))
-            hutil.do_status_report("Enable", "error", 0, "{0}".format(e))
-        waagent.Log("Finished collection.")
-        time.sleep(MonitoringInterval)
-
-if __name__ == '__main__':
-    main()
