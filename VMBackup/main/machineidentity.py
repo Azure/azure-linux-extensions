@@ -25,7 +25,7 @@ import subprocess
 class MachineIdentity:
     def __init__(self):
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
-        self.machine_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C-origin'
+        self.machine_identity_file = '/var/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C-origin'
 
     def current_identity(self):
         #/var/lib/dbus/machine-id

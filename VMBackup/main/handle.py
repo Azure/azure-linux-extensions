@@ -135,10 +135,10 @@ def enable():
                     
                     # check whether we freeze succeed first?
                     if(freeze_result is not None and len(freeze_result.errors) > 0 ):
-                            run_result = 2
-                            run_status = 'error'
-                            error_msg  = 'Enable failed with error' + str(freeze_result.errors)
-                            backup_logger.log(error_msg, False, 'Warning')
+                        run_result = 2
+                        run_status = 'error'
+                        error_msg  = 'Enable failed with error' + str(freeze_result.errors)
+                        backup_logger.log(error_msg, False, 'Warning')
                     else:
                         backup_logger.log("doing snapshot now...")
                         snap_shotter    = Snapshotter(backup_logger)
@@ -183,7 +183,7 @@ def enable():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
-    hutil.do_exit(run_result, 'Enable', run_status, str(run_result), error_msg)
+    hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
