@@ -54,6 +54,7 @@ def enable(hutil):
                       'Failed to launch Azure Enhanced Monitor')
     else:
         waagent.SetFileContents(pidFile, str(child.pid))
+        waagent.Log(("Daemon pid: {0}").format(child.pid))
         hutil.do_exit(0, 'Enable', 'success', '0', 
                       'Azure Enhanced Monitor is enabled')
 
@@ -71,7 +72,7 @@ def disable(hutil):
             hutil.do_exit(0, 'Disable', 'success', '0', 
                           'Azure Enhanced Monitor is disabled')
         os.remove(pidFile)
-
+    
     hutil.do_exit(0, 'Disable', 'success', '0', 
                   'Azure Enhanced Monitor is not running')
 
@@ -126,8 +127,7 @@ def main():
                 hutil = parse_context("enable")
                 daemon(hutil)
         except Exception, e:
-            hutil.error(("Extension has run into an error:{0}, {1}, "
-                         "{2}").format(command, e, traceback.format_exc()))
+            hutil.error("{0}, {1}").format(e, traceback.format_exc()))
             hutil.do_exit(1, command, 'failed','0', 
                           '{0} failed:{1}'.format(command, e))
 
