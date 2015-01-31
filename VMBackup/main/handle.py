@@ -66,7 +66,7 @@ def main():
 
 def install():
     hutil.do_parse_context('Install')
-    hutil.do_exit(0, 'Install','Installed','0', 'Install Succeeded')
+    hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
 def enable():
     freezer = FsFreezer(backup_logger)
@@ -154,7 +154,10 @@ def enable():
                             run_status = 'success'
                             error_msg  = 'Enable Succeeded'
                             backup_logger.log(error_msg)
-
+        else:
+            run_status = 'error'
+            run_result = 11
+            error_msg = 'command is not correct'
     except Exception as e:
         errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
