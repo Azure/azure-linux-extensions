@@ -69,3 +69,4 @@ VMBackup/*.suo
 # CustomScript ignors
 CustomScript/test/download/0/stdout
 CustomScript/test/download/0/errout
+*node_modules/

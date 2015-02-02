@@ -1,0 +1,13 @@
+[{
+  "name": "AzureEnhancedMonitor",
+  "version": 1.0,
+  "handlerManifest": {
+    "installCommand": "handler.py install",
+    "uninstallCommand": "handler.py uninstall",
+    "updateCommand": "handler.py update",
+    "enableCommand": "handler.py enable",
+    "disableCommand": "handler.py disable",
+    "rebootAfterInstall": false,
+    "reportHeartbeat": false
+  }
+}]
