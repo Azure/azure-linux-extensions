@@ -181,6 +181,9 @@ def enable():
     if(global_error_result  is not None):
         if(hasattr(global_error_result,'errno') and global_error_result.errno==2):
             run_result = 12
+        elif(para_parser is None):
+            print "run result == 11"
+            run_result = 11
         else:
             run_result = 2
         run_status = 'error'
