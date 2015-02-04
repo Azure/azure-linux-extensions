@@ -61,11 +61,6 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         return getDefaultSubscription(profile);
     }).then(function(subscription){
         console.log("[INFO]Using subscription: " + subscription.name);
-        console.log("[INFO]You could use the following command to select " + 
-                    "another subscription.");
-        console.log("");
-        console.log("    azure account set [<subscript_id>|<subscript_name>]");
-        console.log("");
         debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
@@ -97,6 +92,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         aemConfig['osdisk.account'] = osdiskAccount;
         aemConfig['osdisk.name'] = selectedVM.oSVirtualHardDisk.name;
         accounts[osdiskAccount] = {};
+        aemConfig['disk.count'] = selectedVM.dataVirtualHardDisks.length;
         for(var i = 0; i < selectedVM.dataVirtualHardDisks.length; i++){
             var dataDisk = selectedVM.dataVirtualHardDisks[i];
             console.log("[INFO]Adding configure for data disk: " + 
@@ -119,7 +115,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
             var promise = getStorageAccountKey(storageClient, accountName)
               .then(function(accountKey){
                 accounts[accountName].key = accountKey;
-                aemConfig[accountName + "minute.key"] = accountKey;
+                aemConfig[accountName + ".minute.key"] = accountKey;
                 return getStorageAccountEndpoints(storageClient, accountName);
             }).then(function(endpoints){
                 var tableEndpoint;
@@ -186,9 +182,10 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         extensions.push(aemExtConfig);
         selectedVM.provisionGuestAgent = true;
         selectedVM.resourceExtensionReferences = extensions;
-        console.log("[INFO]Update configuration for VM: " + selectedVM.roleName);
+        console.log("[INFO]Updating configuration for VM: " + selectedVM.roleName);
+        console.log("[INFO]This could take a few minutes. Please wait.")
         debug && console.log(JSON.stringify(selectedVM, null, 4)) 
-        //return updateVirtualMachine(computeClient, svcName, vmName, selectedVM);
+        return updateVirtualMachine(computeClient, svcName, vmName, selectedVM);
     });
 }
 
@@ -347,10 +344,10 @@ var getVirtualMachine = function(computeClient, svcName, vmName){
 var getCloudCredential = function(subscription){
     var cred;
     if(subscription.credential.type === 'cert'){
-        cred = compute.createCertificateCloudCredentials({
+        cred = computeMgmt.createCertificateCloudCredentials({
             subscriptionId:subscription.id ,
-            cert:subscription.cert.cert,
-            key:subscription.cert.key,
+            cert:subscription.managementCertificate.cert,
+            key:subscription.managementCertificate.key,
         });
     }else{//if(subscription.credential.type === 'token'){
        cred = new common.TokenCloudCredentials({
@@ -397,6 +394,11 @@ var getDefaultSubscription = function(profile){
         console.log("[WARN]No subscription is selected.");
         defaultSubscription = profile.subscriptions[0];
         console.log("[INFO]The first subscription will be used.");
+        console.log("[INFO]You could use the following command to select " + 
+                    "another subscription.");
+        console.log("");
+        console.log("    azure account set [<subscript_id>|<subscript_name>]");
+        console.log("");
     }
     if(defaultSubscription.user){
         return getTokenCredential(defaultSubscription);
@@ -454,12 +456,23 @@ var main = function(){
         console.log("[INFO]Azure Enhanced Monitoring Extension " + 
                     "configuration updated.");
         console.log("[INFO]It can take up to 15 Minutes for the " + 
-                    "monitoring data to appear in the  system.");
+                    "monitoring data to appear in the system.");
         process.exit(0);
     }, function(err){
-        console.log(err);
-        console.log(err.stack);
-        process.exit(-1);
+        if(err && err.statusCode == 401){
+            console.error("[ERROR]Token expired. " + 
+                          "Please run the following command to login.");
+            console.log("    ");
+            console.log("    azure login -u <user_name>");
+            console.log("or");
+            console.log("    azure account import <pem_file>");
+            console.log("    ");
+            process.exit(-1);
+        }else{
+            console.log(err);
+            console.log(err.stack);
+            process.exit(-1);
+        }
     });
 }
 
@@ -467,11 +480,11 @@ var usage = function(){
     console.log("");
     console.log("Usage:");
     console.log("    setaem <service_name> <vm_name>");
-    console.log("  or");
+    console.log("or");
     console.log("    setaem <vm_name>");
     console.log("");
     console.log("  *if service_name and vm_name are the same, " + 
-                   "service_name could be omitted.");
+                "service_name could be omitted.");
     console.log("");
 }
 

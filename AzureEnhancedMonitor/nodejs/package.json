@@ -4,7 +4,7 @@
   "contributors": [
     "Yue, Zhang <yuezha@microsoft.com>"
   ],
-  "version": "0.8.13",
+  "version": "1.0.0",
   "description": "Azure Linux VM configuration tools",
   "tags": [
     "azure",
@@ -32,8 +32,8 @@
   ],
   "dependencies": {
     "promise" : "6.1.0",
-    "azure": "0.10.2",
     "azure-common" : "0.9.10",
+    "azure-storage" : "0.4.2",
     "azure-mgmt-storage" : "0.9.14",
     "azure-mgmt-compute" : "0.9.14"
   },
@@ -46,5 +46,7 @@
   },
   "bin": {
     "setaem": "setaem.js"
+  },
+  "scripts":{
   }
 }
