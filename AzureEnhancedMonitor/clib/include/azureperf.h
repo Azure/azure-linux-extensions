@@ -17,13 +17,12 @@
 /*The max buf size for all string*/
 #define STR_BUF_MAX         (256)
 
-#define TYPE_NAME_MAX       (4)
+#define TYPE_NAME_MAX       (64)
 #define PROPERTY_NAME_MAX   (128)
 #define INSTANCE_NAME_MAX   (256)
 #define STRING_VALUE_MAX    (256)
 #define UNIT_NAME_MAX       (64)
 #define MACHINE_NAME_MAX    (128)
-#define ERR_MSG_MAX         (128)
 
 #define PERF_COUNT_MAX      (128)
 
@@ -33,11 +32,18 @@
 #define PERF_COUNTER_TYPE_LARGE	    (3)
 #define PERF_COUNTER_TYPE_STRING	(4)
 
-#define AP_ERR_NOT_FOUND            (-1)
-#define AP_ERR_BUF_OVERFLOW         (-2) 
-#define AP_ERR_IO_ERR               (-3)
-#define AP_ERR_BAD_FORMAT           (-4)
-#define AP_ERR_STR_BUF_OVERFLOW     (-5)
+#define AP_ERR_PC_NOT_FOUND                 (-1)
+#define AP_ERR_PC_BUF_OVERFLOW              (-2) 
+#define AP_ERR_INVALID_COUNTER_TYPE         (-11)
+#define AP_ERR_INVALID_TYPE_NAME            (-12)
+#define AP_ERR_INVALID_PROPERTY_NAME        (-13)
+#define AP_ERR_INVALID_INSTANCE_NAME        (-14)
+#define AP_ERR_INVALID_IS_EMPTY_FLAG        (-15)
+#define AP_ERR_INVALID_VALUE                (-15)
+#define AP_ERR_INVALID_UNIT_NAME            (-16)
+#define AP_ERR_INVALID_REFRESH_INTERVAL     (-17)
+#define AP_ERR_INVALID_TIMESTAMP            (-18)
+#define AP_ERR_INVALID_MACHINE_NAME         (-19)
 
 
 typedef struct 
@@ -65,7 +71,6 @@ typedef struct
     perf_counter    buf[PERF_COUNT_MAX]; 
     int             len; 
     int             err;
-    char            err_msg[ERR_MSG_MAX];
     char            *ap_file;
 } ap_handler;
 

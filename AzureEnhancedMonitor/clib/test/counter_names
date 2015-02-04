@@ -1,0 +1,44 @@
+config;Cloud Provider;Cloud Provider
+config;CPU Over-Provisioning;CPU Over-Provisioning
+config;Memory Over-Provisioning;Memory Over-Provisioning
+config;Data Provider Version;Data Provider Version
+config;Data Sources;Data Sources
+config;Instance Type;Instance Type
+config;Virtualization Solution;Virtualization Solution
+config;Virtualization Solution Version;Virtualization Solution Version
+cpu;Current Hw Frequency;Current Hw Frequency
+cpu;Max Hw Frequency;Max Hw Frequency
+cpu;Current VM Processing Power;Current VM Processing Power
+cpu;Guaranteed VM Processing Power;Guaranteed VM Processing Power
+cpu;Max. VM Processing Power;Max VM Processing Power
+cpu;Number of Cores per CPU;Number of Cores per CPU
+cpu;Number of Threads per Core;Number of Threads per Core
+cpu;Phys. Processing Power per vCPU;Phys Processing Power per vCPU
+cpu;Processor Type;Processor Type
+cpu;Reference Compute Unit;Reference Compute Unit
+cpu;vCPU Mapping;vCPU Mapping
+cpu;VM Processing Power Consumption;VM Processing Power Consumption
+memory;Current Memory assigned;Current Memory assigned
+memory;Guaranteed Memory assigned;Guaranteed Memory assigned
+memory;Max Memory assigned;Max Memory assigned
+memory;VM Memory Consumption;VM Memory Consumption
+network;Adapter Id;Adapter Id
+network;Mapping;Mapping
+network;Minimum Network Bandwidth;Min Network Bandwidth
+network;Maximum Network Bandwidth;Max Network Bandwidth
+network;Network Read Bytes;Network Read Bytes
+network;Network Write Bytes;Network Write Bytes
+network;Packets Retransmitted;Packets Retransmitted
+config;Last Hardware Change;Last Hardware Change
+storage;Phys. Disc to Storage Mapping;Phys Disc to Storage Mapping
+storage;Storage ID;Storage ID
+storage;Storage Read Bytes;Read Bytes
+storage;Storage Read Ops;Read Ops
+storage;Storage Read Op Latency E2E msec;Read Op Latency E2E
+storage;Storage Read Op Latency Server msec;Read Op Latency Server
+storage;Storage Read Throughput E2E MB/sec;Read Throughput E2E
+storage;Storage Write Bytes;Write Bytes
+storage;Storage Write Ops;Write Ops
+storage;Storage Write Op Latency E2E msec;Write Op Latency E2E
+storage;Storage Write Op Latency Server msec;Write Op Latency Server
+storage;Storage Write Throughput E2E MB/sec;Write Throughput E2E

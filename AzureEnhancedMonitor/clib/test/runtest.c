@@ -17,26 +17,27 @@
 #include <stdio.h>
 #include <azureperf.h> 
 
+
 int main()
+{
+    run_test("./cases/positive_case");
+}
+
+int run_test(char* ap_file)
 {
     int ret = 0;
     ap_handler *handler = 0;
     int i = 0;
 
     handler = ap_open();
-    handler->ap_file = "./PerfCounters";
+    handler->ap_file = ap_file;
     ap_refresh(handler);
     if(handler->err)
     {
         ret = handler->err;
-        printf("Error:%d\n", handler->err);
-        printf("%s\n", handler->err_msg);
+        printf("Error code:%d\n", handler->err);
     }
-    printf("Found %d counters.\n", handler->len);
-    for(;i < handler->len; i++)
-    {
-          
-    }
+    printf("Found counters:%d\n", handler->len);
     ap_close(handler);
     return ret;
 }
