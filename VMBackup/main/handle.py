@@ -92,9 +92,9 @@ def enable():
         else:
             current_identity = mi.current_identity()
             if(current_identity != stored_identity):
-                current_seq_no = hutil.get_seq_no();
+                current_seq_no = 0
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_inused_config_seq(current_seq_no)
+                hutil.set_inused_config_seq(0)
                 mi.save_identity()
             else:
                 hutil.exit_if_enabled()
