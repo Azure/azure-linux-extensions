@@ -22,10 +22,11 @@
 import unittest
 import env
 import os
-import aem
 import json
 import datetime
 from Utils.WAAgentUtil import waagent
+import aem
+import handler
 
 TestConfig="""{
         "vm.size" : "Small (A1)",

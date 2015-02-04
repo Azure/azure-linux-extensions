@@ -190,21 +190,28 @@ class HandlerUtility:
         self._log = waagent.Log
         self._error = waagent.Error
 
+    def is_seq_smaller(self):
+        return int(self._context._seq_no) <= self._get_most_recent_seq()
+
+    def save_seq(self):
+        self._set_most_recent_seq(self._context._seq_no)
+        self.log("set most recent sequence number to " + self._context._seq_no)
+
     def exit_if_enabled(self):
         self.exit_if_seq_smaller()
 
     def exit_if_seq_smaller(self):
-        if(int(self._context._seq_no) <= self._get_most_recent_seq()):
+        if(self.is_seq_smaller()):
             self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
             sys.exit(0)
-        self._set_most_recent_seq(self._context._seq_no)
-        self.log("set most recent sequence number to " + self._context._seq_no)
+        self.save_seq()
 
     def _get_most_recent_seq(self):
         if(os.path.isfile('mrseq')):
             seq = waagent.GetFileContents('mrseq')
             if(seq):
                 return int(seq)
+
         return -1
 
     def is_current_config_seq_greater_inused(self):
