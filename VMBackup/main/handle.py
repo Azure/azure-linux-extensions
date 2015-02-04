@@ -96,7 +96,6 @@ def enable():
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 hutil.set_inused_config_seq(current_seq_no)
                 mi.save_identity()
-                hutil.exit_if_enabled()
             else:
                 hutil.exit_if_enabled()
 
@@ -182,7 +181,6 @@ def enable():
         if(hasattr(global_error_result,'errno') and global_error_result.errno==2):
             run_result = 12
         elif(para_parser is None):
-            print "run result == 11"
             run_result = 11
         else:
             run_result = 2

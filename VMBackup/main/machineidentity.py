@@ -21,25 +21,20 @@
 
 import os
 import subprocess
+import xml
+import xml.dom.minidom
 
 class MachineIdentity:
     def __init__(self):
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
-        self.machine_identity_file = '/var/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C-origin'
 
     def current_identity(self):
-        #/var/lib/dbus/machine-id
         identity = None
-        if(os.path.exists(self.machine_identity_file)):
-            file = open(self.machine_identity_file, 'r')
-            identity = file.read()
-            file.close()
-        else:
-            p = subprocess.Popen(['uuidgen'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            identity, err = p.communicate()
-            file = open(self.machine_identity_file, 'w')
-            file.write(identity);
-            file.close()
+        file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
+        xmlText = file.read()
+        dom = xml.dom.minidom.parseString(xmlText)
+        deployment = dom.getElementsByTagName("Deployment")
+        identity=deployment[0].getAttribute("guid")
         return identity
 
     def save_identity(self):
