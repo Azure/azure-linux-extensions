@@ -13,6 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+#ifndef AZURE_PERF
+#define AZURE_PERF
+
+/*All the strings are utf-8 encoded*/
 
 /*The max buf size for all string*/
 #define STR_BUF_MAX         (256)
@@ -80,7 +84,57 @@ extern void ap_close(ap_handler* handler);
 
 extern void ap_refresh(ap_handler* handler);
 
-//"\config\Cloud Provider";
-extern void ap_metric_machine_cloudprovider(ap_handler* handler, 
-                                            perf_counter* pc);
+extern int ap_metric_all(ap_handler *handler, perf_counter *pc, size_t size);
 
+//config\Cloud Provider
+extern int ap_metric_config_cloud_provider(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\CPU Over-Provisioning
+extern int ap_metric_config_cpu_over_provisioning(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Memory Over-Provisioning
+extern int ap_metric_config_memory_over_provisioning(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Data Provider Version
+extern int ap_metric_config_data_provider_version(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Data Sources
+extern int ap_metric_config_data_sources(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Instance Type
+extern int ap_metric_config_instance_type(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Virtualization Solution
+extern int ap_metric_config_virtualization_solution(ap_handler *handler, perf_counter *pc, size_t size);
+
+//config\Virtualization Solution Version
+extern int ap_metric_config_virtualization_solution_version(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Current Hw Frequency
+extern int ap_metric_cpu_current_hw_frequency(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Max Hw Frequency
+extern int ap_metric_cpu_max_hw_frequency(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Current VM Processing Power
+extern int ap_metric_cpu_current_vm_processing_power(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Guaranteed VM Processing Power
+extern int ap_metric_cpu_guaranteed_vm_processing_power(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Max. VM Processing Power
+extern int ap_metric_cpu_max_vm_processing_power(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Number of Cores per CPU
+extern int ap_metric_cpu_number_of_cores_per_cpu(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Number of Threads per Core
+extern int ap_metric_cpu_number_of_threads_per_core(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Phys. Processing Power per vCPU
+extern int ap_metric_cpu_phys_processing_power_per_vcpu(ap_handler *handler, perf_counter *pc, size_t size);
+
+//cpu\Processor Type
+extern int ap_metric_cpu_processor_type(ap_handler *handler, perf_counter *pc, size_t size);
+
+#endif

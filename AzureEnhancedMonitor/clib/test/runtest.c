@@ -15,12 +15,12 @@
 //
 
 #include <stdio.h>
+#include <string.h>
 #include <azureperf.h> 
-
 
 int main()
 {
-    run_test("./cases/positive_case");
+    run_test("./test/cases/positive_case");
 }
 
 int run_test(char* ap_file)
@@ -28,6 +28,7 @@ int run_test(char* ap_file)
     int ret = 0;
     ap_handler *handler = 0;
     int i = 0;
+    perf_counter pc;
 
     handler = ap_open();
     handler->ap_file = ap_file;
@@ -36,8 +37,35 @@ int run_test(char* ap_file)
     {
         ret = handler->err;
         printf("Error code:%d\n", handler->err);
+        goto EXIT;
     }
     printf("Found counters:%d\n", handler->len);
+    for(; i < handler->len; i++)
+    {
+        pc = handler->buf[i];
+        printf("%d: %s\t%s\t",i , pc.type_name, pc.property_name);
+        switch(pc.counter_typer)
+        {
+            case PERF_COUNTER_TYPE_INT:
+                printf("%d\n", pc.val_int);
+                break;
+            case PERF_COUNTER_TYPE_LARGE:
+                printf("%Ld\n", pc.val_large);
+                break;
+            case PERF_COUNTER_TYPE_DOUBLE:
+                printf("%lf\n", pc.val_double);
+                break;
+            case PERF_COUNTER_TYPE_STRING:
+            default:
+                printf("%s\n", pc.val_str);
+                break;
+        }
+        memset(&pc, 0 , sizeof(perf_counter));
+    }
+    ap_metric_config_cloud_provider(handler, &pc, 1);
+    printf(">>%s\t%s\t%s\n", pc.type_name, pc.property_name, pc.val_str);
+
+EXIT:
     ap_close(handler);
     return ret;
 }

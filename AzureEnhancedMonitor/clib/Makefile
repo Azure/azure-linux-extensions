@@ -28,9 +28,13 @@ clean:
 	@echo "Cleaning..."
 	$(RM) -r $(BUILDDIR) $(TARGET)
 
-test:
+test: $(OBJECTS)
 	@echo "Run test"
-	$(CC) test/runtest.c $(INC) -L $(LIBDIR) -lazureperf -o bin/runtest
+	$(CC) test/runtest.c $^ $(INC) -L $(LIBDIR) -lazureperf -o bin/runtest
 	bin/runtest
+
+install:
+	cp $(TARGET) /usr/lib
+	cp $(INCDIR)/azureperf.h /usr/include
 
 .PHONY: clean test
