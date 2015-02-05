@@ -65,7 +65,7 @@ int main()
     // 0x31237648—“Hv#1. It means the next leaf contains version info.
     if(0x31237648 != cpuid[0])
     {
-        return;
+        return 1;
     }
     memset(cpuid, 0, sizeof(unsigned int) * 4);
     get_cpuid(0x40000002, cpuid);
@@ -73,5 +73,6 @@ int main()
     //cpuid[1] is host version. 
     //The high-end 16 bit is major version, while the low-end is minor.
     printf("%d.%d\n", (cpuid[1] >> 16) & 0xFF, (cpuid[1]) & 0xFF);
+    return 0;
 }
 

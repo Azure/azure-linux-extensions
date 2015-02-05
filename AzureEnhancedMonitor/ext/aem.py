@@ -997,20 +997,41 @@ class StorageDataSource(object):
                            instance = dev,
                            value = vhd)
 
+class HvInfo(object):
+    def __init__(self):
+        self.hvName = None;
+        self.hvVersion = None;
+        root_dir = os.path.dirname(__file__)
+        cmd = os.path.join(root_dir, "bin/hvinfo")
+        ret, output = waagent.RunGetOutput(cmd, chk_err=False)
+        print ret
+        if ret ==0 and output is not None:
+            lines = output.split("\n")
+            if len(lines) >= 2:
+                self.hvName = lines[0]
+                self.hvVersion = lines[1]
+
+    def getHvName(self):
+        return self.hvName
+
+    def getHvVersion(self):
+        return self.hvVersion
+
 class StaticDataSource(object):
     def __init__(self, config):
         self.config = config
 
     def collect(self):
-        counters = [];
+        counters = []
+        hvInfo = HvInfo()
         counters.append(self.createCounterCloudProvider())
         counters.append(self.createCounterCpuOverCommitted())
         counters.append(self.createCounterMemoryOverCommitted())
         counters.append(self.createCounterDataProviderVersion())
         counters.append(self.createCounterDataSources())
         counters.append(self.createCounterInstanceType())
-        counters.append(self.createCounterVirtualizationSolution())
-        counters.append(self.createCounterVirtualizationSolutionVersion())
+        counters.append(self.createCounterVirtSln(hvInfo.getHvName()))
+        counters.append(self.createCounterVirtSlnVersion(hvInfo.getHvVersion()))
         return counters
   
      
@@ -1020,17 +1041,17 @@ class StaticDataSource(object):
                            name = "Cloud Provider",
                            value = "Microsoft Azure")
 
-    def createCounterVirtualizationSolutionVersion(self):
+    def createCounterVirtSlnVersion(self, hvVersion):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Virtualization Solution Version",
-                           value = "")
+                           value = hvVersion)
 
-    def createCounterVirtualizationSolution(self):
+    def createCounterVirtSln(self, hvName):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Virtualization Solution",
-                           value = "")
+                           value = hvName)
   
     def createCounterInstanceType(self):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,

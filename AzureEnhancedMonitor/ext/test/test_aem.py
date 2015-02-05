@@ -88,12 +88,12 @@ class TestAEM(unittest.TestCase):
         name = "Virtualization Solution Version"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("", counter.value)
+        self.assertNotEquals(None, counter.value)
 
         name = "Virtualization Solution"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("", counter.value)
+        self.assertNotEquals(None, counter.value)
 
         name = "Instance Type"
         counter = next((c for c in counters if c.name == name))

@@ -5,3 +5,4 @@ Common/psutil/build/lib.linux-x86_64-2.7/_psutil_linux.so
 Common/psutil/build/lib.linux-x86_64-2.7/_psutil_posix.so
 Utils/
 LICENSE-2_0.txt
+AzureEnhancedMonitor/hvinfo/bin
