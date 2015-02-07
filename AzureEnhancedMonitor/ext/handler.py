@@ -24,6 +24,7 @@ import subprocess
 import traceback
 import time
 import aem
+import platform
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
@@ -68,6 +69,7 @@ def disable(hutil):
     if os.path.isfile(pidFile):
         pid = waagent.GetFileContents(pidFile)
         if os.path.isdir(os.path.join("/proc", pid)):
+            waagent.Log(("Stop daemon: {0}").format(pid))
             os.kill(int(pid), 9)
             os.remove(pidFile)
             hutil.do_exit(0, 'Disable', 'success', '0', 
@@ -81,8 +83,6 @@ def daemon(hutil):
     settings = hutil.get_protected_settings()
     config = aem.EnhancedMonitorConfig(settings)
     monitor = aem.EnhancedMonitor(config)
-    if not os.path.isdir(aem.LibDir):
-        os.makedirs(aem.LibDir)
 
     while True:
         waagent.Log("Collecting performance counter.")
@@ -104,9 +104,17 @@ def grace_exit(operation, status, msg):
     hutil = parse_context(operation)
     hutil.do_exit(0, operation, status, '0', msg)
 
+def parse_context(operation):
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context(operation)
+    return hutil
+
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("{0} started to handle.".format(ExtensionShortName))
+    
+    if not os.path.isdir(aem.LibDir):
+        os.makedirs(aem.LibDir)
     
     for command in sys.argv[1:]:
         if re.match("^([-/]*)(install)", command):
@@ -130,11 +138,6 @@ def main():
             hutil.error("{0}, {1}").format(e, traceback.format_exc())
             hutil.do_exit(1, command, 'failed','0', 
                           '{0} failed:{1}'.format(command, e))
-
-def parse_context(operation):
-    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context(operation)
-    return hutil
 
 if __name__ == '__main__':
     main()

@@ -18,7 +18,7 @@
 #
 # Requires Python 2.6+
 #
-
+import sys
 import unittest
 import env
 import os

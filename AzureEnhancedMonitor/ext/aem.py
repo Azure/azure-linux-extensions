@@ -15,6 +15,8 @@
 #
 # Requires Python 2.6+
 #
+
+
 import os
 import re
 import sys
@@ -26,6 +28,13 @@ import psutil
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+
+def timedelta_total_seconds(delta):
+
+    if not hasattr(datetime.timedelta, 'total_seconds'):
+        return delta.days * 86400 + delta.seconds
+    else:
+        return delta.total_seconds()
 
 MonitoringIntervalInMinute = 1 #One minute
 MonitoringInterval = 60 * MonitoringIntervalInMinute
@@ -54,7 +63,7 @@ tickInOneSecond = 1000 * 10000 # 1s = 1000 * 10000 ticks
 
 def getMDSTimestamp(unixTimestamp):
     unixTime = datetime.datetime.utcfromtimestamp(unixTimestamp)
-    startTimestamp = int((unixTime - Epoch).total_seconds())
+    startTimestamp = int(timedelta_total_seconds(unixTime - Epoch))
     return startTimestamp * tickInOneSecond
 
 def getIdentity():
@@ -238,7 +247,10 @@ class CPUInfo(object):
         self.numOfLogicalProcessors = len(lps)
 
         coresPerCPU = re.search("cpu cores\s+:\s+(\d+)", self.cpuinfo)
-        self.numOfCoresPerCPU = int(coresPerCPU.group(1))
+        if coresPerCPU:
+            self.numOfCoresPerCPU = int(coresPerCPU.group(1))
+        else:
+            self.numOfCoresPerCPU = 1
 
         cpuIds = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
                         self.lines)
@@ -247,10 +259,17 @@ class CPUInfo(object):
 
         model = re.search("model name\s+:\s+(.*)\s", self.cpuinfo)
         vendorId = re.search("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
-        self.processorType = "{0}, {1}".format(model.group(1), vendorId.group(1))
+        if model and vendorId:
+            self.processorType = "{0}, {1}".format(model.group(1), 
+                                                   vendorId.group(1))
+        else:
+            self.processorType = None
         
         freq = re.search("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
-        self.frequency = float(freq.group(1))
+        if freq:
+            self.frequency = float(freq.group(1))
+        else:
+            self.frequency = None
 
         ht = re.match("flags\s.*\sht\s", self.cpuinfo)
         self.isHTon = ht is not None
@@ -780,7 +799,7 @@ def isUserRead(op):
     if not op.startswith("user;"):
         return False
     op = op[5:]
-    for prefix in {"Get", "List", "Preflight"}:
+    for prefix in ["Get", "List", "Preflight"]:
         if op.startswith(prefix):
             return True
     return False
@@ -789,7 +808,7 @@ def isUserWrite(op):
     if not op.startswith("user;"):
         return False
     op = op[5:]
-    for prefix in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}:    
+    for prefix in ["Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"]:    
         if op.startswith(prefix):
             return True
     return False

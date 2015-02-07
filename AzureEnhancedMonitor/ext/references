@@ -1,8 +1,6 @@
 Common/azure-sdk-for-python/azure/
 Common/psutil/LICENSE
-Common/psutil/build/lib.linux-x86_64-2.7/psutil
-Common/psutil/build/lib.linux-x86_64-2.7/_psutil_linux.so
-Common/psutil/build/lib.linux-x86_64-2.7/_psutil_posix.so
+Common/libpsutil
 Utils/
 LICENSE-2_0.txt
 AzureEnhancedMonitor/hvinfo/bin
