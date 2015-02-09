@@ -123,10 +123,8 @@ class TestAEM(unittest.TestCase):
     def test_cpuinfo(self):
         cpuinfo = aem.CPUInfo.getCPUInfo()
         self.assertNotEquals(None, cpuinfo)
-        self.assertNotEquals(0, cpuinfo.getNumOfPhysCPUs())
         self.assertNotEquals(0, cpuinfo.getNumOfCoresPerCPU())
         self.assertNotEquals(0, cpuinfo.getNumOfCores())
-        self.assertNotEquals(0, cpuinfo.getNumOfLogicalProcessors())
         self.assertNotEquals(None, cpuinfo.getProcessorType())
         self.assertEquals(float, type(cpuinfo.getFrequency()))
         self.assertEquals(bool, type(cpuinfo.isHyperThreadingOn()))

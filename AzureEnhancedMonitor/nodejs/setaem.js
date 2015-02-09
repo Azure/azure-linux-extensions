@@ -32,8 +32,7 @@ var debug = 0;
 var CurrentScriptVersion = "1.0.0.0";
 
 var aemExtPublisher = "Microsoft.OSTCExtensions";
-//TODO change to AzureEnhacnedMonitroForLinux
-var aemExtName = "AzureEnhancedMonitorForLinux.Test";
+var aemExtName = "AzureEnhancedMonitorForLinux";
 var aemExtVersion = "1.0";
 
 var ladExtName = "LinuxDiagnosticTest3";

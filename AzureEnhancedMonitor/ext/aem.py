@@ -236,27 +236,29 @@ class CPUInfo(object):
 
     @staticmethod
     def getCPUInfo():
-        return CPUInfo(waagent.GetFileContents("/proc/cpuinfo"))
+        cpuinfo = waagent.GetFileContents("/proc/cpuinfo")
+        ret, lscpu = waagent.RunGetOutput("lscpu")
+        return CPUInfo(cpuinfo, lscpu)
 
-    def __init__(self, cpuinfo):
+    def __init__(self, cpuinfo, lscpu):
         self.cpuinfo = cpuinfo
-        self.lines = cpuinfo.split("\n")
-
-        lps = filter(lambda x : re.match("processor\s+:\s+\d+$", x), 
-                              self.lines)
-        self.numOfLogicalProcessors = len(lps)
-
-        coresPerCPU = re.search("cpu cores\s+:\s+(\d+)", self.cpuinfo)
-        if coresPerCPU:
-            self.numOfCoresPerCPU = int(coresPerCPU.group(1))
-        else:
-            self.numOfCoresPerCPU = 1
-
-        cpuIds = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
-                        self.lines)
-        self.physCPUs = len(set(cpuIds))
-        self.numOfCores = self.physCPUs * self.numOfCoresPerCPU
-
+        self.lscpu = lscpu
+        self.cores = 1;
+        self.coresPerCpu = 1;
+        self.threadsPerCore = 1;
+        
+        coresMatch = re.search("CPU(s):\s+(\d+)", self.lscpu)
+        if coresMatch:
+            self.cores = int(coresMatch.group(1))
+        
+        coresPerCpuMatch = re.search("Core(s) per socket:\s+(\d+)", self.lscpu)
+        if coresPerCpuMatch:
+            self.coresPerCpu = int(coresPerCpuMatch.group(1))
+        
+        threadsPerCoreMatch = re.search("Core(s) per socket:\s+(\d+)", self.lscpu)
+        if threadsPerCoreMatch:
+            self.threadsPerCore = int(threadsPerCoreMatch.group(1))
+        
         model = re.search("model name\s+:\s+(.*)\s", self.cpuinfo)
         vendorId = re.search("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
         if model and vendorId:
@@ -265,27 +267,24 @@ class CPUInfo(object):
         else:
             self.processorType = None
         
-        freq = re.search("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
-        if freq:
-            self.frequency = float(freq.group(1))
+        freqMatch = re.search("CPU MHz:\s+(.*)\s", self.lscpu)
+        if freqMatch:
+            self.frequency = float(freqMatch.group(1))
         else:
             self.frequency = None
 
         ht = re.match("flags\s.*\sht\s", self.cpuinfo)
         self.isHTon = ht is not None
 
-    def getNumOfLogicalProcessors(self):
-        return self.numOfLogicalProcessors
-    
     def getNumOfCoresPerCPU(self):
-        return self.numOfCoresPerCPU
+        return self.coresPerCpu
     
     def getNumOfCores(self):
-        return self.numOfCores
-    
-    def getNumOfPhysCPUs(self):
-        return self.physCPUs
+        return self.cores
 
+    def getNumOfThreadsPerCore(self):
+        return self.threadsPerCore
+    
     def getProcessorType(self):
         return self.processorType
    
@@ -297,17 +296,7 @@ class CPUInfo(object):
 
     def getCPUPercent(self):
         return psutil.cpu_percent()
-
-    def __str__(self):
-        return "Phys CPUs    : {0}\n".format(self.getNumOfPhysCPUs())+\
-               "Cores / CPU  : {0}\n".format(self.getNumOfCoresPerCPU())+\
-               "Cores        : {0}\n".format(self.getNumOfCores())+\
-               "Threads      : {0}\n".format(self.getNumOfLogicalProcessors())+\
-               "Model        : {0}\n".format(self.getProcessorType())+\
-               "Frequency    : {0}\n".format(self.getFrequency())+\
-               "Hyper Thread : {0}\n".format(self.isHyperThreadingOn())+\
-               "CPU Usage    : {0}\n".format(self.getCPUPercent())
-
+    
 class MemoryInfo(object):
     def __init__(self):
         self.memInfo = psutil.virtual_memory()
@@ -441,14 +430,10 @@ class LinuxMetric(object):
         return self.cpuInfo.getNumOfCoresPerCPU()
 
     def getNumOfThreadsPerCore(self):
-        lps = self.cpuInfo.getNumOfLogicalProcessors()
-        cores = self.cpuInfo.getNumOfCores()
-        return lps / cores
+        return self.cpuInfo.getNumOfThreadsPerCore()
 
     def getPhysProcessingPowerPerVCPU(self):
-        cores = self.cpuInfo.getNumOfCores()
-        lps = self.cpuInfo.getNumOfLogicalProcessors()
-        return float(cores) / lps
+        return 1 / float(self.getNumOfThreadsPerCore())
 
     def getProcessorType(self):
         return self.cpuInfo.getProcessorType()
@@ -835,7 +820,7 @@ def storageStat(metrics, opFilter):
                                                    x.AverageServerLatency, 
                                         metrics)) / stat['ops']
     #Convert to MB/s
-    stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
+    stat['throughput'] = float(stat['bytes']) / (1024 * 1024) / 60 
     return stat
 
 class AzureStorageStat(object):
