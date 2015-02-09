@@ -34,7 +34,10 @@ test: $(OBJECTS)
 	bin/runtest
 
 install:
-	cp $(TARGET) /usr/lib
+	mkdir -p /usr/lib/azureperf
+	cp $(TARGET) /usr/lib/azureperf
+	echo "/usr/lib/azureperf" > /etc/ld.so.conf.d/azureperf.conf
+	ldconfig
 	cp $(INCDIR)/azureperf.h /usr/include
 
 .PHONY: clean test

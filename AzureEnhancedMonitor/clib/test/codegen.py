@@ -93,5 +93,8 @@ if __name__ == "__main__":
                                                 type_name.lower(),
                                                 short_name)
                 head_out.write(head_snippet)
+                print "printf(\">>>>ap_metric_{0}_{1}\\n\");".format(type_name, short_name)
+                print "ap_metric_{0}_{1}(handler, &pc, 1);".format(type_name, short_name)
+                print "print_counter(&pc);"
 
 
