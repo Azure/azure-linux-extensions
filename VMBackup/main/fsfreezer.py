@@ -50,8 +50,8 @@ class FsFreezer:
         freeze_return_code = 0
         if(self.should_skip(mount)):
             self.logger.log('skip for devtmpfs and devpts '+str(mount.type))
-        elif(mount.type == 'xfs'):
-            freeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
+        #elif(mount.type == 'xfs'):
+        #    freeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
         else:
             freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
         self.logger.log('freeze_result...' + str(freeze_return_code))

@@ -132,6 +132,7 @@ def enable():
                 run_result = 11
                 run_status = 'error'
                 error_msg  = 'required field empty or not correct'
+                backup_logger.log(error_msg, False, 'Error')
             else:
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
@@ -168,6 +169,7 @@ def enable():
             run_status = 'error'
             run_result = 11
             error_msg = 'command is not correct'
+            backup_logger.log(error_msg, False, 'Error')
     except Exception as e:
         errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
