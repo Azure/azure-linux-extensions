@@ -35,7 +35,7 @@ var aemExtPublisher = "Microsoft.OSTCExtensions";
 var aemExtName = "AzureEnhancedMonitorForLinux";
 var aemExtVersion = "1.0";
 
-var ladExtName = "LinuxDiagnosticTest3";
+var ladExtName = "LinuxDiagnostic";
 var ladExtPublisher = "Microsoft.OSTCExtensions";
 var ladExtVersion = "1.1";
 
@@ -444,6 +444,13 @@ var main = function(){
         vmName = process.argv[3];
         svcName = process.argv[2];
     } else if(process.argv.length === 3){
+        if(process.argv[2] === "--help" || process.argv[2] === "-h"){
+            usage();
+            process.exit(0);
+        } else if(process.argv[2] === "--version" || process.argv[2] === "-v"){
+            console.log(CurrentScriptVersion);
+            process.exit(0);
+        }
         vmName = process.argv[2];
         svcName = vmName;
     } else{
@@ -465,7 +472,6 @@ var main = function(){
             console.log("    azure login -u <user_name>");
             console.log("or");
             console.log("    azure account import <pem_file>");
-            console.log("    ");
             process.exit(-1);
         }else{
             console.log(err);
@@ -485,6 +491,13 @@ var usage = function(){
     console.log("  *if service_name and vm_name are the same, " + 
                 "service_name could be omitted.");
     console.log("");
+    console.log("    ");
+    console.log("    -h, --help ");
+    console.log("        Print help.");
+    console.log("    ");
+    console.log("    -v, --version");
+    console.log("        Print version.");
+    console.log("    ");
 }
 
 main();

@@ -42,3 +42,9 @@ echo "exit"                                     >> $build_dir/install.sh
 cd $build_dir
 tar czf - $proj_full_name                       >> $build_dir/install.sh
 chmod +x $build_dir/install.sh
+
+
+cp -r $root/clib $build_dir
+cd $build_dir
+tar czf clib.tar.gz clib/
+
