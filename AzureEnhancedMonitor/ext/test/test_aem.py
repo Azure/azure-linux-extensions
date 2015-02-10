@@ -18,14 +18,15 @@
 #
 # Requires Python 2.6+
 #
-
+import sys
 import unittest
 import env
 import os
-import aem
 import json
 import datetime
 from Utils.WAAgentUtil import waagent
+import aem
+import handler
 
 TestConfig="""{
         "vm.size" : "Small (A1)",
@@ -87,12 +88,12 @@ class TestAEM(unittest.TestCase):
         name = "Virtualization Solution Version"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("", counter.value)
+        self.assertNotEquals(None, counter.value)
 
         name = "Virtualization Solution"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("", counter.value)
+        self.assertNotEquals(None, counter.value)
 
         name = "Instance Type"
         counter = next((c for c in counters if c.name == name))
@@ -122,10 +123,8 @@ class TestAEM(unittest.TestCase):
     def test_cpuinfo(self):
         cpuinfo = aem.CPUInfo.getCPUInfo()
         self.assertNotEquals(None, cpuinfo)
-        self.assertNotEquals(0, cpuinfo.getNumOfPhysCPUs())
         self.assertNotEquals(0, cpuinfo.getNumOfCoresPerCPU())
         self.assertNotEquals(0, cpuinfo.getNumOfCores())
-        self.assertNotEquals(0, cpuinfo.getNumOfLogicalProcessors())
         self.assertNotEquals(None, cpuinfo.getProcessorType())
         self.assertEquals(float, type(cpuinfo.getFrequency()))
         self.assertEquals(bool, type(cpuinfo.isHyperThreadingOn()))

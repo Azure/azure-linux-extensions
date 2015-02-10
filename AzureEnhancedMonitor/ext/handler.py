@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
-#
 # Copyright 2014 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +24,7 @@ import subprocess
 import traceback
 import time
 import aem
+import platform
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
@@ -33,18 +32,20 @@ ExtensionShortName = 'AzureEnhancedMonitor'
 
 def enable(hutil):
     pid = None
-    pidFile = "pid"
+    pidFile = os.path.join(aem.LibDir, "pid");
    
     #Check whether monitor process is running.
     #If it does, return. Otherwise clear pid file
     if os.path.isfile(pidFile):
         pid = waagent.GetFileContents(pidFile)
-        if os.path.isfile(os.path.join("/proc", pid)):
-            hutil.do_exit(0, 'Enable', 'success', '0', 
-                          'Azure Enhanced Monitor is already running')
-            return
-        else:
-            os.remove(pidFile)
+        if os.path.isdir(os.path.join("/proc", pid)):
+            if hutil.is_seq_smaller():
+                hutil.do_exit(0, 'Enable', 'success', '0', 
+                              'Azure Enhanced Monitor is already running')
+            else:
+                waagent.Log("Stop old daemon: {0}".format(pid))
+                os.kill(int(pid), 9)
+        os.remove(pidFile)
 
     args = [os.path.join(os.getcwd(), __file__), "daemon"]
     devnull = open(os.devnull, 'w')
@@ -53,6 +54,7 @@ def enable(hutil):
         hutil.do_exit(1, 'Enable', 'error', '1', 
                       'Failed to launch Azure Enhanced Monitor')
     else:
+        hutil.save_seq()
         waagent.SetFileContents(pidFile, str(child.pid))
         waagent.Log(("Daemon pid: {0}").format(child.pid))
         hutil.do_exit(0, 'Enable', 'success', '0', 
@@ -60,13 +62,14 @@ def enable(hutil):
 
 def disable(hutil):
     pid = None
-    pidFile = "pid"
+    pidFile = os.path.join(aem.LibDir, "pid");
    
     #Check whether monitor process is running.
     #If it does, kill it. Otherwise clear pid file
     if os.path.isfile(pidFile):
         pid = waagent.GetFileContents(pidFile)
         if os.path.isdir(os.path.join("/proc", pid)):
+            waagent.Log(("Stop daemon: {0}").format(pid))
             os.kill(int(pid), 9)
             os.remove(pidFile)
             hutil.do_exit(0, 'Disable', 'success', '0', 
@@ -77,12 +80,9 @@ def disable(hutil):
                   'Azure Enhanced Monitor is not running')
 
 def daemon(hutil):
-    #TODO change to private_settings
-    public_settings = hutil.get_public_settings()
-    config = aem.EnhancedMonitorConfig(public_settings)
+    settings = hutil.get_protected_settings()
+    config = aem.EnhancedMonitorConfig(settings)
     monitor = aem.EnhancedMonitor(config)
-    if not os.path.isdir(aem.LibDir):
-        os.makedirs(aem.LibDir)
 
     while True:
         waagent.Log("Collecting performance counter.")
@@ -104,9 +104,17 @@ def grace_exit(operation, status, msg):
     hutil = parse_context(operation)
     hutil.do_exit(0, operation, status, '0', msg)
 
+def parse_context(operation):
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil.do_parse_context(operation)
+    return hutil
+
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("{0} started to handle.".format(ExtensionShortName))
+    
+    if not os.path.isdir(aem.LibDir):
+        os.makedirs(aem.LibDir)
     
     for command in sys.argv[1:]:
         if re.match("^([-/]*)(install)", command):
@@ -127,14 +135,9 @@ def main():
                 hutil = parse_context("enable")
                 daemon(hutil)
         except Exception, e:
-            hutil.error("{0}, {1}").format(e, traceback.format_exc()))
+            hutil.error("{0}, {1}").format(e, traceback.format_exc())
             hutil.do_exit(1, command, 'failed','0', 
                           '{0} failed:{1}'.format(command, e))
-
-def parse_context(operation):
-    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
-    hutil.do_parse_context(operation)
-    return hutil
 
 if __name__ == '__main__':
     main()

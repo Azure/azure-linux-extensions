@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-#
-#CustomScript extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -18,6 +15,8 @@
 #
 # Requires Python 2.6+
 #
+
+
 import os
 import re
 import sys
@@ -29,6 +28,13 @@ import psutil
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+
+def timedelta_total_seconds(delta):
+
+    if not hasattr(datetime.timedelta, 'total_seconds'):
+        return delta.days * 86400 + delta.seconds
+    else:
+        return delta.total_seconds()
 
 MonitoringIntervalInMinute = 1 #One minute
 MonitoringInterval = 60 * MonitoringIntervalInMinute
@@ -57,7 +63,7 @@ tickInOneSecond = 1000 * 10000 # 1s = 1000 * 10000 ticks
 
 def getMDSTimestamp(unixTimestamp):
     unixTime = datetime.datetime.utcfromtimestamp(unixTimestamp)
-    startTimestamp = int((unixTime - Epoch).total_seconds())
+    startTimestamp = int(timedelta_total_seconds(unixTime - Epoch))
     return startTimestamp * tickInOneSecond
 
 def getIdentity():
@@ -83,10 +89,6 @@ def getAzureDiagnosticCPUData(accountName, accountKey,
                               startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data(CPU).")
-        #TODO remove verbose log
-        waagent.Log("Account:{0}".format(accountName))
-        waagent.Log("StartKey:{0}".format(startKey))
-        waagent.Log("EndKey:{0}".format(endKey))
         table = "LinuxPerfCpuVer1v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey)
@@ -108,10 +110,6 @@ def getAzureDiagnosticMemoryData(accountName, accountKey,
                                  startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data: Memory")
-        #TODO remove verbose log
-        waagent.Log("Account:{0}".format(accountName))
-        waagent.Log("StartKey:{0}".format(startKey))
-        waagent.Log("EndKey:{0}".format(endKey))
         table = "LinuxPerfMemVer1v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey)
@@ -238,46 +236,55 @@ class CPUInfo(object):
 
     @staticmethod
     def getCPUInfo():
-        return CPUInfo(waagent.GetFileContents("/proc/cpuinfo"))
+        cpuinfo = waagent.GetFileContents("/proc/cpuinfo")
+        ret, lscpu = waagent.RunGetOutput("lscpu")
+        return CPUInfo(cpuinfo, lscpu)
 
-    def __init__(self, cpuinfo):
+    def __init__(self, cpuinfo, lscpu):
         self.cpuinfo = cpuinfo
-        self.lines = cpuinfo.split("\n")
-
-        lps = filter(lambda x : re.match("processor\s+:\s+\d+$", x), 
-                              self.lines)
-        self.numOfLogicalProcessors = len(lps)
-
-        coresPerCPU = re.search("cpu cores\s+:\s+(\d+)", self.cpuinfo)
-        self.numOfCoresPerCPU = int(coresPerCPU.group(1))
-
-        cpuIds = filter(lambda x : re.match("physical id\s+:\s+(\d+)$", x), 
-                        self.lines)
-        self.physCPUs = len(set(cpuIds))
-        self.numOfCores = self.physCPUs * self.numOfCoresPerCPU
-
+        self.lscpu = lscpu
+        self.cores = 1;
+        self.coresPerCpu = 1;
+        self.threadsPerCore = 1;
+        
+        coresMatch = re.search("CPU(s):\s+(\d+)", self.lscpu)
+        if coresMatch:
+            self.cores = int(coresMatch.group(1))
+        
+        coresPerCpuMatch = re.search("Core(s) per socket:\s+(\d+)", self.lscpu)
+        if coresPerCpuMatch:
+            self.coresPerCpu = int(coresPerCpuMatch.group(1))
+        
+        threadsPerCoreMatch = re.search("Core(s) per socket:\s+(\d+)", self.lscpu)
+        if threadsPerCoreMatch:
+            self.threadsPerCore = int(threadsPerCoreMatch.group(1))
+        
         model = re.search("model name\s+:\s+(.*)\s", self.cpuinfo)
         vendorId = re.search("vendor_id\s+:\s+(.*)\s", self.cpuinfo)
-        self.processorType = "{0}, {1}".format(model.group(1), vendorId.group(1))
+        if model and vendorId:
+            self.processorType = "{0}, {1}".format(model.group(1), 
+                                                   vendorId.group(1))
+        else:
+            self.processorType = None
         
-        freq = re.search("cpu MHz\s+:\s+(.*)\s", self.cpuinfo)
-        self.frequency = float(freq.group(1))
+        freqMatch = re.search("CPU MHz:\s+(.*)\s", self.lscpu)
+        if freqMatch:
+            self.frequency = float(freqMatch.group(1))
+        else:
+            self.frequency = None
 
         ht = re.match("flags\s.*\sht\s", self.cpuinfo)
         self.isHTon = ht is not None
 
-    def getNumOfLogicalProcessors(self):
-        return self.numOfLogicalProcessors
-    
     def getNumOfCoresPerCPU(self):
-        return self.numOfCoresPerCPU
+        return self.coresPerCpu
     
     def getNumOfCores(self):
-        return self.numOfCores
-    
-    def getNumOfPhysCPUs(self):
-        return self.physCPUs
+        return self.cores
 
+    def getNumOfThreadsPerCore(self):
+        return self.threadsPerCore
+    
     def getProcessorType(self):
         return self.processorType
    
@@ -289,17 +296,7 @@ class CPUInfo(object):
 
     def getCPUPercent(self):
         return psutil.cpu_percent()
-
-    def __str__(self):
-        return "Phys CPUs    : {0}\n".format(self.getNumOfPhysCPUs())+\
-               "Cores / CPU  : {0}\n".format(self.getNumOfCoresPerCPU())+\
-               "Cores        : {0}\n".format(self.getNumOfCores())+\
-               "Threads      : {0}\n".format(self.getNumOfLogicalProcessors())+\
-               "Model        : {0}\n".format(self.getProcessorType())+\
-               "Frequency    : {0}\n".format(self.getFrequency())+\
-               "Hyper Thread : {0}\n".format(self.isHyperThreadingOn())+\
-               "CPU Usage    : {0}\n".format(self.getCPUPercent())
-
+    
 class MemoryInfo(object):
     def __init__(self):
         self.memInfo = psutil.virtual_memory()
@@ -371,7 +368,7 @@ class HardwareChangeInfo(object):
         if not os.path.isfile(HwInfoFile):
             return None, None
         hwInfo = waagent.GetFileContents(HwInfoFile).split("\n")
-        return float(hwInfo[0]), hwInfo[1:]
+        return int(hwInfo[0]), hwInfo[1:]
 
     def setHwInfo(self, timestamp, hwInfo):
         content = str(timestamp)
@@ -382,7 +379,7 @@ class HardwareChangeInfo(object):
         oldTime, oldMacs = self.getHwInfo()
         newMacs = map(lambda x : getMacAddress(x), 
                       self.networkInfo.getAdapterIds())
-        newTime = time.time()
+        newTime = int(time.time())
         newMacs.sort()
         if oldMacs is None or not sameList(newMacs, oldMacs):
             #Hardware changed
@@ -433,14 +430,10 @@ class LinuxMetric(object):
         return self.cpuInfo.getNumOfCoresPerCPU()
 
     def getNumOfThreadsPerCore(self):
-        lps = self.cpuInfo.getNumOfLogicalProcessors()
-        cores = self.cpuInfo.getNumOfCores()
-        return lps / cores
+        return self.cpuInfo.getNumOfThreadsPerCore()
 
     def getPhysProcessingPowerPerVCPU(self):
-        cores = self.cpuInfo.getNumOfCores()
-        lps = self.cpuInfo.getNumOfLogicalProcessors()
-        return float(cores) / lps
+        return 1 / float(self.getNumOfThreadsPerCore())
 
     def getProcessorType(self):
         return self.cpuInfo.getProcessorType()
@@ -549,7 +542,7 @@ class VMDataSource(object):
                            unit="posixtime")
 
     def createCounterCurrHwFrequency(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "cpu",
                            name = "Current Hw Frequency",
                            value = metrics.getCurrHwFrequency(),
@@ -557,7 +550,7 @@ class VMDataSource(object):
                            refreshInterval = 60)
 
     def createCounterMaxHwFrequency(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "cpu",
                            name = "Max Hw Frequency",
                            value = metrics.getMaxHwFrequency(),
@@ -603,25 +596,25 @@ class VMDataSource(object):
                            value = metrics.getPhysProcessingPowerPerVCPU())
 
     def createCounterProcessorType(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "cpu",
                            name = "Processor Type",
                            value = metrics.getProcessorType())
 
     def createCounterReferenceComputeUnit(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "cpu",
                            name = "Reference Compute Unit",
                            value = metrics.getReferenceComputeUnit())
 
     def createCounterVCPUMapping(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "cpu",
                            name = "vCPU Mapping",
                            value = metrics.getVCPUMapping())
 
     def createCounterVMProcessingPowerConsumption(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "cpu",
                            name = "VM Processing Power Consumption",
                            value = metrics.getVMProcessingPowerConsumption(),
@@ -651,7 +644,7 @@ class VMDataSource(object):
                            unit = "MB")
 
     def createCounterVMMemConsumption(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "memory",
                            name = "VM Memory Consumption",
                            value = metrics.getVMMemConsumption(),
@@ -660,14 +653,14 @@ class VMDataSource(object):
                            refreshInterval = 60)
 
     def createCounterAdapterId(self, adapterId):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "network",
                            name = "Adapter Id",
                            instance = adapterId,
                            value = adapterId)
 
     def createCounterNetworkMapping(self, metrics, adapterId):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "network",
                            name = "Mapping",
                            instance = adapterId,
@@ -690,14 +683,14 @@ class VMDataSource(object):
                            unit = "Mbit/s")
 
     def createCounterNetworkReadBytes(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Read Bytes",
                            value = metrics.getNetworkReadBytes(),
                            unit = "byte/s")
 
     def createCounterNetworkWriteBytes(self, metrics):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Write Bytes",
                            value = metrics.getNetworkWriteBytes(),
@@ -730,10 +723,6 @@ def getStorageTableKeyRange():
 def getStorageMetrics(account, key, table, startKey, endKey):
     try:
         waagent.Log("Retrieve storage metrics data.")
-        #TODO remove verbose log
-        waagent.Log("Account:{0}".format(account))
-        waagent.Log("StartKey:{0}".format(startKey))
-        waagent.Log("EndKey:{0}".format(endKey))
         tableService = TableService(account_name = account, account_key = key)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
                    "").format(startKey, endKey)
@@ -795,7 +784,7 @@ def isUserRead(op):
     if not op.startswith("user;"):
         return False
     op = op[5:]
-    for prefix in {"Get", "List", "Preflight"}:
+    for prefix in ["Get", "List", "Preflight"]:
         if op.startswith(prefix):
             return True
     return False
@@ -804,7 +793,7 @@ def isUserWrite(op):
     if not op.startswith("user;"):
         return False
     op = op[5:]
-    for prefix in {"Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"}:    
+    for prefix in ["Put" ,"Set" ,"Clear" ,"Delete" ,"Create" ,"Snapshot"]:    
         if op.startswith(prefix):
             return True
     return False
@@ -831,7 +820,7 @@ def storageStat(metrics, opFilter):
                                                    x.AverageServerLatency, 
                                         metrics)) / stat['ops']
     #Convert to MB/s
-    stat['throughput'] = stat['bytes'] / (1024 * 1024) / 60 
+    stat['throughput'] = float(stat['bytes']) / (1024 * 1024) / 60 
     return stat
 
 class AzureStorageStat(object):
@@ -909,7 +898,7 @@ class StorageDataSource(object):
         return counters
 
     def createCounterReadBytes(self, account, stat):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "storage",
                            name = "Storage Read Bytes",
                            instance = account,
@@ -953,7 +942,7 @@ class StorageDataSource(object):
                            refreshInterval = 60)
 
     def createCounterWriteBytes(self, account, stat):
-        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "storage",
                            name = "Storage Write Bytes",
                            instance = account,
@@ -1011,20 +1000,41 @@ class StorageDataSource(object):
                            instance = dev,
                            value = vhd)
 
+class HvInfo(object):
+    def __init__(self):
+        self.hvName = None;
+        self.hvVersion = None;
+        root_dir = os.path.dirname(__file__)
+        cmd = os.path.join(root_dir, "bin/hvinfo")
+        ret, output = waagent.RunGetOutput(cmd, chk_err=False)
+        print ret
+        if ret ==0 and output is not None:
+            lines = output.split("\n")
+            if len(lines) >= 2:
+                self.hvName = lines[0]
+                self.hvVersion = lines[1]
+
+    def getHvName(self):
+        return self.hvName
+
+    def getHvVersion(self):
+        return self.hvVersion
+
 class StaticDataSource(object):
     def __init__(self, config):
         self.config = config
 
     def collect(self):
-        counters = [];
+        counters = []
+        hvInfo = HvInfo()
         counters.append(self.createCounterCloudProvider())
         counters.append(self.createCounterCpuOverCommitted())
         counters.append(self.createCounterMemoryOverCommitted())
         counters.append(self.createCounterDataProviderVersion())
         counters.append(self.createCounterDataSources())
         counters.append(self.createCounterInstanceType())
-        counters.append(self.createCounterVirtualizationSolution())
-        counters.append(self.createCounterVirtualizationSolutionVersion())
+        counters.append(self.createCounterVirtSln(hvInfo.getHvName()))
+        counters.append(self.createCounterVirtSlnVersion(hvInfo.getHvVersion()))
         return counters
   
      
@@ -1034,17 +1044,17 @@ class StaticDataSource(object):
                            name = "Cloud Provider",
                            value = "Microsoft Azure")
 
-    def createCounterVirtualizationSolutionVersion(self):
+    def createCounterVirtSlnVersion(self, hvVersion):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Virtualization Solution Version",
-                           value = "")
+                           value = hvVersion)
 
-    def createCounterVirtualizationSolution(self):
+    def createCounterVirtSln(self, hvName):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Virtualization Solution",
-                           value = "")
+                           value = hvName)
   
     def createCounterInstanceType(self):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
@@ -1094,7 +1104,7 @@ class PerfCounter(object):
                  value, 
                  instance="",
                  unit="none",
-                 timestamp = int(time.time()),
+                 timestamp = None,
                  refreshInterval=0):
         self.counterType = counterType
         self.category = category
@@ -1103,17 +1113,20 @@ class PerfCounter(object):
         self.value = value
         self.unit = unit
         self.refreshInterval = refreshInterval
-        self.timestamp = timestamp
+        if(timestamp):
+            self.timestamp = timestamp
+        else:
+            self.timestamp = int(time.time())
         self.machine = socket.gethostname()
 
     def __str__(self):
-        return (u";{0};{1};{2};{3};{4};{5};{6};{7};{8};{9}"
+        return (u"{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};\n"
                  "").format(self.counterType,
                             self.category,
                             self.name,
                             self.instance,
-                            1 if self.value is None else 0,
-                            self.value,
+                            0 if self.value is not None else 1,
+                            self.value if self.value is not None else "",
                             self.unit,
                             self.refreshInterval,
                             self.timestamp,
@@ -1135,7 +1148,7 @@ class EnhancedMonitor(object):
             counters.extend(dataSource.collect())
         self.writer.write(counters)
 
-EventFile=os.path.join(LibDir, "Events")
+EventFile=os.path.join(LibDir, "PerfCounters")
 class PerfCounterWriter(object):
     def write(self, counters, maxRetry = 3, eventFile=EventFile):
         for i in range(0, maxRetry):
@@ -1153,7 +1166,7 @@ class PerfCounterWriter(object):
 
     def _write(self, counters, eventFile):
         with open(eventFile, "w+") as F:
-            F.write("\n".join(map(lambda c : str(c), counters)))
+            F.write("".join(map(lambda c : str(c), counters)).encode("utf8"))
 
 class EnhancedMonitorConfig(object):
     def __init__(self, configData):
