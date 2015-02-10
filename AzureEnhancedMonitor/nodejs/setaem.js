@@ -37,7 +37,7 @@ var aemExtVersion = "1.0";
 
 var ladExtName = "LinuxDiagnostic";
 var ladExtPublisher = "Microsoft.OSTCExtensions";
-var ladExtVersion = "1.1";
+var ladExtVersion = "1.0";
 
 var ROLECONTENT = "IaaS";
 var AzureEndpoint = "windows.net";
