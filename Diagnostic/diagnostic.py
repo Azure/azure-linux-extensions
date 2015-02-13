@@ -34,7 +34,7 @@ import time
 import datetime
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
-
+import commands
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
 AgentDir = '/var/lib/waagent'
@@ -64,32 +64,33 @@ DebianConfig = {"installomi":"bash "+omi_universal_dpkg_name+" --install --force
                  "packages":('libglibmm-2.4-1c2a',),
                   "restartrsyslog":"service rsyslog restart",
                   "syslogpackages":(),
-                 'distrolibs':'debian','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                 'distrolibs':'debian/* shared/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
                 }
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_rpm_name+" --install --force;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
-                 "packages":('glibmm24',),
+                 "packages":('glibmm24','tar',),
+                'distrolibs':'redhat/* shared/*',
                   "restartrsyslog":"service rsyslog restart",
                  "syslogpackages":('policycoreutils-python',),
                   'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
                  }
 
 UbuntuConfig = dict(DebianConfig.items()+
-                    {'distrolibs':'ubuntu'
+                    {'distrolibs':'debian/* shared/*'
                     }
                     .items())
 SuseConfig11 = dict(RedhatConfig.items()+
                     {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
                      "packages":('glibmm2',),
                      "syslogpackages":('rsyslog',),
-                  'distrolibs':'suse'}
+                  'distrolibs':'suse/*'}
                   .items())
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                   "packages":('libglibmm-2_4-1','libgthread-2_0-0',),
+                   "packages":('libglibmm-2_4-1','libgthread-2_0-0','ca-certificates-mozilla',),
                     "syslogpackages":('rsyslog',),
-                  'distrolibs':'suse12'}
+                  'distrolibs':'suse12/*'}
                   .items())
 
 CentosConfig = dict(RedhatConfig.items()+
@@ -107,16 +108,30 @@ elif All_Dist.has_key(dist[0]):
     distConfig =  All_Dist[dist[0]]
 else:
     hutil.error("os version:"+dist[0]+" not supported")
-    
+
 
 def main(command):
     #Global Variables definition
     global EnableSyslog
-   
     if  hutil.get_protected_settings().has_key('enableSyslog'):
-        EnableSyslog = hutil.get_protected_settings()['enableSyslog']
+        if hutil.get_protected_settings()['enableSyslog'].lower() == 'true':
+            EnableSyslog = True
+        else:
+            EnableSyslog = False
+   
+    for notsupport in ('WALinuxAgent-2.0.5','WALinuxAgent-2.0.4','WALinuxAgent-1'):
+        code,str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*"+notsupport+"' /usr/sbin/waagent",chk_err=False)
+        if code==0 and str_ret.find(notsupport)>-1:
+            hutil.log("can run this extension on  "+notsupport)
+            hutil.do_status_report("Install", "error",'1', "can run this extension on  "+notsupport)
+            return 
+        
     if distConfig == None:
         hutil.do_status_report("Install", "error",'1', "can't be installed on this OS")
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                op=waagent.WALAEventOperation.Enable,
+                                isSuccess=False,
+                                      message="can't be installed on this OS"+str(platform.dist()))
         return 
     try:
         if re.match("^([-/]*)(disable)", command):
@@ -133,6 +148,7 @@ def main(command):
             hutil.do_status_report("Install", "success",'0', "Install succeeded")
         elif re.match("^([-/]*)(enable)", command):
             # if daemon process not runs
+            hutil.log("get pid:"+str(get_mdsd_process()))
             if len(get_mdsd_process())!=2 or  hutil.is_current_config_seq_greater_inused():
                 stop_mdsd()
                 start_daemon()
@@ -148,7 +164,7 @@ def main(command):
     except Exception, e:
         hutil.error(("Failed to enable the extension with error:{0}, "
                      "{1}").format(e, traceback.format_exc()))
-        hutil.do_status_report('Enable','failed','0',
+        hutil.do_status_report('Enable','error','0',
                       'Enable failed:{0}'.format(e))
 
 
@@ -158,9 +174,7 @@ def parse_context(operation):
     return 
 
 def setup():
-    error,msg = install_omi()
-    if error !=0:
-        hutil.error(msg)
+    global EnableSyslog
     if EnableSyslog:
         error,msg = install_rsyslogom()
         if error !=0:
@@ -177,7 +191,8 @@ def start_daemon():
     child = subprocess.Popen(args, stdout=log, stderr=log)
     wait_n = 20
     while len(get_mdsd_process())==0 and wait_n >0:
-        time.sleep(10)    
+        time.sleep(10)  
+        wait_n=wait_n-1  
     if wait_n <=0:
         hutil.error("wait daemon start time out")   
 
@@ -185,8 +200,8 @@ def start_mdsd():
     global EnableSyslog 
     agent_dir = AgentDir 
     with open(os.path.join(agent_dir,MDSDPidFile),"w") as pidfile:
-         pidfile.write(str(os.getpid())+'\n');
-    
+         pidfile.write(str(os.getpid())+'\n')
+         pidfile.close()
     retry = 4
     while retry >0:
         error,msg = install_required_package()
@@ -197,6 +212,8 @@ def start_mdsd():
             retry-=1
             hutil.log("Sleep 60 retry "+str(retry))
             time.sleep(60)
+
+    install_omi()
 
     if EnableSyslog and not is_rsylogom_installed():
         install_rsyslogom()
@@ -241,8 +258,9 @@ def start_mdsd():
             ts = TableService(settings['storageAccountName'], settings['storageAccountKey'])
             for t in (settings['perftable']+'Cpu',settings['perftable']+'Disk',settings['perftable']+'Mem',settings['logtable']):
                 ts.create_table(settings['namespace']+t+'Ver'+settings['version']+'v0')
+            ts.create_table('SchemasTable')
         except Exception,e:
-            hutil.error(("Failed to create azure tables (And CONTINUE)with error:{0},"
+            hutil.error(("Failed to create azure tables (will continue) with error:{0},"
                      "stacktrace:{1}").format(e, traceback.format_exc()))
  
     default_port = RSYSLOG_OM_PORT
@@ -265,13 +283,14 @@ def start_mdsd():
                                      env=copy_env)
 
             with open(os.path.join(agent_dir,MDSDPidFile),"w") as pidfile:
-                pidfile.write(str(os.getpid())+'\n');
-                pidfile.write(str(mdsd.pid)+'\n');
+                pidfile.write(str(os.getpid())+'\n')
+                pidfile.write(str(mdsd.pid)+'\n')
+                pidfile.close()              
 	
             last_error_time = datetime.datetime.now()            
             while True:
                 time.sleep(30)  
-                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 :
+                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 and len(get_mdsd_process()) >=2:
                     mdsd.kill()
                     hutil.log("Another process is started, now exit")
                     return                      
@@ -288,11 +307,11 @@ def start_mdsd():
                 last_error = tail(monitor_file_path)
                 if len(last_error) > 0 and (datetime.datetime.now()- last_error_time) < datetime.timedelta(minutes=30):
                     hutil.log("Error in MDSD:"+last_error)
-                    hutil.do_status_report("Enable","running",'1',"WARNING: error happens at:"+str(last_error_time)+":"+last_error)
-                if len(last_error) >0 and last_error.find("Error: EnumerateInstances failed") >=0:
-                    hutil.error("Error: EnumerateInstances means mdsd is now in busy loop:")
-                    mdsd.kill()
-                    os.remove(monitor_file_path)
+                    hutil.do_status_report("Enable","warning",'1',"WARNING: error happens at:"+str(last_error_time)+":"+last_error)
+                #if len(last_error) >0 and last_error.find("Error: EnumerateInstances failed") >=0:
+                #    hutil.error("Error: EnumerateInstances means mdsd is now in busy loop:")
+                #    mdsd.kill()
+                #    os.remove(monitor_file_path)
             
                                     
             if mdsd_log:
@@ -301,19 +320,22 @@ def start_mdsd():
 
             error = tail(mdsd_log_path)
             hutil.error("MDSD crashed:"+error)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            try:
+                waagent.AddExtensionEvent(name=hutil.get_name(),
                                 op=waagent.WALAEventOperation.Enable,
                                 isSuccess=False,
                                       message=error)
+            except Exception:
+                pass
 
-        hutil.do_status_report("Enable","failed",'1',"mdsd stopped:"+error)
+        hutil.do_status_report("Enable","error",'1',"mdsd stopped:"+error)
 
     except Exception,e:
         if mdsd_log:
             hutil.error("Error :"+tail(mdsd_log_path))
         hutil.error(("Failed to launch mdsd with error:{0},"
                      "stacktrace:{1}").format(e, traceback.format_exc()))
-        hutil.do_status_report('Enable', 'failed', '1',
+        hutil.do_status_report('Enable', 'error', '1',
                       'Lanch script failed:{0}'.format(e))
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
@@ -341,9 +363,11 @@ def get_mdsd_process():
     
     with open(MDSDPidFile,"r") as pidfile:
         for pid in pidfile.readlines():
-            is_still_alive = waagent.RunGetOutput("ps aux |grep -v 'ps aux'|grep "+pid.strip()+"|grep 'mdsd\|-daemon'|wc -l")[1]
-            if is_still_alive.strip() == '1':
+            is_still_alive = waagent.RunGetOutput("cat /proc/"+pid.strip()+"/cmdline",chk_err=False)[1]
+            if is_still_alive.find('LinuxDiagnostic') > 0 :
                 mdsd_pids.append(pid.strip())
+            else:
+                hutil.log("return not alive "+is_still_alive.strip())
     return mdsd_pids
 
 def get_dist_config():
@@ -357,11 +381,12 @@ def get_dist_config():
 
 def copy_distrolibs():
     libs = distConfig['distrolibs']
-    if len(libs) >0 and os.path.exists(libs):
-        return RunGetOutput('\cp -f {0}/* {1}'.format(libs,MdsdFolder))
+    if len(libs) >0:
+        return RunGetOutput('\cp -f {0} {1}'.format(libs,MdsdFolder))
     return 0,""
 
 def install_omi():
+    #Update scenario will be considerd when it comes
     if os.path.exists("/opt/microsoft/omi/bin/omiserver"):
         return 0,"Already installed"
     #hostname=os.uname()[1]
@@ -431,6 +456,7 @@ def install_rsyslogom():
     return 0,"install mdsdom completed"
 
 def install_required_package():
+    global EnableSyslog
     cmd_temp = distConfig['installrequiredpackage']
     packages = distConfig['packages']
     if EnableSyslog:
@@ -442,7 +468,7 @@ def install_required_package():
             cmd = cmd_temp.replace("PACKAGE",p)
             hutil.log(cmd)
             process = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,executable='/bin/bash')
-            timeout=50
+            timeout=360
             while process.poll() is None and timeout > 0:
                 time.sleep(10)
                 timeout-=1
