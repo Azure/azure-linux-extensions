@@ -35,13 +35,14 @@ import subprocess
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
         super(UbuntuPatching,self).__init__()
+
     def install_extras(self, paras):
         print("installing in ubuntu")
         if(paras.command == "disk"):
-            common_extras = ['cryptsetup-bin']
-            for extra in self.common_extras:
+            common_extras = ['cryptsetup-bin','lsscsi']
+            for extra in common_extras:
                 print("installation for " + extra + 'result is ' + str(subprocess.call(['apt-get', 'install','-y', extra])))
-            
+
             if(paras.filesystem == "btrfs"):
                 extras = ['btrfs-tools']
                 for extra in extras:

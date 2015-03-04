@@ -79,20 +79,28 @@ def enable():
         if(para_validate_result != 0):
             pass
 
-        if(para_parser.path is None or para_parser.path == ""):
-            # self.paras.path = /dev/sdb
-            # if the paras.path is specified then we use it ,if it's empty,
-            # then we find by ourself.  grep SCSI /var/log/syslog
-            # Mar  4 02:52:52 fareast-andliuvm kernel: [1681992.945113] sd 5:0:0:0: [sdc] Attached SCSI disk
-            p = subprocess.Popen(['grep','SCSI','/var/log/syslog'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            identity, err = p.communicate()
-            
+        if(para_parser.mountname is None or para_parser.mountname == ""):
+            para_parser.mountname = "encrypted"
+            path = os.path.join(para_parser.mountpoint,para_parser.mountname)
+            finalpath = path
+            i = 0
+            while(os.path.exists(finalpath) or os.path.exists("/dev/mapper/" + para_parser.mountname)):
+                print("finalpath=="+finalpath)
+                i+=1
+                finalpath = path + str(i)
+                para_parser.mountname = "encrypted" + str(i)
+            os.makedirs(finalpath)
             pass
+
+        if(para_parser.path is None or para_parser.path == ""):
+            p = subprocess.Popen(['lsscsi','[*:0:0:' + str(para_parser.lun) + ']'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            identity, err = p.communicate()
+            vals = identity.split()
+            para_parser.path = vals[len(vals) - 1]
 
         if(para_parser.filesystem is None or para_parser.filesystem == ""):
             para_parser.filesystem = "ext4"
-            pass
-            
+
         encryption = Encryption(para_parser)
         encryption.encrypt()
 

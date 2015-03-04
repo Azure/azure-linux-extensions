@@ -24,7 +24,7 @@ from common import CommonVariables
 
 
 # parameter format should be like this:
-# {"command":"disk","path":"/dev/xvdc","filesystem":"ext4","mountname":"mountname","mountpoint":"/mnt/","password":"password1","passphrase":"User@123"}
+# {"command":"disk","lun":"1","filesystem":"ext4","mountname":"mountname","mountpoint":"/mnt/","password":"password1","passphrase":"User@123"}
 # {"command":"folder","path":"/home/andy/Private","password":"password1"}
 class ParameterParser(object):
 
@@ -33,16 +33,18 @@ class ParameterParser(object):
         TODO: we should validate the parameter first
         """
         self.command = protected_settings.get('command')
-        self.path = protected_settings.get('path')
+        self.path=None
+        #self.path = protected_settings.get('path')
+        self.lun = protected_settings.get('lun')
         self.filesystem = protected_settings.get('filesystem')
         self.mountname = protected_settings.get('mountname')
         self.mountpoint = protected_settings.get('mountpoint')
         #password is the password of the pfx file.
         self.password = protected_settings.get('password')
-        self.passphrase=protected_settings.get('passphrase')
+        self.passphrase = protected_settings.get('passphrase')
         self.keyaddess = protected_settings.get('key_address')
 
     def validate(self):
         # 0 means ok
-        # 1 means 
+        # 1 means
         return 0;
