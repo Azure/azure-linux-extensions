@@ -35,16 +35,21 @@ import subprocess
 class UbuntuPatching(AbstractPatching):
     def __init__(self):
         super(UbuntuPatching,self).__init__()
-        #self.update_cmd = 'apt-get update'
-        #self.check_cmd = 'apt-get -qq -s upgrade'
-        #waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
-        #self.check_security_cmd = self.check_cmd + ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
-        #self.download_cmd = 'apt-get -d -y install'
-        #self.patch_cmd = 'apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install'
-        #self.status_cmd = 'apt-cache show'
-        ## Avoid a config prompt
-        #waagent.Run("DEBIAN_FRONTEND=noninteractive", False)
-    def install_extras(self):
+    def install_extras(self, paras):
         print("installing in ubuntu")
-        for extra in self.extras:
-            print("installation for "+extra +'result is '+str(subprocess.call(['apt-get', 'install','-y', extra])))
+        if(paras.command == "disk"):
+            common_extras = ['cryptsetup-bin']
+            for extra in self.common_extras:
+                print("installation for " + extra + 'result is ' + str(subprocess.call(['apt-get', 'install','-y', extra])))
+            
+            if(paras.filesystem == "btrfs"):
+                extras = ['btrfs-tools']
+                for extra in extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['apt-get', 'install','-y', extra])))
+            pass
+
+        elif(paras.command == "folder"):
+            common_extras = ['ecryptfs-utils']
+            for extra in common_extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['apt-get', 'install','-y', extra])))
+            pass

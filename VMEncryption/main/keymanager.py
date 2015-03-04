@@ -28,7 +28,6 @@ import sys
 import uuid
 import time
 #import chilkat
-
 class KeyManager(object):
     def __init__(self, storageSASUri,password):
         file_name = 'tmpfs_' + str(uuid.uuid4())
@@ -39,22 +38,24 @@ class KeyManager(object):
         returnCode = proc.wait()
 
         commandToExecute = '/bin/bash -c "mount tmpfs /' + file_name + ' -t tmpfs -o size=10M ' + '2> /dev/null"'
-        #TODO: handle the error case that the tmpfs not mount due to out of memory or other reason.
+        #TODO: handle the error case that the tmpfs not mount due to out of
+        #memory or other reason.
         print(commandToExecute)
         proc = Popen(commandToExecute, shell=True)
         returnCode = proc.wait()
-        time.sleep( 5 )
+        time.sleep(5)
         cert_file_path = '/' + file_name + '/cert.pfx'
         pem_file_path = '/' + file_name + '/cert.pem'
         self.download_and_save_file(storageSASUri, cert_file_path)
 
-        #openssl pkcs12 -in /4658108b-c1f8-42c1-b58c-35b7321885d6/cert.pfx -clcerts -nokeys -out cert.pem -passin pass:User@123
+        #openssl pkcs12 -in /4658108b-c1f8-42c1-b58c-35b7321885d6/cert.pfx
+        #-clcerts -nokeys -out cert.pem -passin pass:User@123
         #' -out ' + pem_file_path +
-        commandToExecute = '/bin/bash -c "openssl pkcs12  -clcerts -nokeys -in '+ cert_file_path +  ' -passin pass:' + password + '"'
+        commandToExecute = '/bin/bash -c "openssl pkcs12  -clcerts -nokeys -in ' + cert_file_path + ' -passin pass:' + password + '"'
         print(commandToExecute)
         proc = Popen(commandToExecute, shell=True, stdout = subprocess.PIPE)
 
-        keyStream='';
+        keyStream = ''
         while True:
             line = proc.stdout.readline()
             keyStream += line.strip()
@@ -64,11 +65,12 @@ class KeyManager(object):
         returnCode = proc.wait()
 
         begin = keyStream.index("-----BEGIN CERTIFICATE-----")
-        end = keyStream.index("-----END CERTIFICATE-----");
-        self.key = keyStream[ begin+len("-----BEGIN CERTIFICATE-----") : end]
+        end = keyStream.index("-----END CERTIFICATE-----")
+        self.key = keyStream[begin + len("-----BEGIN CERTIFICATE-----") : end]
 
         print('key==' + self.key)
-        #commandToExecute = '/bin/bash -c "umount /' + file_name + ' 2> /dev/null"'
+        #commandToExecute = '/bin/bash -c "umount /' + file_name + ' 2>
+        #/dev/null"'
         #print(commandToExecute)
         #proc = Popen(commandToExecute, shell=True)
         #returnCode = proc.wait()

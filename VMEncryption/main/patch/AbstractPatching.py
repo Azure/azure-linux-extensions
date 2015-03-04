@@ -36,7 +36,7 @@ class AbstractPatching(object):
     AbstractPatching defines a skeleton neccesary for a concrete Patching class.
     """
     def __init__(self):
-        self.extras = ['cryptsetup-bin', 'ecryptfs-utils']
+        #self.common_extras = ['cryptsetup-bin', 'ecryptfs-utils']
         pass
-    def install_extras(self):
+    def install_extras(self,paras):
         pass

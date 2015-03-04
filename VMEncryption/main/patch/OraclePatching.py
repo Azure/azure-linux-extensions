@@ -34,5 +34,5 @@ from redhatPatching import redhatPatching
 class OraclePatching(redhatPatching):
     def __init__(self):
         super(OraclePatching,self).__init__()
-    def install_extras(self):
+    def install_extras(self,paras):
         super.install_extras()

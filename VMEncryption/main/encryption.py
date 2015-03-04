@@ -37,48 +37,59 @@ class Encryption(object):
         if MyPatching == None:
             sys.exit(1)
         else:
-            MyPatching.install_extras()
+            MyPatching.install_extras(self.paras)
 
     def encrypt(self):
         self.install_extras()
-        keyManager = KeyManager(self.paras.keyaddess, self.paras.password);
+        # keyManager = KeyManager(self.paras.keyaddess, self.paras.password);
         print(self.paras.command)
 
         if(self.paras.command == 'disk'):
-            #self.paras.path = /dev/sdb
-            commandToExecute = '/bin/bash -c "cryptsetup -y luksFormat ' + self.paras.path + ' <<< ' + keyManager.key + ' 2> /dev/null"'
+            commandToExecute = '/bin/bash -c "cryptsetup -y luksFormat ' + self.paras.path + ' <<< ' + self.paras.passphrase + ' 2> /dev/null"'
             print(commandToExecute)
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 
-            commandToExecute = '/bin/bash -c "cryptsetup luksOpen ' + self.paras.path +' ' + self.paras.mountname + ' <<< ' + keyManager.key + ' 2> /dev/null"'
+            commandToExecute = '/bin/bash -c "cryptsetup luksOpen ' + self.paras.path + ' ' + self.paras.mountname + ' <<< ' + self.paras.passphrase + ' 2> /dev/null"'
             print(commandToExecute)
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 
-            commandToExecute = '/bin/bash -c "mkfs.ext4 /dev/mapper/' + self.paras.mountname + ' <<< ' + self.paras.mountname + ' 2> /dev/null"'
+            # we should specify the file system?
+            # if self.paras.fstype is specified, then use it, if not, use ext4
+            mkfs_command = ""
+            if(self.paras.filesystem == "ext4"):
+                mkfs_command = "mkfs.ext4"
+            elif(self.paras.filesystem == "ext3"):
+                mkfs_command = "mkfs.ext3"
+            elif(self.paras.filesystem == "xfs"):
+                mkfs_command = "mkfs.xfs"
+            elif(self.paras.filesystem == "btrfs"):
+                mkfs_command = "mkfs.btrfs"
+                pass
+            commandToExecute = '/bin/bash -c ' + mkfs_command + ' /dev/mapper/' + self.paras.mountname + ' <<< ' + self.paras.mountname + ' 2> /dev/null"'
             print(commandToExecute)
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 
             commandToExecute = '/bin/bash -c "mkdir ' + (self.paras.mountpoint + self.paras.mountname) + ' 2> /dev/null"'
             print(commandToExecute)
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 
             commandToExecute = '/bin/bash -c "mount /dev/mapper/' + self.paras.mountname + ' ' + (self.paras.mountpoint + self.paras.mountname) + ' 2> /dev/null"'
             print(commandToExecute)
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 
         elif(self.paras.command == 'folder'):
             commandToExecute = 'ecryptfs-setup-private'
             proc = Popen(commandToExecute, shell=True)
             returnCode = proc.wait()
-            print('returnCode'+str(returnCode));
+            print('returnCode' + str(returnCode))
 

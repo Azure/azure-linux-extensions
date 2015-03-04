@@ -40,10 +40,10 @@ from encryption import Encryption
 
 #Main function is the only entrence to this extension handler
 def main():
-    #global hutil
-    #HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    #HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
-   # hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
+    global hutil
+    HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -63,12 +63,10 @@ def install():
 
 def enable():
     try:
-        #hutil.do_parse_context('Enable')
+        hutil.do_parse_context('Enable')
         # Ensure the same configuration is executed only once
         # If the previous enable failed, we do not have retry logic here.
-        # Since the custom script may not work in an intermediate state
-        # hutil.exit_if_enabled()
-        # we need to freeze the file system first
+        hutil.exit_if_enabled()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -76,8 +74,25 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
-        
         para_parser = ParameterParser(protected_settings, public_settings)
+        para_validate_result = para_parser.validate()
+        if(para_validate_result != 0):
+            pass
+
+        if(para_parser.path is None or para_parser.path == ""):
+            # self.paras.path = /dev/sdb
+            # if the paras.path is specified then we use it ,if it's empty,
+            # then we find by ourself.  grep SCSI /var/log/syslog
+            # Mar  4 02:52:52 fareast-andliuvm kernel: [1681992.945113] sd 5:0:0:0: [sdc] Attached SCSI disk
+            p = subprocess.Popen(['grep','SCSI','/var/log/syslog'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            identity, err = p.communicate()
+            
+            pass
+
+        if(para_parser.filesystem is None or para_parser.filesystem == ""):
+            para_parser.filesystem = "ext4"
+            pass
+            
         encryption = Encryption(para_parser)
         encryption.encrypt()
 
@@ -91,17 +106,14 @@ def enable():
         pass
 
 def uninstall():
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     hutil.do_parse_context('Uninstall')
     hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
 
 def disable():
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     hutil.do_parse_context('Disable')
     hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 

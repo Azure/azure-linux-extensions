@@ -43,5 +43,7 @@ class redhatPatching(AbstractPatching):
         #self.patch_cmd = 'yum -y update'
         #self.status_cmd = 'yum -q info'
         #self.cache_dir = '/var/cache/yum/'
-    def install_extras(self):
+    def install_extras(self,paras):
         pass
+    #def prepare(self):
+    #    return super(redhatPatching, self).prepare()

@@ -33,5 +33,5 @@ from redhatPatching import redhatPatching
 class centosPatching(redhatPatching):
     def __init__(self):
         super(centosPatching,self).__init__()
-    def install_extras(self):
+    def install_extras(self,paras):
         pass
