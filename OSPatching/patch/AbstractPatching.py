@@ -289,7 +289,8 @@ class AbstractPatching(object):
 
         self.delete_stop_flag()
         #self.report()
-        self.reboot_if_required()
+        if self.patched is not None and len(self.patched) > 0:
+            self.reboot_if_required()
 
     def _patch(self, category, patchlist):
         if self.exists_stop_flag():
@@ -361,7 +362,8 @@ class AbstractPatching(object):
 
         self.delete_stop_flag()
         #self.report()
-        self.reboot_if_required()
+        if self.patched is not None and len(self.patched) > 0:
+            self.reboot_if_required()
 
     def reboot_if_required(self):
         """

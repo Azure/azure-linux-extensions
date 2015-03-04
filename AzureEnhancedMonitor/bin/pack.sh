@@ -18,11 +18,12 @@ mkdir -p $target_dir
 cd $root/clib
 make clean
 
-cd $root/nodejs
+cp -r $root/nodejs $build_dir
+cd $build_dir/nodejs
 npm pack
 
 cp -r $root/clib $target_dir
-cp $root/nodejs/*.tgz $target_dir
+cp $build_dir/nodejs/*.tgz $target_dir
 cp $root/bin/setup.sh $target_dir
 chmod +x $root/bin/setup.sh
 
