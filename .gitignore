@@ -61,6 +61,7 @@ VMBackup/dist/*
 VMBackup/azure-sdk
 VMBackup/azure-sdk/*
 VMBackup/main/azure/*
+VMBackup/main/Utils/*
 VMBackup/MANIFEST
 VMBackup/*.pyproj
 VMBackup/*.pyproj.user
@@ -70,3 +71,7 @@ VMBackup/*.suo
 CustomScript/test/download/0/stdout
 CustomScript/test/download/0/errout
 *node_modules/
+
+# VMEncryption ignores
+VMEncryption/main/azure/*
+VMEncryption/main/Utils/*
