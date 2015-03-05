@@ -24,7 +24,9 @@ from common import CommonVariables
 
 
 # parameter format should be like this:
-# {"command":"disk","lun":"1","filesystem":"ext4","mountname":"mountname","mountpoint":"/mnt/","password":"password1","passphrase":"User@123"}
+# {"command":"disk","query":{"scsi_number":"[5:0:0:1]","path":"/dev/sdb"},
+# "filesystem":"ext4","mountname":"mountname","mountpoint":"/mnt/","password":"password1","passphrase":"User@123"
+# }
 # {"command":"folder","path":"/home/andy/Private","password":"password1"}
 class ParameterParser(object):
 
@@ -35,7 +37,7 @@ class ParameterParser(object):
         self.command = protected_settings.get('command')
         self.path=None
         #self.path = protected_settings.get('path')
-        self.lun = protected_settings.get('lun')
+        self.query = protected_settings.get('query')
         self.filesystem = protected_settings.get('filesystem')
         self.mountname = protected_settings.get('mountname')
         self.mountpoint = protected_settings.get('mountpoint')

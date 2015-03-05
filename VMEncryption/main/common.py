@@ -22,8 +22,15 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'VMEncryption'
-    extension_version = 1.0
+    extension_version = 1.1
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
     extension_description = extension_label
+    os_not_supported=1
+    luks_format_error=2
+    luks_open_error=3
+    mkfs_error=4
+    folder_conflict_error=5
+    mount_error=6
+   

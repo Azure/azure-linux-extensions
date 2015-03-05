@@ -35,15 +35,20 @@ from AbstractPatching import AbstractPatching
 class redhatPatching(AbstractPatching):
     def __init__(self):
         super(redhatPatching,self).__init__()
-        #self.cron_restart_cmd = 'service crond restart'
-        #self.check_cmd = 'yum -q check-update'
-        #self.check_security_cmd = 'yum -q --security check-update'
-        #self.clean_cmd = 'yum clean packages'
-        #self.download_cmd = 'yum -q -y --downloadonly update'
-        #self.patch_cmd = 'yum -y update'
-        #self.status_cmd = 'yum -q info'
-        #self.cache_dir = '/var/cache/yum/'
     def install_extras(self,paras):
-        pass
-    #def prepare(self):
-    #    return super(redhatPatching, self).prepare()
+        print("installing in redhat")
+        if(paras.command == "disk"):
+            common_extras = ['cryptsetup-bin','lsscsi']
+            for extra in common_extras:
+                print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+
+            if(paras.filesystem == "btrfs"):
+                extras = ['btrfs-tools']
+                for extra in extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+            pass
+
+        elif(paras.command == "folder"):
+            common_extras = ['ecryptfs-utils']
+            for extra in common_extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))

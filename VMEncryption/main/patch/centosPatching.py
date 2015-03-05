@@ -34,4 +34,19 @@ class centosPatching(redhatPatching):
     def __init__(self):
         super(centosPatching,self).__init__()
     def install_extras(self,paras):
-        pass
+        print("installing in oracle")
+        if(paras.command == "disk"):
+            common_extras = ['cryptsetup-bin','lsscsi']
+            for extra in common_extras:
+                print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+
+            if(paras.filesystem == "btrfs"):
+                extras = ['btrfs-tools']
+                for extra in extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+            pass
+
+        elif(paras.command == "folder"):
+            common_extras = ['ecryptfs-utils']
+            for extra in common_extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))

@@ -28,27 +28,29 @@ import shutil
 import time
 import traceback
 import datetime
-
-from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
+import subprocess
 from AbstractPatching import AbstractPatching
 
 
 class SuSEPatching(AbstractPatching):
     def __init__(self):
         super(SuSEPatching,self).__init__()
-        #self.clean_cmd = 'zypper clean'
-        #self.check_cmd = 'zypper -q --gpg-auto-import-keys --non-interactive
-        #list-patches'
-        #self.check_security_cmd = self.check_cmd + ' --category security'
-        #self.download_cmd = 'zypper --non-interactive install -d
-        #--auto-agree-with-licenses -t patch '
-        #self.patch_cmd = 'zypper --non-interactive install
-        #--auto-agree-with-licenses -t patch '
-        #self.reboot_required = False
-        #waagent.Run('zypper -q --gpg-auto-import-keys --non-interactive
-        #refresh', False)
+
     def install_extras(self,paras):
-        pass
-    #def prepare(self):
-    #    return super(SuSEPatching, self).prepare()
+        print("installing in suse")
+        if(paras.command == "disk"):
+            p = subprocess.Popen(["rescan-scsi-bus.sh"])
+            common_extras = ['cryptsetup-bin','lsscsi']
+            for extra in common_extras:
+                print("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
+
+            if(paras.filesystem == "btrfs"):
+                extras = ['btrfs-tools']
+                for extra in extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
+            pass
+
+        elif(paras.command == "folder"):
+            common_extras = ['ecryptfs-utils']
+            for extra in common_extras:
+                    print("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
