@@ -1158,10 +1158,11 @@ class PerfCounterWriter(object):
                              "").format(len(counters)))
                 return
             except IOError, e:
-                waagent.Warn("Write to event file failed: {0}".format(e))
+                waagent.Warn("Write to perf counters file failed: {0}".format(e))
                 waagent.Log("Retry: {0}".format(i))
+                time.sleep(1)
         
-        raise IOError(("Couldn't serialize event to event file:{0}"
+        waagent.Error(("Failed to serialize perf counter to file:{0}"
                          "").format(eventFile))
 
     def _write(self, counters, eventFile):
