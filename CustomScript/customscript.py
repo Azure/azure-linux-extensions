@@ -197,7 +197,7 @@ def run_script(hutil, args, interval = 30):
             msg = get_formatted_log("Script is running...", 
                                     tail(std_out_file), tail(err_out_file))
             hutil.log(msg)
-            hutil.do_status_report('Enable', 'running', '0', msg)
+            hutil.do_status_report('Enable', 'transitioning', '0', msg)
             time.sleep(interval)
 
         if child.returncode and child.returncode != 0:
