@@ -25,6 +25,7 @@ import traceback
 import time
 import datetime
 import psutil
+import string
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -45,6 +46,9 @@ AzureTableDelay = 60 * AzureTableDelayInMinute
 
 AzureEnhancedMonitorVersion = "1.0.0"
 LibDir = "/var/lib/AzureEnhancedMonitor"
+
+def printable(s):
+    return filter(lambda c : c in string.printable, str(s))
 
 def easyHash(s):
     """
@@ -102,7 +106,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey,
         return cpuPercent
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
-                       "").format(e, traceback.format_exc()))
+                       "").format(printable(e), traceback.format_exc()))
         return None
     
 
@@ -123,7 +127,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey,
         return memoryPercent
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
-                       "").format(e, traceback.format_exc()))
+                       "").format(printable(e), traceback.format_exc()))
         return None
 
 class AzureDiagnosticData(object):
@@ -733,7 +737,7 @@ def getStorageMetrics(account, key, table, startKey, endKey):
         return metrics
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
-                       "").format(e, traceback.format_exc()))
+                       "").format(printable(e), traceback.format_exc()))
         return None
 
 def getDataDisks():
@@ -1063,7 +1067,7 @@ class StaticDataSource(object):
                            value = self.config.getVmSize())
 
     def createCounterDataSources(self):
-        dataSource = "lad" if self.config.isLADEnabled() else "local"
+        dataSource = "wad" if self.config.isLADEnabled() else "local"
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
                            name = "Data Sources",
@@ -1158,23 +1162,40 @@ class PerfCounterWriter(object):
                              "").format(len(counters)))
                 return
             except IOError, e:
-                waagent.Warn("Write to perf counters file failed: {0}".format(e))
+                waagent.Warn(("Write to perf counters file failed: {0}"
+                              "").format(printable(e)))
                 waagent.Log("Retry: {0}".format(i))
                 time.sleep(1)
-        
-        waagent.Error(("Failed to serialize perf counter to file:{0}"
-                         "").format(eventFile))
+
+        waagent.Error(("Failed to serialize perf counter to file:"
+                       "{0}").format(eventFile))
+        raise
 
     def _write(self, counters, eventFile):
         with open(eventFile, "w+") as F:
             F.write("".join(map(lambda c : str(c), counters)).encode("utf8"))
 
 class EnhancedMonitorConfig(object):
-    def __init__(self, configData):
-        self.configData = configData
+    def __init__(self, privateConfig, publicConfig):
+        self.configData = {}
+        diskCount = 0
+        accountNames = []
+        for item in publicConfig["cfg"]:
+            self.configData[item["key"]] = item["value"]
+            if item["key"].startswith("disk.lun"):
+                diskCount = diskCount + 1
+
+        for item in privateConfig["cfg"]:
+            self.configData[item["key"]] = item["value"]
+            if item["key"].endswith("minute.name"):
+                accountNames.append(item["value"])
+
+        self.configData["disk.count"] = diskCount
+        self.configData["account.names"] = accountNames
+
 
     def getVmSize(self):
-        return self.configData["vm.size"]
+        return self.configData["vmsize"]
 
     def getVmRoleInstance(self):
         return self.configData["vm.roleinstance"]
@@ -1192,13 +1213,15 @@ class EnhancedMonitorConfig(object):
         return self.configData["script.version"]
 
     def isVerbose(self):
-        return self.configData["verbose"]
+        flag = self.configData["verbose"]
+        return flag == "1" or flag == 1
 
     def getOSDiskName(self):
         return self.configData["osdisk.name"]
 
     def getOSDiskAccount(self):
-        return self.configData["osdisk.account"]
+        osdiskConnMinute = self.getOSDiskConnMinute()
+        return self.configData["{0}.name".format(osdiskConnMinute)]
 
     def getOSDiskConnMinute(self):
         return self.configData["osdisk.connminute"]
@@ -1243,14 +1266,15 @@ class EnhancedMonitorConfig(object):
         return self.configData["{0}.hour.uri".format(name)]
 
     def isLADEnabled(self):
-        return self.configData["lad.isenabled"]
+        flag = self.configData["wad.isenabled"]
+        return flag == "1" or flag == 1
 
     def getLADKey(self):
-        return self.configData["lad.key"]
+        return self.configData["wad.key"]
 
     def getLADName(self):
-        return self.configData["lad.name"]
+        return self.configData["wad.name"]
 
     def getLADUri(self):
-        return self.configData["lad.uri"]
+        return self.configData["wad.uri"]
 

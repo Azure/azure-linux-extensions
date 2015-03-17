@@ -25,10 +25,14 @@ import traceback
 import time
 import aem
 import platform
+import string
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as util
 
 ExtensionShortName = 'AzureEnhancedMonitor'
+
+def printable(s):
+    return filter(lambda c : c in string.printable, str(s))
 
 def enable(hutil):
     pid = None
@@ -80,23 +84,26 @@ def disable(hutil):
                   'Azure Enhanced Monitor is not running')
 
 def daemon(hutil):
-    settings = hutil.get_protected_settings()
-    config = aem.EnhancedMonitorConfig(settings)
+    publicConfig = hutil.get_public_settings()
+    privateConfig = hutil.get_protected_settings()
+    config = aem.EnhancedMonitorConfig(publicConfig, privateConfig)
     monitor = aem.EnhancedMonitor(config)
+    hutil.set_verbose_log(config.isVerbose())
 
     while True:
         waagent.Log("Collecting performance counter.")
         startTime = time.time()
         try:
             monitor.run()
-            hutil.do_status_report("Enable", "success", 0, "")
+            hutil.do_status_report("Enable", "success", 0, "Monitoring service is running.")
         except Exception, e:
-            waagent.Error("{0} {1}".format(e, traceback.format_exc()))
+            waagent.Error("{0} {1}".format(printable(e), 
+                                           traceback.format_exc()))
             hutil.do_status_report("Enable", "error", 0, "{0}".format(e))
         waagent.Log("Finished collection.")
         timeElapsed = time.time() - startTime
         timeToWait = (aem.MonitoringInterval - timeElapsed)
-        #Make sure timeToWait is in the range(0, aem.MonitoringInterval)
+        #Make sure timeToWait is in the range [0, aem.MonitoringInterval)
         timeToWait = timeToWait % aem.MonitoringInterval
         time.sleep(timeToWait)
 
@@ -135,7 +142,7 @@ def main():
                 hutil = parse_context("enable")
                 daemon(hutil)
         except Exception, e:
-            hutil.error("{0}, {1}").format(e, traceback.format_exc())
+            hutil.error("{0}, {1}".format(e, traceback.format_exc()))
             hutil.do_exit(1, command, 'failed','0', 
                           '{0} failed:{1}'.format(command, e))
 

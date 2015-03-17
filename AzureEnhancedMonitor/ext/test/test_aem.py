@@ -28,48 +28,84 @@ from Utils.WAAgentUtil import waagent
 import aem
 import handler
 
-TestConfig="""{
-        "vm.size" : "Small (A1)",
-        "vm.roleinstance" : "haha",
-        "vm.role" : "hehe",
-        "vm.deploymentid" : "should-be-a-guid",
-        "vm.memory.isovercommitted" : 0,
-        "vm.cpu.isovercommitted" :  0,
-        "script.version" : "1.0.0",
-        "verbose" : 0,
-        "osdisk.name" : "test-aem",
-        "osdisk.account" : "test-aem",
-        "osdisk.connminute":"",
-        "osdisk.connhour":"",
-        "disk.count" : 2,
-        "disk.lun.1" : 1,
-        "disk.name.1" : "test-aem-dd1",
-        "disk.account.1" : "test-aem-dd1",
-        "disk.connminute.1" : "",
-        "disk.connhour.1" : "",
-        "disk.lun.2" : 1,
-        "disk.name.2" : "test-aem-dd2",
-        "disk.account.2" : "test-aem-dd2",
-        "disk.connminute.2" : "",
-        "disk.connhour.2" : "",
-        "account.names" :["testaemstorage"],
-        "testaemstorage.minute.key" : "1sdf209unljnlfjahsdlfh===",
-        "testaemstorage.hour.uri" : "http://foo.bar/",
-        "testaemstorage.minute.uri" : "http://foo.bar/",
-        "lad.isenabled" : 0,
-        "lad.key" : "23rsdf2fzcvf=+12",
-        "lad.name" : "asdf",
-        "lad.uri": "http://foo.bar/"
+TestPublicConfig = """\
+{
+    "cfg": [{
+        "key":  "vmsize",
+        "value":  "Small (A1)"
+    },{
+        "key":  "vm.roleinstance",
+        "value":  "osupdate"
+    },{
+        "key":  "vm.role",
+        "value":  "IaaS"
+    },{
+        "key":  "vm.deploymentid",
+        "value":  "cd98461b43364478a908d03d0c3135a7"
+    },{
+        "key":  "vm.memory.isovercommitted",
+        "value":  0
+    },{
+        "key":  "vm.cpu.isovercommitted",
+        "value":  0
+    },{
+        "key":  "script.version",
+        "value":  "1.2.0.0"
+    },{
+        "key":  "verbose",
+        "value":  "0"
+    },{
+        "key":  "osdisk.connminute",
+        "value":  "asdf.minute"
+    },{
+        "key":  "osdisk.connhour",
+        "value":  "asdf.hour"
+    },{
+        "key":  "osdisk.name",
+        "value":  "osupdate-osupdate-2015-02-12.vhd"
+    },{
+        "key":  "asdf.hour.uri",
+        "value":  "https://asdf.table.core.windows.net/$metricshourprimarytransactionsblob"
+    },{
+        "key":  "asdf.minute.uri",
+        "value":  "https://asdf.table.core.windows.net/$metricsminuteprimarytransactionsblob"
+    },{
+        "key":  "asdf.hour.name",
+        "value":  "asdf"
+    },{
+        "key":  "asdf.minute.name",
+        "value":  "asdf"
+    },{
+        "key":  "wad.name",
+        "value":  "asdf"
+    },{
+        "key":  "wad.isenabled",
+        "value":  "1"
+    },{
+        "key":  "wad.uri",
+        "value":  "https://asdf.table.core.windows.net/wadperformancecounterstable"
+    }]
 }
 """
-
+TestPrivateConfig = """\
+{
+    "cfg" : [{
+        "key" : "asdf.minute.key",
+        "value" : "qwer"
+    },{
+        "key" : "wad.key",
+        "value" : "qwer"
+    }]
+}
+"""
 class TestAEM(unittest.TestCase):
     def setUp(self):
         waagent.LoggerInit("/dev/null", "/dev/stdout")
 
     def test_config(self):
-        configData = json.loads(TestConfig)
-        config = aem.EnhancedMonitorConfig(configData)
+        publicConfig = json.loads(TestPublicConfig)
+        privateConfig = json.loads(TestPrivateConfig)
+        config = aem.EnhancedMonitorConfig(publicConfig, privateConfig)
         self.assertNotEquals(None, config)
         return config
 
@@ -103,7 +139,7 @@ class TestAEM(unittest.TestCase):
         name = "Data Sources"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("local", counter.value)
+        self.assertEquals("wad", counter.value)
 
         name = "Data Provider Version"
         counter = next((c for c in counters if c.name == name))
@@ -209,7 +245,7 @@ class TestAEM(unittest.TestCase):
 
     def test_vm_datasource(self):
         config = self.test_config()
-        config.configData["lad.isenable"] = 0
+        config.configData["wad.isenabled"] = "0"
         dataSource = aem.VMDataSource(config)
         counters = dataSource.collect()
         self.assertNotEquals(None, counters)
