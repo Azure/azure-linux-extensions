@@ -190,6 +190,14 @@ class HandlerUtility:
         self._log = waagent.Log
         self._error = waagent.Error
 
+    def set_verbose_log(self, verbose):
+        if(verbose == "1" or verbose == 1):
+            self.log("Enable verbose log")
+            LoggerInit(self._context._log_file, '/dev/stdout', verbose=True)
+        else:
+            self.log("Disable verbose log")
+            LoggerInit(self._context._log_file, '/dev/stdout', verbose=False)
+
     def is_seq_smaller(self):
         return int(self._context._seq_no) <= self._get_most_recent_seq()
 
