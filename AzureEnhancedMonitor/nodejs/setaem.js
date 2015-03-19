@@ -41,9 +41,46 @@ var ladExtVersion = "1.0";
 
 var ROLECONTENT = "IaaS";
 var AzureEndpoint = "windows.net";
-var BlobMetricsTable= "$MetricsMinutePrimaryTransactionsBlob";
+var BlobMetricsMinuteTable= "$MetricsMinutePrimaryTransactionsBlob";
+var BlobMetricsHourTable= "$MetricsMinutePrimaryTransactionsBlob";
 var ladMetricesTable= "";
 /*End of Const*/
+
+var AemConfig = function(){
+    this.prv = [];
+    this.pub = [];
+};
+
+AemConfig.prototype.setPublic = function(key, value){
+    this.pub.push({
+        'key' : key,
+        'value' : value
+    });
+};
+
+
+AemConfig.prototype.setPrivate = function(key, value){
+    this.prv.push({
+        'key' : key,
+        'value' : value
+    });
+};
+
+AemConfig.prototype.getPublic = function(){
+    return {
+        'key' : aemExtName + "PublicConfigParameter",
+        'value' : JSON.stringify({'cfg' : this.pub}),
+        'type':'Public'
+    }
+};
+
+AemConfig.prototype.getPrivate = function(){
+    return {
+        'key' : aemExtName + "PrivateConfigParameter",
+        'value' : JSON.stringify({'cfg' : this.prv}),
+        'type':'Private'
+    }
+};
 
 var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
     var azureProfile;
@@ -52,8 +89,8 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
     var storageClient;
     var selectedVM;
     var osdiskAccount;
-    var accounts = {};
-    var aemConfig = {};
+    var accounts = [];
+    var aemConfig = new AemConfig();
 
     return getAzureProfile().then(function(profile){
         azureProfile = profile;
@@ -76,46 +113,52 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         if(selectedVM.roleSize === 'ExtralSmall'){
             cpuOverCommitted = 1
         }
-        aemConfig['vm.size'] = selectedVM.roleSize;
-        aemConfig['vm.roleinstance'] = selectedVM.roleName;
-        aemConfig['vm.role'] = 'IaaS';
-        aemConfig['vm.memory.isovercommitted'] = 0;
-        aemConfig['vm.cpu.isovercommitted'] = cpuOverCommitted;
-        aemConfig['script.version'] = CurrentScriptVersion;
-        aemConfig['verbose'] = 0;
+        aemConfig.setPublic('vmsize', selectedVM.roleSize);
+        aemConfig.setPublic('vm.roleinstance', selectedVM.roleName);
+        aemConfig.setPublic('vm.role', 'IaaS');
+        aemConfig.setPublic('vm.memory.isovercommitted', 0);
+        aemConfig.setPublic('vm.cpu.isovercommitted', cpuOverCommitted);
+        aemConfig.setPublic('script.version', CurrentScriptVersion);
+        aemConfig.setPublic('verbose', '0');
     }).then(function(){
         //Set vm disk config
         var osdisk = selectedVM.oSVirtualHardDisk;
         osdiskAccount = getStorageAccountFromUri(osdisk.mediaLink);
         console.log("[INFO]Adding configure for OS disk.");
-        aemConfig['osdisk.account'] = osdiskAccount;
-        aemConfig['osdisk.name'] = selectedVM.oSVirtualHardDisk.name;
-        accounts[osdiskAccount] = {};
-        aemConfig['disk.count'] = selectedVM.dataVirtualHardDisks.length;
+        aemConfig.setPublic('osdisk.account', osdiskAccount);
+        aemConfig.setPublic('osdisk.name', selectedVM.oSVirtualHardDisk.name);
+        aemConfig.setPublic('osdisk.connminute', osdiskAccount + ".minute");
+        aemConfig.setPublic('osdisk.connhour', osdiskAccount + ".hour");
+        accounts.push({
+            name: osdiskAccount,
+        });
         for(var i = 0; i < selectedVM.dataVirtualHardDisks.length; i++){
             var dataDisk = selectedVM.dataVirtualHardDisks[i];
             console.log("[INFO]Adding configure for data disk: " + 
                         dataDisk.name);
             var datadiskAccount = getStorageAccountFromUri(dataDisk.mediaLink);
-            accounts[datadiskAccount] = {};
+            accounts.push({
+                name:datadiskAccount
+            });
             //The default lun value is 0
             var lun = dataDisk.logicalUnitNumber || 0;
-            aemConfig['disk.lun.' + i] = lun;
-            aemConfig['disk.name.' + i] = dataDisk.name;
-            aemConfig['disk.account.' + i] = datadiskAccount;
+            aemConfig.setPublic('disk.lun.' + i, lun);
+            aemConfig.setPublic('disk.name.' + i, dataDisk.name);
+            aemConfig.setPublic('disk.account.' + i, datadiskAccount);
+            aemConfig.setPublic('disk.connminute.' + i, 
+                                datadiskAccount + ".minute");
+            aemConfig.setPublic('disk.connhour.' + i, datadiskAccount + ".hour");
         }
     }).then(function(){
         //Set storage account config
         var promises = [];
-        var accountNames = Object.keys(accounts);
-        aemConfig["account.names"] = accountNames;
-
-        Object.keys(accounts).forEach(function(accountName){
-            var promise = getStorageAccountKey(storageClient, accountName)
+        Object(accounts).forEach(function(account){
+            var promise = getStorageAccountKey(storageClient, account.name)
               .then(function(accountKey){
-                accounts[accountName].key = accountKey;
-                aemConfig[accountName + ".minute.key"] = accountKey;
-                return getStorageAccountEndpoints(storageClient, accountName);
+                account.key = accountKey
+                aemConfig.setPrivate(account.name + ".minute.key", accountKey);
+                aemConfig.setPrivate(account.name + ".hour.key", accountKey);
+                return getStorageAccountEndpoints(storageClient, account.name);
             }).then(function(endpoints){
                 var tableEndpoint;
                 endpoints.every(function(endpoint){
@@ -126,23 +169,26 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                         return true;
                     }
                 });
-                accounts[accountName].tableEndpoint = tableEndpoint;
-                var minuteUri = tableEndpoint + BlobMetricsTable;
-                aemConfig[accountName + ".minute.uri"] = minuteUri;
+                account.tableEndpoint = tableEndpoint;
+                var minuteUri = tableEndpoint + BlobMetricsMinuteTable;
+                var hourUri = tableEndpoint + BlobMetricsHourTable;
+                aemConfig.setPublic(account.name + ".minute.uri", minuteUri);
+                aemConfig.setPublic(account.name + ".hour.uri", hourUri);
+                aemConfig.setPublic(account.name + ".minute.name", account.name);
+                aemConfig.setPublic(account.name + ".hour.name", account.name);
             }).then(function(){
-                return checkStorageAccountAnalytics(accountName,
-                                                    accounts[accountName].key);
+                return checkStorageAccountAnalytics(account.name, account.key);
             });
             promises.push(promise);
         });
         return Promise.all(promises);
     }).then(function(){
         //Set Linux diagnostic config
-        aemConfig["lad.isenabled"] = 1;
-        aemConfig["lad.name"] = osdiskAccount;
-        aemConfig["lad.key"] = accounts[osdiskAccount].key;
-        var ladUri = accounts[osdiskAccount].tableEndpoint + ladMetricesTable;
-        aemConfig["lad.uri"] = ladUri;
+        aemConfig.setPublic("wad.isenabled", 1);
+        aemConfig.setPublic("wad.name", accounts[0].name);
+        aemConfig.setPrivate("wad.key", accounts[0].key);
+        var ladUri = accounts[0].tableEndpoint + ladMetricesTable;
+        aemConfig.setPublic("wad.uri", ladUri);
     }).then(function(){
         //Update vm
         var extensions = [];
@@ -155,8 +201,8 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
             'resourceExtensionParameterValues' : [{
                 'key' : ladExtName + "PrivateConfigParameter",
                 'value' : JSON.stringify({
-                    'storageAccountName' : osdiskAccount,
-                    'storageAccountKey' : accounts[osdiskAccount].key
+                    'storageAccountName' : accounts[0].name,
+                    'storageAccountKey' : accounts[0].key
                 }),
                 'type':'Private'
             }]
@@ -167,15 +213,10 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
             'publisher' : aemExtPublisher,
             'version' : aemExtVersion,
             'state': 'Enable',
-            'resourceExtensionParameterValues' : [{
-                'key' : aemExtName + "PrivateConfigParameter",
-                'value' : JSON.stringify(aemConfig),
-                'type':'Private'
-            },{//TODO remove public config
-                'key' : aemExtName + "PublicConfigParameter",
-                'value' : JSON.stringify(aemConfig),
-                'type':'Public'
-            }]
+            'resourceExtensionParameterValues' : [
+                aemConfig.getPublic(), 
+                aemConfig.getPrivate()
+            ]
         };
         extensions.push(ladExtConfig);
         extensions.push(aemExtConfig);
