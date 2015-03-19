@@ -135,36 +135,35 @@ def enable():
                 backup_logger.log(error_msg, False, 'Error')
             else:
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
-                if(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
-                    """
-                    make sure the log is not doing when the file system is freezed.
-                    """
-                    backup_logger.log("doing freeze now...", True)
-                    freeze_called = True
-                    freeze_result   = freezer.freezeall()
-                    backup_logger.log("freeze result " + str(freeze_result))
+                """
+                make sure the log is not doing when the file system is freezed.
+                """
+                backup_logger.log("doing freeze now...", True)
+                freeze_called = True
+                freeze_result = freezer.freezeall()
+                backup_logger.log("freeze result " + str(freeze_result))
                     
-                    # check whether we freeze succeed first?
-                    if(freeze_result is not None and len(freeze_result.errors) > 0 ):
+                # check whether we freeze succeed first?
+                if(freeze_result is not None and len(freeze_result.errors) > 0 ):
+                    run_result = 2
+                    run_status = 'error'
+                    error_msg  = 'Enable failed with error' + str(freeze_result.errors)
+                    backup_logger.log(error_msg, False, 'Warning')
+                else:
+                    backup_logger.log("doing snapshot now...")
+                    snap_shotter    = Snapshotter(backup_logger)
+                    snapshot_result = snap_shotter.snapshotall(para_parser)
+                    backup_logger.log("snapshotall ends...")
+                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                        error_msg  = "snapshot result: " + str(snapshot_result.errors)
                         run_result = 2
                         run_status = 'error'
-                        error_msg  = 'Enable failed with error' + str(freeze_result.errors)
-                        backup_logger.log(error_msg, False, 'Warning')
+                        backup_logger.log(error_msg, False, 'Error')
                     else:
-                        backup_logger.log("doing snapshot now...")
-                        snap_shotter    = Snapshotter(backup_logger)
-                        snapshot_result = snap_shotter.snapshotall(para_parser)
-                        backup_logger.log("snapshotall ends...")
-                        if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                            error_msg  = "snapshot result: " + str(snapshot_result.errors)
-                            run_result = 2
-                            run_status = 'error'
-                            backup_logger.log(error_msg, False, 'Error')
-                        else:
-                            run_result = 1
-                            run_status = 'success'
-                            error_msg  = 'Enable Succeeded'
-                            backup_logger.log(error_msg)
+                        run_result = 1
+                        run_status = 'success'
+                        error_msg  = 'Enable Succeeded'
+                        backup_logger.log(error_msg)
         else:
             run_status = 'error'
             run_result = 11
@@ -212,9 +211,6 @@ def disable():
 
 def update():
     hutil.do_parse_context('Upadate')
-    current_seq_no = hutil.get_seq_no();
-    backup_logger.log("update scenario, set current_seq_no to " + str(current_seq_no), True)
-    hutil.set_inused_config_seq(current_seq_no)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 if __name__ == '__main__' :
