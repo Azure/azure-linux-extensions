@@ -36,6 +36,10 @@ echo "#"                                        >> $build_dir/install.sh
 echo "root=\$(dirname \$0)"                     >> $build_dir/install.sh
 echo "cd \$root"                                >> $build_dir/install.sh
 echo "root=\`pwd\`"                             >> $build_dir/install.sh
+echo "if [ -d $proj_full_name ]; then"          >> $build_dir/install.sh
+echo "    echo \"[INFO]Remove old package...\"" >> $build_dir/install.sh
+echo "    rm $proj_full_name -rf"               >> $build_dir/install.sh
+echo "fi"                                       >> $build_dir/install.sh
 echo "echo \"[INFO]Unpacking...\""              >> $build_dir/install.sh
 echo "sed -e '1,/^exit$/d' "\$0" | tar xzf -"   >> $build_dir/install.sh
 echo "$proj_full_name/setup.sh"                 >> $build_dir/install.sh

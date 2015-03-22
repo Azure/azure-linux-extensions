@@ -10,41 +10,38 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-function install_nodejs_suse()
+function install_nodejs_tarball()
 {
-    suse_version="SLE_11_SP3"
-    if [ "$(grep 'openSUSE 13.1' /etc/*release*)" != "" ] ; then
-        suse_version="openSUSE_13.1"
-    elif [ "$(grep 'openSUSE 13.2' /etc/*release*)" != "" ] ; then
-        suse_version="openSUSE_13.2"
-    elif [ "$(grep 'SUSE Linux Enterprise Server 11' /etc/*release*)" != "" ] ; then
-        if [ "$(grep 'PATCHLEVEL = 3' /etc/*release*)" != "" ] ; then
-            suse_version="SLE_11_SP3"
-        elif [ "$(grep 'PATCHLEVEL = 2' /etc/*release*)" != "" ] ; then
-            suse_version="SLE_11_SP2"
-        elif [ "$(grep 'PATCHLEVEL = 1' /etc/*release*)" != "" ] ; then
-            suse_version="SLE_11_SP1"
-        else
-            suse_version="SLE_11"
-        fi
-    elif [ "$(grep 'SUSE Linux Enterprise Server 12' /etc/*release*)" != "" ] ; then
-        suse_version="SLE_12"
+    version="v0.10.37"
+    node_version="node-$version-linux-x64"
+    src="$root/$node_version"
+    target="/usr/local"
+
+    echo "[INFO]Installing nodejs from http://nodejs.org/dist/$version/${node_version}.tar.gz"
+    if [ -f ${src}.tar.gz ]; then
+        rm ${src}.tar.gz -f
     fi
+    if [ -d ${src} ]; then
+        rm ${src} -rf
+    fi
+    wget http://nodejs.org/dist/$version/${node_version}.tar.gz 1>>$install_log 2>&1
+    tar -zxf ${node_version}.tar.gz  1>>$install_log 2>&1
+
+    echo "[INFO]Install nodejs to $target"
+    if [ -f $target/bin/node ]; then
+        rm $target/bin/node -f
+    fi
+    cp $src/bin/node $target/bin/node
     
-    set -e
-    if [ "$(zypper repos | grep devel_languages_nodejs)" != "" ] ; then 
-        zypper removerepo devel_languages_nodejs 1>>$install_log 2>&1
+    echo "[INFO]Create link to $target/bin/node"
+    if [ -f /usr/bin/node ]; then
+        rm /usr/bin/node -f
     fi
-
-    zypper addrepo http://download.opensuse.org/repositories/devel:languages:nodejs/$suse_version/devel:languages:nodejs.repo 1>>$install_log 2>&1
-    zypper --gpg-auto-import-keys refresh 1>>$install_log 2>&1
-
-    #Install nodejs
-    zypper install -yl nodejs 1>>$install_log 2>&1
-
-    #Install npm
+    ln -s $target/bin/node /usr/bin/node
+   
+    echo "[INFO]Install npm"
     curl -sL https://www.npmjs.org/install.sh | sh 1>>$install_log 2>&1
-    set +e
+
 }
 
 function install_nodejs()
@@ -56,15 +53,8 @@ function install_nodejs()
     elif [ "$(type yum 2>/dev/null)" != "" ] ; then
         curl -sL https://rpm.nodesource.com/setup | bash - 1>>$install_log 2>&1
         yum -y install nodejs 1>>$install_log 2>&1
-    elif [ "$(type zypper 2>/dev/null)" != "" ] ; then
-        install_nodejs_suse
     else
-        echo "[ERROR]Neither apt-get, yum or zypper is found, you need to install nodejs manually."
-        echo ""
-        echo "    You could refer to https://github.com/joyent/node/wiki/installing-node.js-via-package-manager."
-        echo ""
-        echo "[ERROR]Install nodejs and npm failed. See $install_log."
-        exit 1
+        install_nodejs_tarball 
     fi
     if [ ! $? ]; then
         echo "[ERROR]Install nodejs and npm failed. See $install_log."
