@@ -97,7 +97,42 @@ class HandlerUtility:
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
-        
+    
+    def _parse_config(self, ctxt):
+        config = None
+        try:
+            config=json.loads(ctxt)
+        except:
+            self.error('JSON exception decoding ' + ctxt)
+
+        if config == None:
+            self.error("JSON error processing settings file:" + ctxt)
+        else:
+            handlerSettings = config['runtimeSettings'][0]['handlerSettings']
+            if handlerSettings.has_key('protectedSettings') and \
+                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+                    handlerSettings['protectedSettings'] is not None and \
+                    handlerSettings["protectedSettingsCertThumbprint"] is not None:
+                protectedSettings = handlerSettings['protectedSettings']
+                thumb=handlerSettings['protectedSettingsCertThumbprint']
+                cert=waagent.LibDir+'/'+thumb+'.crt'
+                pkey=waagent.LibDir+'/'+thumb+'.prv'
+                waagent.SetFileContents('/tmp/kk', protectedSettings)
+                cleartxt=None
+                cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
+                os.remove("/tmp/kk")
+                if cleartxt == None:
+                    self.error("OpenSSh decode error using  thumbprint " + thumb )
+                    do_exit(1,operation,'error','1', operation + ' Failed')
+                jctxt=''
+                try:
+                    jctxt=json.loads(cleartxt)
+                except:
+                    self.error('JSON exception decoding ' + cleartxt)
+                handlerSettings['protectedSettings']=jctxt
+                self.log('Config decoded correctly.')
+        return config
+
     def do_parse_context(self,operation):
         self._context = HandlerContext(self._short_name)
         handler_env=None
@@ -151,33 +186,9 @@ class HandlerUtility:
                     '1', 
                     'Failed')
         self.log("JSON config: " + ctxt)
-        config = None
-        try:
-            config=json.loads(ctxt)
-        except:
-            self.error('JSON exception decoding ' + ctxt)
-        if config == None:
-            self.error("JSON error processing " + settings_file)
-        else:
-            if config['runtimeSettings'][0]['handlerSettings'].has_key('protectedSettings'):
-                thumb=config['runtimeSettings'][0]['handlerSettings']['protectedSettingsCertThumbprint']
-                cert=waagent.LibDir+'/'+thumb+'.crt'
-                pkey=waagent.LibDir+'/'+thumb+'.prv'
-                waagent.SetFileContents('/tmp/kk',config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
-                cleartxt=None
-                cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb )
-                    do_exit(1,operation,'error','1', operation + ' Failed')
-                jctxt=''
-                try:
-                    jctxt=json.loads(cleartxt)
-                except:
-                    self.error('JSON exception decoding ' + cleartxt)
-                config['runtimeSettings'][0]['handlerSettings']['protectedSettings']=jctxt
-                self.log('Config decoded correctly.')
-            self._context._config = config
+        self._context._config = _parse_config(ctxt)
         return self._context
+
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
