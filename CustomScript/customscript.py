@@ -117,20 +117,25 @@ def daemon(hutil):
         run_script(hutil, args)
     else:
         error_msg = "CommandToExecute is empty or invalid."
-        hutil.error(error_msg)
         raise ValueError(error_msg)
 
 def download_files(hutil):
-    protected_settings = hutil.get_protected_settings()
     public_settings = hutil.get_public_settings()
+    if public_settings is None:
+        raise ValueError("Public configuration couldn't be None.")
     cmd = public_settings.get('commandToExecute')
-
     blob_uris = public_settings.get('fileUris')
+
+    protected_settings = hutil.get_protected_settings()
     storage_account_name = None
     storage_account_key = None
     if protected_settings:
-        storage_account_name = protected_settings.get("storageAccountName").strip()
-        storage_account_key = protected_settings.get("storageAccountKey").strip()
+        storage_account_name = protected_settings.get("storageAccountName")
+        storage_account_key = protected_settings.get("storageAccountKey")
+        if storage_account_name is not None:
+            storage_account_name = storage_account_name.strip()
+        if storage_account_key is not None:
+            storage_account_key = storage_account_key.strip()
 
     if (not blob_uris or not isinstance(blob_uris, list) or len(blob_uris) == 0):
         hutil.log("fileUris value provided is empty or invalid. "
@@ -156,7 +161,6 @@ def download_files(hutil):
     else: 
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account or storage key is not provided"
-        hutil.error(error_msg)
         raise ValueError(error_msg)
         
 def start_daemon(hutil):
