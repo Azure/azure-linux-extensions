@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
 if [ ! $1 ]  ; then
     echo "" 
     echo "    Usage: create_zip.sh <path_to_extension_dir>"
@@ -30,8 +31,13 @@ if [ ! -d $1 ]  ; then
     exit 1
 fi
 
+curr_dir=`pwd`
 ext_dir=$1
+cd $ext_dir
+ext_dir=`pwd`
 ext_meta=$ext_dir/HandlerManifest.json
+cd $curr_dir
+
 
 if [ ! -f $ext_meta ] ; then
     echo ""
@@ -40,12 +46,13 @@ if [ ! -f $ext_meta ] ; then
     exit 1
 fi
 
-cur_dir=`pwd`
 script=$(dirname $0)
 root=$script/..
 cd $root
 root=`pwd`
+
 util_dir=$root/Utils
+build_dir=$root/build
 
 ext_name=`grep 'name' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
 ext_version=`grep 'version' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
@@ -64,8 +71,12 @@ if [ ! $ext_version ] ; then
     exit 1
 fi
 
+if [ ! -d $build_dir ] ; then
+    mkdir $build_dir
+fi
+
 ext_full_name=$ext_name-$ext_version
-tmp_dir=/tmp/$ext_full_name
+tmp_dir=$build_dir/$ext_full_name
 
 echo "Create zip for $ext_name version $ext_version"
 
@@ -74,7 +85,11 @@ mkdir $tmp_dir
 
 echo "Copy files..."
 cp -r $ext_dir/* $tmp_dir
-cp -r $util_dir $tmp_dir
+rm $tmp_dir/references
+
+echo "Copy dependecies..."
+cat $ext_dir/references
+cat $ext_dir/references | xargs cp -r -t $tmp_dir
 
 echo "Switch to tmp dir..."
 cd $tmp_dir
@@ -85,7 +100,7 @@ rm -r */test
 rm *.pyc
 
 echo "Create zip..."
-zip -r $cur_dir/$ext_full_name.zip .
+zip -r $build_dir/$ext_full_name.zip .
 
 echo "Delete tmp dir..."
 rm $tmp_dir -r
