@@ -206,6 +206,13 @@ def get_blob_name_from_uri(uri):
 def get_container_name_from_uri(uri):
     return get_properties_from_uri(uri)['container_name']
 
+def get_host_base_from_uri(blob_uri):
+    uri = urlparse.urlparse(blob_uri)
+    netloc = uri.netloc
+    if netloc is None:
+        return None
+    return netloc[netloc.find('.'):]
+
 def get_properties_from_uri(uri):
     path = get_path_from_uri(uri)
     if path.endswith('/'):
@@ -223,11 +230,13 @@ def get_path_from_uri(uriStr):
     uri = urlparse.urlparse(uriStr)
     return uri.path
 
-def download_blob(storage_account_name, storage_account_key, 
-                  blob_uri, seqNo, command, hutil):
+def download_and_save_blob(storage_account_name, 
+                           storage_account_key, 
+                           blob_uri,
+                           download_dir):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
-    download_dir = prepare_download_dir(seqNo)
+    host_base = get_host_base_from_uri(blob_uri)
     # if blob_name is a path, extract the file_name
     last_sep = blob_name.rfind('/')
     if last_sep != -1:
@@ -237,9 +246,19 @@ def download_blob(storage_account_name, storage_account_key,
     download_path = os.path.join(download_dir, file_name)
     #Guest agent already ensure the plugin is enabled one after another. 
     #The blob download will not conflict.
-    blob_service = BlobService(storage_account_name, storage_account_key)
+    blob_service = BlobService(storage_account_name, 
+                               storage_account_key,
+                               host_base=host_base)
+    blob_service.get_blob_to_path(container_name, blob_name, download_path)
+    
+
+def download_blob(storage_account_name, storage_account_key, 
+                  blob_uri, seqNo, command, hutil):
     try:
-        blob_service.get_blob_to_path(container_name, blob_name, download_path)
+        download_dir = prepare_download_dir(seqNo)
+        download_and_save_blob(storage_account_name, 
+                               storage_account_key,
+                               blob_uri)
     except Exception, e:
         hutil.error(("Failed to download blob with uri:{0}"
                      "with error{1}").format(blob_uri,e))

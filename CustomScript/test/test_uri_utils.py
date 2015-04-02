@@ -40,5 +40,13 @@ class TestUriUtils(unittest.TestCase):
         container = cs.get_container_name_from_uri(uri)
         self.assertEqual(container, "vhds")
 
+    def test_get_host_base_from_uri(self):
+        blob_uri = "http://qingfu2.blob.core.windows.net/vhds/abc.sh?st=2014-06-27Z&se=2014-06-27&sr=c&sp=r&sig=KBwcWOx"
+        host_base = cs.get_host_base_from_uri(blob_uri)
+        self.assertEqual(host_base, ".blob.core.windows.net")
+        blob_uri = "https://yue.blob.core.chinacloudapi.cn/"
+        host_base = cs.get_host_base_from_uri(blob_uri)
+        self.assertEqual(host_base, ".blob.core.chinacloudapi.cn")
+
 if __name__ == '__main__':
     unittest.main()

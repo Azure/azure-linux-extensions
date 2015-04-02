@@ -45,6 +45,9 @@ class MockUtil():
     def do_exit(self,exit_code,operation,status,code,message):
         self.test.assertNotEqual(None, message)
 
+    def log(*args, **kwargs):
+        pass
+
 class TestCommandExecution(unittest.TestCase):
     def test_parse_cmd(self):
         print __file__
