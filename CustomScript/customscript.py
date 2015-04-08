@@ -255,21 +255,24 @@ def download_and_save_blob(storage_account_name,
                                storage_account_key,
                                host_base=host_base)
     blob_service.get_blob_to_path(container_name, blob_name, download_path)
+    return (blob_name, container_name, host_base, download_path)
     
 
 def download_blob(storage_account_name, storage_account_key, 
                   blob_uri, seqNo, command, hutil):
     try:
         download_dir = prepare_download_dir(seqNo)
-        download_and_save_blob(storage_account_name, 
-                               storage_account_key,
-                               blob_uri)
+        result = download_and_save_blob(storage_account_name, 
+                                        storage_account_key,
+                                        blob_uri,
+                                        download_dir)
+        blob_name, _, _, download_path = result
+        if blob_name in command:
+            os.chmod(download_path, 0100)
     except Exception, e:
         hutil.error(("Failed to download blob with uri:{0}"
                      "with error{1}").format(blob_uri,e))
         raise
-    if blob_name in command:
-        os.chmod(download_path, 0100)
 
 def download_external_files(uris, seqNo,command, hutil):
     for uri in uris:
