@@ -186,7 +186,7 @@ class HandlerUtility:
                     '1', 
                     'Failed')
         self.log("JSON config: " + ctxt)
-        self._context._config = _parse_config(ctxt)
+        self._context._config = self._parse_config(ctxt)
         return self._context
 
 
