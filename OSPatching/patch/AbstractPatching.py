@@ -75,6 +75,12 @@ class AbstractPatching(object):
 
         self.current_config_list = list()
 
+        # Reboot Requirements
+        self.reboot_required = False
+        self.open_deleted_files_before = list()
+        self.open_deleted_files_after = list()
+        self.needs_restart = list()
+
     def parse_settings(self, settings):
         disabled = settings.get('disabled')
         if disabled is None:
@@ -245,6 +251,8 @@ class AbstractPatching(object):
         if retcode > 0:
             self.hutil.error("Failed to check valid upgrades")
             sys.exit(1)
+        if 'walinuxagent' in downloadlist:
+            downloadlist.remove('walinuxagent')
         if not downloadlist:
             self.hutil.log("No packages are available for update.")
             return
@@ -267,7 +275,10 @@ class AbstractPatching(object):
             self.delete_stop_flag()
             return
 
+        # Record the scheduled time
         waagent.AppendFileContents(self.history_scheduled, time.strftime("%Y-%m-%d %a", time.localtime()) + '\n' )
+        # Record the open deleted files before patching
+        self.open_deleted_files_before = self.check_open_deleted_files()
 
         retcode = self.stop_download()
         if retcode == 0:
@@ -287,6 +298,7 @@ class AbstractPatching(object):
         else:
             self.hutil.log("Installing patches (Category:" + self.category_all + ") is stopped/canceled")
 
+        self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
         if self.patched is not None and len(self.patched) > 0:
@@ -303,6 +315,8 @@ class AbstractPatching(object):
         self.hutil.log("Patch list: " + ' '.join(patchlist))
         pkg_failed = []
         for pkg_name in patchlist:
+            if pkg_name == 'walinuxagent':
+                continue
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 self.hutil.log("Patching time exceeded. The pending package will be \
@@ -328,6 +342,9 @@ class AbstractPatching(object):
         self.hutil.log("Going to patch one-off")
         waagent.SetFileContents(self.package_downloaded_path, '')
         waagent.SetFileContents(self.package_patched_path, '')
+
+        # Record the open deleted files before patching
+        self.open_deleted_files_before = self.check_open_deleted_files()
 
         pkg_failed = []
         retcode, patchlist_required = self.check(self.category_required)
@@ -360,23 +377,73 @@ class AbstractPatching(object):
         for pkg in pkg_failed:
             waagent.AppendFileContents(self.package_downloaded_path, pkg + '\n')
 
+        self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
     def reboot_if_required(self):
-        """
-        In auto mode, a reboot should be only necessary when kernel has been upgraded.
-        """
-        if self.reboot_after_patch == 'NotRequired':
-            if self.check_reboot():
-                self.hutil.do_exit(0, 'Enable', 'success', '0', 'Pending Reboot')
-        if self.reboot_after_patch == 'Required' or (self.reboot_after_patch == 'Auto' and self.check_reboot()):
-            self.hutil.log("System going to reboot...")
+        self.check_reboot()
+        self.check_needs_restart()
+        msg = ''
+        if self.reboot_after_patch == 'NotRequired' and self.reboot_required:
+            msg += 'Pending Reboot'
+            if self.needs_restart:
+                msg += ': ' + ' '.join(self.needs_restart)
+            self.hutil.do_exit(0, 'Enable', 'success', '0', msg)
+        if self.reboot_after_patch == 'Required':
+            msg += "System going to reboot(Required)"
+        elif self.reboot_after_patch == 'Auto' and self.reboot_required:
+            msg += "System going to reboot(Auto)"
+        elif self.reboot_after_patch == 'RebootIfNeed':
+            if (self.reboot_required or self.needs_restart):
+                msg += "System going to reboot(RebootIfNeed)"
+        if msg:
+            if self.needs_restart:
+                msg += ': ' + ' '.join(self.needs_restart)
+            self.hutil.log(msg)
             retcode = waagent.Run('reboot')
             if retcode != 0:
                 self.hutil.error("Failed to reboot")
+
+    def check_needs_restart(self):
+        self.needs_restart.extend(self.get_pkg_needs_restart())
+        patched_files = dict()
+        for pkg in self.get_pkg_patched():
+            cmd = ' '.join([self.pkg_query_cmd, pkg])
+            try:
+                retcode, output = waagent.RunGetOutput(cmd)
+                patched_files[os.path.basename(pkg)] = [filename for filename in output.split("\n") if os.path.isfile(filename)]
+            except Exception:
+                self.hutil.error("Failed to " + cmd)
+        # for k,v in patched_files.items():
+        #     self.hutil.log(k + ": " + " ".join(v))
+        open_deleted_files = list()
+        for filename in self.open_deleted_files_after:
+            if filename not in self.open_deleted_files_before:
+                open_deleted_files.append(filename)
+        # self.hutil.log("Open deleted files: " + " ".join(open_deleted_files))
+        for pkg,files in patched_files.items():
+            for filename in files:
+                realpath = os.path.realpath(filename)
+                if realpath in open_deleted_files and pkg not in self.needs_restart:
+                     self.needs_restart.append(pkg)
+        self.hutil.log("Packages needs to restart: " + " ".join(self.needs_restart))
+
+    def get_pkg_needs_restart(self):
+        return []
+
+    def check_open_deleted_files(self):
+        ret = list()
+        retcode,output = waagent.RunGetOutput('lsof | grep "DEL"')
+        if retcode == 0:
+            for line in output.split('\n'):
+                if line:
+                    filename = line.split()[-1]
+                    if filename not in ret:
+                        ret.append(filename)
+        return ret
 
     def create_stop_flag(self):
         waagent.SetFileContents(self.stop_flag_path, '')
@@ -399,6 +466,15 @@ class AbstractPatching(object):
             return []
         patchlist = [line.split()[0] for line in pkg_to_patch.split('\n') if line.endswith(category)]
         return patchlist
+
+    def get_pkg_patched(self):
+        if not os.path.isfile(self.package_patched_path):
+            return []
+        pkg_patched = waagent.GetFileContents(self.package_patched_path)
+        if not pkg_patched:
+            return []
+        patchedlist = [line.split()[0] for line in pkg_patched.split('\n') if line]
+        return patchedlist
 
     def get_current_config(self):
         return ','.join(self.current_config_list)

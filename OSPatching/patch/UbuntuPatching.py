@@ -43,6 +43,7 @@ class UbuntuPatching(AbstractPatching):
         self.download_cmd = 'apt-get -d -y install'
         self.patch_cmd = 'apt-get -y -q --force-yes install'
         self.status_cmd = 'apt-cache show'
+        self.pkg_query_cmd = 'dpkg-query -L'
         # Avoid a config prompt
         os.environ['DEBIAN_FRONTEND']='noninteractive'
 
@@ -77,7 +78,13 @@ class UbuntuPatching(AbstractPatching):
         return waagent.Run(self.patch_cmd + ' ' + package)
 
     def check_reboot(self):
-        return os.path.isfile('/var/run/reboot-required')
+        self.reboot_required = os.path.isfile('/var/run/reboot-required')
+
+    def get_pkg_needs_restart(self):
+        fd = '/var/run/reboot-required.pkgs'
+        if not os.path.isfile(fd):
+            return []
+        return waagent.GetFileContents(fd).split('\n')
 
     def report(self):
         """

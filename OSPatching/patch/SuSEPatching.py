@@ -37,12 +37,16 @@ from AbstractPatching import AbstractPatching
 class SuSEPatching(AbstractPatching):
     def __init__(self, hutil):
         super(SuSEPatching,self).__init__(hutil)
+        self.patched_pkgs = None
+        self.cache_dir = os.path.join(os.path.dirname(sys.argv[0]), 'packages')
+        if not os.path.isdir(self.cache_dir):
+            os.mkdir(self.cache_dir)
         self.clean_cmd = 'zypper clean'
         self.check_cmd = 'zypper -q --gpg-auto-import-keys --non-interactive list-patches'
         self.check_security_cmd = self.check_cmd + ' --category security'
-        self.download_cmd = 'zypper --non-interactive install -d --auto-agree-with-licenses -t patch '
-        self.patch_cmd = 'zypper --non-interactive install --auto-agree-with-licenses -t patch '
-        self.reboot_required = False
+        self.download_cmd = 'zypper --non-interactive --pkg-cache-dir ' + self.cache_dir + ' install -d --auto-agree-with-licenses -t patch '
+        self.patch_cmd = 'zypper --non-interactive --pkg-cache-dir ' + self.cache_dir + ' install --auto-agree-with-licenses -t patch '
+        self.pkg_query_cmd = 'rpm -qlp'
         waagent.Run('zypper -q --gpg-auto-import-keys --non-interactive refresh', False)
     
     def check(self, category):
@@ -75,6 +79,13 @@ class SuSEPatching(AbstractPatching):
             return 0
 
     def patch_package(self, package):
+        if self.patched_pkgs == None:
+            self.patched_pkgs = list()
+            for root,dirs,files in os.walk(self.cache_dir):
+                for filename in files:
+                    if filename.endswith('rpm'):
+                        shutil.copy(os.path.join(root, filename), "/tmp/")
+                        self.patched_pkgs.append("/tmp/"+filename)
         retcode = waagent.Run(self.patch_cmd + package, False)
         if 0 < retcode and retcode < 100:
             return 1
@@ -84,4 +95,7 @@ class SuSEPatching(AbstractPatching):
             return 0
 
     def check_reboot(self):
-        return self.reboot_required
+        pass
+
+    def get_pkg_patched(self):
+        return self.patched_pkgs
