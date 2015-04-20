@@ -27,8 +27,14 @@ import datetime
 import psutil
 import string
 from azure.storage import TableService, Entity
-from Utils.WAAgentUtil import waagent
+from Utils.WAAgentUtil import waagent, AddExtensionEvent
 import Utils.HandlerUtil as Util
+
+
+FAILED_TO_RETRIEVE_MDS_DATA="(03100)Failed to retrieve mds data"
+FAILED_TO_RETRIEVE_LOCAL_DATA="(03101)Failed to retrieve local data"
+FAILED_TO_RETRIEVE_STORAGE_DATA="(03102)Failed to retrieve storage data"
+FAILED_TO_SERIALIZE_PERF_COUNTERS="(03103)Failed to serialize perf counters"
 
 def timedelta_total_seconds(delta):
 
@@ -107,6 +113,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
 
@@ -128,6 +135,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
 class AzureDiagnosticData(object):
@@ -360,6 +368,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
+            AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
 
@@ -738,6 +747,7 @@ def getStorageMetrics(account, key, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
 def getDataDisks():
@@ -1169,6 +1179,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
+        AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
     def _write(self, counters, eventFile):

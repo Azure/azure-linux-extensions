@@ -26,7 +26,7 @@ import time
 import aem
 import platform
 import string
-from Utils.WAAgentUtil import waagent
+from Utils.WAAgentUtil import waagent, InitExtensionEventLog
 import Utils.HandlerUtil as util
 
 ExtensionShortName = 'AzureEnhancedMonitor'
@@ -89,13 +89,14 @@ def daemon(hutil):
     config = aem.EnhancedMonitorConfig(publicConfig, privateConfig)
     monitor = aem.EnhancedMonitor(config)
     hutil.set_verbose_log(config.isVerbose())
-
+    InitExtensionEventLog(hutil.get_name())
     while True:
         waagent.Log("Collecting performance counter.")
         startTime = time.time()
         try:
             monitor.run()
-            hutil.do_status_report("Enable", "success", 0, "Monitoring service is running.")
+            hutil.do_status_report("Enable", "success", 0, 
+                                   "Monitoring service is running.")
         except Exception, e:
             waagent.Error("{0} {1}".format(printable(e), 
                                            traceback.format_exc()))
