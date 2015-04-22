@@ -94,18 +94,7 @@ def enable():
             if(current_identity != stored_identity):
                 current_seq_no = 0
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_inused_config_seq(0)
-                #remove all the settings file
-                config_folder = hutil._context._config_dir
-
-                for subdir, dirs, files in os.walk(config_folder):
-                    for file in files:
-                        try:
-                            if(str(file).lower().endswith('.settings')):
-                                os.remove(config_folder+'/'+file)
-                        except ValueError:
-                            backup_logger.log('failed to remove file'+str(file))
-                            continue
+                hutil.set_inused_config_seq(-1)
                 mi.save_identity()
             else:
                 hutil.exit_if_enabled()

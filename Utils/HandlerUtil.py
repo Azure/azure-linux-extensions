@@ -55,11 +55,13 @@ Example Status Report:
 
 
 import os
+import os.path
 import sys
 import imp
 import base64
 import json
 import time
+from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 
@@ -82,12 +84,20 @@ class HandlerUtility:
 
     def _get_current_seq_no(self, config_folder):
         seq_no = -1
+        cur_seq_no = -1
+        freshest_time = None
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
                     cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if cur_seq_no > seq_no:
+                    if(freshest_time == None):
+                        freshest_time = os.path.getmtime(join(config_folder,file))
                         seq_no = cur_seq_no
+                    else:
+                        current_file_m_time = os.path.getmtime(join(config_folder,file))
+                        if(current_file_m_time > freshest_time):
+                            freshest_time=current_file_m_time
+                            seq_no = cur_seq_no
                 except ValueError:
                     continue
         return seq_no
