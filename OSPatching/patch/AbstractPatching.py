@@ -34,6 +34,11 @@ import datetime
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
+try:
+    from VMStatusTestUserDefined import VMStatusTest
+except:
+    from VMStatusTestDefault import VMStatusTest
+
 # Global variables definition
 ExtensionShortName = 'OSPatching'
 
@@ -72,6 +77,9 @@ class AbstractPatching(object):
 
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
+
+        self.check_idle = True
+        self.check_healthy = True
 
         self.current_config_list = list()
 
@@ -148,7 +156,31 @@ class AbstractPatching(object):
             self.category = self.category_all
         else:
             self.category = category
-        self.current_config_list.append('category=' + self.category)        
+        self.current_config_list.append('category=' + self.category)
+
+        check_idle = settings.get('vmStatusTest', dict()).get('checkIdle')
+        if (check_idle is None or check_idle == ''):
+            # Skip idle check by default in "Patch Now" mode
+            if self.patch_now:
+                self.check_idle = False
+        else:
+            if check_idle.lower() == 'true':
+                self.check_idle = True
+            elif check_idle.lower() == 'false':
+                self.check_idle = False
+            else:
+                self.hutil.error('checkIdle parameter is invalid')
+        self.current_config_list.append('checkIdle=' + str(self.check_idle))
+
+        check_healthy = settings.get('VMStatusTest', dict()).get('checkHealthy')
+        if not (check_healthy is None or check_healthy == ''):
+            if check_healthy.lower() == 'true':
+                self.check_healthy = True
+            elif check_healthy.lower() == 'false':
+                self.check_healthy = False
+            else:
+                self.hutil.error('checkHealthy parameter is invalid')
+        self.current_config_list.append('checkHealthy=' + str(self.check_healthy))
 
     def install(self):
         pass
@@ -233,6 +265,17 @@ class AbstractPatching(object):
             self.hutil.error(output)
 
     def download(self):
+        if self.check_idle:
+            if VMStatusTest.is_vm_idle():
+                msg = "Checking the VM is idle: True"
+            else:
+                msg = "Checking the VM is idle: False. Downloading is skipped."
+            self.hutil.log(msg)
+            return
+        else:
+            msg = "Skipped VM idle checking"
+            self.hutil.log(msg)
+
         if self.exists_stop_flag():
             self.hutil.log("Downloading patches is stopped/canceled")
             return
@@ -270,6 +313,17 @@ class AbstractPatching(object):
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
 
     def patch(self):
+        if self.check_idle:
+            if VMStatusTest.is_vm_idle():
+                msg = "Checking the VM is idle: True"
+            else:
+                msg = "Checking the VM is idle: False. Downloading is skipped."
+            self.hutil.log(msg)
+            return
+        else:
+            msg = "Skipped VM idle checking"
+            self.hutil.log(msg)
+
         if self.exists_stop_flag():
             self.hutil.log("Installing patches is stopped/canceled")
             self.delete_stop_flag()
@@ -301,6 +355,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
+        if self.check_healthy:
+            self.hutil.log("Checking the VM is healthy after patching: " + str(VMStatusTest.is_vm_healthy()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -336,6 +392,17 @@ class AbstractPatching(object):
         """
         Called when startTime is empty string, which means a on-demand patch.
         """
+        if self.check_idle:
+            if VMStatusTest.is_vm_idle():
+                msg = "Checking the VM is idle: True"
+            else:
+                msg = "Checking the VM is idle: False. Downloading is skipped."
+            self.hutil.log(msg)
+            return
+        else:
+            msg = "Skipped VM idle checking"
+            self.hutil.log(msg)
+
         global start_patch_time
         start_patch_time = time.time()
 
@@ -380,6 +447,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
+        if self.check_healthy:
+            self.hutil.log("Checking the VM is healthy after patching: " + str(VMStatusTest.is_vm_healthy()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
