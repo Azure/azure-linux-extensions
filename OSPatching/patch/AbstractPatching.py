@@ -35,15 +35,15 @@ import logging
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
-# Global variables definition
-ExtensionShortName = 'OSPatching'
-VMStatusTestTemplate = False
-
 try:
     from VMStatusTestUserDefined import VMStatusTest
+    use_template = False
 except:
     from VMStatusTestDefault import VMStatusTest
-    VMStatusTestTemplate = True
+    use_template = True
+
+# Global variables definition
+ExtensionShortName = 'OSPatching'
 
 class AbstractPatching(object):
     """
@@ -116,7 +116,7 @@ class AbstractPatching(object):
         else:
             self.reboot_after_patch = reboot_after_patch
         self.current_config_list.append('rebootAfterPatch=' + self.reboot_after_patch)
-        waagent.AddExtensionEvent(name=hutil.get_name(),
+        waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
                                   message=" ".join(["rebootAfterPatch", self.reboot_after_patch]))
@@ -139,10 +139,10 @@ class AbstractPatching(object):
                 self.hutil.log_and_syslog(logging.INFO, msg)
                 day_of_week = 'Everyday'
             self.current_config_list.append('dayOfWeek=' + day_of_week)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message=" ".join(["dayOfWeek", self.dayOfWeek]))
+                                      message="dayOfWeek=" + day_of_week)
             day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
             if 'Everyday' in day_of_week:
                 self.day_of_week = range(1,8)
@@ -155,10 +155,10 @@ class AbstractPatching(object):
             else:
                 self.interval_of_weeks = interval_of_weeks
             self.current_config_list.append('intervalOfWeeks=' + str(self.interval_of_weeks))
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message=" ".join(["intervalOfWeeks", self.intervalOfWeeks]))
+                                      message=" ".join(["intervalOfWeeks", self.interval_of_weeks]))
 
         install_duration = settings.get('installDuration')
         if install_duration is None or install_duration == '':
@@ -180,7 +180,7 @@ class AbstractPatching(object):
         else:
             self.category = category
         self.current_config_list.append('category=' + self.category)
-        waagent.AddExtensionEvent(name=hutil.get_name(),
+        waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
                                   message=" ".join(["category", self.category]))
@@ -297,16 +297,7 @@ class AbstractPatching(object):
 
     def download(self):
         self.is_template()
-        if self.check_idle:
-            if VMStatusTest.is_vm_idle():
-                msg = "Checking the VM is idle: True"
-            else:
-                msg = "Checking the VM is idle: False. Downloading is skipped."
-            self.hutil.log_and_syslog(logging.INFO, msg)
-            return
-        else:
-            msg = "Skipped VM idle checking"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+        self.check_vm_idle()
 
         if self.exists_stop_flag():
             self.hutil.log_and_syslog(logging.INFO, "Downloading patches is stopped/canceled")
@@ -321,10 +312,10 @@ class AbstractPatching(object):
         if self.category == self.category_all:
             self._download(self.category_all)
         end_download_time = time.time()
-        waagent.AddExtensionEvent(name=hutil.get_name(),
+        waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
-                                  message=" ".join(["Real downloading time is", str(round(end_download_time-start_download_time,3)), "s"])
+                                  message=" ".join(["Real downloading time is", str(round(end_download_time-start_download_time,3)), "s"]))
 
     def _download(self, category):
         self.hutil.log_and_syslog(logging.INFO, "Start to check&download patches (Category:" + category + ")")
@@ -351,16 +342,7 @@ class AbstractPatching(object):
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
 
     def patch(self):
-        if self.check_idle:
-            if VMStatusTest.is_vm_idle():
-                msg = "Checking the VM is idle: True"
-            else:
-                msg = "Checking the VM is idle: False. Patching is skipped."
-            self.hutil.log_and_syslog(logging.INFO, msg)
-            return
-        else:
-            msg = "Skipped VM idle checking"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+        self.check_vm_idle()
 
         if self.exists_stop_flag():
             self.hutil.log_and_syslog(logging.INFO, "Installing patches is stopped/canceled")
@@ -376,10 +358,10 @@ class AbstractPatching(object):
         if retcode == 0:
             self.hutil.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be \
                                 downloaded in the next cycle")
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Downloading time out"]
+                                      message="Downloading time out")
 
         global start_patch_time
         start_patch_time = time.time()
@@ -402,10 +384,10 @@ class AbstractPatching(object):
         else:
             self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + self.category_all + ") is stopped/canceled")
         if is_time_out[0] or is_time_out[1]:
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Patching time out"]
+                                      message="Patching time out")
 
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
@@ -448,16 +430,7 @@ class AbstractPatching(object):
         Called when startTime is empty string, which means a on-demand patch.
         """
         self.is_template()
-        if self.check_idle:
-            if VMStatusTest.is_vm_idle():
-                msg = "Checking the VM is idle: True"
-            else:
-                msg = "Checking the VM is idle: False. Downloading is skipped."
-            self.hutil.log_and_syslog(logging.INFO, msg)
-            return
-        else:
-            msg = "Skipped VM idle checking"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+        self.check_vm_idle()
 
         global start_patch_time
         start_patch_time = time.time()
@@ -500,10 +473,10 @@ class AbstractPatching(object):
                 self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + self.category_all + ") is stopped/canceled")
 
         if is_time_out[0] or is_time_out[1]:
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Patching time out"]
+                                      message="Patching time out")
 
         shutil.copy2(self.package_patched_path, self.package_downloaded_path)
         for pkg in pkg_failed:
@@ -525,7 +498,7 @@ class AbstractPatching(object):
             msg += 'Pending Reboot'
             if self.needs_restart:
                 msg += ': ' + ' '.join(self.needs_restart)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
                                       message=" ".join([self.reboot_after_patch, msg,
@@ -543,22 +516,22 @@ class AbstractPatching(object):
             if self.needs_restart:
                 msg += ': ' + ' '.join(self.needs_restart)
             self.hutil.log_and_syslog(logging.INFO, msg)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Reboot"]
+                                      message="Reboot")
             retcode = waagent.Run('reboot')
             if retcode != 0:
                 self.hutil.log_and_syslog(logging.ERROR, "Failed to reboot")
-                waagent.AddExtensionEvent(name=hutil.get_name(),
+                waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                           op=waagent.WALAEventOperation.Enable,
                                           isSuccess=False,
-                                          message="Failed to reboot"]
+                                          message="Failed to reboot")
         else:
-            waagent.AddExtensionEvent(name=hutil.get_name(),
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Not reboot"]
+                                      message="Not reboot")
 
     def check_needs_restart(self):
         self.needs_restart.extend(self.get_pkg_needs_restart())
@@ -582,7 +555,13 @@ class AbstractPatching(object):
                 realpath = os.path.realpath(filename)
                 if realpath in open_deleted_files and pkg not in self.needs_restart:
                      self.needs_restart.append(pkg)
-        self.hutil.log_and_syslog(logging.INFO, "Packages needs to restart: " + " ".join(self.needs_restart))
+        msg = "Packages needs to restart: "
+        pkgs = " ".join(self.needs_restart)
+        if pkgs:
+            msg += pkgs
+        else:
+            msg = "There is no package which needs to restart"
+        self.hutil.log_and_syslog(logging.INFO, msg)
 
     def get_pkg_needs_restart(self):
         return []
@@ -633,7 +612,19 @@ class AbstractPatching(object):
         return 'Current Configuation: ' + ','.join(self.current_config_list)
 
     def is_template(self):
-        if not VMStatusTestTemplate:
+        if use_template:
             msg = "User does not provide VM status test scripts."
             msg += " The default template is used."
             self.hutil.log_and_syslog(logging.WARNING, msg)
+
+    def check_vm_idle(self):
+        if self.check_idle:
+            is_vm_idle = VMStatusTest.is_vm_idle()
+            msg = "Checking the VM is idle: " + str(is_vm_idle)
+            self.hutil.log_and_syslog(logging.INFO, msg)
+            if not is_vm_idle:
+                self.hutil.log_and_syslog(logging.WARNING, "Current Operation is skipped.")
+                return
+        else:
+            msg = "Skipped VM idle checking"
+            self.hutil.log_and_syslog(logging.INFO, msg)

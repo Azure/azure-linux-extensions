@@ -60,22 +60,10 @@ def enable():
         MyPatching.parse_settings(settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
-        download_dir = prepare_download_dir(hutil.get_seq_no())
-        maxRetry = 2
-        for retry in range(0, maxRetry + 1):
-            try:
-                download_files(hutil)
-                break
-            except Exception, e:
-                hutil.log_and_syslog(logging.ERROR, "Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
-                if retry != maxRetry:
-                    hutil.log_and_syslog(logging.INFO, "Sleep 10 seconds")
-                    time.sleep(10)
-                else:
-                    raise
-        src = os.path.join(download_dir, VMStatusTestUserDefined)
-        dst = os.path.join(os.getcwd(), "patch")
-        shutil.copy(src, dst)
+        startTime = settings.get("startTime", "")
+        if startTime:
+            set_most_recent_seq_scheduled()
+        download_customized_vmstatustest()
         MyPatching.enable()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. ' + current_config)
@@ -106,6 +94,9 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
+        delete_current_vmstatustestscript()
+        seqNo = get_most_recent_seq(scheduled=True)
+        copy_vmstatustestscript(prepare_download_dir(seqNo))
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
         settings = protected_settings.copy()
@@ -138,6 +129,9 @@ def patch():
 def oneoff():
     hutil.do_parse_context('Oneoff')
     try:
+        delete_current_vmstatustestscript()
+        seqNo = get_most_recent_seq()
+        copy_vmstatustestscript(prepare_download_dir(seqNo))
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
         settings = protected_settings.copy()
@@ -156,21 +150,19 @@ def download_files(hutil):
     public_settings = hutil.get_public_settings()
     settings = protected_settings.copy()
     settings.update(public_settings)
-
     local_script = settings.get("vmStatusTest", dict()).get('localScript')
+    blob_uri = settings.get("vmStatusTest", dict()).get('fileUri')
+    if not local_script and not blob_uri:
+        hutil.log_and_syslog(logging.WARNING, "localScript and fileUri value "
+                  "provided is empty or invalid. Continue with executing command...")
+        return
+    hutil.do_status_report('Downloading','transitioning', '0',
+                           'Downloading VMStatusTest files...')
     if local_script:
         hutil.log_and_syslog(logging.INFO, "Saving scripts from user's configurations...")
         file_path = save_local_file(local_script, hutil.get_seq_no(), hutil)
         preprocess_files(file_path, hutil)
         return
-
-    blob_uri = settings.get("vmStatusTest", dict()).get('fileUri')
-    if not blob_uri:
-        hutil.log_and_syslog(logging.INFO, "fileUri value provided is empty or invalid. "
-                  "Continue with executing command...")
-        return
-    hutil.do_status_report('Downloading','transitioning', '0',
-                           'Downloading VMStatusTest files...')
 
     storage_account_name = None
     storage_account_key = None
@@ -200,29 +192,21 @@ def download_blob(storage_account_name, storage_account_key,
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
     download_dir = prepare_download_dir(seqNo)
-    # if blob_name is a path, extract the file_name
-    last_sep = blob_name.rfind('/')
-    if last_sep != -1:
-        file_name = blob_name[last_sep+1:]
-    else:
-        file_name = blob_name
-    download_path = os.path.join(download_dir, file_name)
+    download_path = os.path.join(download_dir, VMStatusTestUserDefined)
     #Guest agent already ensure the plugin is enabled one after another.
     #The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0}"
-                     "with error{1}").format(blob_uri,e))
+        hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0} "
+                     "with error {1}").format(blob_uri,e))
         raise
     return download_path
 
 def download_external_file(uri, seqNo,  hutil):
     download_dir = prepare_download_dir(seqNo)
-    path = get_path_from_uri(uri)
-    file_name = path.split('/')[-1]
-    file_path = os.path.join(download_dir, file_name)
+    file_path = os.path.join(download_dir, VMStatusTestUserDefined)
     try:
         download_and_save_file(uri, file_path)
     except Exception, e:
@@ -334,6 +318,45 @@ def get_properties_from_uri(uri):
     container_name = path[:first_sep]
     return {'blob_name': blob_name, 'container_name': container_name}
 
+def download_customized_vmstatustest():
+    download_dir = prepare_download_dir(hutil.get_seq_no())
+    maxRetry = 2
+    for retry in range(0, maxRetry + 1):
+        try:
+            download_files(hutil)
+            break
+        except Exception, e:
+            hutil.log_and_syslog(logging.ERROR, "Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
+            if retry != maxRetry:
+                hutil.log_and_syslog(logging.INFO, "Sleep 10 seconds")
+                time.sleep(10)
+            else:
+                raise
+
+def copy_vmstatustestscript(src_dir):
+    src = os.path.join(src_dir, VMStatusTestUserDefined)
+    dst = os.path.join(os.getcwd(), "patch")
+    if os.path.isfile(src):
+        shutil.copy(src, dst)
+
+def delete_current_vmstatustestscript():
+    current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+VMStatusTestUserDefined)
+    if os.path.isfile(current_vmstatustestscript):
+        os.remove(current_vmstatustestscript)
+
+def get_most_recent_seq(scheduled=False):
+    mrseq_file = 'mrseq'
+    if scheduled:
+        mrseq_file += '_scheduled'
+    if(os.path.isfile(mrseq_file)):
+        seq = waagent.GetFileContents(mrseq_file)
+        return seq
+    else:
+        return "-1"
+
+def set_most_recent_seq_scheduled():
+    seq = hutil.get_seq_no()
+    waagent.SetFileContents('mrseq_scheduled', seq)
 
 # Main function is the only entrance to this extension handler
 def main():
@@ -343,6 +366,7 @@ def main():
     global hutil
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
                                 ExtensionShortName)
+
     global MyPatching
     MyPatching = GetMyPatching(hutil)
     if MyPatching == None:
