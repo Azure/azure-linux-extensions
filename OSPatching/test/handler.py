@@ -39,42 +39,46 @@ from patch import *
 # Global variables definition
 ExtensionShortName = 'OSPatching'
 DownloadDirectory = 'download'
-VMStatusTestUserDefined = "VMStatusTestUserDefined.py"
+idleTestScriptName = "idleTest.py"
+healthyTestScriptName = "healthyTest.py"
 
-vmStatusTestScriptLocal = """
+idleTestScriptLocal = """
 #!/usr/bin/python
-# User Defined Locally.
-class VMStatusTest(object):
-    @classmethod
-    def is_vm_idle(cls):
-        return True
-
-    @classmethod
-    def is_vm_healthy(cls):
-        return True
+# Locally.
+def is_vm_idle():
+    return True
 """
-vmStatusTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/VMStatusTestUserDefined.py"
 
-vmStatusTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/VMStatusTestUserDefined.py"
+healthyTestScriptLocal = """
+#!/usr/bin/python
+# Locally.
+def is_vm_healthy():
+    return True
+"""
+
+idleTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/idleTest.py"
+healthyTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/healthyTest.py"
+
+idleTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/idleTest.py"
+healthyTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/healthyTest.py"
 
 public_settings = {
     "disabled" : "false",
     "stop" : "false",
     "rebootAfterPatch" : "RebootIfNeed",
-    "startTime" : "11:00",
+    "startTime" : "",
     "category" : "ImportantAndRecommended",
     "installDuration" : "00:30",
     "vmStatusTest" : {
-        "checkIdle" : "",
-        "checkHealthy" : "",
-        "localScript" : vmStatusTestScriptLocal,
-        #"fileUri" : vmStatusTestScriptStorage
+        "local" : "true",
+        "idleTestScript" : idleTestScriptLocal, #idleTestScriptStorage,
+        "healthyTestScript" : healthyTestScriptLocal, #healthyTestScriptStorage
     }
 }
 
 protected_settings = {
-    "storageAccountName" : "",
-    "storageAccountKey" : ""
+    "storageAccountName" : "<TOCHANGE>",
+    "storageAccountKey" : "<TOCHANGE>"
 }
 
 def install():
@@ -97,9 +101,8 @@ def enable():
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
         startTime = settings.get("startTime", "")
-        if startTime:
-            set_most_recent_seq_scheduled()
         download_customized_vmstatustest()
+        copy_vmstatustestscript(hutil.get_seq_no(), startTime)
         MyPatching.enable()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. ' + current_config)
@@ -130,9 +133,6 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
-        delete_current_vmstatustestscript()
-        seqNo = get_most_recent_seq(scheduled=True)
-        copy_vmstatustestscript(prepare_download_dir(seqNo))
         # protected_settings = hutil.get_protected_settings()
         # public_settings = hutil.get_public_settings()
         settings = protected_settings.copy()
@@ -165,15 +165,12 @@ def patch():
 def oneoff():
     hutil.do_parse_context('Oneoff')
     try:
-        delete_current_vmstatustestscript()
-        seqNo = get_most_recent_seq()
-        copy_vmstatustestscript(prepare_download_dir(seqNo))
         # protected_settings = hutil.get_protected_settings()
         # public_settings = hutil.get_public_settings()
         settings = protected_settings.copy()
         settings.update(public_settings)
         MyPatching.parse_settings(settings)
-        MyPatching.patch_one_off()
+        # MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
@@ -186,18 +183,49 @@ def download_files(hutil):
     # public_settings = hutil.get_public_settings()
     settings = protected_settings.copy()
     settings.update(public_settings)
-    local_script = settings.get("vmStatusTest", dict()).get('localScript')
-    blob_uri = settings.get("vmStatusTest", dict()).get('fileUri')
-    if not local_script and not blob_uri:
-        hutil.log_and_syslog(logging.WARNING, "localScript and fileUri value "
-                  "provided is empty or invalid. Continue with executing command...")
+    local = settings.get("vmStatusTest", dict()).get("local", "")
+    if local.lower() == "true":
+        local = True
+    elif local.lower() == "false":
+        local = False
+    else:
+        hutil.log_and_syslog(logging.WARNING, "The parameter \"local\" "
+                  "is empty or invalid. Set it as False. Continue...")
+        local = False
+    idle_test_script = settings.get("vmStatusTest", dict()).get('idleTestScript')
+    healthy_test_script = settings.get("vmStatusTest", dict()).get('healthyTestScript')
+
+    if (not idle_test_script and not healthy_test_script):
+        hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" and \"healthyTestScript\" "
+                  "are both empty. Exit downloading VMStatusTest scripts...")
         return
+    elif local:
+        if (idle_test_script and idle_test_script.startswith("http")) or \
+           (healthy_test_script and healthy_test_script.startswith("http")):
+            hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" or \"healthyTestScript\" "
+                  "should not be uri. Exit downloading VMStatusTest scripts...")
+            return
+    elif not local:
+        if (idle_test_script and not idle_test_script.startswith("http")) or \
+           (healthy_test_script and not healthy_test_script.startswith("http")):
+            hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" or \"healthyTestScript\" "
+                  "should be uri. Exit downloading VMStatusTest scripts...")
+            return
+
     hutil.do_status_report('Downloading','transitioning', '0',
-                           'Downloading VMStatusTest files...')
-    if local_script:
-        hutil.log_and_syslog(logging.INFO, "Saving scripts from user's configurations...")
-        file_path = save_local_file(local_script, hutil.get_seq_no(), hutil)
-        preprocess_files(file_path, hutil)
+                           'Downloading VMStatusTest scripts...')
+
+    vmStatusTestScripts = dict()
+    vmStatusTestScripts[idle_test_script] = idleTestScriptName
+    vmStatusTestScripts[healthy_test_script] = healthyTestScriptName
+
+    if local:
+        hutil.log_and_syslog(logging.INFO, "Saving VMStatusTest scripts from user's configurations...")
+        for src,dst in vmStatusTestScripts.items():
+            if not src:
+                continue
+            file_path = save_local_file(src, dst, hutil)
+            preprocess_files(file_path, hutil)
         return
 
     storage_account_name = None
@@ -206,29 +234,37 @@ def download_files(hutil):
         storage_account_name = settings.get("storageAccountName", "").strip()
         storage_account_key = settings.get("storageAccountKey", "").strip()
     if storage_account_name and storage_account_key:
-        hutil.log_and_syslog(logging.INFO, "Downloading scripts from azure storage...")
-        file_path = download_blob(storage_account_name,
-                                  storage_account_key,
-                                  blob_uri,
-                                  hutil.get_seq_no(),
-                                  hutil)
+        hutil.log_and_syslog(logging.INFO, "Downloading VMStatusTest scripts from azure storage...")
+        for src,dst in vmStatusTestScripts.items():
+            if not src:
+                continue
+            file_path = download_blob(storage_account_name,
+                                      storage_account_key,
+                                      src,
+                                      dst,
+                                      hutil)
+            preprocess_files(file_path, hutil)
     elif not(storage_account_name or storage_account_key):
         hutil.log_and_syslog(logging.INFO, "No azure storage account and key specified in protected "
-                  "settings. Downloading scripts from external links...")
-        file_path = download_external_file(blob_uri, hutil.get_seq_no(), hutil)
+                  "settings. Downloading VMStatusTest scripts from external links...")
+        for src,dst in vmStatusTestScripts.items():
+            if not src:
+                continue
+            file_path = download_external_file(src, dst, hutil)
+            preprocess_files(file_path, hutil)
     else:
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account or storage key is not provided"
         hutil.log_and_syslog(logging.ERROR, error_msg)
         raise ValueError(error_msg)
-    preprocess_files(file_path, hutil)
 
 def download_blob(storage_account_name, storage_account_key,
-                  blob_uri, seqNo, hutil):
+                  blob_uri, dst, hutil):
+    seqNo = hutil.get_seq_no()
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
     download_dir = prepare_download_dir(seqNo)
-    download_path = os.path.join(download_dir, VMStatusTestUserDefined)
+    download_path = os.path.join(download_dir, dst)
     #Guest agent already ensure the plugin is enabled one after another.
     #The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
@@ -240,9 +276,10 @@ def download_blob(storage_account_name, storage_account_key,
         raise
     return download_path
 
-def download_external_file(uri, seqNo,  hutil):
+def download_external_file(uri, dst, hutil):
+    seqNo = hutil.get_seq_no()
     download_dir = prepare_download_dir(seqNo)
-    file_path = os.path.join(download_dir, VMStatusTestUserDefined)
+    file_path = os.path.join(download_dir, dst)
     try:
         download_and_save_file(uri, file_path)
     except Exception, e:
@@ -251,11 +288,12 @@ def download_external_file(uri, seqNo,  hutil):
         raise
     return file_path
 
-def save_local_file(content, seqNo,  hutil):
+def save_local_file(src, dst, hutil):
+    seqNo = hutil.get_seq_no()
     download_dir = prepare_download_dir(seqNo)
-    file_path = os.path.join(download_dir, VMStatusTestUserDefined)
+    file_path = os.path.join(download_dir, dst)
     try:
-        waagent.SetFileContents(file_path, content)
+        waagent.SetFileContents(file_path, src)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to save file from user's configuration "
                      "with error {0}").format(e))
@@ -369,30 +407,37 @@ def download_customized_vmstatustest():
             else:
                 raise
 
-def copy_vmstatustestscript(src_dir):
-    src = os.path.join(src_dir, VMStatusTestUserDefined)
-    dst = os.path.join(os.getcwd(), "patch")
-    if os.path.isfile(src):
-        shutil.copy(src, dst)
+def copy_vmstatustestscript(seqNo, startTime):
+    src_dir = prepare_download_dir(seqNo)
+    for filename in (idleTestScriptName, healthyTestScriptName):
+        src = os.path.join(src_dir, filename)
+        if startTime:
+            dst = "scheduled"
+        else:
+            dst = "oneoff"
+        dst = os.path.join(os.getcwd(), dst)
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
 
 def delete_current_vmstatustestscript():
-    current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+VMStatusTestUserDefined)
-    if os.path.isfile(current_vmstatustestscript):
-        os.remove(current_vmstatustestscript)
+    for filename in (idleTestScriptName, healthyTestScriptName):
+        current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+filename)
+        if os.path.isfile(current_vmstatustestscript):
+            os.remove(current_vmstatustestscript)
 
-def get_most_recent_seq(scheduled=False):
-    mrseq_file = 'mrseq'
-    if scheduled:
-        mrseq_file += '_scheduled'
-    if(os.path.isfile(mrseq_file)):
-        seq = waagent.GetFileContents(mrseq_file)
-        return seq
-    else:
-        return "-1"
+# def get_most_recent_seq(scheduled=False):
+#     mrseq_file = 'mrseq'
+#     if scheduled:
+#         mrseq_file += '_scheduled'
+#     if(os.path.isfile(mrseq_file)):
+#         seq = waagent.GetFileContents(mrseq_file)
+#         return seq
+#     else:
+#         return "-1"
 
-def set_most_recent_seq_scheduled():
-    seq = hutil.get_seq_no()
-    waagent.SetFileContents('mrseq_scheduled', seq)
+# def set_most_recent_seq_scheduled():
+#     seq = hutil.get_seq_no()
+#     waagent.SetFileContents('mrseq_scheduled', seq)
 
 # Main function is the only entrance to this extension handler
 def main():

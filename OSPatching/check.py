@@ -27,7 +27,7 @@ def main():
     if intervalOfWeeks == 1:
         sys.exit(0)
 
-    history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'history/scheduled')
+    history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'scheduled/history')
     today = datetime.date.today()
     today_dayOfWeek = today.strftime("%a")
 

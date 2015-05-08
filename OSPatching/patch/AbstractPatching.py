@@ -35,12 +35,40 @@ import logging
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
+StatusTest = {
+    "Scheduled" : {
+        "Idle" : None,
+        "Healthy" : None
+    },
+    "Oneoff" : {
+        "Idle" : None,
+        "Healthy" : None
+    }
+}
+
 try:
-    from VMStatusTestUserDefined import VMStatusTest
-    use_template = False
+    from scheduled.idleTest import is_vm_idle
+    StatusTest["Scheduled"]["Idle"] = is_vm_idle
 except:
-    from VMStatusTestDefault import VMStatusTest
-    use_template = True
+    pass
+
+try:
+    from oneoff.idleTest import is_vm_idle
+    StatusTest["Oneoff"]["Idle"] = is_vm_idle
+except:
+    pass
+
+try:
+    from scheduled.healthyTest import is_vm_healthy
+    StatusTest["Scheduled"]["Healthy"] = is_vm_healthy
+except:
+    pass
+
+try:
+    from oneoff.healthyTest import is_vm_healthy
+    StatusTest["Oneoff"]["Healthy"] = is_vm_healthy
+except:
+    pass
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
@@ -76,7 +104,7 @@ class AbstractPatching(object):
         self.package_downloaded_path = os.path.join(waagent.LibDir, 'package.downloaded')
         self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
         self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
-        self.history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'history/scheduled')
+        self.history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'scheduled/history')
 
         self.category_required = 'Important'
         self.category_all = 'ImportantAndRecommended'
@@ -185,33 +213,13 @@ class AbstractPatching(object):
                                   isSuccess=True,
                                   message=" ".join(["category", self.category]))
 
-        check_idle = settings.get('vmStatusTest', dict()).get('checkIdle')
-        if (check_idle is None or check_idle == ''):
-            # Skip idle check by default in "Patch Now" mode
-            if self.patch_now:
-                self.check_idle = False
-        else:
-            if check_idle.lower() == 'true':
-                self.check_idle = True
-            elif check_idle.lower() == 'false':
-                self.check_idle = False
-            else:
-                msg = 'checkIdle parameter is invalid'
-                self.hutil.log_and_syslog(logging.ERROR, msg)
-        self.current_config_list.append('checkIdle=' + str(self.check_idle))
-
-        check_healthy = settings.get('VMStatusTest', dict()).get('checkHealthy')
-        if not (check_healthy is None or check_healthy == ''):
-            if check_healthy.lower() == 'true':
-                self.check_healthy = True
-            elif check_healthy.lower() == 'false':
-                self.check_healthy = False
-            else:
-                msg = 'checkHealthy parameter is invalid'
-                self.hutil.log_and_syslog(logging.ERROR, msg)
-        self.current_config_list.append('checkHealthy=' + str(self.check_healthy))
         msg = self.get_current_config()
         self.hutil.log_and_syslog(logging.INFO, msg)
+
+        if self.patch_now:
+            self.status_test = StatusTest["Oneoff"]
+        else:
+            self.status_test = StatusTest["Scheduled"]
 
     def install(self):
         pass
@@ -296,8 +304,9 @@ class AbstractPatching(object):
             self.hutil.log_and_syslog(logging.ERROR, output)
 
     def download(self):
-        self.is_template()
-        self.check_vm_idle()
+        self.provide_vm_status_test()
+        if not self.check_vm_idle():
+            return
 
         if self.exists_stop_flag():
             self.hutil.log_and_syslog(logging.INFO, "Downloading patches is stopped/canceled")
@@ -342,7 +351,8 @@ class AbstractPatching(object):
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
 
     def patch(self):
-        self.check_vm_idle()
+        if not self.check_vm_idle():
+            return
 
         if self.exists_stop_flag():
             self.hutil.log_and_syslog(logging.INFO, "Installing patches is stopped/canceled")
@@ -392,8 +402,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
-        if self.check_healthy:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(VMStatusTest.is_vm_healthy()))
+        if self.status_test["Healthy"]:
+            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(self.status_test["Healthy"]()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -429,8 +439,9 @@ class AbstractPatching(object):
         """
         Called when startTime is empty string, which means a on-demand patch.
         """
-        self.is_template()
-        self.check_vm_idle()
+        self.provide_vm_status_test()
+        if not self.check_vm_idle():
+            return
 
         global start_patch_time
         start_patch_time = time.time()
@@ -485,8 +496,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
-        if self.check_healthy:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(VMStatusTest.is_vm_healthy()))
+        if self.status_test["Healthy"]:
+            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(self.status_test["Healthy"]()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -611,20 +622,27 @@ class AbstractPatching(object):
     def get_current_config(self):
         return 'Current Configuation: ' + ','.join(self.current_config_list)
 
-    def is_template(self):
-        if use_template:
-            msg = "User does not provide VM status test scripts."
-            msg += " The default template is used."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+    def provide_vm_status_test(self):
+        for status,provided in self.status_test.items():
+            if provided is None:
+                provided = "False"
+                level = logging.WARNING
+            else:
+                provided = "True"
+                level = logging.INFO
+            msg = "The VM %s test script is provided: %s" % (status, provided)
+            self.hutil.log_and_syslog(level, msg)
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=True,
+                                      message=msg)
 
     def check_vm_idle(self):
-        if self.check_idle:
-            is_vm_idle = VMStatusTest.is_vm_idle()
-            msg = "Checking the VM is idle: " + str(is_vm_idle)
+        is_idle = True
+        if self.status_test["Idle"]:
+            is_idle = self.status_test["Idle"]()
+            msg = "Checking the VM is idle: " + str(is_idle)
             self.hutil.log_and_syslog(logging.INFO, msg)
-            if not is_vm_idle:
+            if not is_idle:
                 self.hutil.log_and_syslog(logging.WARNING, "Current Operation is skipped.")
-                return
-        else:
-            msg = "Skipped VM idle checking"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+        return is_idle
