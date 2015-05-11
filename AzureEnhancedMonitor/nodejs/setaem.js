@@ -100,8 +100,9 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
-        computeClient = computeMgmt.createComputeManagementClient(cred);
-        storageClient = storageMgmt.createStorageManagementClient(cred);
+        var baseUri = subscription.managementEndpointUrl
+        computeClient = computeMgmt.createComputeManagementClient(cred, baseUri);
+        storageClient = storageMgmt.createStorageManagementClient(cred, baseUri);
     }).then(function(){
         return getVirtualMachine(computeClient, svcName, vmName);
     }).then(function(vm){
@@ -161,23 +162,27 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                 return getStorageAccountEndpoints(storageClient, account.name);
             }).then(function(endpoints){
                 var tableEndpoint;
-                endpoints.every(function(endpoint){
+                var blobEndpoint;
+                endpoints.forEach(function(endpoint){
                     if(endpoint.match(/.*table.*/)){
                         tableEndpoint = endpoint;
-                        return false;
-                    }else{
-                        return true;
+                    }else if(endpoint.match(/.*blob.*/)){
+                        blobEndpoint = endpoint;
                     }
                 });
                 account.tableEndpoint = tableEndpoint;
+                account.blobEndpoint = blobEndpoint;
                 var minuteUri = tableEndpoint + BlobMetricsMinuteTable;
                 var hourUri = tableEndpoint + BlobMetricsHourTable;
+                account.minuteUri = minuteUri
                 aemConfig.setPublic(account.name + ".minute.uri", minuteUri);
                 aemConfig.setPublic(account.name + ".hour.uri", hourUri);
                 aemConfig.setPublic(account.name + ".minute.name", account.name);
                 aemConfig.setPublic(account.name + ".hour.name", account.name);
             }).then(function(){
-                return checkStorageAccountAnalytics(account.name, account.key);
+                return checkStorageAccountAnalytics(account.name, 
+                                                    account.key,
+                                                    account.blobEndpoint);
             });
             promises.push(promise);
         });
@@ -279,9 +284,10 @@ var getStorageAccountKey = function(storageClient, accountName){
     });
 };
 
-var getStorageAccountAnalytics = function(accountName, accountKey){
+var getStorageAccountAnalytics = function(accountName, accountKey, host){
     return new Promise(function(fullfill, reject){
-        var blobService = storage.createBlobService(accountName, accountKey); 
+        var blobService = storage.createBlobService(accountName, accountKey, 
+                                                    host); 
         blobService.getServiceProperties(null, function(err, properties, resp){
             if(err){
                 reject(err)
@@ -312,8 +318,8 @@ var analyticsSettings = {
     } 
 };
 
-var checkStorageAccountAnalytics = function(accountName, accountKey){
-   return getStorageAccountAnalytics(accountName, accountKey)
+var checkStorageAccountAnalytics = function(accountName, accountKey, host){
+   return getStorageAccountAnalytics(accountName, accountKey, host)
      .then(function(properties){
         if(!properties 
                 || !properties.Logging
@@ -328,15 +334,17 @@ var checkStorageAccountAnalytics = function(accountName, accountKey){
                 || properties.MinuteMetrics.RetentionPolicy.Days == 0
                 ){
             console.log("[INFO] Turn on storage analytics for: " + accountName)
-            return setStorageAccountAnalytics(accountName, accountKey, 
+            return setStorageAccountAnalytics(accountName, accountKey, host,
                                               analyticsSettings);
         }
    });
 }
 
-var setStorageAccountAnalytics = function(accountName, accountKey, properties){
+var setStorageAccountAnalytics = function(accountName, accountKey, 
+                                          host, properties){
     return new Promise(function(fullfill, reject){
-        var blobService = storage.createBlobService(accountName, accountKey); 
+        var blobService = storage.createBlobService(accountName, accountKey,
+                                                    host); 
         blobService.setServiceProperties(properties, null, 
                                          function(err, properties, resp){
             if(err){
