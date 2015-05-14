@@ -34,6 +34,7 @@ import logging
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+from ConfigOptions import ConfigOptions
 
 StatusTest = {
     "Scheduled" : {
@@ -84,35 +85,36 @@ class AbstractPatching(object):
         self.to_patch = []
         self.downloaded = []
 
+        # Patching Configuration
         self.disabled = None
         self.stop = None
         self.reboot_after_patch = None
+        self.category = None
+        self.install_duration = None
+        self.oneoff = None
         self.interval_of_weeks = None
         self.day_of_week = None
         self.start_time = None
         self.download_time = None
-        self.install_duration = None
-        self.patch_now = None
-        self.category = None
         self.download_duration = 3600
         self.gap_between_stage = 60
+        self.current_configs = dict()
 
+        self.category_required = ConfigOptions.category["required"]
+        self.category_all = ConfigOptions.category["all"]
+
+        # Crontab Variables
         self.crontab = '/etc/crontab'
         self.cron_restart_cmd = 'service cron restart'
         self.cron_chkconfig_cmd = 'chkconfig cron on'
 
-        self.package_downloaded_path = os.path.join(waagent.LibDir, 'package.downloaded')
-        self.package_patched_path = os.path.join(waagent.LibDir, 'package.patched')
-        self.stop_flag_path = os.path.join(waagent.LibDir, 'StopOSPatching')
-        self.history_scheduled = os.path.join(os.path.dirname(sys.argv[0]), 'scheduled/history')
-
-        self.category_required = 'Important'
-        self.category_all = 'ImportantAndRecommended'
-
-        self.check_idle = True
-        self.check_healthy = True
-
-        self.current_config_list = list()
+        # Path Variables
+        self.cwd = os.path.dirname(sys.argv[0])
+        self.package_downloaded_path = os.path.join(self.cwd, 'package.downloaded')
+        self.package_patched_path = os.path.join(self.cwd, 'package.patched')
+        self.stop_flag_path = os.path.join(self.cwd, 'StopOSPatching')
+        self.history_scheduled = os.path.join(self.cwd, 'scheduled/history')
+        self.scheduled_configs_file = os.path.join(self.cwd, 'scheduled/configs')
 
         # Reboot Requirements
         self.reboot_required = False
@@ -121,105 +123,153 @@ class AbstractPatching(object):
         self.needs_restart = list()
 
     def parse_settings(self, settings):
-        disabled = settings.get('disabled')
-        if disabled is None:
-            msg = "The value of option \"disabled\" not \
-                  specified in configuration\n Set it False by default"
+        disabled = settings.get("disabled")
+        if disabled is None or disabled.lower() not in ConfigOptions.disabled:
+            msg = "The value of parameter \"disabled\" is empty or invalid. \
+                   Set it False by default."
             self.hutil.log_and_syslog(logging.WARNING, msg)
-
-        self.disabled = True if disabled in ['True', 'true'] else False
-        self.current_config_list.append('disabled=' + str(self.disabled))
+            self.disabled = False
+        else:
+            if disabled.lower() == "true":
+                self.disabled = True
+            else:
+                self.disabled = False
+        self.current_configs["disabled"] = str(self.disabled)
         if self.disabled:
-            msg = "The extension " + ExtensionShortName+ "is disabled"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            msg = "The extension " + ExtensionShortName+ "is disabled."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
             return
 
-        stop = settings.get('stop')
-        self.stop = True if stop in ['True', 'true'] else False
-        self.current_config_list.append('stop=' + str(self.stop))
-
-        reboot_after_patch = settings.get('rebootAfterPatch')
-        if reboot_after_patch is None or reboot_after_patch == '':
-            self.reboot_after_patch = 'Auto'
+        stop = settings.get("stop")
+        if stop is None or stop.lower() not in ConfigOptions.stop:
+            msg = "The value of parameter \"stop\" is empty or invalid. \
+                  Set it False by default."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.stop = False
         else:
-            self.reboot_after_patch = reboot_after_patch
-        self.current_config_list.append('rebootAfterPatch=' + self.reboot_after_patch)
+            if stop.lower() == 'true':
+                self.stop = True
+            else:
+                self.stop = False
+        self.current_configs["stop"] = str(self.stop)
+
+        reboot_after_patch = settings.get("rebootAfterPatch")
+        if reboot_after_patch is None or reboot_after_patch.lower() not in ConfigOptions.reboot_after_patch:
+            self.reboot_after_patch = ConfigOptions.reboot_after_patch[0]
+        else:
+            self.reboot_after_patch = reboot_after_patch.lower()
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
                                   message=" ".join(["rebootAfterPatch", self.reboot_after_patch]))
+        self.current_configs["rebootAfterPatch"] = self.reboot_after_patch
 
-        start_time = settings.get('startTime')
-        if start_time is None or start_time == '':
-            msg = 'startTime defaults to Now'
-            self.hutil.log_and_syslog(logging.INFO, msg)
-            self.patch_now = True
-            self.current_config_list.append('startTime=Now')
+        category = settings.get('category')
+        if category is None or category.lower() not in ConfigOptions.category.values():
+            msg = "The value of parameter \"category\" is empty or invalid. \
+                  Set it " + self.category_required + " by default."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.category = self.category_required
         else:
-            self.patch_now = False
-            self.current_config_list.append('startTime=' + start_time)            
-            self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
-            self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
- 
-            day_of_week = settings.get('dayOfWeek')
-            if day_of_week is None or day_of_week == '':
-                msg = 'dayOfWeek defaults to Everyday'
-                self.hutil.log_and_syslog(logging.INFO, msg)
-                day_of_week = 'Everyday'
-            self.current_config_list.append('dayOfWeek=' + day_of_week)
-            waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
-                                      message="dayOfWeek=" + day_of_week)
-            day2num = {'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7}
-            if 'Everyday' in day_of_week:
-                self.day_of_week = range(1,8)
-            else:
-                self.day_of_week = [day2num[day] for day in day_of_week.split('|')]
+            self.category = category.lower()
+        waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=True,
+                                  message=" ".join(["category", self.category]))
+        self.current_configs["category"] =  self.category
 
-            interval_of_weeks = settings.get('intervalOfWeeks')
-            if interval_of_weeks is None or interval_of_weeks == '':
-                self.interval_of_weeks = '1'
-            else:
-                self.interval_of_weeks = interval_of_weeks
-            self.current_config_list.append('intervalOfWeeks=' + str(self.interval_of_weeks))
-            waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
-                                      message=" ".join(["intervalOfWeeks", self.interval_of_weeks]))
-
+        check_hrmin = re.compile(r'^[0-9]{1,2}:[0-9]{1,2}$')
         install_duration = settings.get('installDuration')
-        if install_duration is None or install_duration == '':
-            msg = 'install_duration defaults to 3600s'
+        if install_duration is None or not re.match(check_hrmin, install_duration):
+            msg = "The value of parameter \"installDuration\" is empty or invalid. \
+                  Set it 1 hour by default."
             self.hutil.log_and_syslog(logging.INFO, msg)
             self.install_duration = 3600
         else:
             hr_min = install_duration.split(':')
             self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
-        self.current_config_list.append('installDuration=' + str(self.install_duration))
-        # 5 min for reboot
-        self.install_duration -= 300
-
-        category = settings.get('category')
-        if category is None or category == '':
-            msg = 'category defaults to ' + self.category_all
-            self.hutil.log_and_syslog(logging.INFO, msg)
-            self.category = self.category_all
+        if self.install_duration <= 300:
+            msg = "The value of parameter \"installDuration\" is smaller than 5 minutes. \
+                  The extension will not reserve 5 minutes for reboot. It is recommended to set \
+                  \"installDuration\" more than 10 minutes."
         else:
-            self.category = category
-        self.current_config_list.append('category=' + self.category)
-        waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                  op=waagent.WALAEventOperation.Enable,
-                                  isSuccess=True,
-                                  message=" ".join(["category", self.category]))
-
-        msg = self.get_current_config()
+            msg = "The extension will reserve 5 minutes for reboot."
+            # 5 min for reboot
+            self.install_duration -= 300
         self.hutil.log_and_syslog(logging.INFO, msg)
+        self.current_configs["installDuration"] = str(self.install_duration)
 
-        if self.patch_now:
-            self.status_test = StatusTest["Oneoff"]
+        oneoff = settings.get('oneoff')
+        if stop is None or oneoff.lower() not in ConfigOptions.oneoff:
+            msg = "The value of parameter \"oneoff\" is empty or invalid. \
+                  Set it False by default."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.oneoff = False
         else:
-            self.status_test = StatusTest["Scheduled"]
+            if oneoff.lower() == "true":
+                self.oneoff = True
+                msg = "The extension will run in one-off mode."
+            else:
+                self.oneoff = False
+                msg = "The extension will run in scheduled task mode."
+            self.hutil.log_and_syslog(logging.INFO, msg)
+        self.current_configs["oneoff"] = str(self.oneoff)
+
+        if not self.oneoff:
+            start_time = settings.get('startTime')
+            if start_time is None or not re.match(check_hrmin, start_time):
+                msg = "The parameter \"startTime\" is empty or invalid. \
+                      It defaults to 03:00."
+                self.hutil.log_and_syslog(logging.WARNING, msg)
+                start_time = "03:00"
+            self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
+            self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
+            self.current_configs["startTime"] = start_time
+ 
+            day_of_week = settings.get("dayOfWeek")
+            if day_of_week is None or day_of_week == "":
+                msg = "The parameter \"dayOfWeek\" is empty. \
+                      dayOfWeek defaults to Everyday."
+                self.hutil.log_and_syslog(logging.WARNING, msg)
+                day_of_week = "everyday"
+                self.day_of_week = ConfigOptions.day_of_week["everyday"]
+            else:
+                for day in day_of_week.split('|'):
+                    day = day.strip().lower()
+                    if day not in ConfigOptions.day_of_week:
+                        msg = "The parameter \"dayOfWeek\" is invalid. \
+                              dayOfWeek defaults to Everyday."
+                        self.hutil.log_and_syslog(logging.WARNING, msg)
+                        day_of_week = "everyday"
+                        break
+                if "everyday" in day_of_week:
+                    self.day_of_week = ConfigOptions.day_of_week["everyday"]
+                else:
+                    self.day_of_week = [ConfigOptions.day_of_week[day.strip().lower()] for day in day_of_week.split('|')]
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=True,
+                                      message="dayOfWeek=" + day_of_week)
+            self.current_configs["dayOfWeek"] = day_of_week
+
+            interval_of_weeks = settings.get('intervalOfWeeks')
+            if interval_of_weeks is None or interval_of_weeks not in ConfigOptions.interval_of_weeks:
+                msg = "The parameter \"intervalOfWeeks\" is empty or invalid. \
+                      intervalOfWeeks defaults to 1."
+                self.hutil.log_and_syslog(logging.WARNING, msg)
+                self.interval_of_weeks = '1'
+            else:
+                self.interval_of_weeks = interval_of_weeks
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=True,
+                                      message=" ".join(["intervalOfWeeks", self.interval_of_weeks]))
+            self.current_configs["intervalOfWeeks"] = self.interval_of_weeks
+
+            waagent.SetFileContents(self.scheduled_configs_file, json.dumps(self.current_configs))
+
+        msg = "Current Configuration: " + self.get_current_config()
+        self.hutil.log_and_syslog(logging.INFO, msg)
 
     def install(self):
         pass
@@ -230,7 +280,7 @@ class AbstractPatching(object):
             self.create_stop_flag()
             return
         self.delete_stop_flag()
-        if not self.disabled and self.patch_now:
+        if not self.disabled and self.oneoff:
             script_file_path = os.path.realpath(sys.argv[0])
             os.system(' '.join(['python', script_file_path, '-oneoff', '>/dev/null 2>&1 &']))
         else:
@@ -304,8 +354,11 @@ class AbstractPatching(object):
             self.hutil.log_and_syslog(logging.ERROR, output)
 
     def download(self):
-        self.provide_vm_status_test()
-        if not self.check_vm_idle():
+        settings = json.loads(waagent.GetFileContents(self.scheduled_configs_file))
+        self.parse_settings(settings)
+
+        self.provide_vm_status_test(StatusTest["Scheduled"])
+        if not self.check_vm_idle(StatusTest["Scheduled"]):
             return
 
         if self.exists_stop_flag():
@@ -330,8 +383,9 @@ class AbstractPatching(object):
         self.hutil.log_and_syslog(logging.INFO, "Start to check&download patches (Category:" + category + ")")
         retcode, downloadlist = self.check(category)
         if retcode > 0:
-            self.hutil.log_and_syslog(logging.ERROR, "Failed to check valid upgrades")
-            sys.exit(1)
+            msg = "Failed to check valid upgrades"
+            self.hutil.log_and_syslog(logging.ERROR, msg)
+            self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
         if 'walinuxagent' in downloadlist:
             downloadlist.remove('walinuxagent')
         if not downloadlist:
@@ -351,7 +405,10 @@ class AbstractPatching(object):
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
 
     def patch(self):
-        if not self.check_vm_idle():
+        settings = json.loads(waagent.GetFileContents(self.scheduled_configs_file))
+        self.parse_settings(settings)
+
+        if not self.check_vm_idle(StatusTest["Scheduled"]):
             return
 
         if self.exists_stop_flag():
@@ -402,8 +459,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
-        if self.status_test["Healthy"]:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(self.status_test["Healthy"]()))
+        if StatusTest["Scheduled"]["Healthy"]:
+            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(StatusTest["Scheduled"]["Healthy"]()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -439,8 +496,8 @@ class AbstractPatching(object):
         """
         Called when startTime is empty string, which means a on-demand patch.
         """
-        self.provide_vm_status_test()
-        if not self.check_vm_idle():
+        self.provide_vm_status_test(StatusTest["Oneoff"])
+        if not self.check_vm_idle(StatusTest["Oneoff"]):
             return
 
         global start_patch_time
@@ -457,8 +514,9 @@ class AbstractPatching(object):
         is_time_out = [False, False]
         retcode, patchlist_required = self.check(self.category_required)
         if retcode > 0:
-            self.hutil.log_and_syslog(logging.ERROR, "Failed to check valid upgrades")
-            sys.exit(1)
+            msg = "Failed to check valid upgrades"
+            self.hutil.log_and_syslog(logging.ERROR, msg)
+            self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
         if not patchlist_required:
             self.hutil.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_required + ")")
         else:
@@ -469,8 +527,9 @@ class AbstractPatching(object):
                 if not is_time_out[0]:
                     retcode, patchlist_other = self.check(self.category_all)
                     if retcode > 0:
-                        self.hutil.log_and_syslog(logging.ERROR, "Failed to check valid upgrades")
-                        sys.exit(1)
+                        msg = "Failed to check valid upgrades"
+                        self.hutil.log_and_syslog(logging.ERROR, msg)
+                        self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
                     patchlist_other = [pkg for pkg in patchlist_other if pkg not in patchlist_required]
                     if len(patchlist_other) == 0:
                         self.hutil.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_all + ")")
@@ -496,8 +555,8 @@ class AbstractPatching(object):
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
-        if self.status_test["Healthy"]:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(self.status_test["Healthy"]()))
+        if StatusTest["Oneoff"]["Healthy"]:
+            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(StatusTest["Oneoff"]["Healthy"]()))
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -620,10 +679,13 @@ class AbstractPatching(object):
         return patchedlist
 
     def get_current_config(self):
-        return 'Current Configuation: ' + ','.join(self.current_config_list)
+        current_configs = []
+        for k,v in self.current_configs.items():
+            current_configs.append(k + "=" + v)
+        return ",".join(current_configs)
 
-    def provide_vm_status_test(self):
-        for status,provided in self.status_test.items():
+    def provide_vm_status_test(self, status_test):
+        for status,provided in status_test.items():
             if provided is None:
                 provided = "False"
                 level = logging.WARNING
@@ -637,10 +699,10 @@ class AbstractPatching(object):
                                       isSuccess=True,
                                       message=msg)
 
-    def check_vm_idle(self):
+    def check_vm_idle(self, status_test):
         is_idle = True
-        if self.status_test["Idle"]:
-            is_idle = self.status_test["Idle"]()
+        if status_test["Idle"]:
+            is_idle = status_test["Idle"]()
             msg = "Checking the VM is idle: " + str(is_idle)
             self.hutil.log_and_syslog(logging.INFO, msg)
             if not is_idle:

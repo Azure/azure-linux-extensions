@@ -66,9 +66,12 @@ public_settings = {
     "disabled" : "false",
     "stop" : "false",
     "rebootAfterPatch" : "RebootIfNeed",
-    "startTime" : "",
     "category" : "ImportantAndRecommended",
     "installDuration" : "00:30",
+    "oneoff" : "false",
+    "intervalOfWeeks" : "1",
+    "dayOfWeek" : "everyday",
+    "startTime" : "03:00",
     "vmStatusTest" : {
         "local" : "true",
         "idleTestScript" : idleTestScriptLocal, #idleTestScriptStorage,
@@ -100,12 +103,12 @@ def enable():
         MyPatching.parse_settings(settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
-        startTime = settings.get("startTime", "")
+        oneoff = settings.get("oneoff")
         download_customized_vmstatustest()
-        copy_vmstatustestscript(hutil.get_seq_no(), startTime)
+        copy_vmstatustestscript(hutil.get_seq_no(), oneoff)
         MyPatching.enable()
         current_config = MyPatching.get_current_config()
-        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. ' + current_config)
+        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
         hutil.log_and_syslog(logging.ERROR, "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -170,7 +173,7 @@ def oneoff():
         settings = protected_settings.copy()
         settings.update(public_settings)
         MyPatching.parse_settings(settings)
-        # MyPatching.patch_one_off()
+        MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
@@ -407,14 +410,14 @@ def download_customized_vmstatustest():
             else:
                 raise
 
-def copy_vmstatustestscript(seqNo, startTime):
+def copy_vmstatustestscript(seqNo, oneoff):
     src_dir = prepare_download_dir(seqNo)
     for filename in (idleTestScriptName, healthyTestScriptName):
         src = os.path.join(src_dir, filename)
-        if startTime:
-            dst = "scheduled"
-        else:
+        if oneoff is not None and oneoff.lower() == "false":
             dst = "oneoff"
+        else:
+            dst = "scheduled"
         dst = os.path.join(os.getcwd(), dst)
         if os.path.isfile(src):
             shutil.copy(src, dst)
@@ -424,20 +427,6 @@ def delete_current_vmstatustestscript():
         current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+filename)
         if os.path.isfile(current_vmstatustestscript):
             os.remove(current_vmstatustestscript)
-
-# def get_most_recent_seq(scheduled=False):
-#     mrseq_file = 'mrseq'
-#     if scheduled:
-#         mrseq_file += '_scheduled'
-#     if(os.path.isfile(mrseq_file)):
-#         seq = waagent.GetFileContents(mrseq_file)
-#         return seq
-#     else:
-#         return "-1"
-
-# def set_most_recent_seq_scheduled():
-#     seq = hutil.get_seq_no()
-#     waagent.SetFileContents('mrseq_scheduled', seq)
 
 # Main function is the only entrance to this extension handler
 def main():
@@ -450,7 +439,7 @@ def main():
 
     global MyPatching
     MyPatching = GetMyPatching(hutil)
-    if MyPatching == None:
+    if MyPatching is None:
         sys.exit(1)
 
     for a in sys.argv[1:]:
