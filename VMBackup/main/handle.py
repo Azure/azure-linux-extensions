@@ -86,11 +86,13 @@ def enable():
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
+        hutil.log(" stored identity is " + stored_identity)
         if(stored_identity is None):
             mi.save_identity()
             hutil.exit_if_enabled()
         else:
             current_identity = mi.current_identity()
+            hutil.log(" current identity " + current_identity)
             if(current_identity != stored_identity):
                 current_seq_no = 0
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
