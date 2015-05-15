@@ -32,6 +32,7 @@ import shlex
 import traceback
 import httplib
 import xml.parsers.expat
+from os.path import join
 from mounts import Mounts
 from mounts import Mount
 from fsfreezer import FsFreezer
