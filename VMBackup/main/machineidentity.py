@@ -33,7 +33,7 @@ class MachineIdentity:
         file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
         xmlText = file.read()
         dom = xml.dom.minidom.parseString(xmlText)
-        deployment = dom.getElementsByTagName("Deployment")
+        deployment = dom.getElementsByTagName("Role")
         identity=deployment[0].getAttribute("guid")
         return identity
 
