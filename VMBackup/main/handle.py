@@ -95,11 +95,12 @@ def enable():
             current_identity = mi.current_identity()
             hutil.log(" current identity " + current_identity)
             if(current_identity != stored_identity):
-                current_seq_no = hutil._get_current_seq_no()
+                current_seq_no = hutil._get_current_seq_no(hutil._context._config_dir)
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                #remove other .config files. or the waagent would report the 3 status...
+                #remove other .config files.  or the waagent would report the 3
+                #status...
                 
-                for subdir, dirs, files in os.walk( hutil._context._config_dir):
+                for subdir, dirs, files in os.walk(hutil._context._config_dir):
                     for file in files:
                         try:
                             cur_seq_no = int(os.path.basename(file).split('.')[0])
