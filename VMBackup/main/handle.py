@@ -105,7 +105,7 @@ def enable():
                         try:
                             cur_seq_no = int(os.path.basename(file).split('.')[0])
                             if(cur_seq_no != current_seq_no):
-                                os.remove(file)
+                                os.remove(join(config_folder,file))
                         except ValueError:
                             continue
                 hutil.set_inused_config_seq(current_seq_no)
