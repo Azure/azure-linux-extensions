@@ -1,7 +1,5 @@
 In some distros, python has to be upgraded to Python2.7
-mkdir config
-mkdir status
-copy /var/lib/waagent/<extension-name>/config/0.settings into config
-Run "sudo ./test_handler.py"
-Run "sudo ./test_handler2.py"
-Run "sudo ./test_handler3.py"
+copy test.crt and test.prv into /var/lib/waagent/
+Run "./prepare_settings.py; ./test_handler_1.py"
+Run "./prepare_settings.py; ./test_handler_2.py"
+Run "./prepare_settings.py; ./test_handler_3.py"

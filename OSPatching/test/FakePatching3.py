@@ -24,8 +24,9 @@ from AbstractPatching import AbstractPatching
 class FakePatching(AbstractPatching):
     def __init__(self, hutil=None):
         super(FakePatching,self).__init__(hutil)
+        self.pkg_query_cmd = 'dpkg-query -L'
         self.gap_between_stage = 20
-        self.download_duration = 3600
+        self.download_duration = 60
         self.security_download_list = ['a', 'b', 'c', 'd', 'e']
         self.all_download_list = ['1', '2', '3', '4', 'a', 'b', 'c', 'd', 'e']
 
@@ -40,7 +41,7 @@ class FakePatching(AbstractPatching):
         Check valid upgrades,
         Return the package list to download & upgrade
         """
-        if category == 'Important':
+        if category == 'important':
             return 0, self.security_download_list
         else:
             return 0, self.all_download_list

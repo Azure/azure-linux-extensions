@@ -34,13 +34,25 @@ import logging
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+import json
+import unittest
+sys.path.append('..')
 from patch import *
+from FakePatching2 import FakePatching
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
 DownloadDirectory = 'download'
 idleTestScriptName = "idleTest.py"
 healthyTestScriptName = "healthyTest.py"
+handlerName = os.path.basename(sys.argv[0])
+status_file = './status/0.status'
+log_file = './extension.log'
+
+settings_file = "default.settings"
+with open(settings_file, "r") as f:
+    settings_string = f.read()
+settings = json.loads(settings_string)
 
 def install():
     hutil.do_parse_context('Install')
@@ -54,10 +66,6 @@ def install():
 def enable():
     hutil.do_parse_context('Enable')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
@@ -79,6 +87,8 @@ def uninstall():
 def disable():
     hutil.do_parse_context('Disable')
     try:
+        # Ensure the same configuration is executed only once
+        hutil.exit_if_seq_smaller()
         MyPatching.disable()
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded.')
     except Exception, e:
@@ -92,10 +102,6 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.download()
         current_config = MyPatching.get_current_config()
@@ -108,10 +114,6 @@ def download():
 def patch():
     hutil.do_parse_context('Patch')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch()
         current_config = MyPatching.get_current_config()
@@ -124,10 +126,6 @@ def patch():
 def oneoff():
     hutil.do_parse_context('Oneoff')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
@@ -138,14 +136,10 @@ def oneoff():
         hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed. Current Configuation: ' + current_config)
 
 def download_files(hutil):
-    protected_settings = hutil.get_protected_settings()
-    public_settings = hutil.get_public_settings()
-    settings = protected_settings.copy()
-    settings.update(public_settings)
     local = settings.get("vmStatusTest", dict()).get("local", "")
-    if str(local).lower() == "true":
+    if local.lower() == "true":
         local = True
-    elif str(local).lower() == "false":
+    elif local.lower() == "false":
         local = False
     else:
         hutil.log_and_syslog(logging.WARNING, "The parameter \"local\" "
@@ -228,7 +222,6 @@ def download_blob(storage_account_name, storage_account_key,
     #The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(download_path))
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0} "
@@ -241,7 +234,6 @@ def download_external_file(uri, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
         download_and_save_file(uri, file_path)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download external file with uri:{0} "
@@ -254,7 +246,6 @@ def save_local_file(src, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
         waagent.SetFileContents(file_path, src)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to save file from user's configuration "
@@ -373,33 +364,222 @@ def copy_vmstatustestscript(seqNo, oneoff):
     src_dir = prepare_download_dir(seqNo)
     for filename in (idleTestScriptName, healthyTestScriptName):
         src = os.path.join(src_dir, filename)
-        if oneoff is not None and str(oneoff).lower() == "true":
-            dst = "oneoff"
-        else:
-            dst = "scheduled"
-        dst = os.path.join(os.getcwd(), dst)
-        current_vmstatustestscript = os.path.join(dst, filename)
-        if os.path.isfile(current_vmstatustestscript):
-            os.remove(current_vmstatustestscript)
-        # Remove the .pyc file
-        if os.path.isfile(current_vmstatustestscript+'c'):
-            os.remove(current_vmstatustestscript+'c')
         if os.path.isfile(src):
+            if oneoff is not None and oneoff.lower() == "true":
+                dst = "oneoff"
+            else:
+                dst = "scheduled"
+            dst = os.path.join(os.getcwd(), dst)
             shutil.copy(src, dst)
 
+def delete_current_vmstatustestscript():
+    for filename in (idleTestScriptName, healthyTestScriptName):
+        current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+filename)
+        if os.path.isfile(current_vmstatustestscript):
+            os.remove(current_vmstatustestscript)
 
-# Main function is the only entrance to this extension handler
+class Test(unittest.TestCase):
+    def setUp(self):
+        print '\n\n============================================================================================'
+        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
+        waagent.Log("%s started to handle." %(ExtensionShortName))
+        global hutil
+        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
+                                    ExtensionShortName)
+        hutil.do_parse_context('TEST')
+
+        global MyPatching
+        MyPatching = FakePatching(hutil)
+        if MyPatching is None:
+            sys.exit(1)
+
+        distro = DistInfo()[0]
+        if 'centos' in distro or 'Oracle' in distro or 'redhat' in distro:
+            MyPatching.cron_restart_cmd = 'service crond restart'
+
+        try:
+            os.remove('mrseq')
+        except:
+            pass
+
+        waagent.SetFileContents(MyPatching.package_downloaded_path, '')
+        waagent.SetFileContents(MyPatching.package_patched_path, '')
+
+    def test_download_time_exceed(self):
+        '''
+        check package.downloaded and package.patched
+        '''
+        print 'test_download_time_exceed'
+
+        global settings
+        current_time = time.time()
+        settings = change_settings("startTime", time.strftime('%H:%M', time.localtime(current_time + 180)))
+        settings = change_settings("category", "importantandrecommended")
+
+        old_log_len = len(waagent.GetFileContents(log_file))
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        time.sleep(180 + 10)
+
+        all_download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertTrue(set(all_download_list) == set(['a', 'b', 'c', 'd', 'e']))
+        # Check extension.log
+        log_contents = waagent.GetFileContents(log_file)[old_log_len:]
+        self.assertTrue('Download time exceeded' in log_contents)
+        restore_settings()
+
+    def test_stop_before_download(self):
+        '''
+        check stop flag before download and after patch
+        '''
+        print 'test_stop_before_download'
+        global settings
+        current_time = time.time()
+        settings = change_settings("startTime", time.strftime('%H:%M', time.localtime(current_time + 180)))
+        settings = change_settings("category", "importantandrecommended")
+
+        old_log_len = len(waagent.GetFileContents(log_file))
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        os.remove('mrseq')
+        settings = change_settings("stop", "true")
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        time.sleep(180 + 5 + 60)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_downloaded_path))
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
+        log_contents = waagent.GetFileContents(log_file)[old_log_len:]
+        self.assertTrue('Downloading patches is stopped/canceled' in log_contents)
+        restore_settings()
+
+    def test_stop_while_download(self):
+        print 'test_stop_while_download'
+        global settings
+        current_time = time.time()
+        settings = change_settings("startTime", time.strftime('%H:%M', time.localtime(current_time + 180)))
+        settings = change_settings("category", "importantandrecommended")
+
+        old_log_len = len(waagent.GetFileContents(log_file))
+        delta_time = int(time.strftime('%S', time.localtime(current_time + 120)))
+
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+
+        # set stop flag after downloaded 40 seconds
+        time.sleep(160 - delta_time)
+        os.remove('mrseq')
+        settings = change_settings("stop", "true")
+        with self.assertRaises(SystemExit) as cm:
+            enable()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertTrue(MyPatching.exists_stop_flag())
+
+        # Make sure the total sleep time is greater than 180s
+        time.sleep(20 + delta_time + 5)
+        self.assertFalse(MyPatching.exists_stop_flag())
+        download_list = get_patch_list(MyPatching.package_downloaded_path)
+        self.assertEqual(download_list, ['a', 'b', 'c'])
+        self.assertFalse(waagent.GetFileContents(MyPatching.package_patched_path))
+        # Check extension.log
+        log_contents = waagent.GetFileContents(log_file)[old_log_len:]
+        self.assertTrue('Installing patches is stopped/canceled' in log_contents)
+        restore_settings()
+
+
+def get_patch_list(file_path, category = None):
+    content = waagent.GetFileContents(file_path)
+    if category != None:
+        result = [line.split()[0] for line in content.split('\n') if line.endswith(category)]
+    else:
+        result = [line.split()[0] for line in content.split('\n') if ' ' in line]
+    return result
+    
+
+def get_status(operation, retkey='status'):
+    contents = waagent.GetFileContents(status_file)
+    status = json.loads(contents)[0]['status']
+    if status['operation'] == operation:
+        return status[retkey]
+    return ''
+
+def change_settings(key, value):
+    with open(settings_file, "r") as f:
+        settings_string = f.read()
+        settings = json.loads(settings_string)
+    with open(settings_file, "w") as f:
+        settings[key] = value
+        settings_string = json.dumps(settings)
+        f.write(settings_string)
+    return settings
+
+def restore_settings():
+    idleTestScriptLocal = """#!/usr/bin/python
+    # Locally.
+    def is_vm_idle():
+        return True
+    """
+
+    healthyTestScriptLocal = """#!/usr/bin/python
+    # Locally.
+    def is_vm_healthy():
+        return True
+    """
+
+    idleTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/idleTest.py"
+    healthyTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/healthyTest.py"
+
+    idleTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/idleTest.py"
+    healthyTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/healthyTest.py"
+
+    settings = {
+        "disabled" : "false",
+        "stop" : "false",
+        "rebootAfterPatch" : "rebootifneed",
+        "category" : "important",
+        "installDuration" : "00:30",
+        "oneoff" : "false",
+        "intervalOfWeeks" : "1",
+        "dayOfWeek" : "everyday",
+        "startTime" : "03:00",
+        "vmStatusTest" : {
+            "local" : "true",
+            "idleTestScript" : idleTestScriptLocal, #idleTestScriptStorage,
+            "healthyTestScript" : healthyTestScriptLocal, #healthyTestScriptStorage
+        },
+        "storageAccountName" : "<TOCHANGE>",
+        "storageAccountKey" : "<TOCHANGE>"
+    }
+
+    settings_string = json.dumps(settings)
+    settings_file = "default.settings"
+    with open(settings_file, "w") as f:
+        f.write(settings_string)
+
+
 def main():
+    if len(sys.argv) == 1:
+        unittest.main()
+        return
+
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
     global hutil
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
                                 ExtensionShortName)
-
+    hutil.do_parse_context('TEST')
     global MyPatching
-    MyPatching = GetMyPatching(hutil)
-    if MyPatching is None:
+    MyPatching = FakePatching(hutil)
+
+    if MyPatching == None:
         sys.exit(1)
 
     for a in sys.argv[1:]:
@@ -419,7 +599,6 @@ def main():
             patch()
         elif re.match("^([-/]*)(oneoff)", a):
             oneoff()
-
 
 if __name__ == '__main__':
     main()

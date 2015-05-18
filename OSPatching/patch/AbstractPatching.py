@@ -109,7 +109,7 @@ class AbstractPatching(object):
         self.cron_chkconfig_cmd = 'chkconfig cron on'
 
         # Path Variables
-        self.cwd = os.path.dirname(sys.argv[0])
+        self.cwd = os.getcwd()
         self.package_downloaded_path = os.path.join(self.cwd, 'package.downloaded')
         self.package_patched_path = os.path.join(self.cwd, 'package.patched')
         self.stop_flag_path = os.path.join(self.cwd, 'StopOSPatching')
@@ -124,13 +124,12 @@ class AbstractPatching(object):
 
     def parse_settings(self, settings):
         disabled = settings.get("disabled")
-        if disabled is None or disabled.lower() not in ConfigOptions.disabled:
-            msg = "The value of parameter \"disabled\" is empty or invalid. \
-                   Set it False by default."
+        if disabled is None or str(disabled).lower() not in ConfigOptions.disabled:
+            msg = "The value of parameter \"disabled\" is empty or invalid. Set it False by default."
             self.hutil.log_and_syslog(logging.WARNING, msg)
             self.disabled = False
         else:
-            if disabled.lower() == "true":
+            if str(disabled).lower() == "true":
                 self.disabled = True
             else:
                 self.disabled = False
@@ -141,13 +140,12 @@ class AbstractPatching(object):
             return
 
         stop = settings.get("stop")
-        if stop is None or stop.lower() not in ConfigOptions.stop:
-            msg = "The value of parameter \"stop\" is empty or invalid. \
-                  Set it False by default."
+        if stop is None or str(stop).lower() not in ConfigOptions.stop:
+            msg = "The value of parameter \"stop\" is empty or invalid. Set it False by default."
             self.hutil.log_and_syslog(logging.WARNING, msg)
             self.stop = False
         else:
-            if stop.lower() == 'true':
+            if str(stop).lower() == 'true':
                 self.stop = True
             else:
                 self.stop = False
@@ -155,6 +153,8 @@ class AbstractPatching(object):
 
         reboot_after_patch = settings.get("rebootAfterPatch")
         if reboot_after_patch is None or reboot_after_patch.lower() not in ConfigOptions.reboot_after_patch:
+            msg = "The value of parameter \"rebootAfterPatch\" is empty or invalid. Set it \"rebootifneed\" by default."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
             self.reboot_after_patch = ConfigOptions.reboot_after_patch[0]
         else:
             self.reboot_after_patch = reboot_after_patch.lower()
@@ -166,8 +166,7 @@ class AbstractPatching(object):
 
         category = settings.get('category')
         if category is None or category.lower() not in ConfigOptions.category.values():
-            msg = "The value of parameter \"category\" is empty or invalid. \
-                  Set it " + self.category_required + " by default."
+            msg = "The value of parameter \"category\" is empty or invalid. Set it " + self.category_required + " by default."
             self.hutil.log_and_syslog(logging.WARNING, msg)
             self.category = self.category_required
         else:
@@ -181,32 +180,36 @@ class AbstractPatching(object):
         check_hrmin = re.compile(r'^[0-9]{1,2}:[0-9]{1,2}$')
         install_duration = settings.get('installDuration')
         if install_duration is None or not re.match(check_hrmin, install_duration):
-            msg = "The value of parameter \"installDuration\" is empty or invalid. \
-                  Set it 1 hour by default."
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            msg = "The value of parameter \"installDuration\" is empty or invalid. Set it 1 hour by default."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
             self.install_duration = 3600
+            self.current_configs["installDuration"] = "01:00"
         else:
             hr_min = install_duration.split(':')
             self.install_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
+            self.current_configs["installDuration"] = install_duration
         if self.install_duration <= 300:
-            msg = "The value of parameter \"installDuration\" is smaller than 5 minutes. \
-                  The extension will not reserve 5 minutes for reboot. It is recommended to set \
-                  \"installDuration\" more than 10 minutes."
+            msg = "The value of parameter \"installDuration\" is smaller than 5 minutes. The extension will not reserve 5 minutes for reboot. It is recommended to set \"installDuration\" more than 30 minutes."
+            self.hutil.log_and_syslog(logging.WARNING, msg)
         else:
             msg = "The extension will reserve 5 minutes for reboot."
             # 5 min for reboot
             self.install_duration -= 300
-        self.hutil.log_and_syslog(logging.INFO, msg)
-        self.current_configs["installDuration"] = str(self.install_duration)
+            self.hutil.log_and_syslog(logging.INFO, msg)
+
+        # The parameter "downloadDuration" is not exposed to users. So there's no log.
+        download_duration = settings.get('downloadDuration')
+        if download_duration is not None and re.match(check_hrmin, download_duration):
+            hr_min = download_duration.split(':')
+            self.download_duration = int(hr_min[0]) * 3600 + int(hr_min[1]) * 60
 
         oneoff = settings.get('oneoff')
-        if stop is None or oneoff.lower() not in ConfigOptions.oneoff:
-            msg = "The value of parameter \"oneoff\" is empty or invalid. \
-                  Set it False by default."
+        if oneoff is None or str(oneoff).lower() not in ConfigOptions.oneoff:
+            msg = "The value of parameter \"oneoff\" is empty or invalid. Set it False by default."
             self.hutil.log_and_syslog(logging.WARNING, msg)
             self.oneoff = False
         else:
-            if oneoff.lower() == "true":
+            if str(oneoff).lower() == "true":
                 self.oneoff = True
                 msg = "The extension will run in one-off mode."
             else:
@@ -218,8 +221,7 @@ class AbstractPatching(object):
         if not self.oneoff:
             start_time = settings.get('startTime')
             if start_time is None or not re.match(check_hrmin, start_time):
-                msg = "The parameter \"startTime\" is empty or invalid. \
-                      It defaults to 03:00."
+                msg = "The parameter \"startTime\" is empty or invalid. It defaults to 03:00."
                 self.hutil.log_and_syslog(logging.WARNING, msg)
                 start_time = "03:00"
             self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
@@ -228,8 +230,7 @@ class AbstractPatching(object):
  
             day_of_week = settings.get("dayOfWeek")
             if day_of_week is None or day_of_week == "":
-                msg = "The parameter \"dayOfWeek\" is empty. \
-                      dayOfWeek defaults to Everyday."
+                msg = "The parameter \"dayOfWeek\" is empty. dayOfWeek defaults to Everyday."
                 self.hutil.log_and_syslog(logging.WARNING, msg)
                 day_of_week = "everyday"
                 self.day_of_week = ConfigOptions.day_of_week["everyday"]
@@ -237,8 +238,7 @@ class AbstractPatching(object):
                 for day in day_of_week.split('|'):
                     day = day.strip().lower()
                     if day not in ConfigOptions.day_of_week:
-                        msg = "The parameter \"dayOfWeek\" is invalid. \
-                              dayOfWeek defaults to Everyday."
+                        msg = "The parameter \"dayOfWeek\" is invalid. dayOfWeek defaults to Everyday."
                         self.hutil.log_and_syslog(logging.WARNING, msg)
                         day_of_week = "everyday"
                         break
@@ -254,8 +254,7 @@ class AbstractPatching(object):
 
             interval_of_weeks = settings.get('intervalOfWeeks')
             if interval_of_weeks is None or interval_of_weeks not in ConfigOptions.interval_of_weeks:
-                msg = "The parameter \"intervalOfWeeks\" is empty or invalid. \
-                      intervalOfWeeks defaults to 1."
+                msg = "The parameter \"intervalOfWeeks\" is empty or invalid. intervalOfWeeks defaults to 1."
                 self.hutil.log_and_syslog(logging.WARNING, msg)
                 self.interval_of_weeks = '1'
             else:
@@ -266,6 +265,7 @@ class AbstractPatching(object):
                                       message=" ".join(["intervalOfWeeks", self.interval_of_weeks]))
             self.current_configs["intervalOfWeeks"] = self.interval_of_weeks
 
+            # Save the latest configuration for scheduled task to avoid one-off mode's affection
             waagent.SetFileContents(self.scheduled_configs_file, json.dumps(self.current_configs))
 
         msg = "Current Configuration: " + self.get_current_config()
@@ -354,6 +354,7 @@ class AbstractPatching(object):
             self.hutil.log_and_syslog(logging.ERROR, output)
 
     def download(self):
+        # Read the latest configuration for scheduled task
         settings = json.loads(waagent.GetFileContents(self.scheduled_configs_file))
         self.parse_settings(settings)
 
@@ -405,6 +406,7 @@ class AbstractPatching(object):
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
 
     def patch(self):
+        # Read the latest configuration for scheduled task
         settings = json.loads(waagent.GetFileContents(self.scheduled_configs_file))
         self.parse_settings(settings)
 
@@ -423,8 +425,7 @@ class AbstractPatching(object):
 
         retcode = self.stop_download()
         if retcode == 0:
-            self.hutil.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be \
-                                downloaded in the next cycle")
+            self.hutil.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be downloaded in the next cycle")
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
@@ -449,12 +450,15 @@ class AbstractPatching(object):
                     is_time_out[1],failed = self._patch(self.category_all, patchlist)
                     pkg_failed.extend(failed)
         else:
-            self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + self.category_all + ") is stopped/canceled")
+            msg = "Installing patches (Category:" + self.category_all + ") is stopped/canceled"
+            self.hutil.log_and_syslog(logging.INFO, msg)
         if is_time_out[0] or is_time_out[1]:
+            msg = "Patching time out"
+            self.hutil.log_and_syslog(logging.WARNING, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message="Patching time out")
+                                      message=msg)
 
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
@@ -467,10 +471,10 @@ class AbstractPatching(object):
     def _patch(self, category, patchlist):
         if self.exists_stop_flag():
             self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + category + ") is stopped/canceled")
-            return
+            return False,list()
         if not patchlist:
             self.hutil.log_and_syslog(logging.INFO, "No packages are available for update.")
-            return
+            return False,list()
         self.hutil.log_and_syslog(logging.INFO, "Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
         self.hutil.log_and_syslog(logging.INFO, "Patch list: " + ' '.join(patchlist))
         pkg_failed = []
@@ -479,8 +483,8 @@ class AbstractPatching(object):
                 continue
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
-                self.hutil.log_and_syslog(logging.WARNING, "Patching time exceeded. The pending package will be \
-                                patched in the next cycle")
+                msg = "Patching time exceeded. The pending package will be patched in the next cycle"
+                self.hutil.log_and_syslog(logging.WARNING, msg)
                 return True,pkg_failed
             retcode = self.patch_package(pkg_name)
             if retcode != 0:
@@ -564,7 +568,7 @@ class AbstractPatching(object):
         self.check_reboot()
         self.check_needs_restart()
         msg = ''
-        if self.reboot_after_patch == 'NotRequired' and self.reboot_required:
+        if self.reboot_after_patch == 'notrequired' and self.reboot_required:
             msg += 'Pending Reboot'
             if self.needs_restart:
                 msg += ': ' + ' '.join(self.needs_restart)
@@ -575,11 +579,11 @@ class AbstractPatching(object):
                                                        len(self.needs_restart),
                                                        "packages need to restart"]))
             self.hutil.do_exit(0, 'Enable', 'success', '0', msg)
-        if self.reboot_after_patch == 'Required':
+        if self.reboot_after_patch == 'required':
             msg += "System going to reboot(Required)"
-        elif self.reboot_after_patch == 'Auto' and self.reboot_required:
+        elif self.reboot_after_patch == 'auto' and self.reboot_required:
             msg += "System going to reboot(Auto)"
-        elif self.reboot_after_patch == 'RebootIfNeed':
+        elif self.reboot_after_patch == 'rebootifneed':
             if (self.reboot_required or self.needs_restart):
                 msg += "System going to reboot(RebootIfNeed)"
         if msg:
@@ -667,6 +671,8 @@ class AbstractPatching(object):
         if not pkg_to_patch:
             return []
         patchlist = [line.split()[0] for line in pkg_to_patch.split('\n') if line.endswith(category)]
+        if patchlist is None:
+            return []
         return patchlist
 
     def get_pkg_patched(self):
