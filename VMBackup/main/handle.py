@@ -87,10 +87,8 @@ def enable():
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
-        hutil.log(" stored identity is " + stored_identity)
         if(stored_identity is None):
             mi.save_identity()
-
             hutil.exit_if_enabled()
         else:
             current_identity = mi.current_identity()
