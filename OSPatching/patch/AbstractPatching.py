@@ -36,6 +36,11 @@ from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 from ConfigOptions import ConfigOptions
 
+mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
+with open(mfile,'r') as f:
+    manifest = json.loads(f.read())[0]
+    Version = manifest['version']
+
 StatusTest = {
     "Scheduled" : {
         "Idle" : None,
@@ -71,8 +76,6 @@ try:
 except:
     pass
 
-# Global variables definition
-ExtensionShortName = 'OSPatching'
 
 class AbstractPatching(object):
     """
@@ -135,7 +138,7 @@ class AbstractPatching(object):
                 self.disabled = False
         self.current_configs["disabled"] = str(self.disabled)
         if self.disabled:
-            msg = "The extension " + ExtensionShortName+ "is disabled."
+            msg = "The extension is disabled."
             self.hutil.log_and_syslog(logging.WARNING, msg)
             return
 
@@ -161,7 +164,8 @@ class AbstractPatching(object):
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
-                                  message=" ".join(["rebootAfterPatch", self.reboot_after_patch]))
+                                  version=Version,
+                                  message="rebootAfterPatch="+self.reboot_after_patch)
         self.current_configs["rebootAfterPatch"] = self.reboot_after_patch
 
         category = settings.get('category')
@@ -174,7 +178,8 @@ class AbstractPatching(object):
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=True,
-                                  message=" ".join(["category", self.category]))
+                                  version=Version,
+                                  message="category="+self.category)
         self.current_configs["category"] =  self.category
 
         check_hrmin = re.compile(r'^[0-9]{1,2}:[0-9]{1,2}$')
@@ -249,6 +254,7 @@ class AbstractPatching(object):
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
+                                      version=Version,
                                       message="dayOfWeek=" + day_of_week)
             self.current_configs["dayOfWeek"] = day_of_week
 
@@ -262,7 +268,8 @@ class AbstractPatching(object):
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
-                                      message=" ".join(["intervalOfWeeks", self.interval_of_weeks]))
+                                      version=Version,
+                                      message="intervalOfWeeks="+self.interval_of_weeks)
             self.current_configs["intervalOfWeeks"] = self.interval_of_weeks
 
             # Save the latest configuration for scheduled task to avoid one-off mode's affection
@@ -376,8 +383,9 @@ class AbstractPatching(object):
             self._download(self.category_all)
         end_download_time = time.time()
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                  op=waagent.WALAEventOperation.Enable,
+                                  op=waagent.WALAEventOperation.Download,
                                   isSuccess=True,
+                                  version=Version,
                                   message=" ".join(["Real downloading time is", str(round(end_download_time-start_download_time,3)), "s"]))
 
     def _download(self, category):
@@ -427,8 +435,9 @@ class AbstractPatching(object):
         if retcode == 0:
             self.hutil.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be downloaded in the next cycle")
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op=waagent.WALAEventOperation.Download,
+                                      isSuccess=False,
+                                      version=Version,
                                       message="Downloading time out")
 
         global start_patch_time
@@ -456,15 +465,23 @@ class AbstractPatching(object):
             msg = "Patching time out"
             self.hutil.log_and_syslog(logging.WARNING, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op="Patch",
+                                      isSuccess=False,
+                                      version=Version,
                                       message=msg)
 
         self.open_deleted_files_after = self.check_open_deleted_files()
         self.delete_stop_flag()
         #self.report()
         if StatusTest["Scheduled"]["Healthy"]:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(StatusTest["Scheduled"]["Healthy"]()))
+            is_healthy = StatusTest["Scheduled"]["Healthy"]()
+            msg = "Checking the VM is healthy after patching: " + str(is_healthy)
+            self.hutil.log_and_syslog(logging.INFO, msg)
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op="Check healthy",
+                                      isSuccess=is_healthy,
+                                      version=Version,
+                                      message=msg)
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -548,8 +565,9 @@ class AbstractPatching(object):
 
         if is_time_out[0] or is_time_out[1]:
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op="Oneoff Patch",
+                                      isSuccess=False,
+                                      version=Version,
                                       message="Patching time out")
 
         shutil.copy2(self.package_patched_path, self.package_downloaded_path)
@@ -560,7 +578,14 @@ class AbstractPatching(object):
         self.delete_stop_flag()
         #self.report()
         if StatusTest["Oneoff"]["Healthy"]:
-            self.hutil.log_and_syslog(logging.INFO, "Checking the VM is healthy after patching: " + str(StatusTest["Oneoff"]["Healthy"]()))
+            is_healthy = StatusTest["Oneoff"]["Healthy"]()
+            msg = "Checking the VM is healthy after patching: " + str(is_healthy)
+            self.hutil.log_and_syslog(logging.INFO, msg)
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op="Check healthy",
+                                      isSuccess=is_healthy,
+                                      version=Version,
+                                      message=msg)
         if self.patched is not None and len(self.patched) > 0:
             self.reboot_if_required()
 
@@ -573,8 +598,9 @@ class AbstractPatching(object):
             if self.needs_restart:
                 msg += ': ' + ' '.join(self.needs_restart)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op="Reboot",
+                                      isSuccess=False,
+                                      version=Version,
                                       message=" ".join([self.reboot_after_patch, msg,
                                                        len(self.needs_restart),
                                                        "packages need to restart"]))
@@ -591,20 +617,23 @@ class AbstractPatching(object):
                 msg += ': ' + ' '.join(self.needs_restart)
             self.hutil.log_and_syslog(logging.INFO, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
+                                      op="Reboot",
                                       isSuccess=True,
+                                      version=Version,
                                       message="Reboot")
             retcode = waagent.Run('reboot')
             if retcode != 0:
                 self.hutil.log_and_syslog(logging.ERROR, "Failed to reboot")
                 waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                          op=waagent.WALAEventOperation.Enable,
+                                          op="Reboot",
                                           isSuccess=False,
+                                          version=Version,
                                           message="Failed to reboot")
         else:
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op="Reboot",
+                                      isSuccess=False,
+                                      version=Version,
                                       message="Not reboot")
 
     def check_needs_restart(self):
@@ -701,8 +730,9 @@ class AbstractPatching(object):
             msg = "The VM %s test script is provided: %s" % (status, provided)
             self.hutil.log_and_syslog(level, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
-                                      isSuccess=True,
+                                      op="provides %s test script" % (status,),
+                                      isSuccess=provided,
+                                      version=Version,
                                       message=msg)
 
     def check_vm_idle(self, status_test):
@@ -711,6 +741,11 @@ class AbstractPatching(object):
             is_idle = status_test["Idle"]()
             msg = "Checking the VM is idle: " + str(is_idle)
             self.hutil.log_and_syslog(logging.INFO, msg)
+            waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                      op="Check idle",
+                                      isSuccess=is_idle,
+                                      version=Version,
+                                      message=msg)
             if not is_idle:
                 self.hutil.log_and_syslog(logging.WARNING, "Current Operation is skipped.")
         return is_idle

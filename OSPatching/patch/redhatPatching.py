@@ -52,9 +52,7 @@ class redhatPatching(AbstractPatching):
         Install for dependencies.
         """
         # For yum --downloadonly option
-        retcode = waagent.Run('yum -y install yum-downloadonly')
-        if retcode > 0:
-            self.hutil.error("Failed to install yum-downloadonly")
+        waagent.Run('yum -y install yum-downloadonly', False)
 
         # For yum --security option
         retcode = waagent.Run('yum -y install yum-plugin-security')

@@ -23,7 +23,7 @@ import os
 import sys
 import re
 import time
-import chardet
+import json
 import tempfile
 import urllib2
 import urlparse
@@ -37,10 +37,13 @@ import Utils.HandlerUtil as Util
 from patch import *
 
 # Global variables definition
-ExtensionShortName = 'OSPatching'
 DownloadDirectory = 'download'
 idleTestScriptName = "idleTest.py"
 healthyTestScriptName = "healthyTest.py"
+mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
+with open(mfile,'r') as f:
+    manifest = json.loads(f.read())[0]
+    ExtensionShortName = manifest['name']
 
 def install():
     hutil.do_parse_context('Install')
@@ -281,6 +284,9 @@ def is_text_file(file_path):
 
 def is_text(contents):
     supported_encoding = ['ascii', 'UTF-8', 'UTF-16LE', 'UTF-16BE']
+    # Openlogic and Oracle distros don't have python-chardet
+    waagent.Run('yum -y install python-chardet', False)
+    import chardet
     code_type = chardet.detect(contents)['encoding']
     if code_type in supported_encoding:
         return True, code_type
