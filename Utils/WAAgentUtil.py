@@ -67,3 +67,16 @@ if not hasattr(waagent, "WALAEventOperation"):
         Update = "Update"           
     waagent.WALAEventOperation = _WALAEventOperation
 
+__ExtensionName__=None
+def InitExtensionEventLog(name):
+    __ExtensionName__=name
+
+def AddExtensionEvent(name=__ExtensionName__,
+                      op=waagent.WALAEventOperation.Enable, 
+                      isSuccess=False, 
+                      message=None):
+    if name is not None:
+        waagent.AddExtensionEvent(name=name,
+                                  op=op,
+                                  isSuccess=isSuccess,
+                                  message=message)

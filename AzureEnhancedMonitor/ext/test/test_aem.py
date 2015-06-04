@@ -107,6 +107,10 @@ class TestAEM(unittest.TestCase):
         privateConfig = json.loads(TestPrivateConfig)
         config = aem.EnhancedMonitorConfig(publicConfig, privateConfig)
         self.assertNotEquals(None, config)
+        self.assertEquals(".table.core.windows.net", 
+                          config.getStorageHostBase('asdf'))
+        self.assertEquals(".table.core.windows.net", 
+                          config.getLADHostBase())
         return config
 
     def test_static_datasource(self):

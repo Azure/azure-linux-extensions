@@ -26,9 +26,16 @@ import time
 import datetime
 import psutil
 import string
+import urlparse
 from azure.storage import TableService, Entity
-from Utils.WAAgentUtil import waagent
+from Utils.WAAgentUtil import waagent, AddExtensionEvent
 import Utils.HandlerUtil as Util
+
+
+FAILED_TO_RETRIEVE_MDS_DATA="(03100)Failed to retrieve mds data"
+FAILED_TO_RETRIEVE_LOCAL_DATA="(03101)Failed to retrieve local data"
+FAILED_TO_RETRIEVE_STORAGE_DATA="(03102)Failed to retrieve storage data"
+FAILED_TO_SERIALIZE_PERF_COUNTERS="(03103)Failed to serialize perf counters"
 
 def timedelta_total_seconds(delta):
 
@@ -36,6 +43,13 @@ def timedelta_total_seconds(delta):
         return delta.days * 86400 + delta.seconds
     else:
         return delta.total_seconds()
+
+def get_host_base_from_uri(blob_uri):
+    uri = urlparse.urlparse(blob_uri)
+    netloc = uri.netloc
+    if netloc is None:
+        return None
+    return netloc[netloc.find('.'):]
 
 MonitoringIntervalInMinute = 1 #One minute
 MonitoringInterval = 60 * MonitoringIntervalInMinute
@@ -89,13 +103,14 @@ def getAzureDiagnosticKeyRange():
     endKey = getMDSPartitionKey(identity, getMDSTimestamp(endTime))
     return startKey, endKey
 
-def getAzureDiagnosticCPUData(accountName, accountKey, 
+def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
                               startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data(CPU).")
         table = "LinuxPerfCpuVer1v0"
         tableService = TableService(account_name = accountName, 
-                                    account_key = accountKey)
+                                    account_key = accountKey,
+                                    host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
                    "and Host eq '{2}'").format(startKey, endKey, hostname)
         oselect = ("PercentProcessorTime,Host")
@@ -107,16 +122,18 @@ def getAzureDiagnosticCPUData(accountName, accountKey,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
 
-def getAzureDiagnosticMemoryData(accountName, accountKey, 
+def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
                                  startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data: Memory")
         table = "LinuxPerfMemVer1v0"
         tableService = TableService(account_name = accountName, 
-                                    account_key = accountKey)
+                                    account_key = accountKey,
+                                    host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
                    "and Host eq '{2}'").format(startKey, endKey, hostname)
         oselect = ("PercentAvailableMemory,Host")
@@ -128,6 +145,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
 class AzureDiagnosticData(object):
@@ -135,15 +153,18 @@ class AzureDiagnosticData(object):
         self.config = config
         accountName = config.getLADName()
         accountKey = config.getLADKey()
+        hostBase = config.getLADHostBase()
         hostname = socket.gethostname()
         startKey, endKey = getAzureDiagnosticKeyRange()
         self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
                                                     accountKey,
+                                                    hostBase,
                                                     startKey,
                                                     endKey,
                                                     hostname)
         self.memoryPercent = getAzureDiagnosticMemoryData(accountName, 
                                                           accountKey,
+                                                          hostBase,
                                                           startKey,
                                                           endKey,
                                                           hostname)
@@ -360,6 +381,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
+            AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
 
@@ -724,10 +746,12 @@ def getStorageTableKeyRange():
     startTime = endTime - MonitoringInterval
     return getStorageTimestamp(startTime), getStorageTimestamp(endTime)
 
-def getStorageMetrics(account, key, table, startKey, endKey):
+def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
     try:
         waagent.Log("Retrieve storage metrics data.")
-        tableService = TableService(account_name = account, account_key = key)
+        tableService = TableService(account_name = account, 
+                                    account_key = key,
+                                    host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}'"
                    "").format(startKey, endKey)
         oselect = ("TotalRequests,TotalIngress,TotalEgress,AverageE2ELatency,"
@@ -738,6 +762,7 @@ def getStorageMetrics(account, key, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
 def getDataDisks():
@@ -880,8 +905,10 @@ class StorageDataSource(object):
         for account in accounts:
             tableName = self.config.getStorageAccountMinuteTable(account)
             accountKey = self.config.getStorageAccountKey(account)
+            hostBase = self.config.getStorageHostBase(account)
             metrics = getStorageMetrics(account, 
                                         accountKey,
+                                        hostBase,
                                         tableName,
                                         startKey,
                                         endKey)
@@ -1169,6 +1196,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
+        AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
     def _write(self, counters, eventFile):
@@ -1252,6 +1280,9 @@ class EnhancedMonitorConfig(object):
 
     def getStorageAccountKey(self, name):
         return self.configData["{0}.minute.key".format(name)]
+    
+    def getStorageHostBase(self, name):
+        return get_host_base_from_uri(self.getStorageAccountMinuteUri(name)) 
 
     def getStorageAccountMinuteUri(self, name):
         return self.configData["{0}.minute.uri".format(name)]
@@ -1274,6 +1305,9 @@ class EnhancedMonitorConfig(object):
 
     def getLADName(self):
         return self.configData["wad.name"]
+    
+    def getLADHostBase(self):
+        return get_host_base_from_uri(self.getLADUri())
 
     def getLADUri(self):
         return self.configData["wad.uri"]

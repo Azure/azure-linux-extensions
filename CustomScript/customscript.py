@@ -117,20 +117,25 @@ def daemon(hutil):
         run_script(hutil, args)
     else:
         error_msg = "CommandToExecute is empty or invalid."
-        hutil.error(error_msg)
         raise ValueError(error_msg)
 
 def download_files(hutil):
-    protected_settings = hutil.get_protected_settings()
     public_settings = hutil.get_public_settings()
+    if public_settings is None:
+        raise ValueError("Public configuration couldn't be None.")
     cmd = public_settings.get('commandToExecute')
-
     blob_uris = public_settings.get('fileUris')
+
+    protected_settings = hutil.get_protected_settings()
     storage_account_name = None
     storage_account_key = None
     if protected_settings:
-        storage_account_name = protected_settings.get("storageAccountName").strip()
-        storage_account_key = protected_settings.get("storageAccountKey").strip()
+        storage_account_name = protected_settings.get("storageAccountName")
+        storage_account_key = protected_settings.get("storageAccountKey")
+        if storage_account_name is not None:
+            storage_account_name = storage_account_name.strip()
+        if storage_account_key is not None:
+            storage_account_key = storage_account_key.strip()
 
     if (not blob_uris or not isinstance(blob_uris, list) or len(blob_uris) == 0):
         hutil.log("fileUris value provided is empty or invalid. "
@@ -156,7 +161,6 @@ def download_files(hutil):
     else: 
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account or storage key is not provided"
-        hutil.error(error_msg)
         raise ValueError(error_msg)
         
 def start_daemon(hutil):
@@ -228,6 +232,13 @@ def get_blob_name_from_uri(uri):
 def get_container_name_from_uri(uri):
     return get_properties_from_uri(uri)['container_name']
 
+def get_host_base_from_uri(blob_uri):
+    uri = urlparse.urlparse(blob_uri)
+    netloc = uri.netloc
+    if netloc is None:
+        return None
+    return netloc[netloc.find('.'):]
+
 def get_properties_from_uri(uri):
     path = get_path_from_uri(uri)
     if path.endswith('/'):
@@ -245,11 +256,13 @@ def get_path_from_uri(uriStr):
     uri = urlparse.urlparse(uriStr)
     return uri.path
 
-def download_blob(storage_account_name, storage_account_key, 
-                  blob_uri, seqNo, command, hutil):
+def download_and_save_blob(storage_account_name, 
+                           storage_account_key, 
+                           blob_uri,
+                           download_dir):
     container_name = get_container_name_from_uri(blob_uri)
     blob_name = get_blob_name_from_uri(blob_uri)
-    download_dir = prepare_download_dir(seqNo)
+    host_base = get_host_base_from_uri(blob_uri)
     # if blob_name is a path, extract the file_name
     last_sep = blob_name.rfind('/')
     if last_sep != -1:
@@ -259,16 +272,29 @@ def download_blob(storage_account_name, storage_account_key,
     download_path = os.path.join(download_dir, file_name)
     #Guest agent already ensure the plugin is enabled one after another. 
     #The blob download will not conflict.
-    blob_service = BlobService(storage_account_name, storage_account_key)
+    blob_service = BlobService(storage_account_name, 
+                               storage_account_key,
+                               host_base=host_base)
+    blob_service.get_blob_to_path(container_name, blob_name, download_path)
+    return (blob_name, container_name, host_base, download_path)
+    
+
+def download_blob(storage_account_name, storage_account_key, 
+                  blob_uri, seqNo, command, hutil):
     try:
-        blob_service.get_blob_to_path(container_name, blob_name, download_path)
+        download_dir = prepare_download_dir(seqNo)
+        result = download_and_save_blob(storage_account_name, 
+                                        storage_account_key,
+                                        blob_uri,
+                                        download_dir)
+        blob_name, _, _, download_path = result
+        preprocess_files(download_path, hutil)
+        if blob_name in command:
+            os.chmod(download_path, 0100)
     except Exception, e:
         hutil.error(("Failed to download blob with uri:{0}"
                      "with error{1}").format(blob_uri,e))
         raise
-    preprocess_files(download_path, hutil)
-    if blob_name in command:
-        os.chmod(download_path, 0100)
 
 def download_external_files(uris, seqNo, command, hutil):
     for uri in uris:
