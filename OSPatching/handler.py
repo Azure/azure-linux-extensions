@@ -59,8 +59,12 @@ def enable():
     try:
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
+        if protected_settings:
+            settings = protected_settings.copy()
+        else:
+            settings = dict()
+        if public_settings:
+            settings.update(public_settings)
         MyPatching.parse_settings(settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
@@ -97,8 +101,12 @@ def download():
     try:
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
+        if protected_settings:
+            settings = protected_settings.copy()
+        else:
+            settings = dict()
+        if public_settings:
+            settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.download()
         current_config = MyPatching.get_current_config()
@@ -113,8 +121,12 @@ def patch():
     try:
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
+        if protected_settings:
+            settings = protected_settings.copy()
+        else:
+            settings = dict()
+        if public_settings:
+            settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch()
         current_config = MyPatching.get_current_config()
@@ -129,8 +141,12 @@ def oneoff():
     try:
         protected_settings = hutil.get_protected_settings()
         public_settings = hutil.get_public_settings()
-        settings = protected_settings.copy()
-        settings.update(public_settings)
+        if protected_settings:
+            settings = protected_settings.copy()
+        else:
+            settings = dict()
+        if public_settings:
+            settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
@@ -143,8 +159,12 @@ def oneoff():
 def download_files(hutil):
     protected_settings = hutil.get_protected_settings()
     public_settings = hutil.get_public_settings()
-    settings = protected_settings.copy()
-    settings.update(public_settings)
+    if protected_settings:
+        settings = protected_settings.copy()
+    else:
+        settings = dict()
+    if public_settings:
+        settings.update(public_settings)
     local = settings.get("vmStatusTest", dict()).get("local", "")
     if str(local).lower() == "true":
         local = True
