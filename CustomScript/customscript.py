@@ -35,7 +35,6 @@ import urllib2
 import urlparse
 import time
 import codecs
-import chardet
 import shutil
 import tempfile
 import json
@@ -389,55 +388,54 @@ def download_and_save_file(uri, file_path):
 
 def preprocess_files(file_path, hutil):
     """
-        Preprocess the text file. If it is a binary file, skip it.
+        The file is preprocessed if it satisfies any of the following
+        condistions:
+            the file's extension is '.sh' or '.py'
+            the content of the file starts with '#!'
     """
-    is_text, code_type = is_text_file(file_path)
-    if is_text:
+    ret = to_process(file_path)
+    if ret:
         dos2unix(file_path)
         hutil.log("Converting text files from DOS to Unix formats: Done")
-        if code_type in ['UTF-8', 'UTF-16LE', 'UTF-16BE']:
-            remove_bom(file_path)
-            hutil.log("Removing BOM: Done")
+        remove_bom(file_path)
+        hutil.log("Removing BOM: Done")
 
 
-def is_text_file(file_path):
+def to_process(file_path, extensions=['.sh', ".py"]):
+    for extension in extensions:
+        if file_path.endswith(extension):
+            return True
     with open(file_path, 'rb') as f:
-        contents = f.read(512)
-    return is_text(contents)
-
-
-def is_text(contents):
-    supported_encoding = ['ascii', 'UTF-8', 'UTF-16LE', 'UTF-16BE']
-    code_type = chardet.detect(contents)['encoding']
-    if code_type in supported_encoding:
-        return True, code_type
-    else:
-        return False, code_type
+        contents = f.read(64)
+    if '#!' in contents:
+        return True
+    return False
 
 
 def dos2unix(file_path):
-    temp_file_path = tempfile.mkstemp()[1]
-    f_temp = open(temp_file_path, 'wb')
     with open(file_path, 'rU') as f:
         contents = f.read()
-    f_temp.write(contents)
-    f_temp.close()
+    temp_file_path = tempfile.mkstemp()[1]
+    with open(temp_file_path, 'wb') as f_temp:
+        f_temp.write(contents)
     shutil.move(temp_file_path, file_path)
 
 
 def remove_bom(file_path):
-    temp_file_path = tempfile.mkstemp()[1]
-    f_temp = open(temp_file_path, 'wb')
     with open(file_path, 'rb') as f:
         contents = f.read()
+    new_contents = None
     for encoding in ["utf-8-sig", "utf-16"]:
         try:
-            f_temp.write(contents.decode(encoding).encode('utf-8'))
+            new_contents = contents.decode(encoding).encode('utf-8')
             break
         except UnicodeDecodeError:
             continue
-    f_temp.close()
-    shutil.move(temp_file_path, file_path)
+    if new_contents is not None:
+        temp_file_path = tempfile.mkstemp()[1]
+        with open(temp_file_path, 'wb') as f_temp:
+            f_temp.write(new_contents)
+        shutil.move(temp_file_path, file_path)
 
 
 def get_blob_name_from_uri(uri):
