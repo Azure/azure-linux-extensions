@@ -38,16 +38,25 @@ import codecs
 import chardet
 import shutil
 import tempfile
+import json
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 
 
-ExtensionShortName = 'CustomScript'
+# Global Variables
+mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
+with open(mfile,'r') as f:
+    manifest = json.loads(f.read())[0]
+    ExtensionShortName = manifest['name']
+    Version = manifest['version']
 DownloadDirectory = 'download'
 StdoutFile = "stdout"
 ErroutFile = "errout"
 OutputSize = 4 * 1024
+# CustomScript-specific Operation
+DownloadOp = "Download"
+RunScriptOp = "RunScript"
 
 
 #Main function is the only entrence to this extension handler
@@ -111,7 +120,18 @@ def enable(hutil):
                 hutil.log("Sleep 10 seconds")
                 time.sleep(10)
             else:
+                error_msg = "Failed to download files"
+                waagent.AddExtensionEvent(name=ExtensionShortName,
+                                          op=DownloadOp,
+                                          isSuccess=False,
+                                          version=Version,
+                                          message="(01100)"+error_msg)
                 raise
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op=DownloadOp,
+                              isSuccess=True,
+                              version=Version,
+                              message="(01303)Succeeded to download files")
     start_daemon(hutil)
 
 
@@ -134,8 +154,13 @@ def download_files(hutil):
             storage_account_key = storage_account_key.strip()
 
     if (not blob_uris or not isinstance(blob_uris, list) or len(blob_uris) == 0):
-        hutil.log("fileUris value provided is empty or invalid. "
-                  "Continue with executing command...")
+        error_msg = "fileUris value provided is empty or invalid."
+        hutil.log(error_msg + " Continue with executing command...")
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op='Donwload',
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01001)"+error_msg)
         return
 
     hutil.do_status_report('Downloading','transitioning', '0',
@@ -156,6 +181,12 @@ def download_files(hutil):
     else:
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account and key should appear in pairs."
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=DownloadOp,
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01000)"+error_msg)
         raise ValueError(error_msg)
 
 
@@ -177,7 +208,14 @@ def start_daemon(hutil):
         hutil.do_exit(0, 'Enable', 'transitioning', '0',
                       'Launching the script...')
     else:
-        raise ValueError("commandToExecute is not specified in the configuration")
+        error_msg = "CommandToExecute is empty or invalid"
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=RunScriptOp,
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01002)"+error_msg)
+        raise ValueError(error_msg)
 
 
 def daemon(hutil):
@@ -188,6 +226,12 @@ def daemon(hutil):
         run_script(hutil, args)
     else:
         error_msg = "CommandToExecute is empty or invalid."
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=RunScriptOp,
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01002)"+error_msg)
         raise ValueError(error_msg)
 
 
@@ -200,6 +244,7 @@ def run_script(hutil, args, interval = 30):
     try:
         std_out = open(std_out_file, "w")
         err_out = open(err_out_file, "w")
+        start_time = time.time()
         child = subprocess.Popen(args,
                                  cwd = download_dir,
                                  stdout=std_out,
@@ -216,15 +261,38 @@ def run_script(hutil, args, interval = 30):
             msg = get_formatted_log("Script returned an error.",
                                     tail(std_out_file), tail(err_out_file))
             hutil.error(msg)
+            waagent.AddExtensionEvent(name=ExtensionShortName,
+                                      op=RunScriptOp,
+                                      isSuccess=False,
+                                      version=Version,
+                                      message="(01302)"+msg)
             hutil.do_exit(1, 'Enable', 'failed', '1', msg)
         else:
             msg = get_formatted_log("Script is finished.",
                                     tail(std_out_file), tail(err_out_file))
             hutil.log(msg)
+            waagent.AddExtensionEvent(name=ExtensionShortName,
+                                      op=RunScriptOp,
+                                      isSuccess=True,
+                                      version=Version,
+                                      message="(01302)"+msg)
+            end_time = time.time()
+            waagent.AddExtensionEvent(name=ExtensionShortName,
+                                      op=RunScriptOp,
+                                      isSuccess=True,
+                                      version=Version,
+                                      message=("(01304)Script executing time: "
+                                      "{0}s").format(str(end_time-start_time)))
             hutil.do_exit(0, 'Enable', 'success','0', msg)
     except Exception, e:
-        hutil.error(("Failed to launch script with error: {0},"
-                     "stacktrace: {1}").format(e, traceback.format_exc()))
+        error_msg = ("Failed to launch script with error: {0},"
+                     "stacktrace: {1}").format(e, traceback.format_exc())
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=RunScriptOp,
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01101)"+error_msg)
         hutil.do_exit(1, 'Enable', 'failed', '1',
                       'Lanch script failed: {0}'.format(e))
     finally:
