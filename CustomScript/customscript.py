@@ -143,13 +143,12 @@ def download_files(hutil):
 
     if storage_account_name and storage_account_key:
         hutil.log("Downloading scripts from azure storage...")
-        for blob_uri in blob_uris:
-            download_blob(storage_account_name,
-                          storage_account_key,
-                          blob_uri,
-                          hutil.get_seq_no(),
-                          cmd,
-                          hutil)
+        download_blobs(storage_account_name,
+                       storage_account_key,
+                       blob_uris,
+                       hutil.get_seq_no(),
+                       cmd,
+                       hutil)
     elif not(storage_account_name or storage_account_key):
         hutil.log("No azure storage account and key specified in protected "
                   "settings. Downloading scripts from external links...")
@@ -235,6 +234,18 @@ def run_script(hutil, args, interval = 30):
             err_out.close()
 
 
+def download_blobs(storage_account_name, storage_account_key,
+                   blob_uris, seqNo, command, hutil):
+    for blob_uri in blob_uris:
+        if blob_uri:
+            download_blob(storage_account_name,
+                          storage_account_key,
+                          blob_uri,
+                          seqNo,
+                          command,
+                          hutil)
+
+
 def download_blob(storage_account_name, storage_account_key,
                   blob_uri, seqNo, command, hutil):
     try:
@@ -278,7 +289,8 @@ def download_and_save_blob(storage_account_name,
 
 def download_external_files(uris, seqNo, command, hutil):
     for uri in uris:
-        download_external_file(uri, seqNo, command, hutil)
+        if uri:
+            download_external_file(uri, seqNo, command, hutil)
 
 
 def download_external_file(uri, seqNo, command, hutil):
