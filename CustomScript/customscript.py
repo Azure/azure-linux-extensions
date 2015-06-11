@@ -379,12 +379,12 @@ def download_external_file(uri, seqNo, command, hutil):
 
 def download_and_save_file(uri, file_path):
     src = urllib2.urlopen(uri)
-    dest = open(file_path, 'wb')
-    buf_size = 1024
-    buf = src.read(buf_size)
-    while(buf):
-        dest.write(buf)
+    with open(file_path, 'wb') as dest:
+        buf_size = 1024
         buf = src.read(buf_size)
+        while(buf):
+            dest.write(buf)
+            buf = src.read(buf_size)
 
 
 def preprocess_files(file_path, hutil):
