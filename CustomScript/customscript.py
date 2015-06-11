@@ -39,9 +39,9 @@ import chardet
 import shutil
 import tempfile
 from azure.storage import BlobService
-
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+
 
 ExtensionShortName = 'CustomScript'
 DownloadDirectory = 'download'
@@ -49,14 +49,15 @@ StdoutFile = "stdout"
 ErroutFile = "errout"
 OutputSize = 4 * 1024
 
+
 #Main function is the only entrence to this extension handler
 def main():
     #Global Variables definition
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    waagent.Log("%s started to handle." %(ExtensionShortName)) 
+    waagent.Log("%s started to handle." %(ExtensionShortName))
 
     try:
-        for a in sys.argv[1:]:        
+        for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 dummy_command("Disable", "success", "Disable succeeded")
             elif re.match("^([-/]*)(uninstall)", a):
@@ -72,19 +73,22 @@ def main():
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
-        hutil.error(("Failed to enable the extension with error:{0}, "
+        hutil.error(("Failed to enable the extension with error: {0}, "
                      "{1}").format(e, traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','failed','0', 
-                      'Enable failed:{0}'.format(e))
+        hutil.do_exit(1, 'Enable','failed','0',
+                      'Enable failed: {0}'.format(e))
+
 
 def dummy_command(operation, status, msg):
     hutil = parse_context(operation)
     hutil.do_exit(0, operation, status, '0', msg)
 
+
 def parse_context(operation):
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context(operation)
     return hutil
+
 
 def enable(hutil):
     """
@@ -101,7 +105,8 @@ def enable(hutil):
             download_files(hutil)
             break
         except Exception, e:
-            hutil.error("Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
+            hutil.error(("Failed to download files, "
+                         "retry={0}, maxRetry={1}").format(retry, maxRetry))
             if retry != maxRetry:
                 hutil.log("Sleep 10 seconds")
                 time.sleep(10)
@@ -109,15 +114,6 @@ def enable(hutil):
                 raise
     start_daemon(hutil)
 
-def daemon(hutil):
-    public_settings = hutil.get_public_settings()
-    cmd = public_settings.get('commandToExecute')
-    args = parse_args(cmd)
-    if args:
-        run_script(hutil, args)
-    else:
-        error_msg = "CommandToExecute is empty or invalid."
-        raise ValueError(error_msg)
 
 def download_files(hutil):
     public_settings = hutil.get_public_settings()
@@ -142,27 +138,28 @@ def download_files(hutil):
                   "Continue with executing command...")
         return
 
-    hutil.do_status_report('Downloading','transitioning', '0', 
+    hutil.do_status_report('Downloading','transitioning', '0',
                            'Downloading files...')
-        
+
     if storage_account_name and storage_account_key:
         hutil.log("Downloading scripts from azure storage...")
         for blob_uri in blob_uris:
-            download_blob(storage_account_name, 
-                          storage_account_key, 
-                          blob_uri, 
-                          hutil.get_seq_no(), 
-                          cmd, 
+            download_blob(storage_account_name,
+                          storage_account_key,
+                          blob_uri,
+                          hutil.get_seq_no(),
+                          cmd,
                           hutil)
     elif not(storage_account_name or storage_account_key):
         hutil.log("No azure storage account and key specified in protected "
                   "settings. Downloading scripts from external links...")
         download_external_files(blob_uris, hutil.get_seq_no(), cmd, hutil)
-    else: 
+    else:
         #Storage account and key should appear in pairs
-        error_msg = "Azure storage account or storage key is not provided"
+        error_msg = "Azure storage account and key should appear in pairs."
         raise ValueError(error_msg)
-        
+
+
 def start_daemon(hutil):
     public_settings = hutil.get_public_settings()
     cmd = public_settings.get('commandToExecute')
@@ -170,19 +167,31 @@ def start_daemon(hutil):
         hutil.log("Command to execute:" + cmd)
         args = [os.path.join(os.getcwd(), __file__), "-daemon"]
 
-        #This process will start a new background process by calling
-        #    customscript.py -daemon 
-        #to run the script and will exit itself immediatelly.
+        # This process will start a new background process by calling
+        #     customscript.py -daemon
+        # to run the script and will exit itself immediatelly.
 
-        #Redirect stdout and stderr to /dev/null. Otherwise daemon process will
-        #throw Broke pipe exeception when parent process exit.
+        # Redirect stdout and stderr to /dev/null. Otherwise daemon process
+        # will throw Broke pipe exeception when parent process exit.
         devnull = open(os.devnull, 'w')
         child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-        hutil.do_exit(0, 'Enable', 'transitioning', '0', 
+        hutil.do_exit(0, 'Enable', 'transitioning', '0',
                       'Launching the script...')
     else:
         raise ValueError("commandToExecute is not specified in the configuration")
-    
+
+
+def daemon(hutil):
+    public_settings = hutil.get_public_settings()
+    cmd = public_settings.get('commandToExecute')
+    args = parse_args(cmd)
+    if args:
+        run_script(hutil, args)
+    else:
+        error_msg = "CommandToExecute is empty or invalid."
+        raise ValueError(error_msg)
+
+
 def run_script(hutil, args, interval = 30):
     download_dir = prepare_download_dir(hutil.get_seq_no())
     std_out_file = os.path.join(download_dir, StdoutFile)
@@ -194,31 +203,31 @@ def run_script(hutil, args, interval = 30):
         err_out = open(err_out_file, "w")
         child = subprocess.Popen(args,
                                  cwd = download_dir,
-                                 stdout=std_out, 
+                                 stdout=std_out,
                                  stderr=err_out)
         time.sleep(1)
         while child.poll() == None:
-            msg = get_formatted_log("Script is running...", 
+            msg = get_formatted_log("Script is running...",
                                     tail(std_out_file), tail(err_out_file))
             hutil.log(msg)
             hutil.do_status_report('Enable', 'transitioning', '0', msg)
             time.sleep(interval)
 
         if child.returncode and child.returncode != 0:
-            msg = get_formatted_log("Script returned an error.", 
+            msg = get_formatted_log("Script returned an error.",
                                     tail(std_out_file), tail(err_out_file))
             hutil.error(msg)
             hutil.do_exit(1, 'Enable', 'failed', '1', msg)
         else:
-            msg = get_formatted_log("Script is finished.", 
+            msg = get_formatted_log("Script is finished.",
                                     tail(std_out_file), tail(err_out_file))
             hutil.log(msg)
             hutil.do_exit(0, 'Enable', 'success','0', msg)
     except Exception, e:
-        hutil.error(("Failed to launch script with error:{0},"
-                     "stacktrace:{1}").format(e, traceback.format_exc()))
-        hutil.do_exit(1, 'Enable', 'failed', '1', 
-                      'Lanch script failed:{0}'.format(e))
+        hutil.error(("Failed to launch script with error: {0},"
+                     "stacktrace: {1}").format(e, traceback.format_exc()))
+        hutil.do_exit(1, 'Enable', 'failed', '1',
+                      'Lanch script failed: {0}'.format(e))
     finally:
         if std_out:
             std_out.close()
@@ -226,64 +235,11 @@ def run_script(hutil, args, interval = 30):
             err_out.close()
 
 
-def get_blob_name_from_uri(uri):
-    return get_properties_from_uri(uri)['blob_name']
-
-def get_container_name_from_uri(uri):
-    return get_properties_from_uri(uri)['container_name']
-
-def get_host_base_from_uri(blob_uri):
-    uri = urlparse.urlparse(blob_uri)
-    netloc = uri.netloc
-    if netloc is None:
-        return None
-    return netloc[netloc.find('.'):]
-
-def get_properties_from_uri(uri):
-    path = get_path_from_uri(uri)
-    if path.endswith('/'):
-        path = path[:-1]
-    if path[0] == '/':
-        path = path[1:]
-    first_sep = path.find('/')
-    if first_sep == -1:
-        hutil.error("Failed to extract container, blob, from {}".format(path))
-    blob_name = path[first_sep+1:]
-    container_name = path[:first_sep]
-    return {'blob_name': blob_name, 'container_name': container_name}
-
-def get_path_from_uri(uriStr):
-    uri = urlparse.urlparse(uriStr)
-    return uri.path
-
-def download_and_save_blob(storage_account_name, 
-                           storage_account_key, 
-                           blob_uri,
-                           download_dir):
-    container_name = get_container_name_from_uri(blob_uri)
-    blob_name = get_blob_name_from_uri(blob_uri)
-    host_base = get_host_base_from_uri(blob_uri)
-    # if blob_name is a path, extract the file_name
-    last_sep = blob_name.rfind('/')
-    if last_sep != -1:
-        file_name = blob_name[last_sep+1:]
-    else:
-        file_name = blob_name
-    download_path = os.path.join(download_dir, file_name)
-    #Guest agent already ensure the plugin is enabled one after another. 
-    #The blob download will not conflict.
-    blob_service = BlobService(storage_account_name, 
-                               storage_account_key,
-                               host_base=host_base)
-    blob_service.get_blob_to_path(container_name, blob_name, download_path)
-    return (blob_name, container_name, host_base, download_path)
-    
-
-def download_blob(storage_account_name, storage_account_key, 
+def download_blob(storage_account_name, storage_account_key,
                   blob_uri, seqNo, command, hutil):
     try:
         download_dir = prepare_download_dir(seqNo)
-        result = download_and_save_blob(storage_account_name, 
+        result = download_and_save_blob(storage_account_name,
                                         storage_account_key,
                                         blob_uri,
                                         download_dir)
@@ -292,13 +248,38 @@ def download_blob(storage_account_name, storage_account_key,
         if blob_name in command:
             os.chmod(download_path, 0100)
     except Exception, e:
-        hutil.error(("Failed to download blob with uri:{0}"
-                     "with error{1}").format(blob_uri,e))
+        hutil.error(("Failed to download blob with uri: {0} "
+                     "with error {1}").format(blob_uri,e))
         raise
+
+
+def download_and_save_blob(storage_account_name,
+                           storage_account_key,
+                           blob_uri,
+                           download_dir):
+    container_name = get_container_name_from_uri(blob_uri)
+    blob_name = get_blob_name_from_uri(blob_uri)
+    host_base = get_host_base_from_uri(blob_uri)
+    # If blob_name is a path, extract the file_name
+    last_sep = blob_name.rfind('/')
+    if last_sep != -1:
+        file_name = blob_name[last_sep+1:]
+    else:
+        file_name = blob_name
+    download_path = os.path.join(download_dir, file_name)
+    # Guest agent already ensure the plugin is enabled one after another.
+    # The blob download will not conflict.
+    blob_service = BlobService(storage_account_name,
+                               storage_account_key,
+                               host_base=host_base)
+    blob_service.get_blob_to_path(container_name, blob_name, download_path)
+    return (blob_name, container_name, host_base, download_path)
+
 
 def download_external_files(uris, seqNo, command, hutil):
     for uri in uris:
         download_external_file(uri, seqNo, command, hutil)
+
 
 def download_external_file(uri, seqNo, command, hutil):
     download_dir = prepare_download_dir(seqNo)
@@ -308,12 +289,23 @@ def download_external_file(uri, seqNo, command, hutil):
     try:
         download_and_save_file(uri, file_path)
     except Exception, e:
-        hutil.error(("Failed to download external file with uri:{0}"
-                     "with error{1}").format(uri, e))
+        hutil.error(("Failed to download external file with uri: {0} "
+                     "with error {1}").format(uri, e))
         raise
     preprocess_files(file_path, hutil)
     if command and file_name in command:
         os.chmod(file_path, 0100)
+
+
+def download_and_save_file(uri, file_path):
+    src = urllib2.urlopen(uri)
+    dest = open(file_path, 'wb')
+    buf_size = 1024
+    buf = src.read(buf_size)
+    while(buf):
+        dest.write(buf)
+        buf = src.read(buf_size)
+
 
 def preprocess_files(file_path, hutil):
     """
@@ -327,10 +319,12 @@ def preprocess_files(file_path, hutil):
             remove_bom(file_path)
             hutil.log("Removing BOM: Done")
 
+
 def is_text_file(file_path):
     with open(file_path, 'rb') as f:
         contents = f.read(512)
     return is_text(contents)
+
 
 def is_text(contents):
     supported_encoding = ['ascii', 'UTF-8', 'UTF-16LE', 'UTF-16BE']
@@ -340,6 +334,7 @@ def is_text(contents):
     else:
         return False, code_type
 
+
 def dos2unix(file_path):
     temp_file_path = tempfile.mkstemp()[1]
     f_temp = open(temp_file_path, 'wb')
@@ -348,6 +343,7 @@ def dos2unix(file_path):
     f_temp.write(contents)
     f_temp.close()
     shutil.move(temp_file_path, file_path)
+
 
 def remove_bom(file_path):
     temp_file_path = tempfile.mkstemp()[1]
@@ -363,14 +359,41 @@ def remove_bom(file_path):
     f_temp.close()
     shutil.move(temp_file_path, file_path)
 
-def download_and_save_file(uri, file_path):
-    src = urllib2.urlopen(uri)
-    dest = open(file_path, 'wb')
-    buf_size = 1024
-    buf = src.read(buf_size)
-    while(buf):
-        dest.write(buf)
-        buf = src.read(buf_size)
+
+def get_blob_name_from_uri(uri):
+    return get_properties_from_uri(uri)['blob_name']
+
+
+def get_container_name_from_uri(uri):
+    return get_properties_from_uri(uri)['container_name']
+
+
+def get_host_base_from_uri(blob_uri):
+    uri = urlparse.urlparse(blob_uri)
+    netloc = uri.netloc
+    if netloc is None:
+        return None
+    return netloc[netloc.find('.'):]
+
+
+def get_properties_from_uri(uri):
+    path = get_path_from_uri(uri)
+    if path.endswith('/'):
+        path = path[:-1]
+    if path[0] == '/':
+        path = path[1:]
+    first_sep = path.find('/')
+    if first_sep == -1:
+        hutil.error("Failed to extract container, blob, from {}".format(path))
+    blob_name = path[first_sep+1:]
+    container_name = path[:first_sep]
+    return {'blob_name': blob_name, 'container_name': container_name}
+
+
+def get_path_from_uri(uriStr):
+    uri = urlparse.urlparse(uriStr)
+    return uri.path
+
 
 def prepare_download_dir(seqNo):
     download_dir_main = os.path.join(os.getcwd(), DownloadDirectory)
@@ -379,21 +402,24 @@ def prepare_download_dir(seqNo):
     create_directory_if_not_exists(download_dir)
     return download_dir
 
+
 def create_directory_if_not_exists(directory):
     """create directory if no exists"""
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+
 def parse_args(cmd):
     cmd = filter(lambda x : x in string.printable, cmd)
     cmd = cmd.decode("ascii", "ignore")
     args = shlex.split(cmd)
-    # from python 2.6 to python 2.7.2, shlex.split output UCS-4 result like 
-    #'\x00\x00a'. Temp workaround is to replace \x00
+    # From python 2.6 to python 2.7.2, shlex.split output UCS-4 result like
+    # '\x00\x00a'. Temp workaround is to replace \x00
     for idx, val in enumerate(args):
         if '\x00' in args[idx]:
             args[idx] = args[idx].replace('\x00', '')
     return args
+
 
 def tail(log_file, output_size = OutputSize):
     pos = min(output_size, os.path.getsize(log_file))
@@ -403,6 +429,7 @@ def tail(log_file, output_size = OutputSize):
         buf = filter(lambda x: x in string.printable, buf)
         return buf.decode("ascii", "ignore")
 
+
 def get_formatted_log(summary, stdout, stderr):
     msg_format = ("{0}\n"
                   "---stdout---\n"
@@ -410,6 +437,7 @@ def get_formatted_log(summary, stdout, stderr):
                   "---errout---\n"
                   "{2}\n")
     return msg_format.format(summary, stdout, stderr)
+
 
 if __name__ == '__main__' :
     main()
