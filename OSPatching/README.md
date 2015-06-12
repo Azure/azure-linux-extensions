@@ -69,3 +69,7 @@ $PublicConfig = ConvertTo-Json -InputObject @{
     "timestamp" = $TimeStamp
 }
 ```
+
+* If the scheduled task can not run on some redhat distro, there may be
+a selinux-policy problem. Please refer to
+[https://bugzilla.redhat.com/show_bug.cgi?id=657104](https://bugzilla.redhat.com/show_bug.cgi?id=657104)
