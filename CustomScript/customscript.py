@@ -170,13 +170,12 @@ def download_files(hutil):
         download_blobs(storage_account_name,
                        storage_account_key,
                        blob_uris,
-                       hutil.get_seq_no(),
                        cmd,
                        hutil)
     elif not(storage_account_name or storage_account_key):
         hutil.log("No azure storage account and key specified in protected "
                   "settings. Downloading scripts from external links...")
-        download_external_files(blob_uris, hutil.get_seq_no(), cmd, hutil)
+        download_external_files(blob_uris, cmd, hutil)
     else:
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account and key should appear in pairs."
@@ -302,20 +301,20 @@ def run_script(hutil, args, interval = 30):
 
 
 def download_blobs(storage_account_name, storage_account_key,
-                   blob_uris, seqNo, command, hutil):
+                   blob_uris, command, hutil):
     for blob_uri in blob_uris:
         if blob_uri:
             download_blob(storage_account_name,
                           storage_account_key,
                           blob_uri,
-                          seqNo,
                           command,
                           hutil)
 
 
 def download_blob(storage_account_name, storage_account_key,
-                  blob_uri, seqNo, command, hutil):
+                  blob_uri, command, hutil):
     try:
+        seqNo = hutil.get_seq_no()
         download_dir = prepare_download_dir(seqNo)
         result = download_and_save_blob(storage_account_name,
                                         storage_account_key,
@@ -323,7 +322,7 @@ def download_blob(storage_account_name, storage_account_key,
                                         download_dir)
         blob_name, _, _, download_path = result
         preprocess_files(download_path, hutil)
-        if blob_name in command:
+        if command and blob_name in command:
             os.chmod(download_path, 0100)
     except Exception, e:
         hutil.error(("Failed to download blob with uri: {0} "
@@ -354,26 +353,27 @@ def download_and_save_blob(storage_account_name,
     return (blob_name, container_name, host_base, download_path)
 
 
-def download_external_files(uris, seqNo, command, hutil):
+def download_external_files(uris, command, hutil):
     for uri in uris:
         if uri:
-            download_external_file(uri, seqNo, command, hutil)
+            download_external_file(uri, command, hutil)
 
 
-def download_external_file(uri, seqNo, command, hutil):
+def download_external_file(uri, command, hutil):
+    seqNo = hutil.get_seq_no()
     download_dir = prepare_download_dir(seqNo)
     path = get_path_from_uri(uri)
     file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
     try:
         download_and_save_file(uri, file_path)
+        preprocess_files(file_path, hutil)
+        if command and file_name in command:
+            os.chmod(file_path, 0100)
     except Exception, e:
         hutil.error(("Failed to download external file with uri: {0} "
                      "with error {1}").format(uri, e))
         raise
-    preprocess_files(file_path, hutil)
-    if command and file_name in command:
-        os.chmod(file_path, 0100)
 
 
 def download_and_save_file(uri, file_path):
