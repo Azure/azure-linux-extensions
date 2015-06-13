@@ -156,7 +156,7 @@ def download_files(hutil):
         error_msg = "fileUris value provided is empty or invalid."
         hutil.log(error_msg + " Continue with executing command...")
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op='Donwload',
+                                  op=DownloadOp,
                                   isSuccess=False,
                                   version=Version,
                                   message="(01001)"+error_msg)
