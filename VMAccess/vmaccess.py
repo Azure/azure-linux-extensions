@@ -150,9 +150,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
             ovf_env.UserName = user_name
             if(no_convert):
                 if(cert_txt):
-                    waagent.SetFileContents("temp.pub", cert_txt)
                     pub_path = ovf_env.PrepareDir(pub_path)
-                    waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
+                    waagent.AppendFileContents(pub_path,cert_txt)
                     waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
                     waagent.ChangeOwner(pub_path, user_name)
                     os.remove('temp.pub')
@@ -180,7 +179,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 hutil.log("Succeeded in resetting ssh_key.")
-        except:
+        except Exception as e :
+            hutil.log(str(e))
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=False,
