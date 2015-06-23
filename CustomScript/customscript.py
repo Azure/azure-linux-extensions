@@ -34,10 +34,10 @@ import traceback
 import urllib2
 import urlparse
 import time
-import codecs
 import shutil
 import tempfile
 import json
+from codecs import *
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -424,6 +424,12 @@ def dos2unix(file_path):
 def remove_bom(file_path):
     with open(file_path, 'rb') as f:
         contents = f.read()
+    bom_list = [BOM, BOM_BE, BOM_LE, BOM_UTF16, BOM_UTF16_BE, BOM_UTF16_LE, BOM_UTF8]
+    for bom in bom_list:
+        if contents.startswith(bom):
+            break
+    else:
+        return
     new_contents = None
     for encoding in ["utf-8-sig", "utf-16"]:
         try:
