@@ -44,6 +44,7 @@ class redhatPatching(AbstractPatching):
         self.download_cmd = 'yum -q -y --downloadonly update'
         self.patch_cmd = 'yum -y update'
         self.status_cmd = 'yum -q info'
+        self.pkg_query_cmd = 'repoquery -l'
         self.cache_dir = '/var/cache/yum/'
 
     def install(self):
@@ -51,19 +52,22 @@ class redhatPatching(AbstractPatching):
         Install for dependencies.
         """
         # For yum --downloadonly option
-        retcode = waagent.Run('yum -y install yum-downloadonly')
-        if retcode > 0:
-            self.hutil.error("Failed to install yum-downloadonly")
+        waagent.Run('yum -y install yum-downloadonly', False)
 
         # For yum --security option
         retcode = waagent.Run('yum -y install yum-plugin-security')
         if retcode > 0:
             self.hutil.error("Failed to install yum-plugin-security")
 
-        # For package-cleanup
+        # For package-cleanup, needs-restarting, repoquery
         retcode = waagent.Run('yum -y install yum-utils')
         if retcode > 0:
             self.hutil.error("Failed to install yum-utils")
+
+        # For lsof
+        retcode = waagent.Run('yum -y install lsof')
+        if retcode > 0:
+            self.hutil.error("Failed to install lsof")
 
         # Install missing dependencies
         missing_dependency_list = self.check_missing_dependencies()
@@ -109,7 +113,7 @@ class redhatPatching(AbstractPatching):
         last_kernel = last_kernel.split()[0][7:]
         retcode,current_kernel = waagent.RunGetOutput('uname -r')
         current_kernel = current_kernel.strip()
-        return last_kernel != current_kernel
+        self.reboot_required = (last_kernel != current_kernel)
 
     def report(self):
         """

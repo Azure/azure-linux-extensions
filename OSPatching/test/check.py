@@ -22,16 +22,14 @@ import os
 import sys
 import datetime
 
-
 def main():
     intervalOfWeeks = int(sys.argv[1])
     if intervalOfWeeks == 1:
         sys.exit(0)
 
-    history_scheduled = os.path.join(os.path.dirname(sys.argv[0]),
-                                     'scheduled/history')
+    history_scheduled = os.path.join(os.getcwd(), 'scheduled/history')
     today = datetime.date.today()
-    today_dayOfWeek = today.strftime('%a')
+    today_dayOfWeek = today.strftime("%a")
 
     last_scheduled_date = None
     with open(history_scheduled) as f:
@@ -40,12 +38,10 @@ def main():
         for line in lines:
             line = line.strip()
             if line.endswith(today_dayOfWeek):
-                last_scheduled_date = datetime.datetime.strptime(line,
-                                                                 '%Y-%m-%d %a')
+                last_scheduled_date =  datetime.datetime.strptime(line, '%Y-%m-%d %a')
                 break
 
-    if (last_scheduled_date is not None and last_scheduled_date.date() +
-            datetime.timedelta(days=intervalOfWeeks*7) > today):
+    if last_scheduled_date is not None and last_scheduled_date.date() + datetime.timedelta(days=intervalOfWeeks*7) > today:
         sys.exit(1)
     else:
         sys.exit(0)

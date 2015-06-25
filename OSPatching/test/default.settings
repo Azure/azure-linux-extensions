@@ -1,10 +1,1 @@
-{
-    "disabled" : "false",
-    "stop" : "false",
-    "rebootAfterPatch" : "Auto",
-    "intervalOfWeeks" : "2",
-    "dayOfWeek" : "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
-    "startTime" : "02:00",
-    "category" : "ImportantAndRecommended",
-    "installDuration" : "00:30"
-}
+{"dayOfWeek": "everyday", "rebootAfterPatch": "rebootifneed", "storageAccountKey": "<TOCHANGE>", "stop": "false", "vmStatusTest": {"local": "true", "idleTestScript": "#!/usr/bin/python\n    # Locally.\n    def is_vm_idle():\n        return True\n    ", "healthyTestScript": "#!/usr/bin/python\n    # Locally.\n    def is_vm_healthy():\n        return True\n    "}, "disabled": "false", "startTime": "03:00", "category": "important", "intervalOfWeeks": "1", "installDuration": "00:30", "storageAccountName": "<TOCHANGE>", "oneoff": "false"}

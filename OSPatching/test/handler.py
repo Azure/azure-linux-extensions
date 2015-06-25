@@ -23,7 +23,7 @@ import os
 import sys
 import re
 import time
-import json
+import chardet
 import tempfile
 import urllib2
 import urlparse
@@ -37,13 +37,52 @@ import Utils.HandlerUtil as Util
 from patch import *
 
 # Global variables definition
+ExtensionShortName = 'OSPatching'
 DownloadDirectory = 'download'
 idleTestScriptName = "idleTest.py"
 healthyTestScriptName = "healthyTest.py"
-mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
-with open(mfile,'r') as f:
-    manifest = json.loads(f.read())[0]
-    ExtensionShortName = manifest['name']
+
+idleTestScriptLocal = """
+#!/usr/bin/python
+# Locally.
+def is_vm_idle():
+    return True
+"""
+
+healthyTestScriptLocal = """
+#!/usr/bin/python
+# Locally.
+def is_vm_healthy():
+    return True
+"""
+
+idleTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/idleTest.py"
+healthyTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/healthyTest.py"
+
+idleTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/idleTest.py"
+healthyTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/healthyTest.py"
+
+public_settings = {
+    "disabled" : "false",
+    "stop" : "false",
+    "rebootAfterPatch" : "RebootIfNeed",
+    "category" : "ImportantAndRecommended",
+    "installDuration" : "00:30",
+    "oneoff" : "false",
+    "intervalOfWeeks" : "1",
+    "dayOfWeek" : "everyday",
+    "startTime" : "03:00",
+    "vmStatusTest" : {
+        "local" : "true",
+        "idleTestScript" : idleTestScriptLocal, #idleTestScriptStorage,
+        "healthyTestScript" : healthyTestScriptLocal, #healthyTestScriptStorage
+    }
+}
+
+protected_settings = {
+    "storageAccountName" : "<TOCHANGE>",
+    "storageAccountKey" : "<TOCHANGE>"
+}
 
 def install():
     hutil.do_parse_context('Install')
@@ -57,14 +96,10 @@ def install():
 def enable():
     hutil.do_parse_context('Enable')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        if protected_settings:
-            settings = protected_settings.copy()
-        else:
-            settings = dict()
-        if public_settings:
-            settings.update(public_settings)
+        # protected_settings = hutil.get_protected_settings()
+        # public_settings = hutil.get_public_settings()
+        settings = protected_settings.copy()
+        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         # Ensure the same configuration is executed only once
         hutil.exit_if_seq_smaller()
@@ -86,6 +121,8 @@ def uninstall():
 def disable():
     hutil.do_parse_context('Disable')
     try:
+        # Ensure the same configuration is executed only once
+        hutil.exit_if_seq_smaller()
         MyPatching.disable()
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded.')
     except Exception, e:
@@ -99,14 +136,10 @@ def update():
 def download():
     hutil.do_parse_context('Download')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        if protected_settings:
-            settings = protected_settings.copy()
-        else:
-            settings = dict()
-        if public_settings:
-            settings.update(public_settings)
+        # protected_settings = hutil.get_protected_settings()
+        # public_settings = hutil.get_public_settings()
+        settings = protected_settings.copy()
+        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.download()
         current_config = MyPatching.get_current_config()
@@ -119,14 +152,10 @@ def download():
 def patch():
     hutil.do_parse_context('Patch')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        if protected_settings:
-            settings = protected_settings.copy()
-        else:
-            settings = dict()
-        if public_settings:
-            settings.update(public_settings)
+        # protected_settings = hutil.get_protected_settings()
+        # public_settings = hutil.get_public_settings()
+        settings = protected_settings.copy()
+        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch()
         current_config = MyPatching.get_current_config()
@@ -139,14 +168,10 @@ def patch():
 def oneoff():
     hutil.do_parse_context('Oneoff')
     try:
-        protected_settings = hutil.get_protected_settings()
-        public_settings = hutil.get_public_settings()
-        if protected_settings:
-            settings = protected_settings.copy()
-        else:
-            settings = dict()
-        if public_settings:
-            settings.update(public_settings)
+        # protected_settings = hutil.get_protected_settings()
+        # public_settings = hutil.get_public_settings()
+        settings = protected_settings.copy()
+        settings.update(public_settings)
         MyPatching.parse_settings(settings)
         MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
@@ -157,18 +182,14 @@ def oneoff():
         hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed. Current Configuation: ' + current_config)
 
 def download_files(hutil):
-    protected_settings = hutil.get_protected_settings()
-    public_settings = hutil.get_public_settings()
-    if protected_settings:
-        settings = protected_settings.copy()
-    else:
-        settings = dict()
-    if public_settings:
-        settings.update(public_settings)
+    # protected_settings = hutil.get_protected_settings()
+    # public_settings = hutil.get_public_settings()
+    settings = protected_settings.copy()
+    settings.update(public_settings)
     local = settings.get("vmStatusTest", dict()).get("local", "")
-    if str(local).lower() == "true":
+    if local.lower() == "true":
         local = True
-    elif str(local).lower() == "false":
+    elif local.lower() == "false":
         local = False
     else:
         hutil.log_and_syslog(logging.WARNING, "The parameter \"local\" "
@@ -251,7 +272,6 @@ def download_blob(storage_account_name, storage_account_key,
     #The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(download_path))
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0} "
@@ -264,7 +284,6 @@ def download_external_file(uri, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
         download_and_save_file(uri, file_path)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download external file with uri:{0} "
@@ -277,7 +296,6 @@ def save_local_file(src, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
         waagent.SetFileContents(file_path, src)
     except Exception, e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to save file from user's configuration "
@@ -304,9 +322,6 @@ def is_text_file(file_path):
 
 def is_text(contents):
     supported_encoding = ['ascii', 'UTF-8', 'UTF-16LE', 'UTF-16BE']
-    # Openlogic and Oracle distros don't have python-chardet
-    waagent.Run('yum -y install python-chardet', False)
-    import chardet
     code_type = chardet.detect(contents)['encoding']
     if code_type in supported_encoding:
         return True, code_type
@@ -399,20 +414,19 @@ def copy_vmstatustestscript(seqNo, oneoff):
     src_dir = prepare_download_dir(seqNo)
     for filename in (idleTestScriptName, healthyTestScriptName):
         src = os.path.join(src_dir, filename)
-        if oneoff is not None and str(oneoff).lower() == "true":
+        if oneoff is not None and oneoff.lower() == "false":
             dst = "oneoff"
         else:
             dst = "scheduled"
         dst = os.path.join(os.getcwd(), dst)
-        current_vmstatustestscript = os.path.join(dst, filename)
-        if os.path.isfile(current_vmstatustestscript):
-            os.remove(current_vmstatustestscript)
-        # Remove the .pyc file
-        if os.path.isfile(current_vmstatustestscript+'c'):
-            os.remove(current_vmstatustestscript+'c')
         if os.path.isfile(src):
             shutil.copy(src, dst)
 
+def delete_current_vmstatustestscript():
+    for filename in (idleTestScriptName, healthyTestScriptName):
+        current_vmstatustestscript = os.path.join(os.getcwd(), "patch/"+filename)
+        if os.path.isfile(current_vmstatustestscript):
+            os.remove(current_vmstatustestscript)
 
 # Main function is the only entrance to this extension handler
 def main():
