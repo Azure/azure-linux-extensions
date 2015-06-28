@@ -98,7 +98,6 @@ def enable():
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 #remove other .config files.  or the waagent would report the 3
                 #status...
-                
                 for subdir, dirs, files in os.walk(hutil._context._config_dir):
                     for file in files:
                         try:
@@ -149,7 +148,7 @@ def enable():
                 if(freeze_result is not None and len(freeze_result.errors) > 0 ):
                     run_result = 2
                     run_status = 'error'
-                    error_msg  = 'Enable failed with error' + str(freeze_result.errors)
+                    error_msg  = 'Enable failed with error' + str(freeze_result)
                     backup_logger.log(error_msg, False, 'Warning')
                 else:
                     backup_logger.log("doing snapshot now...")
@@ -157,7 +156,7 @@ def enable():
                     snapshot_result = snap_shotter.snapshotall(para_parser)
                     backup_logger.log("snapshotall ends...")
                     if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                        error_msg  = "snapshot result: " + str(snapshot_result.errors)
+                        error_msg  = "snapshot result: " + str(snapshot_result)
                         run_result = 2
                         run_status = 'error'
                         backup_logger.log(error_msg, False, 'Error')
@@ -217,3 +216,4 @@ def update():
 
 if __name__ == '__main__' :
     main()
+
