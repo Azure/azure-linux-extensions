@@ -31,85 +31,36 @@ from StringIO import StringIO
 class Error(Exception):
     pass
 
-
-def system(*args):
-    error = subprocess.call(args)
-    if error:
-        raise Error("nonzero exitcode %d from command `%s'" % (error, " ".join(args)))
-
 class Mount:
-    def __init__(self, device, dir, type, opts):
-        self.device = device
-        self.dir = dir
+    def __init__(self, name, type, fstype, mount_point):
+        self.name = name
         self.type = type
-        self.opts = opts
+        self.fstype = fstype
+        self.mount_point = mount_point
 
 class Mounts:
-    @staticmethod
-    def _parse(fh, root):
-        for line in fh.readlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            vals = re.split(r'\s+', line)
-            if len(vals) < 4:
-                continue
-
-            device, dir, type, opts = vals[:4]
-            if not dir.startswith("/"):
-                dir = "/" + dir
-
-            if root:
-                # skip mounts that are not subdirectories of root
-                if not dir.startswith(root):
-                    continue
-
-                if root != "/":
-                    dir = dir[len(root):]
-
-            yield Mount(device, dir, type, opts)
-            
-    def __init__(self, root=None, fstab=None):
-        """Initialize a list of mounts under <root> (defaults to /)
-
-        By default we merge /etc/mtab and /proc/mounts, unless
-        <fstab> is provided.
-
-        <fstab> can be a file path, a file handle, or a string containing
-        fstab-like values"""
-
+    def __init__(self,logger):
         self.mounts = []
-        if root:
-            root = realpath(root)
-        if fstab:
-            if isinstance(fstab, file):
-                fh = fstab
-            else:
-                fstab = str(fstab)
-                if exists(fstab):
-                    try:
-                        fh = file(fstab)
-                    except IOError, e:
-                        raise Error(e)
-                else:
-                    fh = StringIO(fstab)
+        self.logger = logger
 
-            for mount in self._parse(fh, root):
-                self.mounts.append(mount)
+        p = subprocess.Popen(['lsblk', '-l', '-n','-o','NAME,TYPE,FSTYPE,MOUNTPOINT'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out_lsblk_output, err = p.communicate()
+        out_lsblk_output = str(out_lsblk_output)
+        self.logger.log("out_lsblk_output:\n" + str(out_lsblk_output))
+        lines = out_lsblk_output.splitlines()
+        line_number = len(lines)
+        for i in range(0,line_number):
+            item_value = lines[i].strip().split()
+            print("item_value==" + str(item_value))
+            name = item_value[0]
+            type = item_value[1]
+            fstype = ""
+            mountpoint = ""
+            if(len(item_value) > 2):
+                fstype = item_value[2]
+            if(len(item_value) > 3):
+                mountpoint = item_value[3]
+            mount = Mount(item_value[0], item_value[1], fstype, mountpoint)
 
-        self.root = root
-
-    def __len__(self):
-        return len(self.mounts)
-    
-    def __str__(self):
-        return "\n".join([ " ".join([mount.device, mount.dir, mount.type, mount.opts]) \
-                           for mount in self.mounts ])
-
-    def exists(self, dir):
-        """Returns True if dir exists in mounts"""
-        for mount in self.mounts:
-            if mount.dir.rstrip("/") == dir.rstrip("/"):
-                return True
-        return False
+            self.mounts.append(mount)
+        pass
