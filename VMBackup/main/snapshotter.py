@@ -27,15 +27,17 @@ class SnapshotError(object):
         self.errorcode = 0
         self.path = None
     def __str__(self):
-        return 'errorcode:'+self.errorcode+'path:'+self.path
-        pass
+        return 'errorcode:' + str(self.errorcode) + 'path:' + str(self.path)
 
 class SnapshotResult(object):
     def __init__(self):
         self.errors = []
 
     def __str__(self):
-        return 'errors' + str(self.errors)
+        error_str=""
+        for error in self.errors:
+            error_str+=(str(error)) + "\n"
+        return error_str
 
 class Snapshotter(object):
     """description of class"""

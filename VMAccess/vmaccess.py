@@ -122,7 +122,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
-    
+    no_convert = False
     if(not(user_pass) and not(cert_txt) and not(ovf_env.SshPublicKeys)):
         raise Exception("No password or ssh_key is specified.")
 
@@ -145,27 +145,46 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     #Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt or len(ovf_env.SshPublicKeys) > 0:
+        if cert_txt and cert_txt.strip().lower().startswith("ssh-rsa"):
+            no_convert = True
         try:
             pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
             ovf_env.UserName = user_name
-            if cert_txt:
-                _save_cert_str_as_file(cert_txt, 'temp.crt')
-            else :
-                for pkey in ovf_env.SshPublicKeys:
-                    if pkey[1]:
-                        shutil.copy(os.path.join(waagent.LibDir, pkey[0] + '.crt'), os.path.join(os.getcwd(),'temp.crt'))
-                        break
-            pub_path = ovf_env.PrepareDir(pub_path)
-            retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
-            if retcode > 0:
-                raise Exception("Failed to generate public key file.")
-            waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
-            waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
-            waagent.ChangeOwner(pub_path, user_name)
-            os.remove('temp.pub')
-            os.remove('temp.crt')
-            hutil.log("Succeeded in resetting ssh_key.")
-        except:
+            if(no_convert):
+                if(cert_txt):
+                    pub_path = ovf_env.PrepareDir(pub_path)
+                    final_cert_txt = cert_txt
+                    if(not cert_txt.endswith("\n")):
+                        final_cert_txt=final_cert_txt+"\n"
+                    waagent.AppendFileContents(pub_path,final_cert_txt)
+                    waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
+                    waagent.ChangeOwner(pub_path, user_name)
+                    hutil.log("Succeeded in resetting ssh_key.")
+                else:
+                    waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=False,
+                                      message="(02100)Failed to reset ssh key because the cert content is empty.")
+            else:
+                if cert_txt:
+                    _save_cert_str_as_file(cert_txt, 'temp.crt')
+                else :
+                    for pkey in ovf_env.SshPublicKeys:
+                        if pkey[1]:
+                            shutil.copy(os.path.join(waagent.LibDir, pkey[0] + '.crt'), os.path.join(os.getcwd(),'temp.crt'))
+                            break
+                pub_path = ovf_env.PrepareDir(pub_path)
+                retcode = waagent.Run(waagent.Openssl + " x509 -in temp.crt -noout -pubkey > temp.pub")
+                if retcode > 0:
+                    raise Exception("Failed to generate public key file.")
+                waagent.MyDistro.sshDeployPublicKey('temp.pub',pub_path)
+                waagent.MyDistro.setSelinuxContext(pub_path,'unconfined_u:object_r:ssh_home_t:s0')
+                waagent.ChangeOwner(pub_path, user_name)
+                os.remove('temp.pub')
+                os.remove('temp.crt')
+                hutil.log("Succeeded in resetting ssh_key.")
+        except Exception as e :
+            hutil.log(str(e))
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=False,
@@ -266,10 +285,10 @@ def _backup_sshd_config(sshd_file_path):
         shutil.copyfile(sshd_file_path, backup_file_name)
 
 def _save_cert_str_as_file(cert_txt, file_name):
-    cert_start = cert_txt.index(BeginCertificateTag)
-    if(cert_txt >= 0):
+    cert_start = cert_txt.find(BeginCertificateTag)
+    if(cert_start >= 0):
         cert_txt = cert_txt[cert_start + len(BeginCertificateTag):]
-    cert_end =  cert_txt.index(EndCertificateTag)
+    cert_end =  cert_txt.find(EndCertificateTag)
     if(cert_end >= 0):
         cert_txt = cert_txt[:cert_end]
     cert_txt = cert_txt.strip()
@@ -305,4 +324,3 @@ def _insert_rule_if_not_exists(rule_string):
 
 if __name__ == '__main__' :
     main()
-
