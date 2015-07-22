@@ -122,7 +122,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
-    no_convert = protect_settings.get('no_convert') 
+    no_convert = False
     if(not(user_pass) and not(cert_txt) and not(ovf_env.SshPublicKeys)):
         raise Exception("No password or ssh_key is specified.")
 
@@ -145,6 +145,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     #Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt or len(ovf_env.SshPublicKeys) > 0:
+        if cert_txt and cert_txt.strip().lower().startswith("ssh-rsa"):
+            no_convert = True
         try:
             pub_path = os.path.join('/home/', user_name, '.ssh','authorized_keys')
             ovf_env.UserName = user_name
@@ -322,5 +324,3 @@ def _insert_rule_if_not_exists(rule_string):
 
 if __name__ == '__main__' :
     main()
-
-
