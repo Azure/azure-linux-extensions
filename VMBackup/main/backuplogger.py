@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -87,7 +87,7 @@ class Backuplogger(object):
                     connection.close()
                     return True
                 else:
-                    self.hutil.log("blobType is " + str(blobType)
+                    self.hutil.log("blobType is " + str(blobType))
                     return False
             else:
                 self.hutil.log("logbloburi is None")
