@@ -65,9 +65,12 @@ def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context('Enable')
     try:
+	public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         reset_ssh = protect_settings.get('reset_ssh')
-        # check port each time the VM boots up
+        check_disk = public_settings.get('check_disk')
+	repair_disk = public_settings.get('repair_disk')
+	# check port each time the VM boots up
         if reset_ssh:
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
@@ -83,6 +86,15 @@ def enable():
     except Exception, e:
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
+
+        if check_disk:
+            _fsck_check()
+            hutil.log("Successfully checked disk")
+	    hutil.exit_if_enabled()
+        if repair_disk:
+            _fsck_repair()
+            hutil.log("Repaired and remounted disk")
+	    hutil.exit_if_enabled()
 
 def uninstall():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -320,6 +332,41 @@ def _insert_rule_if_not_exists(rule_string):
     cmd_result = waagent.RunGetOutput("iptables-save")
     if cmd_result[0] == 0 and (rule_string not in cmd_result[1]):
         waagent.Run("iptables -I %s" %rule_string)
+
+def _fsck_check():
+     try:
+	retcode = waagent.Run("fsck -As -y")
+     if retcode >0:
+	raise Exception("Disk check was not successful")
+     else:
+	return retcode
+except Exception, e:
+        hutil.error("Failed to run disk check with error: %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Check','error','0', 'Check failed.')
+
+
+def _fsck_repair():
+    #first unmount disks and loop devices lazy + forced
+    try:
+	cmd_result = waagent.Run("umount -dflr")
+	if cmd_result!=0:
+	#Fail fast
+		raise Exception("Failed to unmount disks")
+	else:
+	  # run repair
+	  retcode = waagent.Run("fsck -AR -y")
+	    if retcode >0:
+		raise Exception("Failed to repair disk")
+		else:
+		#remount all post repair and return
+		retcode = waagent.Run("mount -a")
+		if retcode ==0:
+		return retcode
+		else:
+		raise Exception("Failed to mount disks")
+	except Exception, e:
+		hutil.error("%s" %(str(e), traceback.format_exc()))
+		hutil.do_exit(1, 'Repair','error','0', 'Repair failed.')
 
 
 if __name__ == '__main__' :
