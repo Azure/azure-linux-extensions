@@ -1,1 +1,0 @@
-[{  "name": "Microsoft.OSTCExtensions.SteppingStoneForLinuxTest", "seqNo": "0", "version": 1.0,  "handlerEnvironment": {    "logFolder": "/root/SteppingStoneForLinuxTest",    "configFolder": "/root/SteppingStoneForLinuxTest/config",    "statusFolder": "/root/SteppingStoneForLinuxTest/status",    "heartbeatFile": "/root/SteppingStoneForLinuxTest/heartbeat.log"}}]
