@@ -52,6 +52,34 @@ For "commandToExecute", there are three acceptable formats.
 ```
 
 ## Install CustomScript Extension
+### Xplat-cli Sample
+To learn how to install and configure the Azure CLI, visit [Install and Configure the Azure CLI](https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/#how-to-install-the-azure-cli).
+
+```
+azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -i '{"fileUris":["<url>"], "commandToExecute": "<command>" }' -f '{"storageAccountName":"<storage-account-name>","storageAccountKey":"<storage-account-key>"}'
+```
+You can also put your configuration in a json file as the following, and pass the path to Azure CLI.
+```
+{
+  "fileUris": [
+    "https://raw.githubusercontent.com/Azure/azure-linux-extensions/master/CustomScript/README.md"
+  ],
+  "commandToExecute": "echo hello",
+  "timestamp": 1438929795
+}
+```
+```
+azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -c <path-to-public-configuration> -e <path-to-private-configuration>
+```
+
+* If you need to run the same script repeatly, you can add a timestamp
+in the "-i" parameter.
+```bash
+$ data +%s
+1438929794
+$ azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -i '{"fileUris":["<url>"], "commandToExecute": "<command>", "timestamp": 1438929794 }' -f '{"storageAccountName":"<storage-account-name>","storageAccountKey":"<storage-account-key>"}'
+```
+
 ### PowerShell Sample
 ```powershell
 $ExtensionName = 'CustomScriptForLinux'
@@ -80,34 +108,6 @@ in the "-PublicConfiguration" parameter.
 ```powershell
 $TimeStamp = (Get-Date).Ticks
 -PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "<command>", "timestamp": $TimeStamp}'
-```
-
-### Xplat-cli Sample
-To learn how to install and configure the Azure CLI, visit [Install and Configure the Azure CLI](https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/#how-to-install-the-azure-cli).
-
-```
-azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -i '{"fileUris":["<url>"], "commandToExecute": "<command>" }' -f '{"storageAccountName":"<storage-account-name>","storageAccountKey":"<storage-account-key>"}'
-```
-You can also put your configuration in a json file as the following, and pass the path to Azure CLI.
-```
-{
-  "fileUris": [
-    "https://raw.githubusercontent.com/Azure/azure-linux-extensions/master/CustomScript/README.md"
-  ],
-  "commandToExecute": "echo hello",
-  "timestamp": 1438929795
-}
-```
-```
-azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -c <path-to-public-configuration> -e <path-to-private-configuration>
-```
-
-* If you need to run the same script repeatly, you can add a timestamp
-in the "-i" parameter.
-```bash
-$ data +%s
-1438929794
-$ azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> -i '{"fileUris":["<url>"], "commandToExecute": "<command>", "timestamp": 1438929794 }' -f '{"storageAccountName":"<storage-account-name>","storageAccountKey":"<storage-account-key>"}'
 ```
 
 ## More Information
