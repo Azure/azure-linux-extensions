@@ -111,4 +111,4 @@ $TimeStamp = (Get-Date).Ticks
 ```
 
 ## More Information
-To learn more information about the usage of CustomScrpt Extension, please visit [Automate Linux VM Customization Tasks Using CustomScript Extension](http://azure.microsoft.com/blog/2014/08/20/automate-linux-vm-customization-tasks-using-customscript-extension/).
+To learn more information about the usage of CustomScript Extension, please visit [Automate Linux VM Customization Tasks Using CustomScript Extension](http://azure.microsoft.com/blog/2014/08/20/automate-linux-vm-customization-tasks-using-customscript-extension/).
