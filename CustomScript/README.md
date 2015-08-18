@@ -70,7 +70,8 @@ $ azure config mode asm
 
 You can deploying CustomScript Extension by running:
 ```
-$ azure vm extension set <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> \
+$ azure vm extension set <vm-name> \
+CustomScriptForLinux Microsoft.OSTCExtensions <version> \
 --public-config-path public.json  \
 --private-config-path protected.json
 ```
@@ -91,7 +92,8 @@ $ azure config mode arm
 
 You can deploying CustomScript Extension by running:
 ```
-$ azure vm extension set <resource-group> <vm-name> CustomScriptForLinux Microsoft.OSTCExtensions <version> \
+$ azure vm extension set <resource-group> <vm-name> \
+CustomScriptForLinux Microsoft.OSTCExtensions <version> \
 --public-config-path public.json  \
 --private-config-path protected.json
 ```
@@ -125,7 +127,10 @@ $PrivateConf = '{
     "storageAccountKey": "<storage-account-key>"
 }'
 
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf | Update-AzureVM
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
+  -Publisher $Publisher -Version $Version `
+  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
+  Update-AzureVM
 ```
 
 #### 2.2.2 Resource Manager
@@ -153,7 +158,10 @@ $PrivateConf = '{
     "storageAccountKey": "<storage-account-key>"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf -Location $Location
+Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+  -Name $ExtensionName -Publisher $Publisher `
+  -ExtensionType $ExtensionName -TypeHandlerVersion $Version `
+  -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
 
 For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
