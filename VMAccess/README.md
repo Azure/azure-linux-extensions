@@ -66,7 +66,8 @@ $ azure config mode asm
 
 You can deploying VMAccess Extension by running:
 ```
-$ azure vm extension set <vm-name> VMAccessForLinux Microsoft.OSTCExtensions <version> \
+$ azure vm extension set <vm-name> \
+VMAccessForLinux Microsoft.OSTCExtensions <version> \
 --private-config-path protected.json
 ```
 
@@ -85,7 +86,8 @@ $ azure config mode arm
 
 You can deploying VMAccess Extension by running:
 ```
-$ azure vm extension set <resource-group> <vm-name> VMAccessForLinux Microsoft.OSTCExtensions <version> \
+$ azure vm extension set <resource-group> <vm-name> \
+VMAccessForLinux Microsoft.OSTCExtensions <version> \
 --private-config-path protected.json
 ```
 
@@ -118,7 +120,10 @@ $PrivateConf = '{
   "remove_user": "<username-to-remove>"
 }'
 
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf | Update-AzureVM
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
+  -Publisher $Publisher -Version $Version `
+  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
+  Update-AzureVM
 ```
 
 #### 2.2.2 Resource Manager
@@ -146,7 +151,9 @@ $PrivateConf = '{
   "remove_user": "<username-to-remove>"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName -TypeHandlerVersion $Version -Settingstring $PublicConf -$PublicConf $PrivateConf -Location $Location
+Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+  -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
+  -TypeHandlerVersion $Version -Settingstring $PublicConf -$PublicConf $PrivateConf
 ```
 
 For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
