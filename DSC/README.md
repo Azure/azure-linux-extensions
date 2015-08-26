@@ -5,7 +5,10 @@ Latest version is 1.0.
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
+
+About how to create MOF document, please refer to below documents.
 * [Get started with Windows PowerShell Desired State Configuration for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
+* [Built-In Windows PowerShell Desired State Configuration Resources for Linux](https://technet.microsoft.com/en-us/library/mt126209.aspx)
 
 DSCForLinux Extension can:
 * Push MOF configurations to the Linux VM (Push Mode)
