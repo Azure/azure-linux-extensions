@@ -153,7 +153,7 @@ $PrivateConf = '{
 
 Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
-  -TypeHandlerVersion $Version -Settingstring $PublicConf -$PublicConf $PrivateConf
+  -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
 
 For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
