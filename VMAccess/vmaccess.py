@@ -197,7 +197,8 @@ def _get_other_sudoers(userName):
     if not os.path.isfile(sudoersFile):
         return None
     sudoers = waagent.GetFileContents(sudoersFile).split("\n")
-    sudoers = filter(lambda x : userName not in x, sudoers)
+    pattern = '^{0}\s'.format(userName)
+    sudoers = filter(lambda x : re.match(pattern, x) is None, sudoers)
     return sudoers
 
 def _save_other_sudoers(sudoers):
