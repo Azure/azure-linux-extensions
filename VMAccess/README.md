@@ -1,7 +1,7 @@
 # VMAccess Extension
 Provide several ways to allow owner of the VM to get the SSH access back.
 
-Current version is 1.2.
+Current version is 1.3.
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
@@ -251,6 +251,9 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 see the status on Azure Portal
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
+## Changelog
+### v1.3 Sep. 8, 2015
+Add waagent to extension package
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
