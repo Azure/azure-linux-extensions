@@ -75,3 +75,8 @@ CustomScript/test/download/0/errout
 # VMEncryption ignores
 VMEncryption/main/azure/*
 VMEncryption/main/Utils/*
+
+# Common
+Common/psutil/build/*
+Common/psutil/dist/*
+Common/psutil/psutil.egg-info/*

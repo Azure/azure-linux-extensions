@@ -30,8 +30,10 @@ import shutil
 import time
 import traceback
 
-from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
+
+from waagentloader import load_waagent
+waagent = load_waagent()
 
 #Define global variables
 ExtensionShortName = 'VMAccess'
@@ -195,7 +197,8 @@ def _get_other_sudoers(userName):
     if not os.path.isfile(sudoersFile):
         return None
     sudoers = waagent.GetFileContents(sudoersFile).split("\n")
-    sudoers = filter(lambda x : userName not in x, sudoers)
+    pattern = '^{0}\s'.format(userName)
+    sudoers = filter(lambda x : re.match(pattern, x) is None, sudoers)
     return sudoers
 
 def _save_other_sudoers(sudoers):
@@ -258,7 +261,7 @@ def _reset_sshd_config(sshd_file_path):
         cfg_content += "    permissions: 0600\n"
         cfg_content += "    owner: root:root\n"
         cfg_content += "    content: |\n"
-        for line in GetFileContents(config_file_path).split('\n'):
+        for line in waagent.GetFileContents(config_file_path).split('\n'):
             cfg_content += "      {0}\n".format(line)
         
         # Change the sshd port in /etc/systemd/system/sshd.socket
@@ -271,9 +274,9 @@ def _reset_sshd_config(sshd_file_path):
         cfg_content += "      ListenStream={0}\n".format(sshd_port)
         cfg_content += "      Accept=yes\n"
         
-        SetFileContents(cfg_tempfile, cfg_content)
+        waagent.SetFileContents(cfg_tempfile, cfg_content)
         
-        Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
+        waagent.Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
         os.remove(cfg_tempfile)
     else:
         shutil.copyfile(config_file_path, sshd_file_path)
