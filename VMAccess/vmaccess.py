@@ -69,7 +69,7 @@ def enable():
         protect_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         reset_ssh = protect_settings.get('reset_ssh')
         check_disk = public_settings.get('check_disk')
-	repair_disk = public_settings.get('repair_disk')
+        repair_disk = public_settings.get('repair_disk')
 	# check port each time the VM boots up
         if reset_ssh:
             _open_ssh_port()
@@ -83,18 +83,16 @@ def enable():
             _remove_user_account(remove_user, hutil)
         _set_user_account_pub_key(protect_settings, hutil)
         hutil.do_exit(0, 'Enable', 'success','0', 'Enable succeeded.')
-    except Exception, e:
-        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable','error','0', 'Enable failed.')
-
-        if check_disk:
+	if check_disk:
             _fsck_check()
             hutil.log("Successfully checked disk")
-	    hutil.exit_if_enabled()
+            hutil.exit_if_enabled()
         if repair_disk:
             _fsck_repair()
             hutil.log("Repaired and remounted disk")
-	    hutil.exit_if_enabled()
+            hutil.exit_if_enabled()
+    except Exception, e:
+        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
 
 def uninstall():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
