@@ -585,14 +585,15 @@ class VMDataSource(object):
         #Network
         adapterIds = metrics.getNetworkAdapterIds()
         for adapterId in adapterIds:
-            counters.append(self.createCounterAdapterId(adapterId))
-            counters.append(self.createCounterNetworkMapping(metrics, adapterId))
-            counters.append(self.createCounterMinNetworkBandwidth(metrics, 
-                                                                  adapterId))
-            counters.append(self.createCounterMaxNetworkBandwidth(metrics,
-                                                                  adapterId))
-			counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
-			counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
+			if adapterIds.startswith('eth')
+				counters.append(self.createCounterAdapterId(adapterId))
+				counters.append(self.createCounterNetworkMapping(metrics, adapterId))
+				counters.append(self.createCounterMinNetworkBandwidth(metrics, 
+																	  adapterId))
+				counters.append(self.createCounterMaxNetworkBandwidth(metrics,
+																	  adapterId))
+				counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
+				counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
         counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
         
         #Hardware change
