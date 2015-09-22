@@ -75,17 +75,17 @@ def UpdateLastestErrorRecord(s):
 	eventFile=os.path.join(LibDir, LastestErrorRecord)
 	maxRetry = 3
 	for i in range(0, maxRetry):
-        try:
-            with open(eventFile, "w+") as F:
+		try:
+			with open(eventFile, "w+") as F:
 				F.write(s.encode("utf8"))
-            return
-        except IOError, e:
-            time.sleep(1)
+			return
+		except IOError, e:
+			time.sleep(1)
 
-    waagent.Error(("Failed to serialize lastest error record to file:"
-                   "{0}").format(eventFile))
-    AddExtensionEvent(message="failed to write lastest error record")
-    raise
+	waagent.Error(("Failed to serialize lastest error record to file:"
+					"{0}").format(eventFile))
+	AddExtensionEvent(message="failed to write lastest error record")
+	raise
 			
 def printable(s):
     return filter(lambda c : c in string.printable, str(s))
