@@ -25,13 +25,13 @@ DSCForLinux Extension can:
 Here're all the supported public configuration parameters:
 
 * `MofFileUri`: (optional, string) the uri of the public MOF file
-* `ResourceZipFileUrl`: (optional, string) the uri of the custom resource ZIP file
+* `ResourceZipFileUri`: (optional, string) the uri of the custom resource ZIP file
 * `ResourceName`: (optional, string) the name of the custom resource module
 * `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove. If not specified, it's considered as Pull mode.
 
-### 1.2 Private configuration
+### 1.2 Protected configuration
 
-Here're all the supported private configuration parameters:
+Here're all the supported protected configuration parameters:
 
 * `StorageAccountName`: (optional, string) the name of the storage account that contains the file
 * `StorageAccountKey`: (optional, string) the key of the storage account that contains the file
@@ -43,26 +43,49 @@ Here're all the supported private configuration parameters:
 
 You can deploy it using Azure CLI and Azure PowerShell.
 
-### 2.1. Apply a MOF configuration file (in Azure Storage Account) to the VM
+### 2.1. Using [**Azure CLI**][azure-cli]
+Before deploying DSCForLinux Extension, you should configure your `public.json` and `protected.json`, according to the different scenarios in section 3.
 
-#### 2.1.1. Using [**Azure CLI**][azure-cli]
-Create the private configuration json file (private.json) with following content
-```json
-{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
-}
+#### 2.1.1. Classic
+The Classic mode is also called Azure Service Management mode. You can switch to it by running:
+```
+$ azure config mode asm
 ```
 
-Enable the extension by running:
+You can deploy DSCForLinux Extension by running:
 ```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> --private-config-path private.json
+$ azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> \
+--private-config-path protected.json --public-config-path public.json
 ```
 
-#### 2.1.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+To learn the latest extension version available, run:
+```
+$ azure vm extension list
+```
+
+#### 2.1.2. Resource Manager
+You can switch to Azure Resource Manager mode by running:
+```
+$ azure config mode arm
+```
+
+You can deploy DSCForLinux Extension by running:
+```
+$ azure vm extension set <resource-group> <vm-name> \
+DSCForLinux Microsoft.OSTCExtensions <version> \
+--private-config-path protected.json --public-config-path public.json
+```
+
+> **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
+
+### 2.2. Using [**Azure PowerShell**][azure-powershell]
+
+#### 2.2.1 Classic
+You can switch to Azure Service Management mode by running:
+```powershell
+Switch-AzureMode -Name AzureServiceManagement
+```
+And deploy DSCForLinux Extension by running:
 ```powershell
 $vmname = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $vmname -Name $vmname
@@ -71,6 +94,8 @@ $extensionName = 'DSCForLinux'
 $publisher = 'Microsoft.OSTCExtensions'
 $version = '<version>'
 
+# You need to change the content of the $privateConfig and $publicConfig 
+# according to different scenarios in section 3
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
@@ -78,47 +103,98 @@ $privateConfig = '{
   "MofFileName": "<mof-file-name>"
 }'
 
+$publicConfig = '{
+  "Mode": "Push"
+}'
+
 Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PrivateConfiguration $privateConfig | Update-AzureVM
+  -Version $version -PrivateConfiguration $privateConfig `
+  -PublicConfiguration $publicConfig | Update-AzureVM
 ```
 
-### 2.2. Apply a public MOF configuration file to the VM
+#### 2.2.2.Resource Manager
+You can change to Azure Resource Manager mode by running:
+```powershell
+Switch-AzureMode -Name AzureResourceManager
+```
+You can deploy DSCForLinux Extension by running:
+```powershell
+$rgName = '<resource-group-name>'
+$vmName = '<vm-name>'
+$location = '<location>'
 
-#### 2.2.1. Using [**Azure CLI**][azure-cli]
-Create the public configuration json file (public.json) with following content
+$extensionName = 'DSCForLinux'
+$publisher = 'Microsoft.OSTCExtensions'
+$version = <version>
+
+# You need to change the content of the $privateConfig and $publicConfig 
+# according to different scenarios in section 3
+$privateConfig = '{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>",
+  "ContainerName": "<container-name>",
+  "MofFileName": "<mof-file-name>"
+}'
+
+$publicConfig = '{
+  "Mode": "Push"
+}'
+
+Set-AzureVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $location `
+  -Name $extensionName -Publisher $publisher -ExtensionType $extensionName `
+  -TypeHandlerVersion $version -SettingString $publicConfig -ProtectedSettingString $privateConfig
+```
+
+For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
+
+### 2.3. Using [**ARM Template**][arm-template]
+
+For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
+
+## 3. Scenarios
+
+### 3.1 Apply a MOF configuration file (in Azure Storage Account) to the VM
+
+protected.json
+```json
+{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>",
+  "ContainerName": "<container-name>",
+  "MofFileName": "<mof-file-name>"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>",
+  "ContainerName": "<container-name>",
+  "MofFileName": "<mof-file-name>"
+}'
+```
+
+### 3.2. Apply a MOF configuration file (in public storage) to the VM
+
+public.json
 ```json
 {
   "MofFileUri": "<mof-file-uri>"
 }
 ```
 
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> --public-config-path public.json
-```
-
-#### 2.2.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $publicConfig = '{
   "MofFileUri": "<mof-file-uri>"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PublicConfiguration $publicConfig | Update-AzureVM
 ```
 
-### 2.3. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
+### 3.3. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
 
 #### 2.3.1. Using [**Azure CLI**][azure-cli]
-Create the private configuration json file (private.json) with following content
+protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
@@ -127,28 +203,16 @@ Create the private configuration json file (private.json) with following content
   "MofFileName": "<meta-mof-file-name>"
 }
 ```
-Create the public configuration json file (public.json) with following content
+
+public.json
 ```json
 {
   "Mode": "Pull"
 }
 ```
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> `
-  --private-config-path private.json --public-config-path public.json
-```
 
-#### 2.3.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
@@ -159,51 +223,26 @@ $privateConfig = '{
 $publicConfig = '{
   "Mode": "Pull"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PrivateConfiguration $privateConfig -PublicConfiguration $publicConfig `
-  | Update-AzureVM
 ```
 
-### 2.4. Apply a public meta MOF configuration file to the VM
-
-#### 2.4.1. Using [**Azure CLI**][azure-cli]
-Create the public configuration json file (public.json) with following content
+### 3.4. Apply a meta MOF configuration file (in public storage) to the VM
+public.json
 ```json
 {
   "MofFileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }
 ```
-
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> --public-config-path public.json
-```
-
-#### 2.4.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $publicConfig = '{
   "MofFileUri": "<mof-file-uri>",
   "Mode": "Pull"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PublicConfiguration $publicConfig | Update-AzureVM
 ```
 
-### 2.5. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
-
-#### 2.5.1. Using [**Azure CLI**][azure-cli]
-Create the private configuration json file (private.json) with following content
+### 3.5. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
+protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
@@ -212,28 +251,15 @@ Create the private configuration json file (private.json) with following content
   "ResourceZipFileName": "<resource-zip-file-name>"
 }
 ```
-Create the public configuration json file (public.json) with following content
+public.json
 ```json
 {
   "Mode": "Install"
 }
 ```
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> `
-  --private-config-path private.json --public-config-path public.json
-```
 
-#### 2.5.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
@@ -244,81 +270,54 @@ $privateConfig = '{
 $publicConfig = '{
   "Mode": "Install"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PrivateConfiguration $privateConfig -PublicConfiguration $publicConfig `
-  | Update-AzureVM
 ```
 
-### 2.6. Install a custom resource module (public ZIP file) to the VM
-
-#### 2.6.1. Using [**Azure CLI**][azure-cli]
-Create the public configuration json file (public.json) with following content
+### 3.6. Install a custom resource module (ZIP file in public storage) to the VM
+public.json
 ```json
 {
   "ResourceZipFileUri": "<resource-zip-file-uri>",
   "Mode": "Install"
 }
 ```
-
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> --public-config-path public.json
-```
-
-#### 2.6.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $publicConfig = '{
   "ResourceZipFileUri": "<resource-zip-file-uri>",
   "Mode": "Install"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PublicConfiguration $publicConfig | Update-AzureVM
 ```
 
-### 2.7. Remove a custom resource module from the VM
-
-#### 2.7.1. Using [**Azure CLI**][azure-cli]
-Create the public configuration json file (public.json) with following content
+### 3.7. Remove a custom resource module from the VM
+public.json
 ```json
 {
   "ResourceName": "<resource-name>",
   "Mode": "Remove"
 }
 ```
-
-Enable the extension by running:
-```
-azure vm extension set <vm-name> DSCForLinux Microsoft.OSTCExtensions <version> --public-config-path public.json
-```
-
-#### 2.7.2. Using [**Azure PowerShell**][azure-powershell]
-Enable the extension by running:
+powershell format
 ```powershell
-$vmname = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $vmname -Name $vmname
-
-$extensionName = 'DSCForLinux'
-$publisher = 'Microsoft.OSTCExtensions'
-$version = '<version>'
-
 $publicConfig = '{
   "ResourceName": "<resource-name>",
   "Mode": "Remove"
 }'
-
-Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
-  -Version $version -PublicConfiguration $publicConfig | Update-AzureVM
 ```
+
+## Supported Linux Distributions
+- Ubuntu 12.04 LTS, 14.04 LTS
+- CentOS 6.5 and higher
+- Oracle Linux 6.4 and higher
+- openSUSE 13.1 and higher
+- SUSE Linux Enterprise Server 11 SP3 and higher
+
+## Debug
+* The status of the extension is reported back to Azure so that user can see the status on Azure Portal
+* The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
+
+## Known issue
+* To distribute MOF configurations to the Linux VM with Pull Servers, you need to make sure the cron service is running in the VM.
+
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
