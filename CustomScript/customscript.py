@@ -103,35 +103,79 @@ def enable(hutil):
     Ensure the same configuration is executed only once
     If the previous enable failed, we do not have retry logic here,
     since the custom script may not work in an intermediate state.
-    But if download_files fails, we will retry it for maxRetry times.
+    But if download_files fails, we will wait and retry.
     """
     hutil.exit_if_enabled()
     prepare_download_dir(hutil.get_seq_no())
-    maxRetry = 2
-    for retry in range(0, maxRetry + 1):
+    public_settings = hutil.get_public_settings()
+    if public_settings is None:
+        raise ValueError("Public configuration couldn't be None.")
+    tries = public_settings.get('tries')
+    wait = public_settings.get('wait')
+    if tries is None:
+        tries = 10
+    if wait is None:
+        wait = 20
+    hutil.log(("Will try to download files, "
+               "try count={0}, wait time={1}s").format(tries, wait))
+    for retry in range(0, tries):
         try:
             download_files(hutil)
             break
         except Exception, e:
-            hutil.error(("Failed to download files, "
-                         "retry={0}, maxRetry={1}").format(retry, maxRetry))
-            if retry != maxRetry:
-                hutil.log("Sleep 10 seconds")
-                time.sleep(10)
-            else:
-                error_msg = "Failed to download files"
-                waagent.AddExtensionEvent(name=ExtensionShortName,
-                                          op=DownloadOp,
-                                          isSuccess=False,
-                                          version=Version,
-                                          message="(01100)"+error_msg)
-                raise
+            hutil.error("Failed to download files, retry.")
+            hutil.log("Sleep {0} seconds".format(wait))
+            time.sleep(wait)
+    else:
+        error_msg = "Failed to download files"
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=DownloadOp,
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01100)"+error_msg)
+        raise
+    msg = "Succeeded to download files, retry count={0}".format(retry)
+    hutil.log(msg)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=DownloadOp,
                               isSuccess=True,
                               version=Version,
-                              message="(01303)Succeeded to download files")
+                              message="(01303)"+msg)
+
+    # The internal DNS needs some time to be ready.
+    # Wait and retry to check if there is time in retry window.
+    is_idns_ready = check_idns()
+    while (not is_idns_ready):
+        if retry == tries:
+            error_msg = "Internal DNS is not ready, ignore it."
+            hutil.error(error_msg)
+            waagent.AddExtensionEvent(name=ExtensionShortName,
+                                      op="CheckIDNS",
+                                      isSuccess=False,
+                                      version=Version,
+                                      message="(01306)"+error_msg)
+            break
+        hutil.error("Internal DNS is not ready, retry to check.")
+        hutil.log("Sleep {0} seconds".format(wait))
+        time.sleep(wait)
+        is_idns_ready = check_idns()
+        retry = retry + 1
+    else:
+        msg = "Internal DNS is ready"
+        hutil.log(msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op="CheckIDNS",
+                                  isSuccess=True,
+                                  version=Version,
+                                  message="(01306)"+msg)
+
     start_daemon(hutil)
+
+
+def check_idns():
+    ret = waagent.Run("host $(hostname)")
+    return (not ret)
 
 
 def download_files(hutil):
