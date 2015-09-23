@@ -42,11 +42,11 @@ They are in JSON format and defined in every specific configuration.
 3. The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
 # Known Issues
-1. When you run the PowerShell command "Set-AzureVMExtension" on Linux VM, you may hit following error: "Provision Guest Agent must be enabled on the VM object before setting IaaS VM Access Extension". This does not happen if you are using the new portal.
+1. When you run the PowerShell command "Set-AzureVMExtension" on Linux VM, you may hit following error: "Provision Guest Agent must be enabled on the VM object before setting IaaS VM Access Extension". 
 
-  * Root Cause: When you create the image via portal, the value of guest agent on the VM is not always set to "True". If your VM is created using PowerShell, you will not see this issue.
+  * Root Cause: When you create the Linux VM via portal, the value of provision guest agent on the VM is not always set to "True". If your VM is created using PowerShell or using the Azure new portal, you will not see this issue.
 
-  * Resolution: Add the following PowerShell command to set the ProvisionGuestAgent to "True";
+  * Resolution: Add the following PowerShell command to set the ProvisionGuestAgent to "True".
   ```powershell
   $vm = Get-AzureVM -ServiceName 'MyServiceName' -Name 'MyVMName'
   $vm.GetInstance().ProvisionGuestAgent = $true
