@@ -65,8 +65,8 @@ LastestErrorRecord = "LastestErrorRecord"
 
 def getLastestErrorRecord():
 	eventFile=os.path.join(LibDir, LastestErrorRecord)
-	if os.path.isfile(eventFile):
-		f = open('eventFile', 'r')
+	if os.path.exists(eventFile) and os.path.isfile(eventFile):
+		f = open(eventFile, 'r')
 		return f.read()
 
 	return "0"
@@ -148,7 +148,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+        updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
@@ -172,7 +172,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+        updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
@@ -419,7 +419,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
-	    updateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
+            updateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
             AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
@@ -812,7 +812,7 @@ def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	updateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
+        updateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
@@ -1247,7 +1247,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
-	updateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
+        updateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
         AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
