@@ -27,7 +27,7 @@ import datetime
 import psutil
 import string
 import urlparse
-from azure.storage import TableService, Entity
+from azure.storage.table import TableService, Entity
 from Utils.WAAgentUtil import waagent, AddExtensionEvent
 import Utils.HandlerUtil as Util
 
@@ -148,7 +148,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-		UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
@@ -172,7 +172,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-		UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
@@ -383,30 +383,30 @@ class NetworkInfo(object):
         self.nicNames = []
         self.readBytes = 0
         self.writeBytes = 0
-		self.networkReadBytes = {}
-		self.networkWriteBytes = {}
+	self.networkReadBytes = {}
+	self.networkWriteBytes = {}
         for nicName, stat in self.nics.iteritems():
             if nicName != 'lo':
                 self.nicNames.append(nicName)
                 self.readBytes = self.readBytes + stat[1] #bytes_recv
                 self.writeBytes = self.writeBytes + stat[0] #bytes_sent
-				self.networkReadBytes[nicName] = stat[1]
-				self.networkWriteBytes[nicName] = stat[0]
+		self.networkReadBytes[nicName] = stat[1]
+		self.networkWriteBytes[nicName] = stat[0]
 
     def getAdapterIds(self):
         return self.nicNames
 
     def getNetworkReadBytes(self, adapterId):
-		if adapterId in self.networkReadBytes :
-			return self.networkReadBytes[adapterId]
-		else
-			return 0
+	if adapterId in self.networkReadBytes :
+		return self.networkReadBytes[adapterId]
+	else:
+		return 0
 
     def getNetworkWriteBytes(self, adapterId):
         if adapterId in self.networkWriteBytes :
-			return self.networkWriteBytes[adapterId]
-		else
-			return 0
+		return self.networkWriteBytes[adapterId]
+	else:
+		return 0
 
     def getNetstat(self):
         retCode, output = waagent.RunGetOutput("netstat -s", chk_err=False)
@@ -419,7 +419,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
-			UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
+	    UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
             AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
@@ -585,22 +585,20 @@ class VMDataSource(object):
         #Network
         adapterIds = metrics.getNetworkAdapterIds()
         for adapterId in adapterIds:
-			if adapterIds.startswith('eth')
-				counters.append(self.createCounterAdapterId(adapterId))
-				counters.append(self.createCounterNetworkMapping(metrics, adapterId))
-				counters.append(self.createCounterMinNetworkBandwidth(metrics, 
-																	  adapterId))
-				counters.append(self.createCounterMaxNetworkBandwidth(metrics,
-																	  adapterId))
-				counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
-				counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
+		if adapterId.startswith('eth'):
+			counters.append(self.createCounterAdapterId(adapterId))
+			counters.append(self.createCounterNetworkMapping(metrics, adapterId))
+			counters.append(self.createCounterMinNetworkBandwidth(metrics, adapterId))
+			counters.append(self.createCounterMaxNetworkBandwidth(metrics, adapterId))
+			counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
+			counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
         counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
         
         #Hardware change
         counters.append(self.createCounterLastHardwareChange(metrics))
 		
-		#Errors
-		counters.append(self.createCounterErrors(metrics))
+	#Errors
+	counters.append(self.createCounterErrors(metrics))
 		
         return counters
     
@@ -611,7 +609,7 @@ class VMDataSource(object):
                            value = metrics.getLastHardwareChange(),
                            unit="posixtime")
 
-	def createCounterErrors(self, metrics):
+    def createCounterErrors(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "config",
                            name = "Error",
@@ -774,7 +772,7 @@ class VMDataSource(object):
                            value = metrics.getNetworkWriteBytes(adapterId),
                            unit = "byte/s")
 
-    def createCounterNetworkPacketRetransmitted(self, metrics, adapterId):
+    def createCounterNetworkPacketRetransmitted(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
                            name = "Packets Retransmitted",
@@ -814,7 +812,7 @@ def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-		UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
+	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
@@ -1249,7 +1247,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
-		UpdateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
+	UpdateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
         AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
