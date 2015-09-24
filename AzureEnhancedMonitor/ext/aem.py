@@ -63,7 +63,7 @@ LibDir = "/var/lib/AzureEnhancedMonitor"
 
 LastestErrorRecord = "LastestErrorRecord"
 
-def GetLastestErrorRecord():
+def getLastestErrorRecord():
 	eventFile=os.path.join(LibDir, LastestErrorRecord)
 	if os.path.isfile(eventFile):
 		f = open('eventFile', 'r')
@@ -71,7 +71,7 @@ def GetLastestErrorRecord():
 
 	return "0"
 
-def UpdateLastestErrorRecord(s):
+def updateLastestErrorRecord(s):
 	eventFile=os.path.join(LibDir, LastestErrorRecord)
 	maxRetry = 3
 	for i in range(0, maxRetry):
@@ -148,7 +148,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+	updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
@@ -172,7 +172,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
+	updateLastestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
@@ -419,7 +419,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
-	    UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
+	    updateLastestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
             AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
@@ -597,8 +597,8 @@ class VMDataSource(object):
         #Hardware change
         counters.append(self.createCounterLastHardwareChange(metrics))
 		
-	#Errors
-	counters.append(self.createCounterErrors(metrics))
+        #Error
+        counters.append(self.createCounterError())
 		
         return counters
     
@@ -609,11 +609,11 @@ class VMDataSource(object):
                            value = metrics.getLastHardwareChange(),
                            unit="posixtime")
 
-    def createCounterErrors(self, metrics):
+    def createCounterError(self):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "config",
                            name = "Error",
-                           value = GetLastestErrorRecord())
+                           value = getLastestErrorRecord())
 						   
     def createCounterCurrHwFrequency(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
@@ -812,7 +812,7 @@ def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
-	UpdateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
+	updateLastestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
@@ -1247,7 +1247,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
-	UpdateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
+	updateLastestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
         AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
