@@ -193,7 +193,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         aemConfig.setPublic("wad.name", accounts[0].name);
         aemConfig.setPrivate("wad.key", accounts[0].key);
         var ladUri = accounts[0].tableEndpoint + ladMetricesTable;
-		console.log("[INFO]Your endpoint is: "+accounts[0].tableEndpoint);
+        console.log("[INFO]Your endpoint is: "+accounts[0].tableEndpoint);
         aemConfig.setPublic("wad.uri", ladUri);
     }).then(function(){
         //Update vm
@@ -209,7 +209,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                 'value' : JSON.stringify({
                     'storageAccountName' : accounts[0].name,
                     'storageAccountKey' : accounts[0].key,
-					'endpoint' : accounts[0].tableEndpoint.substring((accounts[0].tableEndpoint.search(/\./)) + 1, accounts[0].tableEndpoint.length)
+                    'endpoint' : accounts[0].tableEndpoint.substring((accounts[0].tableEndpoint.search(/\./)) + 1, accounts[0].tableEndpoint.length)
                 }),
                 'type':'Private'
             }]
