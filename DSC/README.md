@@ -41,7 +41,7 @@ Here're all the supported protected configuration parameters:
 
 ## 2. Deploying the Extension to a VM
 
-You can deploy it using Azure CLI and Azure PowerShell.
+You can deploy it using Azure CLI, Azure PowerShell and ARM template.
 
 ### 2.1. Using [**Azure CLI**][azure-cli]
 Before deploying DSCForLinux Extension, you should configure your `public.json` and `protected.json`, according to the different scenarios in section 3.
@@ -193,7 +193,6 @@ $publicConfig = '{
 
 ### 3.3. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
 
-#### 2.3.1. Using [**Azure CLI**][azure-cli]
 protected.json
 ```json
 {
@@ -236,7 +235,7 @@ public.json
 powershell format
 ```powershell
 $publicConfig = '{
-  "MofFileUri": "<mof-file-uri>",
+  "MofFileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }'
 ```
@@ -304,20 +303,23 @@ $publicConfig = '{
 }'
 ```
 
-## Supported Linux Distributions
+## 4. Supported Linux Distributions
 - Ubuntu 12.04 LTS, 14.04 LTS
 - CentOS 6.5 and higher
 - Oracle Linux 6.4 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
 
-## Debug
+## 5. Debug
 * The status of the extension is reported back to Azure so that user can see the status on Azure Portal
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
-## Known issue
+## 6. Known issue
 * To distribute MOF configurations to the Linux VM with Pull Servers, you need to make sure the cron service is running in the VM.
 
+## Changelog
+### v1.0 Sep. 24, 2015
+Initial version
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
