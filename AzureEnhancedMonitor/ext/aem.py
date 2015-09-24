@@ -383,15 +383,15 @@ class NetworkInfo(object):
         self.nicNames = []
         self.readBytes = 0
         self.writeBytes = 0
-	self.networkReadBytes = {}
-	self.networkWriteBytes = {}
+        self.networkReadBytes = {}
+        self.networkWriteBytes = {}
         for nicName, stat in self.nics.iteritems():
             if nicName != 'lo':
                 self.nicNames.append(nicName)
                 self.readBytes = self.readBytes + stat[1] #bytes_recv
                 self.writeBytes = self.writeBytes + stat[0] #bytes_sent
-		self.networkReadBytes[nicName] = stat[1]
-		self.networkWriteBytes[nicName] = stat[0]
+                self.networkReadBytes[nicName] = stat[1]
+                self.networkWriteBytes[nicName] = stat[0]
 
     def getAdapterIds(self):
         return self.nicNames
