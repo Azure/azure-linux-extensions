@@ -58,35 +58,35 @@ MonitoringInterval = 60 * MonitoringIntervalInMinute
 AzureTableDelayInMinute = 5 #Five minute
 AzureTableDelay = 60 * AzureTableDelayInMinute
 
-AzureEnhancedMonitorVersion = "1.0.0"
+AzureEnhancedMonitorVersion = "2.0.0"
 LibDir = "/var/lib/AzureEnhancedMonitor"
 
 LatestErrorRecord = "LatestErrorRecord"
 
 def getLatestErrorRecord():
-	eventFile=os.path.join(LibDir, LatestErrorRecord)
-	if os.path.exists(eventFile) and os.path.isfile(eventFile):
-		f = open(eventFile, 'r')
-		return f.read()
+    eventFile=os.path.join(LibDir, LatestErrorRecord)
+    if os.path.exists(eventFile) and os.path.isfile(eventFile):
+        f = open(eventFile, 'r')
+        return f.read()
 
-	return "0"
+    return "0"
 
 def updateLatestErrorRecord(s):
-	eventFile=os.path.join(LibDir, LatestErrorRecord)
-	maxRetry = 3
-	for i in range(0, maxRetry):
-		try:
-			with open(eventFile, "w+") as F:
-				F.write(s.encode("utf8"))
-			return
-		except IOError, e:
-			time.sleep(1)
+    eventFile=os.path.join(LibDir, LatestErrorRecord)
+    maxRetry = 3
+    for i in range(0, maxRetry):
+        try:
+            with open(eventFile, "w+") as F:
+                F.write(s.encode("utf8"))
+                return
+        except IOError, e:
+            time.sleep(1)
 
-	waagent.Error(("Failed to serialize latest error record to file:"
-					"{0}").format(eventFile))
-	AddExtensionEvent(message="failed to write latest error record")
-	raise
-			
+    waagent.Error(("Failed to serialize latest error record to file:"
+                    "{0}").format(eventFile))
+    AddExtensionEvent(message="failed to write latest error record")
+    raise
+
 def printable(s):
     return filter(lambda c : c in string.printable, str(s))
 
@@ -397,16 +397,16 @@ class NetworkInfo(object):
         return self.nicNames
 
     def getNetworkReadBytes(self, adapterId):
-	if adapterId in self.networkReadBytes :
-		return self.networkReadBytes[adapterId]
-	else:
-		return 0
+        if adapterId in self.networkReadBytes :
+            return self.networkReadBytes[adapterId]
+        else:
+            return 0
 
     def getNetworkWriteBytes(self, adapterId):
         if adapterId in self.networkWriteBytes :
-		return self.networkWriteBytes[adapterId]
-	else:
-		return 0
+            return self.networkWriteBytes[adapterId]
+        else:
+            return 0
 
     def getNetstat(self):
         retCode, output = waagent.RunGetOutput("netstat -s", chk_err=False)
@@ -585,21 +585,21 @@ class VMDataSource(object):
         #Network
         adapterIds = metrics.getNetworkAdapterIds()
         for adapterId in adapterIds:
-		if adapterId.startswith('eth'):
-			counters.append(self.createCounterAdapterId(adapterId))
-			counters.append(self.createCounterNetworkMapping(metrics, adapterId))
-			counters.append(self.createCounterMinNetworkBandwidth(metrics, adapterId))
-			counters.append(self.createCounterMaxNetworkBandwidth(metrics, adapterId))
-			counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
-			counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
+            if adapterId.startswith('eth'):
+                counters.append(self.createCounterAdapterId(adapterId))
+                counters.append(self.createCounterNetworkMapping(metrics, adapterId))
+                counters.append(self.createCounterMinNetworkBandwidth(metrics, adapterId))
+                counters.append(self.createCounterMaxNetworkBandwidth(metrics, adapterId))
+                counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
+                counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
         counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
         
         #Hardware change
         counters.append(self.createCounterLastHardwareChange(metrics))
-		
+
         #Error
         counters.append(self.createCounterError())
-		
+
         return counters
     
     def createCounterLastHardwareChange(self, metrics):
@@ -614,7 +614,7 @@ class VMDataSource(object):
                            category = "config",
                            name = "Error",
                            value = getLatestErrorRecord())
-						   
+
     def createCounterCurrHwFrequency(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
                            category = "cpu",
@@ -760,7 +760,7 @@ class VMDataSource(object):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Read Bytes",
-						   instance = adapterId,
+                           instance = adapterId,
                            value = metrics.getNetworkReadBytes(adapterId),
                            unit = "byte/s")
 
@@ -768,7 +768,7 @@ class VMDataSource(object):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Write Bytes",
-						   instance = adapterId,
+                           instance = adapterId,
                            value = metrics.getNetworkWriteBytes(adapterId),
                            unit = "byte/s")
 
