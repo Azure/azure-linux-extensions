@@ -33,7 +33,7 @@ var CurrentScriptVersion = "1.0.0.0";
 
 var aemExtPublisher = "Microsoft.OSTCExtensions";
 var aemExtName = "AzureEnhancedMonitorForLinux";
-var aemExtVersion = "1.0";
+var aemExtVersion = "2.0";
 
 var ladExtName = "LinuxDiagnostic";
 var ladExtPublisher = "Microsoft.OSTCExtensions";
