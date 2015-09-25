@@ -58,4 +58,4 @@ You could also use `sudo make install` to install the lib or `make test` to run 
 ```
 vim /var/lib/AzureEnhancedMonitor/PerfCounters
 ```
-or use any other text editor to open it
+Or use any other text editor to open it.
