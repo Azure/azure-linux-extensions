@@ -148,7 +148,7 @@ class TestAEM(unittest.TestCase):
         name = "Data Provider Version"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("1.0.0", counter.value)
+        self.assertEquals("2.0.0", counter.value)
 
         name = "Memory Over-Provisioning"
         counter = next((c for c in counters if c.name == name))
