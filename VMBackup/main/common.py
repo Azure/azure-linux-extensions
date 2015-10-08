@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -29,8 +29,20 @@ class CommonVariables:
     extension_description = extension_label
     object_str = 'objectStr'
     logs_blob_uri = 'logsBlobUri'
+    status_blob_uri = 'statusBlobUri'
+    commandStartTimeUTCTicks = "commandStartTimeUTCTicks"
     task_id = 'taskId'
     command_to_execute = 'commandToExecute'
     iaas_vmbackup_command = 'snapshot'
     iaas_install_command = 'install'
     locale = 'locale'
+
+    """
+    error code definitions
+    """
+    success = 1
+    parameter_error = 11
+    error_12 = 12
+    wrong_time_error = 13
+    same_taskid_error = 14
+    error = 2

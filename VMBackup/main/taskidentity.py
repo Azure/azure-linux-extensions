@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -24,31 +24,17 @@ import subprocess
 import xml
 import xml.dom.minidom
 
-class MachineIdentity:
+class TaskIdentity:
     def __init__(self):
-        self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
+        self.store_identity_file = './task_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
-    def current_identity(self):
-        identity = None
-        file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
-        xmlText = file.read()
-        dom = xml.dom.minidom.parseString(xmlText)
-        deployment = dom.getElementsByTagName("Role")
-        identity=deployment[0].getAttribute("guid")
-        return identity
-
-    def save_identity(self):
-        file = open(self.store_identity_file,'w')
-        machine_identity = self.current_identity()
-        print(machine_identity)
-        file.write(machine_identity)
-        file.close()
+    def save_identity(self,identity):
+        with open(self.store_identity_file,'w') as f:
+            f.write(identity)
 
     def stored_identity(self):
         identity_stored = None
         if(os.path.exists(self.store_identity_file)):
-            file = open(self.store_identity_file,'r')
-            identity_stored = file.read()
-            file.close()
+            with open(self.store_identity_file,'r') as f:
+                identity_stored = f.read()
         return identity_stored
-

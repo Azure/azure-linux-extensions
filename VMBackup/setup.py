@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -62,15 +62,15 @@ packages_array.append(CommonVariables.azure_path + '/servicemanagement')
 packages_array.append(CommonVariables.azure_path + '/storage')
 
 
-"""
-copy the utils lib to local
-"""
+#"""
+#copy the utils lib to local
+#"""
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
-if os.path.isdir(target_utils_path):
-    shutil.rmtree(target_utils_path)
-print('copying')
-shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
-print('copying end')
+#if os.path.isdir(target_utils_path):
+#    shutil.rmtree(target_utils_path)
+#print('copying')
+#shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
+#print('copying end')
 packages_array.append(target_utils_path)
 
 

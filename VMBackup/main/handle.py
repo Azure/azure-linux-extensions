@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -24,6 +24,7 @@ import base64
 import os
 import os.path
 import re
+import json
 import string
 import subprocess
 import sys
@@ -32,6 +33,7 @@ import shlex
 import traceback
 import httplib
 import xml.parsers.expat
+import datetime
 from os.path import join
 from mounts import Mounts
 from mounts import Mount
@@ -42,7 +44,8 @@ from Utils import HandlerUtil
 from urlparse import urlparse
 from snapshotter import Snapshotter
 from backuplogger import Backuplogger
-from machineidentity import MachineIdentity
+from blobwriter import BlobWriter
+from taskidentity import TaskIdentity
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -69,111 +72,133 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
+def do_status_report(self, operation, status, status_code, message, taskId,commandStartTimeUTCTicks,blobUri):
+        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        tstamp = time.strftime(DateTimeFormat, time.gmtime())
+        stat = [{
+            "version" : hutil._context._version,
+            "timestampUTC" : tstamp,
+            "status" : {
+                "name" : hutil._context._name,
+                "operation" : operation,
+                "status" : status,
+                "code" : status_code,
+                "taskId":taskId,
+                "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
+                "formattedMessage" : {
+                    "lang" : "en-US",
+                    "message" : message
+                }
+            }
+        }]
+        stat_rept = json.dumps(stat)
+        blobWriter = BlobWriter(self.hutil)
+        blobWriter.WriteBlob(stat_rept,blobUri)
+
 def enable():
     freezer = FsFreezer(backup_logger)
-    unfreeze_result     = None
-    snapshot_result     = None
-    freeze_result       = None
+    unfreeze_result = None
+    snapshot_result = None
+    freeze_result = None
     global_error_result = None
-    para_parser         = None
-    run_result          = 1
-    error_msg           = ''
-    run_status          = None
-    # precheck 
-    freeze_called       = False
+    para_parser = None
+    run_result = 1
+    error_msg = ''
+    run_status = None
+    # precheck
+    freeze_called = False
     try:
         hutil.do_parse_context('Enable')
 
-        # handle the restoring scenario.
-        mi = MachineIdentity()
-        stored_identity = mi.stored_identity()
-        if(stored_identity is None):
-            mi.save_identity()
-            hutil.exit_if_enabled()
-        else:
-            current_identity = mi.current_identity()
-            hutil.log(" current identity " + current_identity)
-            if(current_identity != stored_identity):
-                current_seq_no = hutil._get_current_seq_no(hutil._context._config_dir)
-                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                #remove other .config files.  or the waagent would report the 3
-                #status...
-                for subdir, dirs, files in os.walk(hutil._context._config_dir):
-                    for file in files:
-                        try:
-                            cur_seq_no = int(os.path.basename(file).split('.')[0])
-                            if(cur_seq_no != current_seq_no):
-                                os.remove(join(hutil._context._config_dir,file))
-                        except ValueError:
-                            continue
-                hutil.set_inused_config_seq(current_seq_no)
-                mi.save_identity()
-            else:
-                hutil.exit_if_enabled()
-
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
+        mi = MachineIdentity()
+
         """
         protectedSettings is the privateConfig passed from Powershell.
+        WATCHOUT that, the _context_config are using the most freshest timestamp.
+        if the time sync is alive, this should be right.
         """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
-        commandToExecute = para_parser.commandToExecute
-        #validate all the required parameter here
-        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
-            backup_logger.log("install succeed.",True)
-            run_status = 'success'
-            error_msg  = 'Install Succeeded'
-            run_result = 0
-            backup_logger.log(error_msg)
-        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
-            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
-                run_result = 11
-                run_status = 'error'
-                error_msg  = 'required field empty or not correct'
-                backup_logger.log(error_msg, False, 'Error')
-            else:
-                backup_logger.log('commandToExecute is ' + commandToExecute, True)
-                """
-                make sure the log is not doing when the file system is freezed.
-                """
-                backup_logger.log("doing freeze now...", True)
-                freeze_called = True
-                freeze_result = freezer.freezeall()
-                backup_logger.log("freeze result " + str(freeze_result))
-                    
-                # check whether we freeze succeed first?
-                if(freeze_result is not None and len(freeze_result.errors) > 0 ):
-                    run_result = 2
-                    run_status = 'error'
-                    error_msg  = 'Enable failed with error' + str(freeze_result)
-                    backup_logger.log(error_msg, False, 'Warning')
-                else:
-                    backup_logger.log("doing snapshot now...")
-                    snap_shotter    = Snapshotter(backup_logger)
-                    snapshot_result = snap_shotter.snapshotall(para_parser)
-                    backup_logger.log("snapshotall ends...")
-                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                        error_msg  = "snapshot result: " + str(snapshot_result)
-                        run_result = 2
-                        run_status = 'error'
-                        backup_logger.log(error_msg, False, 'Error')
-                    else:
-                        run_result = 1
-                        run_status = 'success'
-                        error_msg  = 'Enable Succeeded'
-                        backup_logger.log(error_msg)
-        else:
+        commandStartTime = datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = para_parser.commandStartTimeUTCTicks / 10)
+        utcNow = datetime.utcnow()
+        timespan = utcNow - commandStartTime
+        TWENTY_MINUTES = 20 * 60
+        taskIdentity = TaskIdentity()
+        currentTaskIdentity = taskIdentity.stored_identity()
+        # handle the machine identity for the restoration scenario.
+
+        if(abs(timespan.total_seconds()) > TWENTY_MINUTES):
+            #exit with time error
             run_status = 'error'
-            run_result = 11
-            error_msg = 'command is not correct'
+            run_result = CommonVariables.wrong_time_error
+            error_msg = 'the call time stamp is out of date.'
             backup_logger.log(error_msg, False, 'Error')
+            sys.exit(0)
+        elif(para_parser.taskId == currentTaskIdentity):
+            run_status = 'error'
+            run_result = CommonVariables.same_taskid_error
+            error_msg = 'the task id is handled.'
+            backup_logger.log(error_msg, False, 'Error')
+            sys.exit(0)
+        else:
+            taskIdentity.save_identity(para_parser.taskId)
+            commandToExecute = para_parser.commandToExecute
+            #validate all the required parameter here
+            if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+                backup_logger.log("install succeed.",True)
+                run_status = 'success'
+                error_msg = 'Install Succeeded'
+                run_result = CommonVariables.success
+                backup_logger.log(error_msg)
+            elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+                if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+                    run_result = CommonVariables.parameter_error
+                    run_status = 'error'
+                    error_msg = 'required field empty or not correct'
+                    backup_logger.log(error_msg, False, 'Error')
+                else:
+                    backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                    """
+                    make sure the log is not doing when the file system is freezed.
+                    """
+                    backup_logger.log("doing freeze now...", True)
+                    freeze_called = True
+                    freeze_result = freezer.freezeall()
+                    backup_logger.log("freeze result " + str(freeze_result))
+                    
+                    # check whether we freeze succeed first?
+                    if(freeze_result is not None and len(freeze_result.errors) > 0):
+                        run_result = CommonVariables.error
+                        run_status = 'error'
+                        error_msg = 'Enable failed with error' + str(freeze_result)
+                        backup_logger.log(error_msg, False, 'Warning')
+                    else:
+                        backup_logger.log("doing snapshot now...")
+                        snap_shotter = Snapshotter(backup_logger)
+                        snapshot_result = snap_shotter.snapshotall(para_parser)
+                        backup_logger.log("snapshotall ends...")
+                        if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                            error_msg = "snapshot result: " + str(snapshot_result)
+                            run_result = CommonVariables.error
+                            run_status = 'error'
+                            backup_logger.log(error_msg, False, 'Error')
+                        else:
+                            run_result = CommonVariables.success
+                            run_status = 'success'
+                            error_msg = 'Enable Succeeded'
+                            backup_logger.log(error_msg)
+            else:
+                run_status = 'error'
+                run_result = CommonVariables.parameter_error
+                error_msg = 'command is not correct'
+                backup_logger.log(error_msg, False, 'Error')
     except Exception as e:
         errMsg = "Failed to enable the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
-        print(errMsg)
         global_error_result = e
     finally:
         backup_logger.log("doing unfreeze now...")
@@ -190,15 +215,17 @@ def enable():
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
-    if(global_error_result  is not None):
-        if(hasattr(global_error_result,'errno') and global_error_result.errno==2):
-            run_result = 12
+    if(global_error_result is not None):
+        if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
+            run_result = CommonVariables.error_12
         elif(para_parser is None):
-            run_result = 11
+            run_result = CommonVariables.parameter_error
         else:
-            run_result = 2
+            run_result = CommonVariables.error
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
+
+    do_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 

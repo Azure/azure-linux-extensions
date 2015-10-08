@@ -54,14 +54,11 @@ docs/_build/
 target/*
 
 # VMBackup package ignors
-VMBackup/Utils
-VMBackup/Utils/*
 VMBackup/dist
 VMBackup/dist/*
 VMBackup/azure-sdk
 VMBackup/azure-sdk/*
 VMBackup/main/azure/*
-VMBackup/main/Utils/*
 VMBackup/MANIFEST
 VMBackup/*.pyproj
 VMBackup/*.pyproj.user
@@ -80,3 +77,4 @@ VMEncryption/main/Utils/*
 Common/psutil/build/*
 Common/psutil/dist/*
 Common/psutil/psutil.egg-info/*
+VMBackup/.vs/VMBackup/v14/.suo
