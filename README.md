@@ -1,186 +1,53 @@
 # Linux extensions for Microsoft Azure IaaS
 
-This project provides the source code of Linux extensions for Microsoft Azure IaaS
+This project provides the source code of Linux extensions for Microsoft Azure IaaS.
+
+VM Extensions are injected components authored by Microsoft and Partners into Linux VM (IaaS) to enable software and configuration automation.
 
 # Extension List
 
-## Custom Script Extension
-Allow the owner of the Azure VM to run script stored in Azure storage during or
-after VM provisioning
-### Features
-* It can be installed using Azure PowerShell Cmdlets, xPlat scripts or Azure Management Portal
-* It supports major Linux and FreeBSD distro
-* Windows style newline in Shell and Python scripts is converted automatically
-* BOM in Shell and Python scripts is removed automatically
-* The scripts can be located on Azure Storage or
-external public storage (e.g. Github)
-* The status of the extension is reported back to Azure so that user can
-see the status on Azure Portal
-* Support inline command
-* All the execution output and error of the scripts are logged into
-the download directory of the scripts, and the tail of the output is
-logged into the log directory specified in HandlerEnvironment.json
-and reported back to Azure
+| Name | Lastest Version | Description |
+|:---|:---|:---|
+| [Custom Script](https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript) | 1.3 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
+| [DSC](https://github.com/Azure/azure-linux-extensions/tree/master/DSC) | 1.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
+| [OS Patching](https://github.com/Azure/azure-linux-extensions/tree/master/OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
+| [VM Access](https://github.com/Azure/azure-linux-extensions/tree/master/VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
 
-### Requirement
-Python 2.7+
-### Usage
-PowerShell Sample
-```powershell
-$ExtensionName = 'CustomScriptForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version = '1.3'
+# Contributing guide
+3rd party partners are welcomed to contribute the Linux extensions. Before you make a contribution, you should read the following guide.
 
-$VmName = '<vm_name>'
-Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
+## 1. HandlerManifest.json
+The extensions are installed, enabled, disabled, updated and uninstalled by [Azure Linux Agent](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-agent-user-guide/).
 
-$PublicConf = '{
-    "fileUris":["<url>"],
-    "commandToExecute": "<command>"
-}'
-$PrivateConf = '{
-    "storageAccountName": "<storage_account_name>",
-    "storageAccountKey":"<storage_account_key>"
-}'
+You can see these common commands in `HandlerManifest.json` and take [here](https://github.com/Azure/azure-linux-extensions/blob/master/CustomScript/HandlerManifest.json) as an example.
 
-Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf | Update-AzureVM
-```
+The most important commands:
+* The `install` command is executed only when the extension is deployed the VM for the first time.
+* The `enable` command will enable your configurations (in section 2).
 
-Xplat Sample
-```
-azure vm extension set <vm_name> CustomScriptForLinux Microsoft.OSTCExtensions 1.3 -i '{"fileUris":["<url>"], "commandToExecute": "<command>" }' -t '{"storageAccountName":"<storage_account_name>","storageAccountKey":"<storage_account_key>"}'
-```
+## 2. Configuraions
+The configurations include two parts: public configuration and protected configuration.
 
-### Limitation
-* To run a script, you need to specify interpreter in "commandToExecute" field,
-or you can use "./myscript.sh" if Shebang("#!") is specified in the script.
-```powershell
--PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "sh myscript.sh"}'
-```
-```powershell
--PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "python myscript.py"}'
-```
+They are in JSON format and defined in every specific configuration.
 
-* Here is some examples to run inline commands. You need to specify "python -c"
-if they are Python commands.
-```powershell
--PublicConfiguration '{"commandToExecute": "echo Hello"}'
-```
-```powershell
--PublicConfiguration '{"commandToExecute": "python -c \"print 1.3\""}'
-```
+## How to test
+1. Install the extension in your virtual machine on Azure.
+2. `cd /var/lib/waagent` and you can see your extension path.
+3. Fix the bug which you found, and test your code change just by re-enabling the extension.
+4. Feel free to create your pull request.
 
-* If you need to run the same script repeatly, you have to add a timestamp
-in the "-PublicConfiguration" parameter.
-```powershell
-$TimeStamp = (Get-Date).Ticks
--PublicConfiguration '{"fileUris":["<url>"], "commandToExecute": "<command>", "timestamp": $TimeStamp}'
-```
+# Debug
+1. The status of the extension is reported back to Azure, and you can see the status on Azure Portal.
+2. You can check `/var/log/waagent.log` to verify if the extension is enabled successfully.
+3. The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
-### More Information
-http://azure.microsoft.com/blog/2014/08/20/automate-linux-vm-customization-tasks-using-customscript-extension/
+# Known Issues
+1. When you run the PowerShell command "Set-AzureVMExtension" on Linux VM, you may hit following error: "Provision Guest Agent must be enabled on the VM object before setting IaaS VM Access Extension". 
 
-## VM Access Extension
-Provide several ways to allow owner of the VM to get the SSH access back
-### Features
-* it can be installed through Azure RESTFUL API for extension
-* it supports major Linux and FreeBSD distro
-* it can reset the password of the original sudo user 
-* it can create a new sudo user with the password specified
-* it can set the public host key with the key given or it can reset the public host key provided during VM provisioning if host key not provided
-* it can open the SSH port(22) and restore the sshd_config if reset_ssh is set to True  
-* status of the extension is reported back to Azure so that you can see the status on Azure Portal
+  * Root Cause: When you create the Linux VM via portal, the value of provision guest agent on the VM is not always set to "True". If your VM is created using PowerShell or using the Azure new portal, you will not see this issue.
 
-### Usage
-PowerShell script to deploy the extension on VM	
-```powershell
-$VmName = '<vm_name>'
-Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-$vm = get-azurevm $VmName
-$UserName = "<user_name>"
-$Password = "<password>"
-$ExtensionName = '<extension_name>'
-$Publisher = '<publisher_name>'
-$Version =  '<version>'
-$cert = Get-Content "<cert_path>"
-$PrivateConfig = '{"username":"' + $UserName + '", "password": "' +  $Password + '", "ssh_key":"' + $cert + '","reset_ssh":"True"}'	
-Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM  $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM	
-``` 
-
-## OS Patching Extension
-Allow the owner of the Azure VM to configure the Linux VM patching schedule
-cycle. And the actual patching operation is automated based on the
-pre-configured schedule.
-### Features
-* it can be installed through Azure RESTFUL API for extension
-* it supports major Linux
-* it can be configured by the user
-* it can patch the os automatically as a scheduled task
-* it can patch the os automatically as a one-off
-* status of the extension is reported back to Azure so that
-you can see the status on Azure Portal
-* it can be stopped before the actual patching operation
-* the status of VM can be checked by user-defined scripts,
-which can be stored locally, in github or Azure Storage
-
-### Prepare
-Add-Add-AzureAccount
-Select-AzureSubscription -SubscriptionName '<your_subscription_name>'
-
-### Usage
-PowerShell script to deploy the extension on VM
-```powershell
-$ExtensionName = 'OSPatchingForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version =  '2.0'
-
-$VmName = '<vm_name>'
-Write-Host ('Retrieving the VM ' + $VmName + '.....................')
-$vm = get-azurevm $VmName
-
-$idleTestScriptUri = '<path_to_idletestscript>'
-$healthyTestScriptUri = '<path_to_healthytestscript>'
-
-$PublicConfig = ConvertTo-Json -InputObject @{
-    "disabled" = $false;
-    "stop" = $true|$false;
-    "rebootAfterPatch" = "RebootIfNeed|Required|NotRequired|Auto";
-    "category" = "Important|ImportantAndRecommended";
-    "installDuration" = "<hr:min>";
-    "oneoff" = $true|$false;
-    "intervalOfWeeks" = "<number>";
-    "dayOfWeek" = "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday";
-    "startTime" = "<hr:min>";
-    "vmStatusTest" = (@{
-        "local" = $false;
-        "idleTestScript" = $idleTestScriptUri;
-        "healthyTestScript" = $healthyTestScriptUri
-    })
-}
-
-# Optional
-# If you use azure storage, you have to offer the key
-$PrivateConfig = ConvertTo-Json -InputObject @{
-    "storageAccountName" = "<storage_account_name>";
-    "storageAccountKey" = "<storage_account_key>"
-}
-
-Write-Host ('Deploying the extension ' + $ExtensionName + ' with Version ' + $Version + ' on ' + $VmName + '.....................')
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm -Publisher $Publisher -Version $Version -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig | Update-AzureVM
-```
-
-### Limitation
-* If you need to run the same script repeatly, you have to add a timestamp in the "-PublicConfiguration" parameter, for example:
-```powershell
-$TimeStamp = (Get-Date).Ticks
-$PublicConfig = ConvertTo-Json -InputObject @{
-    <Other-Configuration>;
-    "timestamp" = $TimeStamp
-}
-```
-
-## Test Handler Extension
-This extension is an extension example  
+  * Resolution: Add the following PowerShell command to set the ProvisionGuestAgent to "True".
+  ```powershell
+  $vm = Get-AzureVM -ServiceName 'MyServiceName' -Name 'MyVMName'
+  $vm.GetInstance().ProvisionGuestAgent = $true
+  ```

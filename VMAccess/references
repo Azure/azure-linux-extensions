@@ -1,1 +1,3 @@
 Utils/
+Common/WALinuxAgent-2.0.14/waagent
+Common/waagentloader.py
