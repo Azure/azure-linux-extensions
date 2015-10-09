@@ -100,7 +100,8 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
-        var baseUri = subscription.managementEndpointUrl
+        var baseUri = subscription.managementEndpointUrl;
+        console.log(baseUri);
         computeClient = computeMgmt.createComputeManagementClient(cred, baseUri);
         storageClient = storageMgmt.createStorageManagementClient(cred, baseUri);
     }).then(function(){
@@ -467,8 +468,9 @@ var getTokenCredential = function(subscription){
             if(token.userId === subscription.user.name){
                 subscription.credential = {
                     type : 'token',
-                    token : token.accessToken
+                    token : token.accessToken,
                 };
+                subscription.managementEndpointUrl = token.resource;
                 return false
             }
         });
