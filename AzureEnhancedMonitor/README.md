@@ -40,10 +40,12 @@ sudo sh install.sh
     sudo setaem <vm_name>
     ```
 4. Verify that the Enhanced Monitoring is active on the Azure Linux VM. Check if the file  /var/lib/AzureEnhancedMonitor/PerfCounters exists. If exists, display information collected by AEM with:
+
     ```
     cat /var/lib/AzureEnhancedMonitor/PerfCounters
     ```
-    then you will got some texts like:
+    Then you will got some texts like:
+    
     ```
     2;cpu;Current Hw Frequency;;0;2194.659;MHz;60;1444036656;saplnxmon;
     2;cpu;Max Hw Frequency;;0;2194.659;MHz;0;1444036656;saplnxmon;
