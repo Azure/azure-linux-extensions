@@ -43,13 +43,13 @@ sudo sh install.sh
     ```
     cat /var/lib/AzureEnhancedMonitor/PerfCounters
     ```
-	then you will got some texts like:
-	```
-	2;cpu;Current Hw Frequency;;0;2194.659;MHz;60;1444036656;saplnxmon;
-	2;cpu;Max Hw Frequency;;0;2194.659;MHz;0;1444036656;saplnxmon;
-	…
-	…
-	```
+    then you will got some texts like:
+    ```
+    2;cpu;Current Hw Frequency;;0;2194.659;MHz;60;1444036656;saplnxmon;
+    2;cpu;Max Hw Frequency;;0;2194.659;MHz;0;1444036656;saplnxmon;
+    …
+    …
+    ```
 
 Note: after the initial configuration it can take up to 10-15 minutes until the metrics file materializes in the VM.
 
