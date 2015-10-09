@@ -30,7 +30,6 @@ class Backuplogger(object):
     def __init__(self, hutil):
         self.msg = ''
         self.hutil = hutil
-        self.__StorageVersion = "2014-02-14"
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):

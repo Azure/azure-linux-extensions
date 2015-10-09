@@ -29,6 +29,7 @@ import string
 import subprocess
 import sys
 import imp
+import time
 import shlex
 import traceback
 import httplib
@@ -72,8 +73,9 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
-def do_status_report(self, operation, status, status_code, message, taskId,commandStartTimeUTCTicks,blobUri):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+def do_status_report(operation, status, status_code, message, taskId,commandStartTimeUTCTicks,blobUri):
+        backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : hutil._context._version,
@@ -92,8 +94,14 @@ def do_status_report(self, operation, status, status_code, message, taskId,comma
             }
         }]
         stat_rept = json.dumps(stat)
-        blobWriter = BlobWriter(self.hutil)
+        blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(stat_rept,blobUri)
+
+def exit_with_commit_log(error_msg,para_parser):
+    backup_logger.log(error_msg, False, 'Error')
+    if(para_parser is not None):
+        backup_logger.commit(para_parser.logsBlobUri)
+    sys.exit(0)
 
 def enable():
     freezer = FsFreezer(backup_logger)
@@ -112,7 +120,6 @@ def enable():
 
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
-        mi = MachineIdentity()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -122,28 +129,23 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
-
         commandStartTime = datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = para_parser.commandStartTimeUTCTicks / 10)
-        utcNow = datetime.utcnow()
+        
+        utcNow = datetime.datetime.utcnow()
+        backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
         timespan = utcNow - commandStartTime
         TWENTY_MINUTES = 20 * 60
         taskIdentity = TaskIdentity()
         currentTaskIdentity = taskIdentity.stored_identity()
         # handle the machine identity for the restoration scenario.
-
+        backup_logger.log('timespan is '+str(timespan))
         if(abs(timespan.total_seconds()) > TWENTY_MINUTES):
-            #exit with time error
-            run_status = 'error'
-            run_result = CommonVariables.wrong_time_error
             error_msg = 'the call time stamp is out of date.'
-            backup_logger.log(error_msg, False, 'Error')
-            sys.exit(0)
+            exit_with_commit_log(error_msg,para_parser)
+
         elif(para_parser.taskId == currentTaskIdentity):
-            run_status = 'error'
-            run_result = CommonVariables.same_taskid_error
             error_msg = 'the task id is handled.'
-            backup_logger.log(error_msg, False, 'Error')
-            sys.exit(0)
+            exit_with_commit_log(error_msg,para_parser)
         else:
             taskIdentity.save_identity(para_parser.taskId)
             commandToExecute = para_parser.commandToExecute
@@ -224,6 +226,7 @@ def enable():
             run_result = CommonVariables.error
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
+    print("para_parser is "+str(para_parser))
 
     do_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
 

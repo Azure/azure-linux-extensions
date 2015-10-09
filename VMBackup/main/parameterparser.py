@@ -18,7 +18,6 @@
 #
 # Requires Python 2.7+
 #
-from Utils import HandlerUtil
 from common import CommonVariables
 import base64
 import json

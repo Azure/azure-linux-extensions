@@ -28,16 +28,14 @@ class BlobWriter(object):
     """description of class"""
     def __init__(self, hutil):
         self.hutil = hutil
-
+        self.__StorageVersion = "2014-02-14"
     """
     network call should have retry.
     """
     def WriteBlob(self,msg,blobUri):
         retry_times = 3
         while(retry_times > 0):
-            succeeded = False
             try:
-                self.log("committing the log")
                 self.hutil.log(msg)
                 # get the blob type
                 if(blobUri is not None):
@@ -59,13 +57,13 @@ class BlobWriter(object):
                         body_content = msg
                         headers = {}
                         headers["x-ms-blob-type"] = 'BlockBlob'
-                        self.log(str(headers))
+                        self.hutil.log(str(headers))
                         connection = httplib.HTTPSConnection(sasuri_obj.hostname)
                         connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
 
                         result = connection.getresponse()
                         connection.close()
-                        succeeded = True
+                        retry_times = 0
 
                     elif blobType == "PageBlob":
                         body_content = msg
@@ -78,23 +76,20 @@ class BlobWriter(object):
                         headers["x-ms-page-write"] = "update"
                         headers["x-ms-range"] = "bytes={0}-{1}".format(0, size_in_page * 512 - 1)
                         headers["Content-Length"] = str(size_in_page * 512)
-                        self.log(str(headers))
+                        self.hutil.log(str(headers))
                         connection = httplib.HTTPSConnection(sasuri_obj.hostname)                    
                         connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=page',buf, headers = headers)
                         result = connection.getresponse()
                         connection.close()
-                        succeeded = True
+                        retry_times = 0
                     else:
                         self.hutil.log("blobUri is " + str(blobType))
-                        succeeded = False
                         retry_times = 0
                 else:
                     self.hutil.log("logbloburi is None")
-                    succeeded = False
                     retry_times = 0
             except Exception as e:
                 self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-                succeeded = False
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
 
