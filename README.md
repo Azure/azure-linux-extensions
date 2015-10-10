@@ -25,7 +25,7 @@ The most important commands:
 * The `install` command is executed only when the extension is deployed the VM for the first time.
 * The `enable` command will enable your configurations (in section 2).
 
-## 2. Configuraions
+## 2. Configurations
 The configurations include two parts: public configuration and protected configuration.
 
 They are in JSON format and defined in every specific configuration.
