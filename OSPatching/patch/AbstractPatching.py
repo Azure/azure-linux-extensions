@@ -26,6 +26,7 @@ import base64
 import re
 import json
 import platform
+import random
 import shutil
 import time
 import traceback
@@ -89,6 +90,7 @@ class AbstractPatching(object):
         self.patched = []
         self.to_patch = []
         self.downloaded = []
+        self.download_retry_queue = []
 
         # Patching Configuration
         self.disabled = None
@@ -383,6 +385,7 @@ class AbstractPatching(object):
         self._download(self.category_required)
         if self.category == self.category_all:
             self._download(self.category_all)
+        self.retry_download()
         end_download_time = time.time()
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Download,
@@ -410,10 +413,47 @@ class AbstractPatching(object):
             retcode = self.download_package(pkg_name)
             if retcode != 0:
                 self.log_and_syslog(logging.ERROR, "Failed to download the package: " + pkg_name)
+                self.log_and_syslog(logging.INFO, "Put {0} into a retry queue".format(pkg_name))
+                self.download_retry_queue.append((pkg_name, category))
                 continue
             self.downloaded.append(pkg_name)
             self.log_and_syslog(logging.INFO, "Package " + pkg_name + " is downloaded.")
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
+
+    def retry_download(self):
+        retry_count = 0
+        max_retry_count = 12
+        self.log_and_syslog(logging.INFO, "Retry queue: {0}".format(
+            " ".join([pkg_name for pkg_name,category in self.download_retry_queue])))
+        while self.download_retry_queue:
+            pkg_name, category = self.download_retry_queue[0]
+            self.download_retry_queue = self.download_retry_queue[1:]
+            retcode = self.download_package(pkg_name)
+            if retcode == 0:
+                self.downloaded.append(pkg_name)
+                self.log_and_syslog(logging.INFO, "Package " + pkg_name + " is downloaded.")
+                waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
+            else:
+                self.log_and_syslog(logging.ERROR, "Failed to download the package: " + pkg_name)
+                self.log_and_syslog(logging.INFO, "Put {0} back into a retry queue".format(pkg_name))
+                self.download_retry_queue.append((pkg_name,category))
+                retry_count = retry_count + 1
+                if retry_count > max_retry_count:
+                    err_msg = ("Failed to download after {0} retries, "
+                        "retry queue: {1}").format(max_retry_count,
+                        " ".join([pkg_name for pkg_name,category in self.download_retry_queue]))
+                    self.log_and_syslog(logging.ERROR, err_msg)
+                    waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                              op=waagent.WALAEventOperation.Download,
+                                              isSuccess=False,
+                                              version=Version,
+                                              message=err_msg)
+                    break
+                k = retry_count if (retry_count < 10) else 10
+                interval = int(random.uniform(0, 2 ** k))
+                self.log_and_syslog(logging.INFO, ("Sleep {0}s before "
+                    "the next retry, current retry_count = {1}").format(interval, retry_count))
+                time.sleep(interval)
 
     def patch(self):
         # Read the latest configuration for scheduled task
