@@ -57,6 +57,10 @@ OutputSize = 4 * 1024
 DownloadOp = "Download"
 RunScriptOp = "RunScript"
 
+# Change permission of log path
+ext_log_path = '/var/log/azure/'
+if os.path.exists(ext_log_path):
+    os.chmod('/var/log/azure/', 0700)
 
 #Main function is the only entrence to this extension handler
 def main():
