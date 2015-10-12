@@ -64,8 +64,6 @@ import time
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
-import logging
-import logging.handlers
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -80,12 +78,6 @@ class HandlerUtility:
         self._log = log
         self._error = error
         self._short_name = short_name
-        self.syslogger = logging.getLogger(self._short_name)
-        self.syslogger.setLevel(logging.INFO)
-        handler = logging.handlers.SysLogHandler(address='/dev/log')
-        formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
-        handler.setFormatter(formatter)
-        self.syslogger.addHandler(handler)
 
     def _get_log_prefix(self):
         return '[%s-%s]' %(self._context._name, self._context._version)
@@ -115,23 +107,6 @@ class HandlerUtility:
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
-
-    def syslog(self, level, message):
-        if level == logging.INFO:
-            self.syslogger.info(message)
-        elif level == logging.WARNING:
-            self.syslogger.warning(message)
-        elif level == logging.ERROR:
-            self.syslogger.error(message)
-
-    def log_and_syslog(self, level, message):
-        self.syslog(level, message)
-        if level == logging.INFO:
-            self.log(message)
-        elif level == logging.WARNING:
-            self.log(" ".join(["Warning:", message]))
-        elif level == logging.ERROR:
-            self.error(message)
 
     def _parse_config(self, ctxt):
         config = None

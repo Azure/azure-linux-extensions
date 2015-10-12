@@ -85,8 +85,10 @@ def main():
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
-        hutil.error(("Failed to enable the extension with error: {0}, "
-                     "{1}").format(e, traceback.format_exc()))
+        err_msg = ("Failed to enable the extension with error: {0}, "
+                   "{1}").format(e, traceback.format_exc())
+        waagent.Error(err_msg)
+        hutil.error(err_msg)
         hutil.do_exit(1, 'Enable','failed','0',
                       'Enable failed: {0}'.format(e))
 
