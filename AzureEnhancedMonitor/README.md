@@ -44,7 +44,7 @@ sudo sh install.sh
     ```
     cat /var/lib/AzureEnhancedMonitor/PerfCounters
     ```
-    Then you will got some texts like:
+    Then you will get some texts like:
     
     ```
     2;cpu;Current Hw Frequency;;0;2194.659;MHz;60;1444036656;saplnxmon;
