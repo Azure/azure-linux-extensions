@@ -79,8 +79,8 @@ def enable():
         if reset_ssh:
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
-            hutil.exit_if_enabled()
-            remove_user = protect_settings.get('remove_user')
+        hutil.exit_if_enabled()
+        remove_user = protect_settings.get('remove_user')
         if reset_ssh:
             _reset_sshd_config("/etc/ssh/sshd_config")
             hutil.log("Succeeded in reset sshd_config.")
@@ -384,7 +384,7 @@ def _fsck_check():
             return retcode
     except Exception, e:
         hutil.error(
-    "Failed to run disk check with error: %s" %
+    "Failed to run disk check with error: %s, %s" %
      (str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
 
@@ -409,7 +409,7 @@ def _fsck_repair():
       else:
         raise Exception("Failed to mount disks")
     except Exception, e:
-        hutil.error("%s" %(str(e), traceback.format_exc()))
+        hutil.error("%s, %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair','error','0', 'Repair failed.')
 
 
