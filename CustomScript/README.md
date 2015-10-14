@@ -47,6 +47,7 @@ Schema for the protected configuration file looks like this:
 }
 ```
 
+The storage account here is to store the scripts in `fileUris`.
 If the scripts are stored in the private Azure Storage, you should provide
 `storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
 
@@ -193,6 +194,11 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
   }
 }
 ```
+
+There are two sample templates in [Azure/azure-quickstart-templates](https://github.com/Azure/azure-quickstart-templates).
+
+* [201-customscript-extension-public-storage-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-customscript-extension-public-storage-on-ubuntu)
+* [201-customscript-extension-azure-storage-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-customscript-extension-azure-storage-on-ubuntu)
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
