@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -21,6 +21,7 @@
 import urlparse
 import httplib
 import traceback
+from Utils.HttpUtil import HttpUtil
 
 class SnapshotError(object):
     def __init__(self):
@@ -34,7 +35,7 @@ class SnapshotResult(object):
         self.errors = []
 
     def __str__(self):
-        error_str=""
+        error_str = ""
         for error in self.errors:
             error_str+=(str(error)) + "\n"
         return error_str
@@ -50,29 +51,27 @@ class Snapshotter(object):
         if(sasuri is None):
             self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
             snapshot_error.errorcode = -1
-            snapshot_error.sasuri    = sasuri
+            snapshot_error.sasuri = sasuri
         try:
-            sasuri_obj   = urlparse.urlparse(sasuri)
-
+            sasuri_obj = urlparse.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
                 self.logger.log("Failed to parse the sasuri",False,'Error')
                 snapshot_error.errorcode = -1
-                snapshot_error.sasuri    = sasuri
+                snapshot_error.sasuri = sasuri
             else:
-                connection   = httplib.HTTPSConnection(sasuri_obj.hostname)
                 body_content = ''
-                headers      = {}
+                headers = {}
                 headers["Content-Length"] = 0
                 if(meta_data is not None):
                     for meta in meta_data:
-                        key   = meta['Key']
+                        key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
-                connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
-                result = connection.getresponse()
+                http_util = HttpUtil()
                 self.logger.log(str(result.getheaders()))
-                connection.close()
+                result = http_util.Call('PUT',sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
+
                 if(result.status != 201):
                     snapshot_error.errorcode = result.status
                     snapshot_error.sasuri = sasuri
@@ -80,7 +79,7 @@ class Snapshotter(object):
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
             snapshot_error.errorcode = -1
-            snapshot_error.sasuri    = sasuri
+            snapshot_error.sasuri = sasuri
         return snapshot_error
 
     def snapshotall(self, paras):

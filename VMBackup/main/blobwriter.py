@@ -23,6 +23,7 @@ import datetime
 import traceback
 import urlparse
 import httplib
+from Utils.HttpUtil import HttpUtil
 
 class BlobWriter(object):
     """description of class"""
@@ -39,9 +40,8 @@ class BlobWriter(object):
                 self.hutil.log(msg)
                 # get the blob type
                 if(blobUri is not None):
+                    http_util = HttpUtil()
                     sasuri_obj = urlparse.urlparse(blobUri)
-                    connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-
                     #Check blob type
                     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -49,8 +49,7 @@ class BlobWriter(object):
                     headers["x-ms-date"] = timestamp
                     headers["x-ms-version"] = self.__StorageVersion
 
-                    connection.request('GET', sasuri_obj.path + '?' + sasuri_obj.query, headers = headers)
-                    result = connection.getresponse()
+                    result = http_util.Call('GET',sasuri_obj.path + '?' + sasuri_obj.query,None,headers)
                     blobType = result.getheader("x-ms-blob-type")
 
                     if blobType == "BlockBlob":
@@ -58,11 +57,9 @@ class BlobWriter(object):
                         headers = {}
                         headers["x-ms-blob-type"] = 'BlockBlob'
                         self.hutil.log(str(headers))
-                        connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-                        connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
 
-                        result = connection.getresponse()
-                        connection.close()
+                        result = http_util.Call('PUT',sasuri_obj.path + '?' + sasuri_obj.query,body_content,headers=headers)
+                        #connection.close()
                         retry_times = 0
 
                     elif blobType == "PageBlob":
@@ -77,10 +74,7 @@ class BlobWriter(object):
                         headers["x-ms-range"] = "bytes={0}-{1}".format(0, size_in_page * 512 - 1)
                         headers["Content-Length"] = str(size_in_page * 512)
                         self.hutil.log(str(headers))
-                        connection = httplib.HTTPSConnection(sasuri_obj.hostname)                    
-                        connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=page',buf, headers = headers)
-                        result = connection.getresponse()
-                        connection.close()
+                        result = http_util.Call('PUT',sasuri_obj.path + '?' + sasuri_obj.query + '&comp=page',buf,headers=headers)
                         retry_times = 0
                     else:
                         self.hutil.log("blobUri is " + str(blobType))

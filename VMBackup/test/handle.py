@@ -46,6 +46,8 @@ def main():
     
     print(str(timespan.total_seconds()))
     print(str(time_now))
+
+
  #       p = subprocess.call(["fsfreeze", "-f", "/"])
  #       print(p)
  #       #out, err = p.communicate()
