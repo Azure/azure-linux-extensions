@@ -1,6 +1,6 @@
 [{
   "name": "VMAccess",
-  "version": 1.3,
+  "version": "1.4",
   "handlerManifest": {
     "installCommand": "./vmaccess.py -install",
     "uninstallCommand": "./vmaccess.py -uninstall",
