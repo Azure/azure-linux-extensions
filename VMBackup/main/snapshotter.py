@@ -70,7 +70,8 @@ class Snapshotter(object):
                 self.logger.log(str(headers))
                 http_util = HttpUtil()
                 self.logger.log(str(result.getheaders()))
-                result = http_util.Call('PUT',sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
+                sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
 
                 if(result.status != 201):
                     snapshot_error.errorcode = result.status

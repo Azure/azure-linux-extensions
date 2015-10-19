@@ -33,7 +33,7 @@ class HttpUtil(object):
         self.proxyHost = Config.get("HttpProxy.Host")
         self.proxyPort = Config.get("HttpProxy.Port")
 
-    def Call(self,method,uri,data,headers):
+    def Call(self,method,sasuri_obj,data,headers):
         if(self.proxyHost == None or self.proxyPort == None):
             connection = httplib.HTTPSConnection(sasuri_obj.hostname)
             connection.request(method=method, uri=uri, body=data, headers = headers)
@@ -42,7 +42,7 @@ class HttpUtil(object):
         else:
             connection = httplib.HTTPSConnection(proxyHost, proxyPort)
             connection.set_tunnel(sasuri_obj.hostname, 443)
-            connection.request(method=method, uri=uri, body=data, headers=headers)
+            connection.request(method=method, uri=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers=headers)
             resp = connection.getresponse()
             connection.close()
         return resp
