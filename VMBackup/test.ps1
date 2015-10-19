@@ -20,7 +20,7 @@ $privateconfig='
 "objectStr":"CiAgICAgICAgewoiYmxvYlNBU1VyaSI6WwoiaHR0cHM6Ly9hbmRsaXUuYmxvYi5jb3JlLndpbmRvd3MubmV0L2V4dGVuc2lvbnMvYS56aXA/c3Y9MjAxNC0wMi0xNCZzcj1jJnNpZz02dFhBbzFPNzFYYlp6Q3FMUW8weDZJTlpISHk3TjVxTzg5QmM3TyUyRll2TUUlM0Qmc3Q9MjAxNS0wMS0yMlQxNiUzQTAwJTNBMDBaJnNlPTIwMTktMDEtMzBUMTYlM0EwMCUzQTAwWiZzcD1yd2RsIl0KfQogICAgICAgIA=="
 }
 '
-$servicename="andliu-ubuntu14"
+$servicename="andliu-ubunt1"
 $tempAzurevm = (Get-AzureVM -ServiceName $servicename)
 
-set-azurevmextension -extensionName "AgentBackupLinuxExtension" -Publisher "Microsoft.OSTCExtensions" -Version 1.0 -vm $tempAzurevm -PublicConfiguration $publicConfig -PrivateConfiguration $privateconfig | update-azurevm
+set-azurevmextension -extensionName "AgentBackupLinuxExtension2" -Publisher "Microsoft.OSTCExtensions" -Version 1.0 -vm $tempAzurevm -PublicConfiguration $publicConfig -PrivateConfiguration $privateconfig | update-azurevm
