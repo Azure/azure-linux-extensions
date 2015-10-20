@@ -69,10 +69,10 @@ class Snapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil()
-                self.logger.log(str(result.getheaders()))
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
-
+                
+                self.logger.log(str(result.getheaders()))
                 if(result.status != 201):
                     snapshot_error.errorcode = result.status
                     snapshot_error.sasuri = sasuri
