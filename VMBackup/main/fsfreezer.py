@@ -19,7 +19,6 @@
 # Requires Python 2.7+
 #
 import subprocess
-from sets import Set
 from mounts import Mounts
 
 class FreezeError(object):
@@ -45,8 +44,8 @@ class FsFreezer:
         """
         self.logger = logger
         self.mounts = Mounts(self.logger)
-        self.frozen_items = Set()
-        self.unfrozen_items = Set()
+        self.frozen_items = set()
+        self.unfrozen_items = set()
 
     def freeze(self, mount):
         """
