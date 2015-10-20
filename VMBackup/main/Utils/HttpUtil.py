@@ -40,9 +40,10 @@ class HttpUtil(object):
             resp = connection.getresponse()
             connection.close()
         else:
-            connection = httplib.HTTPSConnection(proxyHost, proxyPort)
+            connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort)
             connection.set_tunnel(sasuri_obj.hostname, 443)
-            connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers=headers)
+            path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
+            connection.request(method=method, url=(path), body=data, headers=headers)
             resp = connection.getresponse()
             connection.close()
         return resp
