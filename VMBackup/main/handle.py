@@ -131,7 +131,8 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
-        commandStartTime = convert_time(para_parser.commandStartTimeUTCTicks)
+        utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+        commandStartTime = convert_time(utcTicksLong)
         
         utcNow = datetime.datetime.utcnow()
         backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
