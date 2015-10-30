@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -98,7 +98,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
 
 def exit_with_commit_log(error_msg, para_parser):
     backup_logger.log(error_msg, False, 'Error')
-    if(para_parser is not None):
+    if(para_parser is not None and para_parser.logsBlobUri is not None):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
@@ -229,7 +229,8 @@ def enable():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
-    do_backup_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
+    if(para_parser is not None and para_parser.statusBlobUri is not None):
+        do_backup_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 

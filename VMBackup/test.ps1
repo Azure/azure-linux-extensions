@@ -7,9 +7,9 @@ $publicConfig='
 {
         "locale":"en-us",
         "taskId":"9e136e10-fb80-4467-891e-994965100000",
-        "logsBlobUri":"https://andliu.blob.core.windows.net/blobs/a.txt?sv=2013-08-15&sr=b&sig=f7qZU7ZxDcUDc0l3kcdnF0vqFJDC5gz6LdiJhC3xRxg%3D&st=2015-10-09T07%3A06%3A56Z&se=2015-10-10T07%3A06%3A56Z&sp=rwdl",
-        "statusBlobUri":"https://andliu.blob.core.windows.net/blobs/b.txt?sv=2013-08-15&sr=b&sig=Hliw04gkzsG65l%2FnCAhXJ0CViSaEzkTpfuwSq35AYlk%3D&st=2015-10-09T07%3A07%3A17Z&se=2015-10-10T07%3A07%3A17Z&sp=rwdl",
-        "commandStartTimeUTCTicks":635798983509961452,
+        "logsBlobUri":"https://andliu.blob.core.windows.net/blobs/a.txt?sv=2013-08-15&sr=b&sig=PuFBKd%2FMfPP92kL21973VGwUPloD5aeFZ24KEuVOvAs%3D&st=2015-10-19T09%3A23%3A55Z&se=2016-02-05T01%3A23%3A55Z&sp=rwdl",
+        "statusBlobUri":"https://andliu.blob.core.windows.net/blobs/b.txt?sv=2013-08-15&sr=b&sig=PqsHA72pR8esXYz9%2B5bbBYJ%2B%2F4KRvV7Bic%2BGEhJxmS8%3D&st=2015-10-20T01%3A10%3A42Z&se=2016-07-14T17%3A10%3A42Z&sp=rwdl",
+        "commandStartTimeUTCTicks":635809046306353843,
         "commandToExecute":"snapshot",
         "objectStr":"CiAgICAgICAgICAgICAgICB7CiAgICAgICAgImJhY2t1cE1ldGFkYXRhIjpbCiAgICAgICAgewogICAgICAgICJLZXkiOiJrZXkxIiwiVmFsdWUiOiJ2YWx1ZTEiCiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgIktleSI6ImtleTIiLCJWYWx1ZSI6InZhbHVlMiIKICAgICAgICB9XQogICAgICAgIH0KICAgICAgICA="
 }
