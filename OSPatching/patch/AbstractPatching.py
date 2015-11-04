@@ -644,7 +644,7 @@ class AbstractPatching(object):
                                       isSuccess=False,
                                       version=Version,
                                       message=" ".join([self.reboot_after_patch, msg,
-                                                       len(self.needs_restart),
+                                                       str(len(self.needs_restart)),
                                                        "packages need to restart"]))
             self.hutil.do_exit(0, 'Enable', 'success', '0', msg)
         if self.reboot_after_patch == 'required':
