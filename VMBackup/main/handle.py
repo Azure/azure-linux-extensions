@@ -142,7 +142,8 @@ def enable():
         currentTaskIdentity = taskIdentity.stored_identity()
         # handle the machine identity for the restoration scenario.
         backup_logger.log('timespan is ' + str(timespan))
-        if(abs(timespan.total_seconds()) > TWENTY_MINUTES):
+        total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+        if(abs(total_span_in_seconds) > TWENTY_MINUTES):
             error_msg = 'the call time stamp is out of date.'
             exit_with_commit_log(error_msg, para_parser)
 
