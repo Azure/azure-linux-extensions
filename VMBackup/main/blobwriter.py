@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -37,7 +37,6 @@ class BlobWriter(object):
         retry_times = 3
         while(retry_times > 0):
             try:
-                self.hutil.log(msg)
                 # get the blob type
                 if(blobUri is not None):
                     http_util = HttpUtil()
@@ -50,6 +49,7 @@ class BlobWriter(object):
                     headers["x-ms-version"] = self.__StorageVersion
 
                     result = http_util.Call('GET',sasuri_obj,None,headers)
+                    self.hutil.log('GET' + str(blobUri) + ' result is ' + str(result.status))
                     blobType = result.getheader("x-ms-blob-type")
 
                     if blobType == "BlockBlob":
@@ -76,7 +76,7 @@ class BlobWriter(object):
                         result = http_util.Call('PUT',sasuri_obj,buf,headers=headers)
                         retry_times = 0
                     else:
-                        self.hutil.log("blobUri is " + str(blobType))
+                        self.hutil.log("blobType is " + str(blobType))
                         retry_times = 0
                 else:
                     self.hutil.log("logbloburi is None")

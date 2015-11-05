@@ -45,8 +45,8 @@ def main():
     timespan = utcNow-commandStartTime
     
     print(str(timespan.total_seconds()))
-    print(str(time_now))
-
+    total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+    print(str(total_span_in_seconds))
 
  #       p = subprocess.call(["fsfreeze", "-f", "/"])
  #       print(p)

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -39,5 +39,7 @@ class Backuplogger(object):
             self.hutil.log(log_msg)
 
     def commit(self, logbloburi):
+        #commit to local file system first, then commit to the network.
+        self.hutil.log(self.msg)
         blobWriter = BlobWriter(self.hutil)
         blobWriter.WriteBlob(self.msg,logbloburi)
