@@ -37,47 +37,16 @@ class BlobWriter(object):
         retry_times = 3
         while(retry_times > 0):
             try:
+                self.hutil.log(msg)
                 # get the blob type
                 if(blobUri is not None):
                     http_util = HttpUtil()
                     sasuri_obj = urlparse.urlparse(blobUri)
-                    #Check blob type
-                    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
                     headers = {}
-                    headers["x-ms-date"] = timestamp
-                    headers["x-ms-version"] = self.__StorageVersion
-
-                    result = http_util.Call('GET',sasuri_obj,None,headers)
-                    self.hutil.log('GET' + str(blobUri) + ' result is ' + str(result.status))
-                    blobType = result.getheader("x-ms-blob-type")
-
-                    if blobType == "BlockBlob":
-                        body_content = msg
-                        headers = {}
-                        headers["x-ms-blob-type"] = 'BlockBlob'
-                        self.hutil.log(str(headers))
-                        result = http_util.Call('PUT',sasuri_obj,body_content,headers=headers)
-                        retry_times = 0
-
-                    elif blobType == "PageBlob":
-                        body_content = msg
-                        total_len = len(body_content)
-                        size_in_page = ((total_len + 511) / 512) 
-
-                        buf = bytearray(size_in_page * 512)
-                        buf[0 : total_len - 1] = body_content[0 : total_len - 1]
-                        headers["x-ms-blob-type"] = 'PageBlob'
-                        headers["x-ms-page-write"] = "update"
-                        headers["x-ms-range"] = "bytes={0}-{1}".format(0, size_in_page * 512 - 1)
-                        headers["Content-Length"] = str(size_in_page * 512)
-                        sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
-                        self.hutil.log(str(headers))
-                        result = http_util.Call('PUT',sasuri_obj,buf,headers=headers)
-                        retry_times = 0
-                    else:
-                        self.hutil.log("blobType is " + str(blobType))
-                        retry_times = 0
+                    headers["x-ms-blob-type"] = 'BlockBlob'
+                    self.hutil.log(str(headers))
+                    result = http_util.Call('PUT',sasuri_obj,msg,headers=headers)
+                    retry_times = 0
                 else:
                     self.hutil.log("logbloburi is None")
                     retry_times = 0
