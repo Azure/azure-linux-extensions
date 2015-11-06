@@ -33,7 +33,7 @@ var CurrentScriptVersion = "1.0.0.0";
 
 var aemExtPublisher = "Microsoft.OSTCExtensions";
 var aemExtName = "AzureEnhancedMonitorForLinux";
-var aemExtVersion = "1.0";
+var aemExtVersion = "2.0";
 
 var ladExtName = "LinuxDiagnostic";
 var ladExtPublisher = "Microsoft.OSTCExtensions";
@@ -100,7 +100,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
-        var baseUri = subscription.managementEndpointUrl
+        var baseUri = subscription.managementEndpointUrl;
         computeClient = computeMgmt.createComputeManagementClient(cred, baseUri);
         storageClient = storageMgmt.createStorageManagementClient(cred, baseUri);
     }).then(function(){
@@ -469,6 +469,7 @@ var getTokenCredential = function(subscription){
                     type : 'token',
                     token : token.accessToken
                 };
+                subscription.managementEndpointUrl = token.resource;
                 return false
             }
         });

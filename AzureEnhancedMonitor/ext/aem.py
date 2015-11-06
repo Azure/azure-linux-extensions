@@ -27,7 +27,7 @@ import datetime
 import psutil
 import string
 import urlparse
-from azure.storage.table import TableService, Entity
+from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent, AddExtensionEvent
 import Utils.HandlerUtil as Util
 
