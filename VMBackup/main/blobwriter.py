@@ -23,30 +23,31 @@ import datetime
 import traceback
 import urlparse
 import httplib
-from Utils.HttpUtil import HttpUtil
+from common import CommonVariables
+from HttpUtil import HttpUtil
 
 class BlobWriter(object):
     """description of class"""
     def __init__(self, hutil):
         self.hutil = hutil
-        self.__StorageVersion = "2014-02-14"
     """
     network call should have retry.
     """
     def WriteBlob(self,msg,blobUri):
         retry_times = 3
+        self.hutil.log(msg)
         while(retry_times > 0):
             try:
-                self.hutil.log(msg)
                 # get the blob type
                 if(blobUri is not None):
-                    http_util = HttpUtil()
+                    http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri)
                     headers = {}
                     headers["x-ms-blob-type"] = 'BlockBlob'
                     self.hutil.log(str(headers))
-                    result = http_util.Call('PUT',sasuri_obj,msg,headers=headers)
-                    retry_times = 0
+                    result = http_util.Call('PUT',sasuri_obj,msg,headers = headers)
+                    if(result == CommonVariables.success):
+                        retry_times = 0
                 else:
                     self.hutil.log("logbloburi is None")
                     retry_times = 0
@@ -54,5 +55,3 @@ class BlobWriter(object):
                 self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
-
-

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -21,7 +21,7 @@
 import urlparse
 import httplib
 import traceback
-from Utils.HttpUtil import HttpUtil
+from HttpUtil import HttpUtil
 
 class SnapshotError(object):
     def __init__(self):
@@ -62,19 +62,16 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = 0
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                for meta in meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
-                http_util = HttpUtil()
+                http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
-                
-                self.logger.log(str(result.getheaders()))
-                if(result.status != 201):
-                    snapshot_error.errorcode = result.status
+                if(result != 0):
+                    snapshot_error.errorcode = result
                     snapshot_error.sasuri = sasuri
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())

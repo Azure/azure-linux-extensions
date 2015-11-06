@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -105,49 +105,49 @@ class FsFreezer:
             return True
 
     def freezeall(self):
-            self.root_seen = False
-            freeze_result = FreezeResult()
-            for mount in self.mounts.mounts:
-                if(mount.mount_point == '/'):
-                    self.root_seen = True
-                    self.root_mount = mount
-                elif(mount.mount_point):
-                    try:
-                        freezeError = self.freeze(mount)
-                        if(freezeError.errorcode != 0):
-                            freeze_result.errors.append(freezeError)
-                    except Exception, e:
-                        freezeError = FreezeError()
-                        freezeError.errorcode = -1
-                        freezeError.path = mount.mount_point
+        self.root_seen = False
+        freeze_result = FreezeResult()
+        for mount in self.mounts.mounts:
+            if(mount.mount_point == '/'):
+                self.root_seen = True
+                self.root_mount = mount
+            elif(mount.mount_point):
+                try:
+                    freezeError = self.freeze(mount)
+                    if(freezeError.errorcode != 0):
                         freeze_result.errors.append(freezeError)
-                        self.logger.log(str(e))
-
-            if(self.root_seen):
-                freezeError = self.freeze(self.root_mount)
-                if(freezeError.errorcode != 0):
+                except Exception, e:
+                    freezeError = FreezeError()
+                    freezeError.errorcode = -1
+                    freezeError.path = mount.mount_point
                     freeze_result.errors.append(freezeError)
-            return freeze_result
+                    self.logger.log(str(e))
+
+        if(self.root_seen):
+            freezeError = self.freeze(self.root_mount)
+            if(freezeError.errorcode != 0):
+                freeze_result.errors.append(freezeError)
+        return freeze_result
 
     def unfreezeall(self):
-            self.root_seen = False
-            unfreeze_result = FreezeResult()
-            for mount in self.mounts.mounts:
-                if(mount.mount_point == '/'):
-                    self.root_seen = True
-                    self.root_mount = mount
-                elif(mount.mount_point):
-                    try:
-                        freezeError = self.unfreeze(mount)
-                        if(freezeError.errorcode != 0):
-                            unfreeze_result.errors.append(freezeError)
-                    except Exception,e:
-                        freezeError = FreezeError()
-                        freezeError.errorcode = -1
-                        freezeError.path = mount.mount_point
+        self.root_seen = False
+        unfreeze_result = FreezeResult()
+        for mount in self.mounts.mounts:
+            if(mount.mount_point == '/'):
+                self.root_seen = True
+                self.root_mount = mount
+            elif(mount.mount_point):
+                try:
+                    freezeError = self.unfreeze(mount)
+                    if(freezeError.errorcode != 0):
                         unfreeze_result.errors.append(freezeError)
-            if(self.root_seen):
-                freezeError = self.unfreeze(self.root_mount)
-                if(freezeError.errorcode != 0):
+                except Exception,e:
+                    freezeError = FreezeError()
+                    freezeError.errorcode = -1
+                    freezeError.path = mount.mount_point
                     unfreeze_result.errors.append(freezeError)
-            return unfreeze_result
+        if(self.root_seen):
+            freezeError = self.unfreeze(self.root_mount)
+            if(freezeError.errorcode != 0):
+                unfreeze_result.errors.append(freezeError)
+        return unfreeze_result

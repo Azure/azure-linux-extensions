@@ -93,7 +93,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             }
         }]
         status_report_msg = json.dumps(stat)
-        blobWriter = BlobWriter(hutil)
+        blobWriter = BlobWriter(backup_logger)
         blobWriter.WriteBlob(status_report_msg,blobUri)
 
 def exit_with_commit_log(error_msg, para_parser):
@@ -162,7 +162,7 @@ def enable():
                 backup_logger.log(error_msg)
             elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
                 if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
-                    run_result = CommonVariables.parameter_error
+                    run_result = CommonVariables.error_parameter
                     run_status = 'error'
                     error_msg = 'required field empty or not correct'
                     backup_logger.log(error_msg, False, 'Error')
@@ -199,7 +199,7 @@ def enable():
                             backup_logger.log(error_msg)
             else:
                 run_status = 'error'
-                run_result = CommonVariables.parameter_error
+                run_result = CommonVariables.error_parameter
                 error_msg = 'command is not correct'
                 backup_logger.log(error_msg, False, 'Error')
     except Exception as e:
@@ -225,7 +225,7 @@ def enable():
         if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
             run_result = CommonVariables.error_12
         elif(para_parser is None):
-            run_result = CommonVariables.parameter_error
+            run_result = CommonVariables.error_parameter
         else:
             run_result = CommonVariables.error
         run_status = 'error'

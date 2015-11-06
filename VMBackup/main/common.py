@@ -41,8 +41,10 @@ class CommonVariables:
     error code definitions
     """
     success = 1
-    parameter_error = 11
+    error_parameter = 11
     error_12 = 12
-    wrong_time_error = 13
-    same_taskid_error = 14
+    error_wrong_time = 13
+    error_same_taskid = 14
+    error_log = 15
+    error_upload_status_blob = 16
     error = 2
