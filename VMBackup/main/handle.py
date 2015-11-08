@@ -74,11 +74,11 @@ def install():
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
         backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
-        DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
-        tstamp = time.strftime(DateTimeFormat, time.gmtime())
+        time_span = (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds() * 1000
+        date_string = "/Date(" + str((int)(time_span)) + ")/"
         stat = [{
             "version" : hutil._context._version,
-            "timestampUTC" : tstamp,
+            "timestampUTC" : date_string,
             "status" : {
                 "name" : hutil._context._name,
                 "operation" : operation,
