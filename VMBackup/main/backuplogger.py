@@ -43,3 +43,5 @@ class Backuplogger(object):
         self.hutil.log(self.msg)
         blobWriter = BlobWriter(self.hutil)
         blobWriter.WriteBlob(self.msg,logbloburi)
+    def commit_to_local(self):
+        self.hutil.log(self.msg)

@@ -44,6 +44,7 @@ class HttpUtil(object):
     def CallUsingCurl(self,method,sasuri_obj,data,headers):
         header_str = ""
         for key, value in headers.iteritems():
+            print("key:"+str(key)+"Value:"+str(value))
             header_str = header_str + '-H ' + '"' + key + ':' + value + '"'
         #write the log to a file, and then put the file directly.
         with open(self.tmpFile,'w') as f:
@@ -76,10 +77,11 @@ class HttpUtil(object):
                 resp = connection.getresponse()
             responseBody = resp.read()
             connection.close()
-            self.logger.log("responseBody is: " + str(responseBody))
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
             else:
-                return CommonVariables.error_log
+                return CommonVariables.error_http_failure
         except Exception as e:
+            errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
             return self.CallUsingCurl(method,sasuri_obj,data,headers)

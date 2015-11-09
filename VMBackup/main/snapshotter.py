@@ -26,9 +26,9 @@ from HttpUtil import HttpUtil
 class SnapshotError(object):
     def __init__(self):
         self.errorcode = 0
-        self.path = None
+        self.sasuri = None
     def __str__(self):
-        return 'errorcode:' + str(self.errorcode) + 'path:' + str(self.path)
+        return 'errorcode:' + str(self.errorcode) + 'sasuri:' + str(self.sasuri)
 
 class SnapshotResult(object):
     def __init__(self):

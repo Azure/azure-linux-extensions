@@ -97,7 +97,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
         blobWriter.WriteBlob(status_report_msg,blobUri)
 
 def exit_with_commit_log(error_msg, para_parser):
-    backup_logger.log(error_msg, False, 'Error')
+    backup_logger.log(error_msg, True, 'Error')
     if(para_parser is not None and para_parser.logsBlobUri is not None):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
@@ -137,7 +137,7 @@ def enable():
         utcNow = datetime.datetime.utcnow()
         backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
         timespan = utcNow - commandStartTime
-        TWENTY_MINUTES = 20 * 60 # in seconds
+        TWENTY_MINUTES = 20 * 6000 # in seconds
         taskIdentity = TaskIdentity()
         currentTaskIdentity = taskIdentity.stored_identity()
         # handle the machine identity for the restoration scenario.
@@ -218,6 +218,8 @@ def enable():
 
     if(para_parser is not None and para_parser.logsBlobUri is not None):
         backup_logger.commit(para_parser.logsBlobUri)
+    else:
+        backup_logger.commit_to_local()
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """

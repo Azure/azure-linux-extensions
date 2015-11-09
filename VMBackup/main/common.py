@@ -22,7 +22,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "0.1.0.7"
+    extension_version = "0.1.0.8"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
@@ -45,6 +45,6 @@ class CommonVariables:
     error_12 = 12
     error_wrong_time = 13
     error_same_taskid = 14
-    error_log = 15
+    error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
