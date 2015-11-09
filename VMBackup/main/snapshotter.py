@@ -21,6 +21,7 @@
 import urlparse
 import httplib
 import traceback
+from common import CommonVariables
 from HttpUtil import HttpUtil
 
 class SnapshotError(object):
@@ -86,6 +87,6 @@ class Snapshotter(object):
         blobs = paras.blobs
         for blob in blobs:
             snapshotError = self.snapshot(blob, paras.backup_metadata)
-            if(snapshotError.errorcode != 0):
+            if(snapshotError.errorcode != CommonVariables.success):
                 snapshot_result.errors.append(snapshotError)
         return snapshot_result

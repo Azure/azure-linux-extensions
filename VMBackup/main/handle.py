@@ -137,7 +137,7 @@ def enable():
         utcNow = datetime.datetime.utcnow()
         backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
         timespan = utcNow - commandStartTime
-        TWENTY_MINUTES = 20 * 6000 # in seconds
+        TWENTY_MINUTES = 20 * 60 # in seconds
         taskIdentity = TaskIdentity()
         currentTaskIdentity = taskIdentity.stored_identity()
         # handle the machine identity for the restoration scenario.
