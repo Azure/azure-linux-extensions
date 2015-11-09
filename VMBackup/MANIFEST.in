@@ -1,1 +1,2 @@
-include HandlerManifest.json
+include HandlerManifest.json handler.py
+prune test
