@@ -41,27 +41,31 @@ class HttpUtil(object):
         self.proxyPort = Config.get("HttpProxy.Port")
         self.tmpFile = './tmp_file_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
+    """
+    snapshot also called this. so we should not write the file/read the file in this method.
+    """
     def CallUsingCurl(self,method,sasuri_obj,data,headers):
         header_str = ""
         for key, value in headers.iteritems():
-            print("key:"+str(key)+"Value:"+str(value))
-            header_str = header_str + '-H ' + '"' + key + ':' + value + '"'
-        #write the log to a file, and then put the file directly.
-        with open(self.tmpFile,'w') as f:
-            f.write(data)
+            header_str = header_str + '-H ' + '"' + str(key) + ':' + str(value) + '"'
+
         if(self.proxyHost == None or self.proxyPort == None):
-            commandToExecute = 'curl --request PUT --data-binary @' + self.tmpFile + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
+            commandToExecute = 'curl --request PUT --data-binary @-'  + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
         else:
-            commandToExecute = 'curl --request PUT --data-binary @' + self.tmpFile + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
+            commandToExecute = 'curl --request PUT --data-binary @-'  + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
         args = shlex.split(commandToExecute)
-        proc = Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        proc.stdin.write(data)
         curlResult,err = proc.communicate()
         returnCode = proc.wait()
-        self.logger.log("curl result is: " + str(curlResult))
         self.logger.log("curl error is: " + str(err))
         self.logger.log("curl return code is : "+str(returnCode))
-        return returnCode
+        # what if the curl is returned successfully, but the http response is 403
+        if(returnCode == 0 ):
+            return CommonVariables.success
+        else:
+            return CommonVariables.error_http_failure
 
     def Call(self,method,sasuri_obj,data,headers):
         try:
