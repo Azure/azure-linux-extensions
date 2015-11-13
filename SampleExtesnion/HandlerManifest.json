@@ -1,0 +1,13 @@
+[{
+  "name": "SampleExtension",
+  "version": 1.0,
+  "handlerManifest": {
+    "installCommand": "./install.py",
+    "uninstallCommand": "./uninstall.py",
+    "updateCommand": "./update.py",
+    "enableCommand": "./enable.py",
+    "disableCommand": "./disable.py",
+    "rebootAfterInstall": false,
+    "reportHeartbeat": false
+  }
+}]
