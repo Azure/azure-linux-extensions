@@ -75,10 +75,11 @@ def install():
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
         backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         time_span = (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds() * 1000
-        date_string = "/Date(" + str((int)(time_span)) + ")/"
+        date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+        date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat = [{
             "version" : hutil._context._version,
-            "timestampUTC" : date_string,
+            "timestampUTC" : date_place_holder,
             "status" : {
                 "name" : hutil._context._name,
                 "operation" : operation,
@@ -93,6 +94,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             }
         }]
         status_report_msg = json.dumps(stat)
+        status_report_msg = status_report_msg.replace(date_place_holder,date_string)
         blobWriter = BlobWriter(backup_logger)
         blobWriter.WriteBlob(status_report_msg,blobUri)
 
