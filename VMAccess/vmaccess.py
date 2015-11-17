@@ -97,6 +97,10 @@ def enable():
             _fsck_repair()
             hutil.log("Repaired and remounted disk")
             hutil.exit_if_enabled()
+        if fstab_reset:
+            _fstab_default()
+            hutil.log("Reset fstab successfully")
+            hutil.exit_if_enabled()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
     except Exception, e:
         hutil.error(
@@ -414,6 +418,29 @@ def _fsck_repair():
     except Exception, e:
         hutil.error("%s, %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair','error','0', 'Repair failed.')
+
+def _fstab_default():
+     # Revert to using default fstab config by distro file packaged in with
+     # extension
+     distro = platform.dist()
+     distro_name = distro[0]
+
+     try:
+     waagent.Run("umount -a")
+     if 'ubuntu' in distro_name:
+         cmd_resuilt = waagent.Run("cp $(pwd)/files/fstab_ubuntu /etc/fstab")
+     elif ''centos' in distro_name:
+         cmd_result = waagent.Run("cp $(pwd)/files/fstab_cent /etc/fstab")
+     elif 'suse' in distro_name:
+         cmd_result = waagent.Run("cp $(pwd)/files/fstab_suse /etc/fstab")
+     else:
+         raise Exception("Not a recognized distro")
+     waagent.Run("mount -a")
+     return waagent.Run("mount | column -t")
+     except Exception, e:
+        hutil.error("%s, %s" %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Repair','error','0', 'fstab reset failed.')
+
 
 
 if __name__ == '__main__' :
