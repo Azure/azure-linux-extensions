@@ -120,6 +120,7 @@ def enable():
     # precheck
     freeze_called = False
     try:
+        #this is using the most recent file timestamp.
         hutil.do_parse_context('Enable')
 
         # we need to freeze the file system first
@@ -130,7 +131,6 @@ def enable():
         stored_identity = mi.stored_identity()
         if(stored_identity is None):
             mi.save_identity()
-            hutil.exit_if_enabled()
         else:
             current_identity = mi.current_identity()
             if(current_identity != stored_identity):
@@ -138,8 +138,8 @@ def enable():
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 hutil.set_inused_config_seq(-1)
                 mi.save_identity()
-            else:
-                hutil.exit_if_enabled()
+
+        hutil.exit_if_enabled()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
