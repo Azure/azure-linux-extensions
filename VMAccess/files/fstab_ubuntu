@@ -1,8 +1,0 @@
-# CLOUD_IMG: This file was created/modified by the Cloud Image build process
-UUID=30212642-09d3-467f-8e09-21685826ab50	/	 ext4	defaults,discard	0 0
-
-# CLOUD_IMG: This file was created/modified by the Cloud Image build process
-# The following is used to dynamically configured additional
-# NICs. Do not remove unless you know what you are doing.
-none /etc/network/interfaces.dynamic.d tmpfs   nodev,noexec,nosuid,size=64K 0 0
-/dev/sdb1	/mnt	auto	defaults,nobootwait,comment=cloudconfig	0	2
