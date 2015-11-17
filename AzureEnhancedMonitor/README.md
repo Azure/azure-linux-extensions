@@ -7,7 +7,7 @@ This is an instruction about how to enable Azure Enhanced Monitoring on Azure Li
 First of all, you need to prepare your develop machine to manipulate Linux VM on Azure. We have provided a script to automate this process. The script will install nodejs, npm and azure-cli on your develop machine. Then, it will install a nodejs package for configuring Azure Enhanced Monitoring Extension. Currently, the script supports Ubuntu, CentOS, SUSE etc. If you want to use other Linux distribution as your develop machine, you may need to [install nodejs manually](https://github.com/joyent/node/wiki/installing-node.js-via-package-manager).
 
 ```
-curl -LO https://github.com/Azure/azure-linux-extensions/releases/download/azure-enhanced-monitor-1.0-alpha2/install.sh
+curl -LO https://github.com/Azure/azure-linux-extensions/releases/download/azure-enhanced-monitor-1.0-alpha3/install.sh
 sudo sh install.sh
 ```
 ## Configure Azure Enhanced Monitoring
@@ -61,7 +61,7 @@ Note: after the initial configuration it can take up to 10-15 minutes until the 
 We also provided a lib written in c for reading performance counters.
 
 ```
-curl -LO https://github.com/Azure/azure-linux-extensions/releases/download/azure-enhanced-monitor-1.0-alpha2/clib.tar.gz
+curl -LO https://github.com/Azure/azure-linux-extensions/releases/download/azure-enhanced-monitor-1.0-alpha3/clib.tar.gz
 tar zxf clib.tar.gz
 cd clib
 make
