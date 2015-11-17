@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -47,7 +47,7 @@ from snapshotter import Snapshotter
 from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
-
+from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 def main():
     global backup_logger
@@ -125,6 +125,22 @@ def enable():
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
 
+        # handle the restoring scenario.
+        mi = MachineIdentity()
+        stored_identity = mi.stored_identity()
+        if(stored_identity is None):
+            mi.save_identity()
+            hutil.exit_if_enabled()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = 0
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
+                hutil.set_inused_config_seq(-1)
+                mi.save_identity()
+            else:
+                hutil.exit_if_enabled()
+
         """
         protectedSettings is the privateConfig passed from Powershell.
         WATCHOUT that, the _context_config are using the most freshest timestamp.
@@ -139,20 +155,15 @@ def enable():
         utcNow = datetime.datetime.utcnow()
         backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
         timespan = utcNow - commandStartTime
-        TWENTY_MINUTES = 20 * 60 # in seconds
-        taskIdentity = TaskIdentity()
-        currentTaskIdentity = taskIdentity.stored_identity()
+        THIRTY_MINUTES = 30 * 60 # in seconds
         # handle the machine identity for the restoration scenario.
         backup_logger.log('timespan is ' + str(timespan))
         total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
-        if(abs(total_span_in_seconds) > TWENTY_MINUTES):
-            error_msg = 'the call time stamp is out of date.'
-            exit_with_commit_log(error_msg, para_parser)
-
-        elif(para_parser.taskId == currentTaskIdentity):
-            error_msg = 'the task id is already handled.'
+        if(abs(total_span_in_seconds) > THIRTY_MINUTES):
+            error_msg = 'the call time stamp is out of date. so skip it.'
             exit_with_commit_log(error_msg, para_parser)
         else:
+            taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
             commandToExecute = para_parser.commandToExecute
             #validate all the required parameter here
