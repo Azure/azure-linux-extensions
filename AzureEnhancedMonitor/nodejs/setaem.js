@@ -139,7 +139,7 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
         aemConfig.setPublic('vm.cpu.isovercommitted', cpuOverCommitted);
         aemConfig.setPublic('script.version', CurrentScriptVersion);
         aemConfig.setPublic('verbose', '0');
-		aemConfig.setPublic('href', 'http://aka.ms/sapaem');
+        aemConfig.setPublic('href', 'http://aka.ms/sapaem');
     }).then(function(){
         //Set vm disk config
         /*
@@ -155,10 +155,10 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
         console.log("[INFO]Adding configure for OS disk.");
         aemConfig.setPublic('osdisk.account', osdiskAccount);
         aemConfig.setPublic('osdisk.name', osdisk.name);
-		aemConfig.setPublic('osdisk.caching', osdisk.caching);
-		//aemConfig.setPublic('osdisk.type', osdisk.caching);
-		//aemConfig.setPublic('osdisk.sla.throughput', osdisk.caching);
-		//aemConfig.setPublic('osdisk.caching', osdisk.caching);
+        aemConfig.setPublic('osdisk.caching', osdisk.caching);
+        //aemConfig.setPublic('osdisk.type', osdisk.caching);
+        //aemConfig.setPublic('osdisk.sla.throughput', osdisk.caching);
+        //aemConfig.setPublic('osdisk.caching', osdisk.caching);
         aemConfig.setPublic('osdisk.connminute', osdiskAccount + ".minute");
         aemConfig.setPublic('osdisk.connhour', osdiskAccount + ".hour");
         accounts.push({
@@ -193,11 +193,11 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
     }).then(function(){        
         //Set storage account config
         var promises = [];
-		var i = -2;
+        var i = -2;
         Object(accounts).forEach(function(account){
             var promise = getResourceGroupName(storageClient, account.name)
               .then(function(rgpName){
-				account.rgp = rgpName;
+                account.rgp = rgpName;
                 console.log("!!!!rgp",rgpName);
                 return getStorageAccountKey(storageClient, rgpName, account.name);
             }).then(function(accountKey){
@@ -207,22 +207,22 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
                 aemConfig.setPrivate(account.name + ".hour.key", accountKey);
                 return getStorageAccountProperties(storageClient, account.rgp, account.name);
             }).then(function(properties){
-				
-				i += 1;
-				if (i >= 0) {
-					if (properties.accountType.startsWith("Standard"))
-						aemConfig.setPublic('disk.type.' + i, "Standard");
-					else
-						aemConfig.setPublic('disk.type.' + i, "Premium");
-				} else {
-					if (properties.accountType.startsWith("Standard"))
-						aemConfig.setPublic('osdisk.type' + i, "Standard");
-					else
-						aemConfig.setPublic('osdisk.type' + i, "Premium");
-				}
-				
-				var endpoints = properties.primaryEndpoints;
-				
+                
+                i += 1;
+                if (i >= 0) {
+                    if (properties.accountType.startsWith("Standard"))
+                        aemConfig.setPublic('disk.type.' + i, "Standard");
+                    else
+                        aemConfig.setPublic('disk.type.' + i, "Premium");
+                } else {
+                    if (properties.accountType.startsWith("Standard"))
+                        aemConfig.setPublic('osdisk.type' + i, "Standard");
+                    else
+                        aemConfig.setPublic('osdisk.type' + i, "Premium");
+                }
+                
+                var endpoints = properties.primaryEndpoints;
+                
                 var tableEndpoint;
                 var blobEndpoint;
                 endpoints.forEach(function(endpoint){
@@ -237,11 +237,11 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
                 var minuteUri = tableEndpoint + BlobMetricsMinuteTable;
                 var hourUri = tableEndpoint + BlobMetricsHourTable;
                 account.minuteUri = minuteUri
-				aemConfig.setPublic(account.name + ".hour.uri", hourUri);
-				aemConfig.setsetPrivate(account.name + ".hour.key", account.key);
+                aemConfig.setPublic(account.name + ".hour.uri", hourUri);
+                aemConfig.setsetPrivate(account.name + ".hour.key", account.key);
                 aemConfig.setPublic(account.name + ".minute.uri", minuteUri);
-				aemConfig.setsetPrivate(account.name + ".minute.key", account.key);
-				aemConfig.setPublic(account.name + ".hour.name", account.name);
+                aemConfig.setsetPrivate(account.name + ".minute.key", account.key);
+                aemConfig.setPublic(account.name + ".hour.name", account.name);
                 aemConfig.setPublic(account.name + ".minute.name", account.name);
             }).then(function(){
                 return checkStorageAccountAnalytics(account.name, 
@@ -254,11 +254,11 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
     }).then(function(res){
         //Set Linux diagnostic config
         aemConfig.setPublic("wad.name", accounts[0].name);
-		aemConfig.setPublic("wad.isenabled", 1);
+        aemConfig.setPublic("wad.isenabled", 1);
         var ladUri = accounts[0].tableEndpoint + ladMetricesTable;
         console.log("[INFO]Your endpoint is: "+accounts[0].tableEndpoint);
         aemConfig.setPublic("wad.uri", ladUri);
-		aemConfig.setPrivate("wad.key", accounts[0].key);
+        aemConfig.setPrivate("wad.key", accounts[0].key);
     }).then(function(){
         //Update vm
         var extensions = [];

@@ -1259,7 +1259,7 @@ class EnhancedMonitorConfig(object):
     def __init__(self, privateConfig, publicConfig):
         xmldoc = minidom.parse('/var/lib/waagent/SharedConfig.xml')
         self.deployment = xmldoc.getElementsByTagName('Deployment')
-		self.role = xmldoc.getElementsByTagName('Role')
+        self.role = xmldoc.getElementsByTagName('Role')
         self.configData = {}
         diskCount = 0
         accountNames = []
