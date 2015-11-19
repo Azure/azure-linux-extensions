@@ -17,16 +17,17 @@
 # limitations under the License.
 #
 
-if [ ! $1 ]  ; then
+if [ $# != 2 ]  ; then
     echo "" 
-    echo "    Usage: create_zip.sh <path_to_extension_dir>"
+    echo "    Usage: $0 <path-to-extension> <version>"
+    echo "    Example: $0 SampleExtension 1.0.0.0"
     echo ""
     exit 1
 fi
 
 if [ ! -d $1 ]  ; then
     echo "" 
-    echo "    Error: Couldn't find dir: $1>"
+    echo "    Error: Couldn't find dir: $1"
     echo ""
     exit 1
 fi
@@ -35,16 +36,7 @@ curr_dir=`pwd`
 ext_dir=$1
 cd $ext_dir
 ext_dir=`pwd`
-ext_meta=$ext_dir/HandlerManifest.json
 cd $curr_dir
-
-
-if [ ! -f $ext_meta ] ; then
-    echo ""
-    echo "    Error: Couldn't find \"HandlerManifest.json\" file under $ext_dir"
-    echo ""
-    exit 1
-fi
 
 script=$(dirname $0)
 root=$script/..
@@ -54,27 +46,12 @@ root=`pwd`
 util_dir=$root/Utils
 build_dir=$root/build
 
-ext_name=`grep 'name' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
-ext_version=`grep 'version' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
-
-if [ ! $ext_name ] ; then
-    echo ""
-    echo "    Error: Couldn't detect extention name: $ext_name"
-    echo ""
-    exit 1
-fi
-
-if [ ! $ext_version ] ; then
-    echo ""
-    echo "    Error: Couldn't detect extention version: $ext_version"
-    echo ""
-    exit 1
-fi
-
 if [ ! -d $build_dir ] ; then
     mkdir $build_dir
 fi
 
+ext_name=`echo $1 | sed 's/\/$//'`
+ext_version=$2
 ext_full_name=$ext_name-$ext_version
 tmp_dir=$build_dir/$ext_full_name
 
