@@ -1,6 +1,6 @@
 [{
   "name": "CustomScript",
-  "version": "1.3.0.1",
+  "version": "1.3.0.2",
   "handlerManifest": {
     "installCommand": "customscript.py -install",
     "uninstallCommand": "customscript.py -uninstall",
