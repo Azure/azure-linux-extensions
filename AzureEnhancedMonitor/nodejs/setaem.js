@@ -22,8 +22,8 @@ var path = require('path');
 var Promise = require('promise');
 var common = require('azure-common');
 var storage = require('azure-storage');
-var storageMgmt = require('azure-mgmt-storage');
-var computeMgmt = require('azure-mgmt-compute');
+var storageMgmt = require('azure-arm-storage');
+var computeMgmt = require('azure-arm-compute');
 var readFile = Promise.denodeify(fs.readFile); 
 
 var debug = 0;
@@ -82,7 +82,7 @@ AemConfig.prototype.getPrivate = function(){
     }
 };
 
-var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
+var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
     var azureProfile;
     var currSubscription;
     var computeClient;
@@ -104,45 +104,85 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         computeClient = computeMgmt.createComputeManagementClient(cred, baseUri);
         storageClient = storageMgmt.createStorageManagementClient(cred, baseUri);
     }).then(function(){
-        return getVirtualMachine(computeClient, svcName, vmName);
+        return getVirtualMachine(computeClient, rgpName, vmName);
     }).then(function(vm){
         //Set vm role basic config
-        console.log("[INFO]Found VM: " + vm.roleName);
+        console.log("[INFO]Found VM: " + vm.oSProfile.computerName);
         debug && console.log(JSON.stringify(vm, null, 4));
+        /*
+        vm:
+        { extensions: [ [Object] ],
+          tags: {},
+          hardwareProfile: { virtualMachineSize: 'Standard_A1' },
+          storageProfile: { dataDisks: [], imageReference: [Object], oSDisk: [Object] },
+          oSProfile:
+          { secrets: [],
+            computerName: 'zhongyiubuntu4',
+            adminUsername: 'zhongyi',
+            linuxConfiguration: [Object] },
+          networkProfile: { networkInterfaces: [Object] },
+          diagnosticsProfile: { bootDiagnostics: [Object] },
+          provisioningState: 'Succeeded',
+          id: '/subscriptions/4be8920b-2978-43d7-ab14-04d8549c1d05/resourceGroups/zhongyiubuntu4/providers/Microsoft.Compute/virtualMachines/zhongyiubuntu4',
+          name: 'zhongyiubuntu4',
+          type: 'Microsoft.Compute/virtualMachines',
+          location: 'eastasia' }}
+        */
         selectedVM = vm;
         var cpuOverCommitted = 0;
-        if(selectedVM.roleSize === 'ExtralSmall'){
+        if(selectedVM.hardwareProfile.virtualMachineSize === 'ExtralSmall'){
             cpuOverCommitted = 1
         }
-        aemConfig.setPublic('vmsize', selectedVM.roleSize);
-        aemConfig.setPublic('vm.roleinstance', selectedVM.roleName);
+        aemConfig.setPublic('vmsize', selectedVM.hardwareProfile.virtualMachineSize);
         aemConfig.setPublic('vm.role', 'IaaS');
         aemConfig.setPublic('vm.memory.isovercommitted', 0);
         aemConfig.setPublic('vm.cpu.isovercommitted', cpuOverCommitted);
         aemConfig.setPublic('script.version', CurrentScriptVersion);
         aemConfig.setPublic('verbose', '0');
+		aemConfig.setPublic('href', 'http://aka.ms/sapaem');
     }).then(function(){
         //Set vm disk config
-        var osdisk = selectedVM.oSVirtualHardDisk;
-        osdiskAccount = getStorageAccountFromUri(osdisk.mediaLink);
+        /*
+        osDisk:
+        { operatingSystemType: 'Linux',
+          name: 'zhongyiubuntu4',
+          virtualHardDisk: { uri: 'https://zhongyiubuntu44575.blob.core.windows.net/vhds/zhongyiubuntu4.vhd' },
+          caching: 'ReadWrite',
+          createOption: 'FromImage' }
+        */
+        var osdisk = selectedVM.storageProfile.oSDisk;
+        osdiskAccount = getStorageAccountFromUri(osdisk.virtualHardDisk.uri);
         console.log("[INFO]Adding configure for OS disk.");
         aemConfig.setPublic('osdisk.account', osdiskAccount);
-        aemConfig.setPublic('osdisk.name', selectedVM.oSVirtualHardDisk.name);
+        aemConfig.setPublic('osdisk.name', osdisk.name);
+		aemConfig.setPublic('osdisk.caching', osdisk.caching);
+		//aemConfig.setPublic('osdisk.type', osdisk.caching);
+		//aemConfig.setPublic('osdisk.sla.throughput', osdisk.caching);
+		//aemConfig.setPublic('osdisk.caching', osdisk.caching);
         aemConfig.setPublic('osdisk.connminute', osdiskAccount + ".minute");
         aemConfig.setPublic('osdisk.connhour', osdiskAccount + ".hour");
         accounts.push({
             name: osdiskAccount,
-        });
-        for(var i = 0; i < selectedVM.dataVirtualHardDisks.length; i++){
-            var dataDisk = selectedVM.dataVirtualHardDisks[i];
+        });        
+        /*
+        dataDisk:
+        { lun: 0,
+          name: 'zhongyiubuntu4-20151112-140433',
+          virtualHardDisk: { uri: 'https://zhongyiubuntu44575.blob.core.windows.net/vhds/zhongyiubuntu4-20151112-140433.vhd' },
+          caching: 'None',
+          createOption: 'Empty',
+          diskSizeGB: 1023 }
+        */
+        for(var i = 0; i < selectedVM.storageProfile.dataDisks.length; i++){
+            var dataDisk = selectedVM.storageProfile.dataDisks[i];
             console.log("[INFO]Adding configure for data disk: " + 
                         dataDisk.name);
-            var datadiskAccount = getStorageAccountFromUri(dataDisk.mediaLink);
+            var datadiskAccount = getStorageAccountFromUri(dataDisk.virtualHardDisk.uri);
             accounts.push({
                 name:datadiskAccount
             });
             //The default lun value is 0
-            var lun = dataDisk.logicalUnitNumber || 0;
+            var lun = dataDisk.lun;
             aemConfig.setPublic('disk.lun.' + i, lun);
             aemConfig.setPublic('disk.name.' + i, dataDisk.name);
             aemConfig.setPublic('disk.account.' + i, datadiskAccount);
@@ -150,17 +190,39 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                                 datadiskAccount + ".minute");
             aemConfig.setPublic('disk.connhour.' + i, datadiskAccount + ".hour");
         }
-    }).then(function(){
+    }).then(function(){        
         //Set storage account config
         var promises = [];
+		var i = -2;
         Object(accounts).forEach(function(account){
-            var promise = getStorageAccountKey(storageClient, account.name)
-              .then(function(accountKey){
-                account.key = accountKey
+            var promise = getResourceGroupName(storageClient, account.name)
+              .then(function(rgpName){
+				account.rgp = rgpName;
+                console.log("!!!!rgp",rgpName);
+                return getStorageAccountKey(storageClient, rgpName, account.name);
+            }).then(function(accountKey){
+                console.log("!!!!key",accountKey);
+                account.key = accountKey;
                 aemConfig.setPrivate(account.name + ".minute.key", accountKey);
                 aemConfig.setPrivate(account.name + ".hour.key", accountKey);
-                return getStorageAccountEndpoints(storageClient, account.name);
-            }).then(function(endpoints){
+                return getStorageAccountProperties(storageClient, account.rgp, account.name);
+            }).then(function(properties){
+				
+				i += 1;
+				if (i >= 0) {
+					if (properties.accountType.startsWith("Standard"))
+						aemConfig.setPublic('disk.type.' + i, "Standard");
+					else
+						aemConfig.setPublic('disk.type.' + i, "Premium");
+				} else {
+					if (properties.accountType.startsWith("Standard"))
+						aemConfig.setPublic('osdisk.type' + i, "Standard");
+					else
+						aemConfig.setPublic('osdisk.type' + i, "Premium");
+				}
+				
+				var endpoints = properties.primaryEndpoints;
+				
                 var tableEndpoint;
                 var blobEndpoint;
                 endpoints.forEach(function(endpoint){
@@ -175,10 +237,12 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                 var minuteUri = tableEndpoint + BlobMetricsMinuteTable;
                 var hourUri = tableEndpoint + BlobMetricsHourTable;
                 account.minuteUri = minuteUri
+				aemConfig.setPublic(account.name + ".hour.uri", hourUri);
+				aemConfig.setsetPrivate(account.name + ".hour.key", account.key);
                 aemConfig.setPublic(account.name + ".minute.uri", minuteUri);
-                aemConfig.setPublic(account.name + ".hour.uri", hourUri);
+				aemConfig.setsetPrivate(account.name + ".minute.key", account.key);
+				aemConfig.setPublic(account.name + ".hour.name", account.name);
                 aemConfig.setPublic(account.name + ".minute.name", account.name);
-                aemConfig.setPublic(account.name + ".hour.name", account.name);
             }).then(function(){
                 return checkStorageAccountAnalytics(account.name, 
                                                     account.key,
@@ -187,14 +251,14 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
             promises.push(promise);
         });
         return Promise.all(promises);
-    }).then(function(){
+    }).then(function(res){
         //Set Linux diagnostic config
-        aemConfig.setPublic("wad.isenabled", 1);
         aemConfig.setPublic("wad.name", accounts[0].name);
-        aemConfig.setPrivate("wad.key", accounts[0].key);
+		aemConfig.setPublic("wad.isenabled", 1);
         var ladUri = accounts[0].tableEndpoint + ladMetricesTable;
         console.log("[INFO]Your endpoint is: "+accounts[0].tableEndpoint);
         aemConfig.setPublic("wad.uri", ladUri);
+		aemConfig.setPrivate("wad.key", accounts[0].key);
     }).then(function(){
         //Update vm
         var extensions = [];
@@ -249,39 +313,46 @@ var updateVirtualMachine = function (client, svcName, vmName, parameters){
     });
 }
 
-var getDeployment = function(computeClient, svcName){
-    return  new Promise(function(fullfill, reject){
-        computeClient.deployments.getBySlot(svcName, "Production", 
-                                            function(err, ret){
+var getStorageAccountProperties = function(storageClient, rgpName, accountName){
+    return new Promise(function(fullfill, reject){
+        storageClient.storageAccounts.getProperties(rgpName, accountName, function(err, res){
             if(err){
-                reject(err)
+                reject(err);
             } else {
-                fullfill(ret);
+                fullfill(res.storageAccounts.properties);
             }
         });
     });
 };
 
-var getStorageAccountEndpoints = function(storageClient, accountName){
+var getResourceGroupName = function(storageClient, accountName) {
     return new Promise(function(fullfill, reject){
-        storageClient.storageAccounts.get(accountName, function(err, account){
+        storageClient.storageAccounts.list(function(err, res){
             if(err){
                 reject(err);
             } else {
-                fullfill(account.storageAccount.properties.endpoints);
+                res.storageAccounts.forEach(function (storage) {
+                    var matchRgp = /resourceGroups\/(.+?)\/.*/.exec(storage.id);
+                    var matchAct = /storageAccounts\/(.+?)$/.exec(storage.id);
+                    if (matchAct[1] == accountName) {
+                        fullfill(matchRgp[1]);
+                    }
+                });
             }
         });
     });
 };
 
-var getStorageAccountKey = function(storageClient, accountName){
+var getStorageAccountKey = function(storageClient, rgpName, accountName){
+    console.log("123");
     return new Promise(function(fullfill, reject){
-        storageClient.storageAccounts.getKeys(accountName, function(err, keys){
-            if(err){
+        storageClient.storageAccounts.listKeys(rgpName, accountName, function(err, res){
+            console.log("??");
+            if (err) {
                 reject(err);
             } else {
-                fullfill(keys.primaryKey);
-            } 
+                fullfill(res);
+            }
         });
     });
 };
@@ -365,27 +436,14 @@ var getStorageAccountFromUri = function(uri){
     }
 }
 
-var getVirtualMachine = function(computeClient, svcName, vmName){
+var getVirtualMachine = function(computeClient, rgpName, vmName){
     return new Promise(function(fullfill, reject){
-        computeClient.deployments.getBySlot(svcName, "Production", 
-                                            function(err, deployments){
+        computeClient.virtualMachines.get(rgpName, vmName, 
+                                            function(err, res){
             if(err){
                 reject(err);
             } else {
-                var vm;
-                deployments.roles.every(function(role){
-                    if(role.roleName == vmName){
-                        vm = role;
-                        return false; 
-                    }else{
-                        return true; 
-                    }
-                });
-                if(vm){
-                    fullfill(vm);
-                }else{
-                    reject("VM not found."); 
-                }
+                fullfill(res.virtualMachine);
             }
         });
     });
@@ -469,7 +527,6 @@ var getTokenCredential = function(subscription){
                     type : 'token',
                     token : token.accessToken
                 };
-                subscription.managementEndpointUrl = token.resource;
                 return false
             }
         });
@@ -490,11 +547,11 @@ function getUserHome() {
 }
 
 var main = function(){
-    var svcName = null;
+    var rgpName = null;
     var vmName = null;
     if(process.argv.length === 4){
         vmName = process.argv[3];
-        svcName = process.argv[2];
+        rgpName = process.argv[2];
     } else if(process.argv.length === 3){
         if(process.argv[2] === "--help" || process.argv[2] === "-h"){
             usage();
@@ -504,13 +561,13 @@ var main = function(){
             process.exit(0);
         }
         vmName = process.argv[2];
-        svcName = vmName;
+        rgpName = vmName;
     } else{
         usage();
         process.exit(1);
     }
 
-    setAzureVMEnhancedMonitorForLinux(svcName, vmName).done(function(){
+    setAzureVMEnhancedMonitorForLinux(rgpName, vmName).done(function(){
         console.log("[INFO]Azure Enhanced Monitoring Extension " + 
                     "configuration updated.");
         console.log("[INFO]It can take up to 15 Minutes for the " + 
@@ -521,7 +578,7 @@ var main = function(){
             console.error("[ERROR]Token expired. " + 
                           "Please run the following command to login.");
             console.log("    ");
-            console.log("    azure login -u <user_name>");
+            console.log("    azure login");
             console.log("or");
             console.log("    azure account import <pem_file>");
             process.exit(-1);

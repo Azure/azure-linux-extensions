@@ -133,7 +133,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
                               startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data(CPU).")
-        table = "LinuxPerfCpuVer1v0"
+        table = "LinuxCpuVer2v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey,
                                     host_base = hostBase)
@@ -157,7 +157,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
                                  startKey, endKey, hostname):
     try:
         waagent.Log("Retrieve diagnostic data: Memory")
-        table = "LinuxPerfMemVer1v0"
+        table = "LinuxMemoryVer2v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey,
                                     host_base = hostBase)
@@ -1257,6 +1257,9 @@ class PerfCounterWriter(object):
 
 class EnhancedMonitorConfig(object):
     def __init__(self, privateConfig, publicConfig):
+        xmldoc = minidom.parse('/var/lib/waagent/SharedConfig.xml')
+        self.deployment = xmldoc.getElementsByTagName('Deployment')
+		self.role = xmldoc.getElementsByTagName('Role')
         self.configData = {}
         diskCount = 0
         accountNames = []
@@ -1278,10 +1281,10 @@ class EnhancedMonitorConfig(object):
         return self.configData["vmsize"]
 
     def getVmRoleInstance(self):
-        return self.configData["vm.roleinstance"]
+        return self.role[0].attributes['name'].value
 
     def getVmDeploymentId(self):
-        return self.configData["vm.depoymentId"]
+        return self.deployment[0].attributes['name'].value
 
     def isMemoryOverCommitted(self):
         return self.configData["vm.memory.isovercommitted"]

@@ -95,8 +95,10 @@ def daemon(hutil):
         startTime = time.time()
         try:
             monitor.run()
-            hutil.do_status_report("Enable", "success", 0, 
-                                   "Monitoring service is running.")
+            message = 'deploymentId='+config.getVmDeploymentId()+' '+
+                      'roleInstance='+config.getVmRoleInstance()+' OK'
+            hutil.do_status_report("Enable", "success", 0, message)
+
         except Exception, e:
             waagent.Error("{0} {1}".format(printable(e), 
                                            traceback.format_exc()))
