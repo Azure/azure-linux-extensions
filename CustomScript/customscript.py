@@ -596,7 +596,9 @@ def get_command_to_execute(hutil):
     public_settings = hutil.get_public_settings()
     protected_settings = hutil.get_protected_settings()
     cmd_public = public_settings.get('commandToExecute')
-    cmd_protected = protected_settings.get('commandToExecute')
+    cmd_protected = None
+    if protected_settings is not None:
+        cmd_protected = protected_settings.get('commandToExecute')
     if cmd_public and cmd_protected:
         err_msg = ("commandToExecute was specified both in public settings "
             "and protected settings. It can only be specified in one of them.")
