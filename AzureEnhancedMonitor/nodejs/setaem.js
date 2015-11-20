@@ -155,9 +155,6 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
         console.log("[INFO]Adding configure for OS disk.");
         aemConfig.setPublic('osdisk.account', osdiskAccount);
         aemConfig.setPublic('osdisk.name', osdisk.name);
-        aemConfig.setPublic('osdisk.caching', osdisk.caching);
-        //aemConfig.setPublic('osdisk.type', osdisk.caching);
-        //aemConfig.setPublic('osdisk.sla.throughput', osdisk.caching);
         //aemConfig.setPublic('osdisk.caching', osdisk.caching);
         aemConfig.setPublic('osdisk.connminute', osdiskAccount + ".minute");
         aemConfig.setPublic('osdisk.connhour', osdiskAccount + ".hour");
@@ -185,6 +182,7 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
             var lun = dataDisk.lun;
             aemConfig.setPublic('disk.lun.' + i, lun);
             aemConfig.setPublic('disk.name.' + i, dataDisk.name);
+            aemConfig.setPublic('disk.caching.' + i, dataDisk.name);
             aemConfig.setPublic('disk.account.' + i, datadiskAccount);
             aemConfig.setPublic('disk.connminute.' + i, 
                                 datadiskAccount + ".minute");
@@ -207,20 +205,23 @@ var setAzureVMEnhancedMonitorForLinux = function(rgpName, vmName){
                 aemConfig.setPrivate(account.name + ".hour.key", accountKey);
                 return getStorageAccountProperties(storageClient, account.rgp, account.name);
             }).then(function(properties){
-                
+                //ispremium
                 i += 1;
-                if (i >= 0) {
-                    if (properties.accountType.startsWith("Standard"))
+                if (properties.accountType.startsWith("Standard")) {
+                    if (i >= 0)
                         aemConfig.setPublic('disk.type.' + i, "Standard");
                     else
-                        aemConfig.setPublic('disk.type.' + i, "Premium");
-                } else {
-                    if (properties.accountType.startsWith("Standard"))
                         aemConfig.setPublic('osdisk.type' + i, "Standard");
+                } else {
+                    if (i >= 0)
+                        aemConfig.setPublic('disk.type.' + i, "Premium");
                     else
                         aemConfig.setPublic('osdisk.type' + i, "Premium");
+                    aemConfig.setPublic(account.name + ".hour.ispremium", 1);
+                    aemConfig.setPublic(account.name + ".minute.ispremium", 1);
                 }
                 
+                //endpoints
                 var endpoints = properties.primaryEndpoints;
                 
                 var tableEndpoint;

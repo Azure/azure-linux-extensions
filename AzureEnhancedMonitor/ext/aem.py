@@ -381,30 +381,46 @@ class NetworkInfo(object):
     def __init__(self):
         self.nics = psutil.net_io_counters(pernic=True)
         self.nicNames = []
-        self.readBytes = 0
-        self.writeBytes = 0
-        self.networkReadBytes = {}
-        self.networkWriteBytes = {}
         for nicName, stat in self.nics.iteritems():
             if nicName != 'lo':
                 self.nicNames.append(nicName)
-                self.readBytes = self.readBytes + stat[1] #bytes_recv
-                self.writeBytes = self.writeBytes + stat[0] #bytes_sent
-                self.networkReadBytes[nicName] = stat[1]
-                self.networkWriteBytes[nicName] = stat[0]
 
     def getAdapterIds(self):
         return self.nicNames
 
     def getNetworkReadBytes(self, adapterId):
-        if adapterId in self.networkReadBytes :
-            return self.networkReadBytes[adapterId]
+        net = psutil.net_io_counters(pernic=True)
+        if net[adapterId] != None:
+            bytes_recv1 = net[adapterId][1]
+            time1 = datetime.datetime.now()
+            
+            time.sleep(0.2)
+            
+            net = psutil.net_io_counters(pernic=True)
+            bytes_recv2 = net[adapterId][1]
+            time2 = datetime.datetime.now()
+            
+            interval = (time2 - time1).total_seconds()
+            
+            return (bytes_recv2 - bytes_recv1) / interval
         else:
             return 0
 
     def getNetworkWriteBytes(self, adapterId):
-        if adapterId in self.networkWriteBytes :
-            return self.networkWriteBytes[adapterId]
+        net = psutil.net_io_counters(pernic=True)
+        if net[adapterId] != None:
+            bytes_sent1 = net[adapterId][0]
+            time1 = datetime.datetime.now()
+            
+            time.sleep(0.2)
+            
+            net = psutil.net_io_counters(pernic=True)
+            bytes_sent2 = net[adapterId][0]
+            time2 = datetime.datetime.now()
+            
+            interval = (time2 - time1).total_seconds()
+            
+            return (bytes_sent2 - bytes_sent1) / interval
         else:
             return 0
 
@@ -834,8 +850,8 @@ class DiskInfo(object):
         osdiskVhd = "{0} {1}".format(self.config.getOSDiskAccount(),
                                   self.config.getOSDiskName())
         diskMapping = {
-                "/dev/sda": osdiskVhd,
-                "/dev/sdb": "not mapped to vhd"
+                "/dev/sda": [osdiskVhd, "ReadWrite"],
+                "/dev/sdb": ["not mapped to vhd", "ReadWrite"]
         }
 
         dataDisks = getDataDisks()
@@ -854,7 +870,7 @@ class DiskInfo(object):
                                    self.config.getDataDiskName(i))
             if lun in lunToDevMap:
                 dev = lunToDevMap[lun]
-                diskMapping[dev] = vhd
+                diskMapping[dev] = [vhd, self.config.getDataDiskCaching(i)]
             else:
                 waagent.Warn("Couldn't find disk with lun: {0}".format(lun))
 
@@ -948,8 +964,11 @@ class StorageDataSource(object):
     def collect(self):
         counters = []
         diskMapping = DiskInfo(self.config).getDiskMapping()
-        for dev, vhd in diskMapping.iteritems():
-            counters.append(self.createCounterDiskMapping(dev, vhd)) 
+        for dev, [vhd, caching] in diskMapping.iteritems():
+            counters.append(self.createCounterDiskMapping(dev, vhd))
+            account = vhd[:vhd.index(' ')]
+            counters.append(self.createCounterDiskStorageType(account))
+            counters.append(self.createCounterDiskCaching(account, caching)
 
         accounts = self.config.getStorageAccountNames()
         startKey, endKey = getStorageTableKeyRange()
@@ -968,14 +987,12 @@ class StorageDataSource(object):
             counters.append(self.createCounterReadBytes(account, stat))
             counters.append(self.createCounterReadOps(account, stat))
             counters.append(self.createCounterReadOpE2ELatency(account, stat))
-            counters.append(self.createCounterReadOpServerLatency(account, 
-                                                                  stat))
+            counters.append(self.createCounterReadOpServerLatency(account, stat))
             counters.append(self.createCounterReadOpThroughput(account, stat))
             counters.append(self.createCounterWriteBytes(account, stat))
             counters.append(self.createCounterWriteOps(account, stat))
             counters.append(self.createCounterWriteOpE2ELatency(account, stat))
-            counters.append(self.createCounterWriteOpServerLatency(account, 
-                                                                   stat))
+            counters.append(self.createCounterWriteOpServerLatency(account, stat))
             counters.append(self.createCounterWriteOpThroughput(account, stat))
         return counters
 
@@ -1081,6 +1098,20 @@ class StorageDataSource(object):
                            name = "Phys. Disc to Storage Mapping",
                            instance = dev,
                            value = vhd)
+                    
+    def createCounterDiskStorageType(self, account):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
+                           category = "storage",
+                           name = "Disk Storage Type",
+                           instance = account,
+                           value = self.config.getStorageAccountType(account))
+
+    def createCounterDiskCaching(self, account, caching):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
+                           category = "storage",
+                           name = "Disk Caching",
+                           instance = account,
+                           value = caching)
 
 class HvInfo(object):
     def __init__(self):
@@ -1329,12 +1360,18 @@ class EnhancedMonitorConfig(object):
 
     def getDataDiskConnHour(self, index):
         return self.configData["disk.connhour.{0}".format(index)]
+    
+    def getDataDiskCaching(self, index):
+        return self.configData["disk.caching.{0}".format(index)]
 
     def getStorageAccountNames(self):
         return self.configData["account.names"]
 
     def getStorageAccountKey(self, name):
         return self.configData["{0}.minute.key".format(name)]
+        
+    def getStorageAccountType(self, name):
+        return "Premium" if "{0}.minute.ispremium".format(name) in self.configData else "Standard"
     
     def getStorageHostBase(self, name):
         return get_host_base_from_uri(self.getStorageAccountMinuteUri(name)) 
