@@ -8,7 +8,7 @@ VM Extensions are injected components authored by Microsoft and Partners into Li
 
 | Name | Lastest Version | Description |
 |:---|:---|:---|
-| [Custom Script](https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript) | 1.3 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
+| [Custom Script](https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript) | 1.4 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
 | [DSC](https://github.com/Azure/azure-linux-extensions/tree/master/DSC) | 1.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
 | [OS Patching](https://github.com/Azure/azure-linux-extensions/tree/master/OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
 | [VM Access](https://github.com/Azure/azure-linux-extensions/tree/master/VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
