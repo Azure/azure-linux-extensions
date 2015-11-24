@@ -78,3 +78,6 @@ Common/psutil/build/*
 Common/psutil/dist/*
 Common/psutil/psutil.egg-info/*
 VMBackup/.vs/VMBackup/v14/.suo
+
+# Handler Registration ignores
+*.pem

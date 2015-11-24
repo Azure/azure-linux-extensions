@@ -1,0 +1,16 @@
+<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
+<ProviderNameSpace>Microsoft.Loves.Linux</ProviderNameSpace>
+<Type>SampleExtension</Type>
+<Version>1.0.0.0</Version>
+<Label>Microsoft loves Linux</Label>
+<HostingResources>VmRole</HostingResources>
+<MediaLink>Storage blob location of the Zip file</MediaLink>
+<Description>Microsoft loves Linux</Description>
+<IsInternalExtension>false</IsInternalExtension>
+<Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
+<PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
+<HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
+<IsJsonExtension>true</IsJsonExtension>
+<SupportedOS>Linux</SupportedOS>
+<CompanyName>Microsoft</CompanyName>
+</ExtensionImage>
