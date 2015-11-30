@@ -51,7 +51,7 @@ def install():
         MyPatching.install()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, "Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed.')
 
 def enable():
@@ -76,7 +76,7 @@ def enable():
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
-        hutil.log_and_syslog(logging.ERROR, "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable Failed. Current Configuation: ' + current_config)
 
 def uninstall():
@@ -89,7 +89,7 @@ def disable():
         MyPatching.disable()
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded.')
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, "Failed to disable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to disable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed.')
 
 def update():
@@ -113,7 +113,7 @@ def download():
         hutil.do_exit(0,'Enable','success','0', 'Download Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
-        hutil.log_and_syslog(logging.ERROR, "Failed to download updates with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to download updates with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Download Failed. Current Configuation: ' + current_config)
 
 def patch():
@@ -133,7 +133,7 @@ def patch():
         hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
-        hutil.log_and_syslog(logging.ERROR, "Failed to patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Patch Failed. Current Configuation: ' + current_config)
 
 def oneoff():
@@ -153,7 +153,7 @@ def oneoff():
         hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded. Current Configuation: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
-        hutil.log_and_syslog(logging.ERROR, "Failed to one-off patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
+        hutil.error("Failed to one-off patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed. Current Configuation: ' + current_config)
 
 def download_files(hutil):
@@ -171,26 +171,26 @@ def download_files(hutil):
     elif str(local).lower() == "false":
         local = False
     else:
-        hutil.log_and_syslog(logging.WARNING, "The parameter \"local\" "
+        hutil.log("WARNING: The parameter \"local\" "
                   "is empty or invalid. Set it as False. Continue...")
         local = False
     idle_test_script = settings.get("vmStatusTest", dict()).get('idleTestScript')
     healthy_test_script = settings.get("vmStatusTest", dict()).get('healthyTestScript')
 
     if (not idle_test_script and not healthy_test_script):
-        hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" and \"healthyTestScript\" "
+        hutil.log("WARNING: The parameter \"idleTestScript\" and \"healthyTestScript\" "
                   "are both empty. Exit downloading VMStatusTest scripts...")
         return
     elif local:
         if (idle_test_script and idle_test_script.startswith("http")) or \
            (healthy_test_script and healthy_test_script.startswith("http")):
-            hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" or \"healthyTestScript\" "
+            hutil.log("WARNING: The parameter \"idleTestScript\" or \"healthyTestScript\" "
                   "should not be uri. Exit downloading VMStatusTest scripts...")
             return
     elif not local:
         if (idle_test_script and not idle_test_script.startswith("http")) or \
            (healthy_test_script and not healthy_test_script.startswith("http")):
-            hutil.log_and_syslog(logging.WARNING, "The parameter \"idleTestScript\" or \"healthyTestScript\" "
+            hutil.log("WARNING: The parameter \"idleTestScript\" or \"healthyTestScript\" "
                   "should be uri. Exit downloading VMStatusTest scripts...")
             return
 
@@ -202,7 +202,7 @@ def download_files(hutil):
     vmStatusTestScripts[healthy_test_script] = healthyTestScriptName
 
     if local:
-        hutil.log_and_syslog(logging.INFO, "Saving VMStatusTest scripts from user's configurations...")
+        hutil.log("Saving VMStatusTest scripts from user's configurations...")
         for src,dst in vmStatusTestScripts.items():
             if not src:
                 continue
@@ -216,7 +216,7 @@ def download_files(hutil):
         storage_account_name = settings.get("storageAccountName", "").strip()
         storage_account_key = settings.get("storageAccountKey", "").strip()
     if storage_account_name and storage_account_key:
-        hutil.log_and_syslog(logging.INFO, "Downloading VMStatusTest scripts from azure storage...")
+        hutil.log("Downloading VMStatusTest scripts from azure storage...")
         for src,dst in vmStatusTestScripts.items():
             if not src:
                 continue
@@ -227,7 +227,7 @@ def download_files(hutil):
                                       hutil)
             preprocess_files(file_path, hutil)
     elif not(storage_account_name or storage_account_key):
-        hutil.log_and_syslog(logging.INFO, "No azure storage account and key specified in protected "
+        hutil.log("No azure storage account and key specified in protected "
                   "settings. Downloading VMStatusTest scripts from external links...")
         for src,dst in vmStatusTestScripts.items():
             if not src:
@@ -237,7 +237,7 @@ def download_files(hutil):
     else:
         #Storage account and key should appear in pairs
         error_msg = "Azure storage account or storage key is not provided"
-        hutil.log_and_syslog(logging.ERROR, error_msg)
+        hutil.error(error_msg)
         raise ValueError(error_msg)
 
 def download_blob(storage_account_name, storage_account_key,
@@ -251,10 +251,10 @@ def download_blob(storage_account_name, storage_account_key,
     #The blob download will not conflict.
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(download_path))
+        hutil.log("Downloading to {0}".format(download_path))
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0} "
+        hutil.error(("Failed to download blob with uri:{0} "
                      "with error {1}").format(blob_uri,e))
         raise
     return download_path
@@ -264,10 +264,10 @@ def download_external_file(uri, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
+        hutil.log("Downloading to {0}".format(file_path))
         download_and_save_file(uri, file_path)
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, ("Failed to download external file with uri:{0} "
+        hutil.error(("Failed to download external file with uri:{0} "
                      "with error {1}").format(uri, e))
         raise
     return file_path
@@ -277,10 +277,10 @@ def save_local_file(src, dst, hutil):
     download_dir = prepare_download_dir(seqNo)
     file_path = os.path.join(download_dir, dst)
     try:
-        hutil.log_and_syslog(logging.INFO, "Downloading to {0}".format(file_path))
+        hutil.log("Downloading to {0}".format(file_path))
         waagent.SetFileContents(file_path, src)
     except Exception, e:
-        hutil.log_and_syslog(logging.ERROR, ("Failed to save file from user's configuration "
+        hutil.error(("Failed to save file from user's configuration "
                      "with error {0}").format(e))
         raise
     return file_path
@@ -292,10 +292,10 @@ def preprocess_files(file_path, hutil):
     is_text, code_type = is_text_file(file_path)
     if is_text:
         dos2unix(file_path)
-        hutil.log_and_syslog(logging.INFO, "Converting text files from DOS to Unix formats: Done")
+        hutil.log("Converting text files from DOS to Unix formats: Done")
         if code_type in ['UTF-8', 'UTF-16LE', 'UTF-16BE']:
             remove_bom(file_path)
-            hutil.log_and_syslog(logging.INFO, "Removing BOM: Done")
+            hutil.log("Removing BOM: Done")
 
 def is_text_file(file_path):
     with open(file_path, 'rb') as f:
@@ -375,7 +375,7 @@ def get_properties_from_uri(uri):
         path = path[1:]
     first_sep = path.find('/')
     if first_sep == -1:
-        hutil.log_and_syslog(logging.ERROR, "Failed to extract container, blob, from {}".format(path))
+        hutil.error("Failed to extract container, blob, from {}".format(path))
     blob_name = path[first_sep+1:]
     container_name = path[:first_sep]
     return {'blob_name': blob_name, 'container_name': container_name}
@@ -388,9 +388,9 @@ def download_customized_vmstatustest():
             download_files(hutil)
             break
         except Exception, e:
-            hutil.log_and_syslog(logging.ERROR, "Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
+            hutil.error("Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
             if retry != maxRetry:
-                hutil.log_and_syslog(logging.INFO, "Sleep 10 seconds")
+                hutil.log("Sleep 10 seconds")
                 time.sleep(10)
             else:
                 raise

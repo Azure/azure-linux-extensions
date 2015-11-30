@@ -57,6 +57,10 @@ OutputSize = 4 * 1024
 DownloadOp = "Download"
 RunScriptOp = "RunScript"
 
+# Change permission of log path
+ext_log_path = '/var/log/azure/'
+if os.path.exists(ext_log_path):
+    os.chmod('/var/log/azure/', 0700)
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -81,10 +85,12 @@ def main():
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
-        hutil.error(("Failed to enable the extension with error: {0}, "
-                     "{1}").format(e, traceback.format_exc()))
+        err_msg = ("Failed with error: {0}, "
+                   "{1}").format(e, traceback.format_exc())
+        waagent.Error(err_msg)
+        hutil.error(err_msg)
         hutil.do_exit(1, 'Enable','failed','0',
-                      'Enable failed: {0}'.format(e))
+                      'Enable failed: {0}'.format(err_msg))
 
 
 def dummy_command(operation, status, msg):
@@ -103,42 +109,107 @@ def enable(hutil):
     Ensure the same configuration is executed only once
     If the previous enable failed, we do not have retry logic here,
     since the custom script may not work in an intermediate state.
-    But if download_files fails, we will retry it for maxRetry times.
+    But if download_files fails, we will wait and retry.
     """
     hutil.exit_if_enabled()
+
+    public_settings = hutil.get_public_settings()
+    if public_settings is None:
+        raise ValueError("Public configuration couldn't be None.")
+    retry_count = public_settings.get('retrycount')
+    wait = public_settings.get('wait')
+    if retry_count is None:
+        retry_count = 10
+    if wait is None:
+        wait = 20
+
     prepare_download_dir(hutil.get_seq_no())
-    maxRetry = 2
-    for retry in range(0, maxRetry + 1):
+    retry_count = download_files_with_retry(hutil, retry_count, wait)
+
+    # The internal DNS needs some time to be ready.
+    # Wait and retry to check if there is time in retry window.
+    # The check may be removed safely if iDNS is always ready.
+    check_idns_with_retry(hutil, retry_count, wait)
+
+    start_daemon(hutil)
+
+
+def download_files_with_retry(hutil, retry_count, wait):
+    hutil.log(("Will try to download files, "
+               "number of retries = {0}, "
+               "wait SECONDS between retrievals = {1}s").format(retry_count, wait))
+    for download_retry_count in range(0, retry_count + 1):
         try:
             download_files(hutil)
             break
         except Exception, e:
-            hutil.error(("Failed to download files, "
-                         "retry={0}, maxRetry={1}").format(retry, maxRetry))
-            if retry != maxRetry:
-                hutil.log("Sleep 10 seconds")
-                time.sleep(10)
+            error_msg = ("Failed to download files, "
+                         "retry = {0}, maxRetry = {1}.").format(download_retry_count, retry_count)
+            hutil.error(error_msg)
+            if download_retry_count < retry_count:
+                hutil.log("Sleep {0} seconds".format(wait))
+                time.sleep(wait)
             else:
-                error_msg = "Failed to download files"
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=DownloadOp,
                                           isSuccess=False,
                                           version=Version,
                                           message="(01100)"+error_msg)
                 raise
+
+    msg = ("Succeeded to download files, "
+           "retry count = {0}").format(download_retry_count)
+    hutil.log(msg)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=DownloadOp,
                               isSuccess=True,
                               version=Version,
-                              message="(01303)Succeeded to download files")
-    start_daemon(hutil)
+                              message="(01303)"+msg)
+    return retry_count - download_retry_count
+
+
+def check_idns_with_retry(hutil, retry_count, wait):
+    is_idns_ready = False
+    for check_idns_retry_count in range(0, retry_count + 1):
+        is_idns_ready = check_idns()
+        if is_idns_ready:
+            break
+        else:
+            if check_idns_retry_count < retry_count:
+                hutil.error("Internal DNS is not ready, retry to check.")
+                hutil.log("Sleep {0} seconds".format(wait))
+                time.sleep(wait)
+
+    if is_idns_ready:
+        msg = ("Internal DNS is ready, "
+               "retry count = {0}").format(check_idns_retry_count)
+        hutil.log(msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op="CheckIDNS",
+                                  isSuccess=True,
+                                  version=Version,
+                                  message="(01306)"+msg)
+    else:
+        error_msg = ("Internal DNS is not ready, "
+                     "retry count = {0}, ignore it.").format(check_idns_retry_count)
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op="CheckIDNS",
+                                  isSuccess=False,
+                                  version=Version,
+                                  message="(01306)"+error_msg)
+
+
+def check_idns():
+    ret = waagent.Run("host $(hostname)")
+    return (not ret)
 
 
 def download_files(hutil):
     public_settings = hutil.get_public_settings()
     if public_settings is None:
         raise ValueError("Public configuration couldn't be None.")
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     blob_uris = public_settings.get('fileUris')
 
     protected_settings = hutil.get_protected_settings()
@@ -189,8 +260,7 @@ def download_files(hutil):
 
 
 def start_daemon(hutil):
-    public_settings = hutil.get_public_settings()
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     if cmd:
         hutil.log("Command to execute:" + cmd)
         args = [os.path.join(os.getcwd(), __file__), "-daemon"]
@@ -217,8 +287,7 @@ def start_daemon(hutil):
 
 
 def daemon(hutil):
-    public_settings = hutil.get_public_settings()
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     args = parse_args(cmd)
     if args:
         run_script(hutil, args)
@@ -521,6 +590,23 @@ def get_formatted_log(summary, stdout, stderr):
                   "---errout---\n"
                   "{2}\n")
     return msg_format.format(summary, stdout, stderr)
+
+
+def get_command_to_execute(hutil):
+    public_settings = hutil.get_public_settings()
+    protected_settings = hutil.get_protected_settings()
+    cmd_public = public_settings.get('commandToExecute')
+    cmd_protected = None
+    if protected_settings is not None:
+        cmd_protected = protected_settings.get('commandToExecute')
+    if cmd_public and cmd_protected:
+        err_msg = ("commandToExecute was specified both in public settings "
+            "and protected settings. It can only be specified in one of them.")
+        hutil.error(err_msg)
+        hutil.do_exit(1, 'Enable','failed','0',
+            'Enable failed: {0}'.format(err_msg))
+
+    return cmd_public if cmd_public else cmd_protected
 
 
 if __name__ == '__main__' :

@@ -21,20 +21,22 @@
 import urlparse
 import httplib
 import traceback
+from common import CommonVariables
+from HttpUtil import HttpUtil
 
 class SnapshotError(object):
     def __init__(self):
         self.errorcode = 0
-        self.path = None
+        self.sasuri = None
     def __str__(self):
-        return 'errorcode:' + str(self.errorcode) + 'path:' + str(self.path)
+        return 'errorcode:' + str(self.errorcode) + 'sasuri:' + str(self.sasuri)
 
 class SnapshotResult(object):
     def __init__(self):
         self.errors = []
 
     def __str__(self):
-        error_str=""
+        error_str = ""
         for error in self.errors:
             error_str+=(str(error)) + "\n"
         return error_str
@@ -50,37 +52,33 @@ class Snapshotter(object):
         if(sasuri is None):
             self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
             snapshot_error.errorcode = -1
-            snapshot_error.sasuri    = sasuri
+            snapshot_error.sasuri = sasuri
         try:
-            sasuri_obj   = urlparse.urlparse(sasuri)
-
+            sasuri_obj = urlparse.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
                 self.logger.log("Failed to parse the sasuri",False,'Error')
                 snapshot_error.errorcode = -1
-                snapshot_error.sasuri    = sasuri
+                snapshot_error.sasuri = sasuri
             else:
-                connection   = httplib.HTTPSConnection(sasuri_obj.hostname)
                 body_content = ''
-                headers      = {}
+                headers = {}
                 headers["Content-Length"] = 0
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        key   = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                for meta in meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
-                connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query + '&comp=snapshot', body_content, headers = headers)
-                result = connection.getresponse()
-                self.logger.log(str(result.getheaders()))
-                connection.close()
-                if(result.status != 201):
-                    snapshot_error.errorcode = result.status
+                http_util = HttpUtil(self.logger)
+                sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
+                if(result != 0):
+                    snapshot_error.errorcode = result
                     snapshot_error.sasuri = sasuri
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
             snapshot_error.errorcode = -1
-            snapshot_error.sasuri    = sasuri
+            snapshot_error.sasuri = sasuri
         return snapshot_error
 
     def snapshotall(self, paras):
@@ -89,6 +87,6 @@ class Snapshotter(object):
         blobs = paras.blobs
         for blob in blobs:
             snapshotError = self.snapshot(blob, paras.backup_metadata)
-            if(snapshotError.errorcode != 0):
+            if(snapshotError.errorcode != CommonVariables.success):
                 snapshot_result.errors.append(snapshotError)
         return snapshot_result

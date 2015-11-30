@@ -18,10 +18,13 @@
 #
 # Requires Python 2.7+
 #
+
+import time
 import datetime
 import traceback
 import urlparse
 import httplib
+from blobwriter import BlobWriter
 
 class Backuplogger(object):
     def __init__(self, hutil):
@@ -29,31 +32,16 @@ class Backuplogger(object):
         self.hutil = hutil
 
     """description of class"""
-    def log(self, msg, local = False, level = 'Info'):
-        log_msg = (str(datetime.datetime.now())+'   ' + level + '   '+ msg + '\n')
+    def log(self, msg, local=False, level='Info'):
+        log_msg = (str(datetime.datetime.now()) + '   ' + level + '   ' + msg + '\n')
         self.msg += log_msg
         if(local):
             self.hutil.log(log_msg)
 
     def commit(self, logbloburi):
-        try:
-            self.log("committing the log")
-            self.hutil.log(self.msg)
-            if(logbloburi  is not None):
-                sasuri_obj = urlparse.urlparse(logbloburi)
-                connection = httplib.HTTPSConnection(sasuri_obj.hostname)
-                body_content = self.msg
-                headers={}
-                headers["x-ms-blob-type" ] = 'BlockBlob'
-                self.log(str(headers))
-                connection.request('PUT', sasuri_obj.path + '?' + sasuri_obj.query, body_content, headers = headers)
-
-                result = connection.getresponse()
-                connection.close()
-                return True
-            else:
-                self.hutil.log("logbloburi is None");
-                return False
-        except Exception as e:
-            self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-            return False
+        #commit to local file system first, then commit to the network.
+        self.hutil.log(self.msg)
+        blobWriter = BlobWriter(self.hutil)
+        blobWriter.WriteBlob(self.msg,logbloburi)
+    def commit_to_local(self):
+        self.hutil.log(self.msg)

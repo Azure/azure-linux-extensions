@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -37,6 +37,7 @@ import shutil
 import tempfile
 import json
 import sys
+import subprocess
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
@@ -49,28 +50,28 @@ packages_array.append(main_folder)
 """
 copy the dependency to the local
 """
-azure_sdk_path = 'azure-sdk'
-call(["git", "clone", "https://github.com/Azure/azure-sdk-for-python.git", azure_sdk_path])
-#delete the azure
-if os.path.isdir(CommonVariables.azure_path):
-    shutil.rmtree(CommonVariables.azure_path)
+#azure_sdk_path = 'azure-sdk'
+#call(["git", "clone", "https://github.com/Azure/azure-sdk-for-python.git", azure_sdk_path])
+##delete the azure
+#if os.path.isdir(CommonVariables.azure_path):
+#    shutil.rmtree(CommonVariables.azure_path)
 
-shutil.copytree(azure_sdk_path + '/azure' , CommonVariables.azure_path)
-packages_array.append(CommonVariables.azure_path + '/http')
-packages_array.append(CommonVariables.azure_path + '/servicebus')
-packages_array.append(CommonVariables.azure_path + '/servicemanagement')
-packages_array.append(CommonVariables.azure_path + '/storage')
+#shutil.copytree(azure_sdk_path + '/azure' , CommonVariables.azure_path)
+#packages_array.append(CommonVariables.azure_path + '/http')
+#packages_array.append(CommonVariables.azure_path + '/servicebus')
+#packages_array.append(CommonVariables.azure_path + '/servicemanagement')
+#packages_array.append(CommonVariables.azure_path + '/storage')
 
 
-"""
-copy the utils lib to local
-"""
+#"""
+#copy the utils lib to local
+#"""
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
-if os.path.isdir(target_utils_path):
-    shutil.rmtree(target_utils_path)
-print('copying')
-shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
-print('copying end')
+#if os.path.isdir(target_utils_path):
+#    shutil.rmtree(target_utils_path)
+#print('copying')
+#shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
+#print('copying end')
 packages_array.append(target_utils_path)
 
 
@@ -152,12 +153,20 @@ target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
 
+def dos2unix(src):
+    args = ["dos2unix",src]
+    devnull = open(os.devnull, 'w')
+    child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
+    print 'dos2unix %s ' % (src)
+    child.wait()
+
 def zip(src, dst):
     zf = ZipFile("%s" % (dst), "w")
     abs_src = os.path.abspath(src)
     for dirname, subdirs, files in os.walk(src):
         for filename in files:
             absname = os.path.abspath(os.path.join(dirname, filename))
+            dos2unix(absname)
             arcname = absname[len(abs_src) + 1:]
             print 'zipping %s as %s' % (os.path.join(dirname, filename),
                                         arcname)

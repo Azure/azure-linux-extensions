@@ -33,11 +33,11 @@ var CurrentScriptVersion = "1.0.0.0";
 
 var aemExtPublisher = "Microsoft.OSTCExtensions";
 var aemExtName = "AzureEnhancedMonitorForLinux";
-var aemExtVersion = "1.0";
+var aemExtVersion = "2.0";
 
 var ladExtName = "LinuxDiagnostic";
 var ladExtPublisher = "Microsoft.OSTCExtensions";
-var ladExtVersion = "1.0";
+var ladExtVersion = "2.0";
 
 var ROLECONTENT = "IaaS";
 var AzureEndpoint = "windows.net";
@@ -100,7 +100,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         debug && console.log(JSON.stringify(subscription, null, 4));
         currSubscription = subscription;
         var cred = getCloudCredential(subscription);
-        var baseUri = subscription.managementEndpointUrl
+        var baseUri = subscription.managementEndpointUrl;
         computeClient = computeMgmt.createComputeManagementClient(cred, baseUri);
         storageClient = storageMgmt.createStorageManagementClient(cred, baseUri);
     }).then(function(){
@@ -193,6 +193,7 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
         aemConfig.setPublic("wad.name", accounts[0].name);
         aemConfig.setPrivate("wad.key", accounts[0].key);
         var ladUri = accounts[0].tableEndpoint + ladMetricesTable;
+        console.log("[INFO]Your endpoint is: "+accounts[0].tableEndpoint);
         aemConfig.setPublic("wad.uri", ladUri);
     }).then(function(){
         //Update vm
@@ -207,7 +208,8 @@ var setAzureVMEnhancedMonitorForLinux = function(svcName, vmName){
                 'key' : ladExtName + "PrivateConfigParameter",
                 'value' : JSON.stringify({
                     'storageAccountName' : accounts[0].name,
-                    'storageAccountKey' : accounts[0].key
+                    'storageAccountKey' : accounts[0].key,
+                    'endpoint' : accounts[0].tableEndpoint.substring((accounts[0].tableEndpoint.search(/\./)) + 1, accounts[0].tableEndpoint.length)
                 }),
                 'type':'Private'
             }]
@@ -467,6 +469,7 @@ var getTokenCredential = function(subscription){
                     type : 'token',
                     token : token.accessToken
                 };
+                subscription.managementEndpointUrl = token.resource;
                 return false
             }
         });

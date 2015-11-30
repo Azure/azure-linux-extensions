@@ -26,11 +26,13 @@ import base64
 import re
 import json
 import platform
+import random
 import shutil
 import time
 import traceback
 import datetime
 import logging
+import logging.handlers
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -83,10 +85,12 @@ class AbstractPatching(object):
     """
     def __init__(self, hutil):
         self.hutil = hutil
+        self.syslogger = None
 
         self.patched = []
         self.to_patch = []
         self.downloaded = []
+        self.download_retry_queue = []
 
         # Patching Configuration
         self.disabled = None
@@ -129,7 +133,7 @@ class AbstractPatching(object):
         disabled = settings.get("disabled")
         if disabled is None or str(disabled).lower() not in ConfigOptions.disabled:
             msg = "The value of parameter \"disabled\" is empty or invalid. Set it False by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.disabled = False
         else:
             if str(disabled).lower() == "true":
@@ -139,13 +143,13 @@ class AbstractPatching(object):
         self.current_configs["disabled"] = str(self.disabled)
         if self.disabled:
             msg = "The extension is disabled."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             return
 
         stop = settings.get("stop")
         if stop is None or str(stop).lower() not in ConfigOptions.stop:
             msg = "The value of parameter \"stop\" is empty or invalid. Set it False by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.stop = False
         else:
             if str(stop).lower() == 'true':
@@ -157,7 +161,7 @@ class AbstractPatching(object):
         reboot_after_patch = settings.get("rebootAfterPatch")
         if reboot_after_patch is None or reboot_after_patch.lower() not in ConfigOptions.reboot_after_patch:
             msg = "The value of parameter \"rebootAfterPatch\" is empty or invalid. Set it \"rebootifneed\" by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.reboot_after_patch = ConfigOptions.reboot_after_patch[0]
         else:
             self.reboot_after_patch = reboot_after_patch.lower()
@@ -171,7 +175,7 @@ class AbstractPatching(object):
         category = settings.get('category')
         if category is None or category.lower() not in ConfigOptions.category.values():
             msg = "The value of parameter \"category\" is empty or invalid. Set it " + self.category_required + " by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.category = self.category_required
         else:
             self.category = category.lower()
@@ -186,7 +190,7 @@ class AbstractPatching(object):
         install_duration = settings.get('installDuration')
         if install_duration is None or not re.match(check_hrmin, install_duration):
             msg = "The value of parameter \"installDuration\" is empty or invalid. Set it 1 hour by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.install_duration = 3600
             self.current_configs["installDuration"] = "01:00"
         else:
@@ -195,12 +199,12 @@ class AbstractPatching(object):
             self.current_configs["installDuration"] = install_duration
         if self.install_duration <= 300:
             msg = "The value of parameter \"installDuration\" is smaller than 5 minutes. The extension will not reserve 5 minutes for reboot. It is recommended to set \"installDuration\" more than 30 minutes."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
         else:
             msg = "The extension will reserve 5 minutes for reboot."
             # 5 min for reboot
             self.install_duration -= 300
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
 
         # The parameter "downloadDuration" is not exposed to users. So there's no log.
         download_duration = settings.get('downloadDuration')
@@ -211,7 +215,7 @@ class AbstractPatching(object):
         oneoff = settings.get('oneoff')
         if oneoff is None or str(oneoff).lower() not in ConfigOptions.oneoff:
             msg = "The value of parameter \"oneoff\" is empty or invalid. Set it False by default."
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             self.oneoff = False
         else:
             if str(oneoff).lower() == "true":
@@ -220,14 +224,14 @@ class AbstractPatching(object):
             else:
                 self.oneoff = False
                 msg = "The extension will run in scheduled task mode."
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
         self.current_configs["oneoff"] = str(self.oneoff)
 
         if not self.oneoff:
             start_time = settings.get('startTime')
             if start_time is None or not re.match(check_hrmin, start_time):
                 msg = "The parameter \"startTime\" is empty or invalid. It defaults to 03:00."
-                self.hutil.log_and_syslog(logging.WARNING, msg)
+                self.log_and_syslog(logging.WARNING, msg)
                 start_time = "03:00"
             self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
             self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
@@ -236,7 +240,7 @@ class AbstractPatching(object):
             day_of_week = settings.get("dayOfWeek")
             if day_of_week is None or day_of_week == "":
                 msg = "The parameter \"dayOfWeek\" is empty. dayOfWeek defaults to Everyday."
-                self.hutil.log_and_syslog(logging.WARNING, msg)
+                self.log_and_syslog(logging.WARNING, msg)
                 day_of_week = "everyday"
                 self.day_of_week = ConfigOptions.day_of_week["everyday"]
             else:
@@ -244,7 +248,7 @@ class AbstractPatching(object):
                     day = day.strip().lower()
                     if day not in ConfigOptions.day_of_week:
                         msg = "The parameter \"dayOfWeek\" is invalid. dayOfWeek defaults to Everyday."
-                        self.hutil.log_and_syslog(logging.WARNING, msg)
+                        self.log_and_syslog(logging.WARNING, msg)
                         day_of_week = "everyday"
                         break
                 if "everyday" in day_of_week:
@@ -261,7 +265,7 @@ class AbstractPatching(object):
             interval_of_weeks = settings.get('intervalOfWeeks')
             if interval_of_weeks is None or interval_of_weeks not in ConfigOptions.interval_of_weeks:
                 msg = "The parameter \"intervalOfWeeks\" is empty or invalid. intervalOfWeeks defaults to 1."
-                self.hutil.log_and_syslog(logging.WARNING, msg)
+                self.log_and_syslog(logging.WARNING, msg)
                 self.interval_of_weeks = '1'
             else:
                 self.interval_of_weeks = interval_of_weeks
@@ -276,7 +280,7 @@ class AbstractPatching(object):
             waagent.SetFileContents(self.scheduled_configs_file, json.dumps(self.current_configs))
 
         msg = "Current Configuration: " + self.get_current_config()
-        self.hutil.log_and_syslog(logging.INFO, msg)
+        self.log_and_syslog(logging.INFO, msg)
 
     def install(self):
         pass
@@ -311,11 +315,11 @@ class AbstractPatching(object):
         script_file = os.path.basename(script_file_path)
         retcode, output = waagent.RunGetOutput('ps -ef | grep "' + script_file + ' -download" | grep -v grep | grep -v sh | awk \'{print $2}\'')
         if retcode > 0:
-            self.hutil.log_and_syslog(logging.ERROR, output)
+            self.log_and_syslog(logging.ERROR, output)
         if output != '':
             retcode, output2 = waagent.RunGetOutput("ps -ef | awk '{if($3==" + output.strip() + ") {print $2}}'")
             if retcode > 0:
-                self.hutil.log_and_syslog(logging.ERROR, output2)
+                self.log_and_syslog(logging.ERROR, output2)
             if output2 != '':
                 waagent.Run('kill -9 ' + output2.strip())
             waagent.Run('kill -9 ' + output.strip())
@@ -358,7 +362,7 @@ class AbstractPatching(object):
     def restart_cron(self):
         retcode,output = waagent.RunGetOutput(self.cron_restart_cmd)
         if retcode > 0:
-            self.hutil.log_and_syslog(logging.ERROR, output)
+            self.log_and_syslog(logging.ERROR, output)
 
     def download(self):
         # Read the latest configuration for scheduled task
@@ -370,7 +374,7 @@ class AbstractPatching(object):
             return
 
         if self.exists_stop_flag():
-            self.hutil.log_and_syslog(logging.INFO, "Downloading patches is stopped/canceled")
+            self.log_and_syslog(logging.INFO, "Downloading patches is stopped/canceled")
             return
 
         waagent.SetFileContents(self.package_downloaded_path, '')
@@ -381,6 +385,7 @@ class AbstractPatching(object):
         self._download(self.category_required)
         if self.category == self.category_all:
             self._download(self.category_all)
+        self.retry_download()
         end_download_time = time.time()
         waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                   op=waagent.WALAEventOperation.Download,
@@ -389,29 +394,66 @@ class AbstractPatching(object):
                                   message=" ".join(["Real downloading time is", str(round(end_download_time-start_download_time,3)), "s"]))
 
     def _download(self, category):
-        self.hutil.log_and_syslog(logging.INFO, "Start to check&download patches (Category:" + category + ")")
+        self.log_and_syslog(logging.INFO, "Start to check&download patches (Category:" + category + ")")
         retcode, downloadlist = self.check(category)
         if retcode > 0:
             msg = "Failed to check valid upgrades"
-            self.hutil.log_and_syslog(logging.ERROR, msg)
+            self.log_and_syslog(logging.ERROR, msg)
             self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
         if 'walinuxagent' in downloadlist:
             downloadlist.remove('walinuxagent')
         if not downloadlist:
-            self.hutil.log_and_syslog(logging.INFO, "No packages are available for update.")
+            self.log_and_syslog(logging.INFO, "No packages are available for update.")
             return
-        self.hutil.log_and_syslog(logging.INFO, "There are " + str(len(downloadlist)) + " packages to upgrade.")
-        self.hutil.log_and_syslog(logging.INFO, "Download list: " + ' '.join(downloadlist))
+        self.log_and_syslog(logging.INFO, "There are " + str(len(downloadlist)) + " packages to upgrade.")
+        self.log_and_syslog(logging.INFO, "Download list: " + ' '.join(downloadlist))
         for pkg_name in downloadlist:
             if pkg_name in self.downloaded:
                 continue
             retcode = self.download_package(pkg_name)
             if retcode != 0:
-                self.hutil.log_and_syslog(logging.ERROR, "Failed to download the package: " + pkg_name)
+                self.log_and_syslog(logging.ERROR, "Failed to download the package: " + pkg_name)
+                self.log_and_syslog(logging.INFO, "Put {0} into a retry queue".format(pkg_name))
+                self.download_retry_queue.append((pkg_name, category))
                 continue
             self.downloaded.append(pkg_name)
-            self.hutil.log_and_syslog(logging.INFO, "Package " + pkg_name + " is downloaded.")
+            self.log_and_syslog(logging.INFO, "Package " + pkg_name + " is downloaded.")
             waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
+
+    def retry_download(self):
+        retry_count = 0
+        max_retry_count = 12
+        self.log_and_syslog(logging.INFO, "Retry queue: {0}".format(
+            " ".join([pkg_name for pkg_name,category in self.download_retry_queue])))
+        while self.download_retry_queue:
+            pkg_name, category = self.download_retry_queue[0]
+            self.download_retry_queue = self.download_retry_queue[1:]
+            retcode = self.download_package(pkg_name)
+            if retcode == 0:
+                self.downloaded.append(pkg_name)
+                self.log_and_syslog(logging.INFO, "Package " + pkg_name + " is downloaded.")
+                waagent.AppendFileContents(self.package_downloaded_path, pkg_name + ' ' + category + '\n')
+            else:
+                self.log_and_syslog(logging.ERROR, "Failed to download the package: " + pkg_name)
+                self.log_and_syslog(logging.INFO, "Put {0} back into a retry queue".format(pkg_name))
+                self.download_retry_queue.append((pkg_name,category))
+                retry_count = retry_count + 1
+                if retry_count > max_retry_count:
+                    err_msg = ("Failed to download after {0} retries, "
+                        "retry queue: {1}").format(max_retry_count,
+                        " ".join([pkg_name for pkg_name,category in self.download_retry_queue]))
+                    self.log_and_syslog(logging.ERROR, err_msg)
+                    waagent.AddExtensionEvent(name=self.hutil.get_name(),
+                                              op=waagent.WALAEventOperation.Download,
+                                              isSuccess=False,
+                                              version=Version,
+                                              message=err_msg)
+                    break
+                k = retry_count if (retry_count < 10) else 10
+                interval = int(random.uniform(0, 2 ** k))
+                self.log_and_syslog(logging.INFO, ("Sleep {0}s before "
+                    "the next retry, current retry_count = {1}").format(interval, retry_count))
+                time.sleep(interval)
 
     def patch(self):
         # Read the latest configuration for scheduled task
@@ -422,7 +464,7 @@ class AbstractPatching(object):
             return
 
         if self.exists_stop_flag():
-            self.hutil.log_and_syslog(logging.INFO, "Installing patches is stopped/canceled")
+            self.log_and_syslog(logging.INFO, "Installing patches is stopped/canceled")
             self.delete_stop_flag()
             return
 
@@ -433,7 +475,7 @@ class AbstractPatching(object):
 
         retcode = self.stop_download()
         if retcode == 0:
-            self.hutil.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be downloaded in the next cycle")
+            self.log_and_syslog(logging.WARNING, "Download time exceeded. The pending package will be downloaded in the next cycle")
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op=waagent.WALAEventOperation.Download,
                                       isSuccess=False,
@@ -452,18 +494,18 @@ class AbstractPatching(object):
             if not is_time_out[0]:
                 patchlist = self.get_pkg_to_patch(self.category_all)
                 if len(patchlist) == 0:
-                    self.hutil.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_all + ")")
+                    self.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_all + ")")
                 else:
-                    self.hutil.log_and_syslog(logging.INFO, "Going to sleep for " + str(self.gap_between_stage) + "s")
+                    self.log_and_syslog(logging.INFO, "Going to sleep for " + str(self.gap_between_stage) + "s")
                     time.sleep(self.gap_between_stage)
                     is_time_out[1],failed = self._patch(self.category_all, patchlist)
                     pkg_failed.extend(failed)
         else:
             msg = "Installing patches (Category:" + self.category_all + ") is stopped/canceled"
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
         if is_time_out[0] or is_time_out[1]:
             msg = "Patching time out"
-            self.hutil.log_and_syslog(logging.WARNING, msg)
+            self.log_and_syslog(logging.WARNING, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="Patch",
                                       isSuccess=False,
@@ -476,7 +518,7 @@ class AbstractPatching(object):
         if StatusTest["Scheduled"]["Healthy"]:
             is_healthy = StatusTest["Scheduled"]["Healthy"]()
             msg = "Checking the VM is healthy after patching: " + str(is_healthy)
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="Check healthy",
                                       isSuccess=is_healthy,
@@ -487,13 +529,13 @@ class AbstractPatching(object):
 
     def _patch(self, category, patchlist):
         if self.exists_stop_flag():
-            self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + category + ") is stopped/canceled")
+            self.log_and_syslog(logging.INFO, "Installing patches (Category:" + category + ") is stopped/canceled")
             return False,list()
         if not patchlist:
-            self.hutil.log_and_syslog(logging.INFO, "No packages are available for update.")
+            self.log_and_syslog(logging.INFO, "No packages are available for update.")
             return False,list()
-        self.hutil.log_and_syslog(logging.INFO, "Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
-        self.hutil.log_and_syslog(logging.INFO, "Patch list: " + ' '.join(patchlist))
+        self.log_and_syslog(logging.INFO, "Start to install " + str(len(patchlist)) +" patches (Category:" + category + ")")
+        self.log_and_syslog(logging.INFO, "Patch list: " + ' '.join(patchlist))
         pkg_failed = []
         for pkg_name in patchlist:
             if pkg_name == 'walinuxagent':
@@ -501,15 +543,15 @@ class AbstractPatching(object):
             current_patch_time = time.time()
             if current_patch_time - start_patch_time > self.install_duration:
                 msg = "Patching time exceeded. The pending package will be patched in the next cycle"
-                self.hutil.log_and_syslog(logging.WARNING, msg)
+                self.log_and_syslog(logging.WARNING, msg)
                 return True,pkg_failed
             retcode = self.patch_package(pkg_name)
             if retcode != 0:
-                self.hutil.log_and_syslog(logging.ERROR, "Failed to patch the package:" + pkg_name)
+                self.log_and_syslog(logging.ERROR, "Failed to patch the package:" + pkg_name)
                 pkg_failed.append(' '.join([pkg_name, category]))
                 continue
             self.patched.append(pkg_name)
-            self.hutil.log_and_syslog(logging.INFO, "Package " + pkg_name + " is patched.")
+            self.log_and_syslog(logging.INFO, "Package " + pkg_name + " is patched.")
             waagent.AppendFileContents(self.package_patched_path, pkg_name + ' ' + category + '\n')
         return False,pkg_failed
 
@@ -524,7 +566,7 @@ class AbstractPatching(object):
         global start_patch_time
         start_patch_time = time.time()
 
-        self.hutil.log_and_syslog(logging.INFO, "Going to patch one-off")
+        self.log_and_syslog(logging.INFO, "Going to patch one-off")
         waagent.SetFileContents(self.package_downloaded_path, '')
         waagent.SetFileContents(self.package_patched_path, '')
 
@@ -536,10 +578,10 @@ class AbstractPatching(object):
         retcode, patchlist_required = self.check(self.category_required)
         if retcode > 0:
             msg = "Failed to check valid upgrades"
-            self.hutil.log_and_syslog(logging.ERROR, msg)
+            self.log_and_syslog(logging.ERROR, msg)
             self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
         if not patchlist_required:
-            self.hutil.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_required + ")")
+            self.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_required + ")")
         else:
             is_time_out[0],failed = self._patch(self.category_required, patchlist_required)
             pkg_failed.extend(failed)
@@ -549,19 +591,19 @@ class AbstractPatching(object):
                     retcode, patchlist_other = self.check(self.category_all)
                     if retcode > 0:
                         msg = "Failed to check valid upgrades"
-                        self.hutil.log_and_syslog(logging.ERROR, msg)
+                        self.log_and_syslog(logging.ERROR, msg)
                         self.hutil.do_exit(1, 'Enable', 'error', '0', msg)
                     patchlist_other = [pkg for pkg in patchlist_other if pkg not in patchlist_required]
                     if len(patchlist_other) == 0:
-                        self.hutil.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_all + ")")
+                        self.log_and_syslog(logging.INFO, "No packages are available for update. (Category:" + self.category_all + ")")
                     else:
-                        self.hutil.log_and_syslog(logging.INFO, "Going to sleep for " + str(self.gap_between_stage) + "s")
+                        self.log_and_syslog(logging.INFO, "Going to sleep for " + str(self.gap_between_stage) + "s")
                         time.sleep(self.gap_between_stage)
-                        self.hutil.log_and_syslog(logging.INFO, "Going to patch one-off (Category:" + self.category_all + ")")
+                        self.log_and_syslog(logging.INFO, "Going to patch one-off (Category:" + self.category_all + ")")
                         is_time_out[1],failed = self._patch(self.category_all, patchlist_other)
                         pkg_failed.extend(failed)
             else:
-                self.hutil.log_and_syslog(logging.INFO, "Installing patches (Category:" + self.category_all + ") is stopped/canceled")
+                self.log_and_syslog(logging.INFO, "Installing patches (Category:" + self.category_all + ") is stopped/canceled")
 
         if is_time_out[0] or is_time_out[1]:
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
@@ -580,7 +622,7 @@ class AbstractPatching(object):
         if StatusTest["Oneoff"]["Healthy"]:
             is_healthy = StatusTest["Oneoff"]["Healthy"]()
             msg = "Checking the VM is healthy after patching: " + str(is_healthy)
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="Check healthy",
                                       isSuccess=is_healthy,
@@ -602,7 +644,7 @@ class AbstractPatching(object):
                                       isSuccess=False,
                                       version=Version,
                                       message=" ".join([self.reboot_after_patch, msg,
-                                                       len(self.needs_restart),
+                                                       str(len(self.needs_restart)),
                                                        "packages need to restart"]))
             self.hutil.do_exit(0, 'Enable', 'success', '0', msg)
         if self.reboot_after_patch == 'required':
@@ -615,7 +657,7 @@ class AbstractPatching(object):
         if msg:
             if self.needs_restart:
                 msg += ': ' + ' '.join(self.needs_restart)
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="Reboot",
                                       isSuccess=True,
@@ -623,7 +665,7 @@ class AbstractPatching(object):
                                       message="Reboot")
             retcode = waagent.Run('reboot')
             if retcode != 0:
-                self.hutil.log_and_syslog(logging.ERROR, "Failed to reboot")
+                self.log_and_syslog(logging.ERROR, "Failed to reboot")
                 waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                           op="Reboot",
                                           isSuccess=False,
@@ -645,14 +687,14 @@ class AbstractPatching(object):
                 retcode, output = waagent.RunGetOutput(cmd)
                 patched_files[os.path.basename(pkg)] = [filename for filename in output.split("\n") if os.path.isfile(filename)]
             except Exception:
-                self.hutil.log_and_syslog(logging.ERROR, "Failed to " + cmd)
+                self.log_and_syslog(logging.ERROR, "Failed to " + cmd)
         # for k,v in patched_files.items():
-        #     self.hutil.log_and_syslog(logging.INFO, k + ": " + " ".join(v))
+        #     self.log_and_syslog(logging.INFO, k + ": " + " ".join(v))
         open_deleted_files = list()
         for filename in self.open_deleted_files_after:
             if filename not in self.open_deleted_files_before:
                 open_deleted_files.append(filename)
-        # self.hutil.log_and_syslog(logging.INFO, "Open deleted files: " + " ".join(open_deleted_files))
+        # self.log_and_syslog(logging.INFO, "Open deleted files: " + " ".join(open_deleted_files))
         for pkg,files in patched_files.items():
             for filename in files:
                 realpath = os.path.realpath(filename)
@@ -664,7 +706,7 @@ class AbstractPatching(object):
             msg += pkgs
         else:
             msg = "There is no package which needs to restart"
-        self.hutil.log_and_syslog(logging.INFO, msg)
+        self.log_and_syslog(logging.INFO, msg)
 
     def get_pkg_needs_restart(self):
         return []
@@ -728,7 +770,7 @@ class AbstractPatching(object):
                 provided = "True"
                 level = logging.INFO
             msg = "The VM %s test script is provided: %s" % (status, provided)
-            self.hutil.log_and_syslog(level, msg)
+            self.log_and_syslog(level, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="provides %s test script" % (status,),
                                       isSuccess=provided,
@@ -740,12 +782,45 @@ class AbstractPatching(object):
         if status_test["Idle"]:
             is_idle = status_test["Idle"]()
             msg = "Checking the VM is idle: " + str(is_idle)
-            self.hutil.log_and_syslog(logging.INFO, msg)
+            self.log_and_syslog(logging.INFO, msg)
             waagent.AddExtensionEvent(name=self.hutil.get_name(),
                                       op="Check idle",
                                       isSuccess=is_idle,
                                       version=Version,
                                       message=msg)
             if not is_idle:
-                self.hutil.log_and_syslog(logging.WARNING, "Current Operation is skipped.")
+                self.log_and_syslog(logging.WARNING, "Current Operation is skipped.")
         return is_idle
+
+    def log_and_syslog(self, level, message):
+        if level == logging.INFO:
+            self.hutil.log(message)
+        elif level == logging.WARNING:
+            self.hutil.log(" ".join(["Warning:", message]))
+        elif level == logging.ERROR:
+            self.hutil.error(message)
+        if self.syslogger is None:
+            self.init_syslog()
+        self.syslog(level, message)
+
+    def init_syslog(self):
+        self.syslogger = logging.getLogger(self.hutil.get_name())
+        self.syslogger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
+        try:
+            handler = logging.handlers.SysLogHandler(address='/dev/log')
+            handler.setFormatter(formatter)
+            self.syslogger.addHandler(handler)
+        except:
+            self.syslogger = None
+            self.hutil.error("Syslog is not ready.")
+
+    def syslog(self, level, message):
+        if self.syslogger is None:
+            return
+        if level == logging.INFO:
+            self.syslogger.info(message)
+        elif level == logging.WARNING:
+            self.syslogger.warning(message)
+        elif level == logging.ERROR:
+            self.syslogger.error(message)

@@ -58,8 +58,34 @@ MonitoringInterval = 60 * MonitoringIntervalInMinute
 AzureTableDelayInMinute = 5 #Five minute
 AzureTableDelay = 60 * AzureTableDelayInMinute
 
-AzureEnhancedMonitorVersion = "1.0.0"
+AzureEnhancedMonitorVersion = "2.0.0"
 LibDir = "/var/lib/AzureEnhancedMonitor"
+
+LatestErrorRecord = "LatestErrorRecord"
+
+def getLatestErrorRecord():
+    eventFile=os.path.join(LibDir, LatestErrorRecord)
+    if os.path.exists(eventFile) and os.path.isfile(eventFile):
+        f = open(eventFile, 'r')
+        return f.read()
+
+    return "0"
+
+def updateLatestErrorRecord(s):
+    eventFile=os.path.join(LibDir, LatestErrorRecord)
+    maxRetry = 3
+    for i in range(0, maxRetry):
+        try:
+            with open(eventFile, "w+") as F:
+                F.write(s.encode("utf8"))
+                return
+        except IOError, e:
+            time.sleep(1)
+
+    waagent.Error(("Failed to serialize latest error record to file:"
+                    "{0}").format(eventFile))
+    AddExtensionEvent(message="failed to write latest error record")
+    raise
 
 def printable(s):
     return filter(lambda c : c in string.printable, str(s))
@@ -122,6 +148,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        updateLatestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
@@ -145,6 +172,7 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
     except Exception, e:
         waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        updateLatestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
 
@@ -245,11 +273,11 @@ class AzureDiagnosticMetric(object):
     def getMinNetworkBandwidth(self, adapterId):
         return self.linux.getMinNetworkBandwidth(adapterId)
 
-    def getNetworkReadBytes(self):
-        return self.linux.getNetworkReadBytes()
+    def getNetworkReadBytes(self, adapterId):
+        return self.linux.getNetworkReadBytes(adapterId)
 
-    def getNetworkWriteBytes(self):
-        return self.linux.getNetworkWriteBytes()
+    def getNetworkWriteBytes(self, adapterId):
+        return self.linux.getNetworkWriteBytes(adapterId)
 
     def getNetworkPacketRetransmitted(self):
         return self.linux.getNetworkPacketRetransmitted()
@@ -355,20 +383,30 @@ class NetworkInfo(object):
         self.nicNames = []
         self.readBytes = 0
         self.writeBytes = 0
+        self.networkReadBytes = {}
+        self.networkWriteBytes = {}
         for nicName, stat in self.nics.iteritems():
             if nicName != 'lo':
                 self.nicNames.append(nicName)
                 self.readBytes = self.readBytes + stat[1] #bytes_recv
                 self.writeBytes = self.writeBytes + stat[0] #bytes_sent
+                self.networkReadBytes[nicName] = stat[1]
+                self.networkWriteBytes[nicName] = stat[0]
 
     def getAdapterIds(self):
         return self.nicNames
 
-    def getNetworkReadBytes(self):
-        return self.readBytes
+    def getNetworkReadBytes(self, adapterId):
+        if adapterId in self.networkReadBytes :
+            return self.networkReadBytes[adapterId]
+        else:
+            return 0
 
-    def getNetworkWriteBytes(self):
-        return self.writeBytes
+    def getNetworkWriteBytes(self, adapterId):
+        if adapterId in self.networkWriteBytes :
+            return self.networkWriteBytes[adapterId]
+        else:
+            return 0
 
     def getNetstat(self):
         retCode, output = waagent.RunGetOutput("netstat -s", chk_err=False)
@@ -381,6 +419,7 @@ class NetworkInfo(object):
             return int(match.group(1))
         else:
             waagent.Error("Failed to parse netstat output: {0}".format(netstat))
+            updateLatestErrorRecord(FAILED_TO_RETRIEVE_LOCAL_DATA)
             AddExtensionEvent(message=FAILED_TO_RETRIEVE_LOCAL_DATA)
             return None
 
@@ -500,11 +539,11 @@ class LinuxMetric(object):
     def getMinNetworkBandwidth(self, adapterId):
         return 1000 #Mbit/s 
 
-    def getNetworkReadBytes(self):
-        return self.networkInfo.getNetworkReadBytes()
+    def getNetworkReadBytes(self, adapterId):
+        return self.networkInfo.getNetworkReadBytes(adapterId)
 
-    def getNetworkWriteBytes(self):
-        return self.networkInfo.getNetworkWriteBytes()
+    def getNetworkWriteBytes(self, adapterId):
+        return self.networkInfo.getNetworkWriteBytes(adapterId)
 
     def getNetworkPacketRetransmitted(self):
         return self.networkInfo.getNetworkPacketRetransmitted()
@@ -546,18 +585,21 @@ class VMDataSource(object):
         #Network
         adapterIds = metrics.getNetworkAdapterIds()
         for adapterId in adapterIds:
-            counters.append(self.createCounterAdapterId(adapterId))
-            counters.append(self.createCounterNetworkMapping(metrics, adapterId))
-            counters.append(self.createCounterMinNetworkBandwidth(metrics, 
-                                                                  adapterId))
-            counters.append(self.createCounterMaxNetworkBandwidth(metrics,
-                                                                  adapterId))
-        counters.append(self.createCounterNetworkReadBytes(metrics))
-        counters.append(self.createCounterNetworkWriteBytes(metrics))
+            if adapterId.startswith('eth'):
+                counters.append(self.createCounterAdapterId(adapterId))
+                counters.append(self.createCounterNetworkMapping(metrics, adapterId))
+                counters.append(self.createCounterMinNetworkBandwidth(metrics, adapterId))
+                counters.append(self.createCounterMaxNetworkBandwidth(metrics, adapterId))
+                counters.append(self.createCounterNetworkReadBytes(metrics, adapterId))
+                counters.append(self.createCounterNetworkWriteBytes(metrics, adapterId))
         counters.append(self.createCounterNetworkPacketRetransmitted(metrics))
         
         #Hardware change
         counters.append(self.createCounterLastHardwareChange(metrics))
+
+        #Error
+        counters.append(self.createCounterError())
+
         return counters
     
     def createCounterLastHardwareChange(self, metrics):
@@ -566,6 +608,12 @@ class VMDataSource(object):
                            name = "Last Hardware Change",
                            value = metrics.getLastHardwareChange(),
                            unit="posixtime")
+
+    def createCounterError(self):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
+                           category = "config",
+                           name = "Error",
+                           value = getLatestErrorRecord())
 
     def createCounterCurrHwFrequency(self, metrics):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_DOUBLE,
@@ -708,18 +756,20 @@ class VMDataSource(object):
                            value = metrics.getMinNetworkBandwidth(adapterId),
                            unit = "Mbit/s")
 
-    def createCounterNetworkReadBytes(self, metrics):
+    def createCounterNetworkReadBytes(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Read Bytes",
-                           value = metrics.getNetworkReadBytes(),
+                           instance = adapterId,
+                           value = metrics.getNetworkReadBytes(adapterId),
                            unit = "byte/s")
 
-    def createCounterNetworkWriteBytes(self, metrics):
+    def createCounterNetworkWriteBytes(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
                            category = "network",
                            name = "Network Write Bytes",
-                           value = metrics.getNetworkWriteBytes(),
+                           instance = adapterId,
+                           value = metrics.getNetworkWriteBytes(adapterId),
                            unit = "byte/s")
 
     def createCounterNetworkPacketRetransmitted(self, metrics):
@@ -762,6 +812,7 @@ def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
     except Exception, e:
         waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
                        "").format(printable(e), traceback.format_exc()))
+        updateLatestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
 
@@ -1196,6 +1247,7 @@ class PerfCounterWriter(object):
 
         waagent.Error(("Failed to serialize perf counter to file:"
                        "{0}").format(eventFile))
+        updateLatestErrorRecord(FAILED_TO_SERIALIZE_PERF_COUNTERS)
         AddExtensionEvent(message=FAILED_TO_SERIALIZE_PERF_COUNTERS)
         raise
 
