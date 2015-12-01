@@ -78,3 +78,9 @@ Common/psutil/build/*
 Common/psutil/dist/*
 Common/psutil/psutil.egg-info/*
 VMBackup/.vs/VMBackup/v14/.suo
+*.pyproj
+RDMAUpdate/RDMAUpdate.pyproj.user
+*.sln
+RDMAUpdate/VMBackup.pyproj.user
+VMBackup/.vs/config/applicationhost.config
+RDMAUpdate/.vs/VMBackup/v14/.suo
