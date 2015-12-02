@@ -36,7 +36,7 @@ import httplib
 import xml.parsers.expat
 import datetime
 from os.path import join
-from common import CommonVariables
+from Common import CommonVariables
 from Utils import HandlerUtil
 from urlparse import urlparse
 from Logger import Logger
