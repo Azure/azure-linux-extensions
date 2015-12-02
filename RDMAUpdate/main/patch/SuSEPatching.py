@@ -52,6 +52,7 @@ class SuSEPatching(AbstractPatching):
             self.modprobe_path = '/usr/bin/modprobe'
             self.mount_path = '/bin/mount'
             self.openssl_path = '/usr/bin/openssl'
+            self.ps_path = '/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
             self.rmmod_path = '/sbin/rmmod'
             self.umount_path = '/bin/umount'
@@ -72,30 +73,33 @@ class SuSEPatching(AbstractPatching):
             self.modprobe_path = '/usr/sbin/modprobe'
             self.mount_path = '/usr/bin/mount'
             self.openssl_path = '/usr/bin/openssl'
+            self.ps_path = '/usr/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
             self.rmmod_path = '/usr/sbin/rmmod'
             self.service_path = '/usr/sbin/service'
             self.umount_path = '/usr/bin/umount'
             self.zypper_path = '/usr/bin/zypper'
 
+    def rmdsupdate(self):
+        self.install_hv_utils()
+        self.update_rdma_driver()
+
     def install_hv_utils(self):
         commandExecuter = CommandExecuter.CommandExecuter(self.logger)
-        error, output = commandExecuter.RunGetOutput("ps -ef")	# how about error != 0
-        r = re.search("hv_kvp_daemon", output)
-        if not r :
-            self.logger.log("KVP deamon is not running, install it")
-            commandExecuter.RunGetOutput(self.zypper_path + " install -l hyper-v")
-            commandExecuter.RunGetOutput(self.rmmod_path + " hyper-v")	#find a way to force install non-prompt
-            commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
-            commandExecuter.RunGetOutput(self.service_path + " start hv_kvp_daemon")	#find a way to force install non-prompt
-            
-        else :
-            self.logger.log("KVP deamon is running")
+        error, output = commandExecuter.RunGetOutput(self.ps_path + " -ef")# how about error != 0
+        if(error != CommonVariables.process_success):
+            return CommonVariables.common_failed
+        else:
+            r = re.search("hv_kvp_daemon", output)
+            if not r :
+                self.logger.log("KVP deamon is not running, install it")
+                commandExecuter.RunGetOutput(self.zypper_path + " install -l hyper-v")
+                commandExecuter.RunGetOutput(self.rmmod_path + " hyper-v")	#find a way to force install non-prompt
+                commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
+                commandExecuter.RunGetOutput(self.service_path + " start hv_kvp_daemon")	#find a way to force install non-prompt
+            else :
+                self.logger.log("KVP deamon is running")
 
-        #commandToExecute = 'zypper install -l hyper-v'
-        #returnCode = commandExecuter.Execute(commandToExecute)
-        #self.logger.log('installation for result is ' + str(returnCode))
-    
     def get_nd_driver_version(self):
         with open("/var/lib/hyperv/.kvp_pool_0", "r") as f:
             lines = f.read()

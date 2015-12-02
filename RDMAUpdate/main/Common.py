@@ -32,6 +32,7 @@ class CommonVariables:
     error code definitions
     """
     process_success = 0
+    common_failed = 1
     """
     logs related
     """
