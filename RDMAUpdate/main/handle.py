@@ -66,8 +66,7 @@ def main():
             rmdsupdate()
 
 def rmdsupdate():
-    MyPatching.install_hv_utils()
-    MyPatching.update_rdma_driver()
+    MyPatching.rmdsupdate()
 
 def install():
     hutil.do_parse_context('Install')
