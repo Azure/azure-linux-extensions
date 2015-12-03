@@ -24,7 +24,7 @@ import traceback
 import urlparse
 import httplib
 
-class Logger(object):
+class RDMALogger(object):
     def __init__(self, hutil):
         self.msg = ''
         self.hutil = hutil
