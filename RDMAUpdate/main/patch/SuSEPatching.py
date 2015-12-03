@@ -122,16 +122,19 @@ class SuSEPatching(AbstractPatching):
         commandExecuter = CommandExecuter(self.logger)
         nd_driver_version = self.get_nd_driver_version()
         package_version = self.get_rdms_package_version()
-
-        r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
-        if not r :	#host ND version is the same as the package version, do an update
-            self.logger.log("ND and package version don't match, doing an update")
-            returnCode,message = commandExecuter.RunGetOutput("zypper dup --no-confirm")	#this will update everything, need to find a way to update only the RDMA
-                                                                                        	#driver
-            self.logger.log("update rdma result is " + str(message))
-            commandExecuter.RunGetOutput("reboot")
-        else :
-            self.logger.log("ND and package version match, not doing an update")
+        #package_version would be like this :20150707_k3.12.28_4-3.1
+        #nd_driver_version 142.0
+        self.logger.log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
+        if(nd_driver_version is not None):
+            r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
+            if not r :	#host ND version is the same as the package version, do an update
+                self.logger.log("ND and package version don't match, doing an update")
+                returnCode,message = commandExecuter.RunGetOutput("zypper dup --no-confirm")	#this will update everything, need to find a way to update only the RDMA
+                                                                                        	    #driver
+                self.logger.log("update rdma result is " + str(message))
+                commandExecuter.RunGetOutput("reboot")
+            else :
+                self.logger.log("ND and package version match, not doing an update")
 
     def get_rdms_package_version(self):
         commandExecuter = CommandExecuter(self.logger)
