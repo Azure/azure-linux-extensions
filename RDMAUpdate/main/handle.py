@@ -35,20 +35,22 @@ import traceback
 import httplib
 import xml.parsers.expat
 import datetime
+from patch import *
 from os.path import join
 from Common import CommonVariables
 from Utils import HandlerUtil
 from urlparse import urlparse
-from Logger import Logger
+from RDMALogger import RDMALogger
 from CronUtil import *
 #Main function is the only entrence to this extension handler
 def main():
-    global backup_logger
+    global logger
     global hutil
+    global MyPatching
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-    logger = Logger(hutil)
+    logger = RDMALogger(hutil)
     MyPatching = GetMyPatching(logger)
     hutil.patching = MyPatching
     for a in sys.argv[1:]:
@@ -75,7 +77,8 @@ def install():
 def enable():
     # do it one time when enabling.
     # config the cron job
-    cronUtil = CronUtil(Logger)
+    hutil.do_parse_context('Enable')
+    cronUtil = CronUtil(logger)
     cronUtil.check_update_cron_config()
     cronUtil.restart_cron()
 

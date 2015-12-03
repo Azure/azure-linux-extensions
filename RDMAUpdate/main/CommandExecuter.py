@@ -28,10 +28,10 @@ from subprocess import *
 
 class CommandExecuter(object):
     """description of class"""
-    def __init__(self,logger):
+    def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self,command_to_execute):
+    def Execute(self, command_to_execute):
         self.logger.log("Executing:" + command_to_execute)
         args = shlex.split(command_to_execute)
         proc = Popen(args)
@@ -41,10 +41,9 @@ class CommandExecuter(object):
     def RunGetOutput(self, command_to_execute):
         try:
             output=subprocess.check_output(command_to_execute,stderr=subprocess.STDOUT,shell=True)
+            return 0,output.decode('latin-1')
         except subprocess.CalledProcessError,e :
-            if chk_err :
-                self.logger('CalledProcessError.  Error Code is ' + str(e.returncode)  )
-                self.logger('CalledProcessError.  Command string was ' + e.cmd  )
-                self.logger('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            self.logger.log('CalledProcessError.  Error Code is ' + str(e.returncode)  )
+            self.logger.log('CalledProcessError.  Command string was ' + e.cmd  )
+            self.logger.log('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
             return e.returncode,e.output.decode('latin-1')
-        return 0,output.decode('latin-1')

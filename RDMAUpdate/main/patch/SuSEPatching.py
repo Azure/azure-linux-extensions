@@ -31,13 +31,13 @@ import datetime
 import subprocess
 from AbstractPatching import AbstractPatching
 from Common import *
-from main import CommandExecuter
+from CommandExecuter import CommandExecuter
 
 class SuSEPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
         super(SuSEPatching,self).__init__(distro_info)
+        self.logger = logger
         if(distro_info[1] == "11"):
-            self.logger = logger
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
@@ -58,7 +58,6 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/bin/umount'
             self.zypper_path = '/bin/zypper'
         else:
-            self.logger = logger
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/usr/bin/blkid'
@@ -85,7 +84,7 @@ class SuSEPatching(AbstractPatching):
         self.update_rdma_driver()
 
     def install_hv_utils(self):
-        commandExecuter = CommandExecuter.CommandExecuter(self.logger)
+        commandExecuter = CommandExecuter(self.logger)
         error, output = commandExecuter.RunGetOutput(self.ps_path + " -ef")# how about error != 0
         if(error != CommonVariables.process_success):
             return CommonVariables.common_failed
@@ -93,10 +92,18 @@ class SuSEPatching(AbstractPatching):
             r = re.search("hv_kvp_daemon", output)
             if not r :
                 self.logger.log("KVP deamon is not running, install it")
-                commandExecuter.RunGetOutput(self.zypper_path + " install -l hyper-v")
-                commandExecuter.RunGetOutput(self.rmmod_path + " hyper-v")	#find a way to force install non-prompt
-                commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
-                commandExecuter.RunGetOutput(self.service_path + " start hv_kvp_daemon")	#find a way to force install non-prompt
+                error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -l hyper-v")
+                if(error != CommonVariables.process_success):
+                    return CommonVariables.common_failed
+                error,output = commandExecuter.RunGetOutput(self.rmmod_path + " hv_utils")	#find a way to force install non-prompt
+                if(error != CommonVariables.process_success):
+                    return CommonVariables.common_failed
+                error,output = commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
+                if(error != CommonVariables.process_success):
+                    return CommonVariables.common_failed
+                error,output = commandExecuter.RunGetOutput(self.service_path + " hv_kvp_daemon start ")	#find a way to force install non-prompt
+                if(error != CommonVariables.process_success):
+                    return CommonVariables.common_failed
             else :
                 self.logger.log("KVP deamon is running")
 
@@ -112,22 +119,22 @@ class SuSEPatching(AbstractPatching):
             return None
 
     def update_rdma_driver(self):
-        commandExecuter = CommandExecuter.CommandExecuter(self.logger)
+        commandExecuter = CommandExecuter(self.logger)
         nd_driver_version = self.get_nd_driver_version()
         package_version = self.get_rdms_package_version()
 
         r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
         if not r :	#host ND version is the same as the package version, do an update
-            self.logger("ND and package version don't match, doing an update")
+            self.logger.log("ND and package version don't match, doing an update")
             returnCode,message = commandExecuter.RunGetOutput("zypper dup --no-confirm")	#this will update everything, need to find a way to update only the RDMA
                                                                                         	#driver
             self.logger.log("update rdma result is " + str(message))
             commandExecuter.RunGetOutput("reboot")
         else :
-            self.logger("ND and package version match, not doing an update")
+            self.logger.log("ND and package version match, not doing an update")
 
     def get_rdms_package_version(self):
-        commandExecuter = CommandExecuter.CommandExecuter(self.logger)
+        commandExecuter = CommandExecuter(self.logger)
         error, output = commandExecuter.RunGetOutput("zypper info msft-lis-rdma-kmp-default")
 
         r = re.search("Version: (\S+)", output)
