@@ -95,7 +95,7 @@ def enable():
     cronUtil.check_update_cron_config()
     cronUtil.restart_cron()
 
-    rmdsupdate()
+    update_result = MyPatching.rmdsupdate()
 
     hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 

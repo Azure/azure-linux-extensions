@@ -42,7 +42,7 @@ class CommandExecuter(object):
         try:
             output=subprocess.check_output(command_to_execute,stderr=subprocess.STDOUT,shell=True)
             return 0,output.decode('latin-1')
-        except subprocess.CalledProcessError,e :
+        except subprocess.CalledProcessError as e :
             self.logger.log('CalledProcessError.  Error Code is ' + str(e.returncode)  )
             self.logger.log('CalledProcessError.  Command string was ' + e.cmd  )
             self.logger.log('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
