@@ -4,7 +4,6 @@ Provide several ways to allow owner of the VM to get the SSH access back.
 Current version is 1.3.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
 * [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
 
 VMAccess Extension can:

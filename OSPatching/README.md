@@ -6,8 +6,7 @@ pre-configured schedule.
 Lastest version is 2.0.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
-* [Automate Linux VM OS Updates Using OSPatching Extension](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/)
+* [Automate Linux VM OS Updates Using OSPatching Extension (outdated, needs to update)](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/)
 
 OSPatching Extension can:
 * Patch the OS automatically as a scheduled task
