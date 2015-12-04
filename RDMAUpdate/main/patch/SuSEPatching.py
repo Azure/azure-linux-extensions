@@ -136,11 +136,6 @@ class SuSEPatching(AbstractPatching):
             package_version = r.groups()[0]# e.g.  package_version is "20150707_k3.12.28_4-3.1.140.0"
             return package_version
 
-    #def remove_rdma_driver(self):
-    #    returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove msft-lis-rdma-kmp-default")
-    #    self.logger.log("remove message is :"+str(message));
-    #    return returnCode
-
     def update_rdma_driver(self):
         commandExecuter = CommandExecuter(self.logger)
         nd_driver_version = self.get_nd_driver_version()
@@ -152,13 +147,25 @@ class SuSEPatching(AbstractPatching):
             r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
             if not r :	#host ND version is the same as the package version, do an update
                 self.logger.log("ND and package version don't match, doing an update")
-                #solver.allowVendorChange = true
                 returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove msft-lis-rdma-kmp-default")
                 self.logger.log("remove rdma package result is :" + str(message))
                 returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n install --from sldp-msft msft-lis-rdma-kmp-default")#this will update everything, need to find a way to update only the RDMA
                                                                                             #driver
                 self.logger.log("install rdma package result is :" + str(message))
-                #self.logger.log("update rdma result is " + str(message))
-                #commandExecuter.RunGetOutput("reboot")
+                commandExecuter.RunGetOutput("reboot")
             else :
                 self.logger.log("ND and package version match, not doing an update")
+
+    def check_rdms_update(self):
+        nd_driver_version = self.get_nd_driver_version()
+        package_version = self.get_rdms_package_version()
+        #package_version would be like this :20150707_k3.12.28_4-3.1
+        #nd_driver_version 140.0
+        self.logger.log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
+        if(nd_driver_version is not None):
+            r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
+            if not r :	#host ND version is the same as the package version, do an update
+                return CommonVariables.OutofDate
+            else:
+                return CommonVariables.UpToDate
+        return CommonVariables.Unknown

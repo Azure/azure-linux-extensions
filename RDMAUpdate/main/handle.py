@@ -66,6 +66,17 @@ def main():
             update()
         elif re.match("^([-/]*)(rdmaupdate)", a):
             rmdsupdate()
+        elif re.match("^([-/]*)(chkrdma)", a):
+            chkrdma()
+
+def chkrdma():
+    check_result = MyPatching.check_rdms_update()
+    if(check_result == CommonVariables.UpToDate):
+        hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
+    if(check_result == CommonVariables.OutofDate):
+        hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver out of date.')
+    if(check_result == CommonVariables.Unknown):
+        hutil.do_exit(0, 'Enable','success','0', 'RDMA version not found.')
 
 def rmdsupdate():
     MyPatching.rmdsupdate()
