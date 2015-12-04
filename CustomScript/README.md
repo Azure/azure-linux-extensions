@@ -4,7 +4,7 @@ Allow the owner of the Azure Virtual Machines to run customized scripts in the V
 Latest version is 1.4.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
+* [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
 
 CustomScript Extension can:
 * If provided, download the customized scripts from Azure Storage or external public storage (e.g. Github)
