@@ -22,7 +22,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'RDMAUpdate'
-    extension_version = "0.1.0.1"
+    extension_version = "0.1.0.4"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure RDMA Update Extension for Linux IaaS'
@@ -39,3 +39,11 @@ class CommonVariables:
     InfoLevel = 'Info'
     WarningLevel = 'Warning'
     ErrorLevel = 'Error'
+
+    """
+    check_rdma_result
+    """
+    UpToDate = 0
+    OutofDate = 1
+    Unknown = -1
+

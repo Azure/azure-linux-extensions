@@ -35,9 +35,9 @@ class CronUtil(object):
         script_file_path = os.path.realpath(sys.argv[0])
         script_dir = os.path.dirname(script_file_path)
         script_file = os.path.basename(script_file_path)
-        old_line_end = ' '.join([script_file, '-rdmaupdate'])
+        old_line_end = ' '.join([script_file, '-chkrdma'])
 
-        new_line = ' '.join(['\n-*/15 * * * *', 'root cd', script_dir, '&& python', script_file, '-rdmaupdate > /dev/null 2>&1\n'])
+        new_line = ' '.join(['\n-*/15 * * * *', 'root cd', script_dir, '&& python', script_file, '-chkrdma > /dev/null 2>&1\n'])
 
         HandlerUtil.waagent.ReplaceFileContentsAtomic(self.crontab, \
             '\n'.join(filter(lambda a: a and (old_line_end not in a), HandlerUtil.waagent.GetFileContents(self.crontab).split('\n')))+ new_line)
