@@ -130,12 +130,15 @@ OSPatchingForLinux Microsoft.OSTCExtensions <version> \
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can change to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
 
 You can deploying OSPatching Extension by running:
+
 ```powershell
 $VmName = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
@@ -178,12 +181,17 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```
 
 #### 2.2.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
 
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+
 You can deploying OSPatching Extension by running:
+
 ```powershell
 $RGName = '<resource-group-name>'
 $VmName = '<vm-name>'
@@ -217,12 +225,10 @@ $PrivateConf = ConvertTo-Json -InputObject @{
     "storageAccountKey" = "<storage_account_key>"
 }
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
   -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
-
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
 
 ### 2.3. Using [**ARM Template**][arm-template]
 ```json
@@ -371,4 +377,3 @@ a selinux-policy problem. Please refer to
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx

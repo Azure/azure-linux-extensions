@@ -78,11 +78,15 @@ DSCForLinux Microsoft.OSTCExtensions <version> \
 ### 2.2. Using [**Azure PowerShell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can switch to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
+
 And deploy DSCForLinux Extension by running:
+
 ```powershell
 $vmname = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $vmname -Name $vmname
@@ -110,11 +114,17 @@ Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher
 ```
 
 #### 2.2.2.Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
+
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+
 You can deploy DSCForLinux Extension by running:
+
 ```powershell
 $rgName = '<resource-group-name>'
 $vmName = '<vm-name>'
@@ -137,12 +147,10 @@ $publicConfig = '{
   "Mode": "Push"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $location `
+Set-AzureRmVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $location `
   -Name $extensionName -Publisher $publisher -ExtensionType $extensionName `
   -TypeHandlerVersion $version -SettingString $publicConfig -ProtectedSettingString $privateConfig
 ```
-
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
 
 ### 2.3. Using [**ARM Template**][arm-template]
 
@@ -315,11 +323,13 @@ $publicConfig = '{
 * To distribute MOF configurations to the Linux VM with Pull Servers, you need to make sure the cron service is running in the VM.
 
 ## Changelog
-### v1.0 Sep. 24, 2015
-Initial version
+
+```
+# 1.0 (2015-09-24)
+-Initial version
+```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx
