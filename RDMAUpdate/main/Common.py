@@ -29,10 +29,18 @@ class CommonVariables:
     extension_description = extension_label
 
     """
+    configurations
+    """
+    wrapper_package_name = 'msft-lis-rdma-kmp-default-<wrapper>'
+
+    """
     error code definitions
     """
     process_success = 0
     common_failed = 1
+    install_hv_utils_failed = 2
+    nd_driver_detect_error = 3
+
     """
     logs related
     """
