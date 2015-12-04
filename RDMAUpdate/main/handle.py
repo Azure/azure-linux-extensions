@@ -78,6 +78,8 @@ def enable():
     # do it one time when enabling.
     # config the cron job
     hutil.do_parse_context('Enable')
+    hutil.exit_if_enabled()
+
     cronUtil = CronUtil(logger)
     cronUtil.check_update_cron_config()
     cronUtil.restart_cron()
