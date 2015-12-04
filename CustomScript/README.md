@@ -128,7 +128,7 @@ $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'CustomScriptForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{
     "fileUris": ["<url>"],
@@ -164,7 +164,7 @@ $Location = '<location>'
 
 $ExtensionName = 'CustomScriptForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{
     "fileUris": ["<url>"],
@@ -182,6 +182,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
+
 ```json
 {
   "type": "Microsoft.Compute/virtualMachines/extensions",

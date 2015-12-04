@@ -132,7 +132,7 @@ $location = '<location>'
 
 $extensionName = 'DSCForLinux'
 $publisher = 'Microsoft.OSTCExtensions'
-$version = <version>
+$version = '<version>'
 
 # You need to change the content of the $privateConfig and $publicConfig 
 # according to different scenarios in section 3
@@ -153,6 +153,8 @@ Set-AzureRmVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $loc
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
+
+The sample ARM template is [201-dsc-linux-azure-storage-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-dsc-linux-azure-storage-on-ubuntu) and [201-dsc-linux-public-storage-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-dsc-linux-public-storage-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
