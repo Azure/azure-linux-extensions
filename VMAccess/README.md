@@ -93,16 +93,24 @@ VMAccessForLinux Microsoft.OSTCExtensions <version> \
 
 > **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
 
+In ARM mode, there is another specific and simple command to reset your password.
+
+```
+$ azure vm reset-access [options] <resource-group> <name>
+```
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can change to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
 
 You can deploying VMAccess Extension by running:
+
 ```powershell
 $VmName = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
@@ -127,12 +135,17 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```
 
 #### 2.2.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
 
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+
 You can deploying VMAccess Extension by running:
+
 ```powershell
 $RGName = '<resource-group-name>'
 $VmName = '<vm-name>'
@@ -151,12 +164,10 @@ $PrivateConf = '{
   "remove_user": "<username-to-remove>"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
   -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
-
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
 
 ### 2.3. Using [**ARM Template**][arm-template]
 ```json
@@ -171,7 +182,7 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
-    "typeHandlerVersion": "1.1",
+    "typeHandlerVersion": "1.3",
     "settings": {},
     "protectedSettings": {
       "username": "<username>",
@@ -252,11 +263,13 @@ see the status on Azure Portal
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
 ## Changelog
-### v1.3 Sep. 8, 2015
-Add waagent to extension package
+
+```
+# 1.3 (2015-09-08)
+- Added waagent to extension package
+```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx
