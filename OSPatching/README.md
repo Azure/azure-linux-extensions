@@ -145,7 +145,7 @@ $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $idleTestScriptUri = '<path_to_idletestscript>'
 $healthyTestScriptUri = '<path_to_healthytestscript>'
@@ -199,7 +199,7 @@ $Location = '<location>'
 
 $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = ConvertTo-Json -InputObject @{
     "disabled" = $false;
@@ -231,6 +231,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
+
 ```json
 {
   "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -267,6 +268,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   }
 }
 ```
+
+The sample ARM template is [201-ospatching-extension-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-ospatching-extension-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
