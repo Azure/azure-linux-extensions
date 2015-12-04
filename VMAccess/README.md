@@ -128,7 +128,7 @@ $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'VMAccessForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{}'
 $PrivateConf = '{
@@ -164,7 +164,7 @@ $Location = '<location>'
 
 $ExtensionName = 'VMAccessForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{}'
 $PrivateConf = '{
@@ -206,6 +206,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 
 }
 ```
+
+The sample ARM template is [201-vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
