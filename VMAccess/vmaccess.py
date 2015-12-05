@@ -405,15 +405,13 @@ def _fsck_repair(disk_name, hutil):
         cmd_result = waagent.Run("umount -f /%s" % disk_name)
         if cmd_result!=0:
             # Fail fast
-            hutil.log("Failed to unmount disk")
-            raise Exception("Failed to unmount disk %s" % disk_name)
-        else:
+            hutil.log("Failed to unmount disk: %s" % disk_name)
             # run repair
             retcode = waagent.Run("fsck -AR -y")
-            hutil.log("Ran fsck")
+            hutil.log("Ran fsck with return code: %d" % retcode)
         if retcode == 0:
-            hutil.log(waagent.Run("mount"))
-            return waagent.Run("mount")
+            hutil.log(waagent.RunGetOutput("mount"))
+            return waagent.RunGetOutput("mount")
         else:
             raise Exception("Failed to mount disks")
     except Exception, e:
