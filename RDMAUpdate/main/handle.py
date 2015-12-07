@@ -70,7 +70,7 @@ def main():
             chkrdma()
 
 def chkrdma():
-    check_result = MyPatching.check_rdms_update()
+    check_result = MyPatching.check_rdma_update()
     if(check_result == CommonVariables.UpToDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
     if(check_result == CommonVariables.OutofDate):
@@ -79,7 +79,7 @@ def chkrdma():
         hutil.do_exit(0, 'Enable','success','0', 'RDMA version not found.')
 
 def rmdsupdate():
-    MyPatching.rmdsupdate()
+    MyPatching.rmdaupdate()
 
 def install():
     hutil.do_parse_context('Install')
@@ -95,7 +95,7 @@ def enable():
     cronUtil.check_update_cron_config()
     cronUtil.restart_cron()
 
-    update_result = MyPatching.rmdsupdate()
+    update_result = MyPatching.rmdaupdate()
 
     hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 

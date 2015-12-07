@@ -80,13 +80,13 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
             self.zypper_path = '/usr/bin/zypper'
 
-    def rmdsupdate(self):
+    def rmdaupdate(self):
 
         self.install_hv_utils()
 
         time.sleep(30)
 
-        check_result = self.check_rdms_update()
+        check_result = self.check_rdma_update()
         if(check_result == CommonVariables.UpToDate):
             pass
         elif(check_result == CommonVariables.OutOfDate):
@@ -99,7 +99,7 @@ class SuSEPatching(AbstractPatching):
         elif(check_result == CommonVariables.Unknown):
             pass
 
-    def check_rdms_update(self):
+    def check_rdma_update(self):
         nd_driver_version = self.get_nd_driver_version()
 
         package_version = self.get_rdma_package_version()
