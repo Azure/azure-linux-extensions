@@ -6,8 +6,7 @@ pre-configured schedule.
 Lastest version is 2.0.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
-* [Automate Linux VM OS Updates Using OSPatching Extension](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/)
+* [Automate Linux VM OS Updates Using OSPatching Extension (outdated, needs to update)](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/)
 
 OSPatching Extension can:
 * Patch the OS automatically as a scheduled task
@@ -131,19 +130,22 @@ OSPatchingForLinux Microsoft.OSTCExtensions <version> \
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can change to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
 
 You can deploying OSPatching Extension by running:
+
 ```powershell
 $VmName = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $idleTestScriptUri = '<path_to_idletestscript>'
 $healthyTestScriptUri = '<path_to_healthytestscript>'
@@ -179,12 +181,17 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```
 
 #### 2.2.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
 
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+
 You can deploying OSPatching Extension by running:
+
 ```powershell
 $RGName = '<resource-group-name>'
 $VmName = '<vm-name>'
@@ -192,7 +199,7 @@ $Location = '<location>'
 
 $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = ConvertTo-Json -InputObject @{
     "disabled" = $false;
@@ -218,14 +225,13 @@ $PrivateConf = ConvertTo-Json -InputObject @{
     "storageAccountKey" = "<storage_account_key>"
 }
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
   -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
 
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
-
 ### 2.3. Using [**ARM Template**][arm-template]
+
 ```json
 {
   "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -262,6 +268,8 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
   }
 }
 ```
+
+The sample ARM template is [201-ospatching-extension-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-ospatching-extension-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
@@ -372,4 +380,3 @@ a selinux-policy problem. Please refer to
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx

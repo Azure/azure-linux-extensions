@@ -84,3 +84,7 @@ RDMAUpdate/RDMAUpdate.pyproj.user
 RDMAUpdate/VMBackup.pyproj.user
 VMBackup/.vs/config/applicationhost.config
 RDMAUpdate/.vs/VMBackup/v14/.suo
+
+# Handler Registration ignores
+*.pem
+RDMAUpdate/.vs/RDMAUpdate/v14/.suo
