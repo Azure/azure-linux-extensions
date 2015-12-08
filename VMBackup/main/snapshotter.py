@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -62,7 +62,7 @@ class Snapshotter(object):
             else:
                 body_content = ''
                 headers = {}
-                headers["Content-Length"] = 0
+                headers["Content-Length"] = '0'
                 for meta in meta_data:
                     key = meta['Key']
                     value = meta['Value']
