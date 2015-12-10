@@ -46,7 +46,7 @@ class Mounts:
         p = subprocess.Popen(['lsblk', '-l', '-n','-o','NAME,TYPE,FSTYPE,MOUNTPOINT'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         out_lsblk_output = str(out_lsblk_output)
-        self.logger.log("out_lsblk_output:\n" + str(out_lsblk_output))
+        self.logger.log(msg="out_lsblk_output:\n" + str(out_lsblk_output),local=True)
         lines = out_lsblk_output.splitlines()
         line_number = len(lines)
         for i in range(0,line_number):
@@ -61,6 +61,4 @@ class Mounts:
             if(len(item_value) > 3):
                 mountpoint = item_value[3]
             mount = Mount(item_value[0], item_value[1], fstype, mountpoint)
-
             self.mounts.append(mount)
-        pass
