@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 #CustomScript extension
 #
@@ -53,7 +53,7 @@ class ParameterParser(object):
         first get the protected configuration
         """
         self.privateObjectStr = protected_settings.get(CommonVariables.object_str)
-        if(self.privateObjectStr != None and self.privateObjectStr != ""):
+        if(self.privateObjectStr is not None and self.privateObjectStr != ""):
             decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
             decoded_private_obj_string = decoded_private_obj_string.strip()
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')

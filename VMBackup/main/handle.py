@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -134,9 +134,9 @@ def enable():
         else:
             current_identity = mi.current_identity()
             if(current_identity != stored_identity):
-                current_seq_no = 0
+                current_seq_no = -1
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_inused_config_seq(-1)
+                hutil.set_inused_config_seq(current_seq_no)
                 mi.save_identity()
 
         hutil.exit_if_enabled()
@@ -149,22 +149,24 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
-        utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
-        commandStartTime = convert_time(utcTicksLong)
-        
-        utcNow = datetime.datetime.utcnow()
-        backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
-        timespan = utcNow - commandStartTime
-        THIRTY_MINUTES = 30 * 60 # in seconds
-        # handle the machine identity for the restoration scenario.
-        backup_logger.log('timespan is ' + str(timespan))
-        total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
-        if(abs(total_span_in_seconds) > THIRTY_MINUTES):
-            error_msg = 'the call time stamp is out of date. so skip it.'
-            exit_with_commit_log(error_msg, para_parser)
+
+        if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+            utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+            commandStartTime = convert_time(utcTicksLong)
+            utcNow = datetime.datetime.utcnow()
+            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
+            timespan = utcNow - commandStartTime
+            THIRTY_MINUTES = 30 * 60 # in seconds
+            # handle the machine identity for the restoration scenario.
+            backup_logger.log('timespan is ' + str(timespan))
+            total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+            if(abs(total_span_in_seconds) > THIRTY_MINUTES):
+                error_msg = 'the call time stamp is out of date. so skip it.'
+                exit_with_commit_log(error_msg, para_parser)
         else:
-            taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
+            if(para_parser.taskId is not None and para_parser.taskId != ""):
+                taskIdentity = TaskIdentity()
+                taskIdentity.save_identity(para_parser.taskId)
             commandToExecute = para_parser.commandToExecute
             #validate all the required parameter here
             if(commandToExecute.lower() == CommonVariables.iaas_install_command):
