@@ -127,19 +127,19 @@ class SuSEPatching(AbstractPatching):
             if not r :
                 self.logger.log("KVP deamon is not running, install it")
                 error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -l hyper-v")
-                self.logger.log("install hyper-v output:" + str(output))
+                self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.rmmod_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("rmmod hv_utils output:" + str(output))
+                self.logger.log("rmmod hv_utils return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("modprobe hv_utils output:" + str(output))
+                self.logger.log("modprobe hv_utils return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.service_path + " hv_kvp_daemon start ")	#find a way to force install non-prompt
-                self.logger.log("service hv_kvp_daemon start output:" + str(output))
+                self.logger.log("service hv_kvp_daemon start return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 return CommonVariables.process_success
