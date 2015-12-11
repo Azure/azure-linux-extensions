@@ -1,4 +1,4 @@
-#
+﻿#
 # Handler library for Linux IaaS
 #
 # Copyright 2014 Microsoft Corporation
@@ -97,15 +97,16 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
-                    cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if(freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder,file))
-                        seq_no = cur_seq_no
-                    else:
-                        current_file_m_time = os.path.getmtime(join(config_folder,file))
-                        if(current_file_m_time > freshest_time):
-                            freshest_time = current_file_m_time
+                    if(file.endswith('.settings')):
+                        cur_seq_no = int(os.path.basename(file).split('.')[0])
+                        if(freshest_time == None):
+                            freshest_time = os.path.getmtime(join(config_folder,file))
                             seq_no = cur_seq_no
+                        else:
+                            current_file_m_time = os.path.getmtime(join(config_folder,file))
+                            if(current_file_m_time > freshest_time):
+                                freshest_time = current_file_m_time
+                                seq_no = cur_seq_no
                 except ValueError:
                     continue
         return seq_no
