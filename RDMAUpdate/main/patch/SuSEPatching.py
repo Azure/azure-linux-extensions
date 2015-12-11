@@ -112,7 +112,7 @@ class SuSEPatching(AbstractPatching):
             if(nd_driver_version is not None):
                 r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
                 if not r :	#host ND version is the same as the package version, do an update
-                    return CommonVariables.OutofDate
+                    return CommonVariables.OutOfDate
                 else:
                     return CommonVariables.UpToDate
             return CommonVariables.Unknown

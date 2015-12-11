@@ -54,7 +54,7 @@ class CommonVariables:
     check_rdma_result
     """
     UpToDate = 0
-    OutofDate = 1
+    OutOfDate = 1
     DriverVersionNotFound = 3
     Unknown = -1
 

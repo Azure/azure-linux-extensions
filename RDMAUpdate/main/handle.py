@@ -73,7 +73,7 @@ def chkrdma():
     check_result = MyPatching.check_rdma()
     if(check_result == CommonVariables.UpToDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
-    if(check_result == CommonVariables.OutofDate):
+    if(check_result == CommonVariables.OutOfDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver out of date.')
     if(check_result == CommonVariables.DriverVersionNotFound):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver not found.')
