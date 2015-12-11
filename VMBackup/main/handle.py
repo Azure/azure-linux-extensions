@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -108,6 +108,9 @@ def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
 def enable():
+    #this is using the most recent file timestamp.
+    hutil.do_parse_context('Enable')
+
     freezer = FsFreezer(backup_logger)
     unfreeze_result = None
     snapshot_result = None
@@ -120,9 +123,6 @@ def enable():
     # precheck
     freeze_called = False
     try:
-        #this is using the most recent file timestamp.
-        hutil.do_parse_context('Enable')
-
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
 
