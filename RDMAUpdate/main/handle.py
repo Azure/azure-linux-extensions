@@ -81,10 +81,11 @@ def chkrdma():
         hutil.do_exit(0, 'Enable','success','0', 'RDMA version not found.')
 
 def rmdsupdate():
+    hutil.do_parse_context('Executing')
     try:
         MyPatching.rmdaupdate()
     except Exception as e:
-        self.logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
     hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 
 def start_daemon():
