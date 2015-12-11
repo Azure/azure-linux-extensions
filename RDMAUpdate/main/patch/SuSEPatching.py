@@ -89,7 +89,8 @@ class SuSEPatching(AbstractPatching):
             if(check_result == CommonVariables.UpToDate):
                 return
             elif(check_result == CommonVariables.OutOfDate):
-                update_rdma_driver_result = self.update_rdma_driver()
+                nd_driver_version = self.get_nd_driver_version()
+                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version)
             elif(check_result == CommonVariables.DriverVersionNotFound):
                 raise RdmaException(CommonVariables.driver_version_not_found)
             elif(check_result == CommonVariables.Unknown):
@@ -181,7 +182,7 @@ class SuSEPatching(AbstractPatching):
         else:
             return None
 
-    def update_rdma_driver(host_version):
+    def update_rdma_driver(self, host_version):
         """
         """
         commandExecuter = CommandExecuter(self.logger)
@@ -195,4 +196,5 @@ class SuSEPatching(AbstractPatching):
                     RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
                     return
         else:
-            print "RDMA drivers not found in /opt/microsoft/rdma"
+            self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
+            raise RdmaException(package_not_found)

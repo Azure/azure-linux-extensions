@@ -42,6 +42,7 @@ class CommonVariables:
     nd_driver_detect_error = 3
     driver_version_not_found = 4
     unknown_error = 5
+    package_not_found = 6
 
     """
     logs related
