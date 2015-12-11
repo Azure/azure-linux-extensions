@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -21,8 +21,8 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    extension_name = 'RDMAUpdate'
-    extension_version = "0.1.0.4"
+    extension_name = 'RDMAUpdateForLinux'
+    extension_version = "0.1.0.0"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure RDMA Update Extension for Linux IaaS'
@@ -31,7 +31,7 @@ class CommonVariables:
     """
     configurations
     """
-    wrapper_package_name = 'msft-lis-rdma-kmp-default-<wrapper>'
+    wrapper_package_name = 'msft-rdma-drivers'
 
     """
     error code definitions
@@ -40,6 +40,8 @@ class CommonVariables:
     common_failed = 1
     install_hv_utils_failed = 2
     nd_driver_detect_error = 3
+    driver_version_not_found = 4
+    unknown_error = 5
 
     """
     logs related
@@ -53,5 +55,6 @@ class CommonVariables:
     """
     UpToDate = 0
     OutofDate = 1
+    DriverVersionNotFound = 3
     Unknown = -1
 
