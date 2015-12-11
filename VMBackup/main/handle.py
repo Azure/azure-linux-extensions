@@ -158,65 +158,65 @@ def enable():
             timespan = utcNow - commandStartTime
             THIRTY_MINUTES = 30 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
-            backup_logger.log('timespan is ' + str(timespan))
             total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
             if(abs(total_span_in_seconds) > THIRTY_MINUTES):
                 error_msg = 'the call time stamp is out of date. so skip it.'
                 exit_with_commit_log(error_msg, para_parser)
-        else:
-            if(para_parser.taskId is not None and para_parser.taskId != ""):
-                taskIdentity = TaskIdentity()
-                taskIdentity.save_identity(para_parser.taskId)
-            commandToExecute = para_parser.commandToExecute
-            #validate all the required parameter here
-            if(commandToExecute.lower() == CommonVariables.iaas_install_command):
-                backup_logger.log('install succeed.',True)
-                run_status = 'success'
-                error_msg = 'Install Succeeded'
-                run_result = CommonVariables.success
-                backup_logger.log(error_msg)
-            elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
-                if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
-                    run_result = CommonVariables.error_parameter
-                    run_status = 'error'
-                    error_msg = 'required field empty or not correct'
-                    backup_logger.log(error_msg, False, 'Error')
-                else:
-                    backup_logger.log('commandToExecute is ' + commandToExecute, True)
-                    """
-                    make sure the log is not doing when the file system is freezed.
-                    """
-                    backup_logger.log('doing freeze now...', True)
-                    freeze_called = True
-                    freeze_result = freezer.freezeall()
-                    backup_logger.log('freeze result ' + str(freeze_result))
 
-                    # check whether we freeze succeed first?
-                    if(freeze_result is not None and len(freeze_result.errors) > 0):
+        if(para_parser.taskId is not None and para_parser.taskId != ""):
+            taskIdentity = TaskIdentity()
+            taskIdentity.save_identity(para_parser.taskId)
+        commandToExecute = para_parser.commandToExecute
+        #validate all the required parameter here
+        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+            backup_logger.log('install succeed.',True)
+            run_status = 'success'
+            error_msg = 'Install Succeeded'
+            run_result = CommonVariables.success
+            backup_logger.log(error_msg)
+        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+                run_result = CommonVariables.error_parameter
+                run_status = 'error'
+                error_msg = 'required field empty or not correct'
+                backup_logger.log(error_msg, False, 'Error')
+            else:
+                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                """
+                make sure the log is not doing when the file system is freezed.
+                """
+                backup_logger.log('doing freeze now...', True)
+                freeze_called = True
+                freeze_result = freezer.freezeall()
+                backup_logger.log('freeze result ' + str(freeze_result))
+
+                # check whether we freeze succeed first?
+                if(freeze_result is not None and len(freeze_result.errors) > 0):
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'Enable failed with error: ' + str(freeze_result)
+                    backup_logger.log(error_msg, False, 'Warning')
+                else:
+                    backup_logger.log('doing snapshot now...')
+                    snap_shotter = Snapshotter(backup_logger)
+                    snapshot_result = snap_shotter.snapshotall(para_parser)
+                    backup_logger.log('snapshotall ends...')
+                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                        error_msg = 'snapshot result: ' + str(snapshot_result)
                         run_result = CommonVariables.error
                         run_status = 'error'
-                        error_msg = 'Enable failed with error: ' + str(freeze_result)
-                        backup_logger.log(error_msg, False, 'Warning')
+                        backup_logger.log(error_msg, False, 'Error')
                     else:
-                        backup_logger.log('doing snapshot now...')
-                        snap_shotter = Snapshotter(backup_logger)
-                        snapshot_result = snap_shotter.snapshotall(para_parser)
-                        backup_logger.log('snapshotall ends...')
-                        if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                            error_msg = 'snapshot result: ' + str(snapshot_result)
-                            run_result = CommonVariables.error
-                            run_status = 'error'
-                            backup_logger.log(error_msg, False, 'Error')
-                        else:
-                            run_result = CommonVariables.success
-                            run_status = 'success'
-                            error_msg = 'Enable Succeeded'
-                            backup_logger.log(error_msg)
-            else:
-                run_status = 'error'
-                run_result = CommonVariables.error_parameter
-                error_msg = 'command is not correct'
-                backup_logger.log(error_msg, False, 'Error')
+                        run_result = CommonVariables.success
+                        run_status = 'success'
+                        error_msg = 'Enable Succeeded'
+                        backup_logger.log(error_msg)
+        else:
+            run_status = 'error'
+            run_result = CommonVariables.error_parameter
+            error_msg = 'command is not correct'
+            backup_logger.log(error_msg, False, 'Error')
     except Exception as e:
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')

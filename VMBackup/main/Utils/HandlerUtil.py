@@ -224,7 +224,7 @@ class HandlerUtility:
             self.error(error_msg)
             return None
         else:
-            os.rename(self._context._settings_file,self._context._settings_file + ".processed")
+            os.rename(self._context._settings_file, self._context._settings_file + ".processed")
 
         self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
