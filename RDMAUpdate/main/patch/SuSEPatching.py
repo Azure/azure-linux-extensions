@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python
+#!/usr/bin/python
 #
 # Copyright 2015 Microsoft Corporation
 #
@@ -90,7 +90,8 @@ class SuSEPatching(AbstractPatching):
                 return
             elif(check_result == CommonVariables.OutOfDate):
                 nd_driver_version = self.get_nd_driver_version()
-                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version)
+                rdma_package_installed_version = self.get_rdma_package_version()
+                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version,get_rdma_package_version)
             elif(check_result == CommonVariables.DriverVersionNotFound):
                 raise RdmaException(CommonVariables.driver_version_not_found)
             elif(check_result == CommonVariables.Unknown):
@@ -182,7 +183,7 @@ class SuSEPatching(AbstractPatching):
         else:
             return None
 
-    def update_rdma_driver(self, host_version):
+    def update_rdma_driver(self, host_version, rdma_package_installed_version):
         """
         """
         commandExecuter = CommandExecuter(self.logger)
@@ -191,21 +192,26 @@ class SuSEPatching(AbstractPatching):
         if rdma_pack_result is None :
             self.logger.log("rdma_pack_result is None")
             error, output = commandExecuter.RunGetOutput(self.zypper_path + " ar https://drivers.suse.com/microsoft/Microsoft-LIS-RDMA/sle-12/updates msft-rdma-pack")
-            self.logger.log("error result is "+str(error)+" output is : "+str(output))
+            #wait for the cache build.
+            time.sleep(20)
+            self.logger.log("error result is " + str(error) + " output is : " + str(output))
         else:
             self.logger.log("msft-rdma-pack found")
 
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
-        self.logger.log("remove wrapper package return code is "+str(returnCode)+ " output is: "+str(message))
+        self.logger.log("remove wrapper package return code is " + str(returnCode) + " output is: " + str(message))
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
-        self.logger.log("install wrapper package return code is "+str(returnCode)+ " output is: "+str(message))
+        self.logger.log("install wrapper package return code is " + str(returnCode) + " output is: " + str(message))
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None :
             for filename in r :
                 if re.match("msft-lis-rdma-kmp-default-\d{8}\.(%s).+" % host_version, filename) :
-                    print "Installing RPM /opt/microsoft/rdma/" + filename
-                    commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive remove msft-lis-rdma-kmp-default")
+                    self.logger.log("remove msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
+                    self.logger.log("Installing RPM /opt/microsoft/rdma/" + filename)
+                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    self.logger.log("Install msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
                     return
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
