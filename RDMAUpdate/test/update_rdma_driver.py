@@ -13,13 +13,22 @@ def RunGetOutput(cmd,chk_err=True):
 #def
 
 def InstallRDMADriver(host_version) :
-	RunGetOutput("zypper --non-interactive install msft-rdma-drivers")
+
+	#make sure we have the correct repo configured
+	error, output = RunGetOutput("zypper lr -u")
+	if not re.search("msft-rdma-pack", output) :
+		RunGetOutput("zypper ar https://drivers.suse.com/microsoft/Microsoft-LIS-RDMA/sle-12/updates msft-rdma-pack")
+
+	#install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
+	RunGetOutput("zypper --non-interactive install --force msft-rdma-drivers")
+
+	#install the driver RPM package
 	r = os.listdir("/opt/microsoft/rdma")
 	if r :
 		for filename in r :
 			if re.match("msft-lis-rdma-kmp-default-\d{8}\.(%s).+" % host_version, filename) :
 				print "Installing RPM /opt/microsoft/rdma/" + filename
-				RunGetOutput("zypper --non-interactive install /opt/microsoft/rdma/%s" % filename)
+				RunGetOutput("zypper --non-interactive install --force /opt/microsoft/rdma/%s" % filename)
 				return
 
 	print "RDMA drivers not found in /opt/microsoft/rdma"
@@ -30,7 +39,7 @@ error, output = RunGetOutput("ps -ef")	# how about error != 0
 r = re.search("hv_kvp_daemon", output)
 if not r :
 	print "KVP deamon is not running, install it"
-	RunGetOutput("zypper --non-interactive install hyper-v")	#find a way to force install non-prompt
+	RunGetOutput("zypper --non-interactive install --force hyper-v")
 	RunGetOutput("reboot")
 else :
 	print "KVP deamon is running"

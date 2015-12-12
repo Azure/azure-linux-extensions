@@ -127,7 +127,7 @@ class SuSEPatching(AbstractPatching):
             r = re.search("hv_kvp_daemon", output)
             if not r :
                 self.logger.log("KVP deamon is not running, install it")
-                error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -l hyper-v")
+                error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -force hyper-v")
                 self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
@@ -186,14 +186,20 @@ class SuSEPatching(AbstractPatching):
         """
         """
         commandExecuter = CommandExecuter(self.logger)
+        error, output = commandExecuter.RunGetOutput(self.zypper_path + " lr -u")
+        if not re.search("msft-rdma-pack", output) :
+            RunGetOutput(self.zypper_path + " ar https://drivers.suse.com/microsoft/Microsoft-LIS-RDMA/sle-12/updates msft-rdma-pack")
+
+        #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
+        RunGetOutput(self.zypper_path + " --non-interactive install --force msft-rdma-drivers")
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive -force install " + CommonVariables.wrapper_package_name)
         r = os.listdir("/opt/microsoft/rdma")
         if r :
             for filename in r :
                 if re.match("msft-lis-rdma-kmp-default-\d{8}\.(%s).+" % host_version, filename) :
                     print "Installing RPM /opt/microsoft/rdma/" + filename
-                    RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    RunGetOutput(self.zypper_path + " --non-interactive install -force /opt/microsoft/rdma/%s" % filename)
                     return
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
