@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python
+#!/usr/bin/python
 #
 # Copyright 2015 Microsoft Corporation
 #
@@ -80,41 +80,45 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
             self.zypper_path = '/usr/bin/zypper'
 
-    def rmdsupdate(self):
+    def rmdaupdate(self):
+        check_install_result = self.check_install_hv_utils()
+        if(check_install_result == CommonVariables.process_success):
+            time.sleep(40)
+            check_result = self.check_rdma()
 
-        self.install_hv_utils()
+            if(check_result == CommonVariables.UpToDate):
+                return
+            elif(check_result == CommonVariables.OutOfDate):
+                nd_driver_version = self.get_nd_driver_version()
+                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version)
+            elif(check_result == CommonVariables.DriverVersionNotFound):
+                raise RdmaException(CommonVariables.driver_version_not_found)
+            elif(check_result == CommonVariables.Unknown):
+                raise RdmaException(CommonVariables.unknown_error)
+        else:
+            raise RdmaException(CommonVariables.install_hv_utils_failed)
 
-        time.sleep(30)
 
-        check_result = self.check_rdms_update()
-        if(check_result == CommonVariables.UpToDate):
-            pass
-        elif(check_result == CommonVariables.OutOfDate):
-            install_result = self.install_hv_utils()
-            if(install_result != CommonVariables.process_success):
-                self.logger.log("install hv_utils failed.")
-                return CommonVariables.install_hv_utils_failed
-            else:
-                update_rdma_driver_result = self.update_rdma_driver()
-        elif(check_result == CommonVariables.Unknown):
-            pass
-
-    def check_rdms_update(self):
+    def check_rdma(self):
         nd_driver_version = self.get_nd_driver_version()
-
+        if(nd_driver_version is None or nd_driver_version == ""):
+            return CommonVariables.DriverVersionNotFound
         package_version = self.get_rdma_package_version()
-        #package_version would be like this :20150707_k3.12.28_4-3.1
-        #nd_driver_version 140.0
-        self.logger.log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
-        if(nd_driver_version is not None):
-            r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
-            if not r :	#host ND version is the same as the package version, do an update
-                return CommonVariables.OutofDate
-            else:
-                return CommonVariables.UpToDate
-        return CommonVariables.Unknown
+        if(package_version is None or package_version == ""):
+            return CommonVariables.OutOfDate
+        else:
+            # package_version would be like this :20150707_k3.12.28_4-3.1
+            # nd_driver_version 140.0
+            self.logger.log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
+            if(nd_driver_version is not None):
+                r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
+                if not r :	#host ND version is the same as the package version, do an update
+                    return CommonVariables.OutOfDate
+                else:
+                    return CommonVariables.UpToDate
+            return CommonVariables.Unknown
 
-    def install_hv_utils(self):
+    def check_install_hv_utils(self):
         commandExecuter = CommandExecuter(self.logger)
         error, output = commandExecuter.RunGetOutput(self.ps_path + " -ef")
         if(error != CommonVariables.process_success):
@@ -124,19 +128,19 @@ class SuSEPatching(AbstractPatching):
             if not r :
                 self.logger.log("KVP deamon is not running, install it")
                 error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -l hyper-v")
-                self.logger.log("install hyper-v output:" + str(output))
+                self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.rmmod_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("rmmod hv_utils output:" + str(output))
+                self.logger.log("rmmod hv_utils return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("modprobe hv_utils output:" + str(output))
+                self.logger.log("modprobe hv_utils return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 error,output = commandExecuter.RunGetOutput(self.service_path + " hv_kvp_daemon start ")	#find a way to force install non-prompt
-                self.logger.log("service hv_kvp_daemon start output:" + str(output))
+                self.logger.log("service hv_kvp_daemon start return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
                 return CommonVariables.process_success
@@ -156,7 +160,7 @@ class SuSEPatching(AbstractPatching):
                 NdDriverVersion = r.groups()[0]
                 return NdDriverVersion #e.g.  NdDriverVersion = 142.0
             else :
-                self.logger.log("Error: NdDriverVersion not found. Abort")
+                self.logger.log("Error: NdDriverVersion not found.")
                 return None
         except Exception as e:
             errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
@@ -167,32 +171,30 @@ class SuSEPatching(AbstractPatching):
         """
         """
         commandExecuter = CommandExecuter(self.logger)
-        error, output = commandExecuter.RunGetOutput("zypper info msft-lis-rdma-kmp-default")
-
-        r = re.search("Version: (\S+)", output)
-        if r :
-            package_version = r.groups()[0]# e.g.  package_version is "20150707_k3.12.28_4-3.1.140.0"
-            return package_version
-
-    def update_rdma_driver(self):
-        commandExecuter = CommandExecuter(self.logger)
-        nd_driver_version = self.get_nd_driver_version()
-        package_version = self.get_rdma_package_version()
-        #package_version would be like this :20150707_k3.12.28_4-3.1
-        #nd_driver_version 140.0
-        self.logger.log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
-        if(nd_driver_version is not None):
-            r = re.match(".+(%s)$" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
-            if not r :	#host ND version is the same as the package version, do an update
-                self.logger.log("ND and package version don't match, doing an update")
-                returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove msft-lis-rdma-kmp-default")
-                self.logger.log("remove rdma package result is :" + str(message))
-                returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n install --from sldp-msft msft-lis-rdma-kmp-default")#this will update everything, need to find a way to update only the RDMA
-                                                                                            #driver
-                self.logger.log("install rdma package result is :" + str(message))
-                commandExecuter.RunGetOutput("reboot")
-            else :
-                self.logger.log("ND and package version match, not doing an update")
+        error, output = commandExecuter.RunGetOutput(self.zypper_path + " info msft-lis-rdma-kmp-default")
+        if(error == CommonVariables.process_success):
+            r = re.search("Version: (\S+)", output)
+            if r :
+                package_version = r.groups()[0]# e.g.  package_version is "20150707_k3.12.28_4-3.1.140.0"
+                return package_version
+            else:
+                return None
         else:
-            pass
+            return None
 
+    def update_rdma_driver(self, host_version):
+        """
+        """
+        commandExecuter = CommandExecuter(self.logger)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
+        r = os.listdir("/opt/microsoft/rdma")
+        if r :
+            for filename in r :
+                if re.match("msft-lis-rdma-kmp-default-\d{8}\.(%s).+" % host_version, filename) :
+                    print "Installing RPM /opt/microsoft/rdma/" + filename
+                    RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    return
+        else:
+            self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
+            raise RdmaException(package_not_found)

@@ -85,12 +85,12 @@ def main():
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception, e:
-        err_msg = ("Failed to enable the extension with error: {0}, "
+        err_msg = ("Failed with error: {0}, "
                    "{1}").format(e, traceback.format_exc())
         waagent.Error(err_msg)
         hutil.error(err_msg)
         hutil.do_exit(1, 'Enable','failed','0',
-                      'Enable failed: {0}'.format(e))
+                      'Enable failed: {0}'.format(err_msg))
 
 
 def dummy_command(operation, status, msg):
@@ -209,7 +209,7 @@ def download_files(hutil):
     public_settings = hutil.get_public_settings()
     if public_settings is None:
         raise ValueError("Public configuration couldn't be None.")
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     blob_uris = public_settings.get('fileUris')
 
     protected_settings = hutil.get_protected_settings()
@@ -260,8 +260,7 @@ def download_files(hutil):
 
 
 def start_daemon(hutil):
-    public_settings = hutil.get_public_settings()
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     if cmd:
         hutil.log("Command to execute:" + cmd)
         args = [os.path.join(os.getcwd(), __file__), "-daemon"]
@@ -288,8 +287,7 @@ def start_daemon(hutil):
 
 
 def daemon(hutil):
-    public_settings = hutil.get_public_settings()
-    cmd = public_settings.get('commandToExecute')
+    cmd = get_command_to_execute(hutil)
     args = parse_args(cmd)
     if args:
         run_script(hutil, args)
@@ -592,6 +590,23 @@ def get_formatted_log(summary, stdout, stderr):
                   "---errout---\n"
                   "{2}\n")
     return msg_format.format(summary, stdout, stderr)
+
+
+def get_command_to_execute(hutil):
+    public_settings = hutil.get_public_settings()
+    protected_settings = hutil.get_protected_settings()
+    cmd_public = public_settings.get('commandToExecute')
+    cmd_protected = None
+    if protected_settings is not None:
+        cmd_protected = protected_settings.get('commandToExecute')
+    if cmd_public and cmd_protected:
+        err_msg = ("commandToExecute was specified both in public settings "
+            "and protected settings. It can only be specified in one of them.")
+        hutil.error(err_msg)
+        hutil.do_exit(1, 'Enable','failed','0',
+            'Enable failed: {0}'.format(err_msg))
+
+    return cmd_public if cmd_public else cmd_protected
 
 
 if __name__ == '__main__' :

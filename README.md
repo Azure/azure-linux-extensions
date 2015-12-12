@@ -4,42 +4,20 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
 
 VM Extensions are injected components authored by Microsoft and Partners into Linux VM (IaaS) to enable software and configuration automation.
 
+You can read the document [about virtual machine extensions and features](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/).
+
 # Extension List
 
 | Name | Lastest Version | Description |
 |:---|:---|:---|
-| [Custom Script](https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript) | 1.3 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
-| [DSC](https://github.com/Azure/azure-linux-extensions/tree/master/DSC) | 1.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
-| [OS Patching](https://github.com/Azure/azure-linux-extensions/tree/master/OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
-| [VM Access](https://github.com/Azure/azure-linux-extensions/tree/master/VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
+| [Custom Script](./CustomScript) | 1.4 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
+| [DSC](./DSC) | 1.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
+| [OS Patching](./OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
+| [VM Access](./VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
 
-# Contributing guide
-3rd party partners are welcomed to contribute the Linux extensions. Before you make a contribution, you should read the following guide.
+# Contributing Guide
 
-## 1. HandlerManifest.json
-The extensions are installed, enabled, disabled, updated and uninstalled by [Azure Linux Agent](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-agent-user-guide/).
-
-You can see these common commands in `HandlerManifest.json` and take [here](https://github.com/Azure/azure-linux-extensions/blob/master/CustomScript/HandlerManifest.json) as an example.
-
-The most important commands:
-* The `install` command is executed only when the extension is deployed the VM for the first time.
-* The `enable` command will enable your configurations (in section 2).
-
-## 2. Configurations
-The configurations include two parts: public configuration and protected configuration.
-
-They are in JSON format and defined in every specific configuration.
-
-## How to test
-1. Install the extension in your virtual machine on Azure.
-2. `cd /var/lib/waagent` and you can see your extension path.
-3. Fix the bug which you found, and test your code change just by re-enabling the extension.
-4. Feel free to create your pull request.
-
-# Debug
-1. The status of the extension is reported back to Azure, and you can see the status on Azure Portal.
-2. You can check `/var/log/waagent.log` to verify if the extension is enabled successfully.
-3. The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
+Please refer to [**HERE**](./docs/contribution-guide.md).
 
 # Known Issues
 1. When you run the PowerShell command "Set-AzureVMExtension" on Linux VM, you may hit following error: "Provision Guest Agent must be enabled on the VM object before setting IaaS VM Access Extension". 
