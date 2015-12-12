@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python
+#!/usr/bin/python
 #
 # Copyright 2015 Microsoft Corporation
 #
@@ -199,7 +199,7 @@ class SuSEPatching(AbstractPatching):
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
         self.logger.log("remove wrapper package return code is "+str(returnCode)+ " output is: "+str(message))
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
-        self.logger.log("install wrapper package return code is "+str(returnCode)+ " output is: "+str(message))
+        self.logger.log("remove wrapper package return code is "+str(returnCode)+ " output is: "+str(message))
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None :
             for filename in r :
