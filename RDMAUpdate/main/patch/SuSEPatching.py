@@ -57,7 +57,7 @@ class SuSEPatching(AbstractPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.rmmod_path = '/sbin/rmmod'
             self.umount_path = '/bin/umount'
-            self.zypper_path = '/bin/zypper'
+            self.zypper_path = '/usr/bin/zypper'
         else:
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
