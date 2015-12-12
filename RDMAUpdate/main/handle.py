@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -86,6 +86,7 @@ def rmdsupdate():
         MyPatching.rmdaupdate()
     except Exception as e:
         logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        hutil.do_exit(0, 'Enable','success','0','enable failed, please take a look at the extension log.')
     hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 
 def start_daemon():
