@@ -91,7 +91,7 @@ class SuSEPatching(AbstractPatching):
             elif(check_result == CommonVariables.OutOfDate):
                 nd_driver_version = self.get_nd_driver_version()
                 rdma_package_installed_version = self.get_rdma_package_version()
-                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version,get_rdma_package_version)
+                update_rdma_driver_result = self.update_rdma_driver(nd_driver_version, rdma_package_installed_version)
             elif(check_result == CommonVariables.DriverVersionNotFound):
                 raise RdmaException(CommonVariables.driver_version_not_found)
             elif(check_result == CommonVariables.Unknown):
@@ -196,6 +196,7 @@ class SuSEPatching(AbstractPatching):
             time.sleep(20)
             self.logger.log("error result is " + str(error) + " output is : " + str(output))
         else:
+            self.logger.log("output is: "+str(output))
             self.logger.log("msft-rdma-pack found")
 
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
