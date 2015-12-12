@@ -125,7 +125,7 @@ class SuSEPatching(AbstractPatching):
             return CommonVariables.common_failed
         else:
             r = re.search("hv_kvp_daemon", output)
-            if not r :
+            if r is None :
                 self.logger.log("KVP deamon is not running, install it")
                 error,output = commandExecuter.RunGetOutput(self.zypper_path + " -n install -force hyper-v")
                 self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
@@ -156,7 +156,7 @@ class SuSEPatching(AbstractPatching):
             with open("/var/lib/hyperv/.kvp_pool_0", "r") as f:
                 lines = f.read()
             r = re.match("NdDriverVersion\0+(\d\d\d\.\d)", lines)
-            if r :
+            if r is not None:
                 NdDriverVersion = r.groups()[0]
                 return NdDriverVersion #e.g.  NdDriverVersion = 142.0
             else :
@@ -174,7 +174,7 @@ class SuSEPatching(AbstractPatching):
         error, output = commandExecuter.RunGetOutput(self.zypper_path + " info msft-lis-rdma-kmp-default")
         if(error == CommonVariables.process_success):
             r = re.search("Version: (\S+)", output)
-            if r :
+            if r is not None:
                 package_version = r.groups()[0]# e.g.  package_version is "20150707_k3.12.28_4-3.1.140.0"
                 return package_version
             else:
@@ -187,19 +187,24 @@ class SuSEPatching(AbstractPatching):
         """
         commandExecuter = CommandExecuter(self.logger)
         error, output = commandExecuter.RunGetOutput(self.zypper_path + " lr -u")
-        if not re.search("msft-rdma-pack", output) :
-            commandExecuter.RunGetOutput(self.zypper_path + " ar https://drivers.suse.com/microsoft/Microsoft-LIS-RDMA/sle-12/updates msft-rdma-pack")
+        rdma_pack_result = re.search("msft-rdma-pack", output)
+        if rdma_pack_result is None :
+            self.logger.log("rdma_pack_result is None")
+            error, output = commandExecuter.RunGetOutput(self.zypper_path + " ar https://drivers.suse.com/microsoft/Microsoft-LIS-RDMA/sle-12/updates msft-rdma-pack")
+            self.logger.log("error result is "+str(error)+" output is : "+str(output))
+        else:
+            self.logger.log("msft-rdma-pack found")
 
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
-        commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install --force msft-rdma-drivers")
+        commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install msft-rdma-drivers")
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive -force install " + CommonVariables.wrapper_package_name)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
         r = os.listdir("/opt/microsoft/rdma")
         if r :
             for filename in r :
                 if re.match("msft-lis-rdma-kmp-default-\d{8}\.(%s).+" % host_version, filename) :
                     print "Installing RPM /opt/microsoft/rdma/" + filename
-                    commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install -force /opt/microsoft/rdma/%s" % filename)
+                    commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
                     return
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
