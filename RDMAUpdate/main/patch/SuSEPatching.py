@@ -55,6 +55,7 @@ class SuSEPatching(AbstractPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.ps_path = '/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.reboot_path = '/sbin/reboot'
             self.rmmod_path = '/sbin/rmmod'
             self.service_path='/usr/sbin/service'
             self.umount_path = '/bin/umount'
@@ -76,6 +77,7 @@ class SuSEPatching(AbstractPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.ps_path = '/usr/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.reboot_path = '/sbin/reboot'
             self.rmmod_path = '/usr/sbin/rmmod'
             self.service_path = '/usr/sbin/service'
             self.umount_path = '/usr/bin/umount'
@@ -233,3 +235,7 @@ class SuSEPatching(AbstractPatching):
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
             raise RdmaException(package_not_found)
+
+    def reboot_machine(self):
+        commandExecuter = CommandExecuter(self.logger)
+        commandExecuter.RunGetOutput(reboot_path)
