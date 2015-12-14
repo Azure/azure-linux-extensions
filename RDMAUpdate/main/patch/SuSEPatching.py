@@ -56,6 +56,7 @@ class SuSEPatching(AbstractPatching):
             self.ps_path = '/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
             self.rmmod_path = '/sbin/rmmod'
+            self.service_path='/usr/sbin/service'
             self.umount_path = '/bin/umount'
             self.zypper_path = '/usr/bin/zypper'
         else:
@@ -80,7 +81,7 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
             self.zypper_path = '/usr/bin/zypper'
 
-    def rmdaupdate(self):
+    def rdmaupdate(self):
         check_install_result = self.check_install_hv_utils()
         if(check_install_result == CommonVariables.process_success):
             time.sleep(40)
@@ -98,7 +99,6 @@ class SuSEPatching(AbstractPatching):
                 raise RdmaException(CommonVariables.unknown_error)
         else:
             raise RdmaException(CommonVariables.install_hv_utils_failed)
-
 
     def check_rdma(self):
         nd_driver_version = self.get_nd_driver_version()
@@ -119,6 +119,34 @@ class SuSEPatching(AbstractPatching):
                     return CommonVariables.UpToDate
             return CommonVariables.Unknown
 
+    def reload_hv_utils(self):
+        commandExecuter = CommandExecuter(self.logger)
+        #clear /run/hv_kvp_daemon folder for the service could not be restart walkaround
+
+        error,output = commandExecuter.RunGetOutput(self.rmmod_path + " hv_utils")	#find a way to force install non-prompt
+        self.logger.log("rmmod hv_utils return code: " + str(error) + " output:" + str(output))
+        if(error != CommonVariables.process_success):
+            return CommonVariables.common_failed
+        error,output = commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
+        self.logger.log("modprobe hv_utils return code: " + str(error) + " output:" + str(output))
+        if(error != CommonVariables.process_success):
+            return CommonVariables.common_failed
+        return CommonVariables.process_success
+
+    def restart_hv_kvp_daemon(self):
+        commandExecuter = CommandExecuter(self.logger)
+        reload_result = self.reload_hv_utils()
+        if(reload_result == CommonVariables.process_success):
+            if(os.path.exists('/run/hv_kvp_daemon')):
+                os.rmdir('/run/hv_kvp_daemon')
+            error,output = commandExecuter.RunGetOutput(self.service_path + " hv_kvp_daemon start")	#find a way to force install non-prompt
+            self.logger.log("service hv_kvp_daemon start return code: " + str(error) + " output:" + str(output))
+            if(error != CommonVariables.process_success):
+                return CommonVariables.common_failed
+            return CommonVariables.process_success
+        else:
+            return CommonVariables.common_failed
+
     def check_install_hv_utils(self):
         commandExecuter = CommandExecuter(self.logger)
         error, output = commandExecuter.RunGetOutput(self.ps_path + " -ef")
@@ -132,19 +160,7 @@ class SuSEPatching(AbstractPatching):
                 self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
-                error,output = commandExecuter.RunGetOutput(self.rmmod_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("rmmod hv_utils return code: " + str(error) + " output:" + str(output))
-                if(error != CommonVariables.process_success):
-                    return CommonVariables.common_failed
-                error,output = commandExecuter.RunGetOutput(self.modprobe_path + " hv_utils")	#find a way to force install non-prompt
-                self.logger.log("modprobe hv_utils return code: " + str(error) + " output:" + str(output))
-                if(error != CommonVariables.process_success):
-                    return CommonVariables.common_failed
-                error,output = commandExecuter.RunGetOutput(self.service_path + " hv_kvp_daemon start ")	#find a way to force install non-prompt
-                self.logger.log("service hv_kvp_daemon start return code: " + str(error) + " output:" + str(output))
-                if(error != CommonVariables.process_success):
-                    return CommonVariables.common_failed
-                return CommonVariables.process_success
+                return self.restart_hv_kvp_daemon()
             else :
                 self.logger.log("KVP deamon is running")
                 return CommonVariables.process_success
