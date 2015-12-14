@@ -33,6 +33,7 @@ from AbstractPatching import AbstractPatching
 from Common import *
 from CommandExecuter import CommandExecuter
 from RdmaException import RdmaException
+from SecondStageMarkConfig import SecondStageMarkConfig
 
 class SuSEPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
@@ -162,7 +163,9 @@ class SuSEPatching(AbstractPatching):
                 self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
-                return self.restart_hv_kvp_daemon()
+                secondStageMarkConfig = SecondStageMarkConfig()
+                secondStageMarkConfig.MarkIt()
+                return self.reboot_machine()
             else :
                 self.logger.log("KVP deamon is running")
                 return CommonVariables.process_success
@@ -238,4 +241,4 @@ class SuSEPatching(AbstractPatching):
 
     def reboot_machine(self):
         commandExecuter = CommandExecuter(self.logger)
-        commandExecuter.RunGetOutput(reboot_path)
+        commandExecuter.RunGetOutput(self.reboot_path)
