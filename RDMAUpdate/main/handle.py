@@ -42,6 +42,7 @@ from Utils import HandlerUtil
 from urlparse import urlparse
 from RDMALogger import RDMALogger
 from CronUtil import *
+from SecondStageMarkConfig import SecondStageMarkConfig
 #Main function is the only entrence to this extension handler
 def main():
     global logger
@@ -100,12 +101,16 @@ def enable():
     # do it one time when enabling.
     # config the cron job
     hutil.do_parse_context('Enable')
-    hutil.exit_if_enabled()
-
-    cronUtil = CronUtil(logger)
-    cronUtil.check_update_cron_config()
-    cronUtil.restart_cron()
-    start_daemon()
+    secondStageMarkConfig = SecondStageMarkConfig()
+    if(secondStageMarkConfig.IsMarked()):
+        secondStageMarkConfig.ClearIt()
+        start_daemon()
+    else:
+        hutil.exit_if_enabled()
+        cronUtil = CronUtil(logger)
+        cronUtil.check_update_cron_config()
+        cronUtil.restart_cron()
+        start_daemon()
 
 def install():
     hutil.do_parse_context('Install')
