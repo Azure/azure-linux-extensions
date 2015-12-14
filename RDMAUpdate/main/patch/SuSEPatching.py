@@ -177,7 +177,7 @@ class SuSEPatching(AbstractPatching):
         try:
             with open("/var/lib/hyperv/.kvp_pool_0", "r") as f:
                 lines = f.read()
-            r = re.match("NdDriverVersion\0+(\d\d\d\.\d)", lines)
+            r = re.search("NdDriverVersion\0+(\d\d\d\.\d)", lines)
             if r is not None:
                 NdDriverVersion = r.groups()[0]
                 return NdDriverVersion #e.g.  NdDriverVersion = 142.0
@@ -234,7 +234,7 @@ class SuSEPatching(AbstractPatching):
                     self.logger.log("Installing RPM /opt/microsoft/rdma/" + filename)
                     error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
                     self.logger.log("Install msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
-                    return
+                    return self.reboot_machine()
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
             raise RdmaException(package_not_found)
