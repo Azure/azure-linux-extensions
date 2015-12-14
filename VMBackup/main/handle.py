@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -72,9 +72,16 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
+def timedelta_total_seconds(delta):
+    if not hasattr(datetime.timedelta, 'total_seconds'):
+        return delta.days * 86400 + delta.seconds
+    else:
+        return delta.total_seconds()
+
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
         backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
-        time_span = (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds() * 1000
+        time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+        time_span = timedelta_total_seconds(time_delta) * 1000
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat = [{
@@ -95,7 +102,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
         }]
         status_report_msg = json.dumps(stat)
         status_report_msg = status_report_msg.replace(date_place_holder,date_string)
-        blobWriter = BlobWriter(backup_logger)
+        blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(status_report_msg,blobUri)
 
 def exit_with_commit_log(error_msg, para_parser):
@@ -249,7 +256,12 @@ def enable():
         error_msg  += ('Enable failed.' + str(global_error_result))
 
     if(para_parser is not None and para_parser.statusBlobUri is not None):
-        do_backup_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
+        do_backup_status_report(operation='Enable',status = run_status,\
+                                status_code=str(run_result), \
+                                message=error_msg,\
+                                taskId=para_parser.taskId,\
+                                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                                blobUri=para_parser.statusBlobUri)
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
