@@ -47,6 +47,7 @@ class BlobWriter(object):
                     self.hutil.log(str(headers))
                     result = http_util.Call('PUT',sasuri_obj,msg,headers = headers)
                     if(result == CommonVariables.success):
+                        self.hutil.log("logs blob written succesfully.")
                         retry_times = 0
                 else:
                     self.hutil.log("logbloburi is None")

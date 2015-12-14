@@ -70,20 +70,30 @@ def main():
             chkrdma()
 
 def chkrdma():
-    check_result = MyPatching.check_rdma_update()
+    check_result = MyPatching.check_rdma()
     if(check_result == CommonVariables.UpToDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
-    if(check_result == CommonVariables.OutofDate):
+    if(check_result == CommonVariables.OutOfDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver out of date.')
+    if(check_result == CommonVariables.DriverVersionNotFound):
+        hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver not found.')
     if(check_result == CommonVariables.Unknown):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA version not found.')
 
 def rmdsupdate():
-    MyPatching.rmdaupdate()
+    hutil.do_parse_context('Executing')
+    try:
+        MyPatching.rmdaupdate()
+    except Exception as e:
+        logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        hutil.do_exit(0, 'Enable','success','0','enable failed, please take a look at the extension log.')
+    hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 
-def install():
-    hutil.do_parse_context('Install')
-    hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
+def start_daemon():
+    args = [os.path.join(os.getcwd(), __file__), "-rdmaupdate"]
+    logger.log("start_daemon with args:" + str(args))
+    devnull = open(os.devnull, 'w')
+    child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
 def enable():
     # do it one time when enabling.
@@ -94,10 +104,11 @@ def enable():
     cronUtil = CronUtil(logger)
     cronUtil.check_update_cron_config()
     cronUtil.restart_cron()
+    start_daemon()
 
-    update_result = MyPatching.rmdaupdate()
-
-    hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
+def install():
+    hutil.do_parse_context('Install')
+    hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
@@ -113,4 +124,3 @@ def update():
 
 if __name__ == '__main__' :
     main()
-

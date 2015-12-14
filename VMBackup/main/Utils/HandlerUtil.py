@@ -97,15 +97,16 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
-                    cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if(freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder,file))
-                        seq_no = cur_seq_no
-                    else:
-                        current_file_m_time = os.path.getmtime(join(config_folder,file))
-                        if(current_file_m_time > freshest_time):
-                            freshest_time = current_file_m_time
+                    if(file.endswith('.settings')):
+                        cur_seq_no = int(os.path.basename(file).split('.')[0])
+                        if(freshest_time == None):
+                            freshest_time = os.path.getmtime(join(config_folder,file))
                             seq_no = cur_seq_no
+                        else:
+                            current_file_m_time = os.path.getmtime(join(config_folder,file))
+                            if(current_file_m_time > freshest_time):
+                                freshest_time = current_file_m_time
+                                seq_no = cur_seq_no
                 except ValueError:
                     continue
         return seq_no
@@ -173,7 +174,7 @@ class HandlerUtility:
         if not _context:
             self.do_exit(1,operation,'error','1', operation + ' Failed')
         return _context
-            
+
     def try_parse_context(self):
         self._context = HandlerContext(self._short_name)
         handler_env = None
@@ -223,11 +224,12 @@ class HandlerUtility:
             error_msg = 'Unable to read ' + self._context._settings_file + '. '
             self.error(error_msg)
             return None
+        else:
+            os.rename(self._context._settings_file, self._context._settings_file + ".processed")
 
         self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
         return self._context
-
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
@@ -267,12 +269,6 @@ class HandlerUtility:
 
         return -1
 
-    def is_current_config_seq_greater_inused(self):
-        return int(self._context._seq_no) > self._get_most_recent_seq()
-
-    def get_inused_config_seq(self):
-        return self._get_most_recent_seq()
-
     def set_inused_config_seq(self,seq):
         self._set_most_recent_seq(seq)
 
@@ -301,27 +297,12 @@ class HandlerUtility:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
 
-    def do_heartbeat_report(self, heartbeat_file,status,code,message):
-        # heartbeat
-        health_report = '[{"version":"1.0","heartbeat":{"status":"' + status + '","code":"' + code + '","Message":"' + message + '"}}]'
-        if waagent.SetFileContents(heartbeat_file,health_report) == None :
-            self.error('Unable to wite heartbeat info to ' + heartbeat_file)
-
     def do_exit(self,exit_code,operation,status,code,message):
         try:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
-
-    def get_name(self):
-        return self._context._name
-    
-    def get_seq_no(self):
-        return self._context._seq_no
-
-    def get_log_dir(self):
-        return self._context._log_dir
 
     def get_handler_settings(self):
         return self._context._config['runtimeSettings'][0]['handlerSettings']

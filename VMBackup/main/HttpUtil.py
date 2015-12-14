@@ -76,6 +76,7 @@ class HttpUtil(object):
             else:
                 connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort)
                 connection.set_tunnel(sasuri_obj.hostname, 443)
+                # If proxy is used, full url is needed.
                 path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
                 connection.request(method=method, url=(path), body=data, headers=headers)
                 resp = connection.getresponse()
