@@ -34,6 +34,7 @@ Schema for the public configuration file looks like this:
 | intervalOfWeeks | The update frequency (in weeks) | optional, string | 1 |
 | dayOfWeek | The patching date (of the week)You can specify multiple days in a week | optional, string | Everyday |
 | startTime | Start time of patching | optional, string | 03:00 |
+| distUpgradeList | Path to a repo list which for which a full upgrade (e.g. dist-upgrade in Ubuntu) will occur | optional, string | /etc/apt/sources.list.d/custom.list |
 | vmStatusTest | Including `local`, `idleTestScript` and `healthyTestScript` | optional, object | |
 | local | Flag to assign the location of user-defined scripts | optional, boolean | false |
 | idleTestScript | If `local` is true, it is the contents of the idle test script. Otherwise, it is the uri of the idle test script. | optional, string | |
@@ -51,6 +52,7 @@ Schema for the public configuration file looks like this:
   "intervalOfWeeks": "<number>",
   "dayOfWeek": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Everyday",
   "startTime": "<hr:min>",
+  "distUpgradeList": "</etc/apt/sources.list.d/custom.list>",
   "vmStatusTest": {
     "local": false,
     "idleTestScript": "<path_to_idletestscript>",
