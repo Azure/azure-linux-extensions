@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -65,7 +65,7 @@ def main():
         elif re.match("^([-/]*)(update)", a):
             update()
         elif re.match("^([-/]*)(rdmaupdate)", a):
-            rmdsupdate()
+            rdmaupdate()
         elif re.match("^([-/]*)(chkrdma)", a):
             chkrdma()
 
@@ -80,10 +80,10 @@ def chkrdma():
     if(check_result == CommonVariables.Unknown):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA version not found.')
 
-def rmdsupdate():
+def rdmaupdate():
     hutil.do_parse_context('Executing')
     try:
-        MyPatching.rmdaupdate()
+        MyPatching.rdmaupdate()
     except Exception as e:
         logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         hutil.do_exit(0, 'Enable','success','0','enable failed, please take a look at the extension log.')
