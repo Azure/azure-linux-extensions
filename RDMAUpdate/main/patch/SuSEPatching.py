@@ -219,7 +219,8 @@ class SuSEPatching(AbstractPatching):
         else:
             self.logger.log("output is: "+str(output))
             self.logger.log("msft-rdma-pack found")
-
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --no-gpg-checks refresh")
+        self.logger.log("refresh repro return code is " + str(returnCode) + " output is: " + str(message))
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
         self.logger.log("remove wrapper package return code is " + str(returnCode) + " output is: " + str(message))
