@@ -17,9 +17,9 @@
 # limitations under the License.
 #
 
-if [ ! $1 ]  ; then
+if [ ! $1 ]  || [ ! $2 ] || [ ! $3 ]  ; then
     echo "" 
-    echo "    Usage: create_zip.sh <path_to_extension_dir>"
+    echo "    Usage: create_zip.sh <path_to_extension_dir> <name> <version>"
     echo ""
     exit 1
 fi
@@ -33,29 +33,24 @@ fi
 
 curr_dir=`pwd`
 ext_dir=$1
+ext_name=$2
+ext_version=$3
 cd $ext_dir
 ext_dir=`pwd`
-ext_meta=$ext_dir/HandlerManifest.json
 cd $curr_dir
 
-
-if [ ! -f $ext_meta ] ; then
-    echo ""
-    echo "    Error: Couldn't find \"HandlerManifest.json\" file under $ext_dir"
-    echo ""
-    exit 1
-fi
 
 script=$(dirname $0)
 root=$script/..
 cd $root
 root=`pwd`
 
+echo $ext_name
+echo $ext_version
+
 util_dir=$root/Utils
 build_dir=$root/build
 
-ext_name=`grep 'name' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
-ext_version=`grep 'version' $ext_meta | sed 's/[\"| |,]//g' |gawk -F ':' '{print $2}'`
 
 if [ ! $ext_name ] ; then
     echo ""
