@@ -95,8 +95,9 @@ def daemon(hutil):
         startTime = time.time()
         try:
             monitor.run()
-            message = 'deploymentId='+config.getVmDeploymentId()+' '+
-                      'roleInstance='+config.getVmRoleInstance()+' OK'
+            message = ("deploymentId={0} roleInstance={1} OK"
+                       "").format(config.getVmDeploymentId(), 
+                                  config.getVmRoleInstance())
             hutil.do_status_report("Enable", "success", 0, message)
 
         except Exception, e:
