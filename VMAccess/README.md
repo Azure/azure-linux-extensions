@@ -1,5 +1,5 @@
 # VMAccess Extension
-Provide several ways to allow owner of the VM to get the SSH access back.
+Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
 Current version is 1.3.
 
@@ -14,6 +14,8 @@ VMAccess Extension can:
 * Reset the public host key provided during VM provisioning if host key not provided
 * Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
 * Remove the existing user
+* Check disks
+* Repair added disk
 
 # User Guide
 
@@ -21,7 +23,17 @@ VMAccess Extension can:
 
 ### 1.1. Public configuration
 
-No need to provide the public configuration.
+Schema for the public configuration file looks like:
+
+* `check_disk`: (boolean) whether or not to check disk
+* `repair_disk`: (boolean, string) whether or not to repair disk, disk name
+
+```json
+{ "check_disk": "true",
+  "repair_disk": "true, user-disk-name"
+}
+
+```
 
 ### 1.2. Protected configuration
 

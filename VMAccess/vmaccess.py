@@ -382,7 +382,7 @@ def check_and_repair_disk(hutil):
             hutil.log("Successfully checked disk")
 
         if repair_disk:
-            _fsck_repair(disk_name, hutil)
+            _fsck_repair(hutil, disk_name)
             hutil.log("Repaired and remounted disk")
 
 def _fsck_check(hutil):
@@ -399,7 +399,7 @@ def _fsck_check(hutil):
         hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
 
 
-def _fsck_repair(disk_name, hutil):
+def _fsck_repair(hutil, disk_name):
     # first unmount disks and loop devices lazy + forced
     try:
         cmd_result = waagent.Run("umount -f /%s" % disk_name)
