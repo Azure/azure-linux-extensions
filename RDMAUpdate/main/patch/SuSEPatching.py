@@ -234,11 +234,15 @@ class SuSEPatching(AbstractPatching):
                     self.logger.log("Installing RPM /opt/microsoft/rdma/" + filename)
                     error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
                     self.logger.log("Install msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
-                    return self.reboot_machine()
+                    if(error == CommonVariables.process_success):
+                        self.reboot_machine()
+                    else:
+                        raise RdmaException(CommonVariables.package_install_failed)
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
-            raise RdmaException(package_not_found)
+            raise RdmaException(CommonVariables.package_not_found)
 
     def reboot_machine(self):
+        self.logger.log("rebooting machine")
         commandExecuter = CommandExecuter(self.logger)
         commandExecuter.RunGetOutput(self.reboot_path)
