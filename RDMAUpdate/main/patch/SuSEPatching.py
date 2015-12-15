@@ -165,7 +165,8 @@ class SuSEPatching(AbstractPatching):
                     return CommonVariables.common_failed
                 secondStageMarkConfig = SecondStageMarkConfig()
                 secondStageMarkConfig.MarkIt()
-                return self.reboot_machine()
+                self.reboot_machine()
+                return CommonVariables.process_success
             else :
                 self.logger.log("KVP deamon is running")
                 return CommonVariables.process_success
@@ -219,12 +220,12 @@ class SuSEPatching(AbstractPatching):
         else:
             self.logger.log("output is: "+str(output))
             self.logger.log("msft-rdma-pack found")
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " refresh")
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " refresh --no-gpg-checks")
         self.logger.log("refresh repro return code is " + str(returnCode) + " output is: " + str(message))
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
         self.logger.log("remove wrapper package return code is " + str(returnCode) + " output is: " + str(message))
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install --force " + CommonVariables.wrapper_package_name)
         self.logger.log("install wrapper package return code is " + str(returnCode) + " output is: " + str(message))
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None :
@@ -233,7 +234,7 @@ class SuSEPatching(AbstractPatching):
                     error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive remove msft-lis-rdma-kmp-default")
                     self.logger.log("remove msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
                     self.logger.log("Installing RPM /opt/microsoft/rdma/" + filename)
-                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install --force /opt/microsoft/rdma/%s" % filename)
                     self.logger.log("Install msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
                     if(error == CommonVariables.process_success):
                         self.reboot_machine()

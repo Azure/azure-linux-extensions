@@ -71,6 +71,7 @@ def main():
             chkrdma()
 
 def chkrdma():
+    hutil.do_parse_context('Executing')
     check_result = MyPatching.check_rdma()
     if(check_result == CommonVariables.UpToDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
