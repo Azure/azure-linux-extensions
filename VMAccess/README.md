@@ -236,7 +236,20 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 }
 ```
 
+### 3.7 Checking added disks on VM
+```json
+{
+    "check_disk":"true"
+}
+```
 
+### 3.8 Fix added disks on a VM
+```json
+{
+    "repair_disk": "true",
+    "disk_name": "userdisktofix"
+}
+```
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
