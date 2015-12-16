@@ -410,7 +410,7 @@ def _fsck_repair(hutil, disk_name):
             retcode = waagent.Run("fsck -AR -y")
             hutil.log("Ran fsck with return code: %d" % retcode)
         if retcode == 0:
-            output = waagent.RunGetOutput("mount")
+            retcode,output = waagent.RunGetOutput("mount")
             hutil.log(output)
             return output
         else:
