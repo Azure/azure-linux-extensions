@@ -378,12 +378,14 @@ def check_and_repair_disk(hutil):
             hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
 
         if check_disk:
-            _fsck_check(hutil)
+            outretcode = _fsck_check(hutil)
             hutil.log("Successfully checked disk")
+            return outretcode
 
         if repair_disk:
-            _fsck_repair(hutil, disk_name)
+            outdata = _fsck_repair(hutil, disk_name)
             hutil.log("Repaired and remounted disk")
+            return outdata
 
 def _fsck_check(hutil):
     try:
