@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -34,6 +34,7 @@ class CronUtil(object):
     def check_update_cron_config(self):
         script_file_path = os.path.realpath(sys.argv[0])
         script_dir = os.path.dirname(script_file_path)
+        script_file = os.path.basename(script_file_path)
         old_line_end = ' '.join([script_file, '-chkrdma'])
 
         new_line = ' '.join(['\n0 0 * * *', 'root cd', script_dir, '..&& python main/handle -chkrdma >/dev/null 2>&1\n'])
