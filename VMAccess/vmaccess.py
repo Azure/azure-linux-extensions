@@ -307,9 +307,9 @@ def _reset_sshd_config(sshd_file_path):
         cfg_content += "      [Socket]\n"
         cfg_content += "      ListenStream={0}\n".format(sshd_port)
         cfg_content += "      Accept=yes\n"
-        
+
         waagent.SetFileContents(cfg_tempfile, cfg_content)
-        
+
         waagent.Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
         os.remove(cfg_tempfile)
     else:
@@ -369,6 +369,7 @@ def check_and_repair_disk(hutil):
     if public_settings:
         check_disk = public_settings.get('check_disk')
         repair_disk = public_settings.get('repair_disk')
+        disk_name = public_settings.get('disk_name')
 
         if check_disk and repair_disk:
             err_msg = ("check_disk and repair_disk was both specified."
@@ -377,17 +378,20 @@ def check_and_repair_disk(hutil):
             hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
 
         if check_disk:
-            _fsck_check(hutil)
+            outretcode = _fsck_check(hutil)
             hutil.log("Successfully checked disk")
+            return outretcode
 
         if repair_disk:
-            _fsck_repair(hutil)
+            outdata = _fsck_repair(hutil, disk_name)
             hutil.log("Repaired and remounted disk")
+            return outdata
 
 def _fsck_check(hutil):
     try:
         retcode = waagent.Run("fsck -As -y")
         if retcode > 0:
+            hutil.log(retcode)
             raise Exception("Disk check was not successful")
         else:
             return retcode
@@ -397,29 +401,25 @@ def _fsck_check(hutil):
         hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
 
 
-def _fsck_repair(hutil):
+def _fsck_repair(hutil, disk_name):
     # first unmount disks and loop devices lazy + forced
     try:
-        cmd_result = waagent.Run("umount -adfr")
+        cmd_result = waagent.Run("umount -f /%s" % disk_name)
         if cmd_result!=0:
             # Fail fast
-            raise Exception("Failed to unmount disks")
-        else:
+            hutil.log("Failed to unmount disk: %s" % disk_name)
             # run repair
             retcode = waagent.Run("fsck -AR -y")
-        if retcode > 0:
-            raise Exception("Failed to repair disk")
-        else:
-            # remount all post repair and return
-            retcode = waagent.Run("mount -a")
+            hutil.log("Ran fsck with return code: %d" % retcode)
         if retcode == 0:
-            return retcode
+            retcode,output = waagent.RunGetOutput("mount")
+            hutil.log(output)
+            return output
         else:
             raise Exception("Failed to mount disks")
     except Exception, e:
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair','error','0', 'Repair failed.')
-
 
 if __name__ == '__main__' :
     main()
