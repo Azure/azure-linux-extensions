@@ -122,6 +122,8 @@ class AbstractPatching(object):
         self.stop_flag_path = os.path.join(self.cwd, 'StopOSPatching')
         self.history_scheduled = os.path.join(self.cwd, 'scheduled/history')
         self.scheduled_configs_file = os.path.join(self.cwd, 'scheduled/configs')
+        self.dist_upgrade_list = None
+        self.dist_upgrade_list_key = 'distUpgradeList'
 
         # Reboot Requirements
         self.reboot_required = False
@@ -129,6 +131,11 @@ class AbstractPatching(object):
         self.open_deleted_files_after = list()
         self.needs_restart = list()
 
+    def is_string_none_or_empty(self, str):
+        if str is None or len(str) < 1:
+            return True
+        return False
+    
     def parse_settings(self, settings):
         disabled = settings.get("disabled")
         if disabled is None or str(disabled).lower() not in ConfigOptions.disabled:
@@ -185,7 +192,11 @@ class AbstractPatching(object):
                                   version=Version,
                                   message="category="+self.category)
         self.current_configs["category"] =  self.category
-
+        
+        self.dist_upgrade_list = settings.get(self.dist_upgrade_list_key)
+        if not self.is_string_none_or_empty(self.dist_upgrade_list):
+            self.current_configs[self.dist_upgrade_list_key] = self.dist_upgrade_list
+        
         check_hrmin = re.compile(r'^[0-9]{1,2}:[0-9]{1,2}$')
         install_duration = settings.get('installDuration')
         if install_duration is None or not re.match(check_hrmin, install_duration):
@@ -824,3 +835,4 @@ class AbstractPatching(object):
             self.syslogger.warning(message)
         elif level == logging.ERROR:
             self.syslogger.error(message)
+
