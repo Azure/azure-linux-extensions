@@ -34,14 +34,16 @@ class Backuplogger(object):
     """description of class"""
     def log(self, msg, local=False, level='Info'):
         log_msg = (str(datetime.datetime.now()) + '   ' + level + '   ' + msg + '\n')
-        self.msg += log_msg
         if(local):
             self.hutil.log(log_msg)
+        else:
+            self.msg += log_msg
 
     def commit(self, logbloburi):
         #commit to local file system first, then commit to the network.
         self.hutil.log(self.msg)
         blobWriter = BlobWriter(self.hutil)
         blobWriter.WriteBlob(self.msg,logbloburi)
+
     def commit_to_local(self):
         self.hutil.log(self.msg)

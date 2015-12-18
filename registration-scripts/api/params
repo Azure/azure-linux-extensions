@@ -1,0 +1,21 @@
+AZURE_PRODUCTION=1
+#MOONCAKE_PRODUCTION=1
+
+if [ $MOONCAKE_PRODUCTION -eq 1 ] ; then
+    export ENDPOINT="https://management.core.chinacloudapi.cn"
+    export SUBSCRIPTION="REPLACE-ME"
+    export VERSION='x-ms-version: 2014-06-01' 
+    export CERT="REPLACE-ME"
+    export CONN_STR="REPLACE-ME"
+elif [ $AZURE_PRODUCTION -eq 1 ] ; then
+    export ENDPOINT="https://management.core.windows.net"
+    export SUBSCRIPTION="REPLACE-ME"
+    export VERSION='x-ms-version: 2014-06-01' 
+    export CERT="REPLACE-ME"
+    export CONN_STR="REPLACE-ME"
+fi
+
+echo ENDPOINT: $ENDPOINT >&2
+echo SUBSCRIPTION: $SUBSCRIPTION >&2
+echo CERT: $CERT >&2
+echo VERSION: $VERSION >&2

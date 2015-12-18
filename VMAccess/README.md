@@ -1,10 +1,9 @@
 # VMAccess Extension
-Provide several ways to allow owner of the VM to get the SSH access back.
+Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
-Current version is 1.3.
+Current version is 1.4.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
 * [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
 
 VMAccess Extension can:
@@ -14,6 +13,8 @@ VMAccess Extension can:
 * Reset the public host key provided during VM provisioning if host key not provided
 * Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
 * Remove the existing user
+* Check disks
+* Repair added disk
 
 # User Guide
 
@@ -21,7 +22,17 @@ VMAccess Extension can:
 
 ### 1.1. Public configuration
 
-No need to provide the public configuration.
+Schema for the public configuration file looks like:
+
+* `check_disk`: (boolean) whether or not to check disk
+* `repair_disk`: (boolean, string) whether or not to repair disk, disk name
+
+```json
+{ "check_disk": "true",
+  "repair_disk": "true, user-disk-name"
+}
+
+```
 
 ### 1.2. Protected configuration
 
@@ -93,23 +104,31 @@ VMAccessForLinux Microsoft.OSTCExtensions <version> \
 
 > **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
 
+In ARM mode, there is another specific and simple command to reset your password.
+
+```
+$ azure vm reset-access [options] <resource-group> <name>
+```
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can change to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
 
 You can deploying VMAccess Extension by running:
+
 ```powershell
 $VmName = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'VMAccessForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{}'
 $PrivateConf = '{
@@ -127,12 +146,17 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```
 
 #### 2.2.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
 
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+
 You can deploying VMAccess Extension by running:
+
 ```powershell
 $RGName = '<resource-group-name>'
 $VmName = '<vm-name>'
@@ -140,7 +164,7 @@ $Location = '<location>'
 
 $ExtensionName = 'VMAccessForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{}'
 $PrivateConf = '{
@@ -151,12 +175,10 @@ $PrivateConf = '{
   "remove_user": "<username-to-remove>"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
   -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
-
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
 
 ### 2.3. Using [**ARM Template**][arm-template]
 ```json
@@ -171,7 +193,7 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
-    "typeHandlerVersion": "1.1",
+    "typeHandlerVersion": "1.3",
     "settings": {},
     "protectedSettings": {
       "username": "<username>",
@@ -184,6 +206,8 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
 
 }
 ```
+
+The sample ARM template is [201-vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
@@ -236,7 +260,20 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 }
 ```
 
+### 3.7 Checking added disks on VM
+```json
+{
+    "check_disk":"true"
+}
+```
 
+### 3.8 Fix added disks on a VM
+```json
+{
+    "repair_disk": "true",
+    "disk_name": "userdisktofix"
+}
+```
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
@@ -252,11 +289,13 @@ see the status on Azure Portal
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
 ## Changelog
-### v1.3 Sep. 8, 2015
-Add waagent to extension package
+
+```
+# 1.3 (2015-09-08)
+- Added waagent to extension package
+```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx

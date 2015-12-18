@@ -1,11 +1,10 @@
 # CustomScript Extension
 Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
-Latest version is 1.3.
+Latest version is 1.4.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://msdn.microsoft.com/en-us/library/azure/dn606311.aspx)
-* [Automate Linux VM Customization Tasks Using CustomScript Extension](http://azure.microsoft.com/blog/2014/08/20/automate-linux-vm-customization-tasks-using-customscript-extension/)
+* [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
 
 CustomScript Extension can:
 * If provided, download the customized scripts from Azure Storage or external public storage (e.g. Github)
@@ -13,7 +12,9 @@ CustomScript Extension can:
 * Support inline command
 * Convert Windows style newline in Shell and Python scripts automatically
 * Remove BOM in Shell and Python scripts automatically
+* Protect sensitive data in `commandToExecute`
 
+**Note:** The timeout for script download is 200 seconds. There is no timeout period for script execution.
 
 # User Guide
 
@@ -37,25 +38,33 @@ Schema for the public configuration file looks like this:
 
 Schema for the protected configuration file looks like this:
 
+* `commandToExecute`: (optional, string) the entrypoint script to execute
 * `storageAccountName`: (optional, string) the name of storage account
 * `storageAccountKey`: (optional, string) the access key of storage account
 
 ```json
 {
+  "commandToExecute": "<command-to-execute>",
   "storageAccountName": "<storage-account-name>",
   "storageAccountKey": "<storage-account-key>"
 }
 ```
 
-The storage account here is to store the scripts in `fileUris`.
+**NOTE:**
+
+1. The storage account here is to store the scripts in `fileUris`.
 If the scripts are stored in the private Azure Storage, you should provide
 `storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
+2. `commandToExecute` in protected settings can protect your sensitive data.
+But `commandToExecute` should not be specified both in public and protected configurations.
 
 ## 2. Deploying the Extension to a VM
 
 You can deploy it using Azure CLI, Azure Powershell and ARM template.
 
-> **NOTE:** Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
+**NOTE:**
+
+Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
 In diffrent models, the deploying commands have different syntaxes. Please select the right
 one in section 2.1 and 2.2 below.
  
@@ -105,19 +114,22 @@ CustomScriptForLinux Microsoft.OSTCExtensions <version> \
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
-You can change to Azure Service Management mode by running:
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureServiceManagement
+Add-AzureAccount
 ```
 
 You can deploying CustomScript Extension by running:
+
 ```powershell
 $VmName = '<vm-name>'
 $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 
 $ExtensionName = 'CustomScriptForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{
     "fileUris": ["<url>"],
@@ -135,12 +147,17 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```
 
 #### 2.2.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
+
+You can login to your Azure account (Azure Resource Manager mode) by running:
+
 ```powershell
-Switch-AzureMode -Name AzureResourceManager
+Login-AzureRmAccount
 ```
 
+Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure Powershell with Azure Resource Manager.
+
 You can deploying CustomScript Extension by running:
+
 ```powershell
 $RGName = '<resource-group-name>'
 $VmName = '<vm-name>'
@@ -148,7 +165,7 @@ $Location = '<location>'
 
 $ExtensionName = 'CustomScriptForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
-$Version = <version>
+$Version = '<version>'
 
 $PublicConf = '{
     "fileUris": ["<url>"],
@@ -159,15 +176,14 @@ $PrivateConf = '{
     "storageAccountKey": "<storage-account-key>"
 }'
 
-Set-AzureVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
+Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher `
   -ExtensionType $ExtensionName -TypeHandlerVersion $Version `
   -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
 
-For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Set-AzureVMExtension][Set-AzureVMExtension-ARM].
-
 ### 2.3. Using [**ARM Template**][arm-template]
+
 ```json
 {
   "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -180,7 +196,7 @@ For more details about Set-AzureVMExtension syntax in ARM mode, please visit [Se
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "CustomScriptForLinux",
-    "typeHandlerVersion": "1.3",
+    "typeHandlerVersion": "1.4",
     "settings": {
       "fileUris": [
         "<url>"
@@ -205,45 +221,79 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ## 3. Scenarios
 
 ### 3.1 Run scripts stored in Azure Storage
-```json
-{
-  "fileUris": ["http://MyAccount.blob.core.windows.net/vhds/MyShellScript.sh"],
-  "commandToExecute": " sh MyShellScript.sh"
-}
-```
-```json
-{
-  "storageAccountName": "MyAccount",
-  "storageAccountKey": "Mykey"
-}
-```
+
+* Public configuration
+
+  ```json
+  {
+    "fileUris": ["http://MyAccount.blob.core.windows.net/vhds/MyShellScript.sh"],
+    "commandToExecute": " sh MyShellScript.sh"
+  }
+  ```
+
+* Protected configuration
+
+  ```json
+  {
+    "storageAccountName": "MyAccount",
+    "storageAccountKey": "Mykey"
+  }
+  ```
 
 ### 3.2 Run scripts stored in GitHub
-```json
-{
-  "fileUris": ["https://github.com/MyProject/Archive/MyPythonScript.py"],
-  "commandToExecute": "python MyPythonScript.py"
-}
-```
+
+* Public configuration
+
+  ```json
+  {
+    "fileUris": ["https://github.com/MyProject/Archive/MyPythonScript.py"],
+    "commandToExecute": "python MyPythonScript.py"
+  }
+  ```
+
 No need to provide protected settings.
 
 ### 3.3 Run inline scripts
-```json
-"commandToExecute": "echo Hello"
-"commandToExecute": "python -c \"print 1.3\""
-```
+
+* Public configuration
+
+  ```json
+  "commandToExecute": "echo Hello"
+  "commandToExecute": "python -c \"print 1.4\""
+  ```
 
 ### 3.4 Run scripts with unchanged configurations
+
 Running scripts with the exactly same configurations is unaccepted in current design.
 If you need to run scripts repeatly, you can add a timestamp.
 
-```json
-{
-  "fileUris": ["<url>"],
-  "commandToExecute": "<command>",
-  "timestamp": 123456789
-}
-```
+* Public configuration
+
+  ```json
+  {
+    "fileUris": ["<url>"],
+    "commandToExecute": "<command>",
+    "timestamp": 123456789
+  }
+  ```
+
+### 3.5 Run scripts with sensitive data
+
+* Public configuration
+
+  ```json
+  {
+    "fileUris": ["https://github.com/MyProject/Archive/MyPythonScript.py"]
+  }
+  ```
+
+* Protected configuration
+
+  ```json
+  {
+    "commandToExecute": "python MyPythonScript.py <my-password>"
+  }
+  ```
 
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
@@ -264,9 +314,14 @@ and the tail of the output is logged into the log directory specified
 in HandlerEnvironment.json and reported back to Azure
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
+## Changelog
+
+```
+# 1.4 (2015-11-19)
+- Protect sensitive data in `commandToExecute`
+```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/
-[Set-AzureVMExtension-ARM]: https://msdn.microsoft.com/en-us/library/mt163544.aspx
