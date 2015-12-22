@@ -172,7 +172,8 @@ class HandlerUtility:
     def do_parse_context(self,operation):
         _context = self.try_parse_context()
         if not _context:
-            self.do_exit(1,operation,'error','1', operation + ' Failed')
+            self.log("maybe no new settings file found")
+            sys.exit(1)
         return _context
 
     def try_parse_context(self):
