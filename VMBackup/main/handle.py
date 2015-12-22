@@ -146,7 +146,7 @@ def enable():
                 hutil.set_inused_config_seq(current_seq_no)
                 mi.save_identity()
 
-        hutil.exit_if_enabled()
+        hutil.save_seq()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
