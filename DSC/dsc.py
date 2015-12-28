@@ -45,15 +45,12 @@ import Utils.HandlerUtil as Util
 ExtensionShortName = 'DSC'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omiserver-1.0.8.ssl_'
-dsc_package_prefix = 'packages/dsc-1.0.0-320.ssl_'
-omi_version_deb = '1.0.8.1'
-omi_version_rpm = '1.0.8-1'
-dsc_version_deb = '1.0.0.320'
-dsc_version_rpm = '1.0.0-320'
-
-# On Ubuntu 15.04, omiserver package could not install the omiserver.service file properly, so manually copy the file
-omi_service_file = 'packages/omiserver.service'
+omi_package_prefix = 'packages/omi-1.0.8.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.0-466.ssl_'
+omi_version_deb = '1.0.8.2'
+omi_version_rpm = '1.0.8-2'
+dsc_version_deb = '1.1.0.466'
+dsc_version_rpm = '1.1.0-466'
 
 # DSC-specific Operation
 DownloadOp = "Download"
@@ -61,6 +58,7 @@ ApplyMofOp = "ApplyMof"
 ApplyMetaMofOp = "ApplyMetaMof"
 InstallModuleOp = "InstallModule"
 RemoveModuleOp = "RemoveModule"
+RegisterOp = "Register"
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -98,6 +96,7 @@ def main():
 def install():
     hutil.do_parse_context('Install')
     try:
+        remove_old_dsc_packages()
         install_dsc_packages()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception, e:
@@ -124,6 +123,8 @@ def enable():
                 current_config = apply_dsc_configuration(file_path)
 	    elif mode == 'install':
                 install_module(file_path)
+            elif mode == 'register':
+                register_automation()
             else:
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
                 waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -195,20 +196,53 @@ def get_config(key):
             return value.strip()
     return ''
 
+def remove_old_dsc_packages():
+    distro_name = distro_info[0]
+    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+        deb_remove_old_package('dsc', dsc_version_deb)
+        deb_remove_old_package('omiserver', '1.0.8.2')
+        deb_remove_old_package('omi', omi_version_deb)        
+    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
+        rpm_remove_old_package('dsc', dsc_version_deb)
+        rpm_remove_old_package('omiserver', '1.0.8-2')
+        rpm_remove_old_package('omi', omi_version_deb)                          
+
+
+def deb_remove_old_package(package_name, version):
+    if deb_check_old_package(package_name, version):
+        deb_uninstall_package(package_name)
+
+def rpm_remove_old_package(package_name, version):
+    if rpm_check_old_package(package_name, version):
+        rpm_uninstall_package(package_name)
+
+def deb_check_old_package(package_name, version):
+    code,output = run_cmd('dpkg -s ' + package_name + ' | grep Version:')
+    if code == 0:
+        code,output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
+        if output < version:
+            return True
+    return False
+
+def rpm_check_old_package(package_name, version):
+    code,output = run_cmd('rpm -q ' + package_name)
+    if code == 0:
+        l = len(package_name) + 1
+        if output[l:] < version:
+            return True
+    return False
+
 def install_dsc_packages():
     distro_name = distro_info[0]
     openssl_version = get_openssl_version()
     omi_package_path = omi_package_prefix + openssl_version
     dsc_package_path = dsc_package_prefix + openssl_version
     if (distro_name == 'Ubuntu' or distro_name == 'debian'):
-        deb_install_pkg(omi_package_path + '.deb', 'omiserver', omi_version_deb)
-        # On Ubuntu 15.04 the omiserver service is not installed successfully by the omiserver package
-        if float(distro_info[1]) > 15:
-            shutil.copyfile(omi_service_file, '/lib/systemd/system/omiserver.service')
-        deb_install_pkg(dsc_package_path + '.deb', 'dsc', dsc_version_deb )
+        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
+        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
     elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
-        rpm_install_pkg(omi_package_path + '.rpm', 'omiserver-' + omi_version_rpm)
-        rpm_install_pkg(dsc_package_path + '.rpm', 'dsc-' + dsc_version_rpm)
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
     else:
         raise Exception('Unknown distro: {0}'.format(distro_name))
 
@@ -286,12 +320,12 @@ def get_openssl_version():
         raise Exception(error_msg)                
         
 def start_omiserver():
-    run_cmd('service omiserver start')
-    code,output = run_cmd('service omiserver status')
+    run_cmd('service omiserverd start')
+    code,output = run_cmd('service omiserverd status')
     if code == 0:
-        hutil.log('Service omiserver is started')
+        hutil.log('Service omiserverd is started')
     else:
-        raise Exception('Failed to start service omiserver : {0}'.format(output))
+        raise Exception('Failed to start service omiserverd, status : {0}'.format(output))
 
 def download_file(mode):
     download_dir = prepare_download_dir(hutil.get_seq_no())
@@ -412,9 +446,9 @@ def prepare_download_dir(seq_no):
     return cur_download_dir
 
 def apply_dsc_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SendConfigurationApply.py -configurationmof ' + config_file_path)
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path)
     if code == 0:
-        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetConfiguration.py')
+        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: {0}'.format(output)
@@ -426,9 +460,9 @@ def apply_dsc_configuration(config_file_path):
         raise Exception(error_msg)
 
 def apply_dsc_meta_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SendMetaConfigurationApply.py -configurationmof ' + config_file_path)
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path)
     if code == 0:
-        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetMetaConfiguration.py')
+        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output
     else:
         error_msg = 'Failed to apply Meta MOF configuration: {0}'.format(output)
@@ -481,15 +515,43 @@ def remove_module():
 def uninstall_package(package_name):
     distro_name = distro_info[0]
     if (distro_name == 'Ubuntu' or distro_name == 'debian'):
-        cmd = 'dpkg -P ' + package_name
+        deb_uninstall_package(package_name)
     elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
-        cmd = 'rpm -e ' + package_name
+        rpm_uninstall_package(package_name)
+
+def deb_uninstall_package(package_name):
+    cmd = 'dpkg -P ' + package_name
     code,output = run_cmd(cmd)
     if code == 0:
         hutil.log('Package ' + package_name + ' is removed successfully')
     else:
         raise Exception('Failed to remove package ' + package_name)
 
+def rpm_uninstall_package(package_name):
+    cmd = 'rpm -e ' + package_name
+    code,output = run_cmd(cmd)
+    if code == 0:
+        hutil.log('Package ' + package_name + ' is removed successfully')
+    else:
+        raise Exception('Failed to remove package ' + package_name)
+
+def register_automation():
+    registration_key = get_config('RegistrationKey')
+    registation_url = get_config('RegistrationUrl')
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/Register.py ' + registration_key + ' ' + registation_url)
+    if not code == 0:
+        error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=RemoveModuleOp,
+                                  isSuccess=False,
+                                  message="(03109)" + error_msg)
+        raise Exception(error_msg)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op=RemoveModuleOp,
+                              isSuccess=True,
+                              message="(03108)Succeeded to register with Azure Automation DSC")
+    
 if __name__ == '__main__':
     main()
 
