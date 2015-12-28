@@ -207,7 +207,6 @@ def remove_old_dsc_packages():
         rpm_remove_old_package('omiserver', '1.0.8-2')
         rpm_remove_old_package('omi', omi_version_deb)                          
 
-
 def deb_remove_old_package(package_name, version):
     if deb_check_old_package(package_name, version):
         deb_uninstall_package(package_name)
@@ -543,12 +542,12 @@ def register_automation():
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=RemoveModuleOp,
+                                  op=RegisterOp,
                                   isSuccess=False,
                                   message="(03109)" + error_msg)
         raise Exception(error_msg)
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=RemoveModuleOp,
+                              op=RegisterOp,
                               isSuccess=True,
                               message="(03108)Succeeded to register with Azure Automation DSC")
     
