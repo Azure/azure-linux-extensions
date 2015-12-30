@@ -116,16 +116,16 @@ def enable():
             mode = mode.lower()
         if mode == 'remove':
             remove_module()
+        elif mode == 'register':
+            register_automation()
         else:
             file_path = download_file(mode)
             if mode == 'pull':
                 current_config = apply_dsc_meta_configuration(file_path)
             elif mode == 'push':
                 current_config = apply_dsc_configuration(file_path)
-	    elif mode == 'install':
+            elif mode == 'install':
                 install_module(file_path)
-            elif mode == 'register':
-                register_automation()
             else:
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
                 waagent.AddExtensionEvent(name=ExtensionShortName,
