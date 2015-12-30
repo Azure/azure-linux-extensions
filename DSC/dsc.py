@@ -201,11 +201,11 @@ def remove_old_dsc_packages():
     if (distro_name == 'Ubuntu' or distro_name == 'debian'):
         deb_remove_old_package('dsc', dsc_version_deb)
         deb_remove_old_package('omiserver', '1.0.8.2')
-        deb_remove_old_package('omi', omi_version_deb)        
+        deb_remove_old_package('omi', omi_version_deb)
     elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
-        rpm_remove_old_package('dsc', dsc_version_deb)
+        rpm_remove_old_package('dsc', dsc_version_rpm)
         rpm_remove_old_package('omiserver', '1.0.8-2')
-        rpm_remove_old_package('omi', omi_version_deb)                          
+        rpm_remove_old_package('omi', omi_version_rpm)
 
 def deb_remove_old_package(package_name, version):
     if deb_check_old_package(package_name, version):
