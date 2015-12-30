@@ -228,7 +228,7 @@ class HandlerUtility:
             self.error(error_msg)
             return None
         else:
-            if(self.operation=="Enable"):
+            if(self.operation is not None and self.operation.lower()=="enable"):
                 os.rename(self._context._settings_file, self._context._settings_file + ".processed")
 
         self.log("JSON config: " + ctxt)
