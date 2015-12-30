@@ -78,8 +78,9 @@ def main():
     if not protected_settings:
         protected_settings = {}
 
-    global distro_info
+    global distro_name
     distro_info = platform.dist()
+    distro_name = distro_info[0].lower()
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -197,12 +198,11 @@ def get_config(key):
     return ''
 
 def remove_old_dsc_packages():
-    distro_name = distro_info[0]
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+    if (distro_name == 'ubuntu' or distro_name == 'debian'):
         deb_remove_old_package('dsc', dsc_version_deb)
         deb_remove_old_package('omiserver', '1.0.8.2')
         deb_remove_old_package('omi', omi_version_deb)
-    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
+    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'suse'):
         rpm_remove_old_package('dsc', dsc_version_rpm)
         rpm_remove_old_package('omiserver', '1.0.8-2')
         rpm_remove_old_package('omi', omi_version_rpm)
@@ -232,14 +232,13 @@ def rpm_check_old_package(package_name, version):
     return False
 
 def install_dsc_packages():
-    distro_name = distro_info[0]
     openssl_version = get_openssl_version()
     omi_package_path = omi_package_prefix + openssl_version
     dsc_package_path = dsc_package_prefix + openssl_version
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+    if (distro_name == 'ubuntu' or distro_name == 'debian'):
         deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
-    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
+    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'suse'):
         rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
     else:
@@ -272,12 +271,11 @@ def deb_install_pkg(package_path, package_name, package_version):
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
 def install_package(package):
-    distro_name = distro_info[0]
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+    if (distro_name == 'ubuntu' or distro_name == 'debian'):
         apt_package_install(package)
     elif (distro_name == 'centos' or distro_name == 'redhat'):
         yum_package_install(package)
-    elif distro_name == 'SuSE':
+    elif distro_name == 'suse':
         zypper_package_install(package)
     else:
         raise Exception('Unknown distro: {0}'.format(distro_name))
@@ -512,10 +510,9 @@ def remove_module():
                               message="(03103)Succeeded to remove DSC Module")
 
 def uninstall_package(package_name):
-    distro_name = distro_info[0]
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+    if (distro_name == 'ubuntu' or distro_name == 'debian'):
         deb_uninstall_package(package_name)
-    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
+    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'suse'):
         rpm_uninstall_package(package_name)
 
 def deb_uninstall_package(package_name):
