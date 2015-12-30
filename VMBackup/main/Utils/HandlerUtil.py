@@ -82,6 +82,7 @@ class HandlerUtility:
         self._short_name = short_name
         self.syslogger = logging.getLogger(self._short_name)
         self.syslogger.setLevel(logging.INFO)
+        self.operation = None
         handler = logging.handlers.SysLogHandler(address='/dev/log')
         formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
         handler.setFormatter(formatter)
@@ -159,7 +160,7 @@ class HandlerUtility:
                 os.remove("/tmp/kk")
                 if cleartxt == None:
                     self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1,operation,'error','1', operation + ' Failed')
+                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
@@ -169,7 +170,8 @@ class HandlerUtility:
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self,operation):
+    def do_parse_context(self, operation):
+        self.operation = operation
         _context = self.try_parse_context()
         if not _context:
             self.log("maybe no new settings file found")
@@ -226,7 +228,8 @@ class HandlerUtility:
             self.error(error_msg)
             return None
         else:
-            os.rename(self._context._settings_file, self._context._settings_file + ".processed")
+            if(self.operation=="Enable"):
+                os.rename(self._context._settings_file, self._context._settings_file + ".processed")
 
         self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
@@ -298,7 +301,7 @@ class HandlerUtility:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
 
-    def do_exit(self,exit_code,operation,status,code,message):
+    def do_exit(self, exit_code, operation,status,code,message):
         try:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
