@@ -80,6 +80,9 @@ class HttpUtil(object):
                 path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
                 connection.request(method=method, url=(path), body=data, headers=headers)
                 resp = connection.getresponse()
+
+            if(resp != None):
+                self.logger.log(str(resp.getheaders()))
             responseBody = resp.read()
             connection.close()
             if(resp.status == 200 or resp.status == 201):
