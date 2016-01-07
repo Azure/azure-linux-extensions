@@ -48,17 +48,17 @@ class Mounts:
         out_lsblk_output = str(out_lsblk_output)
         self.logger.log(msg="out_lsblk_output:\n" + str(out_lsblk_output),local=True)
         lines = out_lsblk_output.splitlines()
-        line_number = len(lines)
-        for i in range(0,line_number):
-            item_value = lines[i].strip().split()
-            print("item_value==" + str(item_value))
-            name = item_value[0]
-            type = item_value[1]
-            fstype = ""
-            mountpoint = ""
-            if(len(item_value) > 2):
-                fstype = item_value[2]
-            if(len(item_value) > 3):
-                mountpoint = item_value[3]
-            mount = Mount(item_value[0], item_value[1], fstype, mountpoint)
+        #line_number = len(lines)
+        #for i in range(0,line_number):
+        for line in lines:
+            print("Parsing " + line)
+
+            tmp = line.split('" ')
+            tmp2 = [t.replace('"','') for t in tmp]
+            blk_dict =  { kv[0] : kv[1]  for kv in  [t.split('=') for t in tmp2]}
+            #print blk_dict
+            
+            mount = Mount(blk_dict['NAME'], blk_dict['TYPE'], blk_dict['FSTYPE'], blk_dict['MOUNTPOINT'])
             self.mounts.append(mount)
+        pass
+
