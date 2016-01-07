@@ -242,6 +242,7 @@ def enable():
     if(para_parser is not None and para_parser.logsBlobUri is not None):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
+        backup_logger.log("the logs blob uri is not there, so do not upload log.");
         backup_logger.commit_to_local()
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
