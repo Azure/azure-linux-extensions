@@ -45,5 +45,5 @@ class Mounts:
         disk_util = DiskUtil(patching,logger)
         device_items = disk_util.get_device_items(None);
         for device_item in device_items:
-            mount = Mount(item_value.name, item_value.type, item_value.fstype, item_value.mount_point)
+            mount = Mount(device_item.name, device_item.type, device_item.file_system, device_item.mount_point)
             self.mounts.append(mount)

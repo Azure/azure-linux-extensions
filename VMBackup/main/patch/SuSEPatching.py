@@ -30,7 +30,7 @@ import traceback
 import datetime
 import subprocess
 from AbstractPatching import AbstractPatching
-from Common import *
+from common import *
 
 
 class SuSEPatching(AbstractPatching):

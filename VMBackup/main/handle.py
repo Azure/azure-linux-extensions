@@ -38,6 +38,7 @@ import datetime
 from os.path import join
 from mounts import Mounts
 from mounts import Mount
+from patch import *
 from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
