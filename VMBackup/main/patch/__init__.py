@@ -1,5 +1,6 @@
+#!/usr/bin/python
 #
-# Copyright 2014 Microsoft Corporation
+# Copyright 2015 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.7+
-#
-# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
+# Requires Python 2.4+
 
 import os
 import re
@@ -27,6 +26,7 @@ from centosPatching import centosPatching
 from OraclePatching import OraclePatching
 from SuSEPatching import SuSEPatching
 
+# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
     if 'FreeBSD' in platform.system():
         release = re.sub('\-.*\Z', '', str(platform.release()))

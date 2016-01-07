@@ -50,12 +50,12 @@ from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 def main():
-    global backup_logger
-    global hutil
+    global MyPatching,backup_logger,hutil
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     backup_logger = Backuplogger(hutil)
+    MyPatching = GetMyPatching(logger = backup_logger)
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -118,7 +118,7 @@ def enable():
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Enable')
 
-    freezer = FsFreezer(backup_logger)
+    freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
     unfreeze_result = None
     snapshot_result = None
     freeze_result = None

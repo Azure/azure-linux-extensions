@@ -48,3 +48,17 @@ class CommonVariables:
     error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
+
+class DeviceItem(object):
+    def __init__(self):
+        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL
+        self.name = None
+        self.type = None
+        self.file_system = None
+        self.mount_point = None
+        self.label = None
+        self.uuid = None
+        self.model = None
+        self.size = None
+    def __str__(self):
+        return "name:" + str(self.name) + " type:" + str(self.type) + " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) + " label:" + str(self.label) + " model:" + str(self.model)
