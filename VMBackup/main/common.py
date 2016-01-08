@@ -62,4 +62,3 @@ class DeviceItem(object):
         self.size = None
     def __str__(self):
         return "name:" + str(self.name) + " type:" + str(self.type) + " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) + " label:" + str(self.label) + " model:" + str(self.model)
-
