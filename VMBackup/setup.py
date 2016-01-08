@@ -2,7 +2,7 @@
 #
 # VM Backup extension
 #
-# Copyright 2014 Microsoft Corporation
+# Copyright 2015 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,25 +47,16 @@ main_folder = 'main'
 main_entry = main_folder + '/handle.py'
 packages_array.append(main_folder)
 
+patch_folder = main_folder + '/patch'
+packages_array.append(patch_folder)
+
 """
 copy the dependency to the local
 """
-#azure_sdk_path = 'azure-sdk'
-#call(["git", "clone", "https://github.com/Azure/azure-sdk-for-python.git", azure_sdk_path])
-##delete the azure
-#if os.path.isdir(CommonVariables.azure_path):
-#    shutil.rmtree(CommonVariables.azure_path)
 
-#shutil.copytree(azure_sdk_path + '/azure' , CommonVariables.azure_path)
-#packages_array.append(CommonVariables.azure_path + '/http')
-#packages_array.append(CommonVariables.azure_path + '/servicebus')
-#packages_array.append(CommonVariables.azure_path + '/servicemanagement')
-#packages_array.append(CommonVariables.azure_path + '/storage')
-
-
-#"""
-#copy the utils lib to local
-#"""
+"""
+copy the utils lib to local
+"""
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
 #if os.path.isdir(target_utils_path):
 #    shutil.rmtree(target_utils_path)
@@ -131,8 +122,7 @@ setup(name = CommonVariables.extension_name,
       author='Microsoft Corporation',
       author_email='andliu@microsoft.com',
       url='https://github.com/Azure/azure-linux-extensions',
-      classifiers = [
-        'Development Status :: 5 - Production/Stable',
+      classifiers = ['Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
@@ -140,8 +130,7 @@ setup(name = CommonVariables.extension_name,
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'License :: OSI Approved :: Apache Software License'],
-      packages = packages_array
-     )
+      packages = packages_array)
 
 """
 unzip the package files and re-package it.
@@ -168,8 +157,7 @@ def zip(src, dst):
             absname = os.path.abspath(os.path.join(dirname, filename))
             dos2unix(absname)
             arcname = absname[len(abs_src) + 1:]
-            print 'zipping %s as %s' % (os.path.join(dirname, filename),
-                                        arcname)
+            print 'zipping %s as %s' % (os.path.join(dirname, filename),arcname)
             zf.write(absname, arcname)
     zf.close()
 
