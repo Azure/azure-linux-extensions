@@ -1,0 +1,16 @@
+[
+  {
+    "name":  "OmsAgentForLinux",
+    "version": "1.0.0.0",
+    "handlerManifest": {
+      "installCommand": "omsagent.py -install",
+      "uninstallCommand": "omsagent.py -uninstall",
+      "updateCommand": "omsagent.py -update",
+      "enableCommand": "omsagent.py -enable",
+      "disableCommand": "omsagent.py -disable",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false,
+      "updateMode": "UpdateWithInstall"
+    }
+  }
+]
