@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "VMBackup", "VMBackup.pyproj", "{C0E21872-032B-401C-AEC7-7154E5F107F9}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "VMBackup", "VMBackup.pyproj", "{A09C7CDB-874F-4214-BAB2-90F888EAC208}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,8 +11,8 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C0E21872-032B-401C-AEC7-7154E5F107F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C0E21872-032B-401C-AEC7-7154E5F107F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A09C7CDB-874F-4214-BAB2-90F888EAC208}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A09C7CDB-874F-4214-BAB2-90F888EAC208}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

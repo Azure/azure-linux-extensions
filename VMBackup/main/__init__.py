@@ -15,5 +15,52 @@
 #
 # Requires Python 2.7+
 #
+# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 
+import os
+import re
+import platform
 
+from UbuntuPatching import UbuntuPatching
+from redhatPatching import redhatPatching
+from centosPatching import centosPatching
+from OraclePatching import OraclePatching
+from SuSEPatching import SuSEPatching
+
+def DistInfo():
+    if 'FreeBSD' in platform.system():
+        release = re.sub('\-.*\Z', '', str(platform.release()))
+        distinfo = ['FreeBSD', release]
+        return distinfo
+    if os.path.isfile('/etc/oracle-release'):
+        release = re.sub('\-.*\Z', '', str(platform.release()))
+        distinfo = ['Oracle', release]
+        return distinfo
+    if 'linux_distribution' in dir(platform):
+        distinfo = list(platform.linux_distribution(full_distribution_name=0))
+        # remove trailing whitespace in distro name
+        distinfo[0] = distinfo[0].strip()
+        return distinfo
+    else:
+        return platform.dist()
+
+def GetMyPatching(logger):
+    """
+    Return MyPatching object.
+    NOTE: Logging is not initialized at this point.
+    """
+    dist_info = DistInfo()
+    if 'Linux' in platform.system():
+        Distro = dist_info[0]
+    else: # I know this is not Linux!
+        if 'FreeBSD' in platform.system():
+            Distro = platform.system()
+    Distro = Distro.strip('"')
+    Distro = Distro.strip(' ')
+    patching_class_name = Distro + 'Patching'
+
+    if not globals().has_key(patching_class_name):
+        print Distro + ' is not a supported distribution.'
+        return None
+    patchingInstance = globals()[patching_class_name](logger,dist_info)
+    return patchingInstance

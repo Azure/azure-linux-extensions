@@ -39,7 +39,7 @@ with open(mfile,'r') as f:
     Version = manifest['version']
 
 PackagesDirectory = "packages"
-BundleFileNameTemplate = 'omsagent-1.0.0-65.universal.{0}.sh'
+BundleFileNameTemplate = 'omsagent-1.1.0-2.universal.{0}.sh'
 
 InstallCommandTemplate = './{0} --install'
 UninstallCommandTemplate = './{0} --remove'

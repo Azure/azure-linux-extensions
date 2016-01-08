@@ -35,7 +35,6 @@ import urllib2
 import urlparse
 import time
 import shutil
-import tempfile
 import json
 from codecs import *
 from azure.storage import BlobService
@@ -111,27 +110,8 @@ def enable(hutil):
     Ensure the same configuration is executed only once
     If the previous enable failed, we do not have retry logic here,
     since the custom script may not work in an intermediate state.
-    But if download_files fails, we will wait and retry.
     """
     hutil.exit_if_enabled()
-
-    public_settings = hutil.get_public_settings()
-    if public_settings is None:
-        raise ValueError("Public configuration couldn't be None.")
-    retry_count = public_settings.get('retrycount')
-    wait = public_settings.get('wait')
-    if retry_count is None:
-        retry_count = 10
-    if wait is None:
-        wait = 20
-
-    prepare_download_dir(hutil.get_seq_no())
-    retry_count = download_files_with_retry(hutil, retry_count, wait)
-
-    # The internal DNS needs some time to be ready.
-    # Wait and retry to check if there is time in retry window.
-    # The check may be removed safely if iDNS is always ready.
-    check_idns_with_retry(hutil, retry_count, wait)
 
     start_daemon(hutil)
 
@@ -289,6 +269,28 @@ def start_daemon(hutil):
 
 
 def daemon(hutil):
+    retry_count = 10
+    wait = 20
+    enable_idns_check = True
+
+    public_settings = hutil.get_public_settings()
+    if public_settings:
+        if 'retrycount' in public_settings:
+            retry_count = public_settings.get('retrycount')
+        if 'wait' in public_settings:
+            wait = public_settings.get('wait')
+        if 'enableInternalDNSCheck' in public_settings:
+            enable_idns_check = public_settings.get('enableInternalDNSCheck')
+
+    prepare_download_dir(hutil.get_seq_no())
+    retry_count = download_files_with_retry(hutil, retry_count, wait)
+
+    # The internal DNS needs some time to be ready.
+    # Wait and retry to check if there is time in retry window.
+    # The check may be removed safely if iDNS is always ready.
+    if enable_idns_check:
+        check_idns_with_retry(hutil, retry_count, wait)
+
     cmd = get_command_to_execute(hutil)
     args = ScriptUtil.parse_args(cmd)
     if args:
@@ -380,10 +382,9 @@ def download_external_file(uri, command, hutil):
         raise
 
 
-def download_and_save_file(uri, file_path):
-    src = urllib2.urlopen(uri)
+def download_and_save_file(uri, file_path, timeout=30, buf_size=1024):
+    src = urllib2.urlopen(uri, timeout=timeout)
     with open(file_path, 'wb') as dest:
-        buf_size = 1024
         buf = src.read(buf_size)
         while(buf):
             dest.write(buf)
@@ -400,9 +401,9 @@ def preprocess_files(file_path, hutil):
     ret = to_process(file_path)
     if ret:
         dos2unix(file_path)
-        hutil.log("Converting text files from DOS to Unix formats: Done")
+        hutil.log("Converting {0} from DOS to Unix formats: Done".format(file_path))
         remove_bom(file_path)
-        hutil.log("Removing BOM: Done")
+        hutil.log("Removing BOM of {0}: Done".format(file_path))
 
 
 def to_process(file_path, extensions=['.sh', ".py"]):
@@ -419,7 +420,7 @@ def to_process(file_path, extensions=['.sh', ".py"]):
 def dos2unix(file_path):
     with open(file_path, 'rU') as f:
         contents = f.read()
-    temp_file_path = tempfile.mkstemp()[1]
+    temp_file_path = file_path + ".tmp"
     with open(temp_file_path, 'wb') as f_temp:
         f_temp.write(contents)
     shutil.move(temp_file_path, file_path)
@@ -442,7 +443,7 @@ def remove_bom(file_path):
         except UnicodeDecodeError:
             continue
     if new_contents is not None:
-        temp_file_path = tempfile.mkstemp()[1]
+        temp_file_path = file_path + ".tmp"
         with open(temp_file_path, 'wb') as f_temp:
             f_temp.write(new_contents)
         shutil.move(temp_file_path, file_path)
