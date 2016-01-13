@@ -211,8 +211,9 @@ class HandlerUtility:
             self.error(error_msg)
             return None
         else:
-            if(self.operation is not None and self.operation.lower()=="enable"):
-                os.rename(self._context._settings_file, self._context._settings_file + ".processed")
+            if(self.operation is not None and self.operation.lower() == "enable"):
+                # we should keep the current status file
+                self.backup_settings_status_file(self._context._seq_no)
 
         self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
@@ -224,28 +225,9 @@ class HandlerUtility:
         self._log = waagent.Log
         self._error = waagent.Error
 
-    def is_seq_smaller(self):
-        return int(self._context._seq_no) <= self._get_most_recent_seq()
-
     def save_seq(self):
         self._set_most_recent_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
-
-    def exit_if_enabled(self):
-        self.exit_if_seq_smaller()
-
-    def exit_if_seq_smaller(self):
-        if(self.is_seq_smaller()):
-            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
-            sys.exit(0)
-        self.save_seq()
-
-    def _get_most_recent_seq(self):
-        if(os.path.isfile('mrseq')):
-            seq = waagent.GetFileContents('mrseq')
-            if(seq):
-                return int(seq)
-        return -1
 
     def set_inused_config_seq(self,seq):
         self._set_most_recent_seq(seq)
@@ -271,19 +253,34 @@ class HandlerUtility:
             }
         }]
         stat_rept = json.dumps(stat)
-        # rename all other status files, or the WALA would report the wrong status file.
-        # because the wala choose the status file with the highest sequence number to report.
-        for subdir, dirs, files in os.walk(self._context._status_dir):
-            for file in files:
-                try:
-                    if(file.endswith('.status')):
-                        os.rename(join(self._context._status_dir,file), join(self._context._status_dir,file + ".backup"))
-                except Exception as e:
-                    self.log("failed to rename the status file.")
-
+        # rename all other status files, or the WALA would report the wrong
+        # status file.
+        # because the wala choose the status file with the highest sequence
+        # number to report.
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
+
+    def backup_settings_status_file(self, _seq_no):
+        self.log("current seq no is " + _seq_no)
+        for subdir, dirs, files in os.walk(self._context._config_dir):
+            for file in files:
+                try:
+                    if(file.endswith('.settings') and file != (_seq_no + ".settings")):
+                        new_file_name = file.replace(".","_")
+                        os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
+                except Exception as e:
+                    self.log("failed to rename the status file.")
+
+        for subdir, dirs, files in os.walk(self._context._status_dir):
+            for file in files:
+                try:
+                    if(file.endswith('.status') and file != (_seq_no + ".settings")):
+                        new_file_name = file.replace(".","_")
+                        os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
+                except Exception as e:
+                    self.log("failed to rename the status file.")
+
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
