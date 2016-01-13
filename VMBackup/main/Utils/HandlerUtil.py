@@ -118,23 +118,6 @@ class HandlerUtility:
     def error(self, message):
         self._error(self._get_log_prefix() + message)
 
-    def syslog(self, level, message):
-        if level == logging.INFO:
-            self.syslogger.info(message)
-        elif level == logging.WARNING:
-            self.syslogger.warning(message)
-        elif level == logging.ERROR:
-            self.syslogger.error(message)
-
-    def log_and_syslog(self, level, message):
-        self.syslog(level, message)
-        if level == logging.INFO:
-            self.log(message)
-        elif level == logging.WARNING:
-            self.log(" ".join(["Warning:", message]))
-        elif level == logging.ERROR:
-            self.error(message)
-
     def _parse_config(self, ctxt):
         config = None
         try:
@@ -241,14 +224,6 @@ class HandlerUtility:
         self._log = waagent.Log
         self._error = waagent.Error
 
-    def set_verbose_log(self, verbose):
-        if(verbose == "1" or verbose == 1):
-            self.log("Enable verbose log")
-            LoggerInit(self._context._log_file, '/dev/stdout', verbose=True)
-        else:
-            self.log("Disable verbose log")
-            LoggerInit(self._context._log_file, '/dev/stdout', verbose=False)
-
     def is_seq_smaller(self):
         return int(self._context._seq_no) <= self._get_most_recent_seq()
 
@@ -270,7 +245,6 @@ class HandlerUtility:
             seq = waagent.GetFileContents('mrseq')
             if(seq):
                 return int(seq)
-
         return -1
 
     def set_inused_config_seq(self,seq):
@@ -297,6 +271,16 @@ class HandlerUtility:
             }
         }]
         stat_rept = json.dumps(stat)
+        # rename all other status files, or the WALA would report the wrong status file.
+        # because the wala choose the status file with the highest sequence number to report.
+        for subdir, dirs, files in os.walk(self._context._status_dir):
+            for file in files:
+                try:
+                    if(file.endswith('.status')):
+                        os.rename(join(self._context._status_dir,file), join(self._context._status_dir,file + ".backup"))
+                except Exception as e:
+                    self.log("failed to rename the status file.")
+
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
@@ -316,4 +300,3 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
-
