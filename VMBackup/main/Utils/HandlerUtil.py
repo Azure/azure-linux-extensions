@@ -275,7 +275,7 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(self._context._status_dir):
             for file in files:
                 try:
-                    if(file.endswith('.status') and file != (_seq_no + ".settings")):
+                    if(file.endswith('.status') and file != (_seq_no + ".status")):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
                 except Exception as e:
