@@ -186,7 +186,7 @@ class AzureDiagnosticData(object):
         accountKey = config.getLADKey()
         hostBase = config.getLADHostBase()
         hostname = socket.gethostname()
-		deploymentId = config.getVmDeploymentId()
+        deploymentId = config.getVmDeploymentId()
         startKey, endKey = getAzureDiagnosticKeyRange()
         self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
                                                     accountKey,
