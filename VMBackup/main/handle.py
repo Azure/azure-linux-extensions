@@ -57,6 +57,8 @@ def main():
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     backup_logger = Backuplogger(hutil)
     MyPatching = GetMyPatching(logger = backup_logger)
+    hutil.patching = MyPatching
+
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -108,7 +110,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
 
 def exit_with_commit_log(error_msg, para_parser):
     backup_logger.log(error_msg, True, 'Error')
-    if(para_parser is not None and para_parser.logsBlobUri is not None):
+    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
@@ -257,7 +259,7 @@ def enable():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
-    if(para_parser is not None and para_parser.statusBlobUri is not None):
+    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
         do_backup_status_report(operation='Enable',status = run_status,\
                                 status_code=str(run_result), \
                                 message=error_msg,\
