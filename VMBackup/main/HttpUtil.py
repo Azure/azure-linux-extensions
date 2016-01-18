@@ -91,6 +91,8 @@ class HttpUtil(object):
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
             else:
+                self.logger.log("resp status: " + str(resp.status))
+                self.logger.log("responseBody: " + str(responseBody))
                 return CommonVariables.error_http_failure
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
