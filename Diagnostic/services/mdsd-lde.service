@@ -1,0 +1,16 @@
+[Unit]
+Description=Azure Linux Diagnostic Extension
+
+After=network-online.target walinuxagent.service
+Wants=network-online.target walinuxagent.service
+
+ConditionFileIsExecutable={WORKDIR}/diagnostic.py
+
+[Service]
+Type=simple
+WorkingDirectory={WORKDIR}/
+ExecStart=/usr/bin/python2 {WORKDIR}/diagnostic.py -daemon
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
