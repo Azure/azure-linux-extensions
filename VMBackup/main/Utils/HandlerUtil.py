@@ -225,7 +225,6 @@ class HandlerUtility:
                 # we should keep the current status file
                 self.backup_settings_status_file(self._context._seq_no)
 
-        self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
         return self._context
 
