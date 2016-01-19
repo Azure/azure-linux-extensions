@@ -152,16 +152,6 @@ def enable():
         hutil.exit_if_same_seq()
         hutil.save_seq()
 
-        setting_file_timestamp = os.path.getmtime(hutil._context._settings_file)
-        utcNow = time.time()
-        timespan_in_seconds = utcNow - setting_file_timestamp
-        TEN_SECONDS = 10 # in seconds, this should be lower than 25 seconds.
-        # handle the machine identity for the restoration scenario.
-        backup_logger.log("utcNow is " + str(utcNow) + " and setting file timestamp is " + str(setting_file_timestamp) + " and timespan_in_seconds is " + str(timespan_in_seconds), True)
-        if(abs(timespan_in_seconds) > TEN_SECONDS):
-            backup_logger.log("timestamp for the current setting file is not in valid period")
-            backup_logger.commit_to_local()
-
         """
         protectedSettings is the privateConfig passed from Powershell.
         WATCHOUT that, the _context_config are using the most freshest timestamp.
