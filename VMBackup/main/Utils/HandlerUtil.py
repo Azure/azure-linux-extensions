@@ -107,6 +107,20 @@ class HandlerUtility:
                     continue
         return seq_no
 
+    def get_last_seq(self):
+        if(os.path.isfile('mrseq')):
+            seq = waagent.GetFileContents('mrseq')
+            if(seq):
+                return int(seq)
+        return -1
+
+    def exit_if_same_seq(self):
+        current_seq = int(self._context._seq_no)
+        last_seq = self.get_last_seq()
+        if(current_seq == last_seq):
+            self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
+            sys.exit(0)
+
     def log(self, message):
         self._log(self._get_log_prefix() + message)
 
@@ -222,13 +236,10 @@ class HandlerUtility:
         self._error = waagent.Error
 
     def save_seq(self):
-        self._set_most_recent_seq(self._context._seq_no)
+        self.set_last_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
 
-    def set_inused_config_seq(self,seq):
-        self._set_most_recent_seq(seq)
-
-    def _set_most_recent_seq(self,seq):
+    def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
@@ -276,7 +287,6 @@ class HandlerUtility:
                         os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
-
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:

@@ -146,10 +146,21 @@ def enable():
             if(current_identity != stored_identity):
                 current_seq_no = -1
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_inused_config_seq(current_seq_no)
+                hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
 
+        hutil.exit_if_same_seq()
         hutil.save_seq()
+
+        setting_file_timestamp = os.path.getmtime(hutil._context._settings_file)
+        utcNow = time.time()
+        timespan_in_seconds = utcNow - setting_file_timestamp
+        TEN_SECONDS = 10 # in seconds, this should be lower than 25 seconds.
+        # handle the machine identity for the restoration scenario.
+        backup_logger.log("utcNow is " + str(utcNow) + " and setting file timestamp is " + str(setting_file_timestamp) + " and timespan_in_seconds is " + str(timespan_in_seconds), True)
+        if(abs(timespan_in_seconds) > TEN_SECONDS):
+            backup_logger.log("timestamp for the current setting file is not in valid period")
+            backup_logger.commit_to_local()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -168,7 +179,7 @@ def enable():
             timespan = utcNow - commandStartTime
             THIRTY_MINUTES = 30 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+            total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
             if(abs(total_span_in_seconds) > THIRTY_MINUTES):
                 error_msg = 'the call time stamp is out of date. so skip it.'
