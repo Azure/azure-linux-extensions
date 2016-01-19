@@ -133,7 +133,7 @@ def getAzureDiagnosticKeyRange():
     return startKey, endKey
 
 def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
-                              startKey, endKey, hostname):
+                              startKey, endKey, deploymentId):
     try:
         waagent.Log("Retrieve diagnostic data(CPU).")
         table = "LinuxCpuVer2v0"
@@ -141,8 +141,8 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
                                     account_key = accountKey,
                                     host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
-                   "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentProcessorTime,Host")
+                   "and DeploymentId eq '{2}'").format(startKey, endKey, deploymentId)
+        oselect = ("PercentProcessorTime,DeploymentId")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
@@ -157,7 +157,7 @@ def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
     
 
 def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
-                                 startKey, endKey, hostname):
+                                 startKey, endKey, deploymentId):
     try:
         waagent.Log("Retrieve diagnostic data: Memory")
         table = "LinuxMemoryVer2v0"
@@ -165,8 +165,8 @@ def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
                                     account_key = accountKey,
                                     host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
-                   "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentAvailableMemory,Host")
+                   "and DeploymentId eq '{2}'").format(startKey, endKey, deploymentId)
+        oselect = ("PercentAvailableMemory,DeploymentId")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
@@ -186,19 +186,20 @@ class AzureDiagnosticData(object):
         accountKey = config.getLADKey()
         hostBase = config.getLADHostBase()
         hostname = socket.gethostname()
+        deploymentId = config.getVmDeploymentId()
         startKey, endKey = getAzureDiagnosticKeyRange()
         self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
                                                     accountKey,
                                                     hostBase,
                                                     startKey,
                                                     endKey,
-                                                    hostname)
+                                                    deploymentId)
         self.memoryPercent = getAzureDiagnosticMemoryData(accountName, 
                                                           accountKey,
                                                           hostBase,
                                                           startKey,
                                                           endKey,
-                                                          hostname)
+                                                          deploymentId)
 
     def getCPUPercent(self):
         return self.cpuPercent

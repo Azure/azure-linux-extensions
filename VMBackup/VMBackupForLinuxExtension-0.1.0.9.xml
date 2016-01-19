@@ -1,0 +1,15 @@
+<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
+<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
+<Type>VMBackupForLinuxExtension</Type>
+<Version>0.1.0.9</Version>
+<Label>Windows Azure VMBackup Extension for Linux IaaS</Label>
+<HostingResources>VmRole</HostingResources>
+<MediaLink>https://andliu.blob.core.windows.net/extensions/VMBackupForLinuxExtension-0.1.0.9.zip</MediaLink>
+<Description>Windows Azure VMBackup Extension for Linux IaaS</Description>
+<IsInternalExtension>true</IsInternalExtension>
+<Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
+<PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
+<HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
+<IsJsonExtension>true</IsJsonExtension>
+<CompanyName>Microsoft Open Source Technology Center</CompanyName>
+</ExtensionImage>
