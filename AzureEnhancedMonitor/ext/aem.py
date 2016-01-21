@@ -27,6 +27,7 @@ import datetime
 import psutil
 import string
 import urlparse
+import xml.dom.minidom as minidom
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent, AddExtensionEvent
 import Utils.HandlerUtil as Util
@@ -63,32 +64,34 @@ LibDir = "/var/lib/AzureEnhancedMonitor"
 
 LatestErrorRecord = "LatestErrorRecord"
 
+def clearLastErrorRecord():
+    errFile = os.path.join(LibDir, LatestErrorRecord)
+    if os.path.exists(errFile) and os.path.isfile(errFile):
+        os.remove(errFile)
+
 def getLatestErrorRecord():
-    eventFile=os.path.join(LibDir, LatestErrorRecord)
-    if os.path.exists(eventFile) and os.path.isfile(eventFile):
-        f = open(eventFile, 'r')
-        return f.read()
+    errFile=os.path.join(LibDir, LatestErrorRecord)
+    if os.path.exists(errFile) and os.path.isfile(errFile):
+        with open(errFile, 'r') as f:
+            return f.read()
 
     return "0"
 
 def updateLatestErrorRecord(s):
-    eventFile=os.path.join(LibDir, LatestErrorRecord)
+    errFile = os.path.join(LibDir, LatestErrorRecord)
     maxRetry = 3
     for i in range(0, maxRetry):
         try:
-            with open(eventFile, "w+") as F:
+            with open(errFile, "w+") as F:
                 F.write(s.encode("utf8"))
                 return
-        except IOError, e:
+        except IOError:
             time.sleep(1)
 
     waagent.Error(("Failed to serialize latest error record to file:"
-                    "{0}").format(eventFile))
+                    "{0}").format(errFile))
     AddExtensionEvent(message="failed to write latest error record")
     raise
-
-def printable(s):
-    return filter(lambda c : c in string.printable, str(s))
 
 def easyHash(s):
     """
@@ -130,48 +133,48 @@ def getAzureDiagnosticKeyRange():
     return startKey, endKey
 
 def getAzureDiagnosticCPUData(accountName, accountKey, hostBase,
-                              startKey, endKey, hostname):
+                              startKey, endKey, deploymentId):
     try:
         waagent.Log("Retrieve diagnostic data(CPU).")
-        table = "LinuxPerfCpuVer1v0"
+        table = "LinuxCpuVer2v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey,
                                     host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
-                   "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentProcessorTime,Host")
+                   "and DeploymentId eq '{2}'").format(startKey, endKey, deploymentId)
+        oselect = ("PercentProcessorTime,DeploymentId")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
         cpuPercent = float(data[0].PercentProcessorTime)
         return cpuPercent
-    except Exception, e:
-        waagent.Error(("Failed to retrieve diagnostic data(CPU): {0} {1}"
-                       "").format(printable(e), traceback.format_exc()))
+    except Exception as e:
+        waagent.Error((u"Failed to retrieve diagnostic data(CPU): {0} {1}"
+                       "").format(e, traceback.format_exc()))
         updateLatestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
     
 
 def getAzureDiagnosticMemoryData(accountName, accountKey, hostBase,
-                                 startKey, endKey, hostname):
+                                 startKey, endKey, deploymentId):
     try:
         waagent.Log("Retrieve diagnostic data: Memory")
-        table = "LinuxPerfMemVer1v0"
+        table = "LinuxMemoryVer2v0"
         tableService = TableService(account_name = accountName, 
                                     account_key = accountKey,
                                     host_base = hostBase)
         ofilter = ("PartitionKey ge '{0}' and PartitionKey lt '{1}' "
-                   "and Host eq '{2}'").format(startKey, endKey, hostname)
-        oselect = ("PercentAvailableMemory,Host")
+                   "and DeploymentId eq '{2}'").format(startKey, endKey, deploymentId)
+        oselect = ("PercentAvailableMemory,DeploymentId")
         data = tableService.query_entities(table, ofilter, oselect, 1)
         if data is None or len(data) == 0:
             return None
         memoryPercent = 100 - float(data[0].PercentAvailableMemory)
         return memoryPercent
-    except Exception, e:
-        waagent.Error(("Failed to retrieve diagnostic data(Memory): {0} {1}"
-                       "").format(printable(e), traceback.format_exc()))
+    except Exception as e:
+        waagent.Error((u"Failed to retrieve diagnostic data(Memory): {0} {1}"
+                       "").format(e, traceback.format_exc()))
         updateLatestErrorRecord(FAILED_TO_RETRIEVE_MDS_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_MDS_DATA)
         return None
@@ -183,19 +186,20 @@ class AzureDiagnosticData(object):
         accountKey = config.getLADKey()
         hostBase = config.getLADHostBase()
         hostname = socket.gethostname()
+        deploymentId = config.getVmDeploymentId()
         startKey, endKey = getAzureDiagnosticKeyRange()
         self.cpuPercent = getAzureDiagnosticCPUData(accountName, 
                                                     accountKey,
                                                     hostBase,
                                                     startKey,
                                                     endKey,
-                                                    hostname)
+                                                    deploymentId)
         self.memoryPercent = getAzureDiagnosticMemoryData(accountName, 
                                                           accountKey,
                                                           hostBase,
                                                           startKey,
                                                           endKey,
-                                                          hostname)
+                                                          deploymentId)
 
     def getCPUPercent(self):
         return self.cpuPercent
@@ -381,30 +385,46 @@ class NetworkInfo(object):
     def __init__(self):
         self.nics = psutil.net_io_counters(pernic=True)
         self.nicNames = []
-        self.readBytes = 0
-        self.writeBytes = 0
-        self.networkReadBytes = {}
-        self.networkWriteBytes = {}
         for nicName, stat in self.nics.iteritems():
             if nicName != 'lo':
                 self.nicNames.append(nicName)
-                self.readBytes = self.readBytes + stat[1] #bytes_recv
-                self.writeBytes = self.writeBytes + stat[0] #bytes_sent
-                self.networkReadBytes[nicName] = stat[1]
-                self.networkWriteBytes[nicName] = stat[0]
 
     def getAdapterIds(self):
         return self.nicNames
 
     def getNetworkReadBytes(self, adapterId):
-        if adapterId in self.networkReadBytes :
-            return self.networkReadBytes[adapterId]
+        net = psutil.net_io_counters(pernic=True)
+        if net[adapterId] != None:
+            bytes_recv1 = net[adapterId][1]
+            time1 = time.time()
+            
+            time.sleep(0.2)
+            
+            net = psutil.net_io_counters(pernic=True)
+            bytes_recv2 = net[adapterId][1]
+            time2 = time.time()
+            
+            interval = (time2 - time1)
+            
+            return (bytes_recv2 - bytes_recv1) / interval
         else:
             return 0
 
     def getNetworkWriteBytes(self, adapterId):
-        if adapterId in self.networkWriteBytes :
-            return self.networkWriteBytes[adapterId]
+        net = psutil.net_io_counters(pernic=True)
+        if net[adapterId] != None:
+            bytes_sent1 = net[adapterId][0]
+            time1 = time.time()
+            
+            time.sleep(0.2)
+            
+            net = psutil.net_io_counters(pernic=True)
+            bytes_sent2 = net[adapterId][0]
+            time2 = time.time()
+            
+            interval = (time2 - time1)
+            
+            return (bytes_sent2 - bytes_sent1) / interval
         else:
             return 0
 
@@ -743,7 +763,7 @@ class VMDataSource(object):
     def createCounterMaxNetworkBandwidth(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
-                           name = "Maximum Network Bandwidth",
+                           name = "VM Maximum Network Bandwidth",
                            instance = adapterId,
                            value = metrics.getMaxNetworkBandwidth(adapterId),
                            unit = "Mbit/s")
@@ -751,7 +771,7 @@ class VMDataSource(object):
     def createCounterMinNetworkBandwidth(self, metrics, adapterId):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
                            category = "network",
-                           name = "Minimum Network Bandwidth",
+                           name = "VM Minimum Network Bandwidth",
                            instance = adapterId,
                            value = metrics.getMinNetworkBandwidth(adapterId),
                            unit = "Mbit/s")
@@ -809,9 +829,9 @@ def getStorageMetrics(account, key, hostBase, table, startKey, endKey):
         metrics = tableService.query_entities(table, ofilter, oselect)
         waagent.Log("{0} records returned.".format(len(metrics)))
         return metrics
-    except Exception, e:
-        waagent.Error(("Failed to retrieve storage metrics data: {0} {1}"
-                       "").format(printable(e), traceback.format_exc()))
+    except Exception as e:
+        waagent.Error((u"Failed to retrieve storage metrics data: {0} {1}"
+                       "").format(e, traceback.format_exc()))
         updateLatestErrorRecord(FAILED_TO_RETRIEVE_STORAGE_DATA)
         AddExtensionEvent(message=FAILED_TO_RETRIEVE_STORAGE_DATA)
         return None
@@ -832,10 +852,17 @@ class DiskInfo(object):
 
     def getDiskMapping(self):
         osdiskVhd = "{0} {1}".format(self.config.getOSDiskAccount(),
-                                  self.config.getOSDiskName())
+                                     self.config.getOSDiskName())
+        osdisk = {
+                "vhd":osdiskVhd, 
+                "type": self.config.getOSDiskType(),
+                "caching": self.config.getOSDiskCaching(),
+                "iops": self.config.getOSDiskSLAIOPS(),
+                "throughput": self.config.getOSDiskSLAThroughput(),
+        }
+
         diskMapping = {
-                "/dev/sda": osdiskVhd,
-                "/dev/sdb": "not mapped to vhd"
+                "/dev/sda": osdisk,
         }
 
         dataDisks = getDataDisks()
@@ -850,11 +877,18 @@ class DiskInfo(object):
         diskCount = self.config.getDataDiskCount()
         for i in range(0, diskCount):
             lun = self.config.getDataDiskLun(i)
-            vhd = "{0} {1}".format(self.config.getDataDiskAccount(i),
-                                   self.config.getDataDiskName(i))
+            datadiskVhd = "{0} {1}".format(self.config.getDataDiskAccount(i),
+                                           self.config.getDataDiskName(i))
+            datadisk = {
+                    "vhd": datadiskVhd,
+                    "type": self.config.getDataDiskType(i),
+                    "caching": self.config.getDataDiskCaching(i),
+                    "iops": self.config.getDataDiskSLAIOPS(i),
+                    "throughput": self.config.getDataDiskSLAThroughput(i),
+            }
             if lun in lunToDevMap:
                 dev = lunToDevMap[lun]
-                diskMapping[dev] = vhd
+                diskMapping[dev] = datadisk
             else:
                 waagent.Warn("Couldn't find disk with lun: {0}".format(lun))
 
@@ -947,37 +981,81 @@ class StorageDataSource(object):
 
     def collect(self):
         counters = []
+
+        #Add disk mapping for resource disk
+        counters.append(self.createCounterDiskMapping("/dev/sdb", 
+                                                      "not mapped to vhd"))
+        #Add disk mapping for osdisk and data disk
         diskMapping = DiskInfo(self.config).getDiskMapping()
-        for dev, vhd in diskMapping.iteritems():
-            counters.append(self.createCounterDiskMapping(dev, vhd)) 
+        for dev, disk in diskMapping.iteritems():
+            counters.append(self.createCounterDiskMapping(dev, disk.get("vhd")))
+            counters.append(self.createCounterDiskType(dev, disk.get("type")))
+            counters.append(self.createCounterDiskCaching(dev, disk.get("caching")))
+            if disk.get("type") == "Premium":
+                counters.append(self.createCounterDiskIOPS(dev, disk.get("iops")))
+                counters.append(self.createCounterDiskThroughput(dev, disk.get("throughput")))
 
         accounts = self.config.getStorageAccountNames()
-        startKey, endKey = getStorageTableKeyRange()
         for account in accounts:
-            tableName = self.config.getStorageAccountMinuteTable(account)
-            accountKey = self.config.getStorageAccountKey(account)
-            hostBase = self.config.getStorageHostBase(account)
-            metrics = getStorageMetrics(account, 
-                                        accountKey,
-                                        hostBase,
-                                        tableName,
-                                        startKey,
-                                        endKey)
-            stat = AzureStorageStat(metrics)
-            counters.append(self.createCounterStorageId(account))
-            counters.append(self.createCounterReadBytes(account, stat))
-            counters.append(self.createCounterReadOps(account, stat))
-            counters.append(self.createCounterReadOpE2ELatency(account, stat))
-            counters.append(self.createCounterReadOpServerLatency(account, 
-                                                                  stat))
-            counters.append(self.createCounterReadOpThroughput(account, stat))
-            counters.append(self.createCounterWriteBytes(account, stat))
-            counters.append(self.createCounterWriteOps(account, stat))
-            counters.append(self.createCounterWriteOpE2ELatency(account, stat))
-            counters.append(self.createCounterWriteOpServerLatency(account, 
-                                                                   stat))
-            counters.append(self.createCounterWriteOpThroughput(account, stat))
+            if self.config.getStorageAccountType(account) == "Standard":
+                counters.extend(self.collectMetrixForStandardStorage(account))
         return counters
+
+    def collectMetrixForStandardStorage(self, account):
+        counters = []
+        startKey, endKey = getStorageTableKeyRange()
+        tableName = self.config.getStorageAccountMinuteTable(account)
+        accountKey = self.config.getStorageAccountKey(account)
+        hostBase = self.config.getStorageHostBase(account)
+        metrics = getStorageMetrics(account, 
+                                    accountKey,
+                                    hostBase,
+                                    tableName,
+                                    startKey,
+                                    endKey)
+        stat = AzureStorageStat(metrics)
+        counters.append(self.createCounterStorageId(account))
+        counters.append(self.createCounterReadBytes(account, stat))
+        counters.append(self.createCounterReadOps(account, stat))
+        counters.append(self.createCounterReadOpE2ELatency(account, stat))
+        counters.append(self.createCounterReadOpServerLatency(account, stat))
+        counters.append(self.createCounterReadOpThroughput(account, stat))
+        counters.append(self.createCounterWriteBytes(account, stat))
+        counters.append(self.createCounterWriteOps(account, stat))
+        counters.append(self.createCounterWriteOpE2ELatency(account, stat))
+        counters.append(self.createCounterWriteOpServerLatency(account, stat))
+        counters.append(self.createCounterWriteOpThroughput(account, stat))
+        return counters
+
+    def createCounterDiskType(self, dev, diskType):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
+                           category = "disk",
+                           name = "Storage Type",
+                           instance = dev,
+                           value = diskType)
+
+    def createCounterDiskCaching(self, dev, caching):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
+                           category = "disk",
+                           name = "Caching",
+                           instance = dev,
+                           value = caching)
+
+    def createCounterDiskThroughput(self, dev, throughput):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+                           category = "disk",
+                           name = "SLA Throughput",
+                           instance = dev,
+                           unit = "MB/sec",
+                           value = throughput)
+
+    def createCounterDiskIOPS(self, dev, iops):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+                           category = "disk",
+                           name = "SLA",
+                           instance = dev,
+                           unit = "Ops/sec",
+                           value = iops)
 
     def createCounterReadBytes(self, account, stat):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_LARGE,
@@ -1081,7 +1159,7 @@ class StorageDataSource(object):
                            name = "Phys. Disc to Storage Mapping",
                            instance = dev,
                            value = vhd)
-
+                   
 class HvInfo(object):
     def __init__(self):
         self.hvName = None;
@@ -1117,9 +1195,29 @@ class StaticDataSource(object):
         counters.append(self.createCounterInstanceType())
         counters.append(self.createCounterVirtSln(hvInfo.getHvName()))
         counters.append(self.createCounterVirtSlnVersion(hvInfo.getHvVersion()))
+        vmSLAThroughput = self.config.getVMSLAThroughput()
+        if vmSLAThroughput is not None:
+            counters.append(self.createCounterVMSLAThroughput(vmSLAThroughput))
+        vmSLAIOPS = self.config.getVMSLAIOPS()
+        if vmSLAIOPS is not None:
+            counters.append(self.createCounterVMSLAIOPS(vmSLAIOPS))
+
         return counters
-  
+    
+    def createCounterVMSLAThroughput(self, throughput):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+                           category = "config",
+                           name = "SLA Max Disk Bandwidth per VM",
+                           unit = "Ops/sec",
+                           value = throughput)
      
+    def createCounterVMSLAIOPS(self, iops):
+        return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_INT,
+                           category = "config",
+                           name = "SLA Max Disk IOPS per VM",
+                           unit = "Ops/sec",
+                           value = iops)
+
     def createCounterCloudProvider(self):
         return PerfCounter(counterType = PerfCounterType.COUNTER_TYPE_STRING,
                            category = "config",
@@ -1228,6 +1326,7 @@ class EnhancedMonitor(object):
         counters = []
         for dataSource in self.dataSources:
             counters.extend(dataSource.collect())
+        clearLastErrorRecord()
         self.writer.write(counters)
 
 EventFile=os.path.join(LibDir, "PerfCounters")
@@ -1240,8 +1339,8 @@ class PerfCounterWriter(object):
                              "").format(len(counters)))
                 return
             except IOError, e:
-                waagent.Warn(("Write to perf counters file failed: {0}"
-                              "").format(printable(e)))
+                waagent.Warn((u"Write to perf counters file failed: {0}"
+                              "").format(e))
                 waagent.Log("Retry: {0}".format(i))
                 time.sleep(1)
 
@@ -1256,7 +1355,10 @@ class PerfCounterWriter(object):
             F.write("".join(map(lambda c : str(c), counters)).encode("utf8"))
 
 class EnhancedMonitorConfig(object):
-    def __init__(self, privateConfig, publicConfig):
+    def __init__(self, publicConfig, privateConfig):
+        xmldoc = minidom.parse('/var/lib/waagent/SharedConfig.xml')
+        self.deployment = xmldoc.getElementsByTagName('Deployment')
+        self.role = xmldoc.getElementsByTagName('Role')
         self.configData = {}
         diskCount = 0
         accountNames = []
@@ -1264,80 +1366,114 @@ class EnhancedMonitorConfig(object):
             self.configData[item["key"]] = item["value"]
             if item["key"].startswith("disk.lun"):
                 diskCount = diskCount + 1
+            if item["key"].endswith("minute.name"):
+                accountNames.append(item["value"])
 
         for item in privateConfig["cfg"]:
             self.configData[item["key"]] = item["value"]
-            if item["key"].endswith("minute.name"):
-                accountNames.append(item["value"])
 
         self.configData["disk.count"] = diskCount
         self.configData["account.names"] = accountNames
 
 
     def getVmSize(self):
-        return self.configData["vmsize"]
+        return self.configData.get("vmsize")
 
     def getVmRoleInstance(self):
-        return self.configData["vm.roleinstance"]
+        return self.role[0].attributes['name'].value
 
     def getVmDeploymentId(self):
-        return self.configData["vm.depoymentId"]
+        return self.deployment[0].attributes['name'].value
 
     def isMemoryOverCommitted(self):
-        return self.configData["vm.memory.isovercommitted"]
+        return self.configData.get("vm.memory.isovercommitted")
 
     def isCpuOverCommitted(self):
-        return self.configData["vm.cpu.isovercommitted"]
+        return self.configData.get("vm.cpu.isovercommitted")
 
     def getScriptVersion(self):
-        return self.configData["script.version"]
+        return self.configData.get("script.version")
 
     def isVerbose(self):
-        flag = self.configData["verbose"]
+        flag = self.configData.get("verbose")
         return flag == "1" or flag == 1
 
+    def getVMSLAIOPS((self)):
+        return self.configData.get("vm.sla.iops")
+
+    def getVMSLAThroughput((self)):
+        return self.configData.get("vm.sla.throughput")
+
     def getOSDiskName(self):
-        return self.configData["osdisk.name"]
+        return self.configData.get("osdisk.name")
 
     def getOSDiskAccount(self):
         osdiskConnMinute = self.getOSDiskConnMinute()
-        return self.configData["{0}.name".format(osdiskConnMinute)]
+        return self.configData.get("{0}.name".format(osdiskConnMinute))
 
     def getOSDiskConnMinute(self):
-        return self.configData["osdisk.connminute"]
+        return self.configData.get("osdisk.connminute")
 
     def getOSDiskConnHour(self):
-        return self.configData["osdisk.connhour"]
+        return self.configData.get("osdisk.connhour")
+
+    def getOSDiskType(self):
+        return self.configData.get("osdisk.type")
+
+    def getOSDiskCaching(self):
+        return self.configData.get("osdisk.caching")
+
+    def getOSDiskSLAIOPS(self):
+        return self.configData.get("osdisk.sla.iops")
+    
+    def getOSDiskSLAThroughput(self):
+        return self.configData.get("osdisk.sla.throughput")
     
     def getDataDiskCount(self):
-        return self.configData["disk.count"]
+        return self.configData.get("disk.count")
 
     def getDataDiskLun(self, index):
-        return self.configData["disk.lun.{0}".format(index)]
+        return self.configData.get("disk.lun.{0}".format(index))
 
     def getDataDiskName(self, index):
-        return self.configData["disk.name.{0}".format(index)]
+        return self.configData.get("disk.name.{0}".format(index))
 
     def getDataDiskAccount(self, index):
-        return self.configData["disk.account.{0}".format(index)]
+        return self.configData.get("disk.account.{0}".format(index))
 
     def getDataDiskConnMinute(self, index):
-        return self.configData["disk.connminute.{0}".format(index)]
+        return self.configData.get("disk.connminute.{0}".format(index))
 
     def getDataDiskConnHour(self, index):
-        return self.configData["disk.connhour.{0}".format(index)]
+        return self.configData.get("disk.connhour.{0}".format(index))
+    
+    def getDataDiskType(self, index):
+        return self.configData.get("disk.type.{0}".format(index))
 
+    def getDataDiskCaching(self, index):
+        return self.configData.get("disk.caching.{0}".format(index))
+
+    def getDataDiskSLAIOPS(self, index):
+        return self.configData.get("disk.sla.iops.{0}".format(index))
+    
+    def getDataDiskSLAThroughput(self, index):
+        return self.configData.get("disk.sla.throughput.{0}".format(index))
+    
     def getStorageAccountNames(self):
-        return self.configData["account.names"]
+        return self.configData.get("account.names")
 
     def getStorageAccountKey(self, name):
-        return self.configData["{0}.minute.key".format(name)]
+        return self.configData.get("{0}.minute.key".format(name))
+        
+    def getStorageAccountType(self, name):
+        key = "{0}.minute.ispremium".format(name) 
+        return "Premium" if self.configData.get(key) == 1 else "Standard"
     
     def getStorageHostBase(self, name):
         return get_host_base_from_uri(self.getStorageAccountMinuteUri(name)) 
 
     def getStorageAccountMinuteUri(self, name):
-        return self.configData["{0}.minute.uri".format(name)]
+        return self.configData.get("{0}.minute.uri".format(name))
 
     def getStorageAccountMinuteTable(self, name):
         uri = self.getStorageAccountMinuteUri(name)
@@ -1346,21 +1482,21 @@ class EnhancedMonitorConfig(object):
         return tableName
 
     def getStorageAccountHourUri(self, name):
-        return self.configData["{0}.hour.uri".format(name)]
+        return self.configData.get("{0}.hour.uri".format(name))
 
     def isLADEnabled(self):
-        flag = self.configData["wad.isenabled"]
+        flag = self.configData.get("wad.isenabled")
         return flag == "1" or flag == 1
 
     def getLADKey(self):
-        return self.configData["wad.key"]
+        return self.configData.get("wad.key")
 
     def getLADName(self):
-        return self.configData["wad.name"]
+        return self.configData.get("wad.name")
     
     def getLADHostBase(self):
         return get_host_base_from_uri(self.getLADUri())
 
     def getLADUri(self):
-        return self.configData["wad.uri"]
+        return self.configData.get("wad.uri")
 

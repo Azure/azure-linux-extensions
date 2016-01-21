@@ -32,10 +32,10 @@
   ],
   "dependencies": {
     "promise" : "6.1.0",
-    "azure-common" : "0.9.10",
+    "azure-common" : "0.9.13",
     "azure-storage" : "0.4.2",
-    "azure-mgmt-storage" : "0.9.14",
-    "azure-mgmt-compute" : "0.9.14"
+    "azure-arm-storage" : "0.11.0",
+    "azure-arm-compute" : "0.13.0"
   },
   "devDependencies": {
   },

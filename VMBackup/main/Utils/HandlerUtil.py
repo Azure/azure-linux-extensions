@@ -60,6 +60,7 @@ import sys
 import imp
 import base64
 import json
+import tempfile
 import time
 from os.path import join
 from Utils.WAAgentUtil import waagent
@@ -80,12 +81,7 @@ class HandlerUtility:
         self._log = log
         self._error = error
         self._short_name = short_name
-        self.syslogger = logging.getLogger(self._short_name)
-        self.syslogger.setLevel(logging.INFO)
-        handler = logging.handlers.SysLogHandler(address='/dev/log')
-        formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
-        handler.setFormatter(formatter)
-        self.syslogger.addHandler(handler)
+        self.patching = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -97,41 +93,39 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
-                    cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if(freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder,file))
-                        seq_no = cur_seq_no
-                    else:
-                        current_file_m_time = os.path.getmtime(join(config_folder,file))
-                        if(current_file_m_time > freshest_time):
-                            freshest_time = current_file_m_time
+                    if(file.endswith('.settings')):
+                        cur_seq_no = int(os.path.basename(file).split('.')[0])
+                        if(freshest_time == None):
+                            freshest_time = os.path.getmtime(join(config_folder,file))
                             seq_no = cur_seq_no
+                        else:
+                            current_file_m_time = os.path.getmtime(join(config_folder,file))
+                            if(current_file_m_time > freshest_time):
+                                freshest_time = current_file_m_time
+                                seq_no = cur_seq_no
                 except ValueError:
                     continue
         return seq_no
+
+    def get_last_seq(self):
+        if(os.path.isfile('mrseq')):
+            seq = waagent.GetFileContents('mrseq')
+            if(seq):
+                return int(seq)
+        return -1
+
+    def exit_if_same_seq(self):
+        current_seq = int(self._context._seq_no)
+        last_seq = self.get_last_seq()
+        if(current_seq == last_seq):
+            self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
+            sys.exit(0)
 
     def log(self, message):
         self._log(self._get_log_prefix() + message)
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
-
-    def syslog(self, level, message):
-        if level == logging.INFO:
-            self.syslogger.info(message)
-        elif level == logging.WARNING:
-            self.syslogger.warning(message)
-        elif level == logging.ERROR:
-            self.syslogger.error(message)
-
-    def log_and_syslog(self, level, message):
-        self.syslog(level, message)
-        if level == logging.INFO:
-            self.log(message)
-        elif level == logging.WARNING:
-            self.log(" ".join(["Warning:", message]))
-        elif level == logging.ERROR:
-            self.error(message)
 
     def _parse_config(self, ctxt):
         config = None
@@ -152,13 +146,14 @@ class HandlerUtility:
                 thumb = handlerSettings['protectedSettingsCertThumbprint']
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
-                waagent.SetFileContents('/tmp/kk', protectedSettings)
+                f = tempfile.NamedTemporaryFile(delete=False)
+                f.close()
+                waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                cleartxt = waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                os.remove("/tmp/kk")
+                cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 if cleartxt == None:
                     self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1,operation,'error','1', operation + ' Failed')
+                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
@@ -168,12 +163,14 @@ class HandlerUtility:
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self,operation):
+    def do_parse_context(self, operation):
+        self.operation = operation
         _context = self.try_parse_context()
         if not _context:
-            self.do_exit(1,operation,'error','1', operation + ' Failed')
+            self.log("maybe no new settings file found")
+            sys.exit(0)
         return _context
-            
+
     def try_parse_context(self):
         self._context = HandlerContext(self._short_name)
         handler_env = None
@@ -223,11 +220,13 @@ class HandlerUtility:
             error_msg = 'Unable to read ' + self._context._settings_file + '. '
             self.error(error_msg)
             return None
+        else:
+            if(self.operation is not None and self.operation.lower() == "enable"):
+                # we should keep the current status file
+                self.backup_settings_status_file(self._context._seq_no)
 
-        self.log("JSON config: " + ctxt)
         self._context._config = self._parse_config(ctxt)
         return self._context
-
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
@@ -235,48 +234,11 @@ class HandlerUtility:
         self._log = waagent.Log
         self._error = waagent.Error
 
-    def set_verbose_log(self, verbose):
-        if(verbose == "1" or verbose == 1):
-            self.log("Enable verbose log")
-            LoggerInit(self._context._log_file, '/dev/stdout', verbose=True)
-        else:
-            self.log("Disable verbose log")
-            LoggerInit(self._context._log_file, '/dev/stdout', verbose=False)
-
-    def is_seq_smaller(self):
-        return int(self._context._seq_no) <= self._get_most_recent_seq()
-
     def save_seq(self):
-        self._set_most_recent_seq(self._context._seq_no)
+        self.set_last_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
 
-    def exit_if_enabled(self):
-        self.exit_if_seq_smaller()
-
-    def exit_if_seq_smaller(self):
-        if(self.is_seq_smaller()):
-            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
-            sys.exit(0)
-        self.save_seq()
-
-    def _get_most_recent_seq(self):
-        if(os.path.isfile('mrseq')):
-            seq = waagent.GetFileContents('mrseq')
-            if(seq):
-                return int(seq)
-
-        return -1
-
-    def is_current_config_seq_greater_inused(self):
-        return int(self._context._seq_no) > self._get_most_recent_seq()
-
-    def get_inused_config_seq(self):
-        return self._get_most_recent_seq()
-
-    def set_inused_config_seq(self,seq):
-        self._set_most_recent_seq(seq)
-
-    def _set_most_recent_seq(self,seq):
+    def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
@@ -297,31 +259,40 @@ class HandlerUtility:
             }
         }]
         stat_rept = json.dumps(stat)
+        # rename all other status files, or the WALA would report the wrong
+        # status file.
+        # because the wala choose the status file with the highest sequence
+        # number to report.
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
 
-    def do_heartbeat_report(self, heartbeat_file,status,code,message):
-        # heartbeat
-        health_report = '[{"version":"1.0","heartbeat":{"status":"' + status + '","code":"' + code + '","Message":"' + message + '"}}]'
-        if waagent.SetFileContents(heartbeat_file,health_report) == None :
-            self.error('Unable to wite heartbeat info to ' + heartbeat_file)
+    def backup_settings_status_file(self, _seq_no):
+        self.log("current seq no is " + _seq_no)
+        for subdir, dirs, files in os.walk(self._context._config_dir):
+            for file in files:
+                try:
+                    if(file.endswith('.settings') and file != (_seq_no + ".settings")):
+                        new_file_name = file.replace(".","_")
+                        os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
+                except Exception as e:
+                    self.log("failed to rename the status file.")
 
-    def do_exit(self,exit_code,operation,status,code,message):
+        for subdir, dirs, files in os.walk(self._context._status_dir):
+            for file in files:
+                try:
+                    if(file.endswith('.status') and file != (_seq_no + ".status")):
+                        new_file_name = file.replace(".","_")
+                        os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
+                except Exception as e:
+                    self.log("failed to rename the status file.")
+
+    def do_exit(self, exit_code, operation,status,code,message):
         try:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
-
-    def get_name(self):
-        return self._context._name
-    
-    def get_seq_no(self):
-        return self._context._seq_no
-
-    def get_log_dir(self):
-        return self._context._log_dir
 
     def get_handler_settings(self):
         return self._context._config['runtimeSettings'][0]['handlerSettings']
@@ -331,4 +302,3 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
-

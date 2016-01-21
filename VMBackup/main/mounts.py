@@ -25,6 +25,7 @@ import re
 import sys
 import subprocess
 import types
+from DiskUtil import DiskUtil
 
 from StringIO import StringIO
 
@@ -39,28 +40,10 @@ class Mount:
         self.mount_point = mount_point
 
 class Mounts:
-    def __init__(self,logger):
+    def __init__(self,patching,logger):
         self.mounts = []
-        self.logger = logger
-
-        p = subprocess.Popen(['lsblk', '-l', '-n','-o','NAME,TYPE,FSTYPE,MOUNTPOINT'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out_lsblk_output, err = p.communicate()
-        out_lsblk_output = str(out_lsblk_output)
-        self.logger.log("out_lsblk_output:\n" + str(out_lsblk_output))
-        lines = out_lsblk_output.splitlines()
-        line_number = len(lines)
-        for i in range(0,line_number):
-            item_value = lines[i].strip().split()
-            print("item_value==" + str(item_value))
-            name = item_value[0]
-            type = item_value[1]
-            fstype = ""
-            mountpoint = ""
-            if(len(item_value) > 2):
-                fstype = item_value[2]
-            if(len(item_value) > 3):
-                mountpoint = item_value[3]
-            mount = Mount(item_value[0], item_value[1], fstype, mountpoint)
-
+        disk_util = DiskUtil(patching,logger)
+        device_items = disk_util.get_device_items(None);
+        for device_item in device_items:
+            mount = Mount(device_item.name, device_item.type, device_item.file_system, device_item.mount_point)
             self.mounts.append(mount)
-        pass

@@ -31,12 +31,15 @@ from Utils.WAAgentUtil import waagent
 
 class HttpUtil(object):
     """description of class"""
-    def __init__(self,logger):
+    def __init__(self, hutil):
         try:
+            waagent.MyDistro=waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
         except Exception as e:
+            errorMsg = "Failed to construct ConfigurationProvider with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            hutil.log(errorMsg)
             Config = waagent.ConfigurationProvider()
-        self.logger = logger
+        self.logger = hutil
         self.proxyHost = Config.get("HttpProxy.Host")
         self.proxyPort = Config.get("HttpProxy.Port")
         self.tmpFile = './tmp_file_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
@@ -76,14 +79,20 @@ class HttpUtil(object):
             else:
                 connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort)
                 connection.set_tunnel(sasuri_obj.hostname, 443)
+                # If proxy is used, full url is needed.
                 path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
                 connection.request(method=method, url=(path), body=data, headers=headers)
                 resp = connection.getresponse()
+
+            if(resp != None):
+                self.logger.log(str(resp.getheaders()))
             responseBody = resp.read()
             connection.close()
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
             else:
+                self.logger.log("resp status: " + str(resp.status))
+                self.logger.log("responseBody: " + str(responseBody))
                 return CommonVariables.error_http_failure
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())

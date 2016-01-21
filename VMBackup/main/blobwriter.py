@@ -35,7 +35,6 @@ class BlobWriter(object):
     """
     def WriteBlob(self,msg,blobUri):
         retry_times = 3
-        self.hutil.log(msg)
         while(retry_times > 0):
             try:
                 # get the blob type
@@ -45,9 +44,12 @@ class BlobWriter(object):
                     headers = {}
                     headers["x-ms-blob-type"] = 'BlockBlob'
                     self.hutil.log(str(headers))
-                    result = http_util.Call('PUT',sasuri_obj,msg,headers = headers)
+                    result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = msg, headers = headers)
                     if(result == CommonVariables.success):
+                        self.hutil.log("blob written succesfully to:"+str(blobUri))
                         retry_times = 0
+                    else:
+                        self.hutil.log("blob failed to write")
                 else:
                     self.hutil.log("logbloburi is None")
                     retry_times = 0

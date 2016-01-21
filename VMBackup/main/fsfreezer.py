@@ -39,11 +39,12 @@ class FreezeResult(object):
         return error_str
 
 class FsFreezer:
-    def __init__(self, logger):
+    def __init__(self, patching, logger):
         """
         """
+        self.patching = patching
         self.logger = logger
-        self.mounts = Mounts(self.logger)
+        self.mounts = Mounts(patching = self.patching, logger = self.logger)
         self.frozen_items = set()
         self.unfrozen_items = set()
 
