@@ -124,6 +124,8 @@ class AbstractPatching(object):
         self.scheduled_configs_file = os.path.join(self.cwd, 'scheduled/configs')
         self.dist_upgrade_list = None
         self.dist_upgrade_list_key = 'distUpgradeList'
+        self.dist_upgrade_all = False
+        self.dist_upgrade_all_key = 'distUpgradeAll'
 
         # Reboot Requirements
         self.reboot_required = False
@@ -196,6 +198,17 @@ class AbstractPatching(object):
         self.dist_upgrade_list = settings.get(self.dist_upgrade_list_key)
         if not self.is_string_none_or_empty(self.dist_upgrade_list):
             self.current_configs[self.dist_upgrade_list_key] = self.dist_upgrade_list
+
+        dist_upgrade_all = settings.get(self.dist_upgrade_all_key)
+        if dist_upgrade_all is None:
+            msg = "The value of parameter \"{0}\" is empty or invalid. Set it false by default.".format(self.dist_upgrade_all_key)
+            self.log_and_syslog(logging.INFO, msg)
+            self.dist_upgrade_all = False
+        elif str(dist_upgrade_all).lower() == 'true':
+            self.dist_upgrade_all = True
+        else:
+            self.dist_upgrade_all = False
+        self.current_configs[self.dist_upgrade_all_key] = str(self.dist_upgrade_all)
         
         check_hrmin = re.compile(r'^[0-9]{1,2}:[0-9]{1,2}$')
         install_duration = settings.get('installDuration')
