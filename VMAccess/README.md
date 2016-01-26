@@ -291,6 +291,12 @@ see the status on Azure Portal
 ## Changelog
 
 ```
+# 1.4.1.0 (2016-01-22)
+- Bumped waagent version from 2.0.14 to 2.0.16
+
+# 1.4.0.0 (2015-12-18)
+- Added support for checking and repairing disks
+
 # 1.3 (2015-09-08)
 - Added waagent to extension package
 ```
