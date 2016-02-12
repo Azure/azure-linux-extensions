@@ -39,7 +39,7 @@ with open(mfile,'r') as f:
     Version = manifest['version']
 
 PackagesDirectory = "packages"
-BundleFileNameTemplate = 'omsagent-1.1.0-28.universal.{0}.sh'
+BundleFileName = 'omsagent-1.1.0-28.universal.x64.sh'
 
 # always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
 InstallCommandTemplate = './{0} --upgrade'
@@ -97,29 +97,19 @@ def dummy_command(operation, status, msg):
     hutil.do_exit(0, operation, status, '0', msg)
 
 
-def getbundlefilename():
-    file_name = BundleFileNameTemplate.format('x86')
-    is_64bits = sys.maxsize > 2**32
-    if is_64bits:
-        file_name = BundleFileNameTemplate.format('x64')
-    return file_name
-
-
 def install(hutil):
-    file_name = getbundlefilename();
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    file_path = os.path.join(file_directory, file_name)
+    file_path = os.path.join(file_directory, BundleFileName)
 
     os.chmod(file_path, 100)
-    cmd = InstallCommandTemplate.format(file_name)
+    cmd = InstallCommandTemplate.format(BundleFileName)
     ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Install', ExtensionShortName, Version)
 
 
 def uninstall(hutil):
-    file_name = getbundlefilename();
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)    
 
-    cmd = UninstallCommandTemplate.format(file_name)
+    cmd = UninstallCommandTemplate.format(BundleFileName)
     ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Uninstall', ExtensionShortName, Version)
 
 
