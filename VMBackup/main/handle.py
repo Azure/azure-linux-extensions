@@ -233,7 +233,6 @@ def enable():
         backup_logger.log(errMsg, False, 'Error')
         global_error_result = e
     finally:
-        backup_logger.log('doing unfreeze now...')
         if(freeze_called):
             unfreeze_result = freezer.unfreezeall()
             backup_logger.log('unfreeze result ' + str(unfreeze_result))

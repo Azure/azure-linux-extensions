@@ -116,8 +116,6 @@ class DiskUtil(object):
                     for j in range(0, disk_info_item_array_length):
                         disk_info_property = disk_info_item_array[j]
                         property_item_pair = disk_info_property.split('=')
-                        if(property_item_pair[0] == 'SIZE'):
-                            device_item.size = int(property_item_pair[1].strip('"'))
 
                         if(property_item_pair[0] == 'NAME'):
                             device_item.name = property_item_pair[1].strip('"')
