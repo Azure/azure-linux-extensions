@@ -42,6 +42,7 @@ from Utils import HandlerUtil
 from urlparse import urlparse
 from RDMALogger import RDMALogger
 from CronUtil import *
+from SecondStageMarkConfig import SecondStageMarkConfig
 #Main function is the only entrence to this extension handler
 def main():
     global logger
@@ -70,6 +71,7 @@ def main():
             chkrdma()
 
 def chkrdma():
+    hutil.do_parse_context('Executing')
     check_result = MyPatching.check_rdma()
     if(check_result == CommonVariables.UpToDate):
         hutil.do_exit(0, 'Enable','success','0', 'RDMA Driver up to date.')
@@ -84,10 +86,11 @@ def rdmaupdate():
     hutil.do_parse_context('Executing')
     try:
         MyPatching.rdmaupdate()
+        hutil.do_status_report('Enable','success','0', 'Enable Succeeded')
+        MyPatching.reboot_machine()
     except Exception as e:
         logger.log("Failed to update with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         hutil.do_exit(0, 'Enable','success','0','enable failed, please take a look at the extension log.')
-    hutil.do_exit(0, 'Enable','success','0', 'Enable Succeeded')
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-rdmaupdate"]
@@ -99,12 +102,16 @@ def enable():
     # do it one time when enabling.
     # config the cron job
     hutil.do_parse_context('Enable')
-    hutil.exit_if_enabled()
-
-    cronUtil = CronUtil(logger)
-    cronUtil.check_update_cron_config()
-    cronUtil.restart_cron()
-    start_daemon()
+    secondStageMarkConfig = SecondStageMarkConfig()
+    if(secondStageMarkConfig.IsMarked()):
+        secondStageMarkConfig.ClearIt()
+        start_daemon()
+    else:
+        hutil.exit_if_enabled()
+        cronUtil = CronUtil(logger)
+        cronUtil.check_update_cron_config()
+        cronUtil.restart_cron()
+        start_daemon()
 
 def install():
     hutil.do_parse_context('Install')

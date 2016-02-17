@@ -29,7 +29,7 @@ class SnapshotError(object):
         self.errorcode = 0
         self.sasuri = None
     def __str__(self):
-        return 'errorcode:' + str(self.errorcode) + 'sasuri:' + str(self.sasuri)
+        return 'errorcode: ' + str(self.errorcode) + ' sasuri: ' + str(self.sasuri)
 
 class SnapshotResult(object):
     def __init__(self):

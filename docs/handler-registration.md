@@ -77,7 +77,7 @@ For registration, the publisher would have to provide the definition file.
 |:---------------:|:----- |:----- |
 | ProviderNamespace | This has to be a unique namespace per each subscription. The namespace is a combination of company team, team name (optional) and product name. E.g.: Microsoft.Azure.RemoteAcccess | Namespace cannot be empty, should be less than 256 chars and underscores cannot be used. |
 | Type | Name of the Extension Handler. The type indicate the purpose of the extension | Type cannot be empty, should be less than 256 chars and underscores cannot be used. |
-| Version | Version number of the handler. The combination of namespace, type and version uniquely identifies an extension. | The version number needs to be changed for every release. The format of version number has to be <major_version>.<minorver_version>.<build#>.<revision#> Eg: 1.0.1.1 |
+| Version | Version number of the handler. The combination of namespace, type and version uniquely identifies an extension. | The version number needs to be changed for every release. The format of version number has to be `<major>.<minor>.<build>.<revision>` Eg: 1.0.1.1 |
 | Label | The label of the extension | |
 | HostingResource | This should be either WebRole or WorkerRole or VmRole depending on whether it’s targeted for PaaS or IaaS. | These values are case sensitive. |
 | MediaLink | The blob url which has the Extension Package. | MediaLink value must point to a URL(either Http or Https) in a blob storage and is downloadable. |

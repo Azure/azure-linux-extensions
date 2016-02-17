@@ -1,7 +1,7 @@
 # VMAccess Extension
-Provide several ways to allow owner of the VM to get the SSH access back.
+Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
-Current version is 1.3.
+Current version is 1.4.
 
 You can read the User Guide below.
 * [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
@@ -13,6 +13,8 @@ VMAccess Extension can:
 * Reset the public host key provided during VM provisioning if host key not provided
 * Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
 * Remove the existing user
+* Check disks
+* Repair added disk
 
 # User Guide
 
@@ -20,7 +22,17 @@ VMAccess Extension can:
 
 ### 1.1. Public configuration
 
-No need to provide the public configuration.
+Schema for the public configuration file looks like:
+
+* `check_disk`: (boolean) whether or not to check disk
+* `repair_disk`: (boolean, string) whether or not to repair disk, disk name
+
+```json
+{ "check_disk": "true",
+  "repair_disk": "true, user-disk-name"
+}
+
+```
 
 ### 1.2. Protected configuration
 
@@ -248,7 +260,20 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 }
 ```
 
+### 3.7 Checking added disks on VM
+```json
+{
+    "check_disk":"true"
+}
+```
 
+### 3.8 Fix added disks on a VM
+```json
+{
+    "repair_disk": "true",
+    "disk_name": "userdisktofix"
+}
+```
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
@@ -266,6 +291,12 @@ see the status on Azure Portal
 ## Changelog
 
 ```
+# 1.4.1.0 (2016-01-22)
+- Bumped waagent version from 2.0.14 to 2.0.16
+
+# 1.4.0.0 (2015-12-18)
+- Added support for checking and repairing disks
+
 # 1.3 (2015-09-08)
 - Added waagent to extension package
 ```

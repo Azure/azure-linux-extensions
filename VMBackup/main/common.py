@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -22,7 +22,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "0.1.0.2"
+    extension_version = "0.1.0.91"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
@@ -48,3 +48,17 @@ class CommonVariables:
     error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
+
+class DeviceItem(object):
+    def __init__(self):
+        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL
+        self.name = None
+        self.type = None
+        self.file_system = None
+        self.mount_point = None
+        self.label = None
+        self.uuid = None
+        self.model = None
+        self.size = None
+    def __str__(self):
+        return "name:" + str(self.name) + " type:" + str(self.type) + " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) + " label:" + str(self.label) + " model:" + str(self.model)

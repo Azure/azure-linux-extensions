@@ -33,6 +33,7 @@ from AbstractPatching import AbstractPatching
 from Common import *
 from CommandExecuter import CommandExecuter
 from RdmaException import RdmaException
+from SecondStageMarkConfig import SecondStageMarkConfig
 
 class SuSEPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
@@ -55,6 +56,7 @@ class SuSEPatching(AbstractPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.ps_path = '/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.reboot_path = '/sbin/reboot'
             self.rmmod_path = '/sbin/rmmod'
             self.service_path='/usr/sbin/service'
             self.umount_path = '/bin/umount'
@@ -76,6 +78,7 @@ class SuSEPatching(AbstractPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.ps_path = '/usr/bin/ps'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.reboot_path = '/sbin/reboot'
             self.rmmod_path = '/usr/sbin/rmmod'
             self.service_path = '/usr/sbin/service'
             self.umount_path = '/usr/bin/umount'
@@ -160,7 +163,10 @@ class SuSEPatching(AbstractPatching):
                 self.logger.log("install hyper-v return code: " + str(error) + " output:" + str(output))
                 if(error != CommonVariables.process_success):
                     return CommonVariables.common_failed
-                return self.restart_hv_kvp_daemon()
+                secondStageMarkConfig = SecondStageMarkConfig()
+                secondStageMarkConfig.MarkIt()
+                self.reboot_machine()
+                return CommonVariables.process_success
             else :
                 self.logger.log("KVP deamon is running")
                 return CommonVariables.process_success
@@ -172,7 +178,7 @@ class SuSEPatching(AbstractPatching):
         try:
             with open("/var/lib/hyperv/.kvp_pool_0", "r") as f:
                 lines = f.read()
-            r = re.match("NdDriverVersion\0+(\d\d\d\.\d)", lines)
+            r = re.search("NdDriverVersion\0+(\d\d\d\.\d)", lines)
             if r is not None:
                 NdDriverVersion = r.groups()[0]
                 return NdDriverVersion #e.g.  NdDriverVersion = 142.0
@@ -214,12 +220,12 @@ class SuSEPatching(AbstractPatching):
         else:
             self.logger.log("output is: "+str(output))
             self.logger.log("msft-rdma-pack found")
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " refresh")
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --no-gpg-checks refresh")
         self.logger.log("refresh repro return code is " + str(returnCode) + " output is: " + str(message))
         #install the wrapper package, that will put the driver RPM packages under /opt/microsoft/rdma
         returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " -n remove " + CommonVariables.wrapper_package_name)
         self.logger.log("remove wrapper package return code is " + str(returnCode) + " output is: " + str(message))
-        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install " + CommonVariables.wrapper_package_name)
+        returnCode,message = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install --force " + CommonVariables.wrapper_package_name)
         self.logger.log("install wrapper package return code is " + str(returnCode) + " output is: " + str(message))
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None :
@@ -228,9 +234,17 @@ class SuSEPatching(AbstractPatching):
                     error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive remove msft-lis-rdma-kmp-default")
                     self.logger.log("remove msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
                     self.logger.log("Installing RPM /opt/microsoft/rdma/" + filename)
-                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install /opt/microsoft/rdma/%s" % filename)
+                    error,output = commandExecuter.RunGetOutput(self.zypper_path + " --non-interactive install --force /opt/microsoft/rdma/%s" % filename)
                     self.logger.log("Install msft-lis-rdma-kmp-default result is " + str(error) + " output is: " + str(output))
-                    return
+                    if(error == CommonVariables.process_success):
+                        self.reboot_machine()
+                    else:
+                        raise RdmaException(CommonVariables.package_install_failed)
         else:
             self.logger.log("RDMA drivers not found in /opt/microsoft/rdma")
-            raise RdmaException(package_not_found)
+            raise RdmaException(CommonVariables.package_not_found)
+
+    def reboot_machine(self):
+        self.logger.log("rebooting machine")
+        commandExecuter = CommandExecuter(self.logger)
+        commandExecuter.RunGetOutput(self.reboot_path)

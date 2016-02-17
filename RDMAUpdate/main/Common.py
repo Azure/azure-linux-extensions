@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -22,7 +22,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'RDMAUpdateForLinux'
-    extension_version = "0.1.0.1"
+    extension_version = "0.1.0.8"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure RDMA Update Extension for Linux IaaS'
@@ -43,6 +43,7 @@ class CommonVariables:
     driver_version_not_found = 4
     unknown_error = 5
     package_not_found = 6
+    package_install_failed = 7
 
     """
     logs related

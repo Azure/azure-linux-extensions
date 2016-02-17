@@ -15,5 +15,9 @@
 #
 # Requires Python 2.7+
 #
+# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 
+import os
+import re
+import platform
 

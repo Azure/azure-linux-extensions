@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -38,6 +38,7 @@ import datetime
 from os.path import join
 from mounts import Mounts
 from mounts import Mount
+from patch import *
 from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
@@ -50,12 +51,14 @@ from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 def main():
-    global backup_logger
-    global hutil
+    global MyPatching,backup_logger,hutil
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     backup_logger = Backuplogger(hutil)
+    MyPatching = GetMyPatching(logger = backup_logger)
+    hutil.patching = MyPatching
+
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -72,9 +75,16 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
+def timedelta_total_seconds(delta):
+    if not hasattr(datetime.timedelta, 'total_seconds'):
+        return delta.days * 86400 + delta.seconds
+    else:
+        return delta.total_seconds()
+
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
         backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
-        time_span = (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds() * 1000
+        time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+        time_span = timedelta_total_seconds(time_delta) * 1000
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat = [{
@@ -95,12 +105,12 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
         }]
         status_report_msg = json.dumps(stat)
         status_report_msg = status_report_msg.replace(date_place_holder,date_string)
-        blobWriter = BlobWriter(backup_logger)
+        blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(status_report_msg,blobUri)
 
 def exit_with_commit_log(error_msg, para_parser):
     backup_logger.log(error_msg, True, 'Error')
-    if(para_parser is not None and para_parser.logsBlobUri is not None):
+    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
@@ -111,7 +121,7 @@ def enable():
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Enable')
 
-    freezer = FsFreezer(backup_logger)
+    freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
     unfreeze_result = None
     snapshot_result = None
     freeze_result = None
@@ -136,10 +146,11 @@ def enable():
             if(current_identity != stored_identity):
                 current_seq_no = -1
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_inused_config_seq(current_seq_no)
+                hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
 
-        hutil.exit_if_enabled()
+        hutil.exit_if_same_seq()
+        hutil.save_seq()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -158,7 +169,7 @@ def enable():
             timespan = utcNow - commandStartTime
             THIRTY_MINUTES = 30 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
+            total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
             if(abs(total_span_in_seconds) > THIRTY_MINUTES):
                 error_msg = 'the call time stamp is out of date. so skip it.'
@@ -231,9 +242,10 @@ def enable():
                 backup_logger.log(error_msg, False, 'Warning')
             backup_logger.log('unfreeze ends...')
 
-    if(para_parser is not None and para_parser.logsBlobUri is not None):
+    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
+        backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
@@ -248,8 +260,13 @@ def enable():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
 
-    if(para_parser is not None and para_parser.statusBlobUri is not None):
-        do_backup_status_report(operation='Enable',status = run_status,status_code=str(run_result),message=error_msg,taskId=para_parser.taskId,commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,blobUri=para_parser.statusBlobUri)
+    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        do_backup_status_report(operation='Enable',status = run_status,\
+                                status_code=str(run_result), \
+                                message=error_msg,\
+                                taskId=para_parser.taskId,\
+                                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                                blobUri=para_parser.statusBlobUri)
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
