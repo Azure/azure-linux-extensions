@@ -46,6 +46,14 @@ class Backuplogger(object):
         blobWriter = BlobWriter(self.hutil)
         # append the wala log at the end.
         try:
+            # distro information
+            if(self.hutil is not None and self.hutil.patching is not None and self.hutil.patching.distro_info is not None):
+                distro_str = ""
+                if(len(self.hutil.patching.distro_info)>1):
+                    distro_str = self.hutil.patching.distro_info[0] + " " + self.hutil.patching.distro_info[1]
+                else:
+                    distro_str = self.hutil.patching.distro_info[0]
+                self.msg = "Distro Info:" + distro_str + "\n" + self.msg
             self.msg = "Guest Agent Version is :" + waagent.GuestAgentVersion + "\n" + self.msg
             with open("/var/log/waagent.log", 'rb') as file:
                 file.seek(0, os.SEEK_END)
