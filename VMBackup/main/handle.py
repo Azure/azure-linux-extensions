@@ -82,7 +82,7 @@ def timedelta_total_seconds(delta):
         return delta.total_seconds()
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
-        backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = timedelta_total_seconds(time_delta) * 1000
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
@@ -95,7 +95,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
                 "operation" : operation,
                 "status" : status,
                 "code" : status_code,
-                "taskId":taskId,
+                "taskId": taskId,
                 "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
                 "formattedMessage" : {
                     "lang" : "en-US",

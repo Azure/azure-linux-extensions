@@ -36,7 +36,7 @@ class HttpUtil(object):
             waagent.MyDistro=waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
         except Exception as e:
-            errorMsg = "Failed to construct ConfigurationProvider with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code."
             hutil.log(errorMsg)
             Config = waagent.ConfigurationProvider()
         self.logger = hutil
@@ -92,7 +92,8 @@ class HttpUtil(object):
                 return CommonVariables.success
             else:
                 self.logger.log("resp status: " + str(resp.status))
-                self.logger.log("responseBody: " + str(responseBody))
+                if(responseBody is not None):
+                    self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
                 return CommonVariables.error_http_failure
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())

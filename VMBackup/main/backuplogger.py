@@ -18,13 +18,14 @@
 #
 # Requires Python 2.7+
 #
-
-import time
 import datetime
+import httplib
+import os
+import time
 import traceback
 import urlparse
-import httplib
 from blobwriter import BlobWriter
+from Utils.WAAgentUtil import waagent
 
 class Backuplogger(object):
     def __init__(self, hutil):
@@ -43,7 +44,22 @@ class Backuplogger(object):
         #commit to local file system first, then commit to the network.
         self.hutil.log(self.msg)
         blobWriter = BlobWriter(self.hutil)
-        blobWriter.WriteBlob(self.msg,logbloburi)
+        # append the wala log at the end.
+        try:
+            self.msg = "Guest Agent Version is :" + waagent.GuestAgentVersion + "\n" + self.msg
+            with open("/var/log/waagent.log", 'rb') as file:
+                file.seek(0, os.SEEK_END)
+                length = file.tell()
+                seek_len_abs = 1024 * 10
+                if(length < seek_len_abs):
+                    seek_len_abs = length
+                file.seek(0 - seek_len_abs, os.SEEK_END)
+                tail_wala_log = file.read()
+                self.msg = self.msg + "Tail of WALA Log:" + tail_wala_log
+        except Exception as e:
+            errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.hutil.log(errMsg)
+        blobWriter.WriteBlob(self.msg, logbloburi)
 
     def commit_to_local(self):
         self.hutil.log(self.msg)
