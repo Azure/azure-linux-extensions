@@ -87,10 +87,7 @@ class FsFreezer:
             if(not path in self.unfrozen_items):
                 freeze_return_code = 0
                 self.unfrozen_items.add(path)
-                if(mount.type == 'xfs'):
-                    unfreeze_return_code = subprocess.call(['xfs_freeze', '-u', path])
-                else:
-                    unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
+                unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
             else:
                 self.logger.log('the item ' + str(path) + ' is already unfreezed, so skip it')
         self.logger.log('unfreeze_result...' + str(unfreeze_return_code))
