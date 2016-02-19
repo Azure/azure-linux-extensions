@@ -56,13 +56,13 @@ class FsFreezer:
         path = mount.mount_point
         
         if(path in self.frozen_items):
-            self.logger.log("skipping the mount point " + str(path) + " because we already freezed it")
+            self.logger.log("skipping the mount point because we already freezed it")
             freeze_return_code = 0
         else:
-            self.logger.log('freeze...' + str(path) + ' type ' + str(mount.type))
+            self.logger.log('freeze...')
             freeze_return_code = 0
             if(self.should_skip(mount)):
-                self.logger.log('skip for devtmpfs and devpts ' + str(mount.type))
+                self.logger.log('skip for the unknown file systems')
             else:
                 self.frozen_items.add(path)
                 freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
@@ -79,17 +79,17 @@ class FsFreezer:
         """
         freeze_error = FreezeError()
         path = mount.mount_point
-        self.logger.log('unfreeze...' + str(path) + ' type ' + str(mount.type))
+        self.logger.log('unfreeze...')
         unfreeze_return_code = 0 
         if(self.should_skip(mount)):
-            self.logger.log('skip for the type ' + str(mount.type))
+            self.logger.log('skip for the type ')
         else:
             if(not path in self.unfrozen_items):
                 freeze_return_code = 0
                 self.unfrozen_items.add(path)
                 unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
             else:
-                self.logger.log('the item ' + str(path) + ' is already unfreezed, so skip it')
+                self.logger.log('the item is already unfreezed, so skip it')
         self.logger.log('unfreeze_result...' + str(unfreeze_return_code))
         freeze_error.errorcode = unfreeze_return_code
         if(unfreeze_return_code != 0):
