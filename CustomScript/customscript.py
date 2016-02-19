@@ -39,6 +39,7 @@ import json
 from codecs import *
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
+from distutils.util import strtobool
 import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
@@ -279,7 +280,7 @@ def daemon(hutil):
         if 'wait' in public_settings:
             wait = public_settings.get('wait')
         if 'enableInternalDNSCheck' in public_settings:
-            enable_idns_check = public_settings.get('enableInternalDNSCheck')
+            enable_idns_check = strtobool(public_settings.get('enableInternalDNSCheck'))
 
     prepare_download_dir(hutil.get_seq_no())
     retry_count = download_files_with_retry(hutil, retry_count, wait)
