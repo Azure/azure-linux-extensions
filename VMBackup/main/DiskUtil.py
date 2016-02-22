@@ -88,7 +88,6 @@ class DiskUtil(object):
                 self.logger.log(msg="partition files exists")
                 if(partition_files is not None and len(partition_files) > 0):
                     device_item.type = 'part'
-            device_item.size = int(self.get_device_items_property(dev_name=device_item.name,property_name='SIZE'))
         return device_items
 
     def get_device_items(self, dev_path):
