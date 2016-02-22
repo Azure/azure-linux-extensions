@@ -35,6 +35,7 @@ Schema for the public configuration file looks like this:
 | dayOfWeek | The patching date (of the week)You can specify multiple days in a week | optional, string | Everyday |
 | startTime | Start time of patching | optional, string | 03:00 |
 | distUpgradeList | Path to a repo list which for which a full upgrade (e.g. dist-upgrade in Ubuntu) will occur | optional, string | /etc/apt/sources.list.d/custom.list |
+| distUpgradeAll | Flag to enable full upgrade (e.g. dist-upgrade in Ubuntu) for all repos/packages. Disabled (False) by default | optional, bool | True |
 | vmStatusTest | Including `local`, `idleTestScript` and `healthyTestScript` | optional, object | |
 | local | Flag to assign the location of user-defined scripts | optional, boolean | false |
 | idleTestScript | If `local` is true, it is the contents of the idle test script. Otherwise, it is the uri of the idle test script. | optional, string | |

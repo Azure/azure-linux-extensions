@@ -28,10 +28,10 @@ Schema for the public configuration file looks like:
 * `repair_disk`: (boolean, string) whether or not to repair disk, disk name
 
 ```json
-{ "check_disk": "true",
+{
+  "check_disk": "true",
   "repair_disk": "true, user-disk-name"
 }
-
 ```
 
 ### 1.2. Protected configuration
@@ -40,7 +40,7 @@ Schema for the protected configuration file looks like this:
 
 * `username`: (required, string) the name of the user
 * `password`: (optional, string) the password of the user
-* `ssh_key`: (optional, string) the public key of the user, base64 encoded pem
+* `ssh_key`: (optional, string) the public key of the user
 * `reset_ssh`: (optional, boolean) whether or not reset the ssh
 * `remove_user`: (optional, string) the user name to remove
 
@@ -48,14 +48,30 @@ Schema for the protected configuration file looks like this:
 {
   "username": "<username>",
   "password": "<password>",
-  "ssh_key": "<pem-cert-contents>",
+  "ssh_key": "<cert-contents>",
   "reset_ssh": true,
   "remove_user": "<username-to-remove>"
 }
 ```
 
-> **NOTE:** Currently, only base64 encoded pem format is supported for `ssh_key`.
-It should begin with `-----BEGIN CERTIFICATE-----`.
+`ssh_key` supports both `ssh-rsa` and `.pem` format.
+
+* If your public key is in `ssh-rsa` format, for example, `ssh-rsa XXXXXXXX`, you can use:
+
+  ```
+  "ssh_key": "ssh-rsa XXXXXXXX"
+  ```
+
+* If your public key is in `.pem` format, use the following UNIX command to convert the .pem file to a value that can be passed in a JSON string:
+
+  ```
+  awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' myCert.pem
+  ```
+
+  You can use:
+  ```
+  "ssh_key": "-----BEGIN CERTIFICATE-----\nXXXXXXXXXXXXXXXXXXXXXXXX\n-----END CERTIFICATE-----"
+  ```
 
 ## 2. Deploying the Extension to a VM
 
@@ -110,6 +126,8 @@ In ARM mode, there is another specific and simple command to reset your password
 $ azure vm reset-access [options] <resource-group> <name>
 ```
 
+>**NOTE:** Currently, only public key PEM file is supported for `azure vm reset-access`. It's filed as an [issue](https://github.com/Azure/azure-xplat-cli/issues/2437).
+
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
 #### 2.2.1 Classic
@@ -134,7 +152,7 @@ $PublicConf = '{}'
 $PrivateConf = '{
   "username": "<username>",
   "password": "<password>",
-  "ssh_key": "<pem-cert-contents>",
+  "ssh_key": "<cert-contents>",
   "reset_ssh": true|false,
   "remove_user": "<username-to-remove>"
 }'
@@ -170,7 +188,7 @@ $PublicConf = '{}'
 $PrivateConf = '{
   "username": "<username>",
   "password": "<password>",
-  "ssh_key": "<pem-cert-contents>",
+  "ssh_key": "<cert-contents>",
   "reset_ssh": true|false,
   "remove_user": "<username-to-remove>"
 }'
@@ -193,7 +211,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
-    "typeHandlerVersion": "1.3",
+    "typeHandlerVersion": "1.4",
     "settings": {},
     "protectedSettings": {
       "username": "<username>",
@@ -238,7 +256,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 }
 ```
 
-### 3.4 Creating a new sudo user account
+### 3.4 Creating a new sudo user account with the password
 ```json
 {
   "username":"newusername",
@@ -246,28 +264,36 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 }
 ```
 
-### 3.5 Resetting the SSH configuration
+### 3.5 Creating a new sudo user account with the SSH key
+```json
+{
+  "username":"newusername",
+  "ssh_key":"contentofsshkey"
+}
+```
+
+### 3.6 Resetting the SSH configuration
 ```json
 {
   "reset_ssh": true
 }
 ```
 
-### 3.6 Removing an existing user
+### 3.7 Removing an existing user
 ```json
 {
   "remove_user":"usertoberemoveed",
 }
 ```
 
-### 3.7 Checking added disks on VM
+### 3.8 Checking added disks on VM
 ```json
 {
     "check_disk":"true"
 }
 ```
 
-### 3.8 Fix added disks on a VM
+### 3.9 Fix added disks on a VM
 ```json
 {
     "repair_disk": "true",
@@ -291,6 +317,12 @@ see the status on Azure Portal
 ## Changelog
 
 ```
+# 1.4.1.0 (2016-01-22)
+- Bumped waagent version from 2.0.14 to 2.0.16
+
+# 1.4.0.0 (2015-12-18)
+- Added support for checking and repairing disks
+
 # 1.3 (2015-09-08)
 - Added waagent to extension package
 ```

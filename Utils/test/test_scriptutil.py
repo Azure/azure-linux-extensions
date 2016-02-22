@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
-#
 # Copyright 2014 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,40 +14,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.6+
+# Requires Python 2.7+
 #
 
+import os
+import os.path
 import unittest
 import env
-import os
-import tempfile
+import ScriptUtil as su
 from MockUtil import MockUtil
-import customscript as cs
 
-class TestCommandExecution(unittest.TestCase):
-    def test_parse_cmd(self):
+class TestScriptUtil(unittest.TestCase):
+    def test_parse_args(self):
         print __file__
         cmd = u'sh foo.bar.sh -af bar --foo=bar | more \u6211'
-        args = cs.parse_args(cmd.encode('utf-8'))
+        args = su.parse_args(cmd.encode('utf-8'))
         self.assertNotEquals(None, args)
         self.assertNotEquals(0, len(args))
         print args
     
-    def test_tail(self):
-        with open("/tmp/testtail", "w+") as F:
-            F.write(u"abcdefghijklmnopqrstu\u6211vwxyz".encode("utf-8"))
-        tail = cs.tail("/tmp/testtail", 2)
-        self.assertEquals("yz", tail)
-
-        tail = cs.tail("/tmp/testtail")
-        self.assertEquals("abcdefghijklmnopqrstuvwxyz", tail)
-
-    def test_run_script(self):
+    def test_run_command(self):
         hutil = MockUtil(self)
         test_script = "mock.sh"
         os.chdir(os.path.join(env.root, "test"))
-        cs.run_script(hutil, ["sh", test_script, "0"], 0.1)
-        cs.run_script(hutil, ["sh", test_script, "1"], 0.1)
-
+        exit_code = su.run_command(hutil, ["sh", test_script, "0"], os.getcwd(), 'RunScript-0', 'TestExtension', '1.0', True, 0.1)
+        self.assertEquals(0, exit_code)
+        self.assertEquals("do_exit", hutil.last)
+        exit_code = su.run_command(hutil, ["sh", test_script, "75"], os.getcwd(), 'RunScript-1', 'TestExtension', '1.0', False, 0.1)
+        self.assertEquals(75, exit_code)
+        self.assertEquals("do_status_report", hutil.last)
+    
+    def test_log_or_exit(self):        
+        hutil = MockUtil(self)
+        su.log_or_exit(hutil, True, 0, 'LogOrExit-0', 'Message1')
+        self.assertEquals("do_exit", hutil.last)
+        su.log_or_exit(hutil, False, 0, 'LogOrExit-1', 'Message2')
+        self.assertEquals("do_status_report", hutil.last)
+        
 if __name__ == '__main__':
     unittest.main()
