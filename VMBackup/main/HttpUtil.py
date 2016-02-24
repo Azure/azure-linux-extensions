@@ -33,7 +33,7 @@ class HttpUtil(object):
     """description of class"""
     def __init__(self, hutil):
         try:
-            waagent.MyDistro=waagent.GetMyDistro()
+            waagent.MyDistro = waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
         except Exception as e:
             errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code."
@@ -53,9 +53,9 @@ class HttpUtil(object):
             header_str = header_str + '-H ' + '"' + str(key) + ':' + str(value) + '"'
 
         if(self.proxyHost == None or self.proxyPort == None):
-            commandToExecute = 'curl --request PUT --data-binary @-'  + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
+            commandToExecute = 'curl --request PUT --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
         else:
-            commandToExecute = 'curl --request PUT --data-binary @-'  + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
+            commandToExecute = 'curl --request PUT --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
         args = shlex.split(commandToExecute)
         proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -63,14 +63,15 @@ class HttpUtil(object):
         curlResult,err = proc.communicate()
         returnCode = proc.wait()
         self.logger.log("curl error is: " + str(err))
-        self.logger.log("curl return code is : "+str(returnCode))
-        # what if the curl is returned successfully, but the http response is 403
-        if(returnCode == 0 ):
+        self.logger.log("curl return code is : " + str(returnCode))
+        # what if the curl is returned successfully, but the http response is
+        # 403
+        if(returnCode == 0):
             return CommonVariables.success
         else:
             return CommonVariables.error_http_failure
 
-    def Call(self,method,sasuri_obj,data,headers):
+    def Call(self, method, sasuri_obj, data, headers, fallback_to_curl = False):
         try:
             if(self.proxyHost == None or self.proxyPort == None):
                 connection = httplib.HTTPSConnection(sasuri_obj.hostname)
@@ -98,4 +99,7 @@ class HttpUtil(object):
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
-            return self.CallUsingCurl(method,sasuri_obj,data,headers)
+            if(fallback_to_curl):
+                return self.CallUsingCurl(method,sasuri_obj,data,headers)
+            else:
+                return CommonVariables.error_http_failure
