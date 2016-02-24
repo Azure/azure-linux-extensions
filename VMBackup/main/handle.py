@@ -107,6 +107,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
         status_report_msg = status_report_msg.replace(date_place_holder,date_string)
         blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(status_report_msg,blobUri)
+        return status_report_msg
 
 def exit_with_commit_log(error_msg, para_parser):
     backup_logger.log(error_msg, True, 'Error')
@@ -241,11 +242,6 @@ def enable():
                 backup_logger.log(error_msg, False, 'Warning')
             backup_logger.log('unfreeze ends...')
 
-    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-        backup_logger.commit(para_parser.logsBlobUri)
-    else:
-        backup_logger.log("the logs blob uri is not there, so do not upload log.")
-        backup_logger.commit_to_local()
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
@@ -260,12 +256,23 @@ def enable():
         error_msg  += ('Enable failed.' + str(global_error_result))
 
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        do_backup_status_report(operation='Enable',status = run_status,\
+        status_report_msg = do_backup_status_report(operation='Enable',status = run_status,\
                                 status_code=str(run_result), \
                                 message=error_msg,\
                                 taskId=para_parser.taskId,\
                                 commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                                 blobUri=para_parser.statusBlobUri)
+    if(status_report_msg is not None):
+        backup_logger.log("status report message:")
+        backup_logger.log(status_report_msg)
+    else:
+        backup_logger.log("status_report_msg is none")
+    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+        backup_logger.commit(para_parser.logsBlobUri)
+    else:
+        backup_logger.log("the logs blob uri is not there, so do not upload log.")
+        backup_logger.commit_to_local()
+    
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
