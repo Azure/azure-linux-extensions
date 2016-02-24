@@ -1,12 +1,6 @@
 #scp -r main root@fareast-andliu.cloudapp.net:/var/lib/waagent/Microsoft.OSTCExtensions.VMEncryption-0.1/main
 #. .\keyvault_prepare.ps1
 
-#$passphrase="VGhpcyBpcyB0aGUgcGxhaW4gdGV4dCBtZXNzYWdlLg"
-#$encryption_keyvault_uri="https://andliukeyvault.vault.azure.net/keys/mykey"
-#$keyvault_uri="https://andliukeyvault.vault.azure.net/"
-#$AADClientID="b7b48143-6c58-4cd4-a9e0-0a15cbda0614"
-#$AADClientSecret="/XazYdJ9XaMBbiQ0dwSoyue7LbkQ1OJOePGGcrG3dkA="
-#$alg_name="RSA1_5"
 function Encrypt-Disk
 {
     param
@@ -36,8 +30,6 @@ function Encrypt-Disk
     #Add-AzureDataDisk -CreateNew -DiskSizeInGB 3 -DiskLabel "disklabel$lun" -VM $vm -LUN $lun -MediaLocation $destinationKeyDiskPath| update-azurevm
     # $encryption_keyvault_uri="https://andliukeyvault.vault.azure.net/keys/mykey"
     #$keyvault_uri="https://andliukeyvault.vault.azure.net/"
-    #$AADClientID="b7b48143-6c58-4cd4-a9e0-0a15cbda0614"
-    #$AADClientSecret="/XazYdJ9XaMBbiQ0dwSoyue7LbkQ1OJOePGGcrG3dkA="
     #$alg_name="RSA1_5"
     $publicConfig='
     {
