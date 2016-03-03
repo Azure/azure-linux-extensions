@@ -25,7 +25,8 @@ def setXmlValue(xml,path,property,value,selector=[]):
 
 def getXmlValue(xml,path,property):
     element = xml.find(path)
-    return element.get(property)
+    if element is not None:
+        return element.get(property)
 
 def addElement(xml,path,el,selector=[]):
     elements = xml.findall(path)
