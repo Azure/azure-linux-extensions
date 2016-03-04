@@ -32,11 +32,14 @@ from Utils.WAAgentUtil import waagent
 class HttpUtil(object):
     """description of class"""
     def __init__(self,logger):
+        self.logger = logger
         try:
+            waagent.MyDistro = waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
         except Exception as e:
+            errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code."
+            self.logger.log(errorMsg)
             Config = waagent.ConfigurationProvider()
-        self.logger = logger
         self.proxyHost = Config.get("HttpProxy.Host")
         self.proxyPort = Config.get("HttpProxy.Port")
         self.connection = None
