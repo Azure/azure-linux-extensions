@@ -254,7 +254,7 @@ def enable():
             run_result = CommonVariables.error
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
-
+    status_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
         status_report_msg = do_backup_status_report(operation='Enable',status = run_status,\
                                 status_code=str(run_result), \
