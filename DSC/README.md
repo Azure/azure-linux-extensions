@@ -21,10 +21,9 @@ DSCForLinux Extension can:
 
 Here're all the supported public configuration parameters:
 
-* `MofFileUri`: (optional, string) the uri of the public MOF file
-* `ResourceZipFileUri`: (optional, string) the uri of the custom resource ZIP file
+* `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove. If not specified, it's considered as Pull mode.
+* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove. If not specified, it's considered as Push mode.
 
 ### 1.2 Protected configuration
 
@@ -32,9 +31,6 @@ Here're all the supported protected configuration parameters:
 
 * `StorageAccountName`: (optional, string) the name of the storage account that contains the file
 * `StorageAccountKey`: (optional, string) the key of the storage account that contains the file
-* `ContainerName`: (optional, string) the name of the container that contains the file
-* `MofFileName`: (optional, string) the name of the MOF file in the Azure Storage Account
-* `ResourceZipFileName`: (optional, string) the name of the custom resource ZIP file in the Azure Storage Account, the format should be "name_version.zip".
 
 ## 2. Deploying the Extension to a VM
 
@@ -99,13 +95,12 @@ $version = '<version>'
 # according to different scenarios in section 3
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Push"
+  "Mode": "Push",
+  "FileUri": "<mof-file-uri>"
 }'
 
 Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
@@ -138,13 +133,12 @@ $version = '<version>'
 # according to different scenarios in section 3
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Push"
+  "Mode": "Push",
+  "FileUri": "<mof-file-uri>"
 }'
 
 Set-AzureRmVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $location `
@@ -166,9 +160,15 @@ protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
+}
+```
+
+public.json
+```json
+{
+  "FileUri": "<mof-file-uri>",
+  "Mode": "Push"  
 }
 ```
 
@@ -176,25 +176,30 @@ powershell format
 ```powershell
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 ```
+
+$publicConfig = '{
+  "FileUri": "<mof-file-uri>",
+  "Mode": "Push"  
+}'
+```
+
 
 ### 3.2. Apply a MOF configuration file (in public storage) to the VM
 
 public.json
 ```json
 {
-  "MofFileUri": "<mof-file-uri>"
+  "FileUri": "<mof-file-uri>"
 }
 ```
 
 powershell format
 ```powershell
 $publicConfig = '{
-  "MofFileUri": "<mof-file-uri>"
+  "FileUri": "<mof-file-uri>"
 }'
 ```
 
@@ -205,15 +210,14 @@ protected.json
 {
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<meta-mof-file-name>"
 }
 ```
 
 public.json
 ```json
 {
-  "Mode": "Pull"
+  "Mode": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
 }
 ```
 
@@ -222,12 +226,11 @@ powershell format
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<meta-mof-file-name>"
 }'
 
 $publicConfig = '{
-  "Mode": "Pull"
+  "Mode": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
 }'
 ```
 
@@ -235,14 +238,14 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "MofFileUri": "<meta-mof-file-uri>",
+  "FileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "MofFileUri": "<meta-mof-file-uri>",
+  "FileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }'
 ```
