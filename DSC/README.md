@@ -12,6 +12,7 @@ DSCForLinux Extension can:
 * Distribute MOF configurations to the Linux VM with Pull Servers (Pull Mode)
 * Install custom DSC modules to the Linux VM (Install Mode)
 * Remove custom DSC modules to the Linux VM (Remove Mode)
+* Register the Linux VM to Azure Automation account (Register Mode)
 
 # User Guide
 
@@ -23,7 +24,7 @@ Here're all the supported public configuration parameters:
 
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove. If not specified, it's considered as Push mode.
+* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
 
 ### 1.2 Protected configuration
 
@@ -31,6 +32,8 @@ Here're all the supported protected configuration parameters:
 
 * `StorageAccountName`: (optional, string) the name of the storage account that contains the file
 * `StorageAccountKey`: (optional, string) the key of the storage account that contains the file
+* `RegistrationUrl`: (optional, string) the URL of the Azure Automation account
+* `RegistrationKey`: (optional, string) the access key of the Azure Automation account
 
 ## 2. Deploying the Extension to a VM
 
@@ -313,9 +316,27 @@ $publicConfig = '{
 }'
 ```
 
+### 3.8 Register to Azure Automation account
+protected.json
+```json
+{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}'
+```
+
 ## 4. Supported Linux Distributions
 - Ubuntu 12.04 LTS, 14.04 LTS
 - CentOS 6.5 and higher
+- RHEL 6.5 and higher
 - Oracle Linux 6.4 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
@@ -331,7 +352,12 @@ $publicConfig = '{
 
 ```
 # 1.0 (2015-09-24)
--Initial version
+- Initial version
+
+# 1.1 (2016-03-07)
+- Pick up DSC 1.1
+- Add function to register Azure Automation
+- Refine extension parameters
 ```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/

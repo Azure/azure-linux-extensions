@@ -265,8 +265,6 @@ def install_dsc_packages():
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
         rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
-    else:
-        raise Exception('Unknown distro: {0}'.format(distro_name))
 
 def rpm_install_pkg(package_path, package_name):
     code,output = run_cmd('rpm -q ' + package_name)
