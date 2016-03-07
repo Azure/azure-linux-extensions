@@ -181,7 +181,6 @@ $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>"
 }'
-```
 
 $publicConfig = '{
   "FileUri": "<mof-file-uri>",
