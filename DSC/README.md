@@ -171,7 +171,7 @@ public.json
 ```json
 {
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"  
+  "Mode": "Push"
 }
 ```
 
@@ -184,7 +184,7 @@ $privateConfig = '{
 
 $publicConfig = '{
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"  
+  "Mode": "Push"
 }'
 ```
 
@@ -351,13 +351,13 @@ $privateConfig = '{
 ## Changelog
 
 ```
-# 1.0 (2015-09-24)
-- Initial version
-
 # 1.1 (2016-03-07)
 - Pick up DSC 1.1
 - Add function to register Azure Automation
 - Refine extension parameters
+
+# 1.0 (2015-09-24)
+- Initial version
 ```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/

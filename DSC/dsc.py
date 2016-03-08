@@ -116,7 +116,7 @@ def get_distro_category():
         return DistroCategory.redhat
     elif distro_name == 'suse':
         return DistroCategory.suse 
-    raise Exception('Unsupported distro: {0}'.format(distro_info[0]))    
+    raise Exception('Unsupported distro: {0}'.format(distro_info[0]))
 
 def install():
     hutil.do_parse_context('Install')
@@ -138,12 +138,14 @@ def enable():
             mode = Mode.push
         else:
             mode = mode.lower()
+            if not hasattr(Mode, mode):
+                raise Exception('Invalid mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
             register_automation()
         else:
-            file_path = download_file(mode)
+            file_path = download_file()
             if mode == Mode.pull:
                 current_config = apply_dsc_meta_configuration(file_path)
             elif mode == Mode.push:
@@ -151,14 +153,13 @@ def enable():
             elif mode == Mode.install:
                 install_module(file_path)
             else:
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=False,
                                           message="(03001)Argument error, invalid mode")
+                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
         if mode == Mode.push or mode == Mode.pull:
             if check_dsc_configuration(current_config):
-                hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
                 if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
                                               op=Operation.ApplyMof,
@@ -169,8 +170,8 @@ def enable():
                                               op=Operation.ApplyMetaMof,
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
+                hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
             else:
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
                 if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
                                               op=Operation.ApplyMof,
@@ -181,6 +182,7 @@ def enable():
                                               op=Operation.ApplyMetaMof,
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
+                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception, e:
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -224,10 +226,12 @@ def get_config(key):
 def remove_old_dsc_packages():
     if distro_category == DistroCategory.debian:
         deb_remove_old_package('dsc', dsc_version_deb)
+        # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
         deb_remove_old_package('omiserver', '1.0.8.2')
         deb_remove_old_package('omi', omi_version_deb)
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
         rpm_remove_old_package('dsc', dsc_version_rpm)
+        # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
         rpm_remove_old_package('omiserver', '1.0.8-2')
         rpm_remove_old_package('omi', omi_version_rpm)
 
@@ -344,7 +348,7 @@ def start_omiservice():
     else:
         raise Exception('Failed to start service omid, status : {0}'.format(output))
 
-def download_file(mode):
+def download_file():
     download_dir = prepare_download_dir(hutil.get_seq_no())
 
     storage_account_name = get_config('StorageAccountName')
@@ -373,8 +377,7 @@ def get_path_from_uri(uri_str):
     return uri.path
 
 def download_azure_blob(account_name, account_key, file_uri, download_dir):
-    container_name = get_container_name_from_uri(file_uri)
-    blob_name = get_blob_name_from_uri(file_uri)
+    (blob_name, container_name) = parse_blob_uri(file_uri)
     host_base = get_host_base_from_uri(file_uri)
     download_path = os.path.join(download_dir, blob_name)
     blob_service = BlobService(account_name, account_key, host_base=host_base)
@@ -399,12 +402,6 @@ def download_azure_blob(account_name, account_key, file_uri, download_dir):
                               message="(03301)Succeeded to download file from Azure Storage")
     return download_path
 
-def get_container_name_from_uri(blob_uri):
-    return parse_blob_uri(blob_uri)['container_name']    
-
-def get_blob_name_from_uri(blob_uri):
-    return parse_blob_uri(blob_uri)['blob_name']
-
 def parse_blob_uri(blob_uri):
     path = get_path_from_uri(blob_uri).strip('/')
     first_sep = path.find('/')
@@ -412,7 +409,7 @@ def parse_blob_uri(blob_uri):
         hutil.error("Failed to extract container and blob name from " + blob_uri)
     blob_name = path[first_sep+1:]
     container_name = path[:first_sep]
-    return {'blob_name': blob_name, 'container_name': container_name}
+    return (blob_name, container_name)
 
 def get_path_from_uri(uri):
     uri = urlparse.urlparse(uri)
