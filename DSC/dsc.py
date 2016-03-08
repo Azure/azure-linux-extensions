@@ -139,7 +139,11 @@ def enable():
         else:
             mode = mode.lower()
             if not hasattr(Mode, mode):
-                raise Exception('Invalid mode: ' + mode)
+                waagent.AddExtensionEvent(name=ExtensionShortName,
+                                          op=Operation.Enable,
+                                          isSuccess=False,
+                                          message="(03001)Argument error, invalid mode")
+                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
@@ -150,14 +154,8 @@ def enable():
                 current_config = apply_dsc_meta_configuration(file_path)
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
-            elif mode == Mode.install:
-                install_module(file_path)
             else:
-                waagent.AddExtensionEvent(name=ExtensionShortName,
-                                          op=Operation.Enable,
-                                          isSuccess=False,
-                                          message="(03001)Argument error, invalid mode")
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
+                install_module(file_path)
         if mode == Mode.push or mode == Mode.pull:
             if check_dsc_configuration(current_config):
                 if mode == Mode.push:
