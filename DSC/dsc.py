@@ -370,10 +370,6 @@ def download_file():
         path = download_external_file(file_uri, download_dir)
         return path
 
-def get_path_from_uri(uri_str):
-    uri = urlparse.urlparse(uri_str)
-    return uri.path
-
 def download_azure_blob(account_name, account_key, file_uri, download_dir):
     (blob_name, container_name) = parse_blob_uri(file_uri)
     host_base = get_host_base_from_uri(file_uri)
