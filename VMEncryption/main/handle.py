@@ -243,7 +243,7 @@ def enable():
                 """
                 validate the parameters
                 """
-                if(extension_parameter.VolumeType != 'Data'):
+                if(extension_parameter.VolumeType is None or extension_parameter.VolumeType.lower() != 'data'):
                     hutil.do_exit(0, 'Enable', CommonVariables.extension_error_status,str(CommonVariables.volue_type_not_support), 'VolumeType ' + str(extension_parameter.VolumeType) + ' is not supported.')
 
                 if(extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat]):
