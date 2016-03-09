@@ -1,11 +1,12 @@
 # DSCForLinux Extension
-Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux.
+Allow the owner of the Azure Virtual Machines to configure the VM using Desired State Configuration (DSC) for Linux.
 
-Latest version is 1.0.
+Latest version is 2.0.
 
 About how to create MOF document, please refer to below documents.
-* [Get started with Windows PowerShell Desired State Configuration for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
-* [Built-In Windows PowerShell Desired State Configuration Resources for Linux](https://technet.microsoft.com/en-us/library/mt126209.aspx)
+* [Get started with Desired State Configuration (DSC) for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
+* [Built-In Desired State Configuration Resources for Linux](https://msdn.microsoft.com/en-us/powershell/dsc/lnxbuiltinresources)
+* [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
 * Push MOF configurations to the Linux VM (Push Mode)
@@ -257,15 +258,14 @@ protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "ResourceZipFileName": "<resource-zip-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }
 ```
 public.json
 ```json
 {
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }
 ```
 
@@ -273,13 +273,12 @@ powershell format
 ```powershell
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "ResourceZipFileName": "<resource-zip-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }'
 ```
 
@@ -287,15 +286,15 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "ResourceZipFileUri": "<resource-zip-file-uri>",
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "ResourceZipFileUri": "<resource-zip-file-uri>",
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }'
 ```
 
@@ -351,10 +350,10 @@ $privateConfig = '{
 ## Changelog
 
 ```
-# 1.1 (2016-03-07)
-- Pick up DSC 1.1
+# 2.0 (2016-03-10)
+- Pick up Linux DSC v1.1.1
 - Add function to register Azure Automation
-- Refine extension parameters
+- Refine extension configurations
 
 # 1.0 (2015-09-24)
 - Initial version
