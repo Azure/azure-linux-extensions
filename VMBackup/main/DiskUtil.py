@@ -85,8 +85,8 @@ class DiskUtil(object):
                 device_item.type = 'disk'
             if(device_item.type != 'disk'):
                 partition_files = glob.glob('/sys/block/*/' + device_item.name + '/partition')
-                self.logger.log(msg="partition files exists")
                 if(partition_files is not None and len(partition_files) > 0):
+                    self.logger.log(msg="partition files exists")
                     device_item.type = 'part'
         return device_items
 
