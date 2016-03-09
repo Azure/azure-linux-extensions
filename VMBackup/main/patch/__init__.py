@@ -21,6 +21,7 @@ import re
 import platform
 
 from UbuntuPatching import UbuntuPatching
+from debianPatching import debianPatching
 from redhatPatching import redhatPatching
 from centosPatching import centosPatching
 from OraclePatching import OraclePatching
