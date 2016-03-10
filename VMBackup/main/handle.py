@@ -258,12 +258,19 @@ def enable():
                 snapshot_thread = Thread(target = snapshot)
                 snapshot_thread.start()
                 freeze_watcher_tread.join()
-                unfreeze_result = freezer.unfreezeall()
-                backup_logger.log('unfreeze result ' + str(unfreeze_result))
-                if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
-                    error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                    backup_logger.log(error_msg, False, 'Warning')
+                
+                for i in range(0,3):
+                    unfreeze_result = freezer.unfreezeall()
+                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                    if(unfreeze_result is not None):
+                        if len(unfreeze_result.errors) > 0:
+                            error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
+                            backup_logger.log(error_msg, False, 'Warning')
+                        else:
+                            backup_logger.log('unfreeze result is None')
+                            break;
                 backup_logger.log('unfreeze ends...')
+                
         else:
             run_status = 'error'
             run_result = CommonVariables.error_parameter
