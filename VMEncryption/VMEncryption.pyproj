@@ -62,6 +62,9 @@
     </Compile>
     <Compile Include="main\MachineIdentity.py" />
     <Compile Include="main\OnGoingItemConfig.py" />
+    <Compile Include="main\patch\debianPatching.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="main\TransactionalCopyTask.py">
       <SubType>Code</SubType>
     </Compile>
@@ -77,7 +80,6 @@
     <Compile Include="main\ExtensionParameter.py" />
     <Compile Include="main\patch\AbstractPatching.py" />
     <Compile Include="main\patch\centosPatching.py" />
-    <Compile Include="main\patch\OraclePatching.py" />
     <Compile Include="main\patch\redhatPatching.py" />
     <Compile Include="main\patch\SuSEPatching.py" />
     <Compile Include="main\patch\UbuntuPatching.py" />
