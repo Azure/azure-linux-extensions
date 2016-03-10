@@ -133,31 +133,35 @@ def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
 def snapshot():
-    global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
-    freeze_result = freezer.freezeall()
-    backup_logger.log('T:S freeze result ' + str(freeze_result))
+    try:
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
+        freeze_result = freezer.freezeall()
+        backup_logger.log('T:S freeze result ' + str(freeze_result))
 
-    # check whether we freeze succeed first?
-    if(freeze_result is not None and len(freeze_result.errors) > 0):
-        run_result = CommonVariables.error
-        run_status = 'error'
-        error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-        backup_logger.log(error_msg, False, 'Warning')
-    else:
-        backup_logger.log('T:S doing snapshot now...')
-        snap_shotter = Snapshotter(backup_logger)
-        snapshot_result = snap_shotter.snapshotall(para_parser)
-        backup_logger.log('T:S snapshotall ends...')
-        if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-            error_msg = 'T:S snapshot result: ' + str(snapshot_result)
+        # check whether we freeze succeed first?
+        if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
-            backup_logger.log(error_msg, False, 'Error')
+            error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+            backup_logger.log(error_msg, False, 'Warning')
         else:
-            run_result = CommonVariables.success
-            run_status = 'success'
-            error_msg = 'Enable Succeeded'
-            backup_logger.log("T:S " + error_msg)
+            backup_logger.log('T:S doing snapshot now...')
+            snap_shotter = Snapshotter(backup_logger)
+            snapshot_result = snap_shotter.snapshotall(para_parser)
+            backup_logger.log('T:S snapshotall ends...')
+            if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                error_msg = 'T:S snapshot result: ' + str(snapshot_result)
+                run_result = CommonVariables.error
+                run_status = 'error'
+                backup_logger.log(error_msg, False, 'Error')
+            else:
+                run_result = CommonVariables.success
+                run_status = 'success'
+                error_msg = 'Enable Succeeded'
+                backup_logger.log("T:S " + error_msg)
+    except Exception as e:
+        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, False, 'Error')
     snapshot_done = True
 
 
