@@ -24,7 +24,6 @@ from UbuntuPatching import UbuntuPatching
 from debianPatching import debianPatching
 from redhatPatching import redhatPatching
 from centosPatching import centosPatching
-from OraclePatching import OraclePatching
 from SuSEPatching import SuSEPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()

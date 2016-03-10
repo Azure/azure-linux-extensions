@@ -23,7 +23,7 @@ import platform
 from UbuntuPatching import UbuntuPatching
 from redhatPatching import redhatPatching
 from centosPatching import centosPatching
-from OraclePatching import OraclePatching
+from debianPatching import debianPatching
 from SuSEPatching import SuSEPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
@@ -31,10 +31,6 @@ def DistInfo():
     if 'FreeBSD' in platform.system():
         release = re.sub('\-.*\Z', '', str(platform.release()))
         distinfo = ['FreeBSD', release]
-        return distinfo
-    if os.path.isfile('/etc/oracle-release'):
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['Oracle', release]
         return distinfo
     if 'linux_distribution' in dir(platform):
         distinfo = list(platform.linux_distribution(full_distribution_name=0))
