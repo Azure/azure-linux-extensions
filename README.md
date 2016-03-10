@@ -11,7 +11,7 @@ You can read the document [about virtual machine extensions and features](https:
 | Name | Lastest Version | Description |
 |:---|:---|:---|
 | [Custom Script](./CustomScript) | 1.4 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
-| [DSC](./DSC) | 2.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
+| [DSC](./DSC) | 1.1 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
 | [OS Patching](./OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
 | [VM Access](./VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
 
