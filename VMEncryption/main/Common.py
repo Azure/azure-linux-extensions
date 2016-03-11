@@ -21,7 +21,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.993'
+    extension_version = '0.1.0.994'
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
