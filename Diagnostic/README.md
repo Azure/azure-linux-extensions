@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.4.
+Latest version is 2.3.5.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -228,7 +228,9 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
 - openSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 12 and higher (SLES 11 SP4 support will be added back in the next release. The source code comment should have been updated)
+- SUSE Linux Enterprise Server 11 and higher
+- Debian 8 and higher (7 not supported due to its low GLIBC version)
+- RHEL 6.7 and higher
 
 ## Debug
 

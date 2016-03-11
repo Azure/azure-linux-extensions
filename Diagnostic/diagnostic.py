@@ -2,7 +2,7 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.3.4
+# Linux Azure Diagnostic Extension v.2.3.5
 # Copyright (c) Microsoft Corporation  
 # All rights reserved.   
 # MIT License  
@@ -71,61 +71,58 @@ omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
 DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
-                 "packages":('libglibmm-2.4-1c2a',),
-                  "restartrsyslog":"service rsyslog restart",
-                 'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                "packages":('libglibmm-2.4-1c2a',),
+                "restartrsyslog":"service rsyslog restart",
+                'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
                 }
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
                  "packages":('glibmm24','tar','policycoreutils-python'),
-                'distrolibs':'centos/*',
-                  "restartrsyslog":"service rsyslog restart",
-                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
+                 'distrolibs':'centos/*',
+                 "restartrsyslog":"service rsyslog restart",
+                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
                  }
 
-
-UbuntuConfig = dict(DebianConfig.items()+
-                    {'distrolibs':'ubuntu1404/*'
-                    }
-                    .items())
-
-
-UbuntuConfig1204 = dict(DebianConfig.items()+
-                    {'distrolibs':'debian/*'
-                    }
-                    .items())
 
 UbuntuConfig1510 = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
                         '||apt-get install -y PACKAGES',
-                     'packages':('libglibmm-2.4-1v5',),
-                     'distrolibs':'ubuntu1404/*' # We are using Ubuntu 14.04 binaries (which appear to be just fine for Ubuntu 15.10 as well). And because of that, we don't install other packages (boost, cpprest, ...), other than the libglibmm-2.4.
+                     'packages':('libglibmm-2.4-1v5',)
                     }.items())
 
-# SuSE 11 is no longer supported (removed from All_Dist), but this is kept here just in case.
-# Should be removed eventually.
+# For SUSE11, we need to create a CA certs file for our bundled OpenSSL 1.0 libs
+SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
+
 SuseConfig11 = dict(RedhatConfig.items()+
-                    {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                     "packages":('glibmm2','rsyslog'),
-                  'distrolibs':'suse/*'}
-                  .items())
+                  {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
+                   "packages":('glibmm2','rsyslog'),
+                   'distrolibs' : 'suse11/*',
+                   'distrolibs_prep_cmds' :
+                        (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
+                        ),
+                   'mdsd_env_vars' : { "SSL_CERT_FILE" : SUSE11_MDSD_SSL_CERTS_FILE }
+                  }.items())
+
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
                    "packages":('libglibmm-2_4-1','libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
-                  'distrolibs':'suse12/*'}
-                  .items())
+                   'distrolibs' : 'suse11/*',
+                   'distrolibs_prep_cmds' : (r'\rm -f suse11/libcrypto.so.* suse11/libssl.so.*',) # Should remove bundled OpenSSL libs on SUSE 12 (Use system-installed OpenSSL libs)
+                  }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
-                    {'installrequiredpackag':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
+                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
                      "packages":('glibmm24','policycoreutils-python')}
                   .items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'SuSE:11': None, # SuSE 11 no longer supported
-           'debian':DebianConfig,'SuSE':SuseConfig12,
-           'Ubuntu':UbuntuConfig,'Ubuntu:12.04':UbuntuConfig1204, 'Ubuntu:15.10':UbuntuConfig1510,
-           'SuSE:12':SuseConfig12,'redhat':RedhatConfig,'centos':CentosConfig,'oracle':RedhatConfig}
+All_Dist= {'debian':DebianConfig, 'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510,
+           'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
+           'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12}
 distConfig = None
 dist = platform.dist()
 distroNameAndVersion = dist[0] + ":" + dist[1]
@@ -194,6 +191,10 @@ def setup(local_only):
 
     # copy distrolibs
     if not os.path.isdir(MdsdFolder):
+        # Run prep commands
+        if 'distrolibs_prep_cmds' in distConfig:
+            for cmd in distConfig['distrolibs_prep_cmds']:
+                RunGetOutput(cmd)
         libs = distConfig['distrolibs']
         if len(libs) > 0:
             RunGetOutput('mkdir -p {0}'.format(MdsdFolder))
@@ -581,6 +582,10 @@ def start_mdsd():
     mdsd_log = None
     copy_env = os.environ
     copy_env['LD_LIBRARY_PATH']=MdsdFolder
+    if 'mdsd_env_vars' in distConfig:
+        env_vars = distConfig['mdsd_env_vars']
+        for var_name, var_value in env_vars.items():
+            copy_env[var_name] = var_value
     xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
     command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(MdsdFolder,"mdsd"),
