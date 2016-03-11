@@ -202,8 +202,6 @@ def enable():
                 # failed this time to wait for customers' retry.
                 exit_without_status_report()
 
-    hutil.exit_if_same_seq()
-    hutil.save_seq()
 
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
@@ -227,6 +225,8 @@ def enable():
             logger.log(msg="encryption mark is there, starting daemon.",level=CommonVariables.InfoLevel)
             start_daemon()
         else:
+            hutil.exit_if_same_seq()
+            hutil.save_seq()
             if(encryption_config.config_file_exists() and existed_passphrase_file is not None):
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
                 encryption_marker = mark_encryption(command=extension_parameter.command, \
