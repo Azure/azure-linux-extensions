@@ -201,15 +201,13 @@ def enable():
                 # we should be careful about proceed for this case, we just
                 # failed this time to wait for customers' retry.
                 exit_without_status_report()
-
-
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         if(isinstance(public_settings_str,basestring)):
             public_settings = json.loads(public_settings_str)
         else:
-            public_settings = public_settings_str;
+            public_settings = public_settings_str
 
         if(isinstance(protected_settings_str,basestring)):
             protected_settings = json.loads(protected_settings_str)
@@ -291,6 +289,7 @@ def enable():
         hutil.do_exit(0, 'Enable',CommonVariables.extension_error_status,str(CommonVariables.unknown_error), 'Enable failed.')
 
 def enable_encryption_format(passphrase, encryption_marker, disk_util):
+    logger.log("enable_encryption_format")
     encryption_parameters = encryption_marker.get_encryption_disk_format_query()
 
     encryption_format_items = json.loads(encryption_parameters)
@@ -353,6 +352,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
     if ongoing_item_config is not None, then this is a resume case.
     this function will return the phase 
     """
+    logger.log("encrypt_inplace_without_seperate_header_file")
     current_phase = CommonVariables.EncryptionPhaseBackupHeader
     if(ongoing_item_config is None):
         ongoing_item_config = OnGoingItemConfig(encryption_environment = encryption_environment, logger = logger)
@@ -499,6 +499,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
     """
     if ongoing_item_config is not None, then this is a resume case.
     """
+    logger.log("encrypt_inplace_with_seperate_header_file")
     current_phase = CommonVariables.EncryptionPhaseEncryptDevice
     if(ongoing_item_config is None):
         ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment,logger=logger)
@@ -695,6 +696,7 @@ def daemon():
             """
             ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
             if(ongoing_item_config.config_file_exists()):
+                logger.log("ongoing item config exists.")
                 header_file_path = ongoing_item_config.get_header_file_path()
                 mount_point = ongoing_item_config.get_mount_point()
                 if(not none_or_empty(mount_point)):
@@ -711,11 +713,13 @@ def daemon():
                 if the resuming failed, we should fail.
                 """
                 if(encryption_result_phase != CommonVariables.EncryptionPhaseDone):
+                    original_dev_path = ongoing_item_config.get_original_dev_path()
                     hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = CommonVariables.encryption_failed,\
-                                  message = 'resuming encryption for ' + str(ongoing_item_config.original_dev_path) + ' failed.')
+                                  message = 'resuming encryption for ' + str(original_dev_path) + ' failed.')
                 else:
                     ongoing_item_config.clear_config()
             else:
+                logger.log("ongoing item config not exists.")
                 failed_item = None
                 if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
                     failed_item = enable_encryption_all_in_place(passphrase_file= bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util, bek_util = bek_util)
