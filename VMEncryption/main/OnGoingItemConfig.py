@@ -37,15 +37,12 @@ class OnGoingItemConfig(object):
         self.mount_point = None 
         self.device_size = None
         self.from_end = None
-        
         self.header_slice_file_path = None
-
         self.current_block_size = None
         self.current_source_path = None
         self.current_total_copy_size = None
         self.current_slice_index = None
         self.current_destination = None
-
         self.ongoing_item_config = ConfigUtil(encryption_environment.azure_crypt_ongoing_item_config_path,'azure_crypt_ongoing_item_config',logger)
 
     def config_file_exists(self):
@@ -95,6 +92,26 @@ class OnGoingItemConfig(object):
     
     def get_current_total_copy_size(self):
         return long(self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentTotalCopySizeKey))
+
+    def get_luks_header_file_path(self):
+        return self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentLuksHeaderFilePath)
+
+    def load_value_from_file(self):
+        self.original_dev_name_path = self.get_original_dev_name_path()
+        self.original_dev_path = self.get_original_dev_path()
+        self.mapper_name = self.get_mapper_name()
+        self.luks_header_file_path = self.get_luks_header_file_path()
+        self.phase = self.get_phase()
+        self.file_system = self.get_file_system()
+        self.mount_point = self.get_mount_point() 
+        self.device_size = self.get_device_size()
+        self.from_end = self.get_from_end()
+        self.header_slice_file_path = self.get_header_slice_file_path()
+        self.current_block_size = self.get_current_block_size()
+        self.current_source_path = self.get_current_source_path()
+        self.current_total_copy_size = self.get_current_total_copy_size()
+        self.current_slice_index = self.get_current_slice_index()
+        self.current_destination = self.get_current_destination()
 
     def commit(self):
         key_value_pairs = []

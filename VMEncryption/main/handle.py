@@ -383,6 +383,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
 
     while(current_phase != CommonVariables.EncryptionPhaseDone):
         if(current_phase == CommonVariables.EncryptionPhaseBackupHeader):
+            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader)),level = CommonVariables.InfoLevel)
             if(not ongoing_item_config.get_file_system().lower() in ["ext2","ext3","ext4"]):
                 logger.log(msg = "we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7", level = CommonVariables.WarningLevel)
                 return current_phase
@@ -415,6 +416,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                     ongoing_item_config.commit()
                     current_phase = CommonVariables.EncryptionPhaseEncryptDevice
         elif(current_phase == CommonVariables.EncryptionPhaseEncryptDevice):
+            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseEncryptDevice)),level = CommonVariables.InfoLevel)
             encrypt_result = disk_util.encrypt_disk(dev_path = original_dev_path, passphrase_file = passphrase_file, mapper_name = mapper_name, header_file = None)
             # after the encrypt_disk without seperate header, then the uuid
             # would change.
@@ -428,6 +430,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 current_phase = CommonVariables.EncryptionPhaseCopyData
 
         elif(current_phase == CommonVariables.EncryptionPhaseCopyData):
+            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseCopyData)),level = CommonVariables.InfoLevel)
             device_mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
             ongoing_item_config.current_destination = device_mapper_path
             ongoing_item_config.current_source_path = original_dev_path
@@ -446,6 +449,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 current_phase = CommonVariables.EncryptionPhaseRecoverHeader
 
         elif(current_phase == CommonVariables.EncryptionPhaseRecoverHeader):
+            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseRecoverHeader)),level = CommonVariables.InfoLevel)
             ongoing_item_config.from_end = False
             backed_up_header_slice_file_path = ongoing_item_config.get_header_slice_file_path()
             ongoing_item_config.current_slice_index = 0
@@ -513,12 +517,12 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
         ongoing_item_config.mount_point = device_item.mount_point
         ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
         ongoing_item_config.original_dev_path = os.path.join('/dev/disk/by-uuid', device_item.uuid)
-        luks_header_file = disk_util.create_luks_header(mapper_name=mapper_name)
-        if(luks_header_file is None):
+        luks_header_file_path = disk_util.create_luks_header(mapper_name=mapper_name)
+        if(luks_header_file_path is None):
             logger.log(msg="create header file failed", level=CommonVariables.ErrorLevel)
             return current_phase
         else:
-            ongoing_item_config.luks_header_file_path = luks_header_file
+            ongoing_item_config.luks_header_file_path = luks_header_file_path
             ongoing_item_config.phase = CommonVariables.EncryptionPhaseEncryptDevice
             ongoing_item_config.commit()
     else:
@@ -531,10 +535,10 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             try:
                 mapper_name = ongoing_item_config.get_mapper_name()
                 original_dev_path = ongoing_item_config.get_original_dev_path()
-                luks_header_file = ongoing_item_config.get_header_file_path()
+                luks_header_file_path = ongoing_item_config.get_header_file_path()
                 disabled = toggle_se_linux_for_centos7(True)
                 encrypt_result = disk_util.encrypt_disk(dev_path = original_dev_path, passphrase_file = passphrase_file, \
-                                                        mapper_name = mapper_name, header_file = luks_header_file)
+                                                        mapper_name = mapper_name, header_file = luks_header_file_path)
                 if(encrypt_result != CommonVariables.process_success):
                     logger.log(msg=("the encrypton for " + str(original_dev_path) + " failed"),level=CommonVariables.ErrorLevel)
                     return current_phase
@@ -550,12 +554,12 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             try:
                 mapper_name = ongoing_item_config.get_mapper_name()
                 original_dev_path = ongoing_item_config.get_original_dev_path()
-                luks_header_file = ongoing_item_config.get_header_file_path()
+                luks_header_file_path = ongoing_item_config.get_header_file_path()
                 disabled = toggle_se_linux_for_centos7(True)
                 device_mapper_path = os.path.join("/dev/mapper", mapper_name)
                 if(not os.path.exists(device_mapper_path)):
                     open_result = disk_util.luks_open(passphrase_file = passphrase_file, dev_path = original_dev_path, \
-                                                            mapper_name = mapper_name, header_file = luks_header_file)
+                                                            mapper_name = mapper_name, header_file = luks_header_file_path)
 
                     if(open_result != CommonVariables.process_success):
                         logger.log(msg=("the luks open for " + str(original_dev_path) + " failed"),level = CommonVariables.ErrorLevel)
@@ -584,7 +588,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                     crypt_item_to_update.mapper_name = mapper_name
                     original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
                     crypt_item_to_update.dev_path = original_dev_name_path
-                    crypt_item_to_update.luks_header_path = luks_header_file
+                    crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                     # if the original mountpoint is empty, then leave
                     # it as None
@@ -697,6 +701,7 @@ def daemon():
             ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
             if(ongoing_item_config.config_file_exists()):
                 logger.log("ongoing item config exists.")
+                ongoing_item_config.load_value_from_file()
                 header_file_path = ongoing_item_config.get_header_file_path()
                 mount_point = ongoing_item_config.get_mount_point()
                 if(not none_or_empty(mount_point)):
