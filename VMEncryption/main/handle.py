@@ -289,23 +289,27 @@ def enable():
         hutil.do_exit(0, 'Enable',CommonVariables.extension_error_status,str(CommonVariables.unknown_error), 'Enable failed.')
 
 def enable_encryption_format(passphrase, encryption_marker, disk_util):
-    logger.log("enable_encryption_format")
+    logger.log('enable_encryption_format')
     encryption_parameters = encryption_marker.get_encryption_disk_format_query()
-
+    logger.log('disk format query is {0}'.format(encryption_parameters))
     encryption_format_items = json.loads(encryption_parameters)
     for encryption_item in encryption_format_items:
-        sdx_path = disk_util.query_dev_sdx_path_by_scsi_id(encryption_item["scsi"])
-        devices = disk_util.get_device_items(sdx_path)
+        if encryption_item["scsi"] is not None and encryption_item["scsi"] != '':
+            dev_path_in_query = disk_util.query_dev_sdx_path_by_scsi_id(encryption_item["scsi"])
+        if encryption_item["dev_path"] is None and encryption_item["dev_path"] != '':
+            dev_path_in_query = encryption_item["dev_path"]
+
+        devices = disk_util.get_device_items(dev_path_in_query)
         if(len(devices) != 1):
             logger.log(msg=("the device with scsi number:" + str(encryption_item["scsi"]) + " have more than one sub device. so skip it."),level=CommonVariables.WarningLevel)
             continue
         else:
             device_item = devices[0]
-            if(device_item.file_system == "" and device_item.type == "disk"):
+            if(device_item.file_system == ""):
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
                 device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
-                encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root,mapper_name)
+                encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
                     if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
@@ -345,7 +349,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                 else:
                     logger.log(msg="encryption failed with code " + str(encrypt_result),level=CommonVariables.ErrorLevel)
             else:
-                logger.log(msg="the item fstype is not empty or the type is not a disk")
+                logger.log(msg="the item fstype is not empty")
 
 def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, disk_util, bek_util, ongoing_item_config=None):
     """

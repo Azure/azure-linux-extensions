@@ -320,24 +320,38 @@ class DiskUtil(object):
         return self.query_dev_uuid_path_by_sdx_path(sdx_path)
 
     def get_device_items_property(self, dev_name, property_name):
-        get_property_cmd = self.patching.lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
-        get_property_cmd_args = shlex.split(get_property_cmd)
-        get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        output,err = get_property_cmd_p.communicate()
-        lines = output.splitlines()
-        for i in range(0,len(lines)):
-            item_value_str = lines[i].strip()
-            if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
-                if(dev_name == disk_info_item_array[0]):
-                    if(len(disk_info_item_array) > 1):
-                        return disk_info_item_array[1]
+        if os.path.exists("/dev/" + dev_name):
+            get_property_cmd = self.patching.lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
+            get_property_cmd_args = shlex.split(get_property_cmd)
+            get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            output,err = get_property_cmd_p.communicate()
+            lines = output.splitlines()
+            for i in range(0,len(lines)):
+                item_value_str = lines[i].strip()
+                if(item_value_str != ""):
+                    disk_info_item_array = item_value_str.split()
+                    if(dev_name == disk_info_item_array[0]):
+                        if(len(disk_info_item_array) > 1):
+                            return disk_info_item_array[1]
+        else:
+            get_property_cmd = self.patching.lsblk_path + " /dev/mapper" + dev_name + " -b -nl -o NAME," + property_name
+            get_property_cmd_args = shlex.split(get_property_cmd)
+            get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            output,err = get_property_cmd_p.communicate()
+            lines = output.splitlines()
+            for i in range(0,len(lines)):
+                item_value_str = lines[i].strip()
+                if(item_value_str != ""):
+                    disk_info_item_array = item_value_str.split()
+                    if(dev_name == disk_info_item_array[0]):
+                        if(len(disk_info_item_array) > 1):
+                            return disk_info_item_array[1]
         return None
 
     def get_device_items_sles(self,dev_path):
         self.logger.log(msg=("getting the blk info from " + str(dev_path)))
         device_items = []
-        #first get all the device names
+        #first get all the device names 
         if(dev_path is None):
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
         else:
@@ -356,11 +370,11 @@ class DiskUtil(object):
 
         for i in range(0,len(device_items)):
             device_item = device_items[i]
-            device_item.file_system = self.get_device_items_property(dev_name=device_item.name,property_name='FSTYPE')
-            device_item.mount_point = self.get_device_items_property(dev_name=device_item.name,property_name='MOUNTPOINT')
-            device_item.label = self.get_device_items_property(dev_name=device_item.name,property_name='LABEL')
-            device_item.uuid = self.get_device_items_property(dev_name=device_item.name,property_name='UUID')
-            #get the type of device
+            device_item.file_system = self.get_device_items_property(dev_name=device_item.name, property_name='FSTYPE')
+            device_item.mount_point = self.get_device_items_property(dev_name=device_item.name, property_name='MOUNTPOINT')
+            device_item.label = self.get_device_items_property(dev_name=device_item.name, property_name='LABEL')
+            device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
+            # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
             if(os.path.exists(model_file_path)):
                 with open(model_file_path,'r') as f:
@@ -373,6 +387,7 @@ class DiskUtil(object):
                 self.logger.log(msg="partition files exists")
                 if(partition_files is not None and len(partition_files) > 0):
                     device_item.type = 'part'
+
             device_item.size = int(self.get_device_items_property(dev_name=device_item.name,property_name='SIZE'))
         return device_items
 
