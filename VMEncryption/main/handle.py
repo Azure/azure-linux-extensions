@@ -301,7 +301,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
 
         devices = disk_util.get_device_items(dev_path_in_query)
         if(len(devices) != 1):
-            logger.log(msg=("the device with scsi number:" + str(encryption_item["scsi"]) + " have more than one sub device. so skip it."),level=CommonVariables.WarningLevel)
+            logger.log(msg=("the device with this path {0} have more than one sub device. so skip it.".format(dev_path_in_query)),level=CommonVariables.WarningLevel)
             continue
         else:
             device_item = devices[0]
