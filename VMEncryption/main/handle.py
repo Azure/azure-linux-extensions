@@ -525,8 +525,11 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
         ongoing_item_config.file_system = device_item.file_system
         ongoing_item_config.mapper_name = mapper_name
         ongoing_item_config.mount_point = device_item.mount_point
-        ongoing_item_config.mount_point = device_item.mount_point
-        ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
+        #TODO improve this.
+        if os.path.exists(os.path.join('/dev/', device_item.name)):
+            ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
+        else:
+            ongoing_item_config.original_dev_name_path = os.path.join('/dev/mapper/', device_item.name)
         ongoing_item_config.original_dev_path = os.path.join('/dev/disk/by-uuid', device_item.uuid)
         luks_header_file_path = disk_util.create_luks_header(mapper_name=mapper_name)
         if(luks_header_file_path is None):
@@ -604,7 +607,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                     # if the original mountpoint is empty, then leave
                     # it as None
                     mount_point = ongoing_item_config.get_mount_point()
-                    if mount_point == "" or mount_point is None:
+                    if mount_point is None or mount_point == "":
                         crypt_item_to_update.mount_point = "None"
                     else:
                         crypt_item_to_update.mount_point = mount_point
