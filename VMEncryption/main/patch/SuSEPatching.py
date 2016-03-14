@@ -53,6 +53,7 @@ class SuSEPatching(AbstractPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/bin/umount'
+            self.blockdev_path = '/sbin/blockdev'
         else:
             self.logger = logger
             self.base64_path = '/usr/bin/base64'

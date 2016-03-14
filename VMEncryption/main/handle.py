@@ -294,9 +294,9 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
     logger.log('disk format query is {0}'.format(encryption_parameters))
     encryption_format_items = json.loads(encryption_parameters)
     for encryption_item in encryption_format_items:
-        if encryption_item["scsi"] is not None and encryption_item["scsi"] != '':
+        if encryption_item.has_key("scsi") and encryption_item["scsi"] != '':
             dev_path_in_query = disk_util.query_dev_sdx_path_by_scsi_id(encryption_item["scsi"])
-        if encryption_item["dev_path"] is None and encryption_item["dev_path"] != '':
+        if encryption_item.has_key("dev_path") and encryption_item["dev_path"] != '':
             dev_path_in_query = encryption_item["dev_path"]
 
         devices = disk_util.get_device_items(dev_path_in_query)
@@ -305,10 +305,13 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
             continue
         else:
             device_item = devices[0]
-            if(device_item.file_system == ""):
+            if(device_item.file_system is None or device_item.file_system == ""):
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
-                device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
+                if(device_item.uuid is not None and device_item.uuid !=""):
+                    device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
+                else:
+                    device_to_encrypt_uuid_path = dev_path_in_query
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
@@ -323,7 +326,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                             encryption_environment.enable_se_linux()
 
                 if(encrypt_result == CommonVariables.process_success):
-                    #TODO: let customer specify it in the parameter
+                    #TODO: let customer specify the default file system in the parameter
                     file_system = CommonVariables.default_file_system
                     format_disk_result = disk_util.format_disk(dev_path = encrypted_device_path,file_system = file_system)
                     if(format_disk_result != CommonVariables.process_success):
@@ -349,7 +352,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                 else:
                     logger.log(msg="encryption failed with code " + str(encrypt_result),level=CommonVariables.ErrorLevel)
             else:
-                logger.log(msg="the item fstype is not empty")
+                logger.log(msg=("the item fstype is not empty {0}".format(device_item.file_system)))
 
 def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, disk_util, bek_util, ongoing_item_config=None):
     """

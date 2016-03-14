@@ -32,7 +32,7 @@ class BackupLogger(object):
 
     """description of class"""
     def log(self, msg, local=True, level='Info'):
-        log_msg = (str(datetime.datetime.now()) + '   ' + level + '   ' + msg + '\n')
+        log_msg = (str(datetime.datetime.now()) + '   ' + level + '   ' + msg )
         self.msg += log_msg
         if(local):
             self.hutil.log(log_msg)

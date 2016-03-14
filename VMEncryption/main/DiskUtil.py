@@ -199,7 +199,7 @@ class DiskUtil(object):
             self.logger.log("passphrase_cmd is:" + passphrase_cmd)
             passphrase_p = Popen(passphrase_cmd_args,stdout=subprocess.PIPE)
 
-            cryptsetup_cmd = self.patching.cryptsetup_path + ' luksFormat ' + dev_path + ' -q'
+            cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.patching.cryptsetup_path , dev_path)
             self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
             cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
             cryptsetup_p = Popen(cryptsetup_cmd_args,stdin=passphrase_p.stdout)
@@ -207,9 +207,9 @@ class DiskUtil(object):
             return returnCode
         else:
             if(header_file is not None):
-                cryptsetup_cmd = self.patching.cryptsetup_path + ' luksFormat ' + dev_path + ' --header ' + header_file + ' -d ' + passphrase_file + ' -q'
+                cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.patching.cryptsetup_path , dev_path , header_file , passphrase_file)
             else:
-                cryptsetup_cmd = self.patching.cryptsetup_path + ' luksFormat ' + dev_path + ' -d ' + passphrase_file + ' -q'
+                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.patching.cryptsetup_path ,dev_path , passphrase_file)
             self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
             cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
             cryptsetup_p = Popen(cryptsetup_cmd_args)
@@ -222,9 +222,9 @@ class DiskUtil(object):
         """
         self.hutil.log("dev mapper name to cryptsetup luksOpen " + (mapper_name))
         if(header_file is not None or header_file == ""):
-            cryptsetup_cmd = self.patching.cryptsetup_path + ' luksOpen ' + dev_path + ' ' + mapper_name + ' --header ' + header_file + ' -d ' + passphrase_file + ' -q'
+            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.patching.cryptsetup_path , dev_path ,mapper_name, header_file ,passphrase_file)
         else:
-            cryptsetup_cmd = self.patching.cryptsetup_path + ' luksOpen ' + dev_path + ' ' + mapper_name + ' -d ' + passphrase_file + ' -q'
+            cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.patching.cryptsetup_path , dev_path , mapper_name , passphrase_file)
         self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
         cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
         cryptsetup_p = Popen(cryptsetup_cmd_args)
@@ -320,23 +320,24 @@ class DiskUtil(object):
         return self.query_dev_uuid_path_by_sdx_path(sdx_path)
 
     def get_device_items_property(self, dev_name, property_name):
+        self.logger.log("getting property of device {0}".format(dev_name))
+
+        device_path = None
         if os.path.exists("/dev/" + dev_name):
-            get_property_cmd = self.patching.lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
+            device_path = "/dev/" + dev_name
+        elif os.path.exists("/dev/mapper/" + dev_name):
+            device_path = "/dev/mapper/" + dev_name
+
+        if property_name == "SIZE":
+            get_property_cmd = self.patching.blockdev_path + " --getsize64 " + device_path
             get_property_cmd_args = shlex.split(get_property_cmd)
-            get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output,err = get_property_cmd_p.communicate()
-            lines = output.splitlines()
-            for i in range(0,len(lines)):
-                item_value_str = lines[i].strip()
-                if(item_value_str != ""):
-                    disk_info_item_array = item_value_str.split()
-                    if(dev_name == disk_info_item_array[0]):
-                        if(len(disk_info_item_array) > 1):
-                            return disk_info_item_array[1]
+            return output.strip()
         else:
-            get_property_cmd = self.patching.lsblk_path + " /dev/mapper" + dev_name + " -b -nl -o NAME," + property_name
+            get_property_cmd = self.patching.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             get_property_cmd_args = shlex.split(get_property_cmd)
-            get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output,err = get_property_cmd_p.communicate()
             lines = output.splitlines()
             for i in range(0,len(lines)):
@@ -348,14 +349,15 @@ class DiskUtil(object):
                             return disk_info_item_array[1]
         return None
 
-    def get_device_items_sles(self,dev_path):
+    def get_device_items_sles(self, dev_path):
         self.logger.log(msg=("getting the blk info from " + str(dev_path)))
+        device_items_to_return = []
         device_items = []
         #first get all the device names 
         if(dev_path is None):
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
         else:
-            get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME " + dev_path
+            get_device_cmd = "{0} -b -nl -o NAME {1}".format(self.patching.lsblk_path , dev_path)
         get_device_cmd_args = shlex.split(get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
@@ -368,7 +370,7 @@ class DiskUtil(object):
                 device_item.name = disk_info_item_array[0]
                 device_items.append(device_item)
 
-        for i in range(0,len(device_items)):
+        for i in range(0, len(device_items)):
             device_item = device_items[i]
             device_item.file_system = self.get_device_items_property(dev_name=device_item.name, property_name='FSTYPE')
             device_item.mount_point = self.get_device_items_property(dev_name=device_item.name, property_name='MOUNTPOINT')
@@ -379,17 +381,24 @@ class DiskUtil(object):
             if(os.path.exists(model_file_path)):
                 with open(model_file_path,'r') as f:
                     device_item.model = f.read().strip()
+            else:
+                self.logger.log(msg=("no model file found for device {0}".format(device_item.name)))
             if(device_item.model == 'Virtual Disk'):
                 self.logger.log(msg="model is virtual disk")
                 device_item.type = 'disk'
-            if(device_item.type != 'disk'):
+            else:
                 partition_files = glob.glob('/sys/block/*/' + device_item.name + '/partition')
                 self.logger.log(msg="partition files exists")
                 if(partition_files is not None and len(partition_files) > 0):
                     device_item.type = 'part'
-
-            device_item.size = int(self.get_device_items_property(dev_name=device_item.name,property_name='SIZE'))
-        return device_items
+            size_string = self.get_device_items_property(dev_name=device_item.name,property_name='SIZE')
+            if size_string is not None and size_string != "":
+                device_item.size = int(size_string)
+            if(device_item.size is not None):
+                device_items_to_return.append(device_item)
+            else:
+                self.logger.log(msg=("skip the device {0} because we could not get size of it.".format(device_item.name)))
+        return device_items_to_return
 
     def get_device_items(self, dev_path):
         if(self.patching.distro_info[0].lower() == 'suse' and self.patching.distro_info[1] == '11'):
