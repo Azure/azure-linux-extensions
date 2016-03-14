@@ -61,7 +61,7 @@ class DiskUtil(object):
             mkfs_command = "mkfs.xfs"
         elif(file_system == "btrfs"):
             mkfs_command = "mkfs.btrfs"
-        mkfs_cmd = mkfs_command + ' ' + dev_path
+        mkfs_cmd = "{0} {1}".format(mkfs_command ,dev_path)
         self.logger.log("command to execute :" + mkfs_cmd)
         mkfs_cmd_args = shlex.split(mkfs_cmd)
         proc = Popen(mkfs_cmd_args)
