@@ -463,13 +463,14 @@ class DiskUtil(object):
         if the answer is yes, then skip it.
         """
         if(device_item.file_system is None or device_item.file_system == ""):
+            self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
             return True
         else:
             if(device_item.size < CommonVariables.min_filesystem_size_support):
                 self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.",level=CommonVariables.WarningLevel)
                 return True
 
-            supported_device_type = ["disk","part","raid0","raid1","raid5","raid10"]
+            supported_device_type = ["disk","part","raid0","raid1","raid5","raid10","lvm"]
             if(device_item.type not in supported_device_type):
                 self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.",level=CommonVariables.WarningLevel)
                 return True
