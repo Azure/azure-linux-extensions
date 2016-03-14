@@ -337,7 +337,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
 
-                    if(encryption_item["name"] is not None):
+                    if(encryption_item.has_key("name") and encryption_item["name"] != ""):
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
                     else:
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
