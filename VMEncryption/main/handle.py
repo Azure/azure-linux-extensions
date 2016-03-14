@@ -328,7 +328,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                 if(encrypt_result == CommonVariables.process_success):
                     #TODO: let customer specify the default file system in the parameter
                     file_system = None
-                    if(encryption_item.has_key("") and encryption_item["file_system"] !=""):
+                    if(encryption_item.has_key("file_system") and encryption_item["file_system"] !=""):
                         file_system = encryption_item["file_system"]
                     else:
                         file_system = CommonVariables.default_file_system
