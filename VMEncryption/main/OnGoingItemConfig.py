@@ -94,7 +94,7 @@ class OnGoingItemConfig(object):
         return long(self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentTotalCopySizeKey))
 
     def get_luks_header_file_path(self):
-        return self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentLuksHeaderFilePath)
+        return self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentLuksHeaderFilePathKey)
 
     def load_value_from_file(self):
         self.original_dev_name_path = self.get_original_dev_name_path()
