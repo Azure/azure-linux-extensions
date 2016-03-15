@@ -62,5 +62,5 @@ class EncryptionMarkConfig(object):
                 os.remove(self.encryption_environment.azure_crypt_request_queue_path)
             return True
         except OSError as e:
-            self.logger.log("Failed to clear_queue with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to clear_queue with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False

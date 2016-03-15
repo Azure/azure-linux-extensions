@@ -74,8 +74,8 @@ class ConfigUtil(object):
                 prop_value = config.get(self.azure_crypt_config_section, prop_name)
                 return prop_value
             except (NoSectionError, NoOptionError) as e:
-                self.logger.log(msg="value of prop_name:" + str(prop_name) + " not found")
+                self.logger.log(msg="value of prop_name:{0} not found.".format(prop_name))
                 return None
         else:
-            self.logger.log("the config file " + str(self.config_file_path) + " not exists.")
+            self.logger.log("the config file {0} not exists.".format(self.config_file_path))
             return None

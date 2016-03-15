@@ -113,7 +113,7 @@ class DiskUtil(object):
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
                     existing_content = f.read()
-                    if(existing_content.strip()!=""):
+                    if(existing_content.strip() != ""):
                         new_mount_content = existing_content + "\n" + mount_content_item
                     else:
                         new_mount_content = mount_content_item
@@ -353,7 +353,7 @@ class DiskUtil(object):
         self.logger.log(msg=("getting the blk info from " + str(dev_path)))
         device_items_to_return = []
         device_items = []
-        #first get all the device names 
+        #first get all the device names
         if(dev_path is None):
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
         else:
