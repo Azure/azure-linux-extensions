@@ -719,7 +719,7 @@ def daemon():
                 mount_all_result = disk_util.mount_all()
 
                 if(mount_all_result != CommonVariables.process_success):
-                    logger.log(msg=("mount all failed with code " + str(mount_all_result)), level=CommonVariables.ErrorLevel)
+                    logger.log(msg=("mount all failed with code:{0}".format(mount_all_result)), level=CommonVariables.ErrorLevel)
                 """
                 TODO: resuming the encryption for rebooting suddenly scenario
                 we need the special handling is because the half done device can be a error state: say, the file system header missing.so it could be 
