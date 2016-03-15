@@ -52,6 +52,7 @@ from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
 from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
+from ProcessLock import ProcessLock
 from __builtin__ import int
 #Main function is the only entrence to this extension handler
 def install():
@@ -679,101 +680,106 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
 def daemon():
     hutil.do_parse_context('Executing')
-    try:
-        # Ensure the same configuration is executed only once
-        # If the previous enable failed, we do not have retry logic here.
-        # TODO Remount all
-        encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-        if(encryption_marker.config_file_exists()):
-            logger.log("encryption is marked.")
+    #process lock
+    lock = ProcessLock(logger,encryption_environment.daemon_lock_file_path)
+    if lock.try_lock():
+        try:
+            # Ensure the same configuration is executed only once
+            # If the previous enable failed, we do not have retry logic here.
+            # TODO Remount all
+            encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
+            if(encryption_marker.config_file_exists()):
+                logger.log("encryption is marked.")
         
-        """
-        search for the bek volume, then mount it:)
-        """
-        disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
-
-        encryption_config = EncryptionConfig(encryption_environment,logger)
-        bek_passphrase_file = None
-        """
-        try to find the attached bek volume, and use the file to mount the crypted volumes,
-        and if the passphrase file is found, then we will re-use it for the future.
-        """
-        bek_util = BekUtil(disk_util, logger)
-        if(encryption_config.config_file_exists()):
-            bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-
-        if(bek_passphrase_file is None):
-            hutil.do_exit(0, 'Enable', CommonVariables.extension_error_status, CommonVariables.passphrase_file_not_found, 'Passphrase file not found.')
-        else:
             """
-            check whether there's a scheduled encryption task
+            search for the bek volume, then mount it:)
             """
-            logger.log("trying to install the extras")
-            MyPatching.install_extras()
+            disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
 
-            mount_all_result = disk_util.mount_all()
+            encryption_config = EncryptionConfig(encryption_environment,logger)
+            bek_passphrase_file = None
+            """
+            try to find the attached bek volume, and use the file to mount the crypted volumes,
+            and if the passphrase file is found, then we will re-use it for the future.
+            """
+            bek_util = BekUtil(disk_util, logger)
+            if(encryption_config.config_file_exists()):
+                bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
-            if(mount_all_result != CommonVariables.process_success):
-                logger.log(msg=("mount all failed with code " + str(mount_all_result)), level=CommonVariables.ErrorLevel)
-            """
-            TODO: resuming the encryption for rebooting suddenly scenario
-            we need the special handling is because the half done device can be a error state: say, the file system header missing.so it could be 
-            identified.
-            """
-            ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
-            if(ongoing_item_config.config_file_exists()):
-                logger.log("ongoing item config exists.")
-                ongoing_item_config.load_value_from_file()
-                header_file_path = ongoing_item_config.get_header_file_path()
-                mount_point = ongoing_item_config.get_mount_point()
-                if(not none_or_empty(mount_point)):
-                    logger.log("mount point is not empty, trying to unmount it first.".format(mount_point))
-                    umount_status_code = disk_util.umount(mount_point)
-                    logger.log("unmount return code is {0}".format(umount_status_code))
-                if(none_or_empty(header_file_path)):
-                    encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
-                        disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
-                else:
-                    encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
-                        disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
-                """
-                if the resuming failed, we should fail.
-                """
-                if(encryption_result_phase != CommonVariables.EncryptionPhaseDone):
-                    original_dev_path = ongoing_item_config.get_original_dev_path()
-                    hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = CommonVariables.encryption_failed,\
-                                  message = 'resuming encryption for {0} failed'.format(original_dev_path))
-                else:
-                    ongoing_item_config.clear_config()
+            if(bek_passphrase_file is None):
+                hutil.do_exit(0, 'Enable', CommonVariables.extension_error_status, CommonVariables.passphrase_file_not_found, 'Passphrase file not found.')
             else:
-                logger.log("ongoing item config not exists.")
-                failed_item = None
-                if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
-                    failed_item = enable_encryption_all_in_place(passphrase_file= bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util, bek_util = bek_util)
-                elif(encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat):
-                    failed_item = enable_encryption_format(passphrase = bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util)
-                else:
-                    logger.log(msg = ("command {0} not supported.".format(encryption_marker.get_current_command())), level = CommonVariables.ErrorLevel)
-                    #TODO do exit here
-                if(failed_item != None):
-                    hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = CommonVariables.encryption_failed,\
-                                  message = 'encryption failed for {0}'.format(failed_item))
-                else:
-                    hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_success_status, code = str(CommonVariables.success), message = encryption_config.get_secret_id())
-    except Exception as e:
-        # mount the file systems back.
-        error_msg = ("Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
-        logger.log(msg = error_msg, level = CommonVariables.ErrorLevel)
-        hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = str(CommonVariables.encryption_failed), \
-                              message = error_msg)
+                """
+                check whether there's a scheduled encryption task
+                """
+                logger.log("trying to install the extras")
+                MyPatching.install_extras()
 
-    finally:
-        encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-        #TODO not remove it, backed it up.
-        logger.log("clearing the encryption mark.")
-        encryption_marker.clear_config()
-        bek_util.umount_azure_passhprase(encryption_config)
-        logger.log("finally in daemon")
+                mount_all_result = disk_util.mount_all()
+
+                if(mount_all_result != CommonVariables.process_success):
+                    logger.log(msg=("mount all failed with code " + str(mount_all_result)), level=CommonVariables.ErrorLevel)
+                """
+                TODO: resuming the encryption for rebooting suddenly scenario
+                we need the special handling is because the half done device can be a error state: say, the file system header missing.so it could be 
+                identified.
+                """
+                ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
+                if(ongoing_item_config.config_file_exists()):
+                    logger.log("ongoing item config exists.")
+                    ongoing_item_config.load_value_from_file()
+                    header_file_path = ongoing_item_config.get_header_file_path()
+                    mount_point = ongoing_item_config.get_mount_point()
+                    if(not none_or_empty(mount_point)):
+                        logger.log("mount point is not empty, trying to unmount it first.".format(mount_point))
+                        umount_status_code = disk_util.umount(mount_point)
+                        logger.log("unmount return code is {0}".format(umount_status_code))
+                    if(none_or_empty(header_file_path)):
+                        encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
+                            disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
+                    else:
+                        encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
+                            disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
+                    """
+                    if the resuming failed, we should fail.
+                    """
+                    if(encryption_result_phase != CommonVariables.EncryptionPhaseDone):
+                        original_dev_path = ongoing_item_config.get_original_dev_path()
+                        hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = CommonVariables.encryption_failed,\
+                                      message = 'resuming encryption for {0} failed'.format(original_dev_path))
+                    else:
+                        ongoing_item_config.clear_config()
+                else:
+                    logger.log("ongoing item config not exists.")
+                    failed_item = None
+                    if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
+                        failed_item = enable_encryption_all_in_place(passphrase_file= bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util, bek_util = bek_util)
+                    elif(encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat):
+                        failed_item = enable_encryption_format(passphrase = bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util)
+                    else:
+                        logger.log(msg = ("command {0} not supported.".format(encryption_marker.get_current_command())), level = CommonVariables.ErrorLevel)
+                        #TODO do exit here
+                    if(failed_item != None):
+                        hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = CommonVariables.encryption_failed,\
+                                      message = 'encryption failed for {0}'.format(failed_item))
+                    else:
+                        hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_success_status, code = str(CommonVariables.success), message = encryption_config.get_secret_id())
+        except Exception as e:
+            # mount the file systems back.
+            error_msg = ("Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+            logger.log(msg = error_msg, level = CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = str(CommonVariables.encryption_failed), \
+                                  message = error_msg)
+        finally:
+            encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
+            #TODO not remove it, backed it up.
+            logger.log("clearing the encryption mark.")
+            encryption_marker.clear_config()
+            bek_util.umount_azure_passhprase(encryption_config)
+            lock.release_lock()
+            logger.log("finally in daemon")
+    else:
+        logger.log("there's another daemon running, please wait it to exit.", level = CommonVariables.WarningLevel)
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]
@@ -792,7 +798,6 @@ def start_daemon():
         hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_success_status, code = str(CommonVariables.success), message = encryption_config.get_secret_id())
     else:
         hutil.do_exit(exit_code = 0, operation = 'Enable', status = CommonVariables.extension_error_status, code = str(CommonVariables.encryption_failed), message = 'encryption config not found.')
-
 
 if __name__ == '__main__' :
     main()
