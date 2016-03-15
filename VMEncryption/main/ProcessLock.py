@@ -29,7 +29,7 @@ class ProcessLock(object):
 
     def try_lock(self):
         try:
-            self.fs = open(f,"a+")
+            self.fs = open(self.lock_file_path,"a+")
             return True
         except Exception as e:
             self.logger.log("could not acquire a lock")

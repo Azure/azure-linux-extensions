@@ -681,7 +681,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 def daemon():
     hutil.do_parse_context('Executing')
     #process lock
-    lock = ProcessLock(logger,encryption_environment.daemon_lock_file_path)
+    lock = ProcessLock(logger, encryption_environment.daemon_lock_file_path)
     if lock.try_lock():
         try:
             # Ensure the same configuration is executed only once
