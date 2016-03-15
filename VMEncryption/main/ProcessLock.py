@@ -19,6 +19,7 @@
 # Requires Python 2.7+
 #
 import os.path
+import fcntl
 from Common import CommonVariables
 
 class ProcessLock(object):
@@ -29,11 +30,13 @@ class ProcessLock(object):
 
     def try_lock(self):
         try:
-            self.fs = open(self.lock_file_path,"a+")
+            self.fd = open(self.lock_file_path, "w") 
+            fcntl.flock(self.fd, fcntl.LOCK_EX)
             return True
         except Exception as e:
-            self.logger.log("could not acquire a lock")
+            self.logger.log("could not acquire a lock, error: {0}".format(str(e)))
             return False
 
     def release_lock(self):
-        self.fs.close()
+        fcntl.flock(self.fd, fcntl.LOCK_UN)
+        self.fd.close()
