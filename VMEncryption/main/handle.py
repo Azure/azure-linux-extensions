@@ -776,7 +776,7 @@ def daemon():
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]
-    logger.log("start_daemon with args:" + str(args))
+    logger.log("start_daemon with args: {0}".format(args))
     #This process will start a new background process by calling
     #    handle.py -daemon
     #to run the script and will exit itself immediatelly.

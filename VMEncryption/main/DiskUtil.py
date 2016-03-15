@@ -113,7 +113,7 @@ class DiskUtil(object):
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
                     existing_content = f.read()
-                    if(existing_content.strip() != ""):
+                    if(existing_content is not None and existing_content.strip() != ""):
                         new_mount_content = existing_content + "\n" + mount_content_item
                     else:
                         new_mount_content = mount_content_item
