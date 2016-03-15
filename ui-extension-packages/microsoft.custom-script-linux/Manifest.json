@@ -2,7 +2,7 @@
   "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
   "name": "custom-script-linux",
   "publisher": "microsoft",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "displayName": "ms-resource:displayName",
   "publisherDisplayName": "ms-resource:publisherDisplayName",
   "publisherLegalName": "ms-resource:publisherDisplayName",
@@ -35,7 +35,7 @@
   "links": [
     {
       "displayName": "ms-resource:link1",
-      "uri": "https://www.microsoft.com/"
+      "uri": "https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript"
     }
   ],
   "categories": [
