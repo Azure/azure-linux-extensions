@@ -662,7 +662,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
                 logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
             else:
                 encrypted_items.append(device_item.uuid)
-                logger.log(msg=("encrypting " + str(device_item)))
+                logger.log(msg=("encrypting:{0}".format(device_item)))
                 no_header_file_support = not_support_header_option_distro(MyPatching)
                 #TODO check the file system before encrypting it.
                 if(no_header_file_support):
