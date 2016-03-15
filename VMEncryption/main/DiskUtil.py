@@ -61,8 +61,8 @@ class DiskUtil(object):
             mkfs_command = "mkfs.xfs"
         elif(file_system == "btrfs"):
             mkfs_command = "mkfs.btrfs"
-        mkfs_cmd = "{0} {1}".format(mkfs_command ,dev_path)
-        self.logger.log("command to execute :" + mkfs_cmd)
+        mkfs_cmd = "{0} {1}".format(mkfs_command, dev_path)
+        self.logger.log("command to execute:{0}".format(mkfs_cmd))
         mkfs_cmd_args = shlex.split(mkfs_cmd)
         proc = Popen(mkfs_cmd_args)
         returnCode = proc.wait()
@@ -70,7 +70,7 @@ class DiskUtil(object):
 
     def make_sure_path_exists(self,path):
         mkdir_cmd = self.patching.mkdir_path + ' -p ' + path
-        self.logger.log("make sure path exists, execute :" + mkdir_cmd)
+        self.logger.log("make sure path exists, execute:{0}".format(mkdir_cmd))
         mkdir_cmd_args = shlex.split(mkdir_cmd)
         proc = Popen(mkdir_cmd_args)
         returnCode = proc.wait()
@@ -79,7 +79,7 @@ class DiskUtil(object):
     def get_crypt_items(self):
         crypt_items = []
         if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-            self.logger.log(self.encryption_environment.azure_crypt_mount_config_path + " not exists")
+            self.logger.log("{0} not exists".format(self.encryption_environment.azure_crypt_mount_config_path))
             return None
         else:
             with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
@@ -137,24 +137,24 @@ class DiskUtil(object):
             if(returnCode == CommonVariables.process_success):
                 return luks_header_file_path
             else:
-                self.logger.log(msg=("make luks header failed and return code is " + str(returnCode)),level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=("make luks header failed and return code is:{0}".format(returnCode)), level=CommonVariables.ErrorLevel)
                 return None
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         returnCode = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
         if(returnCode != CommonVariables.process_success):
-            self.logger.log(msg=('cryptsetup luksFormat failed, returnCode is ' + str(returnCode)),level=CommonVariables.ErrorLevel)
+            self.logger.log(msg=('cryptsetup luksFormat failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
             return returnCode
         else:
             returnCode = self.luks_open(passphrase_file=passphrase_file, dev_path=dev_path, mapper_name=mapper_name, header_file= header_file)
             if(returnCode != CommonVariables.process_success):
-                self.logger.log(msg=('cryptsetup luksOpen failed, returnCode is ' + str(returnCode)),level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=('cryptsetup luksOpen failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
             return returnCode
 
     def check_fs(self, dev_path):
         self.logger.log("checking fs:" + str(dev_path))
         check_fs_cmd = self.patching.e2fsck_path + " -f -y " + dev_path
-        self.logger.log("check fs command is " + str(check_fs_cmd))
+        self.logger.log("check fs command is:{0}".format(check_fs_cmd))
         check_fs_cmd_args = shlex.split(check_fs_cmd)
         check_fs_cmd_p = Popen(check_fs_cmd_args)
         returnCode = check_fs_cmd_p.wait()
@@ -162,7 +162,7 @@ class DiskUtil(object):
 
     def expand_fs(self, dev_path):
         expandfs_cmd = self.patching.resize2fs_path + " " + str(dev_path)
-        self.logger.log("expand_fs command is:" + expandfs_cmd)
+        self.logger.log("expand_fs command is:{0}".format(expandfs_cmd))
         expandfs_cmd_args = shlex.split(expandfs_cmd)
         expandfs_p = Popen(expandfs_cmd_args)
         returnCode = expandfs_p.wait()
@@ -173,7 +173,7 @@ class DiskUtil(object):
         size_shrink_to is in sector (512 byte)
         """
         shrinkfs_cmd = self.patching.resize2fs_path + ' ' + str(dev_path) + ' ' + str(size_shrink_to) + 's'
-        self.logger.log("shrink_fs command is:" + shrinkfs_cmd)
+        self.logger.log("shrink_fs command is {0}".format(shrinkfs_cmd))
         shrinkfs_cmd_args = shlex.split(shrinkfs_cmd)
         shrinkfs_p = Popen(shrinkfs_cmd_args)
         returnCode = shrinkfs_p.wait()
@@ -191,16 +191,16 @@ class DiskUtil(object):
         """
         return the return code of the process for error handling.
         """
-        self.hutil.log("dev path to cryptsetup luksFormat " + str(dev_path))
+        self.hutil.log("dev path to cryptsetup luksFormat {0}".format(dev_path))
         #walkaround for sles sp3
         if(self.patching.distro_info[0].lower() == 'suse' and self.patching.distro_info[1] == '11'):
             passphrase_cmd = self.patching.cat_path + ' ' + passphrase_file
             passphrase_cmd_args = shlex.split(passphrase_cmd)
-            self.logger.log("passphrase_cmd is:" + passphrase_cmd)
+            self.logger.log("passphrase_cmd is:{0}".format(passphrase_cmd))
             passphrase_p = Popen(passphrase_cmd_args,stdout=subprocess.PIPE)
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.patching.cryptsetup_path , dev_path)
-            self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
+            self.logger.log("cryptsetup_cmd is:{0}".format(cryptsetup_cmd))
             cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
             cryptsetup_p = Popen(cryptsetup_cmd_args,stdin=passphrase_p.stdout)
             returnCode = cryptsetup_p.wait()
@@ -249,13 +249,13 @@ class DiskUtil(object):
         returnCode = -1
         if file_system is None:
             mount_cmd = self.patching.mount_path + ' ' + dev_path + ' ' + mount_point
-            self.logger.log("mount file system, execute :" + mount_cmd)
+            self.logger.log("mount file system, execute:{0}".format(mount_cmd))
             mount_cmd_args = shlex.split(mount_cmd)
             proc = Popen(mount_cmd_args)
             returnCode = proc.wait()
         else: 
             mount_cmd = self.patching.mount_path + ' ' + dev_path + ' ' + mount_point + ' -t ' + file_system
-            self.logger.log("mount file system, execute :" + mount_cmd)
+            self.logger.log("mount file system, execute:{0}".format(mount_cmd))
             mount_cmd_args = shlex.split(mount_cmd)
             proc = Popen(mount_cmd_args)
             returnCode = proc.wait()
@@ -264,11 +264,11 @@ class DiskUtil(object):
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
         mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper',crypt_item.mapper_name),crypt_item.mount_point,crypt_item.file_system)
-        self.logger.log("mount file system result: " + str(mount_filesystem_result))
+        self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
     def umount(self, path):
         umount_cmd = self.patching.umount_path + ' ' + path
-        self.logger.log("umount, execute :" + umount_cmd)
+        self.logger.log("umount, execute:{0}".format(umount_cmd))
         umount_cmd_args = shlex.split(umount_cmd)
         proc = Popen(umount_cmd_args)
         returnCode = proc.wait()
@@ -276,7 +276,7 @@ class DiskUtil(object):
 
     def mount_all(self):
         mount_all_cmd = self.patching.mount_path + ' -a'
-        self.logger.log("command to execute :" + mount_all_cmd)
+        self.logger.log("command to execute:{0}".format(mount_all_cmd))
         mount_all_cmd_args = shlex.split(mount_all_cmd)
         proc = Popen(mount_all_cmd_args)
         returnCode = proc.wait()
@@ -286,7 +286,7 @@ class DiskUtil(object):
         p = Popen([self.patching.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity, err = p.communicate()
         # identity sample: [5:0:0:0] disk Msft Virtual Disk 1.0 /dev/sdc
-        self.logger.log("lsscsi output is: \n" + identity)
+        self.logger.log("lsscsi output is: {0}\n".format(identity))
         vals = identity.split()
         if(vals is None or len(vals) == 0):
             return None
@@ -297,7 +297,7 @@ class DiskUtil(object):
         """
         the behaviour is if we could get the uuid, then return, if not, just return the sdx.
         """
-        self.logger.log("querying the sdx path of:" + str(sdx_path))
+        self.logger.log("querying the sdx path of:{0}".format(sdx_path))
         #blkid path
         p = Popen([self.patching.blkid_path,sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity,err = p.communicate()
@@ -350,7 +350,7 @@ class DiskUtil(object):
         return None
 
     def get_device_items_sles(self, dev_path):
-        self.logger.log(msg=("getting the blk info from " + str(dev_path)))
+        self.logger.log(msg=("getting the blk info from:{0}".format(dev_path)))
         device_items_to_return = []
         device_items = []
         #first get all the device names
@@ -480,16 +480,16 @@ class DiskUtil(object):
                 return True
             sub_items = self.get_device_items("/dev/" + device_item.name)
             if(len(sub_items) > 1):
-                self.logger.log(msg=("there's sub items for the device: " + str(device_item.name) + ", so skip it."),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)),level=CommonVariables.WarningLevel)
                 return True
 
             azure_blk_items = self.get_azure_devices()
             if(device_item.type == "crypt"):
-                self.logger.log(msg=("device_item.type is " + str(device_item.type) + ", so skip it."),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)),level=CommonVariables.WarningLevel)
                 return True
 
             if(device_item.mount_point == "/"):
-                self.logger.log(msg=("the mountpoint is root " + str(device_item) + ", so skip it."),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("the mountpoint is root:{0}, so skip it.".format(device_item)),level=CommonVariables.WarningLevel)
                 return True
             for azure_blk_item in azure_blk_items:
                 if(azure_blk_item.name == device_item.name):
@@ -517,7 +517,7 @@ class DiskUtil(object):
             f.close()
             if(class_id.strip() == self.ide_class_id):
                 device_sdx_path = self.find_block_sdx_path(vmbus)
-                self.logger.log("found one ide with vmbus:" + str(vmbus) + " and the sdx path is: " + str(device_sdx_path))
+                self.logger.log("found one ide with vmbus: {0} and the sdx path is:".format(vmbus,device_sdx_path))
                 ide_devices.append(device_sdx_path)
         return ide_devices
 

@@ -407,7 +407,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 logger.log(msg = "we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7", level = CommonVariables.WarningLevel)
                 return current_phase
 
-            chk_shrink_result = disk_util.check_shrink_fs(dev_path = original_dev_path,size_shrink_to = size_shrink_to)
+            chk_shrink_result = disk_util.check_shrink_fs(dev_path = original_dev_path, size_shrink_to = size_shrink_to)
             if(chk_shrink_result != CommonVariables.process_success):
                 logger.log(msg = ("check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path)), level = CommonVariables.ErrorLevel)
                 logger.log(msg = "your file system may not have enough space to do the encryption.")
@@ -738,6 +738,7 @@ def daemon():
                     if(none_or_empty(header_file_path)):
                         encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
                             disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
+                        #TODO mount it back when shrink failed
                     else:
                         encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
                             disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
