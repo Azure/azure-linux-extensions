@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -185,18 +185,18 @@ class TransactionalCopyTask(object):
         dd_cmd = str(self.copy_command) + ' if=' + from_device + ' of=' + self.slice_file_path + ' bs=' + str(block_size) + ' skip=' + str(skip) + ' count=' + str(count)
         returnCode = self.command_executer.Execute(dd_cmd)
         if(returnCode != CommonVariables.process_success):
-            self.logger.log(msg=(str(dd_cmd) + ' is ' + str(returnCode)), level = CommonVariables.ErrorLevel)
+            self.logger.log(msg=("{0} is {1}".format(dd_cmd,returnCode)), level = CommonVariables.ErrorLevel)
             return returnCode
         else:
             slice_file_size = os.path.getsize(self.slice_file_path)
-            self.logger.log(msg=("slice_file_size is " + str(slice_file_size)))
+            self.logger.log(msg=("slice_file_size is: {0}".format(slice_file_size)))
             """
             second, copy the data in the middle cache to the backup slice.
             """
             backup_slice_item_cmd = str(self.copy_command) + ' if=' + self.slice_file_path + ' of=' + self.encryption_environment.copy_slice_item_backup_file + ' bs=' + str(block_size) + ' count=' + str(count)
             backup_slice_args = shlex.split(backup_slice_item_cmd)
             backup_process = Popen(backup_slice_args)
-            self.logger.log("backup_slice_item_cmd is " + str(backup_slice_item_cmd))
+            self.logger.log("backup_slice_item_cmd is:{0}".format(backup_slice_item_cmd))
 
             """
             third, copy the data in the middle cache to the target device.
@@ -204,7 +204,7 @@ class TransactionalCopyTask(object):
             dd_cmd = str(self.copy_command) + ' if=' + self.slice_file_path + ' of=' + to_device + ' bs=' + str(block_size) + ' seek=' + str(seek) + ' count=' + str(count)
             returnCode = self.command_executer.Execute(dd_cmd)
             if(returnCode != CommonVariables.process_success):
-                self.logger.log(msg=(str(dd_cmd) + ' is ' + str(returnCode)), level = CommonVariables.ErrorLevel)
+                self.logger.log(msg=("{0} is: {1}".format(dd_cmd, returnCode)), level = CommonVariables.ErrorLevel)
             else:
                 #the copy done correctly, so clear the backup slice file item.
                 backup_process.kill()
@@ -219,7 +219,7 @@ class TransactionalCopyTask(object):
     def prepare_mem_fs(self):
         self.disk_util.make_sure_path_exists(self.tmpfs_mount_point)
         commandToExecute = self.patching.mount_path + " -t tmpfs -o size=" + str(self.block_size + 1024) + " tmpfs " + self.tmpfs_mount_point
-        self.logger.log("prepare mem fs script is: ".format(commandToExecute))
+        self.logger.log("prepare mem fs script is: {0}".format(commandToExecute))
         returnCode = self.command_executer.Execute(commandToExecute)
         return returnCode
 

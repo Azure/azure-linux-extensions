@@ -421,6 +421,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 ongoing_item_config.original_dev_path = original_dev_path
                 ongoing_item_config.commit()
                 if(os.path.exists(encryption_environment.copy_header_slice_file_path)):
+                    logger.log(msg="the header slice file is there, remove it.", level = CommonVariables.WarningLevel)
                     os.remove(encryption_environment.copy_header_slice_file_path)
 
                 copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)

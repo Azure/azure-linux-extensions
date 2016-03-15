@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -23,12 +23,14 @@ import datetime
 import traceback
 import urlparse
 import httplib
+import os
 
 class BackupLogger(object):
     def __init__(self, hutil):
         self.hutil = hutil
+        self.current_process_id = os.getpid()
 
     """description of class"""
     def log(self, msg, level='Info'):
-        log_msg = "{0} {1}".format(level, msg)
+        log_msg = "{0}: {1} {2}".format(self.current_process_id, level, msg)
         self.hutil.log(log_msg)
