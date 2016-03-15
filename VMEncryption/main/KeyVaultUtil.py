@@ -48,11 +48,11 @@ class KeyVaultUtil(object):
         try:
             self.logger.log("start creating kek secret")
             passphrase_encoded = base64.standard_b64encode(Passphrase)
-            keys_uri = self.urljoin(KeyVaultURL,"keys")
+            keys_uri = self.urljoin(KeyVaultURL, "keys")
 
             http_util = HttpUtil(self.logger)
             headers = {}
-            result = http_util.Call(method='GET',http_uri=keys_uri,data=None,headers=headers)
+            result = http_util.Call(method='GET', http_uri=keys_uri, data=None, headers=headers)
             http_util.connection.close()
             """
             get the access token 
@@ -75,16 +75,16 @@ class KeyVaultUtil(object):
             if(KeyEncryptionKeyURL is None or KeyEncryptionKeyURL == ""):
                 secret_value = passphrase_encoded
             else:
-                secret_value = self.encrypt_passphrase(access_token, passphrase_encoded,KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret)
+                secret_value = self.encrypt_passphrase(access_token, passphrase_encoded, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret)
             if(secret_value is None):
                 self.logger.log("secret value is None")
                 return None
 
-            secret_id = self.create_secret(access_token,KeyVaultURL,secret_value,KeyEncryptionAlgorithm,DiskEncryptionKeyFileName)
+            secret_id = self.create_secret(access_token, KeyVaultURL, secret_value, KeyEncryptionAlgorithm, DiskEncryptionKeyFileName)
 
             return secret_id
         except Exception as e:
-            self.logger.log("Failed to create_kek_secret with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None
 
     def get_access_token(self,AuthorizeUri,AADClientID,AADClientSecret):
@@ -93,9 +93,9 @@ class KeyVaultUtil(object):
         request_content = "resource=" + urllib.quote(keyvault_resource_name) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
         headers = {}
         http_util = HttpUtil(self.logger)
-        result = http_util.Call(method='POST',http_uri=token_uri,data=request_content,headers=headers)
+        result = http_util.Call(method='POST', http_uri=token_uri, data=request_content, headers=headers)
 
-        self.logger.log(str(result.status) + " " + str(result.getheaders()))
+        self.logger.log("{0} {1}".format(result.status, result.getheaders()))
         result_content = result.read()
         if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
             self.logger.log(str(result_content))
@@ -121,13 +121,13 @@ class KeyVaultUtil(object):
             http_util = HttpUtil(self.logger)
             headers = {}
             headers["Authorization"] = "Bearer " + AccessToken
-            result = http_util.Call(method='GET',http_uri=KeyEncryptionKeyURL + '?api-version=' + self.api_version,data=None,headers=headers)
+            result = http_util.Call(method='GET', http_uri=KeyEncryptionKeyURL + '?api-version=' + self.api_version, data=None, headers=headers)
 
-            self.logger.log(str(result.status) + " " + str(result.getheaders()))
+            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
                 return None
             result_content = result.read()
-            self.logger.log("result_content is " + str(result_content))
+            self.logger.log("result_content is {0}".format(result_content))
             http_util.connection.close()
             result_json = json.loads(result_content)
             key_id = result_json["key"]["kid"]
@@ -147,8 +147,8 @@ class KeyVaultUtil(object):
             result = http_util.Call(method='POST',http_uri=relative_path,data=request_content,headers=headers)
 
             result_content = result.read()
-            self.logger.log("result_content is: " + str(result_content))
-            self.logger.log(str(result.status) + " " + str(result.getheaders()))
+            self.logger.log("result_content is: {0}".format(result_content))
+            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
                 return None
             http_util.connection.close()
@@ -156,7 +156,7 @@ class KeyVaultUtil(object):
             secret_value = result_json[u'value']
             return secret_value
         except Exception as e:
-            self.logger.log("Failed to encrypt_passphrase with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to encrypt_passphrase with error: {0}, stack trace: %s".format(e, traceback.format_exc()))
             return None
 
     def create_secret(self,AccessToken,KeyVaultURL,secret_value,KeyEncryptionAlgorithm,DiskEncryptionKeyFileName):
@@ -167,7 +167,7 @@ class KeyVaultUtil(object):
         try:
             secret_name = str(uuid.uuid4())
             secret_keyvault_uri = self.urljoin(KeyVaultURL, "secrets", secret_name)
-            self.logger.log("secret_keyvault_uri is :" + str(secret_keyvault_uri) + " and keyvault_uri is :" + str(KeyVaultURL))
+            self.logger.log("secret_keyvault_uri is: {0} and keyvault_uri is:{1}".format(secret_keyvault_uri, KeyVaultURL))
             if(KeyEncryptionAlgorithm is None):
                 request_content = '{{"value":"{0}","attributes":{{"enabled":"true"}},"tags":{{"DiskEncryptionKeyFileName":"{1}"}}}}'\
                     .format(str(secret_value),DiskEncryptionKeyFileName)
@@ -180,9 +180,9 @@ class KeyVaultUtil(object):
             headers["Authorization"] = "Bearer " + AccessToken
             result = http_util.Call(method='PUT',http_uri=secret_keyvault_uri + '?api-version=' + self.api_version,data=request_content,headers=headers)
 
-            self.logger.log(str(result.status) + " " + str(result.getheaders()))
+            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             result_content = result.read()
-            self.logger.log("result_content is " + str(result_content))
+            self.logger.log("result_content is {0}".format(result_content))
             result_json = json.loads(result_content)
             secret_id = result_json["id"]
             http_util.connection.close()
@@ -191,7 +191,7 @@ class KeyVaultUtil(object):
                 return None
             return secret_id
         except Exception as e:
-            self.logger.log("Failed to create_secret with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to create_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None
 
     def get_authorize_uri(self,bearerHeader):
@@ -208,5 +208,5 @@ class KeyVaultUtil(object):
 
             return bearerString
         except Exception as e:
-            self.logger.log("Failed to get_authorize_uri with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.logger.log("Failed to get_authorize_uri with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None

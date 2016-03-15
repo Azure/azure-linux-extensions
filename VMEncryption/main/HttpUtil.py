@@ -70,6 +70,6 @@ class HttpUtil(object):
                 resp = self.connection.getresponse()
             return resp
         except Exception as e:
-            errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = "Failed to call http with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             self.logger.log(errorMsg)
             return None

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -219,7 +219,7 @@ class TransactionalCopyTask(object):
     def prepare_mem_fs(self):
         self.disk_util.make_sure_path_exists(self.tmpfs_mount_point)
         commandToExecute = self.patching.mount_path + " -t tmpfs -o size=" + str(self.block_size + 1024) + " tmpfs " + self.tmpfs_mount_point
-        self.logger.log("prepare mem fs script is: " + str(commandToExecute))
+        self.logger.log("prepare mem fs script is: ".format(commandToExecute))
         returnCode = self.command_executer.Execute(commandToExecute)
         return returnCode
 
