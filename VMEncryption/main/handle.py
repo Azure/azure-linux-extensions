@@ -687,6 +687,7 @@ def daemon():
             # Ensure the same configuration is executed only once
             # If the previous enable failed, we do not have retry logic here.
             # TODO Remount all
+            logger.log("daemon lock acquired sucessfully.")
             encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
             if(encryption_marker.config_file_exists()):
                 logger.log("encryption is marked.")
