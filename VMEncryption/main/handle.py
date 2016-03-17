@@ -732,7 +732,7 @@ def daemon():
                     header_file_path = ongoing_item_config.get_header_file_path()
                     mount_point = ongoing_item_config.get_mount_point()
                     if(not none_or_empty(mount_point)):
-                        logger.log("mount point is not empty, trying to unmount it first.".format(mount_point))
+                        logger.log("mount point is not empty {0}, trying to unmount it first.".format(mount_point))
                         umount_status_code = disk_util.umount(mount_point)
                         logger.log("unmount return code is {0}".format(umount_status_code))
                     if(none_or_empty(header_file_path)):
