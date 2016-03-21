@@ -2,7 +2,7 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.3.5
+# Linux Azure Diagnostic Extension v.2.3.6
 # Copyright (c) Microsoft Corporation  
 # All rights reserved.   
 # MIT License  
@@ -32,7 +32,7 @@ import Utils.HandlerUtil as Util
 import commands
 import base64
 import xml.dom.minidom
-import  xml.etree.ElementTree  as ET
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
@@ -45,7 +45,7 @@ OutputSize = 1024
 EnableSyslog= True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("%s started to handle." %(ExtensionShortName))
-hutil =  Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
 hutil.try_parse_context()
 public_settings = hutil.get_public_settings()
 private_settings = hutil.get_protected_settings()
@@ -61,7 +61,7 @@ def LogRunGetOutPut(cmd):
     hutil.log("Return "+str(error)+":"+msg)
     return error,msg
 
-rsyslog_ommodule_for_check='omprog.so'
+rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
@@ -85,7 +85,7 @@ RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force
                  }
 
 
-UbuntuConfig1510 = dict(DebianConfig.items()+
+UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
                         '||apt-get install -y PACKAGES',
                      'packages':('libglibmm-2.4-1v5',)
@@ -120,7 +120,9 @@ CentosConfig = dict(RedhatConfig.items()+
                   .items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig, 'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510,
+All_Dist= {'debian':DebianConfig, 'debian:7.9': None, # Debian 7 (7.9) can't be supported due to low GLIBC ver. on it (GLIBC_2.14 required)
+           'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
+           'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
            'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12}
 distConfig = None
@@ -206,10 +208,10 @@ def setup(local_only):
 
 
 def hasPublicConfig(key):
-    return  public_settings.has_key(key)
+    return public_settings.has_key(key)
 
 def readPublicConfig(key):
-    if  public_settings.has_key(key):
+    if public_settings.has_key(key):
         return public_settings[key];
     return ''
 
@@ -346,7 +348,7 @@ def getResourceId():
     ladCfg = readPublicConfig('ladCfg')
     resourceId = LadUtil.getResourceIdFromLadCfg(ladCfg)
     if not resourceId:
-        encodedXmlCfg = readPublicConfig('xmlCfg')
+        encodedXmlCfg = readPublicConfig('xmlCfg').strip()
         if encodedXmlCfg:
             xmlCfg = base64.b64decode(encodedXmlCfg)
             resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),'diagnosticMonitorConfiguration/metrics','resourceId')
@@ -406,6 +408,10 @@ def configSettings():
     ladCfg = readPublicConfig('ladCfg')
     try:
         aikey = AIUtil.tryGetAiKey(ladCfg)
+        if aikey:
+            hutil.log("Application Insights key found.")
+        else:
+            hutil.log("Application Insights key not found.")
     except Exception, e:
         hutil.error("Failed check for Application Insights key in LAD configuration with exception:{0} {1}".format(e,traceback.format_exc()))
 
@@ -460,18 +466,19 @@ def main(command):
     configSettings()
 
     for notsupport in ('WALinuxAgent-2.0.5','WALinuxAgent-2.0.4','WALinuxAgent-1'):
-        code,str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*"+notsupport+"' /usr/sbin/waagent",chk_err=False)
-        if code==0 and str_ret.find(notsupport)>-1:
-            hutil.log("can run this extension on  "+notsupport)
-            hutil.do_status_report("Install", "error",'1', "can run this extension on  "+notsupport)
+        code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent", chk_err=False)
+        if code == 0 and str_ret.find(notsupport) > -1:
+            hutil.log("cannot run this extension on  " + notsupport)
+            hutil.do_status_report("Install", "error", '1', "cannot run this extension on  " + notsupport)
             return
 
-    if distConfig == None:
-        hutil.do_status_report("Install", "error",'1', "can't be installed on this OS")
+    if distConfig is None:
+        hutil.log("This distro/version (" + str(platform.dist()) + ") is not supported. This extension event (install/enable) is still considered a success.")
+        hutil.do_status_report("Install", "success", '0', "LAD can't be installed on this OS. Still considered a success.")
         waagent.AddExtensionEvent(name=hutil.get_name(),
-                                op=waagent.WALAEventOperation.Enable,
-                                isSuccess=False,
-                                      message="can't be installed on this OS"+str(platform.dist()))
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=True,
+                                  message="can't be installed on this OS"+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
@@ -586,6 +593,20 @@ def start_mdsd():
         env_vars = distConfig['mdsd_env_vars']
         for var_name, var_value in env_vars.items():
             copy_env[var_name] = var_value
+
+    # mdsd http proxy setting
+    proxy_config_name = 'mdsdHttpProxy'
+    proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has priority
+    if not proxy_config:
+        proxy_config = readPublicConfig(proxy_config_name)
+    if not isinstance(proxy_config, basestring):
+        hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
+    else:
+        proxy_config = proxy_config.strip()
+        if proxy_config:
+            hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
+            copy_env['MDSD_http_proxy'] = proxy_config
+
     xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
     command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(MdsdFolder,"mdsd"),
