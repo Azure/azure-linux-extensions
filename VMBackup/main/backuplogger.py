@@ -21,6 +21,7 @@
 import datetime
 import httplib
 import os
+import string
 import time
 import traceback
 import urlparse
@@ -30,15 +31,25 @@ from Utils.WAAgentUtil import waagent
 class Backuplogger(object):
     def __init__(self, hutil):
         self.msg = ''
+        self.con_path = '/dev/console'
         self.hutil = hutil
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
-        log_msg = (str(datetime.datetime.now()) + '   ' + level + '   ' + msg + '\n')
+        log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
+        self.log_to_con(log_msg)
         if(local):
             self.hutil.log(log_msg)
         else:
             self.msg += log_msg
+
+    def log_to_con(self, msg):
+        try:
+            with open(self.con_path, "w") as C :
+                message = filter(lambda x : x in string.printable, msg)
+                C.write(message.encode('ascii','ignore'))
+        except IOError as e:
+            pass
 
     def commit(self, logbloburi):
         #commit to local file system first, then commit to the network.
