@@ -1,7 +1,7 @@
 # CustomScript Extension
 Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
-Latest version is 1.4.
+Latest version is 1.5.
 
 You can read the User Guide below.
 * [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
@@ -317,7 +317,7 @@ in HandlerEnvironment.json and reported back to Azure
 ## Changelog
 
 ```
-# 1.4.2.0 (2016-02-19)
+# 1.5.0.0 (2016-03-23)
 - Refactor CustomScript and add LogUtil & ScriptUtil
 - Refine MDS enents to log which file the extension fails to download
 - Do not log `commandToExecute` to `extension.log` if it's passed by protectedSettings
