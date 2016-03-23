@@ -2,7 +2,7 @@
   "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
   "name": "custom-script-linux",
   "publisher": "microsoft",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "displayName": "ms-resource:displayName",
   "publisherDisplayName": "ms-resource:publisherDisplayName",
   "publisherLegalName": "ms-resource:publisherDisplayName",
@@ -40,11 +40,5 @@
   ],
   "categories": [
     "classicCompute-vmextension-linux"
-  ],
-  "filters": [
-    {
-      "type": "HideKey",
-      "value": "microsoft_custom-script-linux"
-    }
   ]
 }
