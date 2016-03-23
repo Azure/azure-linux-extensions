@@ -1,0 +1,7 @@
+{
+  "displayName": "Custom Script For Linux",
+  "publisherDisplayName": "Microsoft Corp.",
+  "summary": "Custom Script extension for Linux",
+  "description": "<p>CustomScript Extension is a tool to execute your VM customization tasks post VM provision. When this Extension is added to a Virtual Machine, it can download customer’s scripts from the Azure storage or public storage, and execute the scripts on the VM. CustomScript Extension tasks can also be automated using the Azure PowerShell cmdlets and Azure Cross-Platform Command-Line Interface (xPlat CLI).</p><p><h3>Legal Terms</h3>By clicking the Create button, I acknowledge that I am getting this software from Microsoft Corp. and that the <a href='https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt' target='_blank'>legal terms</a> of Microsoft Corp. apply to it. Microsoft does not provide rights for third-party software. Also see the <a href='https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt' target='_blank'>privacy statement</a> from Microsoft Corp..</p>",
+  "link1": "Documentation"
+}
