@@ -19,6 +19,9 @@
 # Requires Python 2.7+
 #
 import os.path
+import uuid
+import time
+import datetime
 from Common import CommonVariables
 from ConfigParser import ConfigParser
 from ConfigUtil import ConfigUtil
@@ -181,13 +184,15 @@ class OnGoingItemConfig(object):
     def clear_config(self):
         try:
             if(os.path.exists(self.encryption_environment.azure_crypt_ongoing_item_config_path)):
-                self.logger.log(msg="remove the config file: {0}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path))
-                os.remove(self.encryption_environment.azure_crypt_ongoing_item_config_path)
+                self.logger.log(msg="archive the config file: {0}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path))
+                time_stamp = datetime.datetime.now()
+                new_name = "{0}_{1}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path, time_stamp)
+                os.rename(self.encryption_environment.azure_crypt_ongoing_item_config_path, new_name)
             else:
                 self.logger.log(msg=("the config file not exist: {0}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path)), level = CommonVariables.WarningLevel)
             return True
         except OSError as e:
-            self.logger.log("Failed to clear_queue with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+            self.logger.log("Failed to archive_backup_config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False
 
     def __str__(self):

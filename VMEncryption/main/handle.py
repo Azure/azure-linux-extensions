@@ -387,7 +387,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
         ongoing_item_config.phase = CommonVariables.EncryptionPhaseBackupHeader
         ongoing_item_config.commit()
     else:
-        logger.log(msg = "ongoing item config is not none, this is resuming: " + str(ongoing_item_config), level = CommonVariables.WarningLevel)
+        logger.log(msg = "ongoing item config is not none, this is resuming, info: {0}".format(ongoing_item_config), level = CommonVariables.WarningLevel)
 
     logger.log(msg=("encrypting device item: {0}".format(ongoing_item_config.get_original_dev_path())))
     # we only support ext file systems.
@@ -403,14 +403,17 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
     while(current_phase != CommonVariables.EncryptionPhaseDone):
         if(current_phase == CommonVariables.EncryptionPhaseBackupHeader):
             logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader)), level = CommonVariables.InfoLevel)
-            if(not ongoing_item_config.get_file_system().lower() in ["ext2","ext3","ext4"]):
+            if(not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]):
                 logger.log(msg = "we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7", level = CommonVariables.WarningLevel)
+                ongoing_item_config.clear_config()
                 return current_phase
 
             chk_shrink_result = disk_util.check_shrink_fs(dev_path = original_dev_path, size_shrink_to = size_shrink_to)
             if(chk_shrink_result != CommonVariables.process_success):
                 logger.log(msg = ("check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path)), level = CommonVariables.ErrorLevel)
                 logger.log(msg = "your file system may not have enough space to do the encryption.")
+                #remove the ongoing item.
+                ongoing_item_config.clear_config()
                 return current_phase
             else:
                 ongoing_item_config.current_slice_index = 0
