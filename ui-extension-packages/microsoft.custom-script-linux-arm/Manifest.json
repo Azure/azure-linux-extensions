@@ -1,0 +1,44 @@
+{
+  "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
+  "name": "custom-script-linux-arm",
+  "publisher": "microsoft",
+  "version": "1.0.0",
+  "displayName": "ms-resource:displayName",
+  "publisherDisplayName": "ms-resource:publisherDisplayName",
+  "publisherLegalName": "ms-resource:publisherDisplayName",
+  "summary": "ms-resource:summary",
+  "longSummary": "ms-resource:summary",
+  "description": "ms-resource:description",
+  "uiDefinition": {
+    "path": "UiDefinition.json"
+  },
+  "artifacts": [
+    {
+      "name": "MainTemplate",
+      "type": "Template",
+      "path": "Artifacts\\MainTemplate.json",
+      "isDefault": true
+    },
+    {
+      "name": "CreateUiDefinition",
+      "type": "Custom",
+      "path": "Artifacts\\CreateUiDefinition.json",
+      "isDefault": false
+    },
+  ],
+  "icons": {
+    "small": "Icons\\Small.png",
+    "medium": "Icons\\Medium.png",
+    "large": "Icons\\Large.png",
+    "wide": "Icons\\Wide.png"
+  },
+  "links": [
+    {
+      "displayName": "ms-resource:link1",
+      "uri": "https://github.com/Azure/azure-linux-extensions/tree/master/CustomScript"
+    }
+  ],
+  "categories": [
+    "compute-vmextension-linux"
+  ]
+}
