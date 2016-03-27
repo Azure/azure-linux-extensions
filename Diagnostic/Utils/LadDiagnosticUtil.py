@@ -142,3 +142,8 @@ def getResourceIdFromLadCfg(ladCfg):
     if metricsConfiguration:
         if 'resourceId' in metricsConfiguration:
             return metricsConfiguration['resourceId']
+
+# Get event volume from LadCfg
+def getEventVolumeFromLadCfg(ladCfg):
+    return getDiagnosticsMonitorConfigurationElement(ladCfg, 'eventVolume')
+
