@@ -13,6 +13,16 @@ Diagnostic Extension can:
 * Enables user to upload specified log files to designated storage table.
 
 
+## Important Notice
+
+***The new Azure Portal's VM Diagnostic extension status and performance graphs will not work***
+if the Linux Azure Diagnostic extension is configured using one of the methods described in this
+document (that is, using either Azure Powershell or Azure XPLAT CLI with the JSON configs below).
+The Azure Portal's VM Diagnostic extension status and the performance graphs requires that this
+extension be enabled only through the Azure Portal.
+
+
+
 # User Guide
 
 ## 1. Configuration schema
