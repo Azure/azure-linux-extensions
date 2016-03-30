@@ -1,7 +1,7 @@
 # CustomScript Extension
 Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
-Latest version is 1.4.
+Latest version is 1.5.
 
 You can read the User Guide below.
 * [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
@@ -65,7 +65,7 @@ You can deploy it using Azure CLI, Azure Powershell and ARM template.
 **NOTE:**
 
 Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
-In diffrent models, the deploying commands have different syntaxes. Please select the right
+In different models, the deploy commands have different syntaxes. Please select the right
 one in section 2.1 and 2.2 below.
  
 ### 2.1. Using [**Azure CLI**][azure-cli]
@@ -78,7 +78,7 @@ The Classic mode is also called Azure Service Management mode. You can change to
 $ azure config mode asm
 ```
 
-You can deploying CustomScript Extension by running:
+You can deploy CustomScript Extension by running:
 ```
 $ azure vm extension set <vm-name> \
 CustomScriptForLinux Microsoft.OSTCExtensions <version> \
@@ -87,8 +87,7 @@ CustomScriptForLinux Microsoft.OSTCExtensions <version> \
 ```
 
 In the command above, you can change version with `'*'` to use latest
-version available, or `'1.*'` to get newest version that does not introduce non-
-breaking schema changes. To learn the latest version available, run:
+version available, or `'1.*'` to get newest version that does not introduce breaking schema changes. To learn the latest version available, run:
 ```
 $ azure vm extension list
 ```
@@ -100,7 +99,7 @@ You can change to Azure Resource Manager mode by running:
 $ azure config mode arm
 ```
 
-You can deploying CustomScript Extension by running:
+You can deploy CustomScript Extension by running:
 ```
 $ azure vm extension set <resource-group> <vm-name> \
 CustomScriptForLinux Microsoft.OSTCExtensions <version> \
@@ -121,7 +120,7 @@ You can login to your Azure account (Azure Service Management mode) by running:
 Add-AzureAccount
 ```
 
-You can deploying CustomScript Extension by running:
+You can deploy CustomScript Extension by running:
 
 ```powershell
 $VmName = '<vm-name>'
@@ -156,7 +155,7 @@ Login-AzureRmAccount
 
 Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure Powershell with Azure Resource Manager.
 
-You can deploying CustomScript Extension by running:
+You can deploy CustomScript Extension by running:
 
 ```powershell
 $RGName = '<resource-group-name>'
@@ -317,7 +316,17 @@ in HandlerEnvironment.json and reported back to Azure
 ## Changelog
 
 ```
-# 1.4 (2015-11-19)
+# 1.5.0.0 (2016-03-23)
+- Refactor CustomScript and add LogUtil & ScriptUtil
+- Refine MDS enents to log which file the extension fails to download
+- Do not log `commandToExecute` to `extension.log` if it's passed by protectedSettings
+
+# 1.4.1.0 (2015-12-21)
+- Move downloading scripts and internal DNS check into the daemon process
+- Provide an option to disable internal DNS check
+- Add a timeout to urllib2.urlopen()
+
+# 1.4.0.0 (2015-11-19)
 - Protect sensitive data in `commandToExecute`
 ```
 

@@ -85,10 +85,9 @@ class DiskUtil(object):
                 device_item.type = 'disk'
             if(device_item.type != 'disk'):
                 partition_files = glob.glob('/sys/block/*/' + device_item.name + '/partition')
-                self.logger.log(msg="partition files exists")
                 if(partition_files is not None and len(partition_files) > 0):
+                    self.logger.log(msg="partition files exists")
                     device_item.type = 'part'
-            device_item.size = int(self.get_device_items_property(dev_name=device_item.name,property_name='SIZE'))
         return device_items
 
     def get_device_items(self, dev_path):
@@ -116,8 +115,6 @@ class DiskUtil(object):
                     for j in range(0, disk_info_item_array_length):
                         disk_info_property = disk_info_item_array[j]
                         property_item_pair = disk_info_property.split('=')
-                        if(property_item_pair[0] == 'SIZE'):
-                            device_item.size = int(property_item_pair[1].strip('"'))
 
                         if(property_item_pair[0] == 'NAME'):
                             device_item.name = property_item_pair[1].strip('"')

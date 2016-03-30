@@ -2,13 +2,13 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.0
+# Linux Azure Diagnostic Extension v.2.3.7
 # Copyright (c) Microsoft Corporation
-# All rights reserved. 
-# MIT License
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# All rights reserved.   
+# MIT License  
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.  
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
 #
 # Requires Python 2.6+
 #
@@ -32,105 +32,109 @@ import Utils.HandlerUtil as Util
 import commands
 import base64
 import xml.dom.minidom
-import  xml.etree.ElementTree  as ET
+import xml.etree.ElementTree as ET
+from collections import defaultdict
+import Utils.LadDiagnosticUtil as LadUtil
+import Utils.XmlUtil as XmlUtil
+import Utils.ApplicationInsightsUtil as AIUtil
 
-# Version 2.2.0
 ExtensionShortName = 'LinuxAzureDiagnostic'
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 OutputSize = 1024
-EnableSyslog= True
+EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("%s started to handle." %(ExtensionShortName))
-hutil =  Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
 hutil.try_parse_context()
 public_settings = hutil.get_public_settings()
-protected_settings = hutil.get_protected_settings()
+private_settings = hutil.get_protected_settings()
 if not public_settings:
     public_settings = {}
-if not protected_settings:
-    protected_settings = {}
+if not private_settings:
+    private_settings = {}
 
 
 def LogRunGetOutPut(cmd):
     hutil.log("RunCmd "+cmd)
-    error,msg = waagent.RunGetOutput(cmd)
+    error, msg = waagent.RunGetOutput(cmd)
     hutil.log("Return "+str(error)+":"+msg)
-    return error,msg
+    return error, msg
 
-rsyslog_ommodule_for_check='omprog.so'
+rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_rpm_name = 'scx-1.6.2-104.universalr.1.x64.sh'
-omi_universal_dpkg_name = 'scx-1.6.2-104.universald.1.x64.sh'
+omi_universal_pkg_name = 'scx-installer.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-DebianConfig = {"installomi":"bash "+omi_universal_dpkg_name+" --upgrade --force;",
+DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
-                 "packages":('libglibmm-2.4-1c2a',),
-                  "restartrsyslog":"service rsyslog restart",
-                 'distrolibs':'debian/* shared/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                "packages":(),
+                "restartrsyslog":"service rsyslog restart",
+                'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
                 }
 
-RedhatConfig =  {"installomi":"bash "+omi_universal_rpm_name+" --upgrade --force;",
+RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
-                 "packages":('glibmm24','tar','policycoreutils-python'),
-                'distrolibs':'redhat/* shared/*',
-                  "restartrsyslog":"service rsyslog restart",
-                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
+                 "packages":('tar','policycoreutils-python'),
+                 'distrolibs':'centos/*',
+                 "restartrsyslog":"service rsyslog restart",
+                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
                  }
 
 
-UbuntuConfig = dict(DebianConfig.items()+
-                    {'distrolibs':'ubuntu1404/*'
-                    }
-                    .items())
-
-
-UbuntuConfig1204 = dict(DebianConfig.items()+
-                    {'distrolibs':'debian/* shared/*'
-                    }
-                    .items())
-
-UbuntuConfig1510 = dict(DebianConfig.items()+
+UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
                         '||apt-get install -y PACKAGES',
-                     'packages':('libxml++2.6-2v5', 'libglibmm-2.4-1v5', 'libcpprest2.6',
-                        'libboost-regex1.58.0', 'libboost-log1.58.0', 'libboost-filesystem1.58.0', 
-                        'libboost-system1.58.0', 'libboost-thread1.58.0', 'libboost-iostreams1.58.0'),
-                     'distrolibs':'ubuntu1510/*'
+                     'packages':()
                     }.items())
 
+# For SUSE11, we need to create a CA certs file for our bundled OpenSSL 1.0 libs
+SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
+
 SuseConfig11 = dict(RedhatConfig.items()+
-                    {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                     "packages":('glibmm2','rsyslog'),
-                  'distrolibs':'suse/*'}
-                  .items())
+                  {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
+                   "packages":('rsyslog',),
+                   'distrolibs' : 'suse11/*',
+                   'distrolibs_prep_cmds' :
+                        (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                         r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
+                        ),
+                   'mdsd_env_vars' : { "SSL_CERT_FILE" : SUSE11_MDSD_SSL_CERTS_FILE }
+                  }.items())
+
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                   "packages":('libglibmm-2_4-1','libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
-                  'distrolibs':'suse12/*'}
-                  .items())
+                   "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
+                   'distrolibs' : 'suse11/*',
+                   'distrolibs_prep_cmds' : (r'\rm -f suse11/libcrypto.so.* suse11/libssl.so.*',) # Should remove bundled OpenSSL libs on SUSE 12 (Use system-installed OpenSSL libs)
+                  }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
-                    {'installrequiredpackag':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('glibmm24','policycoreutils-python')}
+                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
+                     "packages":('policycoreutils-python',)}
                   .items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'SuSE:11':SuseConfig11,'debian':DebianConfig,'SuSE':SuseConfig12,
-           'Ubuntu':UbuntuConfig,'Ubuntu:12.04':UbuntuConfig1204, 'Ubuntu:15.10':UbuntuConfig1510,
-           'SuSE:12':SuseConfig12,'redhat':RedhatConfig,'centos':CentosConfig}
+All_Dist= {'debian':DebianConfig, 'debian:7.9': None, # Debian 7 (7.9) can't be supported due to low GLIBC ver. on it (GLIBC_2.14 required)
+           'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
+           'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
+           'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
+           'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12, 'SuSE':SuseConfig12}
 distConfig = None
 dist = platform.dist()
-if All_Dist.has_key(dist[0]+":"+dist[1]):
-    distConfig =  All_Dist[dist[0]+":"+dist[1]]
+distroNameAndVersion = dist[0] + ":" + dist[1]
+if All_Dist.has_key(distroNameAndVersion):
+    distConfig =  All_Dist[distroNameAndVersion]
 elif All_Dist.has_key(dist[0]):
     distConfig =  All_Dist[dist[0]]
-else:
-    hutil.error("os version:"+dist[0]+" not supported")
+
+if distConfig is None:
+    hutil.error("os version:" + distroNameAndVersion + " not supported")
 
 UseService = False
 if dist[0] == 'Ubuntu' and dist[1] == '15.10':
@@ -153,34 +157,6 @@ def getChildNode(p,tag):
        print(str(node.tagName)+":"+tag)
        if node.tagName == tag:
            return node
-
-
-def setXmlValue(xml,path,property,value,selector=[]):
-    elements = xml.findall(path)
-    for element in elements:
-        if selector and element.get(selector[0])!=selector[1]:
-            continue
-        if not property:
-            element.text = value
-        elif not element.get(property) or len(element.get(property))==0 :
-            element.set(property,value)
-
-def getXmlValue(xml,path,property):
-    element = xml.find(path)
-    return element.get(property)
-
-def addElement(xml,path,el,selector=[]):
-    elements = xml.findall(path)
-    for element in elements:
-        if selector and element.get(selector[0])!=selector[1]:
-            continue
-        element.append(el)
-
-
-def createElement(schema):
-    return ET.fromstring(schema)
-
-
 
 def parse_context(operation):
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -217,6 +193,10 @@ def setup(local_only):
 
     # copy distrolibs
     if not os.path.isdir(MdsdFolder):
+        # Run prep commands
+        if 'distrolibs_prep_cmds' in distConfig:
+            for cmd in distConfig['distrolibs_prep_cmds']:
+                RunGetOutput(cmd)
         libs = distConfig['distrolibs']
         if len(libs) > 0:
             RunGetOutput('mkdir -p {0}'.format(MdsdFolder))
@@ -227,22 +207,25 @@ def setup(local_only):
     return 0, 'success'
 
 
-def hasConfig(key):
-    return  public_settings.has_key(key) or protected_settings.has_key(key)
+def hasPublicConfig(key):
+    return public_settings.has_key(key)
 
-def readConfig(key):
-    if  public_settings.has_key(key):
+def readPublicConfig(key):
+    if public_settings.has_key(key):
         return public_settings[key];
-    if protected_settings.has_key(key):
-        return protected_settings[key];
+    return ''
+
+def readPrivateConfig(key):
+    if private_settings.has_key(key):
+        return private_settings[key];
     return ''
 
 def createPortalSettings(tree,resourceId):
     portal_config = ET.ElementTree()
     portal_config.parse(os.path.join(WorkDir, "portal.xml.template"))
-    setXmlValue(portal_config,"./DerivedEvents/DerivedEvent/LADQuery","partitionKey",resourceId)
-    addElement(tree,'Events',portal_config._root.getchildren()[0])
-    addElement(tree,'Events',portal_config._root.getchildren()[1])
+    XmlUtil.setXmlValue(portal_config,"./DerivedEvents/DerivedEvent/LADQuery","partitionKey",resourceId)
+    XmlUtil.addElement(tree,'Events',portal_config._root.getchildren()[0])
+    XmlUtil.addElement(tree,'Events',portal_config._root.getchildren()[1])
 
 
 eventSourceSchema = """
@@ -277,14 +260,14 @@ $ModLoad imfile
         return
     for file in files:
         fileid=fileid+1
-        eventSourceElement = createElement(eventSourceSchema)
-        setXmlValue(eventSourceElement,'RouteEvent','eventName',file["table"])
+        eventSourceElement = XmlUtil.createElement(eventSourceSchema)
+        XmlUtil.setXmlValue(eventSourceElement,'RouteEvent','eventName',file["table"])
         eventSourceElement.set('source','ladfile'+str(fileid))
-        addElement(tree,'Events/MdsdEvents',eventSourceElement)
+        XmlUtil.addElement(tree,'Events/MdsdEvents',eventSourceElement)
 
-        sourceElement = createElement(sourceSchema)
+        sourceElement = XmlUtil.createElement(sourceSchema)
         sourceElement.set('name','ladfile'+str(fileid))
-        addElement(tree,'Sources',sourceElement)
+        XmlUtil.addElement(tree,'Sources',sourceElement)
 
         syslog_config = syslogEventSourceConfig.replace('#FILE#',file['file'])
         syslog_config = syslog_config.replace('#STATFILE#',file['file'].replace("/","-"))
@@ -298,81 +281,163 @@ perfSchema = """
       dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" />
     """
 
-def createPerfSettngs(tree,perfs):
+def createPerfSettngs(tree,perfs,forAI=False):
     if not perfs:
         return
     for perf in perfs:
-        perfElement = createElement(perfSchema)
+        perfElement = XmlUtil.createElement(perfSchema)
         perfElement.set('cqlQuery',perf['query'])
         perfElement.set('eventName',perf['table'])
         namespace="root/scx"
         if perf.has_key('namespace'):
            namespace=perf['namespace']
         perfElement.set('omiNamespace',namespace)
-        addElement(tree,'Events/OMI',perfElement,["omitag","perf"])
+        if forAI:
+            AIUtil.updateOMIQueryElement(perfElement)
+        XmlUtil.addElement(tree,'Events/OMI',perfElement,["omitag","perf"])
 
-def createAccountSettings(tree,account,key,endpoint):
-    setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
-    setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
-    setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
+# Updates the MDSD configuration Account elements.
+# Updates existing default Account element with Azure table storage properties.
+# If an aikey is provided to the function, then it adds a new Account element for
+# Application Insights with the application insights key.
+def createAccountSettings(tree,account,key,endpoint,aikey=None):
+    XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
+    XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
+    XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
+    
+    if aikey:
+        AIUtil.createAccountElement(tree,aikey)
 
 def config(xmltree,key,value,xmlpath,selector=[]):
-    v = readConfig(key)
+    v = readPublicConfig(key)
     if not v:
         v = value
-    setXmlValue(xmltree,xmlpath,key,v,selector)
+    XmlUtil.setXmlValue(xmltree,xmlpath,key,v,selector)
 
 def readUUID():
      code,str_ret = waagent.RunGetOutput("dmidecode |grep UUID |awk '{print $2}'",chk_err=False)
-     return str_ret.strip();
+     return str_ret.strip()
 
+def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
+    perfCfgList = []
+    try:
+        ladCfg = readPublicConfig('ladCfg')
+        perfCfgList = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(ladCfg)
+        if not perfCfgList:
+            perfCfgList = readPublicConfig('perfCfg')
+        if not perfCfgList and not hasPublicConfig('perfCfg'):
+            perfCfgList = [
+                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
+                    {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
+                    {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
+                  ]
+    except Exception, e:
+        hutil.error("Failed to parse performance configuration with exception:{0} {1}".format(e,traceback.format_exc()))
+
+    try:
+        createPerfSettngs(mdsdCfg,perfCfgList)
+        if includeAI:
+            createPerfSettngs(mdsdCfg,perfCfgList,True)
+    except Exception, e:
+        hutil.error("Failed to create perf config  error:{0} {1}".format(e,traceback.format_exc()))
+
+# Try to get resourceId from LadCfg, if not present
+# try to fetch from xmlCfg
+def getResourceId():
+    resourceId = None
+    ladCfg = readPublicConfig('ladCfg')
+    resourceId = LadUtil.getResourceIdFromLadCfg(ladCfg)
+    if not resourceId:
+        encodedXmlCfg = readPublicConfig('xmlCfg').strip()
+        if encodedXmlCfg:
+            xmlCfg = base64.b64decode(encodedXmlCfg)
+            resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),'diagnosticMonitorConfiguration/metrics','resourceId')
+# Azure portal uses xmlCfg which contains WadCfg which is pascal case, Currently we will support both casing and deprecate one later
+            if not resourceId:
+                resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),'DiagnosticMonitorConfiguration/Metrics','resourceId')
+    return resourceId
+
+# Try to get syslogCfg from LadCfg, if not present
+# fetch it from public settings
+def getSyslogCfg():
+    syslogCfg = ""
+    ladCfg = readPublicConfig('ladCfg')
+    encodedSyslogCfg = LadUtil.getDiagnosticsMonitorConfigurationElement(ladCfg, 'syslogCfg')
+    if not encodedSyslogCfg:
+        encodedSyslogCfg = readPublicConfig('syslogCfg')
+    if encodedSyslogCfg:
+        syslogCfg = base64.b64decode(encodedSyslogCfg)
+    return syslogCfg
+
+# Try to get fileCfg from LadCfg, if not present
+# fetch it from public settings
+def getFileCfg():
+    ladCfg = readPublicConfig('ladCfg')
+    fileCfg = LadUtil.getFileCfgFromLadCfg(ladCfg)
+    if not fileCfg:
+        fileCfg = readPublicConfig('fileCfg')
+    return fileCfg
+
+# Set event volume in mdsd config.
+# Check if desired event volume is specified, first in ladCfg then in public config.
+# If in neither then default to Medium.
+def setEventVolume(mdsdCfg,ladCfg):
+    eventVolume = LadUtil.getEventVolumeFromLadCfg(ladCfg)
+    if eventVolume:
+        hutil.log("Event volume found in ladCfg: " + eventVolume)
+    else:
+        eventVolume = readPublicConfig("eventVolume")
+        if eventVolume:
+            hutil.log("Event volume found in public config: " + eventVolume)
+        else:
+            eventVolume = "Medium"
+            hutil.log("Event volume not found in config. Using default value: " + eventVolume)
+            
+    XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
+        
 def configSettings():
-    mdsdCfgstr = readConfig('mdsdCfg')
+    mdsdCfgstr = readPublicConfig('mdsdCfg')
     if not mdsdCfgstr :
         with open (os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
             mdsdCfgstr = defaulCfg.read()
     else:
         mdsdCfgstr = base64.b64decode(mdsdCfgstr)
     mdsdCfg = ET.ElementTree()
-    mdsdCfg._setroot(createElement(mdsdCfgstr))
+    mdsdCfg._setroot(XmlUtil.createElement(mdsdCfgstr))
 
     # update deployment id
     deployment_id = get_deployment_id()
-    setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
+    XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
 
-    xmlCfg = readConfig('xmlCfg')
-    if xmlCfg:
-        try:
-            xmlCfg = base64.b64decode(xmlCfg)
-            resourceId = getXmlValue(createElement(xmlCfg),'DiagnosticMonitorConfiguration/Metrics','resourceId')
+    try:
+        resourceId = getResourceId()
+        if resourceId:
             createPortalSettings(mdsdCfg,escape(resourceId))
             instanceID=""
             if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >=0:
                 instanceID = readUUID();
             config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
 
-        except Exception, e:
-            hutil.error("Failed to create portal config  error:{0} {1}".format(e,traceback.format_exc()))
-
-    perfCfg = readConfig('perfCfg')
-    if not perfCfg and not hasConfig('perfCfg'):
-        perfCfg = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
-                    {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
-                    {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
-                  ]
-    try:
-        createPerfSettngs(mdsdCfg,perfCfg)
     except Exception, e:
-        hutil.error("Failed to create perf config  error:{0} {1}".format(e,traceback.format_exc()))
+        hutil.error("Failed to create portal config  error:{0} {1}".format(e,traceback.format_exc()))
+    
+    # Check if Application Insights key is present in ladCfg
+    ladCfg = readPublicConfig('ladCfg')
+    try:
+        aikey = AIUtil.tryGetAiKey(ladCfg)
+        if aikey:
+            hutil.log("Application Insights key found.")
+        else:
+            hutil.log("Application Insights key not found.")
+    except Exception, e:
+        hutil.error("Failed check for Application Insights key in LAD configuration with exception:{0} {1}".format(e,traceback.format_exc()))
 
+    generatePerformanceCounterConfiguration(mdsdCfg,aikey != None)
 
-    syslogCfg = readConfig('syslogCfg')
-    fileCfg = readConfig('fileCfg')
+    syslogCfg = getSyslogCfg()
+    fileCfg = getFileCfg() 
     #fileCfg = [{"file":"/var/log/waagent.log","table":"waagent"},{"file":"/var/log/waagent2.log","table":"waagent3"}]
     try:
-        if syslogCfg:
-           syslogCfg = base64.b64decode(syslogCfg)
         if fileCfg:
            syslogCfg =  createEventFileSettings(mdsdCfg,fileCfg)+syslogCfg
 
@@ -381,17 +446,21 @@ def configSettings():
     except Exception, e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
-    account = readConfig('storageAccountName')
-    key = readConfig('storageAccountKey')
-    endpoint = readConfig('endpoint')
+    account = readPrivateConfig('storageAccountName')
+    key = readPrivateConfig('storageAccountKey')
+    endpoint = readPrivateConfig('endpoint')
     if not endpoint:
         endpoint = 'table.core.windows.net'
     endpoint = 'https://'+account+"."+endpoint;
 
-    createAccountSettings(mdsdCfg,account,key,endpoint)
+    createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
+    # Check and add new syslog RouteEvent for Application Insights.
+    if aikey:
+        AIUtil.createSyslogRouteEventElement(mdsdCfg)
 
-    config(mdsdCfg,"eventVolume","Medium","Management")
+    setEventVolume(mdsdCfg,ladCfg)
+
     config(mdsdCfg,"sampleRateInSeconds","60","Events/OMI/OMIQuery")
 
     mdsdCfg.write(os.path.join(WorkDir, './xmlCfg.xml'))
@@ -407,7 +476,7 @@ def main(command):
     #Global Variables definition
 
     global EnableSyslog, UseService
-    if readConfig('EnableSyslog').lower() == 'false':
+    if readPublicConfig('EnableSyslog').lower() == 'false':
         EnableSyslog = False
     else:
         EnableSyslog = True
@@ -415,18 +484,19 @@ def main(command):
     configSettings()
 
     for notsupport in ('WALinuxAgent-2.0.5','WALinuxAgent-2.0.4','WALinuxAgent-1'):
-        code,str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*"+notsupport+"' /usr/sbin/waagent",chk_err=False)
-        if code==0 and str_ret.find(notsupport)>-1:
-            hutil.log("can run this extension on  "+notsupport)
-            hutil.do_status_report("Install", "error",'1', "can run this extension on  "+notsupport)
+        code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent", chk_err=False)
+        if code == 0 and str_ret.find(notsupport) > -1:
+            hutil.log("cannot run this extension on  " + notsupport)
+            hutil.do_status_report("Install", "error", '1', "cannot run this extension on  " + notsupport)
             return
 
-    if distConfig == None:
-        hutil.do_status_report("Install", "error",'1', "can't be installed on this OS")
+    if distConfig is None:
+        hutil.log("This distro/version (" + str(platform.dist()) + ") is not supported. This extension event (install/enable) is still considered a success.")
+        hutil.do_status_report("Install", "success", '0', "LAD can't be installed on this OS. Still considered a success.")
         waagent.AddExtensionEvent(name=hutil.get_name(),
-                                op=waagent.WALAEventOperation.Enable,
-                                isSuccess=False,
-                                      message="can't be installed on this OS"+str(platform.dist()))
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=True,
+                                  message="can't be installed on this OS"+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
@@ -537,6 +607,26 @@ def start_mdsd():
     mdsd_log = None
     copy_env = os.environ
     copy_env['LD_LIBRARY_PATH']=MdsdFolder
+    if 'mdsd_env_vars' in distConfig:
+        env_vars = distConfig['mdsd_env_vars']
+        for var_name, var_value in env_vars.items():
+            copy_env[var_name] = var_value
+
+    # mdsd http proxy setting
+    proxy_config_name = 'mdsdHttpProxy'
+    proxy_config = waagent.HttpProxyConfigString    # /etc/waagent.conf has highest priority
+    if not proxy_config:
+        proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
+    if not proxy_config:
+        proxy_config = readPublicConfig(proxy_config_name)
+    if not isinstance(proxy_config, basestring):
+        hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
+    else:
+        proxy_config = proxy_config.strip()
+        if proxy_config:
+            hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
+            copy_env['MDSD_http_proxy'] = proxy_config
+
     xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
     command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(MdsdFolder,"mdsd"),
@@ -625,6 +715,7 @@ def stop_mdsd():
     #RunGetOutput("rm "+MDSDPidFile)
     return 0,"stopped"
 
+
 def get_mdsd_process():
 
     mdsd_pids = []
@@ -640,6 +731,7 @@ def get_mdsd_process():
                 hutil.log("return not alive "+is_still_alive.strip())
     return mdsd_pids
 
+
 def get_dist_config():
     dist = platform.dist()
     if All_Dist.has_key(dist[0]+":"+dist[1]):
@@ -651,46 +743,52 @@ def get_dist_config():
 
 
 def install_omi():
-    need_install_omi=0
-    isMysqlNotInstalled,result = RunGetOutput("which mysql")
-    isApacheNotInstalled,result = RunGetOutput("which apache2 || which httpd || which httpd2")
+    need_install_omi = 0
 
-    if 'OMI-1.0.8-3' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
-        need_install_omi=1
-    if not isMysqlNotInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
-        need_install_omi=1
-    if not isApacheNotInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"):
-        need_install_omi=1
+    isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
+    isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
+    if 'OMI-1.0.8-4' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
+        need_install_omi=1
+    if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
+        need_install_omi=1
+    if isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"):
+        need_install_omi=1
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
         RunGetOutput(distConfig["installomi"])
 
-    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth"):
-        mysqladdress=readConfig("mysqladdress")
-        mysqlusername=readConfig("mysqlusername")
-        mysqlpassword=readConfig("mysqlpassword")
+    # Quick and dirty way of checking if mysql/apache process is running
+    isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
+    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
+
+    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
+        mysqladdress=readPrivateConfig("mysqladdress")
+        mysqlusername=readPrivateConfig("mysqlusername")
+        mysqlpassword=readPrivateConfig("mysqlpassword")
         RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
 
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh"):
+    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
 
     RunGetOutput("/opt/omi/bin/service_control restart");
     return 0, "omi installed"
 
+
 def uninstall_omi():
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh"):
+    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache' | grep -v grep")[0] is 0
+    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
     hutil.log("omi will not be uninstalled")
-    return 0,"do nothing"
+    return 0, "do nothing"
 
 
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
-    match= re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    match = re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
     if match:
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:

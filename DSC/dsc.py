@@ -45,22 +45,34 @@ import Utils.HandlerUtil as Util
 ExtensionShortName = 'DSC'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omiserver-1.0.8.ssl_'
-dsc_package_prefix = 'packages/dsc-1.0.0-320.ssl_'
-omi_version_deb = '1.0.8.1'
-omi_version_rpm = '1.0.8-1'
-dsc_version_deb = '1.0.0.320'
-dsc_version_rpm = '1.0.0-320'
-
-# On Ubuntu 15.04, omiserver package could not install the omiserver.service file properly, so manually copy the file
-omi_service_file = 'packages/omiserver.service'
+omi_package_prefix = 'packages/omi-1.0.8.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.1-70.ssl_'
+omi_version_deb = '1.0.8.4'
+omi_version_rpm = '1.0.8-4'
+dsc_version_deb = '1.1.1.70'
+dsc_version_rpm = '1.1.1-70'
 
 # DSC-specific Operation
-DownloadOp = "Download"
-ApplyMofOp = "ApplyMof"
-ApplyMetaMofOp = "ApplyMetaMof"
-InstallModuleOp = "InstallModule"
-RemoveModuleOp = "RemoveModule"
+class Operation:
+    Download = "Download"
+    ApplyMof = "ApplyMof"
+    ApplyMetaMof = "ApplyMetaMof"
+    InstallModule = "InstallModule"
+    RemoveModule = "RemoveModule"
+    Register = "Register"
+    Enable = "Enable"
+
+class DistroCategory:
+    debian = 1
+    redhat = 2
+    suse = 3
+
+class Mode:
+    push = "push"
+    pull = "pull"
+    install = "install"
+    remove = "remove"
+    register = "register"
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -80,8 +92,8 @@ def main():
     if not protected_settings:
         protected_settings = {}
 
-    global distro_info
-    distro_info = platform.dist()
+    global distro_category
+    distro_category = get_distro_category()
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -95,9 +107,21 @@ def main():
         elif re.match("^([-/]*)(update)", a):
             update()
 
+def get_distro_category():
+    distro_info = platform.dist()
+    distro_name = distro_info[0].lower()
+    if distro_name == 'ubuntu' or distro_name == 'debian':
+        return DistroCategory.debian
+    elif distro_name == 'centos' or distro_name == 'redhat':
+        return DistroCategory.redhat
+    elif distro_name == 'suse':
+        return DistroCategory.suse 
+    raise Exception('Unsupported distro: {0}'.format(distro_info[0]))
+
 def install():
     hutil.do_parse_context('Install')
     try:
+        remove_old_dsc_packages()
         install_dsc_packages()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception, e:
@@ -108,53 +132,55 @@ def enable():
     hutil.do_parse_context('Enable')
     hutil.exit_if_enabled()
     try:
-        start_omiserver()
+        start_omiservice()
         mode = get_config('Mode')
         if mode == '':
-            mode = 'push'
+            mode = Mode.push
         else:
             mode = mode.lower()
-        if mode == 'remove':
-            remove_module()
-        else:
-            file_path = download_file(mode)
-            if mode == 'pull':
-                current_config = apply_dsc_meta_configuration(file_path)
-            elif mode == 'push':
-                current_config = apply_dsc_configuration(file_path)
-	    elif mode == 'install':
-                install_module(file_path)
-            else:
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
+            if not hasattr(Mode, mode):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
-                                          op=ApplyMofOp,
+                                          op=Operation.Enable,
                                           isSuccess=False,
                                           message="(03001)Argument error, invalid mode")
-        if mode == 'push' or mode == 'pull':
+                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
+        if mode == Mode.remove:
+            remove_module()
+        elif mode == Mode.register:
+            register_automation()
+        else:
+            file_path = download_file()
+            if mode == Mode.pull:
+                current_config = apply_dsc_meta_configuration(file_path)
+            elif mode == Mode.push:
+                current_config = apply_dsc_configuration(file_path)
+            else:
+                install_module(file_path)
+        if mode == Mode.push or mode == Mode.pull:
             if check_dsc_configuration(current_config):
-                hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
-                if mode == 'push':
+                if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
-                                              op=ApplyMofOp,
+                                              op=Operation.ApplyMof,
                                               isSuccess=True,
                                               message="(03104)Succeeded to apply MOF configuration through Push Mode")
                 else:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
-                                              op=ApplyMetaMofOp,
+                                              op=Operation.ApplyMetaMof,
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
+                hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
             else:
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
-                if mode == 'push':
+                if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
-                                              op=ApplyMofOp,
+                                              op=Operation.ApplyMof,
                                               isSuccess=False,
                                               message="(03105)Failed to apply MOF configuration through Push Mode")
                 else:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
-                                              op=ApplyMetaMofOp,
+                                              op=Operation.ApplyMetaMof,
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
+                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception, e:
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -195,22 +221,52 @@ def get_config(key):
             return value.strip()
     return ''
 
+def remove_old_dsc_packages():
+    if distro_category == DistroCategory.debian:
+        deb_remove_old_package('dsc', dsc_version_deb)
+        # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
+        deb_remove_old_package('omiserver', '1.0.8.2')
+        deb_remove_old_package('omi', omi_version_deb)
+    elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
+        rpm_remove_old_package('dsc', dsc_version_rpm)
+        # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
+        rpm_remove_old_package('omiserver', '1.0.8-2')
+        rpm_remove_old_package('omi', omi_version_rpm)
+
+def deb_remove_old_package(package_name, version):
+    if deb_check_old_package(package_name, version):
+        deb_uninstall_package(package_name)
+
+def rpm_remove_old_package(package_name, version):
+    if rpm_check_old_package(package_name, version):
+        rpm_uninstall_package(package_name)
+
+def deb_check_old_package(package_name, version):
+    code,output = run_cmd('dpkg -s ' + package_name + ' | grep Version:')
+    if code == 0:
+        code,output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
+        if output < version:
+            return True
+    return False
+
+def rpm_check_old_package(package_name, version):
+    code,output = run_cmd('rpm -q ' + package_name)
+    if code == 0:
+        l = len(package_name) + 1
+        if output[l:] < version:
+            return True
+    return False
+
 def install_dsc_packages():
-    distro_name = distro_info[0]
     openssl_version = get_openssl_version()
     omi_package_path = omi_package_prefix + openssl_version
     dsc_package_path = dsc_package_prefix + openssl_version
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
-        deb_install_pkg(omi_package_path + '.deb', 'omiserver', omi_version_deb)
-        # On Ubuntu 15.04 the omiserver service is not installed successfully by the omiserver package
-        if float(distro_info[1]) > 15:
-            shutil.copyfile(omi_service_file, '/lib/systemd/system/omiserver.service')
-        deb_install_pkg(dsc_package_path + '.deb', 'dsc', dsc_version_deb )
-    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
-        rpm_install_pkg(omi_package_path + '.rpm', 'omiserver-' + omi_version_rpm)
-        rpm_install_pkg(dsc_package_path + '.rpm', 'dsc-' + dsc_version_rpm)
-    else:
-        raise Exception('Unknown distro: {0}'.format(distro_name))
+    if distro_category == DistroCategory.debian:
+        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
+        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
+    elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
 
 def rpm_install_pkg(package_path, package_name):
     code,output = run_cmd('rpm -q ' + package_name)
@@ -239,15 +295,12 @@ def deb_install_pkg(package_path, package_name, package_version):
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
 def install_package(package):
-    distro_name = distro_info[0]
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
+    if distro_category == DistroCategory.debian:
         apt_package_install(package)
-    elif (distro_name == 'centos' or distro_name == 'redhat'):
+    elif distro_category == DistroCategory.redhat:
         yum_package_install(package)
-    elif distro_name == 'SuSE':
+    elif distro_category == DistroCategory.suse:
         zypper_package_install(package)
-    else:
-        raise Exception('Unknown distro: {0}'.format(distro_name))
 
 def zypper_package_install(package):
     hutil.log('zypper --non-interactive in ' + package)
@@ -285,69 +338,43 @@ def get_openssl_version():
         hutil.error(error_msg)
         raise Exception(error_msg)                
         
-def start_omiserver():
-    run_cmd('service omiserver start')
-    code,output = run_cmd('service omiserver status')
+def start_omiservice():
+    run_cmd('/opt/omi/bin/service_control start')
+    code,output = run_cmd('service omid status')
     if code == 0:
-        hutil.log('Service omiserver is started')
+        hutil.log('Service omid is started')
     else:
-        raise Exception('Failed to start service omiserver : {0}'.format(output))
+        raise Exception('Failed to start service omid, status : {0}'.format(output))
 
-def download_file(mode):
+def download_file():
     download_dir = prepare_download_dir(hutil.get_seq_no())
 
     storage_account_name = get_config('StorageAccountName')
     storage_account_key = get_config('StorageAccountKey')
-    container_name = get_config('ContainerName')
-    mof_blob_name = get_config('MofFileName')
-    mof_file_uri = get_config('MofFileUri')
-    resource_file_name = get_config('ResourceZipFileName')
-    resource_file_uri = get_config('ResourceZipFileUri')
+    file_uri = get_config('FileUri')
 
-    if mode == 'push' or mode == 'pull':
-        if storage_account_name and storage_account_key and container_name and mof_blob_name:
-            hutil.log('Downloading the MOF file ' + mof_blob_name + ' from azure storage')
-            download_path = os.path.join(download_dir, mof_blob_name)
-            download_azure_blob(storage_account_name, storage_account_key, container_name, mof_blob_name, download_path)
-            return download_path
-        elif mof_file_uri:
-            hutil.log('Downloading the MOF file from external link')
-            file_path = download_external_file(mof_file_uri, download_dir)            
-            return file_path
-        else:
-            error_msg = 'Missing configurations of MOF file'
-            waagent.AddExtensionEvent(name=ExtensionShortName,
-                                      op=DownloadOp,
-                                      isSuccess=False,
-                                      message="(03000)Argument error, invalid file location")
-        
-    elif mode == 'install':
-        if storage_account_name and storage_account_key and container_name and resource_file_name:
-            hutil.log('Downloading the resource zip file ' + resource_file_name + ' from azure storage')
-            download_path = os.path.join(download_dir, resource_file_name)
-            download_azure_blob(storage_account_name, storage_account_key, container_name, resource_file_name, download_path)
-            return download_path
-        elif resource_file_uri:
-            hutil.log('Downloading the resource zip file from external link')
-            file_path = download_external_file(resource_file_uri, download_dir)
-            return file_path
-        else:
-            error_msg = 'Missing configurations of resource zip file'
-            waagent.AddExtensionEvent(name=ExtensionShortName,
-                                      op=DownloadOp,
-                                      isSuccess=False,
-                                      message="(03000)Argument error, invalid file location")
+    if not file_uri:
+        error_msg = 'Missing FileUri configuration'
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=Operation.Download,
+                                  isSuccess=False,
+                                  message="(03000)Argument error, invalid file location")
+        raise Exception(error_msg)
+
+    if storage_account_name and storage_account_key:
+        hutil.log('Downloading file from azure storage...')
+        path = download_azure_blob(storage_account_name, storage_account_key, file_uri, download_dir)
+        return path
     else:
-        error_msg = 'Invalid mode: ' + mode
-    hutil.error(error_msg)
-    raise Exception(error_msg)
+        hutil.log('Downloading file from external link...')
+        path = download_external_file(file_uri, download_dir)
+        return path
 
-def get_path_from_uri(uri_str):
-    uri = urlparse.urlparse(uri_str)
-    return uri.path
-
-def download_azure_blob(account_name, account_key, container_name, blob_name, download_path):
-    blob_service = BlobService(account_name, account_key)
+def download_azure_blob(account_name, account_key, file_uri, download_dir):
+    (blob_name, container_name) = parse_blob_uri(file_uri)
+    host_base = get_host_base_from_uri(file_uri)
+    download_path = os.path.join(download_dir, blob_name)
+    blob_service = BlobService(account_name, account_key, host_base=host_base)
     max_retry = 3
     for retry in range(1, max_retry + 1):
         try:
@@ -359,14 +386,35 @@ def download_azure_blob(account_name, account_key, container_name, blob_name, do
                 time.sleep(10)
             else:
                 waagent.AddExtensionEvent(name=ExtensionShortName,
-                                          op=DownloadOp,
+                                          op=Operation.Download,
                                           isSuccess=False,
                                           message="(03303)Failed to download file from Azure Storage")
                 raise Exception('Failed to download azure blob: ' + blob_name)
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=DownloadOp,
+                              op=Operation.Download,
                               isSuccess=True,
                               message="(03301)Succeeded to download file from Azure Storage")
+    return download_path
+
+def parse_blob_uri(blob_uri):
+    path = get_path_from_uri(blob_uri).strip('/')
+    first_sep = path.find('/')
+    if first_sep == -1:
+        hutil.error("Failed to extract container and blob name from " + blob_uri)
+    blob_name = path[first_sep+1:]
+    container_name = path[:first_sep]
+    return (blob_name, container_name)
+
+def get_path_from_uri(uri):
+    uri = urlparse.urlparse(uri)
+    return uri.path
+
+def get_host_base_from_uri(blob_uri):
+    uri = urlparse.urlparse(blob_uri)
+    netloc = uri.netloc
+    if netloc is None:
+        return None
+    return netloc[netloc.find('.'):]
 
 def download_external_file(file_uri, download_dir):
     path = get_path_from_uri(file_uri)
@@ -384,12 +432,12 @@ def download_external_file(file_uri, download_dir):
                 time.sleep(10)
             else:
                 waagent.AddExtensionEvent(name=ExtensionShortName,
-                                          op=DownloadOp,
+                                          op=Operation.Download,
                                           isSuccess=False,
                                           message="(03304)Failed to download file from public URI")
                 raise Exception('Failed to download public file: ' + file_name)
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=DownloadOp,
+                              op=Operation.Download,
                               isSuccess=True,
                               message="(03302)Succeeded to download file from public URI")
 
@@ -412,29 +460,29 @@ def prepare_download_dir(seq_no):
     return cur_download_dir
 
 def apply_dsc_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SendConfigurationApply.py -configurationmof ' + config_file_path)
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path)
     if code == 0:
-        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetConfiguration.py')
+        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=ApplyMofOp,
+                                  op=Operation.ApplyMof,
                                   isSuccess=False,
                                   message="(03105)" + error_msg)
         raise Exception(error_msg)
 
 def apply_dsc_meta_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SendMetaConfigurationApply.py -configurationmof ' + config_file_path)
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path)
     if code == 0:
-        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetMetaConfiguration.py')
+        code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output
     else:
         error_msg = 'Failed to apply Meta MOF configuration: {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=ApplyMetaMofOp,
+                                  op=Operation.ApplyMetaMof,
                                   isSuccess=False,
                                   message="(03107)" + error_msg)
         raise Exception(error_msg)
@@ -453,12 +501,12 @@ def install_module(file_path):
         error_msg = 'Failed to install DSC Module ' + file_path + ':{0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=InstallModuleOp,
+                                  op=Operation.InstallModule,
                                   isSuccess=False,
                                   message="(03100)" + error_msg)
         raise Exception(error_msg)
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=InstallModuleOp,
+                              op=Operation.InstallModule,
                               isSuccess=True,
                               message="(03101)Succeeded to install DSC Module")
 
@@ -469,27 +517,54 @@ def remove_module():
         error_msg = 'Failed to remove DSC Module ' + module_name + ': {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=RemoveModuleOp,
+                                  op=Operation.RemoveModule,
                                   isSuccess=False,
                                   message="(03102)" + error_msg)
         raise Exception(error_msg)
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=RemoveModuleOp,
+                              op=Operation.RemoveModule,
                               isSuccess=True,
                               message="(03103)Succeeded to remove DSC Module")
 
 def uninstall_package(package_name):
-    distro_name = distro_info[0]
-    if (distro_name == 'Ubuntu' or distro_name == 'debian'):
-        cmd = 'dpkg -P ' + package_name
-    elif (distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'SuSE'):
-        cmd = 'rpm -e ' + package_name
+    if distro_category == DistroCategory.debian:
+        deb_uninstall_package(package_name)
+    elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
+        rpm_uninstall_package(package_name)
+
+def deb_uninstall_package(package_name):
+    cmd = 'dpkg -P ' + package_name
     code,output = run_cmd(cmd)
     if code == 0:
         hutil.log('Package ' + package_name + ' is removed successfully')
     else:
         raise Exception('Failed to remove package ' + package_name)
 
+def rpm_uninstall_package(package_name):
+    cmd = 'rpm -e ' + package_name
+    code,output = run_cmd(cmd)
+    if code == 0:
+        hutil.log('Package ' + package_name + ' is removed successfully')
+    else:
+        raise Exception('Failed to remove package ' + package_name)
+
+def register_automation():
+    registration_key = get_config('RegistrationKey')
+    registation_url = get_config('RegistrationUrl')
+    code,output = run_cmd('/opt/microsoft/dsc/Scripts/Register.py ' + registration_key + ' ' + registation_url)
+    if not code == 0:
+        error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op=Operation.Register,
+                                  isSuccess=False,
+                                  message="(03109)" + error_msg)
+        raise Exception(error_msg)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op=Operation.Register,
+                              isSuccess=True,
+                              message="(03108)Succeeded to register with Azure Automation DSC")
+    
 if __name__ == '__main__':
     main()
 

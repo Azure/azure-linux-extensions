@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.2.
+Latest version is 2.3.7.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -11,6 +11,16 @@ Diagnostic Extension can:
 * Collects and uploads Linux VM's system performance, diagnostic, and syslog data to user’s storage table.
 * Enables user to customize the data metrics that will be collected and uploaded.
 * Enables user to upload specified log files to designated storage table.
+
+
+## Important Notice
+
+***The new Azure Portal's VM Diagnostic extension status and performance graphs will not work***
+if the Linux Azure Diagnostic extension is configured using one of the methods described in this
+document (that is, using either Azure Powershell or Azure XPLAT CLI with the JSON configs below).
+The Azure Portal's VM Diagnostic extension status and the performance graphs requires that this
+extension be enabled only through the Azure Portal.
+
 
 
 # User Guide
@@ -24,6 +34,7 @@ Schema for the public configuration file looks like this:
 * `perfCfg`: (required) A list of WQL query clauses, supported counters could be found in this [document](http://scx.codeplex.com/wikipage?title=xplatproviders&referringTitle=Documentation).
 * `EnableSyslog`: (optional) Whether syslog data should be reported, currently only rsyslog is supported. Can choose from 'true' and 'false', default value is true.
 * `fileCfg`: (optional) A list of files to be tracked, note this only works when EnableSyslog is set to true.
+* `mdsdHttpProxy`: (optional) http proxy configuration for mdsd. Format: "http://proxy_host:proxy_port". "http:" part is optional. DO NOT specify username and password here!
  
 ```json
 {
@@ -36,7 +47,8 @@ Schema for the public configuration file looks like this:
     {"file":"/var/log/a.log", "table":"aLog"},
     {"file":"/var/log/b.log", "table":"bLog"}
   ],
-  "EnableSyslog":"true"
+  "EnableSyslog":"true",
+  "mdsdHttpProxy":"http://your_proxy_host:3128"
 }
 ```
 
@@ -48,11 +60,13 @@ Schema for the protected configuration file looks like this:
 
 * `storageAccountName`: (required) the name of storage account
 * `storageAccountKey`: (required) the access key of storage account
+* `mdsdHttpProxy`: (optional) http proxy configuration for mdsd. Format: "http://username:password@proxy_host:proxy_port". "http:" part is optional. You may specify username and password here. If this is specified both on public and protected configurations, this protected configuration will prevail.
 
 ```json
 {
   "storageAccountName": "<storage-account-name>",
-  "storageAccountKey": "<storage-account-key>"
+  "storageAccountKey": "<storage-account-key>",
+  "mdsdHttpProxy":"http://proxy_username:password@your_proxy_host:3128"
 }
 ```
 
@@ -82,7 +96,7 @@ The Classic mode is also called Azure Service Management mode. You can change to
 $ azure config mode asm
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 ```
 $ azure vm extension set <vm-name> LinuxDiagnostic Microsoft.OSTCExtensions '2.*' -c public.json -e protected.json
 ```
@@ -96,7 +110,7 @@ You can change to Azure Resource Manager mode by running:
 $ azure config mode arm
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 ```
 $ azure vm extension set <resource-group> <vm-name> LinuxDiagnostic Microsoft.OSTCExtensions <version> -c public.json  -e protected.json
 ```
@@ -111,7 +125,7 @@ You can login to your Azure account (Azure Service Management mode) by running:
 Add-AzureAccount
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 
 ```powershell
 $VmName = '<vm-name>'
@@ -120,6 +134,8 @@ $vm = Get-AzureVM -ServiceName $VmName -Name $VmName
 $ExtensionName = 'LinuxDiagnostic'
 $Publisher = 'Microsoft.OSTCExtensions'
 $Version = '<version>'
+
+# Add "mdsdHttpProxy" setting to $PublicConf or $PrivateConf as needed (as mentioned above)
 
 $PublicConf = '{
   "perfCfg":[
@@ -155,7 +171,7 @@ Login-AzureRmAccount
 
 Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure Powershell with Azure Resource Manager.
 
-You can deploying LinuxDiagnostic Extension by running:
+You can deploy LinuxDiagnostic Extension by running:
 
 ```powershell
 $RGName = '<resource-group-name>'
@@ -165,6 +181,8 @@ $Location = '<location>'
 $ExtensionName = 'LinuxDiagnostic'
 $Publisher = 'Microsoft.OSTCExtensions'
 $Version = '<version>'
+
+# Add "mdsdHttpProxy" setting to $PublicConf or $PrivateConf if needed (as mentioned above).
 
 $PublicConf = '{
   "perfCfg":[
@@ -192,6 +210,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 
 ### 2.3. Using [**ARM Template**][arm-template]
 
+Add "mdsdHttpProxy" setting to "settings" section or "protectedSettings" section if needed (as mentioned above).
+
 ```json
 {
   "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -204,7 +224,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "LinuxDiagnostic",
-    "typeHandlerVersion": "2.2",
+    "typeHandlerVersion": "2.3",
     "settings": {
        "perfCfg":[
           {
@@ -227,8 +247,10 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
-- openSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 11 SP3 and higher
+- OpenSUSE 13.1 and higher
+- SUSE Linux Enterprise Server 11 and higher
+- Debian 8 and higher (7 not supported due to its low GLIBC version)
+- RHEL 6.7 and higher
 
 ## Debug
 

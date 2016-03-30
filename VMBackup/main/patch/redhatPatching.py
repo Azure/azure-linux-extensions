@@ -37,7 +37,7 @@ class redhatPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
         super(redhatPatching,self).__init__(distro_info)
         self.logger = logger
-        if(distro_info[1] == "6.7"):
+        if(distro_info is not None and len(distro_info) > 0 and distro_info[1].startswith("6.")):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'

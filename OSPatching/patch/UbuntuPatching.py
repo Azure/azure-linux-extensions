@@ -43,7 +43,8 @@ class UbuntuPatching(AbstractPatching):
         self.check_security_suffix = ' -o Dir::Etc::SourceList=/etc/apt/security.sources.list'
         waagent.Run('grep "-security" /etc/apt/sources.list | sudo grep -v "#" > /etc/apt/security.sources.list')
         self.download_cmd = 'apt-get -d -y install'
-        self.patch_cmd = 'apt-get -y -q --force-yes install'
+        self.patch_cmd = 'apt-get -y -q --force-yes -o Dpkg::Options::="--force-confdef" install'
+        self.fix_cmd = 'dpkg --configure -a --force-confdef'
         self.status_cmd = 'apt-cache show'
         self.pkg_query_cmd = 'dpkg-query -L'
         # Avoid a config prompt
@@ -59,6 +60,22 @@ class UbuntuPatching(AbstractPatching):
         retcode = waagent.Run('apt-get -y install update-notifier-common')
         if retcode > 0:
             self.hutil.error("Failed to install update-notifier-common")
+
+    def try_package_with_autofix(self, cmd):
+        retcode, output = waagent.RunGetOutput(cmd)
+        if retcode == 0:
+            return retcode, output
+        # An error occurred while running the command. Try to recover.
+        # Unfortunately apt-get returns code 100 regardless of the error encountered, 
+        # so we can't smartly detect the cause of failure
+        self.log_and_syslog(logging.WARNING, "Error running command ({0}). Will try to correct package state ({1}). Error was {2}".format(cmd, self.fix_cmd, output))
+        retcode, output = waagent.RunGetOutput(self.fix_cmd)
+        if retcode != 0:
+            self.log_and_syslog(logging.WARNING, "Error correcting package state ({0}). Error was {1}".format(self.fix_cmd, output))
+        retcode, output = waagent.RunGetOutput(cmd)
+        if retcode != 0:
+            self.log_and_syslog(logging.WARNING, "Unable to run ({0}) on second attempt. Giving up. Error was {1}".format(cmd, output))
+        return retcode, output
 
     def check(self, category):
         """
@@ -76,7 +93,8 @@ class UbuntuPatching(AbstractPatching):
         # Otherwise, assume all packages will be upgraded
         if category == self.category_required:
             check_cmd = check_cmd + self.check_security_suffix
-        retcode, output = waagent.RunGetOutput(check_cmd)
+        retcode, output = self.try_package_with_autofix(check_cmd)
+        
         to_download = [line.split()[1] for line in output.split('\n') if line.startswith('Inst')]
 
         # Azure repo assumes upgrade may have dependency changes
@@ -89,17 +107,18 @@ class UbuntuPatching(AbstractPatching):
         else:
             self.log_and_syslog(logging.INFO, "Running dist-upgrade using {0}".format(self.dist_upgrade_list))
             self.check_azure_cmd = 'apt-get -qq -s dist-upgrade -o Dir::Etc::SourceList={0}'.format(self.dist_upgrade_list)
-            retcode, azoutput = waagent.RunGetOutput(self.check_azure_cmd)
+            retcode, azoutput = self.try_package_with_autofix(self.check_azure_cmd)
             azure_to_download = [line.split()[1] for line in azoutput.split('\n') if line.startswith('Inst')]
             to_download += list(set(azure_to_download) - set(to_download))
 
         return retcode, to_download
-
+        
     def download_package(self, package):
         return waagent.Run(self.download_cmd + ' ' + package)
 
     def patch_package(self, package):
-        return waagent.Run(self.patch_cmd + ' ' + package)
+        retcode, output = self.try_package_with_autofix(self.patch_cmd + ' ' + package)
+        return retcode
 
     def check_reboot(self):
         self.reboot_required = os.path.isfile('/var/run/reboot-required')
