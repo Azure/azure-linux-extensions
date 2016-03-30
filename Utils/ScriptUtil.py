@@ -52,7 +52,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
             msg = LogUtil.get_formatted_log("Command is running...",
                                     LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
             hutil.log(msg)
-            hutil.do_status_report(operation, 'Running', '0', msg)
+            hutil.do_status_report(operation, 'transitioning', '0', msg)
             time.sleep(interval)
 
         exit_code = child.returncode
