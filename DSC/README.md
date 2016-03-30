@@ -1,17 +1,19 @@
 # DSCForLinux Extension
-Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux.
+Allow the owner of the Azure Virtual Machines to configure the VM using Desired State Configuration (DSC) for Linux.
 
-Latest version is 1.0.
+Latest version is 2.0.
 
 About how to create MOF document, please refer to below documents.
-* [Get started with Windows PowerShell Desired State Configuration for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
-* [Built-In Windows PowerShell Desired State Configuration Resources for Linux](https://technet.microsoft.com/en-us/library/mt126209.aspx)
+* [Get started with Desired State Configuration (DSC) for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
+* [Built-In Desired State Configuration Resources for Linux](https://msdn.microsoft.com/en-us/powershell/dsc/lnxbuiltinresources)
+* [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
 * Push MOF configurations to the Linux VM (Push Mode)
 * Distribute MOF configurations to the Linux VM with Pull Servers (Pull Mode)
 * Install custom DSC modules to the Linux VM (Install Mode)
 * Remove custom DSC modules to the Linux VM (Remove Mode)
+* Register the Linux VM to Azure Automation account (Register Mode)
 
 # User Guide
 
@@ -21,10 +23,9 @@ DSCForLinux Extension can:
 
 Here're all the supported public configuration parameters:
 
-* `MofFileUri`: (optional, string) the uri of the public MOF file
-* `ResourceZipFileUri`: (optional, string) the uri of the custom resource ZIP file
+* `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove. If not specified, it's considered as Pull mode.
+* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
 
 ### 1.2 Protected configuration
 
@@ -32,9 +33,8 @@ Here're all the supported protected configuration parameters:
 
 * `StorageAccountName`: (optional, string) the name of the storage account that contains the file
 * `StorageAccountKey`: (optional, string) the key of the storage account that contains the file
-* `ContainerName`: (optional, string) the name of the container that contains the file
-* `MofFileName`: (optional, string) the name of the MOF file in the Azure Storage Account
-* `ResourceZipFileName`: (optional, string) the name of the custom resource ZIP file in the Azure Storage Account, the format should be "name_version.zip".
+* `RegistrationUrl`: (optional, string) the URL of the Azure Automation account
+* `RegistrationKey`: (optional, string) the access key of the Azure Automation account
 
 ## 2. Deploying the Extension to a VM
 
@@ -99,13 +99,12 @@ $version = '<version>'
 # according to different scenarios in section 3
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Push"
+  "Mode": "Push",
+  "FileUri": "<mof-file-uri>"
 }'
 
 Set-AzureVMExtension -ExtensionName $extensionName -VM $vm -Publisher $publisher `
@@ -138,13 +137,12 @@ $version = '<version>'
 # according to different scenarios in section 3
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Push"
+  "Mode": "Push",
+  "FileUri": "<mof-file-uri>"
 }'
 
 Set-AzureRmVMExtension -ResourceGroupName $rgName -VMName $vmName -Location $location `
@@ -166,9 +164,15 @@ protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
+}
+```
+
+public.json
+```json
+{
+  "FileUri": "<mof-file-uri>",
+  "Mode": "Push"
 }
 ```
 
@@ -176,25 +180,29 @@ powershell format
 ```powershell
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<mof-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
+}'
+
+$publicConfig = '{
+  "FileUri": "<mof-file-uri>",
+  "Mode": "Push"
 }'
 ```
+
 
 ### 3.2. Apply a MOF configuration file (in public storage) to the VM
 
 public.json
 ```json
 {
-  "MofFileUri": "<mof-file-uri>"
+  "FileUri": "<mof-file-uri>"
 }
 ```
 
 powershell format
 ```powershell
 $publicConfig = '{
-  "MofFileUri": "<mof-file-uri>"
+  "FileUri": "<mof-file-uri>"
 }'
 ```
 
@@ -205,15 +213,14 @@ protected.json
 {
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<meta-mof-file-name>"
 }
 ```
 
 public.json
 ```json
 {
-  "Mode": "Pull"
+  "Mode": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
 }
 ```
 
@@ -222,12 +229,11 @@ powershell format
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
   "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "MofFileName": "<meta-mof-file-name>"
 }'
 
 $publicConfig = '{
-  "Mode": "Pull"
+  "Mode": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
 }'
 ```
 
@@ -235,14 +241,14 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "MofFileUri": "<meta-mof-file-uri>",
+  "FileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "MofFileUri": "<meta-mof-file-uri>",
+  "FileUri": "<meta-mof-file-uri>",
   "Mode": "Pull"
 }'
 ```
@@ -252,15 +258,14 @@ protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "ResourceZipFileName": "<resource-zip-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }
 ```
 public.json
 ```json
 {
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }
 ```
 
@@ -268,13 +273,12 @@ powershell format
 ```powershell
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-  "ContainerName": "<container-name>",
-  "ResourceZipFileName": "<resource-zip-file-name>"
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }'
 ```
 
@@ -282,15 +286,15 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "ResourceZipFileUri": "<resource-zip-file-uri>",
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "ResourceZipFileUri": "<resource-zip-file-uri>",
-  "Mode": "Install"
+  "Mode": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }'
 ```
 
@@ -310,12 +314,31 @@ $publicConfig = '{
 }'
 ```
 
+### 3.8 Register to Azure Automation account
+protected.json
+```json
+{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}'
+```
+
 ## 4. Supported Linux Distributions
 - Ubuntu 12.04 LTS, 14.04 LTS
 - CentOS 6.5 and higher
+- RHEL 6.5 and higher
 - Oracle Linux 6.4 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
+- Debian 7 and 8
 
 ## 5. Debug
 * The status of the extension is reported back to Azure so that user can see the status on Azure Portal
@@ -327,8 +350,13 @@ $publicConfig = '{
 ## Changelog
 
 ```
+# 2.0 (2016-03-10)
+- Pick up Linux DSC v1.1.1
+- Add function to register Azure Automation
+- Refine extension configurations
+
 # 1.0 (2015-09-24)
--Initial version
+- Initial version
 ```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/

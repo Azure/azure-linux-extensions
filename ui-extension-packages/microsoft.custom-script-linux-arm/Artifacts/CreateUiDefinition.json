@@ -1,0 +1,37 @@
+{
+  "handler": "Microsoft.Compute.VmExtension",
+  "version": "0.0.1-preview",
+  "parameters": {
+    "elements": [
+      {
+        "name": "fileUris",
+        "type": "Microsoft.Common.FileUpload",
+        "label": "Script files",
+        "toolTip": "The script files that will be downloaded to the virtual machine.",
+        "constraints": {
+          "required": false
+        },
+        "options": {
+          "multiple": true,
+          "uploadMode": "url"
+        }
+      },
+      {
+        "name": "commandToExecute",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Command",
+        "defaultValue": "sh script.sh",
+        "toolTip": "The command to execute, for example: sh script.sh",
+        "constraints": {
+          "required": true
+        }
+      }
+    ],
+    "outputs": {
+      "vmName": "[vmName()]",
+      "location": "[location()]",
+      "fileUris": "[elements('fileUris')]",
+      "commandToExecute": "[elements('commandToExecute')]"
+    }
+  }
+}

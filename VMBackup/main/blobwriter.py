@@ -44,7 +44,7 @@ class BlobWriter(object):
                     headers = {}
                     headers["x-ms-blob-type"] = 'BlockBlob'
                     self.hutil.log(str(headers))
-                    result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = msg, headers = headers)
+                    result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = msg, headers = headers, fallback_to_curl = True)
                     if(result == CommonVariables.success):
                         self.hutil.log("blob written succesfully to:"+str(blobUri))
                         retry_times = 0

@@ -26,7 +26,7 @@ from HttpUtil import HttpUtil
 
 class SnapshotError(object):
     def __init__(self):
-        self.errorcode = 0
+        self.errorcode = CommonVariables.success
         self.sasuri = None
     def __str__(self):
         return 'errorcode: ' + str(self.errorcode) + ' sasuri: ' + str(self.sasuri)
@@ -51,13 +51,13 @@ class Snapshotter(object):
         snapshot_error = SnapshotError()
         if(sasuri is None):
             self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
-            snapshot_error.errorcode = -1
+            snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         try:
             sasuri_obj = urlparse.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
                 self.logger.log("Failed to parse the sasuri",False,'Error')
-                snapshot_error.errorcode = -1
+                snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
                 body_content = ''
@@ -70,14 +70,16 @@ class Snapshotter(object):
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                self.logger.log("start calling the snapshot rest api")
                 result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
-                if(result != 0):
+                self.logger.log("snapshot api returned: {0}".format(result))
+                if(result != CommonVariables.success):
                     snapshot_error.errorcode = result
                     snapshot_error.sasuri = sasuri
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
-            snapshot_error.errorcode = -1
+            snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         return snapshot_error
 
@@ -85,8 +87,12 @@ class Snapshotter(object):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
         blobs = paras.blobs
-        for blob in blobs:
-            snapshotError = self.snapshot(blob, paras.backup_metadata)
-            if(snapshotError.errorcode != CommonVariables.success):
-                snapshot_result.errors.append(snapshotError)
-        return snapshot_result
+        if blobs is not None:
+            for blob in blobs:
+                snapshotError = self.snapshot(blob, paras.backup_metadata)
+                if(snapshotError.errorcode != CommonVariables.success):
+                    snapshot_result.errors.append(snapshotError)
+            return snapshot_result
+        else:
+            self.logger.log("the blobs are None")
+            return snapshot_result

@@ -35,6 +35,8 @@ import traceback
 import httplib
 import xml.parsers.expat
 import datetime
+from threading import Thread
+from time import sleep
 from os.path import join
 from mounts import Mounts
 from mounts import Mount
@@ -49,9 +51,18 @@ from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
+
 #Main function is the only entrence to this extension handler
+
 def main():
-    global MyPatching,backup_logger,hutil
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,unfreeze_result,snapshot_result,snapshot_done
+    snapshot_done = False
+    run_result = CommonVariables.success
+    run_status = 'success'
+    error_msg = ''
+    freeze_result = None
+    unfreeze_result = None
+    snapshot_result = None
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -72,6 +83,7 @@ def main():
             update()
 
 def install():
+    global hutil
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
@@ -82,33 +94,36 @@ def timedelta_total_seconds(delta):
         return delta.total_seconds()
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
-        backup_logger.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
-        time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-        time_span = timedelta_total_seconds(time_delta) * 1000
-        date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-        stat = [{
-            "version" : hutil._context._version,
-            "timestampUTC" : date_place_holder,
-            "status" : {
-                "name" : hutil._context._name,
-                "operation" : operation,
-                "status" : status,
-                "code" : status_code,
-                "taskId":taskId,
-                "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
-                "formattedMessage" : {
-                    "lang" : "en-US",
-                    "message" : message
-                }
+    global backup_logger,hutil
+    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
+    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+    time_span = timedelta_total_seconds(time_delta) * 1000
+    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+    date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+    stat = [{
+        "version" : hutil._context._version,
+        "timestampUTC" : date_place_holder,
+        "status" : {
+            "name" : hutil._context._name,
+            "operation" : operation,
+            "status" : status,
+            "code" : status_code,
+            "taskId": taskId,
+            "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
+            "formattedMessage" : {
+                "lang" : "en-US",
+                "message" : message
             }
-        }]
-        status_report_msg = json.dumps(stat)
-        status_report_msg = status_report_msg.replace(date_place_holder,date_string)
-        blobWriter = BlobWriter(hutil)
-        blobWriter.WriteBlob(status_report_msg,blobUri)
+        }
+    }]
+    status_report_msg = json.dumps(stat)
+    status_report_msg = status_report_msg.replace(date_place_holder,date_string)
+    blobWriter = BlobWriter(hutil)
+    blobWriter.WriteBlob(status_report_msg,blobUri)
+    return status_report_msg
 
 def exit_with_commit_log(error_msg, para_parser):
+    global backup_logger
     backup_logger.log(error_msg, True, 'Error')
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
@@ -117,19 +132,59 @@ def exit_with_commit_log(error_msg, para_parser):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
+def snapshot():
+    try:
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
+        freeze_result = freezer.freezeall()
+        backup_logger.log('T:S freeze result ' + str(freeze_result))
+
+        # check whether we freeze succeed first?
+        if(freeze_result is not None and len(freeze_result.errors) > 0):
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+            backup_logger.log(error_msg, False, 'Warning')
+        else:
+            backup_logger.log('T:S doing snapshot now...')
+            snap_shotter = Snapshotter(backup_logger)
+            snapshot_result = snap_shotter.snapshotall(para_parser)
+            backup_logger.log('T:S snapshotall ends...')
+            if(snapshot_result is not None and len(snapshot_result.errors) > 0):
+                error_msg = 'T:S snapshot result: ' + str(snapshot_result)
+                run_result = CommonVariables.error
+                run_status = 'error'
+                backup_logger.log(error_msg, False, 'Error')
+            else:
+                run_result = CommonVariables.success
+                run_status = 'success'
+                error_msg = 'Enable Succeeded'
+                backup_logger.log("T:S " + error_msg)
+    except Exception as e:
+        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, False, 'Error')
+    snapshot_done = True
+
+
+def freeze_watcher():
+    global backup_logger,run_status,error_msg,snapshot_done
+    #wait 5 minutes before the snapshoting.
+    for i in range(0, 50):
+        if(snapshot_done):
+            backup_logger.log('T:W snapshot is done', False)
+            break;
+        sleep(6)
+    if not snapshot_done:
+        run_result = CommonVariables.error
+        run_status = 'error'
+        error_msg = 'T:W Snapshot timeout'
+        backup_logger.log(error_msg, False, 'Warning')
+
 def enable():
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Enable')
-
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
-    unfreeze_result = None
-    snapshot_result = None
-    freeze_result = None
     global_error_result = None
-    para_parser = None
-    run_result = 1
-    error_msg = ''
-    run_status = None
     # precheck
     freeze_called = False
     try:
@@ -197,32 +252,25 @@ def enable():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
+                freeze_watcher_tread = Thread(target = freeze_watcher)
+                freeze_watcher_tread.start()
                 backup_logger.log('doing freeze now...', True)
-                freeze_called = True
-                freeze_result = freezer.freezeall()
-                backup_logger.log('freeze result ' + str(freeze_result))
-
-                # check whether we freeze succeed first?
-                if(freeze_result is not None and len(freeze_result.errors) > 0):
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'Enable failed with error: ' + str(freeze_result)
-                    backup_logger.log(error_msg, False, 'Warning')
-                else:
-                    backup_logger.log('doing snapshot now...')
-                    snap_shotter = Snapshotter(backup_logger)
-                    snapshot_result = snap_shotter.snapshotall(para_parser)
-                    backup_logger.log('snapshotall ends...')
-                    if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                        error_msg = 'snapshot result: ' + str(snapshot_result)
-                        run_result = CommonVariables.error
-                        run_status = 'error'
-                        backup_logger.log(error_msg, False, 'Error')
-                    else:
-                        run_result = CommonVariables.success
-                        run_status = 'success'
-                        error_msg = 'Enable Succeeded'
-                        backup_logger.log(error_msg)
+                snapshot_thread = Thread(target = snapshot)
+                snapshot_thread.start()
+                freeze_watcher_tread.join()
+                
+                for i in range(0,3):
+                    unfreeze_result = freezer.unfreezeall()
+                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                    if(unfreeze_result is not None):
+                        if len(unfreeze_result.errors) > 0:
+                            error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
+                            backup_logger.log(error_msg, False, 'Warning')
+                        else:
+                            backup_logger.log('unfreeze result is None')
+                            break;
+                backup_logger.log('unfreeze ends...')
+                
         else:
             run_status = 'error'
             run_result = CommonVariables.error_parameter
@@ -232,21 +280,7 @@ def enable():
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
         global_error_result = e
-    finally:
-        backup_logger.log('doing unfreeze now...')
-        if(freeze_called):
-            unfreeze_result = freezer.unfreezeall()
-            backup_logger.log('unfreeze result ' + str(unfreeze_result))
-            if(unfreeze_result is not None and len(unfreeze_result.errors) > 0):
-                error_msg += ('Enable Succeeded with error: ' + str(unfreeze_result.errors))
-                backup_logger.log(error_msg, False, 'Warning')
-            backup_logger.log('unfreeze ends...')
 
-    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-        backup_logger.commit(para_parser.logsBlobUri)
-    else:
-        backup_logger.log("the logs blob uri is not there, so do not upload log.")
-        backup_logger.commit_to_local()
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
@@ -259,14 +293,24 @@ def enable():
             run_result = CommonVariables.error
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
-
+    status_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        do_backup_status_report(operation='Enable',status = run_status,\
-                                status_code=str(run_result), \
+        status_report_msg = do_backup_status_report(operation='Enable',status=run_status,\
+                                status_code=str(run_result),\
                                 message=error_msg,\
                                 taskId=para_parser.taskId,\
                                 commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                                 blobUri=para_parser.statusBlobUri)
+    if(status_report_msg is not None):
+        backup_logger.log("status report message:")
+        backup_logger.log(status_report_msg)
+    else:
+        backup_logger.log("status_report_msg is none")
+    if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+        backup_logger.commit(para_parser.logsBlobUri)
+    else:
+        backup_logger.log("the logs blob uri is not there, so do not upload log.")
+        backup_logger.commit_to_local()
 
     hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
@@ -284,4 +328,3 @@ def update():
 
 if __name__ == '__main__' :
     main()
-

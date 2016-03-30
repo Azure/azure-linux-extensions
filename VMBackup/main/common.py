@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VM Backup extension
 #
@@ -22,7 +22,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "0.1.0.91"
+    extension_version = "0.1.0.992"
     extension_type = extension_name
     extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'

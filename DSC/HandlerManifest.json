@@ -1,6 +1,6 @@
 [{
   "name": "DSC",
-  "version": 1.0,
+  "version": 2.0,
   "handlerManifest": {
     "installCommand": "dsc.py -install",
     "uninstallCommand": "dsc.py -uninstall",
