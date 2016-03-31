@@ -39,13 +39,14 @@ with open(mfile,'r') as f:
     Version = manifest['version']
 
 PackagesDirectory = "packages"
-BundleFileName = 'omsagent-1.1.0-28.universal.x64.sh'
+BundleFileName = 'omsagent-1.1.0-30.universal.x64.sh'
 
 # always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
-InstallCommandTemplate = './{0} --upgrade'
+InstallCommandTemplate = './{0} --upgrade --force'
 UninstallCommandTemplate = './{0} --remove'
 OmsAdminWorkingDirectory = '/opt/microsoft/omsagent/bin'
 OnboardCommandTemplate = './omsadmin.sh -w {0} -s {1}'
+OnboardWithProxyCommandTemplate = './omsadmin.sh -w {0} -s {1} -p {2}'
 ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
 DisableOmsAgentServiceCommand = './service_control disable'
 EnableOmsAgentServiceCommand = './service_control enable'
@@ -125,12 +126,17 @@ def enable(hutil):
 
     workspaceId = public_settings.get("workspaceId")
     workspaceKey = protected_settings.get("workspaceKey")
+    proxy = protected_settings.get("proxy")
     if workspaceId is None:
         raise ValueError("Workspace ID cannot be None.")
     if workspaceKey is None:
         raise ValueError("Workspace key cannot be None.")
 
-    cmd = OnboardCommandTemplate.format(workspaceId, workspaceKey)
+    if proxy is None:
+        cmd = OnboardCommandTemplate.format(workspaceId, workspaceKey)
+    else:
+        cmd = OnboardWithProxyCommandTemplate.format(workspaceId, workspaceKey, proxy)
+        
     exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), OmsAdminWorkingDirectory, 'Onboard', ExtensionShortName, Version, False)
     # if onboard succeeds we continue, otherwise fail fast
     if exit_code == 0:

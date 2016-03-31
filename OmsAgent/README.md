@@ -31,10 +31,12 @@ Schema for the public configuration file looks like this:
 Schema for the protected configuration file looks like this:
 
 * `workspaceKey`: (required, string) the primary/secondary shared key of the workspace
+* `proxy`: (optional, string) the proxy connection string of the form \[user:pass@\]host\[:port\]
 
 ```json
 {
-  "workspaceKey": "<workspace-key>"
+  "workspaceKey": "<workspace-key>",
+  "proxy": "<proxy-string>"
 }
 ```
 
@@ -112,7 +114,8 @@ $PublicConf = '{
     "workspaceId": "<workspace id>"
 }'
 $PrivateConf = '{
-    "workspaceKey": "<workspace key>"
+    "workspaceKey": "<workspace key>",
+    "proxy": "<proxy string>"
 }'
 
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
@@ -146,7 +149,8 @@ $PublicConf = '{
     "workspaceId": "<workspace id>"
 }'
 $PrivateConf = '{
-    "workspaceKey": "<workspace key>"
+    "workspaceKey": "<workspace key>",
+    "proxy": "<proxy string>"
 }'
 
 Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
@@ -173,7 +177,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
       "workspaceId": "<workspace id>"
     },
     "protectedSettings": {
-      "workspaceKey": "<workspace key>"
+      "workspaceKey": "<workspace key>",
+      "proxy": "<proxy string>"
     }
   }
 }
@@ -189,7 +194,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 ```
 ```json
 {
-  "workspaceKey": "MyWorkspaceKey"
+  "workspaceKey": "MyWorkspaceKey",
+  "proxy": "proxyuser:proxypassword@proxyserver:8080"
 }
 ```
 
