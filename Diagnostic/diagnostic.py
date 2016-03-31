@@ -2,8 +2,8 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.3.6
-# Copyright (c) Microsoft Corporation  
+# Linux Azure Diagnostic Extension v.2.3.7
+# Copyright (c) Microsoft Corporation
 # All rights reserved.   
 # MIT License  
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
@@ -42,7 +42,7 @@ ExtensionShortName = 'LinuxAzureDiagnostic'
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 OutputSize = 1024
-EnableSyslog= True
+EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("%s started to handle." %(ExtensionShortName))
 hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
@@ -57,9 +57,9 @@ if not private_settings:
 
 def LogRunGetOutPut(cmd):
     hutil.log("RunCmd "+cmd)
-    error,msg = waagent.RunGetOutput(cmd)
+    error, msg = waagent.RunGetOutput(cmd)
     hutil.log("Return "+str(error)+":"+msg)
-    return error,msg
+    return error, msg
 
 rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
@@ -71,14 +71,14 @@ omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
 DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
-                "packages":('libglibmm-2.4-1c2a',),
+                "packages":(),
                 "restartrsyslog":"service rsyslog restart",
                 'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
                 }
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
-                 "packages":('glibmm24','tar','policycoreutils-python'),
+                 "packages":('tar','policycoreutils-python'),
                  'distrolibs':'centos/*',
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
@@ -88,7 +88,7 @@ RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
                         '||apt-get install -y PACKAGES',
-                     'packages':('libglibmm-2.4-1v5',)
+                     'packages':()
                     }.items())
 
 # For SUSE11, we need to create a CA certs file for our bundled OpenSSL 1.0 libs
@@ -96,7 +96,7 @@ SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
 SuseConfig11 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                   "packages":('glibmm2','rsyslog'),
+                   "packages":('rsyslog',),
                    'distrolibs' : 'suse11/*',
                    'distrolibs_prep_cmds' :
                         (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
@@ -109,14 +109,14 @@ SuseConfig11 = dict(RedhatConfig.items()+
 
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                   "packages":('libglibmm-2_4-1','libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
+                   "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
                    'distrolibs' : 'suse11/*',
                    'distrolibs_prep_cmds' : (r'\rm -f suse11/libcrypto.so.* suse11/libssl.so.*',) # Should remove bundled OpenSSL libs on SUSE 12 (Use system-installed OpenSSL libs)
                   }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
                     {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('glibmm24','policycoreutils-python')}
+                     "packages":('policycoreutils-python',)}
                   .items())
 
 RSYSLOG_OM_PORT='29131'
@@ -124,7 +124,7 @@ All_Dist= {'debian':DebianConfig, 'debian:7.9': None, # Debian 7 (7.9) can't be 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
-           'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12}
+           'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12, 'SuSE':SuseConfig12}
 distConfig = None
 dist = platform.dist()
 distroNameAndVersion = dist[0] + ":" + dist[1]
@@ -316,7 +316,7 @@ def config(xmltree,key,value,xmlpath,selector=[]):
 
 def readUUID():
      code,str_ret = waagent.RunGetOutput("dmidecode |grep UUID |awk '{print $2}'",chk_err=False)
-     return str_ret.strip();
+     return str_ret.strip()
 
 def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
     perfCfgList = []
@@ -377,6 +377,23 @@ def getFileCfg():
     if not fileCfg:
         fileCfg = readPublicConfig('fileCfg')
     return fileCfg
+
+# Set event volume in mdsd config.
+# Check if desired event volume is specified, first in ladCfg then in public config.
+# If in neither then default to Medium.
+def setEventVolume(mdsdCfg,ladCfg):
+    eventVolume = LadUtil.getEventVolumeFromLadCfg(ladCfg)
+    if eventVolume:
+        hutil.log("Event volume found in ladCfg: " + eventVolume)
+    else:
+        eventVolume = readPublicConfig("eventVolume")
+        if eventVolume:
+            hutil.log("Event volume found in public config: " + eventVolume)
+        else:
+            eventVolume = "Medium"
+            hutil.log("Event volume not found in config. Using default value: " + eventVolume)
+            
+    XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
 def configSettings():
     mdsdCfgstr = readPublicConfig('mdsdCfg')
@@ -442,7 +459,8 @@ def configSettings():
     if aikey:
         AIUtil.createSyslogRouteEventElement(mdsdCfg)
 
-    config(mdsdCfg,"eventVolume","Medium","Management")
+    setEventVolume(mdsdCfg,ladCfg)
+
     config(mdsdCfg,"sampleRateInSeconds","60","Events/OMI/OMIQuery")
 
     mdsdCfg.write(os.path.join(WorkDir, './xmlCfg.xml'))
@@ -596,7 +614,9 @@ def start_mdsd():
 
     # mdsd http proxy setting
     proxy_config_name = 'mdsdHttpProxy'
-    proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has priority
+    proxy_config = waagent.HttpProxyConfigString    # /etc/waagent.conf has highest priority
+    if not proxy_config:
+        proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
     if not proxy_config:
         proxy_config = readPublicConfig(proxy_config_name)
     if not isinstance(proxy_config, basestring):
@@ -695,6 +715,7 @@ def stop_mdsd():
     #RunGetOutput("rm "+MDSDPidFile)
     return 0,"stopped"
 
+
 def get_mdsd_process():
 
     mdsd_pids = []
@@ -710,6 +731,7 @@ def get_mdsd_process():
                 hutil.log("return not alive "+is_still_alive.strip())
     return mdsd_pids
 
+
 def get_dist_config():
     dist = platform.dist()
     if All_Dist.has_key(dist[0]+":"+dist[1]):
@@ -721,46 +743,52 @@ def get_dist_config():
 
 
 def install_omi():
-    need_install_omi=0
-    isMysqlNotInstalled,result = RunGetOutput("which mysql")
-    isApacheNotInstalled,result = RunGetOutput("which apache2 || which httpd || which httpd2")
+    need_install_omi = 0
+
+    isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
+    isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
     if 'OMI-1.0.8-4' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
-    if not isMysqlNotInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
+    if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
         need_install_omi=1
-    if not isApacheNotInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"):
+    if isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"):
         need_install_omi=1
-
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
         RunGetOutput(distConfig["installomi"])
 
-    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth"):
+    # Quick and dirty way of checking if mysql/apache process is running
+    isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
+    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
+
+    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
         RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
 
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh"):
+    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
 
     RunGetOutput("/opt/omi/bin/service_control restart");
     return 0, "omi installed"
 
+
 def uninstall_omi():
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh"):
+    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache' | grep -v grep")[0] is 0
+    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
     hutil.log("omi will not be uninstalled")
-    return 0,"do nothing"
+    return 0, "do nothing"
 
 
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
-    match= re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    match = re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
     if match:
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:

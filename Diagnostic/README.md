@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.6.
+Latest version is 2.3.7.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -11,6 +11,16 @@ Diagnostic Extension can:
 * Collects and uploads Linux VM's system performance, diagnostic, and syslog data to user’s storage table.
 * Enables user to customize the data metrics that will be collected and uploaded.
 * Enables user to upload specified log files to designated storage table.
+
+
+## Important Notice
+
+***The new Azure Portal's VM Diagnostic extension status and performance graphs will not work***
+if the Linux Azure Diagnostic extension is configured using one of the methods described in this
+document (that is, using either Azure Powershell or Azure XPLAT CLI with the JSON configs below).
+The Azure Portal's VM Diagnostic extension status and the performance graphs requires that this
+extension be enabled only through the Azure Portal.
+
 
 
 # User Guide
@@ -86,7 +96,7 @@ The Classic mode is also called Azure Service Management mode. You can change to
 $ azure config mode asm
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 ```
 $ azure vm extension set <vm-name> LinuxDiagnostic Microsoft.OSTCExtensions '2.*' -c public.json -e protected.json
 ```
@@ -100,7 +110,7 @@ You can change to Azure Resource Manager mode by running:
 $ azure config mode arm
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 ```
 $ azure vm extension set <resource-group> <vm-name> LinuxDiagnostic Microsoft.OSTCExtensions <version> -c public.json  -e protected.json
 ```
@@ -115,7 +125,7 @@ You can login to your Azure account (Azure Service Management mode) by running:
 Add-AzureAccount
 ```
 
-You can deploying Diagnostic Extension by running:
+You can deploy Diagnostic Extension by running:
 
 ```powershell
 $VmName = '<vm-name>'
@@ -161,7 +171,7 @@ Login-AzureRmAccount
 
 Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure Powershell with Azure Resource Manager.
 
-You can deploying LinuxDiagnostic Extension by running:
+You can deploy LinuxDiagnostic Extension by running:
 
 ```powershell
 $RGName = '<resource-group-name>'
@@ -237,7 +247,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
-- (OpenSUSE 13.1 and higher support temporarily unavailable, will be revived in next release)
+- OpenSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 and higher
 - Debian 8 and higher (7 not supported due to its low GLIBC version)
 - RHEL 6.7 and higher

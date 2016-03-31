@@ -50,9 +50,7 @@ with open(mfile,'r') as f:
     ExtensionShortName = manifest['name']
     Version = manifest['version']
 DownloadDirectory = 'download'
-StdoutFile = "stdout"
-ErroutFile = "errout"
-OutputSize = 4 * 1024
+
 # CustomScript-specific Operation
 DownloadOp = "Download"
 RunScriptOp = "RunScript"
@@ -124,8 +122,7 @@ def download_files_with_retry(hutil, retry_count, wait):
             download_files(hutil)
             break
         except Exception, e:
-            error_msg = ("Failed to download files, "
-                         "retry = {0}, maxRetry = {1}.").format(download_retry_count, retry_count)
+            error_msg = "{0}, retry = {1}, maxRetry = {2}.".format(e, download_retry_count, retry_count)
             hutil.error(error_msg)
             if download_retry_count < retry_count:
                 hutil.log("Sleep {0} seconds".format(wait))
@@ -243,7 +240,6 @@ def download_files(hutil):
 def start_daemon(hutil):
     cmd = get_command_to_execute(hutil)
     if cmd:
-        hutil.log("Command to execute:" + cmd)
         args = [os.path.join(os.getcwd(), __file__), "-daemon"]
 
         # This process will start a new background process by calling
@@ -330,9 +326,9 @@ def download_blob(storage_account_name, storage_account_key,
         if command and blob_name in command:
             os.chmod(download_path, 0100)
     except Exception, e:
-        hutil.error(("Failed to download blob with uri: {0} "
-                     "with error {1}").format(blob_uri,e))
-        raise
+        error_msg = ("Failed to download blob with uri: {0} "
+                     "with error {1}").format(blob_uri,e)
+        raise Exception(error_msg)
 
 
 def download_and_save_blob(storage_account_name,
@@ -376,9 +372,9 @@ def download_external_file(uri, command, hutil):
         if command and file_name in command:
             os.chmod(file_path, 0100)
     except Exception, e:
-        hutil.error(("Failed to download external file with uri: {0} "
-                     "with error {1}").format(uri, e))
-        raise
+        error_msg = ("Failed to download external file with uri: {0} "
+                     "with error {1}").format(uri, e)
+        raise Exception(error_msg)
 
 
 def download_and_save_file(uri, file_path, timeout=30, buf_size=1024):
@@ -511,7 +507,11 @@ def get_command_to_execute(hutil):
         hutil.do_exit(1, 'Enable','failed','0',
             'Enable failed: {0}'.format(err_msg))
 
-    return cmd_public if cmd_public else cmd_protected
+    if cmd_public:
+        hutil.log("Command to execute:" + cmd_public)
+        return cmd_public
+    else:
+        return cmd_protected
 
 
 if __name__ == '__main__' :

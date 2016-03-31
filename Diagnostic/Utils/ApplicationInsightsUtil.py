@@ -23,13 +23,11 @@ def tryGetAiKey(ladCfg):
     if not 'sinks' in sinksConfig:
         return
     sinks = sinksConfig['sinks']
-    list = [s for s in sinks if s["name"] == "ApplicationInsights"];
+    list = [s for s in sinks if "applicationInsights" in s];
     if not list or len(list) < 1:
         return
     ai = list[0];
-    if not 'instrumentationKey' in ai:
-        return
-    return ai["instrumentationKey"]
+    return ai["applicationInsights"]
 
 def createAccountElement(mdsdCfg, aikey):
     aiAccountElement = XmlUtil.createElement("<Account moniker=\"appinsights\" appInsightsKey=\"" + aikey + "\"/>");
