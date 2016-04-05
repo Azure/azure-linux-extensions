@@ -272,8 +272,10 @@ class HandlerUtility:
         }]
         stat_rept = json.dumps(stat)
         if self._context._status_file:
-            with open(self._context._status_file,'w+') as f:
+            tmp = "%s.tmp" %(self._context._status_file)
+            with open(tmp,'w+') as f:
                 f.write(stat_rept)
+            os.rename(tmp, self._context._status_file)
 
     def do_heartbeat_report(self, heartbeat_file,status,code,message):
         # heartbeat
