@@ -87,7 +87,7 @@ class OnGoingItemConfig(object):
         if(current_slice_index_value is None or current_slice_index_value == ""):
             return None
         else:
-            return long(current_slice_index)
+            return long(current_slice_index_value)
 
     def get_from_end(self):
         return self.ongoing_item_config.get_config(CommonVariables.OngoingItemFromEndKey)
