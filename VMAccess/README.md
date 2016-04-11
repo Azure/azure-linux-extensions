@@ -16,6 +16,12 @@ VMAccess Extension can:
 * Check disks
 * Repair added disk
 
+# Security Notes:
+* VMAccess Extension is designed for regaining access to a VM in the event that access is lost. 
+* Based on this principle, it will grant sudo permission to the account specified in the username field.
+* Do not specify a user in the username field if you do not wish that user to gain sudo permissions.
+* Instead, login to the VM and use built-in tools (e.g. usermod, chage, etc) to manage unprivileged users.
+
 # User Guide
 
 ## 1. Configuration schema
