@@ -258,7 +258,7 @@ def enable():
                     if(extension_parameter.passphrase is None or extension_parameter.passphrase == ""):
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
-                        logger.log(msg="the extension_parameter.passphrase is none")
+                        logger.log(msg="the extension_parameter.passphrase is already defined")
 
                     kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase = extension_parameter.passphrase,\
                     KeyVaultURL = extension_parameter.KeyVaultURL,\
