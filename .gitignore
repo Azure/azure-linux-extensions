@@ -86,3 +86,6 @@ RDMAUpdate/.vs/VMBackup/v14/.suo
 # Handler Registration ignores
 *.pem
 RDMAUpdate/.vs/RDMAUpdate/v14/.suo
+
+# Visual Studio directory
+.vs/
