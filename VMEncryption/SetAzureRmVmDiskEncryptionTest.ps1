@@ -129,6 +129,10 @@ Read-Host "Press Enter to continue..."
 Read-Host "Press Enter to continue..."
 Read-Host "Press Enter to continue..."
 
+$DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
+
+Write-Host "Fetched DiskEncryptionKey successfully"
+
 Set-AzureRmVMDiskEncryptionExtension `
     -ResourceGroupName $ResourceGroupName `
     -VMName $VMName `
@@ -137,7 +141,7 @@ Set-AzureRmVMDiskEncryptionExtension `
     -DiskEncryptionKeyVaultId $KeyVault.ResourceId `
     -DiskEncryptionKeyVaultUrl $KeyVault.VaultUri `
     -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
-    -KeyEncryptionKeyURL $KeyVault.VaultUri + "/keys/diskencryptionkey" `
+    -KeyEncryptionKeyURL $DiskEncryptionKey.Id `
     -KeyEncryptionAlgorithm "RSA-OAEP" `
     -VolumeType "Data" `
     -SequenceVersion "1"
