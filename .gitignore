@@ -60,7 +60,7 @@ VMBackup/azure-sdk
 VMBackup/azure-sdk/*
 VMBackup/main/azure/*
 VMBackup/MANIFEST
-VMBackup/*.pyproj
+#VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
 
