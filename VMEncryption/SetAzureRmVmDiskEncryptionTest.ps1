@@ -7,6 +7,10 @@
 	[string] $AadClientSecret,
     [Parameter(Mandatory=$true)]
 	[string] $ResourcePrefix,
+    [Parameter(Mandatory=$true)]
+	[string] $Username,
+    [Parameter(Mandatory=$true)]
+	[string] $Password,
     [string] $Location="eastus"
 )
 
@@ -82,9 +86,10 @@ $global:DataDiskName = $VMName + "DataDisk"
 $global:DataDiskUri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $DataDiskName + ".vhd"
 
 ## Setup local VM object
-$global:Credential = Get-Credential
+$SecString = ($Password | ConvertTo-SecureString -AsPlainText -Force)
+$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList @($Username, $SecString)
 
-Write-Host "Fetched credentials successfully"
+Write-Host "Created credentials successfully"
 
 $global:VirtualMachine = New-AzureRmVMConfig -VMName $VMName -VMSize $VMSize
 
