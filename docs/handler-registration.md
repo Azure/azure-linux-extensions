@@ -7,6 +7,8 @@ For registering a handler the following two components are required:
 * the handler package - The extension handler package needs to be uploaded to a storage location.
 * the definition xml file - This section gives an overview of some of the key elements that are required in the definition file.
 
+Also, the extension should be registered under the Publisher’s Azure Subscription. Prior to Registration, the subscription should be approved for publishing by Azure Runtime team. During the handler registration, you need specify the certificate of your Azure subscription.
+
 We provide some scripts to help package and register your extensions.
 
 ```
