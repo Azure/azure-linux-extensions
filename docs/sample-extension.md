@@ -5,7 +5,7 @@ In this page, we offer a sample extension using [Utils](./utils.md).
 After this section, you can get the following directory:
 
 ```
-SampleExtesnion/
+SampleExtension/
 ├── disable.py
 ├── enable.py
 ├── HandlerManifest.json
