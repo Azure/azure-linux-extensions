@@ -81,6 +81,8 @@ def main():
             enable()
         elif re.match("^([-/]*)(update)", a):
             update()
+        elif re.match("^([-/]*)(daemon)", a):
+            daemon()
 
 def install():
     global hutil
@@ -179,10 +181,10 @@ def freeze_watcher():
         error_msg = 'T:W Snapshot timeout'
         backup_logger.log(error_msg, False, 'Warning')
 
-def enable():
+def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
     #this is using the most recent file timestamp.
-    hutil.do_parse_context('Enable')
+    hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
     global_error_result = None
     # precheck
@@ -325,6 +327,22 @@ def disable():
 def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
+
+def enable():
+    hutil.do_parse_context('Enable')
+    start_daemon();
+
+def start_daemon():
+    args = [os.path.join(os.getcwd(), __file__), "-daemon"]
+    backup_logger.log("start_daemon with args: {0}".format(args), True)
+    #This process will start a new background process by calling
+    #    handle.py -daemon
+    #to run the script and will exit itself immediatelly.
+
+    #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
+    #throw Broke pipe exeception when parent process exit.
+    devnull = open(os.devnull, 'w')
+    child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
 if __name__ == '__main__' :
     main()
