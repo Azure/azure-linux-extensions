@@ -64,7 +64,14 @@ def uninstall():
     hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
 
 def disable():
+    import pudb; pu.db
     hutil.do_parse_context('Disable')
+
+    logger.log('disabling...')
+
+    # find encrypted devices that are mounted
+    disk_util = DiskUtil(hutil = hutil, patching = MyPatching, logger = logger, encryption_environment = encryption_environment)
+
     hutil.do_exit(0,'Disable',CommonVariables.extension_success_status,'0', 'Disable Succeeded')
 
 def update():

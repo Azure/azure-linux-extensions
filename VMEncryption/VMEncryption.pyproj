@@ -69,6 +69,9 @@
     <Compile Include="main\TransactionalCopyTask.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\ProcessLock.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="main\KeyVaultUtil.py">
       <SubType>Code</SubType>
     </Compile>
