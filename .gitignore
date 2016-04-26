@@ -92,6 +92,6 @@ RDMAUpdate/.vs/RDMAUpdate/v14/.suo
 
 # Ignore HandlerManifest updates
 VMEncryption/HandlerManifest.json
-
-
+VMEncryption/AzureDiskEncryptionForLinux-*.xml
+VMEncryption/MANIFEST
 
