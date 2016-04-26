@@ -89,3 +89,9 @@ RDMAUpdate/.vs/RDMAUpdate/v14/.suo
 
 # Visual Studio directory
 .vs/
+
+# Ignore HandlerManifest updates
+VMEncryption/HandlerManifest.json
+
+
+
