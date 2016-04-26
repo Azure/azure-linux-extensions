@@ -60,6 +60,7 @@
     <Compile Include="main\HttpUtil.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\DecryptionMarkConfig.py" />
     <Compile Include="main\MachineIdentity.py" />
     <Compile Include="main\OnGoingItemConfig.py" />
     <Compile Include="main\patch\debianPatching.py">

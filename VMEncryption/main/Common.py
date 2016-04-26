@@ -64,11 +64,13 @@ class CommonVariables:
     """
     EnableEncryption = 'EnableEncryption'
     EnableEncryptionFormat = 'EnableEncryptionFormat'
+    DisableEncryption = 'DisableEncryption'
 
     """
     encryption config keys
     """
     EncryptionEncryptionOperationKey = 'EncryptionOperation'
+    EncryptionDecryptionOperationKey = 'DecryptionOperation'
     EncryptionVolumeTypeKey = 'VolumeType'
     EncryptionDiskFormatQueryKey = 'DiskFormatQuery'
 

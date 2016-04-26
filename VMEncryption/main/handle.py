@@ -48,6 +48,7 @@ from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
+from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
 from MachineIdentity import MachineIdentity
@@ -64,15 +65,49 @@ def uninstall():
     hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
 
 def disable():
-    import pudb; pu.db
+    import pudb
+    pu.db
     hutil.do_parse_context('Disable')
 
     logger.log('disabling...')
 
-    # find encrypted devices that are mounted
-    disk_util = DiskUtil(hutil = hutil, patching = MyPatching, logger = logger, encryption_environment = encryption_environment)
+    decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
 
-    hutil.do_exit(0,'Disable',CommonVariables.extension_success_status,'0', 'Disable Succeeded')
+    try:
+        protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+
+        if(isinstance(public_settings_str, basestring)):
+            public_settings = json.loads(public_settings_str)
+        else:
+            public_settings = public_settings_str
+
+        if(isinstance(protected_settings_str, basestring)):
+            protected_settings = json.loads(protected_settings_str)
+        else:
+            protected_settings = protected_settings_str
+
+        extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
+
+        decryption_marker.command = CommonVariables.EncryptionDecryptionOperationKey
+        decryption_marker.volume_type = extension_parameter.VolumeType
+        decryption_marker.commit()
+
+        hutil.do_exit(0,
+                      'Disable',
+                      CommonVariables.extension_success_status,
+                      '0',
+                      'Disable Succeeded')
+
+    except Exception as e:
+        logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()),
+                   level=CommonVariables.ErrorLevel)
+
+        hutil.do_exit(0,
+                      'Disable',
+                      CommonVariables.extension_error_status,
+                      str(CommonVariables.unknown_error),
+                      'Disable failed.')
 
 def update():
     hutil.do_parse_context('Upadate')
