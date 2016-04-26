@@ -65,8 +65,7 @@ def uninstall():
     hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
 
 def disable():
-    import pudb
-    pu.db
+    import pudb; pu.db
     hutil.do_parse_context('Disable')
 
     logger.log('disabling...')
