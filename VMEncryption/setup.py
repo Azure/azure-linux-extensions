@@ -32,6 +32,7 @@
 # python setup.py sdist upload
 
 from distutils.core import setup
+import codecs
 import os
 import shutil
 import tempfile
@@ -149,6 +150,23 @@ def dos2unix(src):
     print 'dos2unix %s ' % (src)
     child.wait()
 
+def remove_utf8_bom(src):
+    print 'removing utf-8 bom from %s ' % (src)
+
+    contents = None
+
+    with open(src, "r+b") as fp:
+        bincontents = fp.read()
+        if bincontents[:len(codecs.BOM_UTF8)] == codecs.BOM_UTF8:
+            contents = bincontents.decode('utf-8-sig')
+        elif bincontents[:3] == '\xef\x00\x00':
+            contents = bincontents[3:].decode('utf-8')
+        else:
+            contents = bincontents.decode('utf8')
+
+    with open(src, "wb") as fp:
+        fp.write(contents.encode('utf-8'))
+
 def zip(src, dst):
     zf = ZipFile("%s" % (dst), "w")
     abs_src = os.path.abspath(src)
@@ -156,6 +174,7 @@ def zip(src, dst):
         for filename in files:
             absname = os.path.abspath(os.path.join(dirname, filename))
             dos2unix(absname)
+            remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
             print 'zipping %s as %s' % (os.path.join(dirname, filename),arcname)
             zf.write(absname, arcname)
