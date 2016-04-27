@@ -808,14 +808,18 @@ def daemon_encrypt():
 def daemon_decrypt():
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     
-    if(decryption_marker.config_file_exists()):
-        logger.log("decryption is marked.")
-    else:
+    if not decryption_marker.config_file_exists():
         logger.log("decryption is not marked.")
         return
 
-def daemon():
+    logger.log("decryption is marked.")
+
     import pudb; pu.db
+
+    disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    disk_util.umount_all_crypt_items()
+
+def daemon():
     hutil.do_parse_context('Executing')
     lock = ProcessLock(logger, encryption_environment.daemon_lock_file_path)
     if not lock.try_lock():
