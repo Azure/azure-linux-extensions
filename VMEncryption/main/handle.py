@@ -689,16 +689,40 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
 
     import pudb; pu.db
 
-    current_phase = CommonVariables.DecryptionPhaseCopyData
-
     if ongoing_item_config:
         logger.log(msg="ongoing item config is not none, resuming decryption, info: {0}".format(ongoing_item_config),
                    level=CommonVariables.WarningLevel)
     else:
         logger.log(msg="starting decryption of {0}".format(crypt_item))
         ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
-    
-    return CommonVariables.DecryptionPhaseDone
+        ongoing_item_config.current_destination = crypt_item.dev_path
+        ongoing_item_config.current_source_path = os.path.join(CommonVariables.dev_mapper_root,
+                                                                crypt_item.mapper_name)
+        ongoing_item_config.current_total_copy_size = mapper_device_item.size
+        ongoing_item_config.from_end = True
+        ongoing_item_config.phase = CommonVariables.DecryptionPhaseCopyData
+        ongoing_item_config.current_slice_index = 0
+        ongoing_item_config.current_block_size = CommonVariables.default_block_size
+        ongoing_item_config.commit()
+
+    current_phase = ongoing_item_config.get_phase()
+
+    while(current_phase != CommonVariables.DecryptionPhaseDone):
+        logger.log(msg=("the current phase is {0}".format(CommonVariables.EncryptionPhaseBackupHeader)),
+                   level=CommonVariables.InfoLevel)
+
+        if current_phase == CommonVariables.DecryptionPhaseCopyData:
+            copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config)
+            if(copy_result == CommonVariables.process_success):
+                ongoing_item_config.phase = CommonVariables.DecryptionPhaseDone
+                ongoing_item_config.commit()
+                current_phase = CommonVariables.DecryptionPhaseDone
+            else:
+                logger.log(msg="decryption: block copy failed, result: {0}".format(copy_result),
+                           level=CommonVariables.ErrorLevel)
+                return current_phase
+
+    return current_phase
 
 def decrypt_inplace_with_separate_header_file(passphrase_file,
                                               crypt_item,
