@@ -87,7 +87,7 @@ def disable():
 
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
 
-        decryption_marker.command = CommonVariables.EncryptionDecryptionOperationKey
+        decryption_marker.command = CommonVariables.DisableEncryption
         decryption_marker.volume_type = extension_parameter.VolumeType
         decryption_marker.commit()
 
@@ -816,8 +816,35 @@ def daemon_decrypt():
 
     import pudb; pu.db
 
+    # mount and then unmount all the encrypted items
+    # in order to set-up all the mapper devices
+
     disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    bek_util = BekUtil(disk_util, logger)
+    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger = logger)
+
+    existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    if existing_passphrase_file is not None:
+        mount_encrypted_disks(disk_util=disk_util,
+                              bek_util=bek_util,
+                              encryption_config=encryption_config,
+                              passphrase_file=existing_passphrase_file)
+    else:
+        raise Exception("encryption config is present, but we could not get the bek file.")
+        
     disk_util.umount_all_crypt_items()
+
+    ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
+
+    if ongoing_item_config.config_file_exists():
+        logger.log("ongoing item config exists.")
+    else:
+        logger.log("ongoing item config does not exist.")
+
+        failed_item = None
+
+        if decryption_marker.get_current_command() == CommonVariables.DisableEncryption:
+            logger.log("disabling encryption now")
 
 def daemon():
     hutil.do_parse_context('Executing')
@@ -839,10 +866,10 @@ def daemon():
                         level=CommonVariables.ErrorLevel)
                 
             hutil.do_exit(exit_code=0,
-                            operation='Disable',
-                            status=CommonVariables.extension_error_status,
-                            code=str(CommonVariables.encryption_failed),
-                            message=error_msg)
+                          operation='Disable',
+                          status=CommonVariables.extension_error_status,
+                          code=str(CommonVariables.encryption_failed),
+                          message=error_msg)
         finally:
             logger.log("clearing the decryption mark.")
             decryption_marker.clear_config()
