@@ -687,7 +687,15 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    import pudb; pu.db
+    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
+        logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="raw_device_item: {0}".format(raw_device_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="mapper_device_item {0}".format(mapper_device_item),
+                   level=CommonVariables.ErrorLevel)
+        
+        return
 
     if ongoing_item_config:
         logger.log(msg="ongoing item config is not none, resuming decryption, info: {0}".format(ongoing_item_config),
@@ -722,6 +730,8 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                            level=CommonVariables.ErrorLevel)
                 return current_phase
 
+    ongoing_item_config.clear_config()
+
     return current_phase
 
 def decrypt_inplace_with_separate_header_file(passphrase_file,
@@ -732,6 +742,17 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                               bek_util,
                                               ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_with_separate_header_file")
+
+    if raw_device_item.size != mapper_device_item.size:
+        logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="raw_device_item: {0}".format(raw_device_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="mapper_device_item {0}".format(mapper_device_item),
+                   level=CommonVariables.ErrorLevel)
+        
+        return
+
     return CommonVariables.DecryptionPhaseDone
 
 def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
@@ -806,13 +827,10 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
             return crypt_item
 
-        if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
-            logger.log("mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item))
-            logger.log("raw_device_item: {0}".format(raw_device_item))
-            logger.log("mapper_device_item {0}".format(mapper_device_item))
-            return crypt_item
-
         decryption_result_phase = None
+        
+        import pudb; pu.db
+
         if crypt_item.luks_header_path:
             decryption_result_phase = decrypt_inplace_with_separate_header_file(passphrase_file=passphrase_file,
                                                                                    crypt_item=crypt_item,
@@ -829,6 +847,9 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
                                                                                 bek_util=bek_util)
         
         if(decryption_result_phase == CommonVariables.DecryptionPhaseDone):
+            disk_util.luks_close(crypt_item.mapper_name)
+            disk_util.remove_crypt_item(crypt_item)
+
             continue
         else:
             # decryption failed for a crypt_item, return the failed item to caller

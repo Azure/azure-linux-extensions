@@ -126,6 +126,26 @@ class DiskUtil(object):
         except Exception as e:
             return False
 
+    def remove_crypt_item(self, crypt_item):
+        if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            return False
+
+        try:
+            mount_lines = []
+
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
+                mount_lines = f.readlines()
+
+            filtered_mount_lines = filter(lambda line: crypt_item.mapper_name in mount_lines, mount_lines)
+
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+                wf.write('\n'.join(filtered_mount_lines))
+
+            return True
+
+        except Exception as e:
+            return False
+
     def create_luks_header(self,mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if(os.path.exists(luks_header_file_path)):
@@ -225,6 +245,18 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.patching.cryptsetup_path , dev_path ,mapper_name, header_file ,passphrase_file)
         else:
             cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.patching.cryptsetup_path , dev_path , mapper_name , passphrase_file)
+        self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
+        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
+        cryptsetup_p = Popen(cryptsetup_cmd_args)
+        returnCode = cryptsetup_p.wait()
+        return returnCode
+
+    def luks_close(self, mapper_name):
+        """
+        returns the exit code for cryptsetup process.
+        """
+        self.hutil.log("dev mapper name to cryptsetup luksOpen " + (mapper_name))
+        cryptsetup_cmd = "{0} luksClose {1} -q".format(self.patching.cryptsetup_path, mapper_name)
         self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
         cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
         cryptsetup_p = Popen(cryptsetup_cmd_args)
