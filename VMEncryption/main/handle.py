@@ -721,6 +721,19 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
                     return device_item
     return None
 
+
+def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_util, bek_util):
+    """
+    On success, returns None. Otherwise returns the crypt item for which decryption failed.
+    """
+
+    logger.log(msg="executing disable_encryption_all_in_place")
+
+    for crypt_item in disk_util.get_crypt_items():
+        logger.log("processing crypt_item: " + str(crypt_item))
+
+    return None
+
 def daemon_encrypt():
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
@@ -834,6 +847,8 @@ def daemon_decrypt():
         
     disk_util.umount_all_crypt_items()
 
+    # at this point all the /dev/mapper/* crypt devices should be open
+
     ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
 
     if ongoing_item_config.config_file_exists():
@@ -844,7 +859,25 @@ def daemon_decrypt():
         failed_item = None
 
         if decryption_marker.get_current_command() == CommonVariables.DisableEncryption:
-            logger.log("disabling encryption now")
+            failed_item = disable_encryption_all_in_place(passphrase_file=existing_passphrase_file,
+                                                          decryption_marker=decryption_marker,
+                                                          disk_util=disk_util,
+                                                          bek_util=bek_util)
+        else:
+            raise Exception("command {0} not supported.".format(decryption_marker.get_current_command()))
+        
+        if(failed_item != None):
+                hutil.do_exit(exit_code=0,
+                              operation='Disable',
+                              status=CommonVariables.extension_error_status,
+                              code=CommonVariables.encryption_failed,\
+                              message='decryption failed for {0}'.format(failed_item))
+        else:
+                hutil.do_exit(exit_code=0,
+                              operation='Disable',
+                              status=CommonVariables.extension_success_status,
+                              code=str(CommonVariables.success),
+                              message='decryption succeeded')
 
 def daemon():
     hutil.do_parse_context('Executing')
