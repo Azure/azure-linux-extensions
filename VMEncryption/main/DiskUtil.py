@@ -274,6 +274,11 @@ class DiskUtil(object):
         returnCode = proc.wait()
         return returnCode
 
+    def umount_all_crypt_items(self):
+        for crypt_item in self.get_crypt_items():
+            self.logger.log("Unmounting {0}".format(crypt_item.mount_point))
+            self.umount(crypt_item.mount_point)
+
     def mount_all(self):
         mount_all_cmd = self.patching.mount_path + ' -a'
         self.logger.log("command to execute:{0}".format(mount_all_cmd))
