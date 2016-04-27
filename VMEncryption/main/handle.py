@@ -678,24 +678,14 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             finally:
                 toggle_se_linux_for_centos7(False)
 
-def decrypt_inplace_without_separate_header_file(passphrase_file,
-                                                 crypt_item,
-                                                 raw_device_item,
-                                                 mapper_device_item,
-                                                 disk_util,
-                                                 bek_util,
-                                                 ongoing_item_config=None):
-    logger.log(msg="decrypt_inplace_without_separate_header_file")
-
-    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
-        logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
-                   level=CommonVariables.ErrorLevel)
-        logger.log(msg="raw_device_item: {0}".format(raw_device_item),
-                   level=CommonVariables.ErrorLevel)
-        logger.log(msg="mapper_device_item {0}".format(mapper_device_item),
-                   level=CommonVariables.ErrorLevel)
-        
-        return
+def decrypt_inplace_copy_data(passphrase_file,
+                              crypt_item,
+                              raw_device_item,
+                              mapper_device_item,
+                              disk_util,
+                              bek_util,
+                              ongoing_item_config=None):
+    logger.log(msg="decrypt_inplace_copy_data")
 
     if ongoing_item_config:
         logger.log(msg="ongoing item config is not none, resuming decryption, info: {0}".format(ongoing_item_config),
@@ -734,6 +724,33 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
 
     return current_phase
 
+def decrypt_inplace_without_separate_header_file(passphrase_file,
+                                                 crypt_item,
+                                                 raw_device_item,
+                                                 mapper_device_item,
+                                                 disk_util,
+                                                 bek_util,
+                                                 ongoing_item_config=None):
+    logger.log(msg="decrypt_inplace_without_separate_header_file")
+
+    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
+        logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="raw_device_item: {0}".format(raw_device_item),
+                   level=CommonVariables.ErrorLevel)
+        logger.log(msg="mapper_device_item {0}".format(mapper_device_item),
+                   level=CommonVariables.ErrorLevel)
+        
+        return None
+
+    return decrypt_inplace_copy_data(passphrase_file,
+                                     crypt_item,
+                                     raw_device_item,
+                                     mapper_device_item,
+                                     disk_util,
+                                     bek_util,
+                                     ongoing_item_config)
+
 def decrypt_inplace_with_separate_header_file(passphrase_file,
                                               crypt_item,
                                               raw_device_item,
@@ -753,7 +770,13 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
         
         return
 
-    return CommonVariables.DecryptionPhaseDone
+    return decrypt_inplace_copy_data(passphrase_file,
+                                     crypt_item,
+                                     raw_device_item,
+                                     mapper_device_item,
+                                     disk_util,
+                                     bek_util,
+                                     ongoing_item_config)
 
 def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
     """
