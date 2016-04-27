@@ -678,6 +678,15 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             finally:
                 toggle_se_linux_for_centos7(False)
 
+def decrypt_inplace_without_separate_header_file(passphrase_file, crypt_item, disk_util, bek_util, ongoing_item_config=None):
+    logger.log(msg="decrypt_inplace_without_separate_header_file")
+    
+    return CommonVariables.DecryptionPhaseDone
+
+def decrypt_inplace_with_separate_header_file(passphrase_file, crypt_item, disk_util, bek_util, ongoing_item_config=None):
+    logger.log(msg="decrypt_inplace_with_separate_header_file")
+    return CommonVariables.DecryptionPhaseDone
+
 def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
     """
     if return None for the success case, or return the device item which failed.
@@ -731,6 +740,24 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
     for crypt_item in disk_util.get_crypt_items():
         logger.log("processing crypt_item: " + str(crypt_item))
+
+        decryption_result_phase = None
+        if crypt_item.luks_header_path:
+            decryption_result_phase = decrypt_inplace_with_separate_header_file(passphrase_file=passphrase_file,
+                                                                                   crypt_item=crypt_item,
+                                                                                   disk_util=disk_util,
+                                                                                   bek_util=bek_util)
+        else:
+            decryption_result_phase = decrypt_inplace_without_separate_header_file(passphrase_file=passphrase_file,
+                                                                                crypt_item=crypt_item,
+                                                                                disk_util=disk_util,
+                                                                                bek_util=bek_util)
+        
+        if(decryption_result_phase == CommonVariables.DecryptionPhaseDone):
+            continue
+        else:
+            # decryption failed for a crypt_item, return the failed item to caller
+            return crypt_item
 
     return None
 
