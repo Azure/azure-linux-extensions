@@ -851,8 +851,6 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
             return crypt_item
 
         decryption_result_phase = None
-        
-        import pudb; pu.db
 
         if crypt_item.luks_header_path:
             decryption_result_phase = decrypt_inplace_with_separate_header_file(passphrase_file=passphrase_file,
