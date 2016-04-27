@@ -106,6 +106,7 @@ class CommonVariables:
     """
     decryption phase constants
     """
+    DecryptionPhaseCopyData = 'DecryptingData'
     DecryptionPhaseDone = 'Done'
 
     """

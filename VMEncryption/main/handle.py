@@ -678,12 +678,35 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             finally:
                 toggle_se_linux_for_centos7(False)
 
-def decrypt_inplace_without_separate_header_file(passphrase_file, crypt_item, disk_util, bek_util, ongoing_item_config=None):
+def decrypt_inplace_without_separate_header_file(passphrase_file,
+                                                 crypt_item,
+                                                 raw_device_item,
+                                                 mapper_device_item,
+                                                 disk_util,
+                                                 bek_util,
+                                                 ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
+
+    import pudb; pu.db
+
+    current_phase = CommonVariables.DecryptionPhaseCopyData
+
+    if ongoing_item_config:
+        logger.log(msg="ongoing item config is not none, resuming decryption, info: {0}".format(ongoing_item_config),
+                   level=CommonVariables.WarningLevel)
+    else:
+        logger.log(msg="starting decryption of {0}".format(crypt_item))
+        ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
     
     return CommonVariables.DecryptionPhaseDone
 
-def decrypt_inplace_with_separate_header_file(passphrase_file, crypt_item, disk_util, bek_util, ongoing_item_config=None):
+def decrypt_inplace_with_separate_header_file(passphrase_file,
+                                              crypt_item,
+                                              raw_device_item,
+                                              mapper_device_item,
+                                              disk_util,
+                                              bek_util,
+                                              ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_with_separate_header_file")
     return CommonVariables.DecryptionPhaseDone
 
@@ -738,18 +761,46 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
     logger.log(msg="executing disable_encryption_all_in_place")
 
+    device_items = disk_util.get_device_items(None)
+
     for crypt_item in disk_util.get_crypt_items():
         logger.log("processing crypt_item: " + str(crypt_item))
+
+        def raw_device_item_match(device_item):
+            return crypt_item.dev_path == "/dev/" + device_item.name
+        def mapped_device_item_match(device_item):
+            return crypt_item.mapper_name == device_item.name
+
+        raw_device_item = next((d for d in device_items if raw_device_item_match(d)), None)
+        mapper_device_item = next((d for d in device_items if mapped_device_item_match(d)), None)
+
+        if not raw_device_item:
+            logger.log("raw device not found for crypt_item {0}".format(crypt_item))
+            return crypt_item
+
+        if not mapper_device_item:
+            logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
+            return crypt_item
+
+        if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
+            logger.log("mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item))
+            logger.log("raw_device_item: {0}".format(raw_device_item))
+            logger.log("mapper_device_item {0}".format(mapper_device_item))
+            return crypt_item
 
         decryption_result_phase = None
         if crypt_item.luks_header_path:
             decryption_result_phase = decrypt_inplace_with_separate_header_file(passphrase_file=passphrase_file,
                                                                                    crypt_item=crypt_item,
+                                                                                   raw_device_item=raw_device_item,
+                                                                                   mapper_device_item=mapper_device_item,
                                                                                    disk_util=disk_util,
                                                                                    bek_util=bek_util)
         else:
             decryption_result_phase = decrypt_inplace_without_separate_header_file(passphrase_file=passphrase_file,
                                                                                 crypt_item=crypt_item,
+                                                                                raw_device_item=raw_device_item,
+                                                                                mapper_device_item=mapper_device_item,
                                                                                 disk_util=disk_util,
                                                                                 bek_util=bek_util)
         
@@ -853,8 +904,6 @@ def daemon_decrypt():
         return
 
     logger.log("decryption is marked.")
-
-    import pudb; pu.db
 
     # mount and then unmount all the encrypted items
     # in order to set-up all the mapper devices
