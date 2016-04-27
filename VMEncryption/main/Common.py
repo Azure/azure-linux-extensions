@@ -104,6 +104,11 @@ class CommonVariables:
     EncryptionPhaseDone = 'Done'
 
     """
+    decryption phase constants
+    """
+    DecryptionPhaseDone = 'Done'
+
+    """
     logs related
     """
     InfoLevel = 'Info'
