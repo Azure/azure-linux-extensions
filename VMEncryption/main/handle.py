@@ -71,6 +71,19 @@ def disable():
 
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
 
+    if decryption_marker.config_file_exists():
+        logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
+        start_daemon()
+
+        hutil.do_exit(0,
+                      'Disable',
+                      CommonVariables.extension_success_status,
+                      '0',
+                      'Decryption started')
+    
+    hutil.exit_if_same_seq()
+    hutil.save_seq()
+
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -95,7 +108,7 @@ def disable():
                       'Disable',
                       CommonVariables.extension_success_status,
                       '0',
-                      'Disable Succeeded')
+                      'Decryption started')
 
     except Exception as e:
         logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()),
