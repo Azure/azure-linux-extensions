@@ -94,14 +94,14 @@ manifest_file.close()
 generate the extension xml file
 """
 extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
+<ProviderNameSpace>Microsoft.Azure.Security</ProviderNameSpace>
 <Type>%s</Type>
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
 <MediaLink>%s</MediaLink>
 <Description>%s</Description>
-<IsInternalExtension>true</IsInternalExtension>
+<IsInternalExtension>false</IsInternalExtension>
 <Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
 <PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
