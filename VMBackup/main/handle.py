@@ -220,6 +220,7 @@ def daemon():
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
             utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+            backup_logger.log('utcTicks in long format' + str(utcTicksLong))
             commandStartTime = convert_time(utcTicksLong)
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
