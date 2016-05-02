@@ -39,7 +39,7 @@ with open(mfile,'r') as f:
     Version = manifest['version']
 
 PackagesDirectory = "packages"
-BundleFileName = 'omsagent-1.1.0-30.universal.x64.sh'
+BundleFileName = 'omsagent-1.1.0-124.universal.x64.sh'
 
 # always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
 InstallCommandTemplate = './{0} --upgrade --force'
