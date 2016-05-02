@@ -73,15 +73,16 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
                 "restartrsyslog":"service rsyslog restart",
-                'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
+                'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
                 }
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
-                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
+                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
                  "packages":('tar','policycoreutils-python'),
-                 'distrolibs':'centos/*',
                  "restartrsyslog":"service rsyslog restart",
-                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
+                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
+                 'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
                  }
 
 
@@ -97,30 +98,28 @@ SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 SuseConfig11 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
                    "packages":('rsyslog',),
-                   'distrolibs' : 'suse11/*',
-                   'distrolibs_prep_cmds' :
+                   'mdsd_prep_cmds' :
                         (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
                         ),
-                   'mdsd_env_vars' : { "SSL_CERT_FILE" : SUSE11_MDSD_SSL_CERTS_FILE }
+                   'mdsd_env_vars': {"SSL_CERT_FILE": SUSE11_MDSD_SSL_CERTS_FILE}
                   }.items())
 
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
                    "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
-                   'distrolibs' : 'suse11/*',
-                   'distrolibs_prep_cmds' : (r'\rm -f suse11/libcrypto.so.* suse11/libssl.so.*',) # Should remove bundled OpenSSL libs on SUSE 12 (Use system-installed OpenSSL libs)
+                   'mdsd_env_vars': {"SSL_CERT_DIR": "/var/lib/ca-certificates/openssl", "SSL_CERT_FILE": "/etc/ssl/cert.pem"}
                   }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
                     {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)}
-                  .items())
+                     "packages":('policycoreutils-python',)
+                    }.items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig, 'debian:7.9': None, # Debian 7 (7.9) can't be supported due to low GLIBC ver. on it (GLIBC_2.14 required)
+All_Dist= {'debian':DebianConfig,
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
@@ -191,16 +190,10 @@ def setup(local_only):
         if error !=0:
             hutil.error(msg)
 
-    # copy distrolibs
-    if not os.path.isdir(MdsdFolder):
-        # Run prep commands
-        if 'distrolibs_prep_cmds' in distConfig:
-            for cmd in distConfig['distrolibs_prep_cmds']:
-                RunGetOutput(cmd)
-        libs = distConfig['distrolibs']
-        if len(libs) > 0:
-            RunGetOutput('mkdir -p {0}'.format(MdsdFolder))
-            RunGetOutput('\cp -f {0} {1}'.format(libs, MdsdFolder))
+    # Run prep commands
+    if 'mdsd_prep_cmds' in distConfig:
+        for cmd in distConfig['mdsd_prep_cmds']:
+            RunGetOutput(cmd)
 
     install_omi()
 
