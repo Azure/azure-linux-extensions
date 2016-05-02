@@ -60,7 +60,7 @@ VMBackup/azure-sdk
 VMBackup/azure-sdk/*
 VMBackup/main/azure/*
 VMBackup/MANIFEST
-VMBackup/*.pyproj
+#VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
 
@@ -86,3 +86,12 @@ RDMAUpdate/.vs/VMBackup/v14/.suo
 # Handler Registration ignores
 *.pem
 RDMAUpdate/.vs/RDMAUpdate/v14/.suo
+
+# Visual Studio directory
+.vs/
+
+# Ignore HandlerManifest updates
+VMEncryption/HandlerManifest.json
+VMEncryption/AzureDiskEncryptionForLinux*.xml
+VMEncryption/MANIFEST
+

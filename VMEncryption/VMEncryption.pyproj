@@ -39,6 +39,7 @@
     <Content Include="README.txt" />
     <Content Include="SetAzureDiskEncryptionTest.ps1" />
     <Content Include="SetAzureDiskEncryptionSplits.ps1" />
+    <Content Include="SetAzureRmVmDiskEncryptionTest.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -60,12 +61,16 @@
     <Compile Include="main\HttpUtil.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\DecryptionMarkConfig.py" />
     <Compile Include="main\MachineIdentity.py" />
     <Compile Include="main\OnGoingItemConfig.py" />
     <Compile Include="main\patch\debianPatching.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\TransactionalCopyTask.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="main\ProcessLock.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\KeyVaultUtil.py">
