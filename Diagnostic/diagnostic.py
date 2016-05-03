@@ -69,22 +69,25 @@ omi_universal_pkg_name = 'scx-installer.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
-                "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
+GenericConfig = {"installomi": "bash "+omi_universal_pkg_name+" --upgrade --force",
+                 "uninstallomi": "bash "+omi_universal_pkg_name+" --purge"
+                 }
+
+DebianConfig = dict(GenericConfig.items() +
+               {"installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
                 "restartrsyslog":"service rsyslog restart",
                 'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
                 'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
-                }
+                }.items())
 
-RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
-                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
+RedhatConfig = dict(GenericConfig.items() +
+                {"installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
                  "packages":('tar','policycoreutils-python'),
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
-                 }
-
+                 }.items())
 
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
@@ -163,21 +166,21 @@ def parse_context(operation):
     return
 
 
-def setup(local_only):
+def setup(should_install_required_package):
     global EnableSyslog
 
-    if not local_only:
-        install_package_error=""
+    if should_install_required_package:
+        install_package_error = ""
         retry = 3
-        while retry >0:
-            error,msg = install_required_package()
+        while retry > 0:
+            error, msg = install_required_package()
             hutil.log(msg)
-            if error ==0:
+            if error == 0:
                 break
             else:
-                retry-=1
+                retry -= 1
                 hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error=msg
+                install_package_error = msg
                 time.sleep(60)
         if install_package_error:
             if len(install_package_error) > 1024:
@@ -187,15 +190,18 @@ def setup(local_only):
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
-        if error !=0:
+        if error != 0:
             hutil.error(msg)
+            return 3, msg
 
     # Run prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
-    install_omi()
+    omi_err, omi_msg = install_omi()
+    if omi_err is not 0:
+        return 4, omi_msg
 
     return 0, 'success'
 
@@ -560,7 +566,7 @@ def main(command):
 
 
 def start_daemon():
-    args = ['python',StartDaemonFilePath, "-daemon"]
+    args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
     hutil.log('start daemon '+str(args))
     child = subprocess.Popen(args, stdout=log, stderr=log)
@@ -632,7 +638,7 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
-            mdsd_log = open (mdsd_log_path,"w")
+            mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
                                      cwd=WorkDir,
@@ -648,7 +654,7 @@ def start_mdsd():
             last_error_time = datetime.datetime.now()
             while True:
                 time.sleep(30)
-                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 and len(get_mdsd_process()) >=2:
+                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
                     mdsd.kill()
                     hutil.log("Another process is started, now exit")
                     return
@@ -656,10 +662,11 @@ def start_mdsd():
                     time.sleep(60)
                     mdsd_log.flush()
                     break
+
                 if not os.path.exists(monitor_file_path):
                     continue
                 monitor_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(monitor_file_path))), "%a %b %d %H:%M:%S %Y")
-                if last_error_time >=  monitor_file_ctime:
+                if last_error_time >= monitor_file_ctime:
                     continue
                 last_error_time = monitor_file_ctime
                 last_error = tail(monitor_file_path)
@@ -673,6 +680,7 @@ def start_mdsd():
 
             error = "MDSD crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
+
             try:
                 waagent.AddExtensionEvent(name=hutil.get_name(),
                                 op=waagent.WALAEventOperation.Enable,
@@ -750,7 +758,17 @@ def install_omi():
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
-        RunGetOutput(distConfig["installomi"])
+        isOmiInstalledSuccessfully = False
+        for trialNum in range(1, 4):   # Retry up to 3 times to install OMI
+            isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
+            if isOmiInstalledSuccessfully:
+                break;
+            hutil.error("OMI install failed (trial #" + str(trialNum) + "). Retrying in 30 seconds...")
+            time.sleep(30)
+        if not isOmiInstalledSuccessfully:
+            hutil.error("OMI install failed 3 times. Giving up...")
+            return 1, "OMI install failed 3 times"
+
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
@@ -765,7 +783,7 @@ def install_omi():
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
 
-    RunGetOutput("/opt/omi/bin/service_control restart");
+    RunGetOutput("/opt/omi/bin/service_control restart")
     return 0, "omi installed"
 
 
@@ -773,8 +791,9 @@ def uninstall_omi():
     isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache' | grep -v grep")[0] is 0
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
-    hutil.log("omi will not be uninstalled")
-    return 0, "do nothing"
+    hutil.log("Begin omi uninstallation")
+    RunGetOutput(distConfig["uninstallomi"])
+    return 0, "omi uninstalled"
 
 
 def uninstall_rsyslogom():
@@ -799,9 +818,9 @@ def uninstall_rsyslogom():
     return 0,"rm omazurelinuxmds done"
 
 def install_rsyslogom():
-    error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
+    error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
-    match= re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    match = re.search("(.*)"+rsyslog_ommodule_for_check, rsyslog_info)
     if match:
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:
