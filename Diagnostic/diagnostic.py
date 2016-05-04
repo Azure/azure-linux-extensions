@@ -17,6 +17,7 @@ import array
 import base64
 import os
 import signal
+import syslog
 import os.path
 import re
 import string
@@ -667,8 +668,17 @@ def start_mdsd():
                     omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
                     hutil.error("OMI restart result: " + omi_restart_msg)
                     time.sleep(5)
-                    mdsd.send_signal(signal.SIGHUP)
-                    hutil.error("SIGHUP sent to mdsd")
+                    omi_up_and_running = RunGetOutput("/opt/omi/bin/omicli noop")[0] is 0
+                    if omi_up_and_running:
+                        mdsd.send_signal(signal.SIGHUP)
+                        hutil.error("SIGHUP sent to mdsd")
+                    else:   # OMI restarted but not staying up...
+                        log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
+                        hutil.error(log_msg)
+                        # Also log this issue on syslog as well
+                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.syslog(priority=syslog.LOG_ALERT, message=log_msg)
+                        syslog.closelog()
 
                 if not os.path.exists(monitor_file_path):
                     continue
