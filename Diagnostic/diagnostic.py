@@ -16,6 +16,8 @@ import socket
 import array
 import base64
 import os
+import signal
+import syslog
 import os.path
 import re
 import string
@@ -620,7 +622,7 @@ def start_mdsd():
             hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
             copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
+    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
     command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
@@ -632,7 +634,7 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
-            mdsd_log = open (mdsd_log_path,"w")
+            mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
                                      cwd=WorkDir,
@@ -648,14 +650,36 @@ def start_mdsd():
             last_error_time = datetime.datetime.now()
             while True:
                 time.sleep(30)
-                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 and len(get_mdsd_process()) >=2:
+                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
                     mdsd.kill()
                     hutil.log("Another process is started, now exit")
                     return
-                if not (mdsd.poll() is None):
+                if mdsd.poll() is not None:     # if mdsd has terminated
                     time.sleep(60)
                     mdsd_log.flush()
                     break
+
+                # mdsd is now up for at least 30 seconds.
+
+                # Issue #128 LAD should restart OMI if it crashes
+                omi_up_and_running = RunGetOutput("/opt/omi/bin/omicli noop")[0] is 0
+                if not omi_up_and_running:
+                    hutil.error("OMI noop query failed. OMI crash suspected. Restarting OMI and send SIGHUP to mdsd after 5 seconds.")
+                    omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
+                    hutil.error("OMI restart result: " + omi_restart_msg)
+                    time.sleep(5)
+                    omi_up_and_running = RunGetOutput("/opt/omi/bin/omicli noop")[0] is 0
+                    if omi_up_and_running:
+                        mdsd.send_signal(signal.SIGHUP)
+                        hutil.error("SIGHUP sent to mdsd")
+                    else:   # OMI restarted but not staying up...
+                        log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
+                        hutil.error(log_msg)
+                        # Also log this issue on syslog as well
+                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.syslog(priority=syslog.LOG_ALERT, message=log_msg)
+                        syslog.closelog()
+
                 if not os.path.exists(monitor_file_path):
                     continue
                 monitor_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(monitor_file_path))), "%a %b %d %H:%M:%S %Y")
@@ -677,7 +701,7 @@ def start_mdsd():
                 waagent.AddExtensionEvent(name=hutil.get_name(),
                                 op=waagent.WALAEventOperation.Enable,
                                 isSuccess=False,
-                                      message=error)
+                                message=error)
             except Exception:
                 pass
 
