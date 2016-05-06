@@ -151,4 +151,4 @@ $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
 
 Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
 
-$global:BackupTag = [regex]::match($EnableEncryptionOutput, '(AzureEnc.*?),').Groups[1].Value
+$global:BackupTag = [regex]::match($EncryptionEnableOutput, '(AzureEnc.*?),').Groups[1].Value
