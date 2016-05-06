@@ -177,7 +177,7 @@ def toggle_se_linux_for_centos7(disable):
             encryption_environment.enable_se_linux()
     return False
 
-def mount_encrypted_disks(disk_util, bek_util,passphrase_file,encryption_config):
+def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
     #make sure the azure disk config path exists.
     crypt_items = disk_util.get_crypt_items()
     if(crypt_items is not None):
@@ -202,7 +202,9 @@ def mount_encrypted_disks(disk_util, bek_util,passphrase_file,encryption_config)
                 disk_util.mount_crypt_item(crypt_item, passphrase_file)
             else:
                 logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)),level=CommonVariables.WarningLevel)
-    bek_util.umount_azure_passhprase(encryption_config)
+
+    if bek_util:
+        bek_util.umount_azure_passhprase(encryption_config)
 
 def main():
     global hutil,MyPatching,logger,encryption_environment
@@ -281,7 +283,10 @@ def enable_encryption():
     if(encryption_config.config_file_exists()):
         existed_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if(existed_passphrase_file is not None):
-            mount_encrypted_disks(disk_util=disk_util,bek_util=bek_util,encryption_config=encryption_config,passphrase_file=existed_passphrase_file)
+            mount_encrypted_disks(disk_util=disk_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=existed_passphrase_file)
         else:
             logger.log(msg="the config is there, but we could not get the bek file.",level=CommonVariables.WarningLevel)
             exit_without_status_report()
@@ -751,7 +756,6 @@ def decrypt_inplace_copy_data(passphrase_file,
                               raw_device_item,
                               mapper_device_item,
                               disk_util,
-                              bek_util,
                               ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_copy_data")
 
@@ -797,7 +801,6 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  raw_device_item,
                                                  mapper_device_item,
                                                  disk_util,
-                                                 bek_util,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
@@ -816,7 +819,6 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                      raw_device_item,
                                      mapper_device_item,
                                      disk_util,
-                                     bek_util,
                                      ongoing_item_config)
 
 def decrypt_inplace_with_separate_header_file(passphrase_file,
@@ -824,7 +826,6 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                               raw_device_item,
                                               mapper_device_item,
                                               disk_util,
-                                              bek_util,
                                               ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_with_separate_header_file")
 
@@ -843,7 +844,6 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      raw_device_item,
                                      mapper_device_item,
                                      disk_util,
-                                     bek_util,
                                      ongoing_item_config)
 
 def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
@@ -890,7 +890,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
     return None
 
 
-def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_util, bek_util):
+def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_util):
     """
     On success, returns None. Otherwise returns the crypt item for which decryption failed.
     """
@@ -925,15 +925,13 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
                                                                                    crypt_item=crypt_item,
                                                                                    raw_device_item=raw_device_item,
                                                                                    mapper_device_item=mapper_device_item,
-                                                                                   disk_util=disk_util,
-                                                                                   bek_util=bek_util)
+                                                                                   disk_util=disk_util)
         else:
             decryption_result_phase = decrypt_inplace_without_separate_header_file(passphrase_file=passphrase_file,
                                                                                 crypt_item=crypt_item,
                                                                                 raw_device_item=raw_device_item,
                                                                                 mapper_device_item=mapper_device_item,
-                                                                                disk_util=disk_util,
-                                                                                bek_util=bek_util)
+                                                                                disk_util=disk_util)
         
         if(decryption_result_phase == CommonVariables.DecryptionPhaseDone):
             disk_util.luks_close(crypt_item.mapper_name)
@@ -1041,20 +1039,14 @@ def daemon_decrypt():
 
     # mount and then unmount all the encrypted items
     # in order to set-up all the mapper devices
+    # we don't need the BEK since all the drives that need decryption were made cleartext-key unlockable by first call to disable
 
     disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
-    bek_util = BekUtil(disk_util, logger)
-    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger = logger)
-
-    existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-    if existing_passphrase_file is not None:
-        mount_encrypted_disks(disk_util=disk_util,
-                              bek_util=bek_util,
-                              encryption_config=encryption_config,
-                              passphrase_file=existing_passphrase_file)
-    else:
-        raise Exception("encryption config is present, but we could not get the bek file.")
-        
+    encryption_config = EncryptionConfig(encryption_environment, logger)
+    mount_encrypted_disks(disk_util=disk_util,
+                          bek_util=None,
+                          encryption_config=encryption_config,
+                          passphrase_file=None)
     disk_util.umount_all_crypt_items()
 
     # at this point all the /dev/mapper/* crypt devices should be open
@@ -1069,10 +1061,9 @@ def daemon_decrypt():
         failed_item = None
 
         if decryption_marker.get_current_command() == CommonVariables.DisableEncryption:
-            failed_item = disable_encryption_all_in_place(passphrase_file=existing_passphrase_file,
+            failed_item = disable_encryption_all_in_place(passphrase_file=None,
                                                           decryption_marker=decryption_marker,
-                                                          disk_util=disk_util,
-                                                          bek_util=bek_util)
+                                                          disk_util=disk_util)
         else:
             raise Exception("command {0} not supported.".format(decryption_marker.get_current_command()))
         
