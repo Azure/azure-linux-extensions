@@ -104,6 +104,26 @@ def disable_encryption():
 
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
 
+        disk_util = DiskUtil(hutil=hutil, patching=MyPatching, logger=logger, encryption_environment=encryption_environment)
+        bek_util = BekUtil(disk_util, logger)
+        encryption_config = EncryptionConfig(encryption_environment, logger)
+        bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
+        for crypt_item in disk_util.get_crypt_items():
+            disk_util.create_cleartext_key(crypt_item.mapper_name)
+
+            add_result = disk_util.luks_add_cleartext_key(bek_passphrase_file,
+                                                          crypt_item.dev_path,
+                                                          crypt_item.mapper_name,
+                                                          crypt_item.luks_header_path)
+            if(add_result != CommonVariables.process_success):
+                raise Exception("luksAdd failed with return code {0}".format(add_result))
+
+            crypt_item.uses_cleartext_key = True
+            disk_util.update_crypt_item(crypt_item)
+
+            logger.log('Added cleartext key for {0}'.format(crypt_item))
+
         decryption_marker.command = extension_parameter.command
         decryption_marker.volume_type = extension_parameter.VolumeType
         decryption_marker.commit()
@@ -169,7 +189,11 @@ def mount_encrypted_disks(disk_util, bek_util,passphrase_file,encryption_config)
                 se_linux_status = encryption_environment.get_se_linux()
                 if(se_linux_status.lower() == 'enforcing'):
                     encryption_environment.disable_se_linux()
-            luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,dev_path=crypt_item.dev_path,mapper_name=crypt_item.mapper_name,header_file=crypt_item.luks_header_path)
+            luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                                   dev_path=crypt_item.dev_path,
+                                                   mapper_name=crypt_item.mapper_name,
+                                                   header_file=crypt_item.luks_header_path,
+                                                   uses_cleartext_key=crypt_item.uses_cleartext_key)
             logger.log("luks open result is {0}".format(luks_open_result))
             if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
                 if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
@@ -422,6 +446,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                     crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
+                    crypt_item_to_update.uses_cleartext_key = False
 
                     if(encryption_item.has_key("name") and encryption_item["name"] != ""):
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
@@ -429,7 +454,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
 
                     disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
-                    update_crypt_item_result = disk_util.update_crypt_item(crypt_item_to_update)
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
                     if(not update_crypt_item_result):
                         logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
@@ -568,6 +593,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 crypt_item_to_update.dev_path = original_dev_name_path
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
+                crypt_item_to_update.uses_cleartext_key = False
                 # if the original mountpoint is empty, then leave
                 # it as None
                 mount_point = ongoing_item_config.get_mount_point()
@@ -575,7 +601,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                     crypt_item_to_update.mount_point = "None"
                 else:
                     crypt_item_to_update.mount_point = mount_point
-                update_crypt_item_result = disk_util.update_crypt_item(crypt_item_to_update)
+                update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
                 if(not update_crypt_item_result):
                     logger.log(msg="update crypt item failed",level = CommonVariables.ErrorLevel)
 
@@ -662,8 +688,11 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                 disabled = toggle_se_linux_for_centos7(True)
                 device_mapper_path = os.path.join("/dev/mapper", mapper_name)
                 if(not os.path.exists(device_mapper_path)):
-                    open_result = disk_util.luks_open(passphrase_file = passphrase_file, dev_path = original_dev_path, \
-                                                            mapper_name = mapper_name, header_file = luks_header_file_path)
+                    open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                                      dev_path=original_dev_path,
+                                                      mapper_name=mapper_name,
+                                                      header_file=luks_header_file_path,
+                                                      uses_cleartext_key=False)
 
                     if(open_result != CommonVariables.process_success):
                         logger.log(msg=("the luks open for {0} failed.".format(original_dev_path)),level = CommonVariables.ErrorLevel)
@@ -694,6 +723,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                     crypt_item_to_update.dev_path = original_dev_name_path
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
+                    crypt_item_to_update.uses_cleartext_key = False
                     # if the original mountpoint is empty, then leave
                     # it as None
                     mount_point = ongoing_item_config.get_mount_point()
@@ -701,7 +731,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                         crypt_item_to_update.mount_point = "None"
                     else:
                         crypt_item_to_update.mount_point = mount_point
-                    update_crypt_item_result = disk_util.update_crypt_item(crypt_item_to_update)
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
                     if(not update_crypt_item_result):
                         logger.log(msg="update crypt item failed", level = CommonVariables.ErrorLevel)
                     if(crypt_item_to_update.mount_point != "None"):
