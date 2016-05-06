@@ -16,6 +16,8 @@ import socket
 import array
 import base64
 import os
+import signal
+import syslog
 import os.path
 import re
 import string
@@ -55,10 +57,12 @@ if not private_settings:
     private_settings = {}
 
 
-def LogRunGetOutPut(cmd):
-    hutil.log("RunCmd "+cmd)
+def LogRunGetOutPut(cmd, should_log=True):
+    if should_log:
+        hutil.log("RunCmd "+cmd)
     error, msg = waagent.RunGetOutput(cmd)
-    hutil.log("Return "+str(error)+":"+msg)
+    if should_log:
+        hutil.log("Return "+str(error)+":"+msg)
     return error, msg
 
 rsyslog_ommodule_for_check = 'omprog.so'
@@ -84,7 +88,6 @@ RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
                  }
-
 
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
@@ -163,21 +166,21 @@ def parse_context(operation):
     return
 
 
-def setup(local_only):
+def setup(should_install_required_package):
     global EnableSyslog
 
-    if not local_only:
-        install_package_error=""
+    if should_install_required_package:
+        install_package_error = ""
         retry = 3
-        while retry >0:
-            error,msg = install_required_package()
+        while retry > 0:
+            error, msg = install_required_package()
             hutil.log(msg)
-            if error ==0:
+            if error == 0:
                 break
             else:
-                retry-=1
+                retry -= 1
                 hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error=msg
+                install_package_error = msg
                 time.sleep(60)
         if install_package_error:
             if len(install_package_error) > 1024:
@@ -187,15 +190,18 @@ def setup(local_only):
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
-        if error !=0:
+        if error != 0:
             hutil.error(msg)
+            return 3, msg
 
     # Run prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
-    install_omi()
+    omi_err, omi_msg = install_omi()
+    if omi_err is not 0:
+        return 4, omi_msg
 
     return 0, 'success'
 
@@ -560,7 +566,7 @@ def main(command):
 
 
 def start_daemon():
-    args = ['python',StartDaemonFilePath, "-daemon"]
+    args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
     hutil.log('start daemon '+str(args))
     child = subprocess.Popen(args, stdout=log, stderr=log)
@@ -620,7 +626,7 @@ def start_mdsd():
             hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
             copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
+    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
     command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
@@ -632,7 +638,7 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
-            mdsd_log = open (mdsd_log_path,"w")
+            mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
                                      cwd=WorkDir,
@@ -646,20 +652,61 @@ def start_mdsd():
                 pidfile.close()
 
             last_error_time = datetime.datetime.now()
+            omi_installed = True
+            omicli_path = "/opt/omi/bin/omicli"
+            omicli_noop_query_cmd = omicli_path + " noop"
             while True:
                 time.sleep(30)
-                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 and len(get_mdsd_process()) >=2:
+                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
                     mdsd.kill()
                     hutil.log("Another process is started, now exit")
                     return
-                if not (mdsd.poll() is None):
+                if mdsd.poll() is not None:     # if mdsd has terminated
                     time.sleep(60)
                     mdsd_log.flush()
                     break
+
+                # mdsd is now up for at least 30 seconds.
+
+                # Issue #128 LAD should restart OMI if it crashes
+                omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
+                omi_installed = os.path.isfile(omicli_path)
+
+                if omi_was_installed and not omi_installed:
+                    hutil.log("OMI is uninstalled. This must have been intentional and externally done. Will no longer check if OMI is up and running.")
+
+                omi_reinstalled = not omi_was_installed and omi_installed
+                if omi_reinstalled:
+                    hutil.log("OMI is reinstalled. Will resume checking if OMI is up and running.")
+
+                should_restart_omi = False
+                if omi_installed:
+                    cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+                    should_restart_omi = cmd_exit_status is not 0
+                    if should_restart_omi:
+                        hutil.error("OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
+                        omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
+                        hutil.log("OMI restart result: " + omi_restart_msg)
+                        time.sleep(5)
+
+                should_signal_mdsd = should_restart_omi or omi_reinstalled
+                if should_signal_mdsd:
+                    omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
+                    if omi_up_and_running:
+                        mdsd.send_signal(signal.SIGHUP)
+                        hutil.log("SIGHUP sent to mdsd")
+                    else:   # OMI restarted but not staying up...
+                        log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
+                        hutil.error(log_msg)
+                        # Also log this issue on syslog as well
+                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.syslog(syslog.LOG_ALERT, log_msg)    # syslog.syslog(priority, message) -- not taking kw args
+                        syslog.closelog()
+
                 if not os.path.exists(monitor_file_path):
                     continue
                 monitor_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(monitor_file_path))), "%a %b %d %H:%M:%S %Y")
-                if last_error_time >=  monitor_file_ctime:
+                if last_error_time >= monitor_file_ctime:
                     continue
                 last_error_time = monitor_file_ctime
                 last_error = tail(monitor_file_path)
@@ -673,11 +720,12 @@ def start_mdsd():
 
             error = "MDSD crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
+
             try:
                 waagent.AddExtensionEvent(name=hutil.get_name(),
                                 op=waagent.WALAEventOperation.Enable,
                                 isSuccess=False,
-                                      message=error)
+                                message=error)
             except Exception:
                 pass
 
@@ -750,7 +798,20 @@ def install_omi():
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
-        RunGetOutput(distConfig["installomi"])
+        isOmiInstalledSuccessfully = False
+        maxTries = 5      # Try up to 5 times to install OMI
+        for trialNum in range(1, maxTries+1):
+            isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
+            if isOmiInstalledSuccessfully:
+                break
+            hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
+            if trialNum < maxTries:
+                hutil.error("Retrying in 30 seconds...")
+                time.sleep(30)
+        if not isOmiInstalledSuccessfully:
+            hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
+            return 1, "OMI install failed " + str(maxTries) + " times"
+
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
@@ -765,7 +826,7 @@ def install_omi():
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
 
-    RunGetOutput("/opt/omi/bin/service_control restart");
+    RunGetOutput("/opt/omi/bin/service_control restart")
     return 0, "omi installed"
 
 
@@ -775,7 +836,6 @@ def uninstall_omi():
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
     hutil.log("omi will not be uninstalled")
     return 0, "do nothing"
-
 
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
@@ -799,9 +859,9 @@ def uninstall_rsyslogom():
     return 0,"rm omazurelinuxmds done"
 
 def install_rsyslogom():
-    error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
+    error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
-    match= re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    match = re.search("(.*)"+rsyslog_ommodule_for_check, rsyslog_info)
     if match:
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:

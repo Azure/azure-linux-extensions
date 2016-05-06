@@ -1,4 +1,4 @@
-Linux Azure Diagnostic Extension v.2.3.8
+Linux Azure Diagnostic Extension v.2.3.9
 Copyright (c) Microsoft Corporation
 All rights reserved. 
 MIT License
