@@ -220,6 +220,7 @@ def daemon():
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
             utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
             commandStartTime = convert_time(utcTicksLong)
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
@@ -263,7 +264,7 @@ def daemon():
                 
                 for i in range(0,3):
                     unfreeze_result = freezer.unfreezeall()
-                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                    backup_logger.log('unfreeze result ' + str(unfreeze_result), True)
                     if(unfreeze_result is not None):
                         if len(unfreeze_result.errors) > 0:
                             error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
