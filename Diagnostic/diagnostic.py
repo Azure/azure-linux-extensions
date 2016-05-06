@@ -57,10 +57,12 @@ if not private_settings:
     private_settings = {}
 
 
-def LogRunGetOutPut(cmd):
-    hutil.log("RunCmd "+cmd)
+def LogRunGetOutPut(cmd, should_log=True):
+    if should_log:
+        hutil.log("RunCmd "+cmd)
     error, msg = waagent.RunGetOutput(cmd)
-    hutil.log("Return "+str(error)+":"+msg)
+    if should_log:
+        hutil.log("Return "+str(error)+":"+msg)
     return error, msg
 
 rsyslog_ommodule_for_check = 'omprog.so'
@@ -650,6 +652,9 @@ def start_mdsd():
                 pidfile.close()
 
             last_error_time = datetime.datetime.now()
+            omi_installed = True
+            omicli_path = "/opt/omi/bin/omicli"
+            omicli_noop_query_cmd = omicli_path + " noop"
             while True:
                 time.sleep(30)
                 if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
@@ -664,22 +669,38 @@ def start_mdsd():
                 # mdsd is now up for at least 30 seconds.
 
                 # Issue #128 LAD should restart OMI if it crashes
-                omi_up_and_running = RunGetOutput("/opt/omi/bin/omicli noop")[0] is 0
-                if not omi_up_and_running:
-                    hutil.error("OMI noop query failed. OMI crash suspected. Restarting OMI and send SIGHUP to mdsd after 5 seconds.")
-                    omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
-                    hutil.error("OMI restart result: " + omi_restart_msg)
-                    time.sleep(5)
-                    omi_up_and_running = RunGetOutput("/opt/omi/bin/omicli noop")[0] is 0
+                omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
+                omi_installed = os.path.isfile(omicli_path)
+
+                if omi_was_installed and not omi_installed:
+                    hutil.log("OMI is uninstalled. This must have been intentional and externally done. Will no longer check if OMI is up and running.")
+
+                omi_reinstalled = not omi_was_installed and omi_installed
+                if omi_reinstalled:
+                    hutil.log("OMI is reinstalled. Will resume checking if OMI is up and running.")
+
+                should_restart_omi = False
+                if omi_installed:
+                    cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+                    should_restart_omi = cmd_exit_status is not 0
+                    if should_restart_omi:
+                        hutil.error("OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
+                        omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
+                        hutil.log("OMI restart result: " + omi_restart_msg)
+                        time.sleep(5)
+
+                should_signal_mdsd = should_restart_omi or omi_reinstalled
+                if should_signal_mdsd:
+                    omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
                     if omi_up_and_running:
                         mdsd.send_signal(signal.SIGHUP)
-                        hutil.error("SIGHUP sent to mdsd")
+                        hutil.log("SIGHUP sent to mdsd")
                     else:   # OMI restarted but not staying up...
                         log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
                         hutil.error(log_msg)
                         # Also log this issue on syslog as well
                         syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
-                        syslog.syslog(priority=syslog.LOG_ALERT, message=log_msg)
+                        syslog.syslog(syslog.LOG_ALERT, log_msg)    # syslog.syslog(priority, message) -- not taking kw args
                         syslog.closelog()
 
                 if not os.path.exists(monitor_file_path):
@@ -778,7 +799,7 @@ def install_omi():
     if need_install_omi:
         hutil.log("Begin omi installation.")
         isOmiInstalledSuccessfully = False
-        maxTries = 3      # Try up to 3 times to install OMI
+        maxTries = 5      # Try up to 5 times to install OMI
         for trialNum in range(1, maxTries+1):
             isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
             if isOmiInstalledSuccessfully:
@@ -788,8 +809,8 @@ def install_omi():
                 hutil.error("Retrying in 30 seconds...")
                 time.sleep(30)
         if not isOmiInstalledSuccessfully:
-            hutil.error("OMI install failed 3 times. Giving up...")
-            return 1, "OMI install failed 3 times"
+            hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
+            return 1, "OMI install failed " + str(maxTries) + " times"
 
 
     # Quick and dirty way of checking if mysql/apache process is running
