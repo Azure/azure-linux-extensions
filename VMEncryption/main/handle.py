@@ -119,6 +119,12 @@ def disable_encryption():
             if(add_result != CommonVariables.process_success):
                 raise Exception("luksAdd failed with return code {0}".format(add_result))
 
+            if crypt_item.dev_path.startswith("/dev/sd"):
+                logger.log('Updating crypt item entry to use mapper name')
+                logger.log('Device name before update: {0}'.format(crypt_item.dev_path))
+                crypt_item.dev_path = disk_util.query_dev_uuid_path_by_sdx_path(crypt_item.dev_path)
+                logger.log('Device name after update: {0}'.format(crypt_item.dev_path))
+
             crypt_item.uses_cleartext_key = True
             disk_util.update_crypt_item(crypt_item)
 
@@ -903,7 +909,11 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
-            return crypt_item.dev_path == "/dev/" + device_item.name
+            sdx_device_name = "/dev/" + device_item.name
+            if "by-uuid" in crypt_item.dev_path:
+                return crypt_item.dev_path == disk_util.query_dev_uuid_path_by_sdx_path(sdx_device_name)
+            else:
+                return crypt_item.dev_path == sdx_device_name
         def mapped_device_item_match(device_item):
             return crypt_item.mapper_name == device_item.name
 
