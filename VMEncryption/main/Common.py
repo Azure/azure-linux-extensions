@@ -38,6 +38,7 @@ class CommonVariables:
     default_file_system = 'ext4'
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
+    disk_by_id_root = '/dev/disk/by-id'
     BekVolumeFileSystem = 'vfat'
 
     """

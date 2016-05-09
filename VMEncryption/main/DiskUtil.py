@@ -391,9 +391,7 @@ class DiskUtil(object):
         """
         return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
         """
-        disk_by_id_root = '/dev/disk/by-id'
-
-        for disk_by_id in os.listdir(disk_by_id_root):
+        for disk_by_id in os.listdir(CommonVariables.disk_by_id_root):
             disk_by_id_path = os.path.join(disk_by_id_root, disk_by_id)
             if os.path.realpath(disk_by_id_path) == sdx_path:
                 return disk_by_id_path
