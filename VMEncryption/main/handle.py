@@ -910,7 +910,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         def raw_device_item_match(device_item):
             sdx_device_name = "/dev/" + device_item.name
-            if crypt_item.dev_path.startswith(disk_by_id_root):
+            if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
                 return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
             else:
                 return crypt_item.dev_path == sdx_device_name
