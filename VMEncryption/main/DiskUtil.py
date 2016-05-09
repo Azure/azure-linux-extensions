@@ -387,6 +387,19 @@ class DiskUtil(object):
         sdx_path = vals[len(vals) - 1]
         return sdx_path
 
+    def query_dev_id_path_by_sdx_path(self, sdx_path):
+        """
+        return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
+        """
+        disk_by_id_root = '/dev/disk/by-id'
+
+        for disk_by_id in os.listdir(disk_by_id_root):
+            disk_by_id_path = os.path.join(disk_by_id_root, disk_by_id)
+            if os.path.realpath(disk_by_id_path) == sdx_path:
+                return disk_by_id_path
+
+        return sdx_path
+
     def query_dev_uuid_path_by_sdx_path(self, sdx_path):
         """
         the behaviour is if we could get the uuid, then return, if not, just return the sdx.
