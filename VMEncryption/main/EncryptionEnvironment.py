@@ -36,6 +36,7 @@ class EncryptionEnvironment(object):
         self.azure_crypt_ongoing_item_config_path = os.path.join(self.encryption_config_path,'azure_crypt_ongoing_item.ini')
         self.azure_crypt_current_transactional_copy_path = os.path.join(self.encryption_config_path,'azure_crypt_copy_progress.ini')
         self.luks_header_base_path = os.path.join(self.encryption_config_path,'azureluksheader')
+        self.cleartext_key_base_path = os.path.join(self.encryption_config_path,'cleartext_key')
         self.copy_header_slice_file_path = os.path.join(self.encryption_config_path,'copy_header_slice_file')
         self.copy_slice_item_backup_file = os.path.join(self.encryption_config_path,'copy_slice_item.bak')
 

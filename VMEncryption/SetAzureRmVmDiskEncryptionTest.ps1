@@ -131,14 +131,12 @@ Write-Host "Updated VM successfully"
 ## Encryption
 
 Read-Host "Press Enter to continue..."
-Read-Host "Press Enter to continue..."
-Read-Host "Press Enter to continue..."
 
 $global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
 
 Write-Host "Fetched DiskEncryptionKey successfully"
 
-Set-AzureRmVMDiskEncryptionExtension `
+$global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
     -ResourceGroupName $ResourceGroupName `
     -VMName $VMName `
     -AadClientID $AadClientId `
@@ -149,7 +147,8 @@ Set-AzureRmVMDiskEncryptionExtension `
     -KeyEncryptionKeyURL $DiskEncryptionKey.Id `
     -KeyEncryptionAlgorithm "RSA-OAEP" `
     -VolumeType "Data" `
-    -SequenceVersion "1"
+    -SequenceVersion "1" 3>&1 | Out-String
 
 Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
 
+$global:BackupTag = [regex]::match($EncryptionEnableOutput, '(AzureEnc.*?),').Groups[1].Value

@@ -98,17 +98,23 @@ class DiskUtil(object):
                         crypt_item.luks_header_path = header_file_path
                         crypt_item.mount_point = crypt_mount_item_properties[3]
                         crypt_item.file_system = crypt_mount_item_properties[4]
+                        crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
                         crypt_items.append(crypt_item)
         return crypt_items
 
-    def update_crypt_item(self,crypt_item):
+    def add_crypt_item(self,crypt_item):
         """
         TODO we should judge that the second time.
         format is like this:
         <target name> <source device> <key file> <options>
         """
         try:
-            mount_content_item = crypt_item.mapper_name + " " + crypt_item.dev_path + " " + crypt_item.luks_header_path + " " + crypt_item.mount_point + " " + crypt_item.file_system
+            mount_content_item = (crypt_item.mapper_name + " " +
+                                  crypt_item.dev_path + " " +
+                                  crypt_item.luks_header_path + " " +
+                                  crypt_item.mount_point + " " +
+                                  crypt_item.file_system + " " +
+                                  str(crypt_item.uses_cleartext_key))
 
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
@@ -146,6 +152,10 @@ class DiskUtil(object):
         except Exception as e:
             return False
 
+    def update_crypt_item(self, crypt_item):
+        self.remove_crypt_item(crypt_item)
+        self.add_crypt_item(crypt_item)
+
     def create_luks_header(self,mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if(os.path.exists(luks_header_file_path)):
@@ -160,13 +170,31 @@ class DiskUtil(object):
                 self.logger.log(msg=("make luks header failed and return code is:{0}".format(returnCode)), level=CommonVariables.ErrorLevel)
                 return None
 
+    def create_cleartext_key(self, mapper_name):
+        cleartext_key_file_path = self.encryption_environment.cleartext_key_base_path + mapper_name
+        if(os.path.exists(cleartext_key_file_path)):
+            return cleartext_key_file_path
+        else:
+            commandToExecute = self.patching.bash_path + ' -c "' + self.patching.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path + '"'
+            proc = Popen(commandToExecute, shell=True)
+            returnCode = proc.wait()
+            if(returnCode == CommonVariables.process_success):
+                return cleartext_key_file_path
+            else:
+                self.logger.log(msg=("dd failed with return code: {0}".format(returnCode)), level=CommonVariables.ErrorLevel)
+                return None
+
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         returnCode = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
         if(returnCode != CommonVariables.process_success):
             self.logger.log(msg=('cryptsetup luksFormat failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
             return returnCode
         else:
-            returnCode = self.luks_open(passphrase_file=passphrase_file, dev_path=dev_path, mapper_name=mapper_name, header_file= header_file)
+            returnCode = self.luks_open(passphrase_file=passphrase_file,
+                                        dev_path=dev_path,
+                                        mapper_name=mapper_name,
+                                        header_file=header_file,
+                                        uses_cleartext_key=False)
             if(returnCode != CommonVariables.process_success):
                 self.logger.log(msg=('cryptsetup luksOpen failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
             return returnCode
@@ -235,12 +263,41 @@ class DiskUtil(object):
             cryptsetup_p = Popen(cryptsetup_cmd_args)
             returnCode = cryptsetup_p.wait()
             return returnCode
+        
+    def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
+        """
+        return the return code of the process for error handling.
+        """
+        cleartext_key_file_path = self.encryption_environment.cleartext_key_base_path + mapper_name
 
-    def luks_open(self, passphrase_file, dev_path, mapper_name, header_file):
+        self.hutil.log("cleartext key path: " + (cleartext_key_file_path))
+
+        if not os.path.exists(cleartext_key_file_path):
+            self.hutil.error("cleartext key does not exist")
+            return None
+
+        if(header_file is not None or header_file == ""):
+            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, header_file, cleartext_key_file_path, passphrase_file)
+        else:
+            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, dev_path, cleartext_key_file_path, passphrase_file)
+
+        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
+        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
+        cryptsetup_p = Popen(cryptsetup_cmd_args)
+        returnCode = cryptsetup_p.wait()
+        return returnCode
+
+    def luks_open(self, passphrase_file, dev_path, mapper_name, header_file, uses_cleartext_key):
         """
         return the return code of the process for error handling.
         """
         self.hutil.log("dev mapper name to cryptsetup luksOpen " + (mapper_name))
+
+        if uses_cleartext_key:
+            passphrase_file = self.encryption_environment.cleartext_key_base_path + mapper_name
+
+        self.hutil.log("keyfile: " + (passphrase_file))
+
         if(header_file is not None or header_file == ""):
             cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.patching.cryptsetup_path , dev_path ,mapper_name, header_file ,passphrase_file)
         else:
@@ -328,6 +385,17 @@ class DiskUtil(object):
         if(vals is None or len(vals) == 0):
             return None
         sdx_path = vals[len(vals) - 1]
+        return sdx_path
+
+    def query_dev_id_path_by_sdx_path(self, sdx_path):
+        """
+        return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
+        """
+        for disk_by_id in os.listdir(CommonVariables.disk_by_id_root):
+            disk_by_id_path = os.path.join(CommonVariables.disk_by_id_root, disk_by_id)
+            if os.path.realpath(disk_by_id_path) == sdx_path:
+                return disk_by_id_path
+
         return sdx_path
 
     def query_dev_uuid_path_by_sdx_path(self, sdx_path):
