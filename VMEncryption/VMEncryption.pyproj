@@ -26,20 +26,10 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="attach_key_disk.ps1" />
-    <Content Include="encrypt_disk.ps1" />
-    <Content Include="encrypt_disk_clone.ps1" />
-    <Content Include="encrypt_disk_format.ps1" />
-    <Content Include="encrypt_disk_inplace_withoutbek.ps1" />
     <Content Include="HandlerManifest.json" />
-    <Content Include="keyvault_prepare.ps1" />
-    <Content Include="encrypt_disk_inplace.ps1" />
-    <Content Include="linuxencryption.pfx" />
     <Content Include="MANIFEST.in" />
     <Content Include="README.txt" />
-    <Content Include="SetAzureDiskEncryptionTest.ps1" />
-    <Content Include="SetAzureDiskEncryptionSplits.ps1" />
-    <Content Include="SetAzureRmVmDiskEncryptionTest.ps1" />
+    <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -94,18 +84,11 @@
     <Compile Include="main\Utils\__init__.py" />
     <Compile Include="main\__init__.py" />
     <Compile Include="setup.py" />
-    <Compile Include="test\mockfile.py">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="test\test.py">
-      <SubType>Code</SubType>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
-    <Folder Include="test\" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
