@@ -730,7 +730,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                 else:
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
-                    original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
+                    original_dev_name_path = ongoing_item_config.get_original_dev_path()
                     crypt_item_to_update.dev_path = original_dev_name_path
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
