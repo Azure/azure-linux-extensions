@@ -600,7 +600,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
             if(copy_result == CommonVariables.process_success):
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
-                original_dev_name_path = ongoing_item_config.get_original_dev_path()
+                original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
                 crypt_item_to_update.dev_path = original_dev_name_path
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
