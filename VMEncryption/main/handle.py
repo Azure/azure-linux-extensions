@@ -464,6 +464,9 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                     else:
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
 
+                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                    disk_util.remove_mount_info(crypt_item_to_update.mount_point)
+
                     disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
                     update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
                     if(not update_crypt_item_result):
@@ -616,6 +619,9 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 if(not update_crypt_item_result):
                     logger.log(msg="update crypt item failed",level = CommonVariables.ErrorLevel)
 
+                logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                disk_util.remove_mount_info(mount_point)
+
                 if(os.path.exists(encryption_environment.copy_header_slice_file_path)):
                     os.remove(encryption_environment.copy_header_slice_file_path)
 
@@ -749,6 +755,10 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                         disk_util.mount_filesystem(device_mapper_path, mount_point)
                     else:
                         logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
+
+                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                    disk_util.remove_mount_info(mount_point)
+
                     current_phase = CommonVariables.EncryptionPhaseDone
                     ongoing_item_config.phase = current_phase
                     ongoing_item_config.commit()
@@ -779,6 +789,7 @@ def decrypt_inplace_copy_data(passphrase_file,
         ongoing_item_config.phase = CommonVariables.DecryptionPhaseCopyData
         ongoing_item_config.current_slice_index = 0
         ongoing_item_config.current_block_size = CommonVariables.default_block_size
+        ongoing_item_config.mount_point = crypt_item.mount_point
         ongoing_item_config.commit()
 
     current_phase = ongoing_item_config.get_phase()
@@ -790,6 +801,10 @@ def decrypt_inplace_copy_data(passphrase_file,
         if current_phase == CommonVariables.DecryptionPhaseCopyData:
             copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config)
             if(copy_result == CommonVariables.process_success):
+                logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                disk_util.restore_mount_info(ongoing_item_config.get_mount_point())
+                disk_util.mount_all()
+
                 ongoing_item_config.phase = CommonVariables.DecryptionPhaseDone
                 ongoing_item_config.commit()
                 current_phase = CommonVariables.DecryptionPhaseDone

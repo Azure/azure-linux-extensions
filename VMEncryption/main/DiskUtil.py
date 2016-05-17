@@ -21,6 +21,7 @@
 import subprocess
 import os
 import os.path
+import re
 import shlex
 import sys
 from subprocess import *
@@ -330,6 +331,70 @@ class DiskUtil(object):
             new_mount_content = existing_content + "\n" + mount_content_item
         with open("/etc/fstab",'w') as wf:
             wf.write(new_mount_content)
+
+    def remove_mount_info(self, mount_point):
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+
+        filtered_contents = []
+        removed_lines = []
+
+        with open('/etc/fstab', 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                pattern = '\s' + re.escape(mount_point) + '\s'
+
+                if re.search(pattern, line):
+                    self.logger.log("removing fstab line: {0}".format(line))
+                    removed_lines.append(line)
+                    continue
+
+                filtered_contents.append(line)
+
+        with open('/etc/fstab', 'w') as f:
+            f.write('\n')
+            f.write('\n'.join(filtered_contents))
+            f.write('\n')
+
+        self.logger.log("fstab updated successfully")
+
+        with open('/etc/fstab.azure.backup', 'a+') as f:
+            f.write('\n')
+            f.write('\n'.join(removed_lines))
+            f.write('\n')
+
+        self.logger.log("fstab.azure.backup updated successfully")
+
+    def restore_mount_info(self, mount_point):
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+
+        filtered_contents = []
+        removed_lines = []
+
+        with open('/etc/fstab.azure.backup', 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                pattern = '\s' + re.escape(mount_point) + '\s'
+
+                if re.search(pattern, line):
+                    self.logger.log("removing fstab.azure.backup line: {0}".format(line))
+                    removed_lines.append(line)
+                    continue
+
+                filtered_contents.append(line)
+
+        with open('/etc/fstab.azure.backup', 'w') as f:
+            f.write('\n')
+            f.write('\n'.join(filtered_contents))
+            f.write('\n')
+
+        self.logger.log("fstab.azure.backup updated successfully")
+
+        with open('/etc/fstab', 'a+') as f:
+            f.write('\n')
+            f.write('\n'.join(removed_lines))
+            f.write('\n')
+
+        self.logger.log("fstab updated successfully")
 
     def mount_filesystem(self,dev_path,mount_point,file_system=None):
         """
