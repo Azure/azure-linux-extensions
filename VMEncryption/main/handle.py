@@ -803,7 +803,6 @@ def decrypt_inplace_copy_data(passphrase_file,
             if(copy_result == CommonVariables.process_success):
                 logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                 disk_util.restore_mount_info(ongoing_item_config.get_mount_point())
-                disk_util.mount_all()
 
                 ongoing_item_config.phase = CommonVariables.DecryptionPhaseDone
                 ongoing_item_config.commit()
@@ -961,6 +960,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         if(decryption_result_phase == CommonVariables.DecryptionPhaseDone):
             disk_util.luks_close(crypt_item.mapper_name)
             disk_util.remove_crypt_item(crypt_item)
+            disk_util.mount_all()
 
             continue
         else:
