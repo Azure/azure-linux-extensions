@@ -182,7 +182,7 @@ def freeze_watcher():
             error_msg = 'T:W Snapshot timeout'
             backup_logger.log(error_msg, False, 'Warning')
     except Exception as e:
-        errMsg = 'Failed to do the snapshot because of exception in freeze watcher'
+        errMsg = 'Failed to do  the snapshot because of exception in freeze watcher'
         backup_logger.log(errMsg, False, 'Error')
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
