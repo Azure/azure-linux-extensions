@@ -479,7 +479,8 @@ def main(command):
     #Global Variables definition
 
     global EnableSyslog, UseService
-    if readPublicConfig('EnableSyslog').lower() == 'false':
+    if readPublicConfig('enableSyslog').lower() == 'false' or readPublicConfig('EnableSyslog').lower() == 'false':
+        # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
         EnableSyslog = False
     else:
         EnableSyslog = True
