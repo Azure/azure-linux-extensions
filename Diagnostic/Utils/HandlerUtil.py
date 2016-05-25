@@ -67,13 +67,15 @@ class HandlerContext:
         return
 
 class HandlerUtility:
-    def __init__(self, log, error, short_name):
+    def __init__(self, log, error, short_name, ext_name_in_log_prefix, ext_version):
         self._log = log
         self._error = error
         self._short_name = short_name
+        self._ext_name_in_log_prefix = ext_name_in_log_prefix
+        self._ext_version = ext_version
 
     def _get_log_prefix(self):
-        return '[%s-%s]' %(self._context._name, self._context._version)
+        return '[%s-%s]' %(self._ext_name_in_log_prefix, self._ext_version)
 
     def _get_current_seq_no(self, config_folder):
         seq_no = -1

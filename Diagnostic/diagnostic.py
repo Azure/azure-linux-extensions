@@ -2,7 +2,7 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.3.7
+# Linux Azure Diagnostic Extension (see below for version)
 # Copyright (c) Microsoft Corporation
 # All rights reserved.   
 # MIT License  
@@ -41,13 +41,15 @@ import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
+ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
+ExtensionVersion = '2.3.9001'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("%s started to handle." %(ExtensionShortName))
-hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
 hutil.try_parse_context()
 public_settings = hutil.get_public_settings()
 private_settings = hutil.get_protected_settings()
@@ -83,7 +85,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('tar','policycoreutils-python'),
+                 "packages":(),
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -165,7 +167,7 @@ def getChildNode(p,tag):
            return node
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
     hutil.try_parse_context()
     return
 
@@ -297,7 +299,6 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement,["omitag","perf"])
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
