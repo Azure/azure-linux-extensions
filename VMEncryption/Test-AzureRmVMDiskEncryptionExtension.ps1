@@ -11,6 +11,7 @@
 	[string] $Username,
     [Parameter(Mandatory=$true)]
 	[string] $Password,
+	[string] $ExtensionName="AzureDiskEncryptionForLinux",
     [string] $Location="eastus"
 )
 
@@ -137,6 +138,7 @@ $global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVa
 Write-Host "Fetched DiskEncryptionKey successfully"
 
 $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
+    -ExtensionName $ExtensionName `
     -ResourceGroupName $ResourceGroupName `
     -VMName $VMName `
     -AadClientID $AadClientId `
