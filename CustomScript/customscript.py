@@ -322,7 +322,13 @@ def download_blob(storage_account_name, storage_account_key,
                                         blob_uri,
                                         download_dir)
         blob_name, _, _, download_path = result
-        preprocess_files(download_path, hutil)
+        enable_dos_converting = True
+        public_settings = hutil.get_public_settings()
+        if public_settings:
+            if 'enableDOSConverting' in public_settings:
+                enable_dos_converting = public_settings.get('enableDOSConverting')
+        if enable_dos_converting:
+            preprocess_files(download_path, hutil)
         if command and blob_name in command:
             os.chmod(download_path, 0100)
     except Exception, e:
@@ -368,7 +374,13 @@ def download_external_file(uri, command, hutil):
     file_path = os.path.join(download_dir, file_name)
     try:
         download_and_save_file(uri, file_path)
-        preprocess_files(file_path, hutil)
+        enable_dos_converting = True
+        public_settings = hutil.get_public_settings()
+        if public_settings:
+            if 'enableDOSConverting' in public_settings:
+                enable_dos_converting = public_settings.get('enableDOSConverting')
+        if enable_dos_converting:
+            preprocess_files(file_path, hutil)
         if command and file_name in command:
             os.chmod(file_path, 0100)
     except Exception, e:
@@ -405,6 +417,8 @@ def to_process(file_path, extensions=['.sh', ".py"]):
     for extension in extensions:
         if file_path.endswith(extension):
             return True
+        else:
+            return False
     with open(file_path, 'rb') as f:
         contents = f.read(64)
     if '#!' in contents:
