@@ -99,7 +99,7 @@ $VirtualMachine = Set-AzureRmVMOperatingSystem -VM $VirtualMachine -Linux -Compu
 
 Write-Host "Set AzureRmVMOperatingSystem successfully"
 
-$VirtualMachine = Set-AzureRmVMSourceImage -VM $VirtualMachine -PublisherName "Canonical" -Offer "UbuntuServer" -Skus "14.04.4-DAILY-LTS" -Version "latest"
+$VirtualMachine = Set-AzureRmVMSourceImage -VM $VirtualMachine -PublisherName "OpenLogic" -Offer "CentOS" -Skus "7.2" -Version "latest"
 
 Write-Host "Set AzureVMSourceImage successfully"
 
