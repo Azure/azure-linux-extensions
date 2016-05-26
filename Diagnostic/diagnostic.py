@@ -754,13 +754,34 @@ def start_mdsd():
 
 
 def stop_mdsd():
-    pid_to_kill = " ".join(get_mdsd_process())
-    if len(pid_to_kill)>0:
-        hutil.log("kill -9 "+pid_to_kill)
-        RunGetOutput("kill -9 "+pid_to_kill)
-    #left the pid file won't do bad
-    #RunGetOutput("rm "+MDSDPidFile)
-    return 0,"stopped"
+    pids = get_mdsd_process()
+    if not pids:
+        return 0, "Already stopped"
+
+    kill_cmd = "kill " + " ".join(pids)
+    hutil.log(kill_cmd)
+    RunGetOutput(kill_cmd)
+
+    terminated = False
+    num_checked = 0
+    while not terminated and num_checked < 10:
+        time.sleep(2)
+        num_checked += 1
+        pids = get_mdsd_process()
+        if not pids:
+            hutil.log("stop_mdsd(): All processes successfully terminated")
+            terminated = True
+        else:
+            hutil.log("stop_mdsd() terminate check #{0}: Processes not terminated yet, rechecking in 2 seconds".format(num_checked))
+
+    if not terminated:
+        kill_cmd = "kill -9 " + " ".join(get_mdsd_process())
+        hutil.log("stop_mdsd(): Processes not terminated in 20 seconds. Sending SIGKILL (" + kill_cmd + ")")
+        RunGetOutput(kill_cmd)
+
+    RunGetOutput("rm "+MDSDPidFile)
+
+    return 0, "Terminated" if terminated else "SIGKILLed"
 
 
 def get_mdsd_process():
