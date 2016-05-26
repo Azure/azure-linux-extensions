@@ -80,7 +80,7 @@ manifest_obj = [{
     "enableCommand": main_entry + " -enable",
     "disableCommand": main_entry + " -disable",
     "rebootAfterInstall": False,
-    "reportHeartbeat": False
+    "reportHeartbeat": True
   }
 }]
 
