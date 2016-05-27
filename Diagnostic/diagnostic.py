@@ -45,6 +45,7 @@ ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
 ExtensionVersion = '2.3.9001'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
+MDSDPortFile = os.path.join(WorkDir, 'mdsd.port')
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -583,6 +584,7 @@ def start_daemon():
     if wait_n <=0:
         hutil.error("wait daemon start time out")
 
+
 def start_mdsd():
     global EnableSyslog
     with open(MDSDPidFile, "w") as pidfile:
@@ -633,10 +635,11 @@ def start_mdsd():
             copy_env['MDSD_http_proxy'] = proxy_config
 
     xml_file = os.path.join(WorkDir, './xmlCfg.xml')
-    command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
+    command = '{0} -A -c {1} -p {2} -q {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
+        MDSDPortFile,
         monitor_file_path,
         warn_file_path,
         info_file_path).split(" ")
@@ -644,6 +647,8 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
+            RunGetOutput("rm -f "+MDSDPortFile)  # Must delete any existing port num file
+            rsyslog_reconfigured = False
             mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
@@ -661,6 +666,7 @@ def start_mdsd():
             omi_installed = True
             omicli_path = "/opt/omi/bin/omicli"
             omicli_noop_query_cmd = omicli_path + " noop"
+            # Continuously monitors mdsd process
             while True:
                 time.sleep(30)
                 if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
@@ -673,6 +679,16 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
+
+                # Issue #137 Can't start mdsd if port 29131 is in use.
+                # mdsd now binds to another randomly available port,
+                # and LAD still needs to reconfigure rsyslogd.
+                if not rsyslog_reconfigured and os.path.isfile(MDSDPortFile):
+                    with open(MDSDPortFile, 'r') as mdsd_port_file:
+                        new_port = mdsd_port_file.readline()
+                        hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
+                        reconfigure_omazurelinuxmds_and_restart_rsyslog(new_port)
+                        rsyslog_reconfigured = True
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
@@ -720,11 +736,12 @@ def start_mdsd():
                     hutil.log("Error in MDSD:"+last_error)
                     hutil.do_status_report("Enable","success",'1',"message in /var/log/mdsd.err:"+str(last_error_time)+":"+last_error)
 
+            # mdsd terminated.
             if mdsd_log:
                 mdsd_log.close()
                 mdsd_log = None
 
-            error = "MDSD crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
+            error = "MDSD("+ExtensionVersion+") crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
 
             try:
@@ -735,6 +752,10 @@ def start_mdsd():
             except Exception:
                 pass
 
+            # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
+            install_rsyslogom()
+
+        # mdsd all 3 restarts exhausted
         hutil.do_status_report("Enable","error",'1',"mdsd stopped:"+error)
 
     except Exception,e:
@@ -747,7 +768,7 @@ def start_mdsd():
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=False,
-                                  message="MDSD Crash2:"+str(e))
+                                  message="MDSD("+ExtensionVersion+") Crash2:"+str(e))
     finally:
         if mdsd_log:
             mdsd_log.close()
@@ -864,6 +885,7 @@ def uninstall_omi():
     hutil.log("omi will not be uninstalled")
     return 0, "do nothing"
 
+
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
@@ -884,6 +906,7 @@ def uninstall_rsyslogom():
         RunGetOutput("service rsyslog restart")
 
     return 0,"rm omazurelinuxmds done"
+
 
 def install_rsyslogom():
     error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
@@ -914,6 +937,20 @@ def install_rsyslogom():
     else:
         RunGetOutput("service rsyslog restart")
     return 0,"install mdsdom completed"
+
+
+def reconfigure_omazurelinuxmds_and_restart_rsyslog(new_port):
+    files_to_modify = ['/etc/rsyslog.d/omazurelinuxmds.conf', '/etc/rsyslog.d/omazurelinuxmds_fileom.conf']
+    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
+
+    for f in files_to_modify:
+        RunGetOutput(cmd_to_run.format(new_port, f))
+
+    if distConfig.has_key("restartrsyslog"):
+        RunGetOutput(distConfig["restartrsyslog"])
+    else:
+        RunGetOutput("service rsyslog restart")
+
 
 def install_required_package():
     packages = distConfig['packages']
