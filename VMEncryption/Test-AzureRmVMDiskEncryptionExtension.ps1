@@ -43,6 +43,10 @@ Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "diskencryptionkey" -Destina
 
 Write-Host "Added AzureRmKeyVaultKey successfully"
 
+$global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
+
+Write-Host "Fetched DiskEncryptionKey successfully"
+
 ## Storage
 $global:StorageName = ($ResourcePrefix + "Storage").ToLower()
 $global:StorageType = "Standard_GRS"
@@ -132,10 +136,6 @@ Write-Host "Updated VM successfully"
 ## Encryption
 
 Read-Host "Press Enter to continue..."
-
-$global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
-
-Write-Host "Fetched DiskEncryptionKey successfully"
 
 $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
     -ExtensionName $ExtensionName `
