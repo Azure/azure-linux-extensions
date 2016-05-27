@@ -12,6 +12,7 @@
     [Parameter(Mandatory=$true)]
 	[string] $Password,
 	[string] $ExtensionName="AzureDiskEncryptionForLinux",
+	[string] $SshPubKey,
     [string] $Location="eastus"
 )
 
@@ -115,6 +116,13 @@ Write-Host "Added AzureVMNetworkInterface successfully"
 $VirtualMachine = Set-AzureRmVMOSDisk -VM $VirtualMachine -Name $OSDiskName -VhdUri $OSDiskUri -CreateOption FromImage
 
 Write-Host "Created AzureVMOSDisk successfully"
+
+if ($SshPubKey)
+{
+    $VirtualMachine = Add-AzureRmVMSshPublicKey -VM $VirtualMachine -KeyData $SshPubKey -Path ("/home/" + $Username + "/.ssh/authorized_keys")
+
+    Write-Host "Added SSH public key successfully"
+}
 
 ## Create the VM in Azure
 New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $VirtualMachine
