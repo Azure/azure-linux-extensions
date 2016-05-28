@@ -171,11 +171,11 @@ def freeze_watcher():
     global backup_logger,run_status,error_msg,snapshot_done
     #wait 5 minutes before the snapshoting.
     try:
-        for i in range(0, 50):
+        for i in range(0, 4):
             if(snapshot_done):
                 backup_logger.log('T:W snapshot is done', False)
                 break;
-            sleep(6)
+            sleep(5)
         if not snapshot_done:
             run_result = CommonVariables.error
             run_status = 'error'

@@ -21,6 +21,7 @@
 import urlparse
 import httplib
 import traceback
+import threading
 from common import CommonVariables
 from HttpUtil import HttpUtil
 
@@ -46,7 +47,7 @@ class Snapshotter(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def snapshot(self, sasuri, meta_data):
+    def snapshot(self, sasuri, meta_data,snapshot_result):
         result = None
         snapshot_error = SnapshotError()
         if(sasuri is None):
@@ -81,17 +82,22 @@ class Snapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
-        return snapshot_error
+        if(snapshot_error.errorcode != CommonVariables.success):
+            snapshot_result.errors.append(snapshot_error)
 
     def snapshotall(self, paras):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
+        thread_jobs = []
         blobs = paras.blobs
         if blobs is not None:
             for blob in blobs:
-                snapshotError = self.snapshot(blob, paras.backup_metadata)
-                if(snapshotError.errorcode != CommonVariables.success):
-                    snapshot_result.errors.append(snapshotError)
+                thread = threading.Thread(target=self.snapshot(blob, paras.backup_metadata,snapshot_result))
+                thread_jobs.append(thread)
+            for job in thread_jobs:
+                job.start()
+            for job in thread_jobs:
+                job.join()
             return snapshot_result
         else:
             self.logger.log("the blobs are None")

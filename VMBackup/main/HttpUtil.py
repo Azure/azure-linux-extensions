@@ -57,7 +57,7 @@ class HttpUtil(object):
         else:
             commandToExecute = 'curl --request PUT --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
-        args = shlex.split(commandToExecute)
+        args = shlex.split(commandToExecute.encode('ascii'))
         proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         proc.stdin.write(data)
         curlResult,err = proc.communicate()
