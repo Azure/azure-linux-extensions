@@ -333,6 +333,10 @@ class DiskUtil(object):
             wf.write(new_mount_content)
 
     def remove_mount_info(self, mount_point):
+        if not mount_point:
+            self.logger.log("remove_mount_info: mount_point is empty")
+            return
+
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
 
         filtered_contents = []
@@ -365,6 +369,10 @@ class DiskUtil(object):
         self.logger.log("fstab.azure.backup updated successfully")
 
     def restore_mount_info(self, mount_point):
+        if not mount_point:
+            self.logger.log("restore_mount_info: mount_point is empty")
+            return
+
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
 
         filtered_contents = []

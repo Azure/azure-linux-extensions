@@ -619,8 +619,12 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 if(not update_crypt_item_result):
                     logger.log(msg="update crypt item failed",level = CommonVariables.ErrorLevel)
 
-                logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
-                disk_util.remove_mount_info(mount_point)
+                if mount_point:
+                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                    disk_util.remove_mount_info(mount_point)
+                else:
+                    logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
+                               level=CommonVariables.InfoLevel)
 
                 if(os.path.exists(encryption_environment.copy_header_slice_file_path)):
                     os.remove(encryption_environment.copy_header_slice_file_path)
@@ -756,8 +760,12 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                     else:
                         logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
 
-                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
-                    disk_util.remove_mount_info(mount_point)
+                    if mount_point:
+                        logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                        disk_util.remove_mount_info(mount_point)
+                    else:
+                        logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
+                                   level=CommonVariables.InfoLevel)
 
                     current_phase = CommonVariables.EncryptionPhaseDone
                     ongoing_item_config.phase = current_phase
@@ -801,8 +809,13 @@ def decrypt_inplace_copy_data(passphrase_file,
         if current_phase == CommonVariables.DecryptionPhaseCopyData:
             copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config)
             if(copy_result == CommonVariables.process_success):
-                logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
-                disk_util.restore_mount_info(ongoing_item_config.get_mount_point())
+                mount_point = ongoing_item_config.get_mount_point()
+                if mount_point and mount_point != "None":
+                    logger.log(msg="restoring entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                    disk_util.restore_mount_info(ongoing_item_config.get_mount_point())
+                else:
+                    logger.log(msg=crypt_item.dev_path + " was not in fstab when encryption was enabled, no need to restore",
+                               level=CommonVariables.InfoLevel)
 
                 ongoing_item_config.phase = CommonVariables.DecryptionPhaseDone
                 ongoing_item_config.commit()
