@@ -128,7 +128,9 @@ class DiskUtil(object):
                 new_mount_content = mount_content_item
 
             with open(self.encryption_environment.azure_crypt_mount_config_path,'w') as wf:
+                wf.write('\n')
                 wf.write(new_mount_content)
+                wf.write('\n')
             return True
         except Exception as e:
             return False
@@ -143,10 +145,12 @@ class DiskUtil(object):
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 mount_lines = f.readlines()
 
-            filtered_mount_lines = filter(lambda line: crypt_item.mapper_name in mount_lines, mount_lines)
+            filtered_mount_lines = filter(lambda line: not crypt_item.mapper_name in line, mount_lines)
 
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+                wf.write('\n')
                 wf.write('\n'.join(filtered_mount_lines))
+                wf.write('\n')
 
             return True
 

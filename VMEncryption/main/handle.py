@@ -108,8 +108,11 @@ def disable_encryption():
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        crypt_items = disk_util.get_crypt_items()
 
-        for crypt_item in disk_util.get_crypt_items():
+        logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
+
+        for crypt_item in crypt_items:
             disk_util.create_cleartext_key(crypt_item.mapper_name)
 
             add_result = disk_util.luks_add_cleartext_key(bek_passphrase_file,
@@ -931,8 +934,11 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     logger.log(msg="executing disable_encryption_all_in_place")
 
     device_items = disk_util.get_device_items(None)
+    crypt_items = disk_util.get_crypt_items()
 
-    for crypt_item in disk_util.get_crypt_items():
+    logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
+
+    for crypt_item in crypt_items:
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
