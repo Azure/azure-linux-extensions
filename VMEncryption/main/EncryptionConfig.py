@@ -18,6 +18,8 @@
 #
 # Requires Python 2.7+
 #
+import os
+import datetime
 import os.path
 from Common import CommonVariables
 from ConfigParser import ConfigParser
