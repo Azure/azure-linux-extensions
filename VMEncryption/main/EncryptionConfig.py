@@ -54,3 +54,17 @@ class EncryptionConfig(object):
         parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey,self.secret_id)
         key_value_pairs.append(parameters)
         self.encryption_config.save_configs(key_value_pairs)
+
+    def clear_config(self):
+        try:
+            if(os.path.exists(self.encryption_environment.encryption_config_file_path)):
+                self.logger.log(msg="archiving the encryption config file: {0}".format(self.encryption_environment.encryption_config_file_path))
+                time_stamp = datetime.datetime.now()
+                new_name = "{0}_{1}".format(self.encryption_environment.encryption_config_file_path, time_stamp)
+                os.rename(self.encryption_environment.encryption_config_file_path, new_name)
+            else:
+                self.logger.log(msg=("the config file not exist: {0}".format(self.encryption_environment.encryption_config_file_path)), level = CommonVariables.WarningLevel)
+            return True
+        except OSError as e:
+            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+            return False

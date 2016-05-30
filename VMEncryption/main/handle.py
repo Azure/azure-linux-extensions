@@ -1156,17 +1156,19 @@ def daemon_decrypt():
             raise Exception("command {0} not supported.".format(decryption_marker.get_current_command()))
         
         if(failed_item != None):
-                hutil.do_exit(exit_code=0,
-                              operation='Disable',
-                              status=CommonVariables.extension_error_status,
-                              code=CommonVariables.encryption_failed,
-                              message='decryption failed for {0}'.format(failed_item))
+            hutil.do_exit(exit_code=0,
+                          operation='Disable',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message='decryption failed for {0}'.format(failed_item))
         else:
-                hutil.do_exit(exit_code=0,
-                              operation='Disable',
-                              status=CommonVariables.extension_success_status,
-                              code=str(CommonVariables.success),
-                              message='decryption succeeded')
+            encryption_config.clear_config()
+
+            hutil.do_exit(exit_code=0,
+                          operation='Disable',
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message='decryption succeeded')
 
 def daemon():
     hutil.do_parse_context('Executing')
