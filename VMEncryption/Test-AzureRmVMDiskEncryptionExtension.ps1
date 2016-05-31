@@ -88,8 +88,10 @@ $global:ComputerName = $ResourcePrefix + "VM"
 $global:VMSize = "Standard_D2"
 $global:OSDiskName = $VMName + "OsDisk"
 $global:OSDiskUri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $OSDiskName + ".vhd"
-$global:DataDiskName = $VMName + "DataDisk"
-$global:DataDiskUri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $DataDiskName + ".vhd"
+$global:DataDisk1Name = $VMName + "DataDisk1"
+$global:DataDisk1Uri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $DataDisk1Name + ".vhd"
+$global:DataDisk2Name = $VMName + "DataDisk2"
+$global:DataDisk2Uri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $DataDisk2Name + ".vhd"
 
 ## Setup local VM object
 $SecString = ($Password | ConvertTo-SecureString -AsPlainText -Force)
@@ -133,9 +135,10 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 
 Write-Host "Fetched VM successfully"
 
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDiskName -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDiskUri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 1 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
 
-Write-Host "Added DataDisk successfully: $DataDiskName"
+Write-Host "Added DataDisks successfully: $DataDisk1Name, $DataDisk2Name"
 
 Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
 
