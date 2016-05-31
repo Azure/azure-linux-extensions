@@ -20,6 +20,7 @@
 #
 import subprocess
 from mounts import Mounts
+import datetime
 import threading
 
 class FreezeError(object):
@@ -66,8 +67,12 @@ class FsFreezer:
                 if(self.should_skip(mount)):
                     self.logger.log('skip for the unknown file systems')
                 else:
+                    before_freeze = datetime.datetime.utcnow()
                     self.frozen_items.add(path)
                     freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
+                    after_freeze=datetime.datetime.utcnow()
+                    time_taken=after_freeze-before_freeze
+                    self.logger.log('time taken for freeze :' + str(time_taken))
                 self.logger.log('freeze_result...' + str(freeze_return_code))
             freeze_error.errorcode = freeze_return_code
 
@@ -132,7 +137,6 @@ class FsFreezer:
         except Exception, e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
-            freezeError.path = mount.mount_point
             freeze_result.errors.append(freezeError)
             self.logger.log(str(e))
 
@@ -168,7 +172,6 @@ class FsFreezer:
         except Exception, e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
-            freezeError.path = mount.mount_point
             unfreeze_result.errors.append(freezeError)
             self.logger.log(str(e))
         if(self.root_seen):

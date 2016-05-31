@@ -139,8 +139,6 @@ def snapshot():
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
         freeze_result = freezer.freezeall()
         backup_logger.log('T:S freeze result ' + str(freeze_result))
-
-        # check whether we freeze succeed first?
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
@@ -171,7 +169,7 @@ def freeze_watcher():
     global backup_logger,run_status,error_msg,snapshot_done
     #wait 5 minutes before the snapshoting.
     try:
-        for i in range(0, 4):
+        for i in range(0, 12):
             if(snapshot_done):
                 backup_logger.log('T:W snapshot is done', False)
                 break;
@@ -262,12 +260,16 @@ def daemon():
                 freeze_watcher_tread.start()
                 backup_logger.log('doing freeze now...', True)
                 snapshot_thread = Thread(target = snapshot)
+                start_time=datetime.datetime.utcnow()
                 snapshot_thread.start()
                 freeze_watcher_tread.join()
+                end_time=datetime.datetime.utcnow()
+                time_taken=end_time-start_time
+                backup_logger.log('total time taken..' + str(time_taken))
                 
                 for i in range(0,3):
                     unfreeze_result = freezer.unfreezeall()
-                    backup_logger.log('unfreeze result ' + str(unfreeze_result), True)
+                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
                     if(unfreeze_result is not None):
                         if len(unfreeze_result.errors) > 0:
                             error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
