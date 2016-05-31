@@ -33,6 +33,7 @@ class EncryptionConfig(object):
         self.volume_type = None
         self.secret_id = None
         self.encryption_config = ConfigUtil(encryption_environment.encryption_config_file_path,'azure_crypt_config',logger)
+        self.logger = logger
 
 
     def config_file_exists(self):
