@@ -145,6 +145,7 @@ class FsFreezer:
         return freeze_result
 
     def unfreezeall(self):
+        global unfreeze_done
         self.root_seen = False
         unfreeze_result = FreezeResult()
         thread_jobs = []
