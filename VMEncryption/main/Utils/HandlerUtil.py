@@ -122,10 +122,10 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message):
-        self._log(self._get_log_prefix() + message)
+        self._log(self._get_log_prefix() + ': ' + message)
 
     def error(self, message):
-        self._error(self._get_log_prefix() + message)
+        self._error(self._get_log_prefix() + ': ' + message)
 
     def _parse_config(self, ctxt):
         config = None
@@ -242,7 +242,7 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        self.log("[StatusReport] op: {0}, status: {1}, code: {2}, msg: {3}".format(operation, status, status_code, message))
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
@@ -280,7 +280,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
-            self.do_status_report(operation, status,code,message)
+            self.do_status_report(operation, status, code, message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)

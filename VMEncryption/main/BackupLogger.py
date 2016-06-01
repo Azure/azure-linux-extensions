@@ -32,5 +32,5 @@ class BackupLogger(object):
 
     """description of class"""
     def log(self, msg, level='Info'):
-        log_msg = "{0}: {1} {2}".format(self.current_process_id, level, msg)
+        log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
         self.hutil.log(log_msg)
