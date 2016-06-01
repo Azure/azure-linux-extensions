@@ -176,14 +176,15 @@ class TransactionalCopyTask(object):
 
                 self.current_slice_index += 1
 
-                msg = self.status_prefix + ': ' \
-                    + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
-                    + '%'
+                if status_prefix:
+                    msg = self.status_prefix + ': ' \
+                        + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
+                        + '%'
 
-                self.hutil.do_status_report(operation='DataCopy',
-                                            status=CommonVariables.extension_success_status,
-                                            status_code=str(CommonVariables.success),
-                                            message=msg)
+                    self.hutil.do_status_report(operation='DataCopy',
+                                                status=CommonVariables.extension_success_status,
+                                                status_code=str(CommonVariables.success),
+                                                message=msg)
 
                 self.ongoing_item_config.current_slice_index = self.current_slice_index
                 self.ongoing_item_config.commit()
@@ -212,9 +213,15 @@ class TransactionalCopyTask(object):
 
                 self.current_slice_index += 1
 
-                msg = self.status_prefix + ': ' \
-                    + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
-                    + '%'
+                if status_prefix:
+                    msg = self.status_prefix + ': ' \
+                        + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
+                        + '%'
+
+                    self.hutil.do_status_report(operation='DataCopy',
+                                                status=CommonVariables.extension_success_status,
+                                                status_code=str(CommonVariables.success),
+                                                message=msg)
 
                 self.hutil.do_status_report(operation='DataCopy',
                                             status=CommonVariables.extension_success_status,
