@@ -296,7 +296,8 @@ def enable_encryption():
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger = logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
     if(config_path_result != CommonVariables.process_success):
-        logger.log(msg="azure encryption path creation failed.",level=CommonVariables.ErrorLevel)
+        logger.log(msg="azure encryption path creation failed.",
+                   level=CommonVariables.ErrorLevel)
     if(encryption_config.config_file_exists()):
         existed_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if(existed_passphrase_file is not None):
@@ -305,7 +306,8 @@ def enable_encryption():
                                   encryption_config=encryption_config,
                                   passphrase_file=existed_passphrase_file)
         else:
-            logger.log(msg="the config is there, but we could not get the bek file.",level=CommonVariables.WarningLevel)
+            logger.log(msg="the config is there, but we could not get the bek file.",
+                       level=CommonVariables.WarningLevel)
             exit_without_status_report()
 
     # handle the re-call scenario.  the re-call would resume?
