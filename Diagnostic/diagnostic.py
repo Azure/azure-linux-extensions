@@ -45,7 +45,7 @@ ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
 ExtensionVersion = '2.3.9001'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPortFile = os.path.join(WorkDir, 'mdsd.port')
+MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -635,11 +635,11 @@ def start_mdsd():
             copy_env['MDSD_http_proxy'] = proxy_config
 
     xml_file = os.path.join(WorkDir, './xmlCfg.xml')
-    command = '{0} -A -c {1} -p {2} -q {3} -e {4} -w {5} -o {6}'.format(
+    command = '{0} -A -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
-        MDSDPortFile,
+        MDSDPidPortFile,
         monitor_file_path,
         warn_file_path,
         info_file_path).split(" ")
@@ -647,8 +647,8 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
-            RunGetOutput("rm -f "+MDSDPortFile)  # Must delete any existing port num file
-            rsyslog_reconfigured = False
+            RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
+            mdsd_pid_port_file_checked = False
             mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
@@ -683,12 +683,14 @@ def start_mdsd():
                 # Issue #137 Can't start mdsd if port 29131 is in use.
                 # mdsd now binds to another randomly available port,
                 # and LAD still needs to reconfigure rsyslogd.
-                if not rsyslog_reconfigured and os.path.isfile(MDSDPortFile):
-                    with open(MDSDPortFile, 'r') as mdsd_port_file:
-                        new_port = mdsd_port_file.readline()
-                        hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
-                        reconfigure_omazurelinuxmds_and_restart_rsyslog(new_port)
-                        rsyslog_reconfigured = True
+                if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
+                    with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
+                        new_port = mdsd_pid_port_file.readline()    # This is actually PID, so ignore.
+                        new_port = mdsd_pid_port_file.readline()
+                        if default_port.strip() != new_port.strip():
+                            hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
+                            reconfigure_omazurelinuxmds_and_restart_rsyslog(new_port)
+                        mdsd_pid_port_file_checked = True
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
