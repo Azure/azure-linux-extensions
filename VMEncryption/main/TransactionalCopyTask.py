@@ -176,7 +176,7 @@ class TransactionalCopyTask(object):
 
                 self.current_slice_index += 1
 
-                if status_prefix:
+                if self.status_prefix:
                     msg = self.status_prefix + ': ' \
                         + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
                         + '%'
@@ -213,7 +213,7 @@ class TransactionalCopyTask(object):
 
                 self.current_slice_index += 1
 
-                if status_prefix:
+                if self.status_prefix:
                     msg = self.status_prefix + ': ' \
                         + str(int(self.current_slice_index / (float)(self.total_slice_size) * 100.0)) \
                         + '%'
