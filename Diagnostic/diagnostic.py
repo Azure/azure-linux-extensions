@@ -686,8 +686,8 @@ def start_mdsd():
                 if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
                     with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
                         new_port = mdsd_pid_port_file.readline()    # This is actually PID, so ignore.
-                        new_port = mdsd_pid_port_file.readline()
-                        if default_port.strip() != new_port.strip():
+                        new_port = mdsd_pid_port_file.readline().strip()    # .strip() is important!
+                        if default_port != new_port:
                             hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
                             reconfigure_omazurelinuxmds_and_restart_rsyslog(new_port)
                         mdsd_pid_port_file_checked = True
