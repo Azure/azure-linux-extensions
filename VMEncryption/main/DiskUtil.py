@@ -116,6 +116,9 @@ class DiskUtil(object):
         <target name> <source device> <key file> <options>
         """
         try:
+            if not crypt_item.luks_header_path:
+                crypt_item.luks_header_path = "None"
+
             mount_content_item = (crypt_item.mapper_name + " " +
                                   crypt_item.dev_path + " " +
                                   crypt_item.luks_header_path + " " +
