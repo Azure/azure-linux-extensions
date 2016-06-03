@@ -1158,19 +1158,17 @@ def daemon_encrypt():
                           code=CommonVariables.encryption_failed,
                           message=str(e))
         else:
-            hutil.do_exit(exit_code=0,
-                          operation='EnableEncryptionDataVolumes',
-                          status=CommonVariables.extension_success_status,
-                          code=str(CommonVariables.success),
-                          message='Encryption succeeded for data volumes')
+            hutil.do_status_report(operation='EnableEncryptionDataVolumes',
+                                   status=CommonVariables.extension_success_status,
+                                   status_code=str(CommonVariables.success),
+                                   message='Encryption succeeded for data volumes')
 
     if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeOS.lower() or \
        encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll.lower():
-            hutil.do_exit(exit_code=0,
-                          operation='EnableEncryptionOSVolume',
-                          status=CommonVariables.extension_success_status,
-                          code=str(CommonVariables.success),
-                          message='Encryption succeeded for OS volume')
+            hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                                   status=CommonVariables.extension_success_status,
+                                   status_code=str(CommonVariables.success),
+                                   message='Encryption succeeded for OS volume')
 
             if encryption_config.volume_type.lower() == CommonVariables.VolumeTypeAll:       
                 hutil.do_exit(exit_code=0,
