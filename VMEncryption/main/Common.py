@@ -60,6 +60,12 @@ class CommonVariables:
     AADClientSecretKey = 'AADClientSecret'
     SecretUriKey = 'SecretUri'
 
+    VolumeTypeOS = 'OS'
+    VolumeTypeData = 'Data'
+    VolumeTypeAll = 'All'
+
+    SupportedVolumeTypes = [ VolumeTypeOS, VolumeTypeData, VolumeTypeAll ]
+
     """
     command types
     """
