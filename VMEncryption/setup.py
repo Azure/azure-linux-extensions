@@ -51,6 +51,9 @@ packages_array.append(main_folder)
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+oscrypto_folder = main_folder + '/oscrypto'
+packages_array.append(oscrypto_folder)
+
 """
 copy the dependency to the local
 """

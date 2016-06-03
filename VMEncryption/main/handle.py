@@ -47,6 +47,7 @@ from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
+from oscrypto import *
 from BekUtil import *
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -55,7 +56,9 @@ from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from __builtin__ import int
+
 #Main function is the only entrence to this extension handler
+
 def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
@@ -1172,17 +1175,25 @@ def daemon_encrypt():
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
-            hutil.do_status_report(operation='EnableEncryptionOSVolume',
-                                   status=CommonVariables.extension_success_status,
-                                   status_code=str(CommonVariables.success),
-                                   message='Encryption succeeded for OS volume')
 
-            if volume_type == CommonVariables.VolumeTypeAll.lower():       
-                hutil.do_exit(exit_code=0,
-                              operation='EnableEncryptionOSVolume',
-                              status=CommonVariables.extension_success_status,
-                              code=str(CommonVariables.success),
-                              message='Encryption succeeded for all volumes')
+        os_encryption = OSEncryption(hutil=hutil,
+                                     distro_patcher=MyPatching,
+                                     logger=logger,
+                                     encryption_environment=encryption_environment)
+
+        os_encryption.start_encryption()
+
+        message = ''
+        if volume_type == CommonVariables.VolumeTypeAll.lower():
+            message = 'Encryption succeeded for OS volume'
+        else:
+            message = 'Encryption succeeded for all volumes'
+
+        logger.log(msg=message)
+        hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                               status=CommonVariables.extension_success_status,
+                               status_code=str(CommonVariables.success),
+                               message=message)
 
 
 def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util, bek_util, bek_passphrase_file):

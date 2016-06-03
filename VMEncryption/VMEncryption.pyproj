@@ -73,6 +73,8 @@
     </Compile>
     <Compile Include="main\handle.py" />
     <Compile Include="main\ExtensionParameter.py" />
+    <Compile Include="main\oscrypto\encrypt.py" />
+    <Compile Include="main\oscrypto\__init__.py" />
     <Compile Include="main\patch\AbstractPatching.py" />
     <Compile Include="main\patch\centosPatching.py" />
     <Compile Include="main\patch\redhatPatching.py" />
@@ -87,6 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
+    <Folder Include="main\oscrypto\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
   </ItemGroup>
