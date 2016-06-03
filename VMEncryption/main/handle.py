@@ -353,8 +353,6 @@ def enable_encryption():
             start_daemon('EnableEncryption')
         else:
             hutil.exit_if_same_seq()
-
-            import pudb; pu.db
             
             if not hutil.same_seq_as_last_run():
                 encryption_config = EncryptionConfig(encryption_environment, logger)
@@ -1147,8 +1145,6 @@ def daemon_encrypt():
                       status=CommonVariables.extension_error_status,
                       code=CommonVariables.passphrase_file_not_found,
                       message='Passphrase file not found.')
-
-    import pudb; pu.db
 
     volume_type = encryption_config.get_volume_type().lower()
 
