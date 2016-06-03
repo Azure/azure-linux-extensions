@@ -19,6 +19,23 @@
 # Requires Python 2.7+
 #
 
+import inspect
+import os
+import sys
+
+scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
+sys.path.append(transitionsdir)
+
+from transitions import *
+
+class Matter(object):
+    pass
+
+lump = Matter()
+
+machine = Machine(model=lump, states=['solid', 'liquid', 'gas', 'plasma'], initial='solid')
+
 class OSEncryption(object):
     def __init__(self, hutil, distro_patcher, logger, encryption_environment):
         super(OSEncryption, self).__init__()
@@ -29,4 +46,4 @@ class OSEncryption(object):
         self.encryption_environment = encryption_environment
 
     def start_encryption(self):
-        self.logger.log("Encrypting OS drive")
+        self.logger.log("Encrypting OS drive, machine state: {0}".format(lump.state))
