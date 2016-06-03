@@ -411,6 +411,7 @@ def enable_encryption():
                                       message='Enable failed.')
                     else:
                         encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+                        encryption_config.volume_type = extension_parameter.VolumeType
                         encryption_config.bek_filesystem = CommonVariables.BekVolumeFileSystem
                         encryption_config.secret_id = kek_secret_id_created
                         encryption_config.commit()
