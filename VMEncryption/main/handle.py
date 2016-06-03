@@ -1144,7 +1144,7 @@ def daemon_encrypt():
     import pudb; pu.db
 
     if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeData.lower() or \
-       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll:
+       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll.lower():
         try:
             daemon_encrypt_data_volumes()
         except Exception as e:
@@ -1161,7 +1161,7 @@ def daemon_encrypt():
                           message='Encryption succeeded for data volumes')
 
     if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeOS.lower() or \
-       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll:
+       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll.lower():
             hutil.do_exit(exit_code=0,
                           operation='EnableEncryptionOSVolume',
                           status=CommonVariables.extension_success_status,
