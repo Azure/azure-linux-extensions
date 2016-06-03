@@ -1170,7 +1170,7 @@ def daemon_encrypt():
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for OS volume')
 
-            if encryption_config.volume_type.lower() == CommonVariables.VolumeTypeAll:       
+            if encryption_config.volume_type.lower() == CommonVariables.VolumeTypeAll.lower():       
                 hutil.do_exit(exit_code=0,
                               operation='EnableEncryptionOSVolume',
                               status=CommonVariables.extension_success_status,
