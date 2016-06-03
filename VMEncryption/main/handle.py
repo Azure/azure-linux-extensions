@@ -443,13 +443,13 @@ def enable_encryption():
                                   code=str(CommonVariables.encrypttion_already_enabled),
                                   message=str(kek_secret_id_created))
     except Exception as e:
-        logger.log(msg="Failed to enable the extension with error: {0}, stack trace: {1}".format(e,traceback.format_exc()),
-                   level=CommonVariables.ErrorLevel)
+        message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
         hutil.do_exit(exit_code=0,
                       operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
-                      message='Enable failed.')
+                      message=message)
 
 def enable_encryption_format(passphrase, encryption_marker, disk_util):
     logger.log('enable_encryption_format')
@@ -1161,11 +1161,13 @@ def daemon_encrypt():
                                         bek_util=bek_util,
                                         bek_passphrase_file=bek_passphrase_file)
         except Exception as e:
+            message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
             hutil.do_exit(exit_code=0,
                           operation='EnableEncryptionDataVolumes',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
-                          message=str(e))
+                          message=message)
         else:
             hutil.do_status_report(operation='EnableEncryptionDataVolumes',
                                    status=CommonVariables.extension_success_status,
@@ -1254,7 +1256,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                        disk_util=disk_util)
             else:
                 message = "command {0} not supported.".format(encryption_marker.get_current_command())
-                logger.log(message=message, level=CommonVariables.ErrorLevel)
+                logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
             if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)
