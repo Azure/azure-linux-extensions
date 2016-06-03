@@ -114,6 +114,12 @@ class HandlerUtility:
                 return int(seq)
         return -1
 
+    def get_current_seq(self):
+        return int(self._context._seq_no)
+
+    def same_seq_as_last_run(self):
+        return self.get_current_seq() == self.get_last_seq()
+
     def exit_if_same_seq(self):
         current_seq = int(self._context._seq_no)
         last_seq = self.get_last_seq()
@@ -278,7 +284,9 @@ class HandlerUtility:
                 except Exception as e:
                     self.log("failed to rename the settings file.")
 
-    def do_exit(self, exit_code, operation,status,code,message):
+    def do_exit(self, exit_code, operation, status, code, message):
+        if exit_code == 0:
+            self.save_seq()
         try:
             self.do_status_report(operation, status, code, message)
         except Exception as e:

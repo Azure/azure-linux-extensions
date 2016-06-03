@@ -353,7 +353,14 @@ def enable_encryption():
             start_daemon('EnableEncryption')
         else:
             hutil.exit_if_same_seq()
-            hutil.save_seq()
+
+            import pudb; pu.db
+            
+            if not hutil.same_seq_as_last_run():
+                encryption_config = EncryptionConfig(encryption_environment, logger)
+                encryption_config.volume_type = extension_parameter.VolumeType
+                encryption_config.commit()
+
             if(encryption_config.config_file_exists() and existed_passphrase_file is not None):
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
                 encryption_marker = mark_encryption(command=extension_parameter.command,
