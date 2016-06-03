@@ -1249,7 +1249,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = "command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(message=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
-            if not failed_item:
+            if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)
                 raise Exception(message)
             else:
