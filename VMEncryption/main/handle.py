@@ -1146,7 +1146,7 @@ def daemon_encrypt():
     if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeData.lower() or \
        encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll.lower():
         try:
-            daemon_encrypt_data_volumes()
+            daemon_encrypt_data_volumes(disk_util, bek_util)
         except Exception as e:
             hutil.do_exit(exit_code=0,
                           operation='EnableEncryptionDataVolumes',
@@ -1176,7 +1176,7 @@ def daemon_encrypt():
                               message='Encryption succeeded for all volumes')
 
 
-def daemon_encrypt_data_volumes():
+def daemon_encrypt_data_volumes(disk_util, bek_util):
     try:
         """
         check whether there's a scheduled encryption task
