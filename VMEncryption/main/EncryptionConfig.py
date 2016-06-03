@@ -32,7 +32,9 @@ class EncryptionConfig(object):
         self.bek_filesystem = None
         self.volume_type = None
         self.secret_id = None
-        self.encryption_config = ConfigUtil(encryption_environment.encryption_config_file_path,'azure_crypt_config',logger)
+        self.encryption_config = ConfigUtil(encryption_environment.encryption_config_file_path,
+                                            'azure_crypt_config',
+                                            logger)
         self.logger = logger
 
 
@@ -42,6 +44,9 @@ class EncryptionConfig(object):
     def get_bek_filename(self):
         return self.encryption_config.get_config(CommonVariables.PassphraseFileNameKey)
 
+    def get_volume_type(self):
+        return self.encryption_config.get_config(CommonVariables.VolumeTypeKey)
+
     def get_bek_filesystem(self):
         return self.encryption_config.get_config(CommonVariables.BekVolumeFileSystemKey)
 
@@ -50,11 +55,13 @@ class EncryptionConfig(object):
 
     def commit(self):
         key_value_pairs = []
-        command = ConfigKeyValuePair(CommonVariables.PassphraseFileNameKey,self.passphrase_file_name)
+        command = ConfigKeyValuePair(CommonVariables.PassphraseFileNameKey, self.passphrase_file_name)
         key_value_pairs.append(command)
-        bek_file_system = ConfigKeyValuePair(CommonVariables.BekVolumeFileSystemKey,CommonVariables.BekVolumeFileSystem)
+        bek_file_system = ConfigKeyValuePair(CommonVariables.BekVolumeFileSystemKey, CommonVariables.BekVolumeFileSystem)
         key_value_pairs.append(bek_file_system)
-        parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey,self.secret_id)
+        volume_type = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.volume_type)
+        key_value_pairs.append(volume_type)
+        parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey, self.secret_id)
         key_value_pairs.append(parameters)
         self.encryption_config.save_configs(key_value_pairs)
 

@@ -395,13 +395,13 @@ def enable_encryption():
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
-                    kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase = extension_parameter.passphrase,
-                                                                           KeyVaultURL = extension_parameter.KeyVaultURL,
-                                                                           KeyEncryptionKeyURL = extension_parameter.KeyEncryptionKeyURL,
-                                                                           AADClientID = extension_parameter.AADClientID,
-                                                                           KeyEncryptionAlgorithm = extension_parameter.KeyEncryptionAlgorithm,
-                                                                           AADClientSecret = extension_parameter.AADClientSecret,
-                                                                           DiskEncryptionKeyFileName = extension_parameter.DiskEncryptionKeyFileName)
+                    kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
+                                                                           KeyVaultURL=extension_parameter.KeyVaultURL,
+                                                                           KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
+                                                                           AADClientID=extension_parameter.AADClientID,
+                                                                           KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
+                                                                           AADClientSecret=extension_parameter.AADClientSecret,
+                                                                           DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
                     if(kek_secret_id_created is None):
                         hutil.do_exit(exit_code=0,
@@ -1143,8 +1143,8 @@ def daemon_encrypt():
 
     import pudb; pu.db
 
-    if encryption_config.volume_type.lower() == CommonVariables.VolumeTypeData.lower() or \
-       encryption_config.volume_type.lower() == CommonVariables.VolumeTypeAll:
+    if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeData.lower() or \
+       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll:
         try:
             daemon_encrypt_data_volumes()
         except Exception as e:
@@ -1160,8 +1160,8 @@ def daemon_encrypt():
                           code=str(CommonVariables.success),
                           message='Encryption succeeded for data volumes')
 
-    if encryption_config.volume_type.lower() == CommonVariables.VolumeTypeOS.lower() or \
-       encryption_config.volume_type.lower() == CommonVariables.VolumeTypeAll:
+    if encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeOS.lower() or \
+       encryption_config.get_volume_type().lower() == CommonVariables.VolumeTypeAll:
             hutil.do_exit(exit_code=0,
                           operation='EnableEncryptionOSVolume',
                           status=CommonVariables.extension_success_status,
