@@ -25,8 +25,6 @@ class OSEncryptionState(object):
     def __init__(self, context):
         super(OSEncryptionState, self).__init__()
 
-        self.state_executed = False
-
     def enter(self):
         assert 0, "implement enter"
 
