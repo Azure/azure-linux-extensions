@@ -95,6 +95,7 @@
   <ItemGroup>
     <Folder Include="main\" />
     <Folder Include="main\oscrypto\" />
+    <Folder Include="main\oscrypto\encryptstates\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
   </ItemGroup>

@@ -29,7 +29,7 @@ class OSEncryptionState(object):
         self.context = context
         self.state_executed = False
         self.command_executor = CommandExecutor(self.context.logger)
-
+        
     def enter(self):
         assert 0, "implement enter"
 

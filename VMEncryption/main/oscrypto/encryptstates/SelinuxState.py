@@ -29,10 +29,10 @@ class SelinuxState(OSEncryptionState):
         if self.state_executed:
             return
 
-        self.context.logger.log(">>>>> Entering selinux state")
+        self.context.logger.log("Entering selinux state")
 
     def should_exit(self):
-        self.context.logger.log(">>>>> Verifying if machine should exit selinux state")
+        self.context.logger.log("Verifying if machine should exit selinux state")
         self.state_executed = True
 
         return True

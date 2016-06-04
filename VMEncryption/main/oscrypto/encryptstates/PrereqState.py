@@ -20,6 +20,7 @@
 #
 
 from OSEncryptionState import *
+from pprint import pprint
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
@@ -29,10 +30,19 @@ class PrereqState(OSEncryptionState):
         if self.state_executed:
             return
 
-        self.context.logger.log(">>>>> Entering prereq state")
+        self.context.logger.log("Entering prereq state")
+
+        distro_info = self.context.distro_patcher.distro_info
+        self.context.logger.log("Distro info: {0}, {1}".format(distro_info[0], distro_info[1]))
+
+        if distro_info[0] == 'redhat' and distro_info[1] == '7.2':
+            self.context.logger.log("Enabling OS volume encrypting on RHEL 7.2")
+        else:
+            raise Exception("OS volume encryption is not supported for distro {0} {1}".format(distro_info[0],
+                                                                                              distro_info[1]))
 
     def should_exit(self):
-        self.context.logger.log(">>>>> Verifying if machine should exit prereq state")
+        self.context.logger.log("Verifying if machine should exit prereq state")
         self.state_executed = True
 
         return self.state_executed

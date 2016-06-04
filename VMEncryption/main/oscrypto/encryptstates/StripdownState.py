@@ -29,10 +29,10 @@ class StripdownState(OSEncryptionState):
         if self.state_executed:
             return
 
-        self.context.logger.log(">>>>> Entering stripdown state")
+        self.context.logger.log("Entering stripdown state")
 
     def should_exit(self):
-        self.context.logger.log(">>>>> Verifying if machine should exit stripdown state")
+        self.context.logger.log("Verifying if machine should exit stripdown state")
         self.state_executed = True
 
         return self.state_executed
