@@ -36,7 +36,7 @@ class PrereqState(OSEncryptionState):
         self.context.logger.log("Distro info: {0}, {1}".format(distro_info[0], distro_info[1]))
 
         if distro_info[0] == 'redhat' and distro_info[1] == '7.2':
-            self.context.logger.log("Enabling OS volume encrypting on RHEL 7.2")
+            self.context.logger.log("Enabling OS volume encryption on RHEL 7.2")
         else:
             raise Exception("OS volume encryption is not supported for distro {0} {1}".format(distro_info[0],
                                                                                               distro_info[1]))
