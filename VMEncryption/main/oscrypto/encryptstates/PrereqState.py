@@ -23,9 +23,7 @@ from OSEncryptionState import *
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
-        super(PrereqState, self).__init__(self)
-        self.context = context
-        self.state_executed = False
+        super(PrereqState, self).__init__(context)
 
     def enter(self):
         if self.state_executed:

@@ -23,9 +23,7 @@ from OSEncryptionState import *
 
 class SelinuxState(OSEncryptionState):
     def __init__(self, context):
-        super(SelinuxState, self).__init__(self)
-        self.context = context
-        self.state_executed = False
+        super(SelinuxState, self).__init__(context)
 
     def enter(self):
         if self.state_executed:

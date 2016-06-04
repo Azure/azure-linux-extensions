@@ -23,9 +23,7 @@ from OSEncryptionState import *
 
 class StripdownState(OSEncryptionState):
     def __init__(self, context):
-        super(StripdownState, self).__init__(self)
-        self.context = context
-        self.state_executed = False
+        super(StripdownState, self).__init__(context)
 
     def enter(self):
         if self.state_executed:
