@@ -21,11 +21,14 @@
 
 from collections import namedtuple
 
+from CommandExecutor import *
+
 class OSEncryptionState(object):
     def __init__(self, context):
         super(OSEncryptionState, self).__init__()
         self.context = context
         self.state_executed = False
+        self.command_executor = CommandExecutor(self.context.logger)
 
     def enter(self):
         assert 0, "implement enter"

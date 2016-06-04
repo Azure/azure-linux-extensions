@@ -99,15 +99,18 @@ class OSEncryption(object):
                                      transitions=OSEncryption.transitions,
                                      initial='uninitialized')
 
+    def log_machine_state(self):
+        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+
     def start_encryption(self):
-        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.log_machine_state()
         self.start_machine()
-
-        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        
+        self.log_machine_state()
         self.perform_prereq()
-
-        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        
+        self.log_machine_state()
         self.perform_selinux()
-
-        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        
+        self.log_machine_state()
         self.report_success()
