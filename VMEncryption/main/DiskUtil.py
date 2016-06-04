@@ -75,9 +75,17 @@ class DiskUtil(object):
         returnCode = proc.wait()
         return returnCode
 
-    def make_sure_path_exists(self,path):
+    def make_sure_path_exists(self, path):
         mkdir_cmd = self.patching.mkdir_path + ' -p ' + path
-        self.logger.log("make sure path exists, execute:{0}".format(mkdir_cmd))
+        self.logger.log("make sure path exists, executing: {0}".format(mkdir_cmd))
+        mkdir_cmd_args = shlex.split(mkdir_cmd)
+        proc = Popen(mkdir_cmd_args)
+        returnCode = proc.wait()
+        return returnCode
+
+    def touch_file(self, path):
+        mkdir_cmd = self.patching.touch_path + ' ' + path
+        self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
         mkdir_cmd_args = shlex.split(mkdir_cmd)
         proc = Popen(mkdir_cmd_args)
         returnCode = proc.wait()

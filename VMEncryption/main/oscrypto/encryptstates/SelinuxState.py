@@ -23,16 +23,15 @@ from OSEncryptionState import *
 
 class SelinuxState(OSEncryptionState):
     def __init__(self, context):
-        super(SelinuxState, self).__init__(context)
+        super(SelinuxState, self).__init__('SelinuxState', context)
 
     def enter(self):
-        if self.state_executed:
+        if not super(SelinuxState, self).should_enter():
             return
 
         self.context.logger.log("Entering selinux state")
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit selinux state")
-        self.state_executed = True
 
-        return True
+        return super(SelinuxState, self).should_exit()

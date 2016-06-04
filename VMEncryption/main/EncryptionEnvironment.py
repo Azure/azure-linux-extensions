@@ -29,16 +29,17 @@ class EncryptionEnvironment(object):
         self.logger = logger
         self.encryption_config_path = '/var/lib/azure_disk_encryption_config/'
         self.daemon_lock_file_path = os.path.join(self.encryption_config_path, 'daemon_lock_file.lck')
-        self.encryption_config_file_path = os.path.join(self.encryption_config_path,'azure_crypt_config.ini')
-        self.azure_crypt_mount_config_path = os.path.join(self.encryption_config_path,'azure_crypt_mount')
-        self.azure_crypt_request_queue_path = os.path.join(self.encryption_config_path,'azure_crypt_request_queue.ini')
-        self.azure_decrypt_request_queue_path = os.path.join(self.encryption_config_path,'azure_decrypt_request_queue.ini')
-        self.azure_crypt_ongoing_item_config_path = os.path.join(self.encryption_config_path,'azure_crypt_ongoing_item.ini')
-        self.azure_crypt_current_transactional_copy_path = os.path.join(self.encryption_config_path,'azure_crypt_copy_progress.ini')
-        self.luks_header_base_path = os.path.join(self.encryption_config_path,'azureluksheader')
-        self.cleartext_key_base_path = os.path.join(self.encryption_config_path,'cleartext_key')
-        self.copy_header_slice_file_path = os.path.join(self.encryption_config_path,'copy_header_slice_file')
-        self.copy_slice_item_backup_file = os.path.join(self.encryption_config_path,'copy_slice_item.bak')
+        self.encryption_config_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_config.ini')
+        self.azure_crypt_mount_config_path = os.path.join(self.encryption_config_path, 'azure_crypt_mount')
+        self.azure_crypt_request_queue_path = os.path.join(self.encryption_config_path, 'azure_crypt_request_queue.ini')
+        self.azure_decrypt_request_queue_path = os.path.join(self.encryption_config_path, 'azure_decrypt_request_queue.ini')
+        self.azure_crypt_ongoing_item_config_path = os.path.join(self.encryption_config_path, 'azure_crypt_ongoing_item.ini')
+        self.azure_crypt_current_transactional_copy_path = os.path.join(self.encryption_config_path, 'azure_crypt_copy_progress.ini')
+        self.luks_header_base_path = os.path.join(self.encryption_config_path, 'azureluksheader')
+        self.cleartext_key_base_path = os.path.join(self.encryption_config_path, 'cleartext_key')
+        self.copy_header_slice_file_path = os.path.join(self.encryption_config_path, 'copy_header_slice_file')
+        self.copy_slice_item_backup_file = os.path.join(self.encryption_config_path, 'copy_slice_item.bak')
+        self.os_encryption_markers_path = os.path.join(self.encryption_config_path, 'os_encryption_markers')
 
     def get_se_linux(self):
         proc = Popen([self.patching.getenforce_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)

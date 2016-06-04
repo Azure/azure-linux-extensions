@@ -23,16 +23,15 @@ from OSEncryptionState import *
 
 class StripdownState(OSEncryptionState):
     def __init__(self, context):
-        super(StripdownState, self).__init__(context)
+        super(StripdownState, self).__init__('StripdownState', context)
 
     def enter(self):
-        if self.state_executed:
+        if not super(StripdownState, self).should_enter():
             return
 
         self.context.logger.log("Entering stripdown state")
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
-        self.state_executed = True
 
-        return self.state_executed
+        return super(StripdownState, self).should_exit()

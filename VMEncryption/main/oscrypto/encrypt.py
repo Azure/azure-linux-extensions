@@ -100,7 +100,7 @@ class OSEncryption(object):
                                      initial='uninitialized')
 
     def log_machine_state(self):
-        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.logger.log("======= MACHINE STATE: {0} =======".format(self.state))
 
     def start_encryption(self):
         self.log_machine_state()

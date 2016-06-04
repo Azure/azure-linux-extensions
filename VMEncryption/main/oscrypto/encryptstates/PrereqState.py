@@ -24,10 +24,10 @@ from pprint import pprint
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
-        super(PrereqState, self).__init__(context)
+        super(PrereqState, self).__init__('PrereqState', context)
 
     def enter(self):
-        if self.state_executed:
+        if not super(PrereqState, self).should_enter():
             return
 
         self.context.logger.log("Entering prereq state")
@@ -43,6 +43,5 @@ class PrereqState(OSEncryptionState):
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
-        self.state_executed = True
 
-        return self.state_executed
+        return super(PrereqState, self).should_exit()
