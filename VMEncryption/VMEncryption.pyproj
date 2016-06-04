@@ -35,7 +35,7 @@
     <Compile Include="main\BekUtil.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="main\CommandExecuter.py">
+    <Compile Include="main\CommandExecutor.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\ConfigUtil.py">

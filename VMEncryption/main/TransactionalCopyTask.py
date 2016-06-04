@@ -24,7 +24,7 @@ import os.path
 import sys
 import shlex
 from subprocess import *
-from CommandExecuter import CommandExecuter
+from CommandExecutor import CommandExecutor
 from Common import CommonVariables
 from ConfigUtil import ConfigUtil
 from OnGoingItemConfig import *
@@ -38,7 +38,7 @@ class TransactionalCopyTask(object):
         """
         copy_total_size is in bytes.
         """
-        self.command_executer = CommandExecuter(logger)
+        self.command_executer = CommandExecutor(logger)
         self.ongoing_item_config = ongoing_item_config
         self.total_size = self.ongoing_item_config.get_current_total_copy_size()
         self.block_size = self.ongoing_item_config.get_current_block_size()

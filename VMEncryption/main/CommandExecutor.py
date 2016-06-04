@@ -26,12 +26,12 @@ import shlex
 import sys
 from subprocess import *
 
-class CommandExecuter(object):
+class CommandExecutor(object):
     """description of class"""
-    def __init__(self,logger):
+    def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self,command_to_execute):
+    def Execute(self, command_to_execute):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
         proc = Popen(args)
