@@ -77,4 +77,4 @@ class redhatPatching(AbstractPatching):
     def install_extras(self):
         common_extras = ['cryptsetup', 'lsscsi', 'psmisc', 'cryptsetup-reencrypt', 'lvm2', 'uuid', 'at']
         for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+            self.logger.log("Installation for " + extra + ', result is ' + str(subprocess.call(['yum', 'install','-y', extra])))

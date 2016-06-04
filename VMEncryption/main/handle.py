@@ -1160,7 +1160,7 @@ def daemon_encrypt():
                                         bek_util=bek_util,
                                         bek_passphrase_file=bek_passphrase_file)
         except Exception as e:
-            message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
             hutil.do_exit(exit_code=0,
                           operation='EnableEncryptionDataVolumes',
@@ -1181,7 +1181,22 @@ def daemon_encrypt():
                                      logger=logger,
                                      encryption_environment=encryption_environment)
 
-        os_encryption.start_encryption()
+        try:
+            os_encryption.start_encryption()
+
+            if not os_encryption.state == 'completed':
+                raise Exception("did not reach completed state")
+
+        except Exception as e:
+            message = "Failed to encrypt OS volume with error: {0}, stack trace: {1}, machine state: {2}".format(e,
+                                                                                                                 traceback.format_exc(),
+                                                                                                                 os_encryption.state)
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=0,
+                          operation='EnableEncryptionOSVolume',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message=message)
 
         message = ''
         if volume_type == CommonVariables.VolumeTypeAll.lower():

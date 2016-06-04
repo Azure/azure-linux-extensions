@@ -24,19 +24,57 @@ import os
 import sys
 
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+maindir = os.path.abspath(os.path.join(scriptdir, '../'))
+sys.path.append(maindir)
 transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
+from encryptstates import *
+from Common import *
 from transitions import *
 
-class Matter(object):
-    pass
-
-lump = Matter()
-
-machine = Machine(model=lump, states=['solid', 'liquid', 'gas', 'plasma'], initial='solid')
-
 class OSEncryption(object):
+    states = [
+        State(name='uninitialized'),
+        State(name='prereq', on_enter='on_enter_state'),
+        State(name='selinux', on_enter='on_enter_state'),
+        State(name='stripdown', on_enter='on_enter_state'),
+        State(name='completed'),
+    ]
+
+    transitions = [
+        {
+            'trigger': 'start_machine',
+            'source': 'uninitialized',
+            'dest': 'prereq'
+        },
+        {
+            'trigger': 'perform_prereq',
+            'source': 'prereq',
+            'dest': 'selinux',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_state'
+        },
+        {
+            'trigger': 'perform_selinux',
+            'source': 'selinux',
+            'dest': 'stripdown',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_state'
+        },
+        {
+            'trigger': 'report_success',
+            'source': 'stripdown',
+            'dest': 'completed'
+        },
+    ]
+
+    def on_enter_state(self):
+        self.state_objs[self.state].enter()
+
+    def should_exit_state(self):
+        return self.state_objs[self.state].should_exit()
+
     def __init__(self, hutil, distro_patcher, logger, encryption_environment):
         super(OSEncryption, self).__init__()
 
@@ -45,5 +83,31 @@ class OSEncryption(object):
         self.logger = logger
         self.encryption_environment = encryption_environment
 
+        context = OSEncryptionStateContext(hutil=self.hutil,
+                                           distro_patcher=self.distro_patcher,
+                                           logger=self.logger,
+                                           encryption_environment=self.encryption_environment);
+
+        self.state_objs = {
+            'prereq': PrereqState(context),
+            'selinux': SelinuxState(context),
+            'stripdown': StripdownState(context),
+        }
+
+        self.state_machine = Machine(model=self,
+                                     states=OSEncryption.states,
+                                     transitions=OSEncryption.transitions,
+                                     initial='uninitialized')
+
     def start_encryption(self):
-        self.logger.log("Encrypting OS drive, machine state: {0}".format(lump.state))
+        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.start_machine()
+
+        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.perform_prereq()
+
+        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.perform_selinux()
+
+        self.logger.log("======= MACHINE STATE ======: {0}".format(self.state))
+        self.report_success()

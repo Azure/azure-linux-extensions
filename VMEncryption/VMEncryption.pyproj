@@ -75,6 +75,11 @@
     <Compile Include="main\ExtensionParameter.py" />
     <Compile Include="main\oscrypto\encrypt.py" />
     <Compile Include="main\oscrypto\__init__.py" />
+    <Compile Include="main\oscrypto\encryptstates\OSEncryptionState.py" />
+    <Compile Include="main\oscrypto\encryptstates\PrereqState.py" />
+    <Compile Include="main\oscrypto\encryptstates\SelinuxState.py" />
+    <Compile Include="main\oscrypto\encryptstates\StripdownState.py" />
+    <Compile Include="main\oscrypto\encryptstates\__init__.py" />
     <Compile Include="main\patch\AbstractPatching.py" />
     <Compile Include="main\patch\centosPatching.py" />
     <Compile Include="main\patch\redhatPatching.py" />
