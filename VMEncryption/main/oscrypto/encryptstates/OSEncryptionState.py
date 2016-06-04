@@ -62,8 +62,10 @@ class OSEncryptionState(object):
             return False
 
     def should_exit(self):
-        self.disk_util.make_sure_path_exists(self.context.encryption_environment.os_encryption_markers_path)
-        self.disk_util.touch_file(self.state_marker)
+        if not os.path.exists(self.state_marker):
+            self.disk_util.make_sure_path_exists(self.context.encryption_environment.os_encryption_markers_path)
+            self.disk_util.touch_file(self.state_marker)
+
         self.state_executed = True
 
         return True
