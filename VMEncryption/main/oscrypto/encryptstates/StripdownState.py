@@ -34,7 +34,7 @@ class StripdownState(OSEncryptionState):
         self.context.logger.log("Performing enter checks for stripdown state")
 
         self.command_executor.ExecuteInBash('! [ -e "/tmp/tmproot" ]', True)
-        self.command_executor.ExecuteInBash('! [ -e "/memroot" ]', True)
+        self.command_executor.ExecuteInBash('! [ -e "/oldroot" ]', True)
 
         return True
 
@@ -51,7 +51,9 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
         self.command_executor.ExecuteInBash('for i in bin sbin lib lib64; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
         self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
-        self.command_executor.ExecuteInBash('mount --make-rprivate /', True)
+        self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/', True)
+        self.command_executor.Execute('mount --make-rprivate /', True)
+        self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
