@@ -65,7 +65,8 @@ class OSEncryption(object):
         {
             'trigger': 'report_success',
             'source': 'stripdown',
-            'dest': 'completed'
+            'dest': 'completed',
+            'conditions': 'should_exit_state'
         },
     ]
 
