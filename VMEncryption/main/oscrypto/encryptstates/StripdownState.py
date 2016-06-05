@@ -56,8 +56,17 @@ class StripdownState(OSEncryptionState):
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
+        self.command_executor.ExecuteInBash('/usr/sbin/waagent -daemon &', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
+
+        msg = 'Entered stripped down OS'
+        self.logger.log(msg);
+
+        self.hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                                    status=CommonVariables.extension_success_status,
+                                    status_code=str(CommonVariables.success),
+                                    message=msg)
 
         return super(StripdownState, self).should_exit()
