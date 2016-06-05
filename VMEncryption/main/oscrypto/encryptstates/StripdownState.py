@@ -33,6 +33,9 @@ class StripdownState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for stripdown state")
 
+        self.command_executor.ExecuteInBash('! [ -e "/tmp/tmproot" ]', True)
+        self.command_executor.ExecuteInBash('! [ -e "/memroot" ]', True)
+
         return True
 
     def enter(self):
@@ -40,6 +43,15 @@ class StripdownState(OSEncryptionState):
             return
 
         self.context.logger.log("Entering stripdown state")
+
+        self.command_executor.Execute('umount -a')
+        self.command_executor.Execute('mkdir /tmp/tmproot', True)
+        self.command_executor.Execute('mount -t tmpfs none /tmp/tmproot', True)
+        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot; do mkdir /tmp/tmproot/$i; done', True)
+        self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
+        self.command_executor.ExecuteInBash('for i in bin sbin lib lib64; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
+        self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
+        self.command_executor.ExecuteInBash('mount --make-rprivate /', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")

@@ -37,8 +37,14 @@ class CommandExecutor(object):
         proc = Popen(args)
         return_code = proc.wait()
 
-        if raise_exception_on_failure:
-            raise Exception("Command {0} failed with return code".format(command_to_execute,
-                                                                         return_code))
+        if raise_exception_on_failure and int(return_code) != 0:
+            raise Exception("Command {0} failed with return code {1}".format(command_to_execute,
+                                                                             return_code))
 
         return return_code
+    
+    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False):
+        command_to_execute = 'bash -c "{0}{1}"'.format('set -e; ' if raise_exception_on_failure else '',
+                                                      command_to_execute)
+        
+        return self.Execute(command_to_execute, raise_exception_on_failure)
