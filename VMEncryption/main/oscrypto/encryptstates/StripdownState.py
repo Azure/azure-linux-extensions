@@ -55,6 +55,7 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
+        self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
