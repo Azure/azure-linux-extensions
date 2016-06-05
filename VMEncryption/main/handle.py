@@ -325,9 +325,9 @@ def enable_encryption():
             current_identity = machine_identity.current_identity()
             if(current_identity != stored_identity):
                 current_seq_no = -1
-                backup_logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity,
-                                                                                                        current_identity,
-                                                                                                        current_seq_no))
+                logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity,
+                                                                                                 current_identity,
+                                                                                                 current_seq_no))
                 hutil.set_last_seq(current_seq_no)
                 machine_identity.save_identity()
                 # we should be careful about proceed for this case, we just
