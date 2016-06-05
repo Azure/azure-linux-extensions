@@ -25,8 +25,18 @@ class SelinuxState(OSEncryptionState):
     def __init__(self, context):
         super(SelinuxState, self).__init__('SelinuxState', context)
 
-    def enter(self):
+    def should_enter(self):
+        self.context.logger.log("Verifying if machine should enter selinux state")
+
         if not super(SelinuxState, self).should_enter():
+            return False
+        
+        self.context.logger.log("Performing enter checks for selinux state")
+
+        return True
+
+    def enter(self):
+        if not self.should_enter():
             return
 
         self.context.logger.log("Entering selinux state")

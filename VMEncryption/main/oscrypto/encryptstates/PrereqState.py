@@ -26,8 +26,18 @@ class PrereqState(OSEncryptionState):
     def __init__(self, context):
         super(PrereqState, self).__init__('PrereqState', context)
 
-    def enter(self):
+    def should_enter(self):
+        self.context.logger.log("Verifying if machine should enter prereq state")
+
         if not super(PrereqState, self).should_enter():
+            return False
+        
+        self.context.logger.log("Performing enter checks for prereq state")
+
+        return True
+
+    def enter(self):
+        if not self.should_enter():
             return
 
         self.context.logger.log("Entering prereq state")

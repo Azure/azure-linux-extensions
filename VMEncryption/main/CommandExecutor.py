@@ -31,9 +31,14 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute):
+    def Execute(self, command_to_execute, raise_exception_on_failure=False):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
         proc = Popen(args)
-        returnCode = proc.wait()
-        return returnCode
+        return_code = proc.wait()
+
+        if raise_exception_on_failure:
+            raise Exception("Command {0} failed with return code".format(command_to_execute,
+                                                                         return_code))
+
+        return return_code

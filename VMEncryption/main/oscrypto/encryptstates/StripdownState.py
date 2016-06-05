@@ -25,8 +25,18 @@ class StripdownState(OSEncryptionState):
     def __init__(self, context):
         super(StripdownState, self).__init__('StripdownState', context)
 
-    def enter(self):
+    def should_enter(self):
+        self.context.logger.log("Verifying if machine should enter stripdown state")
+
         if not super(StripdownState, self).should_enter():
+            return False
+        
+        self.context.logger.log("Performing enter checks for stripdown state")
+
+        return True
+
+    def enter(self):
+        if not self.should_enter():
             return
 
         self.context.logger.log("Entering stripdown state")
