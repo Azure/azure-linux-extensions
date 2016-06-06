@@ -19,23 +19,31 @@
 # Requires Python 2.7+
 #
 
-import subprocess
 import os
 import os.path
 import shlex
 import sys
+
 from subprocess import *
+
+class ProcessCommunicator(object):
+    def __init__(self):
+        self.stdout = None
+        self.stderr = None
 
 class CommandExecutor(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute, raise_exception_on_failure=False):
+    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
-        proc = Popen(args)
+        proc = Popen(args, stdout=PIPE, stderr=PIPE)
         return_code = proc.wait()
+
+        if isinstance(communicator, ProcessCommunicator):
+            communicator.stdout, communicator.stderr = proc.communicate()
 
         if raise_exception_on_failure and int(return_code) != 0:
             raise Exception("Command {0} failed with return code {1}".format(command_to_execute,
@@ -43,8 +51,8 @@ class CommandExecutor(object):
 
         return return_code
     
-    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False):
+    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
         command_to_execute = 'bash -c "{0}{1}"'.format('set -e; ' if raise_exception_on_failure else '',
                                                       command_to_execute)
         
-        return self.Execute(command_to_execute, raise_exception_on_failure)
+        return self.Execute(command_to_execute, raise_exception_on_failure, communicator)

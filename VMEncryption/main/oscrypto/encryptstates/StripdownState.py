@@ -50,7 +50,7 @@ class StripdownState(OSEncryptionState):
         self.command_executor.Execute('umount -a')
         self.command_executor.Execute('mkdir /tmp/tmproot', True)
         self.command_executor.Execute('mount -t tmpfs none /tmp/tmproot', True)
-        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot; do mkdir /tmp/tmproot/$i; done', True)
+        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot boot; do mkdir /tmp/tmproot/$i; done', True)
         self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
         self.command_executor.ExecuteInBash('for i in bin sbin lib lib64; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
         self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
@@ -71,7 +71,8 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            relaunch_command = 'sleep 30 && {0} &'.format(' '.join(sys.argv))
+            relaunch_command = 'sleep 30 && /usr/sbin/waagent -daemon &'
+            # relaunch_command = 'sleep 30 && {0} &'.format(' '.join(sys.argv))
             self.command_executor.ExecuteInBash(relaunch_command, True)
 
             self.context.hutil.do_exit(exit_code=0,
