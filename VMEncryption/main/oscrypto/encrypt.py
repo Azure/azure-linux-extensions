@@ -39,6 +39,7 @@ class OSEncryption(object):
         State(name='prereq', on_enter='on_enter_state'),
         State(name='selinux', on_enter='on_enter_state'),
         State(name='stripdown', on_enter='on_enter_state'),
+        State(name='unmount_oldroot', on_enter='on_enter_state'),
         State(name='completed'),
     ]
 
@@ -63,8 +64,15 @@ class OSEncryption(object):
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'report_success',
+            'trigger': 'perform_stripdown',
             'source': 'stripdown',
+            'dest': 'unmount_oldroot',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_state'
+        },
+        {
+            'trigger': 'report_success',
+            'source': 'unmount_oldroot',
             'dest': 'completed',
             'conditions': 'should_exit_state'
         },
@@ -93,6 +101,7 @@ class OSEncryption(object):
             'prereq': PrereqState(context),
             'selinux': SelinuxState(context),
             'stripdown': StripdownState(context),
+            'unmount_oldroot': UnmountOldrootState(context),
         }
 
         self.state_machine = Machine(model=self,
@@ -112,6 +121,9 @@ class OSEncryption(object):
         
         self.log_machine_state()
         self.perform_selinux()
+        
+        self.log_machine_state()
+        self.perform_stripdown()
         
         self.log_machine_state()
         self.report_success()

@@ -19,6 +19,9 @@
 # Requires Python 2.7+
 #
 
+import os
+import sys
+
 from OSEncryptionState import *
 
 class StripdownState(OSEncryptionState):
@@ -54,18 +57,28 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('mkdir /tmp/tmproot/var/log', True)
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
+        self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
         self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
 
-        msg = 'Entered stripped down OS'
-        self.context.logger.log(msg);
+        if not os.path.exists(self.state_marker):
+            self.context.logger.log("First call to stripdown state (pid={0}), restarting process".format(os.getpid()))
 
-        self.context.hutil.do_status_report(operation='EnableEncryptionOSVolume',
-                                    status=CommonVariables.extension_success_status,
-                                    status_code=str(CommonVariables.success),
-                                    message=msg)
+            # create the marker, but do not advance the state machine
+            super(StripdownState, self).should_exit()
 
-        return super(StripdownState, self).should_exit()
+            # the restarted process shall see the marker and advance the state machine
+            relaunch_command = 'sleep 30 && {0} &'.format(' '.join(sys.argv))
+            self.command_executor.ExecuteInBash(relaunch_command, True)
+
+            self.context.hutil.do_exit(exit_code=0,
+                                       operation='EnableEncryptionOSVolume',
+                                       status=CommonVariables.extension_error_status,
+                                       code=CommonVariables.encryption_failed,
+                                       message="Restarted extension from stripped down OS")
+        else:
+            self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
+            return True

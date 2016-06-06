@@ -1277,7 +1277,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                        encryption_marker=encryption_marker,
                                                        disk_util=disk_util)
             else:
-                message = "command {0} not supported.".format(encryption_marker.get_current_command())
+                message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
             if failed_item:
@@ -1387,13 +1387,14 @@ def daemon():
                         status=CommonVariables.extension_error_status,
                         code=str(CommonVariables.encryption_failed),
                         message=error_msg)
-    finally:
+    else:
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
         #TODO not remove it, backed it up.
+        logger.log("returned to daemon successfully after encryption")
         logger.log("clearing the encryption mark.")
         encryption_marker.clear_config()
+    finally:
         lock.release_lock()
-        logger.log("returned to daemon successfully after encryption")
         logger.log("exiting daemon")
 
 def start_daemon(operation):
