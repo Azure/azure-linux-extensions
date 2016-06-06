@@ -76,7 +76,7 @@ omi_universal_pkg_name = 'scx-installer.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
+DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
                 "restartrsyslog":"service rsyslog restart",
@@ -84,7 +84,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;
                 'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
                 }
 
-RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
+RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
                  "packages":(),
                  "restartrsyslog":"service rsyslog restart",
@@ -636,7 +636,7 @@ def start_mdsd():
             copy_env['MDSD_http_proxy'] = proxy_config
 
     xml_file = os.path.join(WorkDir, './xmlCfg.xml')
-    command = '{0} -A -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
+    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
@@ -854,7 +854,17 @@ def install_omi():
         for trialNum in range(1, maxTries+1):
             isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
             if isOmiInstalledSuccessfully:
-                break
+                isOmiRunning = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+                if isOmiRunning:
+                    break
+                # OMI installed successfully, but omiserver is not running.
+                # Dump diag info and retry
+                hutil.error("OMI installed successfully, but omiserver is not running. Dumping some diag info.")
+                cmd = "journalctl > " + os.path.join(WorkDir, "omi-diag.journalctl.out")
+                RunGetOutput(cmd)
+                cmd = "ps -ef > " + os.path.join(WorkDir, "omi-diag.ps_ef.out")
+                RunGetOutput(cmd)
+
             hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
             if trialNum < maxTries:
                 hutil.error("Retrying in 30 seconds...")
@@ -868,16 +878,22 @@ def install_omi():
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
     isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
 
+    shouldRestartOmi = False
+
     if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
         RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
+        shouldRestartOmi = True
 
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
+        shouldRestartOmi = True
 
-    RunGetOutput("/opt/omi/bin/service_control restart")
+    if shouldRestartOmi:
+        RunGetOutput("/opt/omi/bin/service_control restart")
+
     return 0, "omi installed"
 
 
