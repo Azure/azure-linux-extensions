@@ -47,11 +47,18 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.context.logger.log("Entering encrypt_block_device state")
 
         self._find_bek_and_execute_action('_dump_passphrase')
+        self._find_bek_and_execute_action('_luks_format')
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
 
         return super(EncryptBlockDeviceState, self).should_exit()
+
+    def _luks_format(self, bek_path):
+        self.command_executor.Execute('mkdir /boot/luks', True)
+        self.command_executor.Execute('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
+        self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} /dev/sda2 -q'.format(bek_path),
+                                      raise_exception_on_failure=True)
 
     def _dump_passphrase(self, bek_path):
         proc_comm = ProcessCommunicator()
