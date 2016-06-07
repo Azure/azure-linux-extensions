@@ -19,6 +19,7 @@
 # Requires Python 2.7+
 #
 
+import inspect
 import os
 import sys
 
@@ -57,17 +58,40 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('mkdir /oldroot/memroot', True)
         self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
 
-        self.context.logger.log("Pivoted into oldroot successfully")
+        try:
+            self._modify_pivoted_oldroot()
+        except Exception as e:
+            raise
+        finally:
+            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
+            self.command_executor.Execute('rmdir /oldroot/memroot', True)
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
+            self.command_executor.Execute('umount /boot', True)
+            self.command_executor.Execute('umount /oldroot', True)
 
-        self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
-        self.command_executor.Execute('rmdir /oldroot/memroot', True)
-        self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
-        self.command_executor.Execute('umount /boot', True)
-        self.command_executor.Execute('umount /oldroot', True)
-
-        self.context.logger.log("Pivoted back into memroot successfully")
+            self.context.logger.log("Pivoted back into memroot successfully")
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
 
         return super(PatchBootSystemState, self).should_exit()
+
+    def _modify_pivoted_oldroot(self):
+        self.context.logger.log("Pivoted into oldroot successfully")
+
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        patchesdir = os.path.join(scriptdir, '../encryptpatches')
+        patchpath = os.path.join(patchesdir, 'rhel-72-dracut.patch')
+
+        if not os.path.exists(patchpath):
+            self.context.logger.log("Patch not found at path: {0}".format(patchpath))
+        else:
+            self.context.logger.log("Patch found at path: {0}".format(patchpath))
+
+        self.command_executor.ExecuteInBash('echo "GRUB_CMDLINE_LINUX+=\" rd.debug rd.luks.uuid=osencrypt\"" >>/etc/default/grub', True)
+        self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
+        self.command_executor.ExecuteInBash('echo add_drivers+=\" vfat nls_cp437 nls_iso8859-1\" >>/etc/dracut.conf', True)
+        self.command_executor.ExecuteInBash('echo add_dracutmodules+=\" crypt\" >>/etc/dracut.conf', True)
+        self.command_executor.ExecuteInBash('/usr/sbin/dracut -f -v', True)
+        self.command_executor.ExecuteInBash('grub2-install /dev/sda', True)
+        self.command_executor.ExecuteInBash('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
