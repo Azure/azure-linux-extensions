@@ -76,6 +76,10 @@ class PatchBootSystemState(OSEncryptionState):
 
         return super(PatchBootSystemState, self).should_exit()
 
+    def _append_contents_to_file(self, contents, path):
+        with open(path, 'a') as f:
+            f.write(contents)
+
     def _modify_pivoted_oldroot(self):
         self.context.logger.log("Pivoted into oldroot successfully")
 
@@ -88,10 +92,16 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
-        self.command_executor.ExecuteInBash('echo "GRUB_CMDLINE_LINUX+=\" rd.debug rd.luks.uuid=osencrypt\"" >>/etc/default/grub', True)
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
+                                      '/etc/default/grub')
+
         self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
-        self.command_executor.ExecuteInBash('echo add_drivers+=\" vfat nls_cp437 nls_iso8859-1\" >>/etc/dracut.conf', True)
-        self.command_executor.ExecuteInBash('echo add_dracutmodules+=\" crypt\" >>/etc/dracut.conf', True)
-        self.command_executor.ExecuteInBash('/usr/sbin/dracut -f -v', True)
-        self.command_executor.ExecuteInBash('grub2-install /dev/sda', True)
-        self.command_executor.ExecuteInBash('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
+
+        self._append_contents_to_file('\nadd_drivers+=" vfat nls_cp437 nls_iso8859-1"\n',
+                                      '/etc/dracut.conf')
+        self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
+                                      '/etc/dracut.conf')
+
+        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
+        self.command_executor.Execute('grub2-install /dev/sda', True)
+        self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
