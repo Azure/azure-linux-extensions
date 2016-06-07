@@ -55,6 +55,9 @@ class EncryptBlockDeviceState(OSEncryptionState):
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
 
+        self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
+        self.command_executor.Execute('umount /oldroot', True)
+
         return super(EncryptBlockDeviceState, self).should_exit()
 
     def _luks_format(self, bek_path):
