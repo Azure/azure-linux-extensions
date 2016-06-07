@@ -27,6 +27,7 @@ from Common import *
 from CommandExecutor import *
 from BekUtil import *
 from DiskUtil import *
+from EncryptionConfig import *
 
 class OSEncryptionState(object):
     def __init__(self, state_name, context):
@@ -46,6 +47,9 @@ class OSEncryptionState(object):
 
         self.bek_util = BekUtil(disk_util=self.disk_util,
                                 logger=self.context.logger)
+
+        self.encryption_config = EncryptionConfig(encryption_environment=self.context.encryption_environment,
+                                                  logger=self.context.logger)
         
     def should_enter(self):
         if self.state_executed:

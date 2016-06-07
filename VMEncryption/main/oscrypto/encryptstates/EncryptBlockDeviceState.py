@@ -22,6 +22,7 @@
 import os
 import sys
 
+from inspect import ismethod
 from time import sleep
 from OSEncryptionState import *
 
@@ -45,7 +46,26 @@ class EncryptBlockDeviceState(OSEncryptionState):
 
         self.context.logger.log("Entering encrypt_block_device state")
 
+        self._find_bek_and_execute_action('_dump_passphrase')
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
 
         return super(EncryptBlockDeviceState, self).should_exit()
+
+    def _dump_passphrase(self, bek_path):
+        proc_comm = ProcessCommunicator()
+
+        self.command_executor.Execute(command_to_execute="od -c {0}".format(bek_path),
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+        self.context.logger.log("Passphrase:")
+        self.context.logger.log(proc_comm.stdout)
+
+    def _find_bek_and_execute_action(self, callback_method_name):
+        callback_method = getattr(self, callback_method_name)
+        if not ismethod(callback_method):
+            raise Exception("{0} is not a method".format(callback_method_name))
+
+        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        callback_method(bek_path)        
