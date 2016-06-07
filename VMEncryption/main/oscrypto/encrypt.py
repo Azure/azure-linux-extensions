@@ -41,6 +41,7 @@ class OSEncryption(object):
         State(name='stripdown', on_enter='on_enter_state'),
         State(name='unmount_oldroot', on_enter='on_enter_state'),
         State(name='encrypt_block_device', on_enter='on_enter_state'),
+        State(name='patch_boot_system', on_enter='on_enter_state'),
         State(name='completed'),
     ]
 
@@ -79,8 +80,22 @@ class OSEncryption(object):
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'report_success',
+            'trigger': 'perform_unmount_oldroot',
+            'source': 'unmount_oldroot',
+            'dest': 'encrypt_block_device',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_state'
+        },
+        {
+            'trigger': 'perform_patch_boot_system',
             'source': 'encrypt_block_device',
+            'dest': 'patch_boot_system',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_state'
+        },
+        {
+            'trigger': 'report_success',
+            'source': 'patch_boot_system',
             'dest': 'completed',
             'conditions': 'should_exit_state'
         },
@@ -111,6 +126,7 @@ class OSEncryption(object):
             'stripdown': StripdownState(context),
             'unmount_oldroot': UnmountOldrootState(context),
             'encrypt_block_device': EncryptBlockDeviceState(context),
+            'patch_boot_system': PatchBootSystemState(context),
         }
 
         self.state_machine = Machine(model=self,
@@ -135,7 +151,10 @@ class OSEncryption(object):
         self.perform_stripdown()
         
         self.log_machine_state()
-        self.perform_umount_oldroot()
+        self.perform_unmount_oldroot()
+        
+        self.log_machine_state()
+        self.perform_patch_boot_system()
         
         self.log_machine_state()
         self.report_success()

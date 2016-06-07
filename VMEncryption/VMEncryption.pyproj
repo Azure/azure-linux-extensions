@@ -81,6 +81,7 @@
     <Compile Include="main\oscrypto\encryptstates\StripdownState.py" />
     <Compile Include="main\oscrypto\encryptstates\UnmountOldrootState.py" />
     <Compile Include="main\oscrypto\encryptstates\EncryptBlockDeviceState.py" />
+    <Compile Include="main\oscrypto\encryptstates\PatchBootSystemState.py" />
     <Compile Include="main\oscrypto\encryptstates\__init__.py" />
     <Compile Include="main\patch\AbstractPatching.py" />
     <Compile Include="main\patch\centosPatching.py" />

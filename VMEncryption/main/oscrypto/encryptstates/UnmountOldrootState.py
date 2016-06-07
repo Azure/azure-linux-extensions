@@ -76,6 +76,7 @@ class UnmountOldrootState(OSEncryptionState):
         sleep(3)
 
         self.command_executor.Execute('umount /oldroot', True)
+        self.command_executor.Execute('xfs_repair /dev/sda2', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")
@@ -83,7 +84,5 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists('/oldroot/bin'):
             self.context.logger.log("/oldroot was not unmounted")
             return False
-        
-        self.command_executor.Execute('xfs_repair /dev/sda2', True)
 
         return super(UnmountOldrootState, self).should_exit()

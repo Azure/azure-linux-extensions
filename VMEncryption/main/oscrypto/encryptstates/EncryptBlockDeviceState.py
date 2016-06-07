@@ -55,6 +55,9 @@ class EncryptBlockDeviceState(OSEncryptionState):
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
 
+        if not os.path.exists('/dev/mapper/osencrypt'):
+            self._find_bek_and_execute_action('_luks_open')
+
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('umount /oldroot', True)
 
