@@ -48,6 +48,25 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.context.logger.log("Entering patch_boot_system state")
 
+        if not os.path.exists('/boot/luks'):
+            self.command_executor.Execute('mount /boot', True)
+
+        self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
+        self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --bind /$i /oldroot/$i; done', True)
+        self.command_executor.Execute('mount --make-rprivate /', True)
+        self.command_executor.Execute('mkdir /oldroot/memroot', True)
+        self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
+
+        self.context.logger.log("Pivoted into oldroot successfully")
+
+        self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
+        self.command_executor.Execute('rmdir /oldroot/memroot', True)
+        self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
+        self.command_executor.Execute('umount /boot', True)
+        self.command_executor.Execute('umount /oldroot', True)
+
+        self.context.logger.log("Pivoted back into memroot successfully")
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
 
