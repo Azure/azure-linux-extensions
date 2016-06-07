@@ -50,6 +50,11 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self._find_bek_and_execute_action('_luks_format')
         self._find_bek_and_execute_action('_luks_open')
 
+        self.context.hutil.do_status_report(operation='EnableEncryptionDataVolumes',
+                                            status=CommonVariables.extension_success_status,
+                                            status_code=str(CommonVariables.success),
+                                            message='Starting dd copy for OS disk')
+
         self.command_executor.Execute('dd if=/dev/sda2 of=/dev/mapper/osencrypt bs=52428800', True)
 
     def should_exit(self):
