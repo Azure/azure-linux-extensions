@@ -1,2 +1,3 @@
 include HandlerManifest.json handler.py
+recursive-include main/oscrypto/encryptpatches *.patch
 prune test

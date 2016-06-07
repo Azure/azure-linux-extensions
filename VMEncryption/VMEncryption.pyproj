@@ -30,6 +30,7 @@
     <Content Include="MANIFEST.in" />
     <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
+    <Content Include="main\oscrypto\encryptpatches\rhel-72-dracut.patch" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -99,6 +100,7 @@
     <Folder Include="main\" />
     <Folder Include="main\oscrypto\" />
     <Folder Include="main\oscrypto\encryptstates\" />
+    <Folder Include="main\oscrypto\encryptpatches\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
   </ItemGroup>
