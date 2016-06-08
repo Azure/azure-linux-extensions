@@ -26,6 +26,8 @@ Schema for the public configuration file looks like this:
 
 * `fileUris`: (optional, string array) the uri list of the scripts
 * `commandToExecute`: (required, string) the entrypoint script to execute
+* `enableInternalDNSCheck`: (optional, bool) the flag to enable checking the readiness of the internal DNS. The default value is `True`.
+* `enableDOSConverting`: (optional, bool) the flag to enable converting the scripts from the DOS format to the Unix format. The default value is `False`.
  
 ```json
 {
