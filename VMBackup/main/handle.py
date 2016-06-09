@@ -35,6 +35,7 @@ import traceback
 import httplib
 import xml.parsers.expat
 import datetime
+import ConfigParser
 from threading import Thread
 from time import sleep
 from os.path import join
@@ -69,7 +70,7 @@ def main():
     backup_logger = Backuplogger(hutil)
     MyPatching = GetMyPatching(logger = backup_logger)
     hutil.patching = MyPatching
-
+    
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -163,25 +164,6 @@ def snapshot():
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
     snapshot_done = True
-
-
-def freeze_watcher():
-    global backup_logger,run_status,error_msg,snapshot_done
-    #wait 5 minutes before the snapshoting.
-    try:
-        for i in range(0, 12):
-            if(snapshot_done):
-                backup_logger.log('T:W snapshot is done', False)
-                break;
-            sleep(5)
-        if not snapshot_done:
-            run_result = CommonVariables.error
-            run_status = 'error'
-            error_msg = 'T:W Snapshot timeout'
-            backup_logger.log(error_msg, False, 'Warning')
-    except Exception as e:
-        errMsg = 'Failed to do  the snapshot because of exception in freeze watcher'
-        backup_logger.log(errMsg, False, 'Error')
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
     #this is using the most recent file timestamp.
@@ -190,6 +172,18 @@ def daemon():
     global_error_result = None
     # precheck
     freeze_called = False
+
+    configfile=os.path.curdir+'/config/config.ini'
+    if not os.path.exists(configfile):
+        fopen=open(configfile,'w')
+        fopen.write('[SnapshotThread]\ntimeout=60')
+        fopen.close()
+
+    config = ConfigParser.ConfigParser()
+    config.read(configfile)
+    thread_timeout= config.get('SnapshotThread','timeout')
+    backup_logger.log(thread_timeout,local=True)
+
     try:
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
@@ -256,13 +250,34 @@ def daemon():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
-                freeze_watcher_tread = Thread(target = freeze_watcher)
-                freeze_watcher_tread.start()
+                if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+                    temp_status= 'transitioning'
+                    temp_result=CommonVariables.success
+                    temp_msg='Transitioning state in extension'
+                    trans_report_msg = None
+                    trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
+                                    status_code=str(temp_result),\
+                                    message=temp_msg,\
+                                    taskId=para_parser.taskId,\
+                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                                    blobUri=para_parser.statusBlobUri)
+                    if(trans_report_msg is not None):
+                        backup_logger.log("trans status report message:")
+                        backup_logger.log(trans_report_msg)
+                    else:
+                        backup_logger.log("trans_report_msg is none")
+                    hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
                 snapshot_thread = Thread(target = snapshot)
                 start_time=datetime.datetime.utcnow()
                 snapshot_thread.start()
-                freeze_watcher_tread.join()
+                snapshot_thread.join(float(thread_timeout))
+                if snapshot_thread.is_alive():
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:W Snapshot timeout'
+                    backup_logger.log(error_msg, False, 'Warning')
+
                 end_time=datetime.datetime.utcnow()
                 time_taken=end_time-start_time
                 backup_logger.log('total time taken..' + str(time_taken))
