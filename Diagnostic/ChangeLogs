@@ -1,3 +1,12 @@
+2016-06-06: LAD-2.3.9001
+    - Fix issue of syslog messages not collected by default on SLES 11
+    - Minor config syntactic fixes
+    - Logging fix to show correct extension version
+    - Monitoring agent kill is no longer SIGKILL, but SIGTERM.
+    - Monitoring agent listening port is now dynamic if the specified port (29131) is in use.
+    - Monitoring agent core dump is enabled (dumped on its current working directory)
+    - Newer monitoring agent bits with added features (not available on LAD yet)
+
 2016-05-04: LAD-2.3.9
     - mdsd bits are now built as statically as possible, so that a single monolithic executable
       can be used on as many distros/versions.
