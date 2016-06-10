@@ -35,7 +35,6 @@ Schema for the public configuration file looks like this:
 ```
 
 ### 1.2. Protected configuration
-
 Schema for the protected configuration file looks like this:
 
 * `commandToExecute`: (optional, string) the entrypoint script to execute
@@ -55,6 +54,7 @@ Schema for the protected configuration file looks like this:
 1. The storage account here is to store the scripts in `fileUris`.
 If the scripts are stored in the private Azure Storage, you should provide
 `storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
+*Currently only general purpose storage accounts are supported. We intend to add support for the new [Azure Cool Blob Storage](https://azure.microsoft.com/en-us/blog/introducing-azure-cool-storage/) in the near future. See #161*
 2. `commandToExecute` in protected settings can protect your sensitive data.
 But `commandToExecute` should not be specified both in public and protected configurations.
 
