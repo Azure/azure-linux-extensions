@@ -165,7 +165,7 @@ def snapshot():
         backup_logger.log(errMsg, False, 'Error')
     snapshot_done = True
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
@@ -173,16 +173,31 @@ def daemon():
     # precheck
     freeze_called = False
 
-    configfile=os.path.curdir+'/config/config.ini'
+    configfile='/var/lib/waagent/extension_config/config.ini'
+    thread_timeout=str(60)
     if not os.path.exists(configfile):
-        fopen=open(configfile,'w')
-        fopen.write('[SnapshotThread]\ntimeout=60')
-        fopen.close()
-
-    config = ConfigParser.ConfigParser()
-    config.read(configfile)
-    thread_timeout= config.get('SnapshotThread','timeout')
-    backup_logger.log(thread_timeout,local=True)
+        directory_present= True
+        try:
+            os.makedirs(os.path.dirname(configfile))
+        except OSError as e:
+            if e.errno != err.EEXIST:
+                directory_present=False
+        if(directory_present):
+            try:
+                fopen=open(configfile,'w')
+                fopen.write('[SnapshotThread]\ntimeout=60')
+                fopen.close()
+            except Exception as e:
+                errMsg='Config file not present and cannot be created'
+                backup_logger.log(errMsg, False, 'Warning')
+    try:
+        config = ConfigParser.ConfigParser()
+        config.read(configfile)
+        thread_timeout= config.get('SnapshotThread','timeout')
+        backup_logger.log(thread_timeout,local=True)
+    except Exception as e:
+        errMsg='cannot read config file or file not present'
+        backup_logger.log(errMsg, False, 'Warning')
 
     try:
         # we need to freeze the file system first
@@ -250,11 +265,11 @@ def daemon():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
+                temp_status= 'transitioning'
+                temp_result=CommonVariables.success
+                temp_msg='Transitioning state in extension'
+                trans_report_msg = None
                 if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-                    temp_status= 'transitioning'
-                    temp_result=CommonVariables.success
-                    temp_msg='Transitioning state in extension'
-                    trans_report_msg = None
                     trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
                                     status_code=str(temp_result),\
                                     message=temp_msg,\
@@ -266,13 +281,13 @@ def daemon():
                         backup_logger.log(trans_report_msg)
                     else:
                         backup_logger.log("trans_report_msg is none")
-                    hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
+                hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
                 snapshot_thread = Thread(target = snapshot)
                 start_time=datetime.datetime.utcnow()
                 snapshot_thread.start()
                 snapshot_thread.join(float(thread_timeout))
-                if snapshot_thread.is_alive():
+                if not snapshot_done:
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:W Snapshot timeout'
