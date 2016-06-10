@@ -179,7 +179,7 @@ def daemon():
         directory_present= True
         try:
             os.makedirs(os.path.dirname(configfile))
-        except OSError as e:
+        except Exception as e:
             if e.errno != err.EEXIST:
                 directory_present=False
         if(directory_present):
@@ -194,10 +194,10 @@ def daemon():
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
-        backup_logger.log(thread_timeout,local=True)
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, False, 'Warning')
+    backup_logger.log("final thread timeout" + thread_timeout, True)
 
     try:
         # we need to freeze the file system first
