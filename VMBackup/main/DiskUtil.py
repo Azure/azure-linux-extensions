@@ -104,7 +104,7 @@ class DiskUtil(object):
             out_lsblk_output = str(out_lsblk_output)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
-                self.logger.log(msg=str(err),level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=str(err))
             lines = out_lsblk_output.splitlines()
             for i in range(0,len(lines)):
                 item_value_str = lines[i].strip()
