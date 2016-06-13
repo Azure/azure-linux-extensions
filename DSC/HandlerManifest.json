@@ -1,13 +1,14 @@
-[{
-  "name": "DSC",
-  "version": 2.0,
-  "handlerManifest": {
-    "installCommand": "dsc.py -install",
-    "uninstallCommand": "dsc.py -uninstall",
-    "updateCommand": "dsc.py -update",
-    "enableCommand": "dsc.py -enable",
-    "disableCommand": "dsc.py -disable",
-    "rebootAfterInstall": false,
-    "reportHeartbeat": false
+[
+  {
+    "version": 1.0,
+    "handlerManifest": {
+      "disableCommand": "dsc.py -disable",
+      "enableCommand": "dsc.py -enable",
+      "installCommand": "dsc.py -install",
+      "uninstallCommand": "dsc.py -uninstall",
+      "updateCommand": "dsc.py -update",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false
+    }
   }
-}]
+]
