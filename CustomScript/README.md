@@ -1,7 +1,7 @@
 # CustomScript Extension
 Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
-Latest version is 1.5.1.
+Latest version is 1.5.2.
 
 You can read the User Guide below.
 * [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
@@ -298,7 +298,7 @@ If you need to run scripts repeatly, you can add a timestamp.
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
-- openSUSE 13.1 and higher
+- OpenSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
 - FreeBSD
 
@@ -316,6 +316,9 @@ in HandlerEnvironment.json and reported back to Azure
 ## Changelog
 
 ```
+# 1.5.2.0 (2016-04-11)
+- Fix state machine for status transitions.
+
 # 1.5.1.0 (2016-04-05)
 - Atomically write the status file.
 
