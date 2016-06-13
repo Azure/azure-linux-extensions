@@ -173,23 +173,8 @@ def daemon():
     # precheck
     freeze_called = False
 
-    configfile='/var/lib/waagent/extension_config/config.ini'
+    configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    if not os.path.exists(configfile):
-        directory_present= True
-        try:
-            os.makedirs(os.path.dirname(configfile))
-        except Exception as e:
-            if e.errno != err.EEXIST:
-                directory_present=False
-        if(directory_present):
-            try:
-                fopen=open(configfile,'w')
-                fopen.write('[SnapshotThread]\ntimeout=60')
-                fopen.close()
-            except Exception as e:
-                errMsg='Config file not present and cannot be created'
-                backup_logger.log(errMsg, False, 'Warning')
     try:
         config = ConfigParser.ConfigParser()
         config.read(configfile)
