@@ -285,8 +285,6 @@ class HandlerUtility:
                     self.log("failed to rename the settings file.")
 
     def do_exit(self, exit_code, operation, status, code, message):
-        if exit_code == 0:
-            self.save_seq()
         try:
             self.do_status_report(operation, status, code, message)
         except Exception as e:
