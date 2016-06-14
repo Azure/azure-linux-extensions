@@ -13,7 +13,8 @@
 	[string] $Password,
 	[string] $ExtensionName="AzureDiskEncryptionForLinux",
 	[string] $SshPubKey,
-    [string] $Location="eastus"
+    [string] $Location="eastus",
+    [string] $VolumeType="data"
 )
 
 $ErrorActionPreference = "Stop"
@@ -159,7 +160,7 @@ $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
     -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
     -KeyEncryptionKeyURL $DiskEncryptionKey.Id `
     -KeyEncryptionAlgorithm "RSA-OAEP" `
-    -VolumeType "Data" `
+    -VolumeType $VolumeType `
     -SequenceVersion "1" 3>&1 | Out-String
 
 Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
