@@ -1351,6 +1351,9 @@ def daemon():
         return
 
     logger.log("daemon lock acquired sucessfully.")
+    
+    logger.log("waiting for 2 minutes before continuing the daemon")
+    time.sleep(120)
 
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     if decryption_marker.config_file_exists():
@@ -1416,7 +1419,7 @@ def start_daemon(operation):
                       operation=operation,
                       status=CommonVariables.extension_success_status,
                       code=str(CommonVariables.success),
-                      message=operation + ' started')
+                      message=encryption_config.get_secret_id())
     else:
         hutil.do_exit(exit_code=0,
                       operation=operation,
