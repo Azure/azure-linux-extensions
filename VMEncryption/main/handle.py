@@ -296,7 +296,7 @@ def enable_encryption():
     bek_util = BekUtil(disk_util, logger)
     
     existed_passphrase_file = None
-    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger = logger)
+    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
     if(config_path_result != CommonVariables.process_success):
         logger.log(msg="azure encryption path creation failed.",
@@ -358,10 +358,9 @@ def enable_encryption():
             hutil.exit_if_same_seq()
             hutil.save_seq()
             
-            if not hutil.same_seq_as_last_run():
-                encryption_config = EncryptionConfig(encryption_environment, logger)
-                encryption_config.volume_type = extension_parameter.VolumeType
-                encryption_config.commit()
+            encryption_config = EncryptionConfig(encryption_environment, logger)
+            encryption_config.volume_type = extension_parameter.VolumeType
+            encryption_config.commit()
 
             if(encryption_config.config_file_exists() and existed_passphrase_file is not None):
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
@@ -1268,6 +1267,12 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
         else:
             logger.log("OngoingItemConfig does not exist")
             failed_item = None
+
+            if not encryption_marker.config_file_exists():
+                logger.log("Data volumes are not marked for encryption")
+                bek_util.umount_azure_passhprase(encryption_config)
+                return
+
             if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
                 failed_item = enable_encryption_all_in_place(passphrase_file=bek_passphrase_file,
                                                              encryption_marker=encryption_marker,
