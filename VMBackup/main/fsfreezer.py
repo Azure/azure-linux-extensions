@@ -149,8 +149,11 @@ class FsFreezer:
         self.root_seen = False
         unfreeze_result = FreezeResult()
         thread_jobs = []
-        commandToExecute="kill $(ps aux | grep \'fsfreeze\' | awk \'{print $2}\')"
-        subprocess.call(commandToExecute,shell=True)
+        try:
+            commandToExecute="kill $(ps aux | grep \'fsfreeze\' | awk \'{print $2}\')"
+            subprocess.call(commandToExecute,shell=True)
+        except Exception,e:
+            self.logger.log('killing fsfreeze running process failed')
         unfreeze_done= True
         for mount in self.mounts.mounts:
             if(mount.mount_point == '/'):
