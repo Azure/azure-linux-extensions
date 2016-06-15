@@ -69,8 +69,6 @@ if not hasattr(waagent, "WALAEventOperation"):
     waagent.WALAEventOperation = _WALAEventOperation
 
 
-# begin: waagent http proxy config stuff
-
 def GetWaagentHttpProxyConfigString():
     """
     Get http_proxy and https_proxy from waagent config.

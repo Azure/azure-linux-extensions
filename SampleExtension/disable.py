@@ -21,7 +21,7 @@ def main():
 
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context(operation)
     return hutil
 

@@ -79,7 +79,7 @@ def main():
     waagent.Log("%s started to handle." %(ExtensionShortName))    
 
     global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.try_parse_context()
 
     global public_settings
