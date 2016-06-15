@@ -50,20 +50,19 @@ class FsFreezer:
         self.frozen_items = set()
         self.unfrozen_items = set()
 
-    def freeze(self, mount,freeze_result):
+    def freeze(self, mount):
         """
         for xfs we should use the xfs_freeze, or we just use fsfreeze
         """
         global unfreeze_done
         freeze_error = FreezeError()
         path = mount.mount_point
+        freeze_return_code = 0
         if not unfreeze_done:
             if(path in self.frozen_items):
                 self.logger.log("skipping the mount point because we already freezed it")
-                freeze_return_code = 0
             else:
                 self.logger.log('freeze...')
-                freeze_return_code = 0
                 if(self.should_skip(mount)):
                     self.logger.log('skip for the unknown file systems')
                 else:
@@ -78,9 +77,9 @@ class FsFreezer:
 
         if(freeze_return_code != 0):
             freeze_error.path = path
-            freeze_result.errors.append(freeze_error)
+        return freeze_error
 
-    def unfreeze(self, mount,unfreeze_result):
+    def unfreeze(self, mount):
         """
         for xfs we should use the xfs_freeze -u, or we just use fsfreeze -u
         """
@@ -101,7 +100,7 @@ class FsFreezer:
         freeze_error.errorcode = unfreeze_return_code
         if(unfreeze_return_code != 0):
             freeze_error.path = path
-            unfreeze_result.errors.append(freeze_error)
+        return freeze_error
 
     def should_skip(self, mount):
         if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
@@ -114,41 +113,32 @@ class FsFreezer:
         unfreeze_done= False
         self.root_seen = False
         freeze_result = FreezeResult()
-        thread_jobs = []
         for mount in self.mounts.mounts:
             if(mount.mount_point == '/'):
                 self.root_seen = True
                 self.root_mount = mount
             elif(mount.mount_point):
                 try:
-                    thread = threading.Thread(target=self.freeze(mount,freeze_result))
-                    thread_jobs.append(thread)
+                    freezeError = self.freeze(mount)
+                    if(freezeError.errorcode != 0):
+                        freeze_result.errors.append(freezeError)
                 except Exception, e:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
                     freeze_result.errors.append(freezeError)
                     self.logger.log(str(e))
-        try:
-            for job in thread_jobs:
-                job.start()
-            for job in thread_jobs:
-                job.join()
-        except Exception, e:
-            freezeError = FreezeError()
-            freezeError.errorcode = -1
-            freeze_result.errors.append(freezeError)
-            self.logger.log(str(e))
 
         if(self.root_seen):
-            self.freeze(mount,freeze_result) 
+            freezeError = self.freeze(self.root_mount)
+            if(freezeError.errorcode != 0):
+                freeze_result.errors.append(freezeError)
         return freeze_result
 
     def unfreezeall(self):
         global unfreeze_done
         self.root_seen = False
         unfreeze_result = FreezeResult()
-        thread_jobs = []
         try:
             commandToExecute="kill $(ps aux | grep \'fsfreeze\' | awk \'{print $2}\')"
             subprocess.call(commandToExecute,shell=True)
@@ -161,23 +151,16 @@ class FsFreezer:
                 self.root_mount = mount
             elif(mount.mount_point):
                 try:
-                    thread = threading.Thread(target=self.unfreeze(mount,unfreeze_result))
-                    thread_jobs.append(thread)
+                    freezeError = self.unfreeze(mount)
+                    if(freezeError.errorcode != 0):
+                        unfreeze_result.errors.append(freezeError)
                 except Exception,e:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
                     unfreeze_result.errors.append(freezeError)
-        try:
-            for job in thread_jobs:
-                job.start()
-            for job in thread_jobs:
-                job.join()
-        except Exception, e:
-            freezeError = FreezeError()
-            freezeError.errorcode = -1
-            unfreeze_result.errors.append(freezeError)
-            self.logger.log(str(e))
         if(self.root_seen):
-            self.unfreeze(mount,unfreeze_result)
+            freezeError = self.unfreeze(self.root_mount)
+            if(freezeError.errorcode != 0):
+                unfreeze_result.errors.append(freezeError)
         return unfreeze_result
