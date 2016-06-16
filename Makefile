@@ -1,4 +1,4 @@
-default: clean build
+default: clean init build
 
 EXTENSIONS = \
  	CustomScript \
@@ -7,9 +7,12 @@ EXTENSIONS = \
 	VMBackup
 
 clean:
-	rm -f build/*.zip
+	rm -rf build
 
-build: $(EXTENSIONS)
+init:
+	@mkdir -p build
+
+build: init $(EXTENSIONS)
 
 $(EXTENSIONS):
 	$(eval NAME    = $(shell grep -Pom1 "(?<=<Type>)[^<]+" $@/manifest.xml))
