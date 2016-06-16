@@ -49,9 +49,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.context.logger.log("Entering patch_boot_system state")
 
-        if not os.path.exists('/boot/luks'):
-            self.command_executor.Execute('mount /boot', True)
-
+        self.command_executor.Execute('mount /boot', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --bind /$i /oldroot/$i; done', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
