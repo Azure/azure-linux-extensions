@@ -45,7 +45,8 @@ class EncryptBlockDeviceState(OSEncryptionState):
             return
 
         self.context.logger.log("Entering encrypt_block_device state")
-
+        
+        self.command_executor.Execute('mount /boot', False)
         self._find_bek_and_execute_action('_dump_passphrase')
         self._find_bek_and_execute_action('_luks_format')
         self._find_bek_and_execute_action('_luks_open')
