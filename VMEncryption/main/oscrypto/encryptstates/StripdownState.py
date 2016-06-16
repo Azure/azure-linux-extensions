@@ -71,8 +71,7 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            relaunch_command = 'sleep 30 && /usr/sbin/waagent -daemon &'
-            # relaunch_command = 'sleep 30 && {0} &'.format(' '.join(sys.argv))
+            relaunch_command = 'sleep 60 && /usr/sbin/waagent -daemon &'
             self.command_executor.ExecuteInBash(relaunch_command, True)
 
             self.context.hutil.do_exit(exit_code=0,
