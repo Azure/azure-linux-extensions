@@ -58,6 +58,7 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
+        self.command_executor.Execute('pkill -f .*waagent', True)
         self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
 
@@ -71,8 +72,7 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            relaunch_command = 'sleep 60 && /usr/sbin/waagent -daemon &'
-            self.command_executor.ExecuteInBash(relaunch_command, True)
+            self.command_executor.ExecuteInBash('sleep 30 && /usr/sbin/waagent -daemon &', True)
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',
