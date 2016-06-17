@@ -82,7 +82,7 @@ class UnmountOldrootState(OSEncryptionState):
         while True:
             self.context.logger.log("Restarting systemd-udevd")
             self.command_executor.Execute('killall -s KILL systemd-udevd', True)
-            self.command_executor('/usr/lib/systemd/systemd-udevd --daemon', True)
+            self.command_executor.Execute('/usr/lib/systemd/systemd-udevd --daemon', True)
 
             sleep(10)
 
