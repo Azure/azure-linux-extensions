@@ -92,8 +92,8 @@ class Snapshotter(object):
         temp_logger=temp_logger + ' snapshot ends..'
         global_logger.put(temp_logger)
         global_error_logger.put(error_logger)
-        if(snapshot_error.errorcode != CommonVariables.success):
-            snapshot_result_error.put(snapshot_error)
+        #if(snapshot_error.errorcode != CommonVariables.success):
+        snapshot_result_error.put(snapshot_error)
 
     def snapshotall(self, paras):
         self.logger.log("doing snapshotall now...")
@@ -117,7 +117,8 @@ class Snapshotter(object):
             if not snapshot_result_error.empty(): 
                 results = [snapshot_result_error.get() for job in mp_jobs]
                 for result in results:
-                    snapshot_result.errors.append(result)
+                    if(result.errorcode != CommonVariables.success):
+                        snapshot_result.errors.append(result)
             return snapshot_result
         else:
             self.logger.log("the blobs are None")
