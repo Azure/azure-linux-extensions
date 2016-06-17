@@ -53,7 +53,25 @@ class PrereqState(OSEncryptionState):
 
         self.context.distro_patcher.install_extras()
 
+        self._patch_waagent()
+        self.command_executor.Execute('systemctl daemon-reload', True)
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
+
+    def _patch_waagent(self):
+        self.context.logger.log("Patching waagent")
+
+        contents = None
+
+        with open('/usr/lib/systemd/system/waagent.service', 'r') as f:
+            contents = f.read()
+
+        contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
+
+        with open('/usr/lib/systemd/system/waagent.service', 'w') as f:
+            f.write(contents)
+
+        self.context.logger.log("waagent patched successfully")
