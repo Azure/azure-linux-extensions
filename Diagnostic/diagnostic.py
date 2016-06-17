@@ -890,7 +890,7 @@ def install_omi():
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
-        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
+        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'", log_cmd=False)
         shouldRestartOmi = True
 
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
