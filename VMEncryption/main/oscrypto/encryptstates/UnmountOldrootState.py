@@ -79,15 +79,15 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
-        self.command_executor.Execute('killall -s KILL systemd-udevd', True)
-
-        sleep(3)
-
-        while self.command_executor.ExecuteInBash('[ -b /dev/sda2 ]', False):
+        while True:
             self.context.logger.log("Restarting systemd-udevd")
             self.command_executor.Execute('killall -s KILL systemd-udevd', True)
             self.command_executor('/usr/lib/systemd/systemd-udevd --daemon', True)
+
             sleep(10)
+
+            if self.command_executor.ExecuteInBash('[ -b /dev/sda2 ]', False) == 0:
+                break
 
         self.command_executor.Execute('xfs_repair /dev/sda2', True)
 
