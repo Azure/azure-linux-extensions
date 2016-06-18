@@ -73,13 +73,6 @@ class OSEncryption(object):
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'perform_umount_oldroot',
-            'source': 'unmount_oldroot',
-            'dest': 'encrypt_block_device',
-            'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
-        },
-        {
             'trigger': 'perform_unmount_oldroot',
             'source': 'unmount_oldroot',
             'dest': 'encrypt_block_device',
