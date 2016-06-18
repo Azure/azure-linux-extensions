@@ -47,8 +47,9 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.context.logger.log("Entering unmount_oldroot state")
 
+        self.command_executor.Execute('swapoff -a', True)
+
         if os.path.exists("/oldroot/mnt/resource"):
-            self.command_executor.Execute('swapoff -a', True)
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 
         proc_comm = ProcessCommunicator()

@@ -22,6 +22,8 @@
 import inspect
 import os
 import sys
+import traceback
+from time import sleep
 
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 maindir = os.path.abspath(os.path.join(scriptdir, '../'))
@@ -143,8 +145,30 @@ class OSEncryption(object):
         self.log_machine_state()
         self.perform_stripdown()
         
-        self.log_machine_state()
-        self.perform_unmount_oldroot()
+        oldroot_unmounted_successfully = False
+        attempt = 1
+
+        while not oldroot_unmounted_successfully:
+            self.logger.log("Attempt #{0} to unmount /oldroot".format(attempt))
+
+            try:
+                self.log_machine_state()
+                self.perform_unmount_oldroot()
+            except Exception as e:
+                message = "Attempt #{0} to unmount /oldroot failed with error: {1}, stack trace: {2}".format(attempt,
+                                                                                                             e,
+                                                                                                             traceback.format_exc())
+                logger.log(msg=message)
+                hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                                       status=CommonVariables.extension_error_status,
+                                       status_code=str(CommonVariables.unmount_oldroot_error),
+                                       message=message)
+
+                sleep(10)
+            else:
+                oldroot_unmounted_successfully = True
+            finally:
+                attempt += 1
         
         self.log_machine_state()
         self.perform_patch_boot_system()
