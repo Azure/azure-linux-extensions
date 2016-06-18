@@ -49,47 +49,47 @@ class OSEncryption(object):
 
     transitions = [
         {
-            'trigger': 'start_machine',
+            'trigger': 'enter_prereq',
             'source': 'uninitialized',
             'dest': 'prereq'
         },
         {
-            'trigger': 'perform_prereq',
+            'trigger': 'enter_selinux',
             'source': 'prereq',
             'dest': 'selinux',
             'before': 'on_enter_state',
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'perform_selinux',
+            'trigger': 'enter_stripdown',
             'source': 'selinux',
             'dest': 'stripdown',
             'before': 'on_enter_state',
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'perform_stripdown',
+            'trigger': 'enter_unmount_oldroot',
             'source': 'stripdown',
             'dest': 'unmount_oldroot',
             'before': 'on_enter_state',
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'perform_unmount_oldroot',
+            'trigger': 'enter_encrypt_block_device',
             'source': 'unmount_oldroot',
             'dest': 'encrypt_block_device',
             'before': 'on_enter_state',
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'perform_patch_boot_system',
+            'trigger': 'enter_patch_boot_system',
             'source': 'encrypt_block_device',
             'dest': 'patch_boot_system',
             'before': 'on_enter_state',
             'conditions': 'should_exit_state'
         },
         {
-            'trigger': 'report_success',
+            'trigger': 'stop_machine',
             'source': 'patch_boot_system',
             'dest': 'completed',
             'conditions': 'should_exit_state'
@@ -134,13 +134,15 @@ class OSEncryption(object):
 
     def start_encryption(self):
         self.log_machine_state()
-        self.start_machine()
-        
+
+        self.enter_prereq()
         self.log_machine_state()
-        self.perform_prereq()
-        
+
+        self.enter_selinux()
         self.log_machine_state()
-        self.perform_selinux()
+
+        self.enter_stripdown()
+        self.log_machine_state()
         
         oldroot_unmounted_successfully = False
         attempt = 1
@@ -149,8 +151,8 @@ class OSEncryption(object):
             self.logger.log("Attempt #{0} to unmount /oldroot".format(attempt))
 
             try:
+                self.self.enter_unmount_oldroot()
                 self.log_machine_state()
-                self.self.perform_stripdown()
             except Exception as e:
                 message = "Attempt #{0} to unmount /oldroot failed with error: {1}, stack trace: {2}".format(attempt,
                                                                                                              e,
@@ -167,11 +169,11 @@ class OSEncryption(object):
             finally:
                 attempt += 1
         
+        self.enter_encrypt_block_device()
         self.log_machine_state()
-        self.perform_unmount_oldroot()
 
+        self.enter_patch_boot_system()
         self.log_machine_state()
-        self.perform_patch_boot_system()
         
+        self.stop_machine()
         self.log_machine_state()
-        self.report_success()
