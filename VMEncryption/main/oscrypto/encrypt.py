@@ -142,9 +142,6 @@ class OSEncryption(object):
         self.log_machine_state()
         self.perform_selinux()
         
-        self.log_machine_state()
-        self.perform_stripdown()
-        
         oldroot_unmounted_successfully = False
         attempt = 1
 
@@ -153,7 +150,7 @@ class OSEncryption(object):
 
             try:
                 self.log_machine_state()
-                self.perform_unmount_oldroot()
+                self.self.perform_stripdown()
             except Exception as e:
                 message = "Attempt #{0} to unmount /oldroot failed with error: {1}, stack trace: {2}".format(attempt,
                                                                                                              e,
@@ -170,6 +167,9 @@ class OSEncryption(object):
             finally:
                 attempt += 1
         
+        self.log_machine_state()
+        self.perform_unmount_oldroot()
+
         self.log_machine_state()
         self.perform_patch_boot_system()
         
