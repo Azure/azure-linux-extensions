@@ -58,48 +58,55 @@ class OSEncryption(object):
             'source': 'prereq',
             'dest': 'selinux',
             'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
         },
         {
             'trigger': 'enter_stripdown',
             'source': 'selinux',
             'dest': 'stripdown',
             'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
         },
         {
             'trigger': 'enter_unmount_oldroot',
             'source': 'stripdown',
             'dest': 'unmount_oldroot',
             'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
+        },
+        {
+            'trigger': 'retry_unmount_oldroot',
+            'source': 'unmount_oldroot',
+            'dest': 'unmount_oldroot',
+            'before': 'on_enter_state'
         },
         {
             'trigger': 'enter_encrypt_block_device',
             'source': 'unmount_oldroot',
             'dest': 'encrypt_block_device',
             'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
         },
         {
             'trigger': 'enter_patch_boot_system',
             'source': 'encrypt_block_device',
             'dest': 'patch_boot_system',
             'before': 'on_enter_state',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
         },
         {
             'trigger': 'stop_machine',
             'source': 'patch_boot_system',
             'dest': 'completed',
-            'conditions': 'should_exit_state'
+            'conditions': 'should_exit_previous_state'
         },
     ]
 
     def on_enter_state(self):
         self.state_objs[self.state].enter()
 
-    def should_exit_state(self):
+    def should_exit_previous_state(self):
+        # when this is called, self.state is still the "source" state in the transition
         return self.state_objs[self.state].should_exit()
 
     def __init__(self, hutil, distro_patcher, logger, encryption_environment):
@@ -151,17 +158,21 @@ class OSEncryption(object):
             self.logger.log("Attempt #{0} to unmount /oldroot".format(attempt))
 
             try:
-                self.self.enter_unmount_oldroot()
+                if attempt == 1:
+                    self.enter_unmount_oldroot()
+                else:
+                    self.retry_unmount_oldroot()
+
                 self.log_machine_state()
             except Exception as e:
                 message = "Attempt #{0} to unmount /oldroot failed with error: {1}, stack trace: {2}".format(attempt,
                                                                                                              e,
                                                                                                              traceback.format_exc())
-                logger.log(msg=message)
-                hutil.do_status_report(operation='EnableEncryptionOSVolume',
-                                       status=CommonVariables.extension_error_status,
-                                       status_code=str(CommonVariables.unmount_oldroot_error),
-                                       message=message)
+                self.logger.log(msg=message)
+                self.hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                                            status=CommonVariables.extension_error_status,
+                                            status_code=str(CommonVariables.unmount_oldroot_error),
+                                            message=message)
 
                 sleep(10)
             else:

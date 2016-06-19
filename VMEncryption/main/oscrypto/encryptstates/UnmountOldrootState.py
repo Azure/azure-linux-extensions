@@ -47,6 +47,9 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.context.logger.log("Entering unmount_oldroot state")
 
+        self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
+        self.command_executor.ExecuteInBash('/usr/sbin/sshd', True)
+
         self.command_executor.Execute('swapoff -a', True)
 
         if os.path.exists("/oldroot/mnt/resource"):
@@ -68,9 +71,6 @@ class UnmountOldrootState(OSEncryptionState):
                 self.context.logger.log("Skipping suicide")
                 continue
             self.command_executor.Execute('kill -9 {0}'.format(victim))
-
-        self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('/usr/sbin/sshd', True)
 
         self.command_executor.Execute('telinit u', True)
 
