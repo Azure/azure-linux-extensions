@@ -65,7 +65,7 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.Execute('rmdir /oldroot/memroot', True)
             self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done', True)
             self.command_executor.Execute('umount /boot', True)
-            self.command_executor.Execute('umount /oldroot', True)
+            self.command_executor.Execute('umount /oldroot')
 
             self.context.logger.log("Pivoted back into memroot successfully")
 
