@@ -20,6 +20,7 @@
 #
 
 import os
+import re
 import sys
 
 from time import sleep
@@ -48,7 +49,25 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('/usr/sbin/sshd', True)
+        self.command_executor.ExecuteInBash('systemctl restart sshd.service', True)
+        
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(command_to_execute="systemctl list-units",
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+
+        for line in proc_comm.stdout.split('\n'):
+            if not "running" in line:
+                continue
+
+            if "waagent.service" in line:
+                continue
+
+            match = re.search(r'\s(\S*?\.service)', line)
+            if match:
+                service = match.groups()[0]
+                self.context.logger.log("Restarting {0}".format(service))
+                self.command_executor.Execute('systemctl restart {0}'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
