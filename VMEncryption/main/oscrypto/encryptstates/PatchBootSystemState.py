@@ -63,8 +63,12 @@ class PatchBootSystemState(OSEncryptionState):
         finally:
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
             self.command_executor.Execute('rmdir /oldroot/memroot', True)
-            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done', True)
-            self.command_executor.Execute('umount /boot', True)
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
+            self.command_executor.Execute('cp -ax' +
+                                          ' /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinuxTest' +
+                                          ' /oldroot/var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinuxTest.Stripdown',
+                                          True)
+            self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
 
             self.context.logger.log("Pivoted back into memroot successfully")
