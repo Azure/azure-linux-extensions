@@ -41,6 +41,6 @@ class BackupLogger(object):
         try:
             with open('/dev/console', 'w') as f:
                 msg = filter(lambda c: c in string.printable, msg)
-                f.write(msg.encode('ascii', 'ignore') + '\n')
+                f.write('[AzureDiskEncryption] ' + msg.encode('ascii', 'ignore') + '\n')
         except IOError as e:
             pass
