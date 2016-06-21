@@ -13,6 +13,7 @@
 	[string] $Password,
 	[string] $ExtensionName="AzureDiskEncryptionForLinux",
 	[string] $SshPubKey,
+    [string] $SshPrivKeyPath,
     [string] $Location="eastus",
     [string] $VolumeType="data"
 )
@@ -144,6 +145,60 @@ Write-Host "Added DataDisks successfully: $DataDisk1Name, $DataDisk2Name"
 Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
 
 Write-Host "Updated VM successfully"
+
+## SSH preparation
+
+if ($SshPrivKeyPath)
+{
+    $hostname = $PublicIp.DnsSettings.Fqdn.ToString()
+
+    $commands = @"
+sudo mkdir /root/.ssh
+sudo cp .ssh/authorized_keys /root/.ssh/
+exit
+"@
+
+    $commands | Out-File -Encoding ascii commands.txt
+    dos2unix commands.txt
+    cmd /c "ssh -tt -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath ${Username}@${hostname} <commands.txt"
+    Remove-Item commands.txt
+
+    Write-Host "Copied SSH public key for root"
+
+    $commands = @"
+parted /dev/sdc
+mklabel msdos
+mkpart pri ext2 0% 100%
+quit
+
+parted /dev/sdd
+mklabel msdos
+mkpart pri ext2 0% 100%
+quit
+
+mkfs.ext4 /dev/sdc1
+mkfs.ext4 /dev/sdd1
+
+UUID1="`$(blkid -s UUID -o value /dev/sdc1)"
+UUID2="`$(blkid -s UUID -o value /dev/sdd1)"
+
+echo "UUID=`$UUID1 /data1 ext4 defaults 0 0" >>/etc/fstab
+echo "UUID=`$UUID2 /data2 ext4 defaults 0 0" >>/etc/fstab
+
+mkdir /data1
+mkdir /data2
+
+mount -a
+exit
+"@
+
+    $commands | Out-File -Encoding ascii commands.txt
+    dos2unix commands.txt
+    cmd /c "ssh -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${hostname} <commands.txt"
+    Remove-Item commands.txt
+
+    Write-Host "Mounted data partitions"
+}
 
 ## Encryption
 
