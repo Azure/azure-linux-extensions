@@ -64,9 +64,11 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
             self.command_executor.Execute('rmdir /oldroot/memroot', True)
             self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
+
+            extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
             self.command_executor.Execute('cp -ax' +
-                                          ' /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinuxTest' +
-                                          ' /oldroot/var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinuxTest.Stripdown',
+                                          ' /var/log/azure/{0}'.format(extension_full_name) +
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
                                           True)
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
