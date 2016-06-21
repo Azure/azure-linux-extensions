@@ -60,14 +60,13 @@ class UnmountOldrootState(OSEncryptionState):
             if not "running" in line:
                 continue
 
-            if "waagent.service" in line:
+            if "waagent.service" in line or "sshd.service" in line:
                 continue
 
             match = re.search(r'\s(\S*?\.service)', line)
             if match:
                 service = match.groups()[0]
-                self.context.logger.log("Restarting {0}".format(service))
-                self.command_executor.Execute('systemctl restart {0}'.format(service))
+                self.command_executor.Execute('systemctl stop {0}'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
