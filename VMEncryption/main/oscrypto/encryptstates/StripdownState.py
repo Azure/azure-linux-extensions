@@ -36,7 +36,7 @@ class StripdownState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for stripdown state")
 
-        self.command_executor.ExecuteInBash('! [ -e "/tmp/tmproot" ]', True)
+        self.command_executor.Execute('rm -rf /tmp/tmproot', True)
         self.command_executor.ExecuteInBash('! [ -e "/oldroot" ]', True)
 
         return True
