@@ -42,7 +42,7 @@ import Utils.ApplicationInsightsUtil as AIUtil
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
 ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
-ExtensionVersion = '2.3.9002'   # Must be updated on each new release! Improve this!
+ExtensionVersion = '2.3.9002.2'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
@@ -72,7 +72,7 @@ rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-1.6.2-269.universal.x64.sh'
+omi_universal_pkg_name = 'scx-1.6.2-241.universal.x64.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
