@@ -150,7 +150,7 @@ Write-Host "Updated VM successfully"
 
 if ($SshPrivKeyPath)
 {
-    $hostname = $PublicIp.DnsSettings.Fqdn.ToString()
+    $global:Hostname = $PublicIp.DnsSettings.Fqdn.ToString()
 
     $commands = @"
 sudo mkdir /root/.ssh
@@ -160,7 +160,7 @@ exit
 
     $commands | Out-File -Encoding ascii commands.txt
     dos2unix commands.txt
-    cmd /c "ssh -tt -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath ${Username}@${hostname} <commands.txt"
+    cmd /c "ssh -tt -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath ${Username}@${Hostname} <commands.txt"
     Remove-Item commands.txt
 
     Write-Host "Copied SSH public key for root"
@@ -194,7 +194,7 @@ exit
 
     $commands | Out-File -Encoding ascii commands.txt
     dos2unix commands.txt
-    cmd /c "ssh -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${hostname} <commands.txt"
+    cmd /c "ssh -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <commands.txt"
     Remove-Item commands.txt
 
     Write-Host "Mounted data partitions"
