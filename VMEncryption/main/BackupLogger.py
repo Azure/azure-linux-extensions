@@ -24,6 +24,7 @@ import traceback
 import urlparse
 import httplib
 import os
+import string
 
 class BackupLogger(object):
     def __init__(self, hutil):
@@ -34,3 +35,12 @@ class BackupLogger(object):
     def log(self, msg, level='Info'):
         log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
         self.hutil.log(log_msg)
+        self.log_to_console(log_msg)
+ 
+    def log_to_console(self, msg):
+        try:
+            with open('/dev/console', 'w') as f:
+                msg = filter(lambda c: c in string.printable, msg)
+                f.write(msg.encode('ascii', 'ignore') + '\n')
+        except IOError as e:
+            pass
