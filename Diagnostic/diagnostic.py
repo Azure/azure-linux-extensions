@@ -753,7 +753,7 @@ def start_mdsd():
                         log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
                         hutil.error(log_msg)
                         # Also log this issue on syslog as well
-                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.openlog('diagnostic.py', syslog.LOG_PID, syslog.LOG_DAEMON)  # syslog.openlog(ident, logoption, facility) -- not taking kw args in Python 2.6
                         syslog.syslog(syslog.LOG_ALERT, log_msg)    # syslog.syslog(priority, message) -- not taking kw args
                         syslog.closelog()
 
