@@ -54,7 +54,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.context.hutil.do_status_report(operation='EnableEncryptionDataVolumes',
                                             status=CommonVariables.extension_success_status,
                                             status_code=str(CommonVariables.success),
-                                            message='Starting dd copy for OS disk')
+                                            message='OS disk encryption started')
 
         self.command_executor.Execute('dd if=/dev/sda2 of=/dev/mapper/osencrypt bs=52428800', True)
 
