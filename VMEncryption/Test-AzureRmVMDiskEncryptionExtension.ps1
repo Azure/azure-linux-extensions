@@ -160,7 +160,7 @@ exit
 
     $commands | Out-File -Encoding ascii commands.txt
     dos2unix commands.txt
-    cmd /c "ssh -tt -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath ${Username}@${Hostname} <commands.txt"
+    cmd /c "ssh -tt -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath ${Username}@${Hostname} <commands.txt"
     Remove-Item commands.txt
 
     Write-Host "Copied SSH public key for root"
@@ -194,7 +194,7 @@ exit
 
     $commands | Out-File -Encoding ascii commands.txt
     dos2unix commands.txt
-    cmd /c "ssh -o UserKnownHostsFile=NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <commands.txt"
+    cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <commands.txt"
     Remove-Item commands.txt
 
     Write-Host "Mounted data partitions"
