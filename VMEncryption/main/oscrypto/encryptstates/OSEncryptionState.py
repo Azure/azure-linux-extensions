@@ -55,7 +55,7 @@ class OSEncryptionState(object):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
 
         if self.state_executed:
-            self.logger.log("State {0} has already executed, not entering".format(self.state_name))
+            self.context.logger.log("State {0} has already executed, not entering".format(self.state_name))
             return False
 
         if not os.path.exists(self.state_marker):
