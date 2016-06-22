@@ -88,6 +88,11 @@ class UnmountOldrootState(OSEncryptionState):
             if int(victim) == os.getpid():
                 self.context.logger.log("Skipping suicide")
                 continue
+
+            if int(victim) == 1:
+                self.context.logger.log("Skipping init")
+                continue
+
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         self.command_executor.Execute('telinit u', True)
