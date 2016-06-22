@@ -52,7 +52,7 @@ class StripdownState(OSEncryptionState):
         self.command_executor.Execute('mount -t tmpfs none /tmp/tmproot', True)
         self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot boot; do mkdir /tmp/tmproot/$i; done', True)
         self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
-        self.command_executor.ExecuteInBash('for i in bin sbin lib lib64; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
+        self.command_executor.ExecuteInBash('for i in bin sbin lib lib64 share; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
         self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
         self.command_executor.ExecuteInBash('mkdir /tmp/tmproot/var/log', True)
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
