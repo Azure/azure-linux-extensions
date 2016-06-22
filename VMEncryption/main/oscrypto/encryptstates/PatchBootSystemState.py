@@ -51,19 +51,22 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.Execute('mount /boot', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
-        self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --bind /$i /oldroot/$i; done', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('mkdir /oldroot/memroot', True)
         self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
+
+        self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /memroot/$i /$i; done', True)
+        self.command_executor.ExecuteInBash('[ -e "/boot/luks" ]', True)
 
         try:
             self._modify_pivoted_oldroot()
         except Exception as e:
             raise
         finally:
-            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot', True)
-            self.command_executor.Execute('rmdir /oldroot/memroot', True)
-            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do umount /oldroot/$i; done', True)
+            self.command_executor.Execute('mount --make-rprivate /')
+            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
+            self.command_executor.Execute('rmdir /oldroot/memroot')
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
 
             extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
             self.command_executor.Execute('cp -ax' +
