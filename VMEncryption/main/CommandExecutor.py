@@ -46,12 +46,15 @@ class CommandExecutor(object):
         if isinstance(communicator, ProcessCommunicator):
             communicator.stdout, communicator.stderr = stdout, stderr
 
-        if raise_exception_on_failure and int(return_code) != 0:
+        if int(return_code) != 0:
             msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
             msg += "\nstdout:\n" + stdout
             msg += "\nstderr:\n" + stderr
 
-            raise Exception(msg)
+            self.logger.log(msg)
+
+            if raise_exception_on_failure:
+                raise Exception(msg)
 
         return return_code
     
