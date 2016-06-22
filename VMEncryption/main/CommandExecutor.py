@@ -41,13 +41,17 @@ class CommandExecutor(object):
         args = shlex.split(command_to_execute)
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
         return_code = proc.wait()
+        stdout, stderr = proc.communicate()
 
         if isinstance(communicator, ProcessCommunicator):
-            communicator.stdout, communicator.stderr = proc.communicate()
+            communicator.stdout, communicator.stderr = stdout, stderr
 
         if raise_exception_on_failure and int(return_code) != 0:
-            raise Exception("Command {0} failed with return code {1}".format(command_to_execute,
-                                                                             return_code))
+            msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
+            msg += "\nstdout:\n" + stdout
+            msg += "\nstderr:\n" + stderr
+
+            raise Exception(msg)
 
         return return_code
     
