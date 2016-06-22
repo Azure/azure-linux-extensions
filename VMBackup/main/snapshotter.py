@@ -92,7 +92,6 @@ class Snapshotter(object):
         temp_logger=temp_logger + ' snapshot ends..'
         global_logger.put(temp_logger)
         global_error_logger.put(error_logger)
-        #if(snapshot_error.errorcode != CommonVariables.success):
         snapshot_result_error.put(snapshot_error)
 
     def snapshotall(self, paras):
