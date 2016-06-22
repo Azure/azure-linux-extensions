@@ -40,8 +40,6 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('umount /oldroot', True)
-        self.command_executor.Execute('mount /boot', True)
-        self.command_executor.Execute('umount /boot', True)
                 
         return True
 
