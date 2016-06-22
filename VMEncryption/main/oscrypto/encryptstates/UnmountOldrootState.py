@@ -66,7 +66,7 @@ class UnmountOldrootState(OSEncryptionState):
             match = re.search(r'\s(\S*?\.service)', line)
             if match:
                 service = match.groups()[0]
-                self.command_executor.Execute('systemctl stop {0}'.format(service))
+                self.command_executor.Execute('systemctl restart {0}'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
