@@ -42,7 +42,7 @@ import Utils.ApplicationInsightsUtil as AIUtil
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
 ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
-ExtensionVersion = '2.3.9002.2'   # Must be updated on each new release! Improve this!
+ExtensionVersion = '2.3.9003'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
