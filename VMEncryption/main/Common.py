@@ -21,9 +21,9 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999105'
+    extension_version = '0.1.0.999116'
     extension_type = extension_name
-    extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
+    extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
     extension_description = extension_label
 
@@ -38,6 +38,7 @@ class CommonVariables:
     default_file_system = 'ext4'
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
+    disk_by_id_root = '/dev/disk/by-id'
     BekVolumeFileSystem = 'vfat'
 
     """
@@ -172,6 +173,10 @@ class CryptItem(object):
         self.mount_point = None
         self.file_system = None
         self.luks_header_path = None
+        self.uses_cleartext_key = None
         
     def __str__(self):
-        return "name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) + " mount_point:" + str(self.mount_point) + " file_system:" + str(self.file_system) + " luks_header_path:" + str(self.luks_header_path)
+        return ("name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) +
+                " mount_point:" + str(self.mount_point) + " file_system:" + str(self.file_system) +
+                " luks_header_path:" + str(self.luks_header_path) +
+                " uses_cleartext_key:" + str(self.uses_cleartext_key))

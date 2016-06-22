@@ -2,7 +2,7 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension v.2.3.7
+# Linux Azure Diagnostic Extension (see below for version)
 # Copyright (c) Microsoft Corporation
 # All rights reserved.   
 # MIT License  
@@ -16,6 +16,8 @@ import socket
 import array
 import base64
 import os
+import signal
+import syslog
 import os.path
 import re
 import string
@@ -39,13 +41,16 @@ import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
+ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
+ExtensionVersion = '2.3.9001'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
+MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("%s started to handle." %(ExtensionShortName))
-hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
 hutil.try_parse_context()
 public_settings = hutil.get_public_settings()
 private_settings = hutil.get_protected_settings()
@@ -55,10 +60,12 @@ if not private_settings:
     private_settings = {}
 
 
-def LogRunGetOutPut(cmd):
-    hutil.log("RunCmd "+cmd)
+def LogRunGetOutPut(cmd, should_log=True):
+    if should_log:
+        hutil.log("RunCmd "+cmd)
     error, msg = waagent.RunGetOutput(cmd)
-    hutil.log("Return "+str(error)+":"+msg)
+    if should_log:
+        hutil.log("Return "+str(error)+":"+msg)
     return error, msg
 
 rsyslog_ommodule_for_check = 'omprog.so'
@@ -69,21 +76,21 @@ omi_universal_pkg_name = 'scx-installer.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
+DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
                 "restartrsyslog":"service rsyslog restart",
-                'distrolibs':'debian/*','checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"'
+                'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
+                'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
                 }
 
-RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade --force;",
-                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi','distrolibs':'redhat',
-                 "packages":('tar','policycoreutils-python'),
-                 'distrolibs':'centos/*',
+RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
+                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
+                 "packages":('policycoreutils-python',),  # This is needed for /usr/sbin/semanage on Redhat.
                  "restartrsyslog":"service rsyslog restart",
-                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"'
+                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
+                 'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
                  }
-
 
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
@@ -95,32 +102,34 @@ UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
 SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
 SuseConfig11 = dict(RedhatConfig.items()+
-                  {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
+                  {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ',
                    "packages":('rsyslog',),
-                   'distrolibs' : 'suse11/*',
-                   'distrolibs_prep_cmds' :
+                   'restartrsyslog':"""\
+if [ ! -f /etc/sysconfig/syslog.org_lad ]; then cp /etc/sysconfig/syslog /etc/sysconfig/syslog.org_lad; fi;
+sed -i 's/SYSLOG_DAEMON="syslog-ng"/SYSLOG_DAEMON="rsyslogd"/g' /etc/sysconfig/syslog;
+service syslog restart""",
+                   'mdsd_prep_cmds' :
                         (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
                          r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
                         ),
-                   'mdsd_env_vars' : { "SSL_CERT_FILE" : SUSE11_MDSD_SSL_CERTS_FILE }
+                   'mdsd_env_vars': {"SSL_CERT_FILE": SUSE11_MDSD_SSL_CERTS_FILE}
                   }.items())
 
 SuseConfig12 = dict(RedhatConfig.items()+
                   {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
                    "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
-                   'distrolibs' : 'suse11/*',
-                   'distrolibs_prep_cmds' : (r'\rm -f suse11/libcrypto.so.* suse11/libssl.so.*',) # Should remove bundled OpenSSL libs on SUSE 12 (Use system-installed OpenSSL libs)
+                   'mdsd_env_vars': {"SSL_CERT_DIR": "/var/lib/ca-certificates/openssl", "SSL_CERT_FILE": "/etc/ssl/cert.pem"}
                   }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
                     {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)}
-                  .items())
+                     "packages":('policycoreutils-python',)
+                    }.items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig, 'debian:7.9': None, # Debian 7 (7.9) can't be supported due to low GLIBC ver. on it (GLIBC_2.14 required)
+All_Dist= {'debian':DebianConfig,
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
@@ -159,26 +168,26 @@ def getChildNode(p,tag):
            return node
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
     hutil.try_parse_context()
     return
 
 
-def setup(local_only):
+def setup(should_install_required_package):
     global EnableSyslog
 
-    if not local_only:
-        install_package_error=""
+    if should_install_required_package:
+        install_package_error = ""
         retry = 3
-        while retry >0:
-            error,msg = install_required_package()
+        while retry > 0:
+            error, msg = install_required_package()
             hutil.log(msg)
-            if error ==0:
+            if error == 0:
                 break
             else:
-                retry-=1
+                retry -= 1
                 hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error=msg
+                install_package_error = msg
                 time.sleep(60)
         if install_package_error:
             if len(install_package_error) > 1024:
@@ -188,21 +197,18 @@ def setup(local_only):
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
-        if error !=0:
+        if error != 0:
             hutil.error(msg)
+            return 3, msg
 
-    # copy distrolibs
-    if not os.path.isdir(MdsdFolder):
-        # Run prep commands
-        if 'distrolibs_prep_cmds' in distConfig:
-            for cmd in distConfig['distrolibs_prep_cmds']:
-                RunGetOutput(cmd)
-        libs = distConfig['distrolibs']
-        if len(libs) > 0:
-            RunGetOutput('mkdir -p {0}'.format(MdsdFolder))
-            RunGetOutput('\cp -f {0} {1}'.format(libs, MdsdFolder))
+    # Run prep commands
+    if 'mdsd_prep_cmds' in distConfig:
+        for cmd in distConfig['mdsd_prep_cmds']:
+            RunGetOutput(cmd)
 
-    install_omi()
+    omi_err, omi_msg = install_omi()
+    if omi_err is not 0:
+        return 4, omi_msg
 
     return 0, 'success'
 
@@ -294,7 +300,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement,["omitag","perf"])
+        XmlUtil.addElement(tree,'Events/OMI',perfElement)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
@@ -476,7 +482,8 @@ def main(command):
     #Global Variables definition
 
     global EnableSyslog, UseService
-    if readPublicConfig('EnableSyslog').lower() == 'false':
+    if readPublicConfig('enableSyslog').lower() == 'false' or readPublicConfig('EnableSyslog').lower() == 'false':
+        # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
         EnableSyslog = False
     else:
         EnableSyslog = True
@@ -565,9 +572,16 @@ def main(command):
                       'Enable failed:{0}'.format(e))
 
 
+def update_selinux_port_setting_for_rsyslogomazuremds(action, port):
+    # This is needed for Redhat-based distros.
+    # 'action' param should be '-a' for adding and '-d' for deleting.
+    # Caller is responsible to make sure a correct action param is passed.
+    if os.path.exists("/usr/sbin/semanage"):
+        RunGetOutput('semanage port {0} -t syslogd_port_t -p tcp {1};echo ignore already added or not found'.format(action, port))
+
 
 def start_daemon():
-    args = ['python',StartDaemonFilePath, "-daemon"]
+    args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
     hutil.log('start daemon '+str(args))
     child = subprocess.Popen(args, stdout=log, stderr=log)
@@ -577,6 +591,7 @@ def start_daemon():
         wait_n=wait_n-1
     if wait_n <=0:
         hutil.error("wait daemon start time out")
+
 
 def start_mdsd():
     global EnableSyslog
@@ -593,9 +608,6 @@ def start_mdsd():
     # sometimes after the mdsd is killed port 29131 is accopied by sryslog, don't know why
     #    RunGetOutput(distConfig["restartrsyslog"])
 
-    if os.path.exists("/usr/sbin/semanage"):
-        RunGetOutput('semanage port -a -t syslogd_port_t -p tcp 29131;echo ignore already added')
-
     log_dir = hutil.get_log_dir()
     monitor_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
@@ -603,6 +615,8 @@ def start_mdsd():
 
 
     default_port = RSYSLOG_OM_PORT
+    update_selinux_port_setting_for_rsyslogomazuremds('-a', default_port)
+
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
     copy_env = os.environ
@@ -627,11 +641,12 @@ def start_mdsd():
             hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
             copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file =  os.path.join(WorkDir, './xmlCfg.xml')
-    command = '{0} -c {1} -p {2} -e {3} -w {4} -o {5}'.format(
+    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
+    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
+        MDSDPidPortFile,
         monitor_file_path,
         warn_file_path,
         info_file_path).split(" ")
@@ -639,7 +654,9 @@ def start_mdsd():
     try:
         for restart in range(0,3):
 
-            mdsd_log = open (mdsd_log_path,"w")
+            RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
+            mdsd_pid_port_file_checked = False
+            mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
                                      cwd=WorkDir,
@@ -653,20 +670,74 @@ def start_mdsd():
                 pidfile.close()
 
             last_error_time = datetime.datetime.now()
+            omi_installed = True
+            omicli_path = "/opt/omi/bin/omicli"
+            omicli_noop_query_cmd = omicli_path + " noop"
+            # Continuously monitors mdsd process
             while True:
                 time.sleep(30)
-                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) <0 and len(get_mdsd_process()) >=2:
+                if " ".join(get_mdsd_process()).find(str(mdsd.pid)) < 0 and len(get_mdsd_process()) >= 2:
                     mdsd.kill()
                     hutil.log("Another process is started, now exit")
                     return
-                if not (mdsd.poll() is None):
+                if mdsd.poll() is not None:     # if mdsd has terminated
                     time.sleep(60)
                     mdsd_log.flush()
                     break
+
+                # mdsd is now up for at least 30 seconds.
+
+                # Issue #137 Can't start mdsd if port 29131 is in use.
+                # mdsd now binds to another randomly available port,
+                # and LAD still needs to reconfigure rsyslogd.
+                if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
+                    with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
+                        new_port = mdsd_pid_port_file.readline()    # This is actually PID, so ignore.
+                        new_port = mdsd_pid_port_file.readline().strip()    # .strip() is important!
+                        if default_port != new_port:
+                            hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
+                            reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port)
+                        mdsd_pid_port_file_checked = True
+
+                # Issue #128 LAD should restart OMI if it crashes
+                omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
+                omi_installed = os.path.isfile(omicli_path)
+
+                if omi_was_installed and not omi_installed:
+                    hutil.log("OMI is uninstalled. This must have been intentional and externally done. Will no longer check if OMI is up and running.")
+
+                omi_reinstalled = not omi_was_installed and omi_installed
+                if omi_reinstalled:
+                    hutil.log("OMI is reinstalled. Will resume checking if OMI is up and running.")
+
+                should_restart_omi = False
+                if omi_installed:
+                    cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+                    should_restart_omi = cmd_exit_status is not 0
+                    if should_restart_omi:
+                        hutil.error("OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
+                        omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
+                        hutil.log("OMI restart result: " + omi_restart_msg)
+                        time.sleep(5)
+
+                should_signal_mdsd = should_restart_omi or omi_reinstalled
+                if should_signal_mdsd:
+                    omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
+                    if omi_up_and_running:
+                        mdsd.send_signal(signal.SIGHUP)
+                        hutil.log("SIGHUP sent to mdsd")
+                    else:   # OMI restarted but not staying up...
+                        log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
+                        hutil.error(log_msg)
+                        # Also log this issue on syslog as well
+                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.syslog(syslog.LOG_ALERT, log_msg)    # syslog.syslog(priority, message) -- not taking kw args
+                        syslog.closelog()
+
                 if not os.path.exists(monitor_file_path):
                     continue
                 monitor_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(monitor_file_path))), "%a %b %d %H:%M:%S %Y")
-                if last_error_time >=  monitor_file_ctime:
+                if last_error_time >= monitor_file_ctime:
                     continue
                 last_error_time = monitor_file_ctime
                 last_error = tail(monitor_file_path)
@@ -674,20 +745,26 @@ def start_mdsd():
                     hutil.log("Error in MDSD:"+last_error)
                     hutil.do_status_report("Enable","success",'1',"message in /var/log/mdsd.err:"+str(last_error_time)+":"+last_error)
 
+            # mdsd terminated.
             if mdsd_log:
                 mdsd_log.close()
                 mdsd_log = None
 
-            error = "MDSD crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
+            error = "MDSD("+ExtensionVersion+") crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
+
             try:
                 waagent.AddExtensionEvent(name=hutil.get_name(),
                                 op=waagent.WALAEventOperation.Enable,
                                 isSuccess=False,
-                                      message=error)
+                                message=error)
             except Exception:
                 pass
 
+            # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
+            install_rsyslogom()
+
+        # mdsd all 3 restarts exhausted
         hutil.do_status_report("Enable","error",'1',"mdsd stopped:"+error)
 
     except Exception,e:
@@ -700,20 +777,41 @@ def start_mdsd():
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=False,
-                                  message="MDSD Crash2:"+str(e))
+                                  message="MDSD("+ExtensionVersion+") Crash2:"+str(e))
     finally:
         if mdsd_log:
             mdsd_log.close()
 
 
 def stop_mdsd():
-    pid_to_kill = " ".join(get_mdsd_process())
-    if len(pid_to_kill)>0:
-        hutil.log("kill -9 "+pid_to_kill)
-        RunGetOutput("kill -9 "+pid_to_kill)
-    #left the pid file won't do bad
-    #RunGetOutput("rm "+MDSDPidFile)
-    return 0,"stopped"
+    pids = get_mdsd_process()
+    if not pids:
+        return 0, "Already stopped"
+
+    kill_cmd = "kill " + " ".join(pids)
+    hutil.log(kill_cmd)
+    RunGetOutput(kill_cmd)
+
+    terminated = False
+    num_checked = 0
+    while not terminated and num_checked < 10:
+        time.sleep(2)
+        num_checked += 1
+        pids = get_mdsd_process()
+        if not pids:
+            hutil.log("stop_mdsd(): All processes successfully terminated")
+            terminated = True
+        else:
+            hutil.log("stop_mdsd() terminate check #{0}: Processes not terminated yet, rechecking in 2 seconds".format(num_checked))
+
+    if not terminated:
+        kill_cmd = "kill -9 " + " ".join(get_mdsd_process())
+        hutil.log("stop_mdsd(): Processes not terminated in 20 seconds. Sending SIGKILL (" + kill_cmd + ")")
+        RunGetOutput(kill_cmd)
+
+    RunGetOutput("rm "+MDSDPidFile)
+
+    return 0, "Terminated" if terminated else "SIGKILLed"
 
 
 def get_mdsd_process():
@@ -757,22 +855,51 @@ def install_omi():
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
-        RunGetOutput(distConfig["installomi"])
+        isOmiInstalledSuccessfully = False
+        maxTries = 5      # Try up to 5 times to install OMI
+        for trialNum in range(1, maxTries+1):
+            isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
+            if isOmiInstalledSuccessfully:
+                isOmiRunning = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+                if isOmiRunning:
+                    break
+                # OMI installed successfully, but omiserver is not running.
+                # Dump diag info and retry
+                hutil.error("OMI installed successfully, but omiserver is not running. Dumping some diag info.")
+                cmd = "journalctl > " + os.path.join(WorkDir, "omi-diag.journalctl.out")
+                RunGetOutput(cmd)
+                cmd = "ps -ef > " + os.path.join(WorkDir, "omi-diag.ps_ef.out")
+                RunGetOutput(cmd)
+
+            hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
+            if trialNum < maxTries:
+                hutil.error("Retrying in 30 seconds...")
+                time.sleep(30)
+        if not isOmiInstalledSuccessfully:
+            hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
+            return 1, "OMI install failed " + str(maxTries) + " times"
+
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
     isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
+
+    shouldRestartOmi = False
 
     if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
         RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
+        shouldRestartOmi = True
 
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
+        shouldRestartOmi = True
 
-    RunGetOutput("/opt/omi/bin/service_control restart");
+    if shouldRestartOmi:
+        RunGetOutput("/opt/omi/bin/service_control restart")
+
     return 0, "omi installed"
 
 
@@ -805,10 +932,11 @@ def uninstall_rsyslogom():
 
     return 0,"rm omazurelinuxmds done"
 
+
 def install_rsyslogom():
-    error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
+    error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
-    match= re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    match = re.search("(.*)"+rsyslog_ommodule_for_check, rsyslog_info)
     if match:
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:
@@ -834,6 +962,23 @@ def install_rsyslogom():
     else:
         RunGetOutput("service rsyslog restart")
     return 0,"install mdsdom completed"
+
+
+def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
+    files_to_modify = ['/etc/rsyslog.d/omazurelinuxmds.conf', '/etc/rsyslog.d/omazurelinuxmds_fileom.conf']
+    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
+
+    for f in files_to_modify:
+        RunGetOutput(cmd_to_run.format(new_port, f))
+
+    update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
+    update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
+
+    if distConfig.has_key("restartrsyslog"):
+        RunGetOutput(distConfig["restartrsyslog"])
+    else:
+        RunGetOutput("service rsyslog restart")
+
 
 def install_required_package():
     packages = distConfig['packages']

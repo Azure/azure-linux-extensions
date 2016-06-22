@@ -35,7 +35,7 @@ class DecryptionMarkConfig(object):
                                                  self.logger)
 
     def get_current_command(self):
-        return self.decryption_mark_config.get_config(CommonVariables.EncryptionDecryptionOperationKey)
+        return self.decryption_mark_config.get_config(CommonVariables.EncryptionEncryptionOperationKey)
 
     def config_file_exists(self):
         return self.decryption_mark_config.config_file_exists()
@@ -43,7 +43,7 @@ class DecryptionMarkConfig(object):
     def commit(self):
         key_value_pairs = []
 
-        command = ConfigKeyValuePair(CommonVariables.EncryptionDecryptionOperationKey, self.command)
+        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey, self.command)
         key_value_pairs.append(command)
 
         volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey, self.volume_type)

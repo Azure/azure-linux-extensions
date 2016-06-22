@@ -1,7 +1,6 @@
 # CustomScript Extension
-Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
-Latest version is 1.5.1.
+Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
 You can read the User Guide below.
 * [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
@@ -35,7 +34,6 @@ Schema for the public configuration file looks like this:
 ```
 
 ### 1.2. Protected configuration
-
 Schema for the protected configuration file looks like this:
 
 * `commandToExecute`: (optional, string) the entrypoint script to execute
@@ -55,6 +53,7 @@ Schema for the protected configuration file looks like this:
 1. The storage account here is to store the scripts in `fileUris`.
 If the scripts are stored in the private Azure Storage, you should provide
 `storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
+*Currently only general purpose storage accounts are supported. We intend to add support for the new [Azure Cool Blob Storage](https://azure.microsoft.com/en-us/blog/introducing-azure-cool-storage/) in the near future. See #161*
 2. `commandToExecute` in protected settings can protect your sensitive data.
 But `commandToExecute` should not be specified both in public and protected configurations.
 
@@ -195,7 +194,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "CustomScriptForLinux",
-    "typeHandlerVersion": "1.4",
+    "typeHandlerVersion": "1.5",
+    "autoUpgradeMinorVersion": true,
     "settings": {
       "fileUris": [
         "<url>"
@@ -295,12 +295,12 @@ If you need to run scripts repeatly, you can add a timestamp.
   ```
 
 ## Supported Linux Distributions
-- Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
-- Oracle Linux 6.4.0.0.0 and higher
-- openSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 11 SP3 and higher
 - FreeBSD
+- OpenSUSE 13.1 and higher
+- Oracle Linux 6.4 and higher
+- SUSE Linux Enterprise Server 11 SP3 and higher
+- Ubuntu 12.04 and higher
 
 ## Debug
 
@@ -312,26 +312,6 @@ the download directory of the scripts
 and the tail of the output is logged into the log directory specified
 in HandlerEnvironment.json and reported back to Azure
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
-
-## Changelog
-
-```
-# 1.5.1.0 (2016-04-05)
-- Atomically write the status file.
-
-# 1.5.0.0 (2016-03-23)
-- Refactor CustomScript and add LogUtil & ScriptUtil
-- Refine MDS enents to log which file the extension fails to download
-- Do not log `commandToExecute` to `extension.log` if it's passed by protectedSettings
-
-# 1.4.1.0 (2015-12-21)
-- Move downloading scripts and internal DNS check into the daemon process
-- Provide an option to disable internal DNS check
-- Add a timeout to urllib2.urlopen()
-
-# 1.4.0.0 (2015-11-19)
-- Protect sensitive data in `commandToExecute`
-```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/

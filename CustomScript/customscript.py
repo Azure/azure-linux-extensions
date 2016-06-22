@@ -39,6 +39,7 @@ import json
 from codecs import *
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
+from distutils.util import strtobool
 import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
@@ -253,7 +254,7 @@ def start_daemon(hutil):
         hutil.do_exit(0, 'Enable', 'transitioning', '0',
                       'Launching the script...')
     else:
-        error_msg = "CommandToExecute is empty or invalid"
+        error_msg = "commandToExecute is empty or invalid"
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,
@@ -275,7 +276,7 @@ def daemon(hutil):
         if 'wait' in public_settings:
             wait = public_settings.get('wait')
         if 'enableInternalDNSCheck' in public_settings:
-            enable_idns_check = public_settings.get('enableInternalDNSCheck')
+            enable_idns_check = strtobool(public_settings.get('enableInternalDNSCheck'))
 
     prepare_download_dir(hutil.get_seq_no())
     retry_count = download_files_with_retry(hutil, retry_count, wait)
@@ -291,7 +292,7 @@ def daemon(hutil):
     if args:
         ScriptUtil.run_command(hutil, args, prepare_download_dir(hutil.get_seq_no()), 'Daemon', ExtensionShortName, Version)
     else:
-        error_msg = "CommandToExecute is empty or invalid."
+        error_msg = "commandToExecute is empty or invalid."
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,

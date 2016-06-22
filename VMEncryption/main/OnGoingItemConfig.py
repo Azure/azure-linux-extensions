@@ -18,6 +18,7 @@
 #
 # Requires Python 2.7+
 #
+import os
 import os.path
 import uuid
 import time

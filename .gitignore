@@ -22,6 +22,9 @@ var/
 .installed.cfg
 *.egg
 
+# Editor
+*~
+
 # PyInstaller
 #  Usually these files are written by a python script from a template 
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -93,5 +96,6 @@ RDMAUpdate/.vs/RDMAUpdate/v14/.suo
 # Ignore HandlerManifest updates
 VMEncryption/HandlerManifest.json
 VMEncryption/AzureDiskEncryptionForLinux*.xml
+VMEncryption/ADEForLinux*.xml
 VMEncryption/MANIFEST
 
