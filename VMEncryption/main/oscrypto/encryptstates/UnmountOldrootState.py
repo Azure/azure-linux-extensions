@@ -49,7 +49,7 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('systemctl restart sshd.service', True)
+        self.command_executor.ExecuteInBash('systemctl restart sshd.service')
         
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="systemctl list-units",
