@@ -39,6 +39,7 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Performing enter checks for unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('[ -e "/oldroot" ]', True)
+        self.command_executor.Execute('mountpoint /oldroot', True)
                 
         return True
 
@@ -105,8 +106,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         while True:
             self.context.logger.log("Restarting systemd-udevd")
-            self.command_executor.Execute('killall -s KILL systemd-udevd')
-            self.command_executor.Execute('/usr/lib/systemd/systemd-udevd --daemon')
+            self.command_executor.Execute('systemctl restart systemd-udevd')
 
             sleep(10)
 

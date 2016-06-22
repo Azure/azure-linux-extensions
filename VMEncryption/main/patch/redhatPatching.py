@@ -76,6 +76,6 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup', 'lsscsi', 'psmisc', 'cryptsetup-reencrypt', 'lvm2', 'uuid', 'at', 'patch', 'procps-ng']
+        common_extras = ['cryptsetup', 'lsscsi', 'psmisc', 'cryptsetup-reencrypt', 'lvm2', 'uuid', 'at', 'patch', 'procps-ng', 'util-linux']
         for extra in common_extras:
             self.logger.log("Installation for " + extra + ', result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
