@@ -402,9 +402,14 @@ def setEventVolume(mdsdCfg,ladCfg):
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
 def configSettings():
+    '''
+    Generates XML cfg file for mdsd, from JSON config settings (public & private).
+    Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
+    Returns (False, '...') if config was invalid and the error message.
+    '''
     mdsdCfgstr = readPublicConfig('mdsdCfg')
-    if not mdsdCfgstr :
-        with open (os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
+    if not mdsdCfgstr:
+        with open(os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
             mdsdCfgstr = defaulCfg.read()
     else:
         mdsdCfgstr = base64.b64decode(mdsdCfgstr)
@@ -421,7 +426,7 @@ def configSettings():
             createPortalSettings(mdsdCfg,escape(resourceId))
             instanceID=""
             if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >=0:
-                instanceID = readUUID();
+                instanceID = readUUID()
             config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
 
     except Exception, e:
@@ -453,11 +458,15 @@ def configSettings():
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
     account = readPrivateConfig('storageAccountName')
+    if not account:
+        return False, "Empty storageAccountName"
     key = readPrivateConfig('storageAccountKey')
+    if not key:
+        return False, "Empty storageAccountKey"
     endpoint = readPrivateConfig('endpoint')
     if not endpoint:
         endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint;
+    endpoint = 'https://'+account+"."+endpoint
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
@@ -471,6 +480,7 @@ def configSettings():
 
     mdsdCfg.write(os.path.join(WorkDir, './xmlCfg.xml'))
 
+    return True, ""
 
 def install_service():
     RunGetOutput('sed s#{WORKDIR}#' + WorkDir + '# ' +
@@ -488,7 +498,19 @@ def main(command):
     else:
         EnableSyslog = True
 
-    configSettings()
+    config_valid, config_invalid_reason = configSettings()
+    if not config_valid:
+        config_invalid_log = "Invalid config settings given: " + config_invalid_reason +\
+                             ". Install will proceed, but enable can't proceed, " \
+                             "in which case it's still considered a success as it's an external error."
+        hutil.log(config_invalid_log)
+        if re.match("^([-/]*)(enable)", command):
+            hutil.do_status_report("Enable", "success", '0', config_invalid_log)
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=True,
+                                      message=config_invalid_log)
+            return
 
     for notsupport in ('WALinuxAgent-2.0.5','WALinuxAgent-2.0.4','WALinuxAgent-1'):
         code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent", chk_err=False)
@@ -498,12 +520,13 @@ def main(command):
             return
 
     if distConfig is None:
-        hutil.log("This distro/version (" + str(platform.dist()) + ") is not supported. This extension event (install/enable) is still considered a success.")
-        hutil.do_status_report("Install", "success", '0', "LAD can't be installed on this OS. Still considered a success.")
+        unsupported_distro_version_log = "LAD can't be installed on this distro/version (" + str(platform.dist()) + "), as it's not supported. This extension install/enable operation is still considered a success as it's an external error."
+        hutil.log(unsupported_distro_version_log)
+        hutil.do_status_report("Install", "success", '0', unsupported_distro_version_log)
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Install,
                                   isSuccess=True,
-                                  message="can't be installed on this OS"+str(platform.dist()))
+                                  message="(LAD-" + ExtensionVersion + ") Can't be installed on this OS "+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
@@ -655,7 +678,7 @@ def start_mdsd():
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. Still considered successful. Config validation result: "\
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
                   + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
         hutil.log(message)
         # No need to do success status report (it's already done). Just silently return.
@@ -907,10 +930,10 @@ def install_omi():
 
     shouldRestartOmi = False
 
-    # Check if OMI is configured to listen to 1270 and reconfigure if so.
-    omiListensTo1270 = RunGetOutput("grep '^httpsport=0,1270' /etc/opt/omi/conf/omiserver.conf")[0] is 0
-    if omiListensTo1270:
-        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -r 1270 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
+    # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
+    omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+    if omi_listens_to_nonzero_port:
+        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
         RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
         shouldRestartOmi = True
 
