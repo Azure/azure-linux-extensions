@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.9001.
+Latest version is 2.3.9003.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -31,9 +31,9 @@ extension be enabled only through the Azure Portal.
 
 Schema for the public configuration file looks like this:
 
-* `perfCfg`: (required) A list of WQL query clauses, supported counters could be found in this [document](http://scx.codeplex.com/wikipage?title=xplatproviders&referringTitle=Documentation).
-* `EnableSyslog`: (optional) Whether syslog data should be reported, currently only rsyslog is supported. Can choose from 'true' and 'false', default value is true.
-* `fileCfg`: (optional) A list of files to be tracked, note this only works when EnableSyslog is set to true.
+* `perfCfg`: (optional) A list of WQL query clauses, supported counters could be found in this [document](http://scx.codeplex.com/wikipage?title=xplatproviders&referringTitle=Documentation). If no perfCfg entry is specified, then memory, CPU, and disk perf counters are added by default. If no perf counters should be collected, give an empty array ([]) as the value for this key.
+* `enableSyslog`: (optional) Whether syslog data should be reported, currently only rsyslog is supported. Can choose from 'true' and 'false', default value is true.
+* `fileCfg`: (optional) A list of files to be tracked, note this only works when enableSyslog is set to true.
 * `mdsdHttpProxy`: (optional) http proxy configuration for mdsd. Format: "http://proxy_host:proxy_port". "http:" part is optional. DO NOT specify username and password here!
  
 ```json
@@ -47,7 +47,7 @@ Schema for the public configuration file looks like this:
     {"file":"/var/log/a.log", "table":"aLog"},
     {"file":"/var/log/b.log", "table":"bLog"}
   ],
-  "EnableSyslog":"true",
+  "enableSyslog":"true",
   "mdsdHttpProxy":"http://your_proxy_host:3128"
 }
 ```
@@ -147,7 +147,7 @@ $PublicConf = '{
     {"file":"/var/log/a.log", "table":"aLog"},
     {"file":"/var/log/b.log", "table":"bLog"}
   ],
-  "EnableSyslog":"true"
+  "enableSyslog":"true"
 }'
 
 $PrivateConf = '{
@@ -194,7 +194,7 @@ $PublicConf = '{
     {"file":"/var/log/a.log", "table":"aLog"},
     {"file":"/var/log/b.log", "table":"bLog"}
   ],
-  "EnableSyslog":"true"
+  "enableSyslog":"true"
 }'
 
 $PrivateConf = '{

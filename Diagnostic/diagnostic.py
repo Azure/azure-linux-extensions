@@ -42,7 +42,7 @@ import Utils.ApplicationInsightsUtil as AIUtil
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
 ExtensionFullName = 'Microsoft.OSTCExtensions.LinuxDiagnostic'
-ExtensionVersion = '2.3.9001'   # Must be updated on each new release! Improve this!
+ExtensionVersion = '2.3.9003'   # Must be updated on each new release! Improve this!
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
@@ -72,7 +72,7 @@ rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-installer.sh'
+omi_universal_pkg_name = 'scx-1.6.2-241.universal.x64.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
@@ -137,17 +137,17 @@ All_Dist= {'debian':DebianConfig,
 distConfig = None
 dist = platform.dist()
 distroNameAndVersion = dist[0] + ":" + dist[1]
-if All_Dist.has_key(distroNameAndVersion):
-    distConfig =  All_Dist[distroNameAndVersion]
+if distroNameAndVersion in All_Dist:  # if All_Dist.has_key(distroNameAndVersion):
+    distConfig = All_Dist[distroNameAndVersion]
 elif All_Dist.has_key(dist[0]):
-    distConfig =  All_Dist[dist[0]]
+    distConfig = All_Dist[dist[0]]
 
 if distConfig is None:
     hutil.error("os version:" + distroNameAndVersion + " not supported")
 
-UseService = False
-if dist[0] == 'Ubuntu' and dist[1] == '15.10':
-    UseService = True
+UseSystemdServiceManager = False
+if dist[0] == 'Ubuntu' and dist[1] >= '15.10':  # Use systemd for Ubuntu 15.10 or later
+    UseSystemdServiceManager = True
 
 
 def escape(datas):
@@ -218,12 +218,12 @@ def hasPublicConfig(key):
 
 def readPublicConfig(key):
     if public_settings.has_key(key):
-        return public_settings[key];
+        return public_settings[key]
     return ''
 
 def readPrivateConfig(key):
     if private_settings.has_key(key):
-        return private_settings[key];
+        return private_settings[key]
     return ''
 
 def createPortalSettings(tree,resourceId):
@@ -257,7 +257,7 @@ $InputRunFileMonitor
 
 
 def createEventFileSettings(tree,files):
-    fileid = 0;
+    fileid = 0
     sysconfig = """
 $ModLoad imfile
 
@@ -402,9 +402,14 @@ def setEventVolume(mdsdCfg,ladCfg):
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
 def configSettings():
+    '''
+    Generates XML cfg file for mdsd, from JSON config settings (public & private).
+    Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
+    Returns (False, '...') if config was invalid and the error message.
+    '''
     mdsdCfgstr = readPublicConfig('mdsdCfg')
-    if not mdsdCfgstr :
-        with open (os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
+    if not mdsdCfgstr:
+        with open(os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
             mdsdCfgstr = defaulCfg.read()
     else:
         mdsdCfgstr = base64.b64decode(mdsdCfgstr)
@@ -421,7 +426,7 @@ def configSettings():
             createPortalSettings(mdsdCfg,escape(resourceId))
             instanceID=""
             if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >=0:
-                instanceID = readUUID();
+                instanceID = readUUID()
             config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
 
     except Exception, e:
@@ -453,11 +458,15 @@ def configSettings():
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
     account = readPrivateConfig('storageAccountName')
+    if not account:
+        return False, "Empty storageAccountName"
     key = readPrivateConfig('storageAccountKey')
+    if not key:
+        return False, "Empty storageAccountKey"
     endpoint = readPrivateConfig('endpoint')
     if not endpoint:
         endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint;
+    endpoint = 'https://'+account+"."+endpoint
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
@@ -471,6 +480,7 @@ def configSettings():
 
     mdsdCfg.write(os.path.join(WorkDir, './xmlCfg.xml'))
 
+    return True, ""
 
 def install_service():
     RunGetOutput('sed s#{WORKDIR}#' + WorkDir + '# ' +
@@ -481,14 +491,26 @@ def install_service():
 def main(command):
     #Global Variables definition
 
-    global EnableSyslog, UseService
+    global EnableSyslog, UseSystemdServiceManager
     if readPublicConfig('enableSyslog').lower() == 'false' or readPublicConfig('EnableSyslog').lower() == 'false':
         # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
         EnableSyslog = False
     else:
         EnableSyslog = True
 
-    configSettings()
+    config_valid, config_invalid_reason = configSettings()
+    if not config_valid:
+        config_invalid_log = "Invalid config settings given: " + config_invalid_reason +\
+                             ". Install will proceed, but enable can't proceed, " \
+                             "in which case it's still considered a success as it's an external error."
+        hutil.log(config_invalid_log)
+        if re.match("^([-/]*)(enable)", command):
+            hutil.do_status_report("Enable", "success", '0', config_invalid_log)
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=True,
+                                      message=config_invalid_log)
+            return
 
     for notsupport in ('WALinuxAgent-2.0.5','WALinuxAgent-2.0.4','WALinuxAgent-1'):
         code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent", chk_err=False)
@@ -498,16 +520,17 @@ def main(command):
             return
 
     if distConfig is None:
-        hutil.log("This distro/version (" + str(platform.dist()) + ") is not supported. This extension event (install/enable) is still considered a success.")
-        hutil.do_status_report("Install", "success", '0', "LAD can't be installed on this OS. Still considered a success.")
+        unsupported_distro_version_log = "LAD can't be installed on this distro/version (" + str(platform.dist()) + "), as it's not supported. This extension install/enable operation is still considered a success as it's an external error."
+        hutil.log(unsupported_distro_version_log)
+        hutil.do_status_report("Install", "success", '0', unsupported_distro_version_log)
         waagent.AddExtensionEvent(name=hutil.get_name(),
-                                  op=waagent.WALAEventOperation.Enable,
+                                  op=waagent.WALAEventOperation.Install,
                                   isSuccess=True,
-                                  message="can't be installed on this OS"+str(platform.dist()))
+                                  message="(LAD-" + ExtensionVersion + ") Can't be installed on this OS "+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
-        if UseService:
+        if UseSystemdServiceManager:
             if re.match("^([-/]*)(disable)", command):
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde')
                 hutil.do_status_report("Disable", "success", '0',"Disable succeeded")
@@ -601,6 +624,13 @@ def start_mdsd():
 
     setup(False)
 
+    # Start OMI if it's not running.
+    # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
+    # Don't check if starting succeeded, as it'll be done in the loop below anyway.
+    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+    if not omi_running:
+        RunGetOutput("/opt/omi/bin/service_control restart")
+
     if not EnableSyslog:
         uninstall_rsyslogom()
 
@@ -611,7 +641,7 @@ def start_mdsd():
     log_dir = hutil.get_log_dir()
     monitor_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
-    warn_file_path =  os.path.join(log_dir, 'mdsd.warn')
+    warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
 
     default_port = RSYSLOG_OM_PORT
@@ -642,6 +672,19 @@ def start_mdsd():
             copy_env['MDSD_http_proxy'] = proxy_config
 
     xml_file = os.path.join(WorkDir, './xmlCfg.xml')
+
+    # We now validate the config and proceed only when it succeeds.
+    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(MdsdFolder, "mdsd"), xml_file)
+    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
+    if config_validate_cmd_status is not 0:
+        # Invalid config. Log error and report success.
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
+                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
+        hutil.log(message)
+        # No need to do success status report (it's already done). Just silently return.
+        return
+
+    # Config validated. Prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
@@ -652,7 +695,9 @@ def start_mdsd():
         info_file_path).split(" ")
 
     try:
-        for restart in range(0,3):
+        num_quick_consecutive_crashes = 0
+
+        while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
 
             RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
             mdsd_pid_port_file_checked = False
@@ -669,7 +714,8 @@ def start_mdsd():
                 pidfile.write(str(mdsd.pid)+'\n')
                 pidfile.close()
 
-            last_error_time = datetime.datetime.now()
+            last_mdsd_start_time = datetime.datetime.now()
+            last_error_time = last_mdsd_start_time
             omi_installed = True
             omicli_path = "/opt/omi/bin/omicli"
             omicli_noop_query_cmd = omicli_path + " noop"
@@ -730,7 +776,7 @@ def start_mdsd():
                         log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
                         hutil.error(log_msg)
                         # Also log this issue on syslog as well
-                        syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_DAEMON)
+                        syslog.openlog('diagnostic.py', syslog.LOG_PID, syslog.LOG_DAEMON)  # syslog.openlog(ident, logoption, facility) -- not taking kw args in Python 2.6
                         syslog.syslog(syslog.LOG_ALERT, log_msg)    # syslog.syslog(priority, message) -- not taking kw args
                         syslog.closelog()
 
@@ -741,7 +787,7 @@ def start_mdsd():
                     continue
                 last_error_time = monitor_file_ctime
                 last_error = tail(monitor_file_path)
-                if len(last_error) > 0 and (datetime.datetime.now()- last_error_time) < datetime.timedelta(minutes=30):
+                if len(last_error) > 0 and (datetime.datetime.now() - last_error_time) < datetime.timedelta(minutes=30):
                     hutil.log("Error in MDSD:"+last_error)
                     hutil.do_status_report("Enable","success",'1',"message in /var/log/mdsd.err:"+str(last_error_time)+":"+last_error)
 
@@ -750,22 +796,35 @@ def start_mdsd():
                 mdsd_log.close()
                 mdsd_log = None
 
-            error = "MDSD("+ExtensionVersion+") crash:"+tail(mdsd_log_path)+tail(monitor_file_path)
-            hutil.error("MDSD crashed:"+error)
+            # Check if this is NOT a quick crash -- we consider a crash quick
+            # if it's within 30 minutes from the start time. If it's not quick,
+            # we just continue by restarting mdsd.
+            mdsd_up_time = datetime.datetime.now() - last_mdsd_start_time
+            if mdsd_up_time > datetime.timedelta(minutes=30):
+                mdsd_terminated_msg = "MDSD("+ExtensionVersion+") terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
+                hutil.log(mdsd_terminated_msg)
+                num_quick_consecutive_crashes = 0
+                continue
 
-            try:
-                waagent.AddExtensionEvent(name=hutil.get_name(),
-                                op=waagent.WALAEventOperation.Enable,
-                                isSuccess=False,
-                                message=error)
-            except Exception:
-                pass
+            # It's a quick crash. Log error and add an extension event.
+            num_quick_consecutive_crashes += 1
+
+            error = "MDSD("+ExtensionVersion+") crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
+            hutil.error("MDSD crashed:"+error)
 
             # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
             install_rsyslogom()
 
-        # mdsd all 3 restarts exhausted
+        # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report("Enable","error",'1',"mdsd stopped:"+error)
+
+        try:
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=False,
+                                      message=error)
+        except Exception:
+            pass
 
     except Exception,e:
         if mdsd_log:
@@ -860,17 +919,7 @@ def install_omi():
         for trialNum in range(1, maxTries+1):
             isOmiInstalledSuccessfully = RunGetOutput(distConfig["installomi"])[0] is 0
             if isOmiInstalledSuccessfully:
-                isOmiRunning = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
-                if isOmiRunning:
-                    break
-                # OMI installed successfully, but omiserver is not running.
-                # Dump diag info and retry
-                hutil.error("OMI installed successfully, but omiserver is not running. Dumping some diag info.")
-                cmd = "journalctl > " + os.path.join(WorkDir, "omi-diag.journalctl.out")
-                RunGetOutput(cmd)
-                cmd = "ps -ef > " + os.path.join(WorkDir, "omi-diag.ps_ef.out")
-                RunGetOutput(cmd)
-
+                break
             hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
             if trialNum < maxTries:
                 hutil.error("Retrying in 30 seconds...")
@@ -879,12 +928,18 @@ def install_omi():
             hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
             return 1, "OMI install failed " + str(maxTries) + " times"
 
+    shouldRestartOmi = False
+
+    # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
+    omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+    if omi_listens_to_nonzero_port:
+        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
+        RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
+        shouldRestartOmi = True
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
     isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
-
-    shouldRestartOmi = False
 
     if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
         mysqladdress=readPrivateConfig("mysqladdress")
