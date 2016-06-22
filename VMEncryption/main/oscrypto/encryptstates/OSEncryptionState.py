@@ -52,7 +52,10 @@ class OSEncryptionState(object):
                                                   logger=self.context.logger)
         
     def should_enter(self):
+        self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
+
         if self.state_executed:
+            self.logger.log("State {0} has already executed, not entering".format(self.state_name))
             return False
 
         if not os.path.exists(self.state_marker):
@@ -66,13 +69,18 @@ class OSEncryptionState(object):
             return False
 
     def should_exit(self):
+        self.context.logger.log("OSEncryptionState.should_exit() called for {0}".format(self.state_name))
+
         if not os.path.exists(self.state_marker):
             self.disk_util.make_sure_path_exists(self.context.encryption_environment.os_encryption_markers_path)
+            self.context.logger.log("Creating state marker {0}".format(self.state_marker))
             self.disk_util.touch_file(self.state_marker)
 
         self.state_executed = True
 
-        return True
+        self.context.logger.log("state_executed for {0}: {1}".format(self.state_name, self.state_executed))
+
+        return self.state_executed
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
