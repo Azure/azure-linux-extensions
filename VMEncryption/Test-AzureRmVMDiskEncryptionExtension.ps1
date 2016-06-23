@@ -198,6 +198,36 @@ exit
     Remove-Item commands.txt
 
     Write-Host "Mounted data partitions"
+
+    $commands = @"
+sed -i 's/SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
+reboot
+"@
+
+    $commands | Out-File -Encoding ascii commands.txt
+    dos2unix commands.txt
+    cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <commands.txt"
+    Remove-Item commands.txt
+
+    Start-Sleep 5
+
+    $vmRunning = $false
+
+    while(!$vmRunning)
+    {
+        try
+        {
+            $tcpClient = New-Object System.Net.Sockets.TcpClient
+            $tcpClient.Connect($Hostname, "22")
+            $vmRunning = $true
+        }
+        catch
+        {
+            Write-Host "VM is not up yet"
+        }
+    }
+
+    Write-Host "SELinux disabled"
 }
 
 ## Encryption
