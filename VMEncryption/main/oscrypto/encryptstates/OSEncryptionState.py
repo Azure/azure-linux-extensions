@@ -50,6 +50,17 @@ class OSEncryptionState(object):
 
         self.encryption_config = EncryptionConfig(encryption_environment=self.context.encryption_environment,
                                                   logger=self.context.logger)
+
+        rootfs_mountpoint = '/'
+
+        if self.command_executor.Execute('mountpoint /oldroot') == 0:
+            rootfs_mountpoint = '/oldroot'
+
+        rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
+        self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
+
+        self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+        self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
         
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
@@ -81,6 +92,17 @@ class OSEncryptionState(object):
         self.context.logger.log("state_executed for {0}: {1}".format(self.state_name, self.state_executed))
 
         return self.state_executed
+
+    def _get_fs_partition(self, fs):
+        result = None
+        dev = os.lstat(fs).st_dev
+
+        for line in file('/proc/mounts'):
+            line = [s.decode('string_escape') for s in line.split()[:3]]
+            if dev == os.lstat(line[1]).st_dev:
+                result = tuple(line)
+
+        return result
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',

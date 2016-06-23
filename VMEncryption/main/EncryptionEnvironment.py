@@ -22,6 +22,7 @@ import os
 import os.path
 import subprocess
 from subprocess import *
+
 class EncryptionEnvironment(object):
     """description of class"""
     def __init__(self,patching,logger):

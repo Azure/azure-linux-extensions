@@ -33,6 +33,7 @@ sys.path.append(transitionsdir)
 
 from encryptstates import *
 from Common import *
+from DiskUtil import *
 from transitions import *
 
 class OSEncryption(object):
@@ -120,7 +121,7 @@ class OSEncryption(object):
         context = OSEncryptionStateContext(hutil=self.hutil,
                                            distro_patcher=self.distro_patcher,
                                            logger=self.logger,
-                                           encryption_environment=self.encryption_environment);
+                                           encryption_environment=self.encryption_environment)
 
         self.state_objs = {
             'prereq': PrereqState(context),

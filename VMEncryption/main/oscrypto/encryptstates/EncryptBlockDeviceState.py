@@ -56,7 +56,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                             status_code=str(CommonVariables.success),
                                             message='OS disk encryption started')
 
-        self.command_executor.Execute('dd if=/dev/sda2 of=/dev/mapper/osencrypt bs=52428800', True)
+        self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt bs=52428800'.format(self.rootfs_block_device), True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
@@ -72,11 +72,13 @@ class EncryptBlockDeviceState(OSEncryptionState):
     def _luks_format(self, bek_path):
         self.command_executor.Execute('mkdir /boot/luks', True)
         self.command_executor.Execute('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
-        self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} /dev/sda2 -q'.format(bek_path),
+        self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} {1} -q'.format(bek_path,
+                                                                                                                    self.rootfs_block_device),
                                       raise_exception_on_failure=True)
 
     def _luks_open(self, bek_path):
-        self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader /dev/sda2 osencrypt -d {0}'.format(bek_path),
+        self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
+                                                                                                                         bek_path),
                                       raise_exception_on_failure=True)
 
     def _dump_passphrase(self, bek_path):

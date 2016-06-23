@@ -110,10 +110,10 @@ class UnmountOldrootState(OSEncryptionState):
 
             sleep(10)
 
-            if self.command_executor.ExecuteInBash('[ -b /dev/sda2 ]', False) == 0:
+            if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
                 break
 
-        self.command_executor.Execute('xfs_repair /dev/sda2', True)
+        self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")
