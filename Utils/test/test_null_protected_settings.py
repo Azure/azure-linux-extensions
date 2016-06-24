@@ -28,7 +28,7 @@ def mock_log(*args, **kwargs):
 
 class TestNullProtectedSettings(unittest.TestCase):
     def test_null_protected_settings(self):
-        hutil = Util.HandlerUtility(mock_log, mock_log, "UnitTest")
+        hutil = Util.HandlerUtility(mock_log, mock_log, "UnitTest", "HandlerUtil.UnitTest", "0.0.1")
         config = hutil._parse_config(Settings)
         handlerSettings = config['runtimeSettings'][0]['handlerSettings']
         self.assertEquals(handlerSettings["protectedSettings"], None)

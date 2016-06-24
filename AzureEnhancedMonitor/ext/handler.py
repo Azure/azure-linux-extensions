@@ -30,6 +30,8 @@ from Utils.WAAgentUtil import waagent, InitExtensionEventLog
 import Utils.HandlerUtil as util
 
 ExtensionShortName = 'AzureEnhancedMonitor'
+ExtensionFullName  = 'Microsoft.OSTCExtensions.AzureEnhancedMonitor'
+ExtensionVersion   = 'AzureEnhancedMonitor'
 
 def printable(s):
     return filter(lambda c : c in string.printable, str(s))
@@ -116,7 +118,7 @@ def grace_exit(operation, status, msg):
     hutil.do_exit(0, operation, status, '0', msg)
 
 def parse_context(operation):
-    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
     hutil.do_parse_context(operation)
     return hutil
 

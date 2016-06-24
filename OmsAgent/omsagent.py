@@ -32,11 +32,7 @@ import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
 # Global Variables
-mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
-with open(mfile,'r') as f:
-    manifest = json.loads(f.read())[0]
-    ExtensionShortName = manifest['name']
-    Version = manifest['version']
+ExtensionShortName = "OmsAgentForLinux"
 
 PackagesDirectory = "packages"
 BundleFileNameTemplate = 'omsagent-1.1.0-28.universal.{0}.sh'
@@ -87,7 +83,7 @@ def main():
 
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context(operation)
     return hutil
     
@@ -112,15 +108,15 @@ def install(hutil):
 
     os.chmod(file_path, 100)
     cmd = InstallCommandTemplate.format(file_name)
-    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Install', ExtensionShortName, Version)
+    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Install', ExtensionShortName, hutil.get_extension_version())
 
 
 def uninstall(hutil):
     file_name = getbundlefilename();
-    file_directory = os.path.join(os.getcwd(), PackagesDirectory)    
+    file_directory = os.path.join(os.getcwd(), PackagesDirectory)
 
     cmd = UninstallCommandTemplate.format(file_name)
-    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Uninstall', ExtensionShortName, Version)
+    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Uninstall', ExtensionShortName, hutil.get_extension_version())
 
 
 def enable(hutil):
@@ -141,16 +137,16 @@ def enable(hutil):
         raise ValueError("Workspace key cannot be None.")
 
     cmd = OnboardCommandTemplate.format(workspaceId, workspaceKey)
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), OmsAdminWorkingDirectory, 'Onboard', ExtensionShortName, Version, False)
+    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), OmsAdminWorkingDirectory, 'Onboard', ExtensionShortName, hutil.get_extension_version(), False)
     # if onboard succeeds we continue, otherwise fail fast
     if exit_code == 0:
-        ScriptUtil.run_command(hutil, ScriptUtil.parse_args(EnableOmsAgentServiceCommand), ServiceControlWorkingDirectory, 'Enable', ExtensionShortName, Version)
+        ScriptUtil.run_command(hutil, ScriptUtil.parse_args(EnableOmsAgentServiceCommand), ServiceControlWorkingDirectory, 'Enable', ExtensionShortName, hutil.get_extension_version())
     else:
         sys.exit(exit_code)
 
 
 def disable(hutil):
-    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(DisableOmsAgentServiceCommand), ServiceControlWorkingDirectory, 'Disable', ExtensionShortName, Version)
+    ScriptUtil.run_command(hutil, ScriptUtil.parse_args(DisableOmsAgentServiceCommand), ServiceControlWorkingDirectory, 'Disable', ExtensionShortName, hutil.get_extension_version())
 
 
 if __name__ == '__main__' :

@@ -18,38 +18,34 @@
 #
 # Requires Python 2.6+
 #
-
-
 import array
 import base64
+import imp
+import json
 import os
 import os.path
 import re
+import shlex
+import shutil
 import string
 import subprocess
 import sys
-import imp
-import shlex
+import time
 import traceback
 import urllib2
 import urlparse
-import time
-import shutil
-import json
-from codecs import *
+
 from azure.storage import BlobService
-from Utils.WAAgentUtil import waagent
+from codecs import *
 from distutils.util import strtobool
+from Utils.WAAgentUtil import waagent
+
 import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
+ExtensionShortName = 'CustomScriptForLinux'
 
 # Global Variables
-mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
-with open(mfile,'r') as f:
-    manifest = json.loads(f.read())[0]
-    ExtensionShortName = manifest['name']
-    Version = manifest['version']
 DownloadDirectory = 'download'
 
 # CustomScript-specific Operation
@@ -132,7 +128,7 @@ def download_files_with_retry(hutil, retry_count, wait):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=DownloadOp,
                                           isSuccess=False,
-                                          version=Version,
+                                          version=hutil.get_extension_version(),
                                           message="(01100)"+error_msg)
                 raise
 
@@ -142,7 +138,7 @@ def download_files_with_retry(hutil, retry_count, wait):
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=DownloadOp,
                               isSuccess=True,
-                              version=Version,
+                              version=hutil.get_extension_version(),
                               message="(01303)"+msg)
     return retry_count - download_retry_count
 
@@ -166,7 +162,7 @@ def check_idns_with_retry(hutil, retry_count, wait):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="CheckIDNS",
                                   isSuccess=True,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01306)"+msg)
     else:
         error_msg = ("Internal DNS is not ready, "
@@ -175,7 +171,7 @@ def check_idns_with_retry(hutil, retry_count, wait):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="CheckIDNS",
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01306)"+error_msg)
 
 
@@ -208,7 +204,7 @@ def download_files(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=DownloadOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01001)"+error_msg)
         return
 
@@ -233,7 +229,7 @@ def download_files(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=DownloadOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01000)"+error_msg)
         raise ValueError(error_msg)
 
@@ -259,7 +255,7 @@ def start_daemon(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01002)"+error_msg)
         raise ValueError(error_msg)
 
@@ -290,14 +286,14 @@ def daemon(hutil):
     cmd = get_command_to_execute(hutil)
     args = ScriptUtil.parse_args(cmd)
     if args:
-        ScriptUtil.run_command(hutil, args, prepare_download_dir(hutil.get_seq_no()), 'Daemon', ExtensionShortName, Version)
+        ScriptUtil.run_command(hutil, args, prepare_download_dir(hutil.get_seq_no()), 'Daemon', ExtensionShortName, hutil.get_extension_version())
     else:
         error_msg = "commandToExecute is empty or invalid."
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01002)"+error_msg)
         raise ValueError(error_msg)
 
