@@ -60,6 +60,8 @@ class OSEncryptionState(object):
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
         self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+        if not self.rootfs_block_device.startswith('/dev'):
+            self.rootfs_block_device = '/dev/sda2'
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
         
     def should_enter(self):
