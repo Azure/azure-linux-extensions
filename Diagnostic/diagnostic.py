@@ -89,7 +89,7 @@ UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                      'packages':()
                     }.items())
 
-# For SUSE11, we need to create a CA certs file for our bundled OpenSSL 1.0 libs
+# For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
 SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
 SuseConfig11 = dict(RedhatConfig.items()+
@@ -499,6 +499,7 @@ def main(command):
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=True,
+                                      version=hutil.get_extension_version(),
                                       message=config_invalid_log)
             return
 
@@ -516,7 +517,8 @@ def main(command):
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Install,
                                   isSuccess=True,
-                                  message="(LAD-" + hutil.get_extension_version() + ") Can't be installed on this OS " + str(platform.dist()))
+                                  version=hutil.get_extension_version(),
+                                  message="Can't be installed on this OS "+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
@@ -790,7 +792,7 @@ def start_mdsd():
             # we just continue by restarting mdsd.
             mdsd_up_time = datetime.datetime.now() - last_mdsd_start_time
             if mdsd_up_time > datetime.timedelta(minutes=30):
-                mdsd_terminated_msg = "MDSD("+hutil.get_extension_version()+") terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
+                mdsd_terminated_msg = "MDSD terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
                 hutil.log(mdsd_terminated_msg)
                 num_quick_consecutive_crashes = 0
                 continue
@@ -798,7 +800,7 @@ def start_mdsd():
             # It's a quick crash. Log error and add an extension event.
             num_quick_consecutive_crashes += 1
 
-            error = "MDSD("+hutil.get_extension_version()+") crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
+            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
 
             # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
@@ -811,6 +813,7 @@ def start_mdsd():
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=False,
+                                      version=hutil.get_extension_version(),
                                       message=error)
         except Exception:
             pass
@@ -825,7 +828,8 @@ def start_mdsd():
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=False,
-                                  message="MDSD("+hutil.get_extension_version()+") Crash2:"+str(e))
+                                  version=hutil.get_extension_version(),
+                                  message="MDSD crash2:"+str(e))
     finally:
         if mdsd_log:
             mdsd_log.close()
