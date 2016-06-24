@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.4+
-
 
 import os
 import sys
@@ -27,7 +24,6 @@ import chardet
 import tempfile
 import urllib2
 import urlparse
-import platform
 import shutil
 import traceback
 import logging
@@ -36,9 +32,11 @@ from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
 import json
 import unittest
-sys.path.append('..')
 from patch import *
 from FakePatching3 import FakePatching
+
+sys.path.append('..')
+
 
 # Global variables definition
 ExtensionShortName = 'OSPatching'
@@ -59,7 +57,7 @@ def install():
     try:
         MyPatching.install()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
-    except Exception, e:
+    except Exception as e:
         hutil.log_and_syslog(logging.ERROR, "Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed.')
 
@@ -75,7 +73,7 @@ def enable():
         MyPatching.enable()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
-    except Exception, e:
+    except Exception as e:
         current_config = MyPatching.get_current_config()
         hutil.log_and_syslog(logging.ERROR, "Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable Failed. Current Configuation: ' + current_config)
@@ -91,7 +89,7 @@ def disable():
         hutil.exit_if_seq_smaller()
         MyPatching.disable()
         hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded.')
-    except Exception, e:
+    except Exception as e:
         hutil.log_and_syslog(logging.ERROR, "Failed to disable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Disable', 'error', '0', 'Disable Failed.')
 
@@ -106,7 +104,7 @@ def download():
         MyPatching.download()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0,'Enable','success','0', 'Download Succeeded. Current Configuation: ' + current_config)
-    except Exception, e:
+    except Exception as e:
         current_config = MyPatching.get_current_config()
         hutil.log_and_syslog(logging.ERROR, "Failed to download updates with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Download Failed. Current Configuation: ' + current_config)
@@ -118,7 +116,7 @@ def patch():
         MyPatching.patch()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0,'Enable','success','0', 'Patch Succeeded. Current Configuation: ' + current_config)
-    except Exception, e:
+    except Exception as e:
         current_config = MyPatching.get_current_config()
         hutil.log_and_syslog(logging.ERROR, "Failed to patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Patch Failed. Current Configuation: ' + current_config)
@@ -130,7 +128,7 @@ def oneoff():
         MyPatching.patch_one_off()
         current_config = MyPatching.get_current_config()
         hutil.do_exit(0,'Enable','success','0', 'Oneoff Patch Succeeded. Current Configuation: ' + current_config)
-    except Exception, e:
+    except Exception as e:
         current_config = MyPatching.get_current_config()
         hutil.log_and_syslog(logging.ERROR, "Failed to one-off patch with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable','error','0', 'Oneoff Patch Failed. Current Configuation: ' + current_config)
@@ -223,7 +221,7 @@ def download_blob(storage_account_name, storage_account_key,
     blob_service = BlobService(storage_account_name, storage_account_key)
     try:
         blob_service.get_blob_to_path(container_name, blob_name, download_path)
-    except Exception, e:
+    except Exception as e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download blob with uri:{0} "
                      "with error {1}").format(blob_uri,e))
         raise
@@ -235,7 +233,7 @@ def download_external_file(uri, dst, hutil):
     file_path = os.path.join(download_dir, dst)
     try:
         download_and_save_file(uri, file_path)
-    except Exception, e:
+    except Exception as e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to download external file with uri:{0} "
                      "with error {1}").format(uri, e))
         raise
@@ -247,7 +245,7 @@ def save_local_file(src, dst, hutil):
     file_path = os.path.join(download_dir, dst)
     try:
         waagent.SetFileContents(file_path, src)
-    except Exception, e:
+    except Exception as e:
         hutil.log_and_syslog(logging.ERROR, ("Failed to save file from user's configuration "
                      "with error {0}").format(e))
         raise
@@ -346,13 +344,12 @@ def get_properties_from_uri(uri):
     return {'blob_name': blob_name, 'container_name': container_name}
 
 def download_customized_vmstatustest():
-    download_dir = prepare_download_dir(hutil.get_seq_no())
     maxRetry = 2
     for retry in range(0, maxRetry + 1):
         try:
             download_files(hutil)
             break
-        except Exception, e:
+        except Exception:
             hutil.log_and_syslog(logging.ERROR, "Failed to download files, retry=" + str(retry) + ", maxRetry=" + str(maxRetry))
             if retry != maxRetry:
                 hutil.log_and_syslog(logging.INFO, "Sleep 10 seconds")
@@ -380,7 +377,7 @@ def delete_current_vmstatustestscript():
 
 class Test(unittest.TestCase):
     def setUp(self):
-        print '\n\n============================================================================================'
+        print('\n\n============================================================================================')
         waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
         waagent.Log("%s started to handle." %(ExtensionShortName))
         global hutil
@@ -406,7 +403,7 @@ class Test(unittest.TestCase):
         waagent.SetFileContents(MyPatching.package_patched_path, '')
 
     def test_stop_between_download_and_stage1(self):
-        print 'test_stop_between_download_and_stage1'
+        print('test_stop_between_download_and_stage1')
 
         global settings
         current_time = time.time()
@@ -513,12 +510,6 @@ def restore_settings():
         return True
     """
 
-    idleTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/idleTest.py"
-    healthyTestScriptGithub = "https://raw.githubusercontent.com/bingosummer/scripts/master/healthyTest.py"
-
-    idleTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/idleTest.py"
-    healthyTestScriptStorage = "https://binxia.blob.core.windows.net/ospatching-v2/healthyTest.py"
-
     settings = {
         "disabled" : "false",
         "stop" : "false",
@@ -549,7 +540,7 @@ def main():
         return
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-    waagent.Log("%s started to handle." %(ExtensionShortName))
+    waagent.Log("%s started to handle." % ExtensionShortName)
 
     global hutil
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
@@ -558,7 +549,7 @@ def main():
     global MyPatching
     MyPatching = FakePatching(hutil)
 
-    if MyPatching == None:
+    if MyPatching is None:
         sys.exit(1)
 
     for a in sys.argv[1:]:

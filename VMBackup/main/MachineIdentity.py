@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import os
 import subprocess
@@ -29,7 +26,6 @@ class MachineIdentity:
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
     def current_identity(self):
-        identity = None
         file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
         xmlText = file.read()
         dom = xml.dom.minidom.parseString(xmlText)

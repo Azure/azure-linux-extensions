@@ -15,16 +15,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
 import unittest
 import env
 import vmaccess
 import os
 from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
 import shutil
 
 waagent.LoggerInit('/tmp/test.log','/dev/stdout')

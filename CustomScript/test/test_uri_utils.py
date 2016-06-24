@@ -15,16 +15,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import unittest
-import env
 import customscript as cs
 
-class TestUriUtils(unittest.TestCase):
 
+class TestUriUtils(unittest.TestCase):
     def test_get_path_from_uri(self):
         uri = "http://qingfu2.blob.core.windows.net/vhds/abc.sh?st=2014-06-27Z&se=2014-06-27&sr=c&sp=r&sig=KBwcWOx"
         path = cs.get_path_from_uri(uri)

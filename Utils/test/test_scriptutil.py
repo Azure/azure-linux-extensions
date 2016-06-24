@@ -13,26 +13,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import os
 import os.path
-import unittest
 import env
 import ScriptUtil as su
+import unittest
 from MockUtil import MockUtil
 
 class TestScriptUtil(unittest.TestCase):
     def test_parse_args(self):
-        print __file__
+        print(__file__)
         cmd = u'sh foo.bar.sh -af bar --foo=bar | more \u6211'
         args = su.parse_args(cmd.encode('utf-8'))
         self.assertNotEquals(None, args)
         self.assertNotEquals(0, len(args))
-        print args
-    
+        print(args)
+
     def test_run_command(self):
         hutil = MockUtil(self)
         test_script = "mock.sh"

@@ -13,9 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 
 import os
@@ -37,8 +34,6 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
     err_out_file = os.path.join(cwd, std_err_file_name)
     std_out = None
     err_out = None
-    msg = None
-    exit_code = None
     try:
         std_out = open(std_out_file, "w")
         err_out = open(err_out_file, "w")
@@ -48,7 +43,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                  stdout=std_out,
                                  stderr=err_out)
         time.sleep(1)
-        while child.poll() == None:
+        while child.poll() is None:
             msg = LogUtil.get_formatted_log("Command is running...",
                                     LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
             hutil.log(msg)
@@ -103,6 +98,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
             err_out.close()
     return exit_code
 
+
 # do_exit calls sys.exit which raises an exception so we do not call it from the finally block
 def log_or_exit(hutil, exit_after_run, exit_code, operation, msg):
     status = 'success' if exit_code == 0 else 'failed'
@@ -110,6 +106,7 @@ def log_or_exit(hutil, exit_after_run, exit_code, operation, msg):
         hutil.do_exit(exit_code, operation, status, str(exit_code), msg)
     else:
         hutil.do_status_report(operation, status, str(exit_code), msg)
+
 
 def parse_args(cmd):
     cmd = filter(lambda x : x in string.printable, cmd)

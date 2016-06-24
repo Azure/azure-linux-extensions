@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import array
 import base64
@@ -55,7 +52,8 @@ from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from __builtin__ import int
-#Main function is the only entrence to this extension handler
+
+
 def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')

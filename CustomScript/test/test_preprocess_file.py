@@ -15,17 +15,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
 import unittest
-import env
 import os
-import tempfile
 import zipfile
 import codecs
 import shutil
+
 from MockUtil import MockUtil
 import customscript as cs
 
@@ -44,23 +40,23 @@ class TestPreprocessFile(unittest.TestCase):
         shutil.move('scripts-master', 'encoding')
 
     def test_bin_file(self):
-        print "\nTest: Is it a binary file"
+        print("\nTest: Is it a binary file")
         file_path = "encoding/mslogo.png"
         self.assertFalse(cs.is_text_file(file_path)[0])
 
     def test_text_file(self):
-        print "\nTest: Is it a text file"
+        print("\nTest: Is it a text file")
         files = [file for file in os.listdir('encoding') if file.endswith('py') or file.endswith('sh') or file.endswith('txt')]
         for file in files:
             file_path = os.path.join('encoding', file)
             try:
                 self.assertTrue(cs.is_text_file(file_path)[0])
             except:
-                print file
+                print(file)
                 raise
 
     def test_bom(self):
-        print "\nTest: Remove BOM"
+        print("\nTest: Remove BOM")
         hutil = MockUtil(self)
         files = [file for file in os.listdir('encoding') if 'bom' in file]
         for file in files:
@@ -76,7 +72,7 @@ class TestPreprocessFile(unittest.TestCase):
                 self.assertFalse(contents.startswith(codecs.BOM_BE))
 
     def test_windows_line_break(self):
-        print "\nTest: Convert text files from DOS to Unix formats"
+        print("\nTest: Convert text files from DOS to Unix formats")
         hutil = MockUtil(self)
         files = [file for file in os.listdir('encoding') if 'dos' in file]
         for file in files:

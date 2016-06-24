@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import subprocess
 import os
 import os.path
@@ -28,6 +26,7 @@ from CommandExecuter import CommandExecuter
 from Common import CommonVariables
 from ConfigUtil import ConfigUtil
 from OnGoingItemConfig import *
+
 
 class TransactionalCopyTask(object):
     """
@@ -101,8 +100,8 @@ class TransactionalCopyTask(object):
             if(self.last_slice_size > 0):
                 if(os.path.exists(self.encryption_environment.copy_slice_item_backup_file)):
                     copy_slice_item_backup_file_size = os.path.getsize(self.encryption_environment.copy_slice_item_backup_file)
-                    returnCode = self.resume_copy_internal(copy_slice_item_backup_file_size = copy_slice_item_backup_file_size, \
-                                                            skip_block = skip_block, \
+                    returnCode = self.resume_copy_internal(copy_slice_item_backup_file_size = copy_slice_item_backup_file_size,
+                                                            skip_block = skip_block,
                                                             original_total_copy_size = self.last_slice_size)
                 else:
                     self.logger.log(msg = "1. the slice item backup file not exists.", level = CommonVariables.WarningLevel)
@@ -121,15 +120,14 @@ class TransactionalCopyTask(object):
         skip_of_last_slice = (skip_block * self.block_size) / block_size_of_last_slice
         count_of_last_slice = self.last_slice_size / block_size_of_last_slice
 
-        copy_result = self.copy_internal(from_device = self.source_dev_full_path, to_device = self.destination, \
-                                            skip = skip_of_last_slice, seek = skip_of_last_slice, block_size = block_size_of_last_slice, count = count_of_last_slice)
+        copy_result = self.copy_internal(from_device = self.source_dev_full_path, to_device = self.destination,
+                                         skip = skip_of_last_slice, seek = skip_of_last_slice, block_size = block_size_of_last_slice, count = count_of_last_slice)
         return copy_result
 
     def begin_copy(self):
         """
         check the device_item size first, cut it
         """
-        returnCode = CommonVariables.success
         self.resume_copy()
         if(self.from_end.lower() == 'true'):
             while(self.current_slice_index < self.total_slice_size):

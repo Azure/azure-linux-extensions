@@ -13,9 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 
 import os
@@ -23,6 +20,7 @@ import os.path
 import string
 
 OutputSize = 4 * 1024
+
 
 def tail(log_file, output_size = OutputSize):
     pos = min(output_size, os.path.getsize(log_file))
