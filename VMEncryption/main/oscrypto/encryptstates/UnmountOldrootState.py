@@ -39,7 +39,9 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Performing enter checks for unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('[ -e "/oldroot" ]', True)
-        self.command_executor.Execute('mountpoint /oldroot', True)
+        
+        if self.command_executor.Execute('mountpoint /oldroot') != 0:
+            return False
                 
         return True
 
