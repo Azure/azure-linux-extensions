@@ -21,8 +21,6 @@ import os.path
 import re
 import sys
 import traceback
-import json
-from codecs import *
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -48,10 +46,8 @@ ext_log_path = '/var/log/azure/'
 if os.path.exists(ext_log_path):
     os.chmod(ext_log_path, 700)
 
-#Main function is the only entrance to this extension handler
 def main():
-    #Global Variables definition
-    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout',True)
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout', True)
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
     try:

@@ -78,7 +78,7 @@ def GetWaagentHttpProxyConfigString():
 
         host = waagent.Config.get("HttpProxy.Host")
         port = waagent.Config.get("HttpProxy.Port")
-    except Exception, e:
+    except Exception as e:
         # waagent.ConfigurationProvider(None) will throw an exception on an old waagent
         # Has to silently swallow because logging is not yet available here
         # and we don't want to bring that in here. Also if the call fails, then there's
@@ -102,7 +102,8 @@ __ExtensionName__ = None
 
 
 def InitExtensionEventLog(name):
-    __ExtensionName__=name
+    global __ExtensionName__
+    __ExtensionName__ = name
 
 
 def AddExtensionEvent(name=__ExtensionName__,

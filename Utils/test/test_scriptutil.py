@@ -16,9 +16,9 @@
 
 import os
 import os.path
-import unittest
 import env
 import ScriptUtil as su
+import unittest
 from MockUtil import MockUtil
 
 class TestScriptUtil(unittest.TestCase):

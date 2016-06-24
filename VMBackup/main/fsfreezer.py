@@ -121,7 +121,7 @@ class FsFreezer:
                 try:
                     thread = threading.Thread(target=self.freeze(mount,freeze_result))
                     thread_jobs.append(thread)
-                except Exception, e:
+                except Exception as e:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
@@ -132,7 +132,7 @@ class FsFreezer:
                 job.start()
             for job in thread_jobs:
                 job.join()
-        except Exception, e:
+        except Exception as e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
             freeze_result.errors.append(freezeError)
@@ -158,7 +158,7 @@ class FsFreezer:
                 try:
                     thread = threading.Thread(target=self.unfreeze(mount,unfreeze_result))
                     thread_jobs.append(thread)
-                except Exception,e:
+                except Exception:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
@@ -168,7 +168,7 @@ class FsFreezer:
                 job.start()
             for job in thread_jobs:
                 job.join()
-        except Exception, e:
+        except Exception as e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
             unfreeze_result.errors.append(freezeError)

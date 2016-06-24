@@ -17,19 +17,16 @@
 # limitations under the License.
 
 import os
-import sys
-import imp
-import base64
-import re
-import json
 import platform
+import re
 import shutil
+import sys
 import time
 import traceback
 
 import Utils.HandlerUtil as Util
-
 from waagentloader import load_waagent
+
 waagent = load_waagent()
 
 # Define global variables
@@ -56,7 +53,7 @@ def main():
                 enable()
             elif re.match("^([-/]*)(update)", a):
                 update()
-    except Exception, e:
+    except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
         waagent.Error(err_msg)
 
@@ -95,7 +92,7 @@ def enable():
         check_and_repair_disk(hutil)
 
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
-    except Exception, e:
+    except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
@@ -124,7 +121,7 @@ def _remove_user_account(user_name, hutil):
         sudoers = _get_other_sudoers(user_name)
         waagent.MyDistro.DeleteAccount(user_name)
         _save_other_sudoers(sudoers)
-    except Exception, e:
+    except Exception as e:
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
                                   isSuccess=False,
@@ -235,7 +232,7 @@ def _save_other_sudoers(sudoers):
     if sudoers is None:
         return
     waagent.AppendFileContents(sudoersFile, "\n".join(sudoers))
-    os.chmod("/etc/sudoers.d/waagent", 0440)
+    os.chmod("/etc/sudoers.d/waagent", 0o440)
 
 
 def _allow_password_auth():
@@ -392,7 +389,7 @@ def _fsck_check(hutil):
             raise Exception("Disk check was not successful")
         else:
             return retcode
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to run disk check with error: {0}, {1}".format(
             str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
@@ -414,7 +411,7 @@ def _fsck_repair(hutil, disk_name):
             return output
         else:
             raise Exception("Failed to mount disks")
-    except Exception, e:
+    except Exception as e:
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair','error','0', 'Repair failed.')
 

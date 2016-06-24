@@ -9,33 +9,29 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.  
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
-import socket
-import array
+
 import base64
+import datetime
 import os
-import signal
-import syslog
 import os.path
+import platform
 import re
+import signal
 import string
 import subprocess
 import sys
-import imp
-import shlex
-import traceback
-import platform
+import syslog
 import time
-import datetime
-from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
-import commands
-import base64
+import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-from collections import defaultdict
+from six import string_types
+
+import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
+from Utils.WAAgentUtil import waagent
 
 ExtensionShortName = 'LinuxAzureDiagnostic'
 WorkDir = os.getcwd()
@@ -332,20 +328,19 @@ def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
                     {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
                     {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
                   ]
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to parse performance configuration with exception:{0} {1}".format(e,traceback.format_exc()))
 
     try:
         createPerfSettngs(mdsdCfg,perfCfgList)
         if includeAI:
             createPerfSettngs(mdsdCfg,perfCfgList,True)
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to create perf config  error:{0} {1}".format(e,traceback.format_exc()))
 
 # Try to get resourceId from LadCfg, if not present
 # try to fetch from xmlCfg
 def getResourceId():
-    resourceId = None
     ladCfg = readPublicConfig('ladCfg')
     resourceId = LadUtil.getResourceIdFromLadCfg(ladCfg)
     if not resourceId:
@@ -424,7 +419,7 @@ def configSettings():
                 instanceID = readUUID()
             config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
 
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to create portal config  error:{0} {1}".format(e,traceback.format_exc()))
     
     # Check if Application Insights key is present in ladCfg
@@ -435,7 +430,7 @@ def configSettings():
             hutil.log("Application Insights key found.")
         else:
             hutil.log("Application Insights key not found.")
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed check for Application Insights key in LAD configuration with exception:{0} {1}".format(e,traceback.format_exc()))
 
     generatePerformanceCounterConfiguration(mdsdCfg,aikey != None)
@@ -449,7 +444,7 @@ def configSettings():
 
         with open(omfileconfig,'w') as hfile:
                 hfile.write(syslogCfg)
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
     account = readPrivateConfig('storageAccountName')
@@ -583,9 +578,8 @@ def main(command):
             elif re.match("^([-/]*)(update)", command):
                 hutil.do_status_report("Update", "success",'0', "Update succeeded")
 
-    except Exception, e:
-        hutil.error(("Failed to enable the extension with error:{0}, "
-                     "{1}").format(e, traceback.format_exc()))
+    except Exception as e:
+        hutil.error(("Failed to enable the extension with error:{0}, {1}").format(e, traceback.format_exc()))
         hutil.do_status_report('Enable','error','0',
                       'Enable failed:{0}'.format(e))
 
@@ -602,7 +596,7 @@ def start_daemon():
     args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
     hutil.log('start daemon '+str(args))
-    child = subprocess.Popen(args, stdout=log, stderr=log)
+    subprocess.Popen(args, stdout=log, stderr=log)
     wait_n = 20
     while len(get_mdsd_process())==0 and wait_n >0:
         time.sleep(10)
@@ -658,7 +652,7 @@ def start_mdsd():
         proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
     if not proxy_config:
         proxy_config = readPublicConfig(proxy_config_name)
-    if not isinstance(proxy_config, basestring):
+    if not isinstance(proxy_config, string_types):
         hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
     else:
         proxy_config = proxy_config.strip()
@@ -733,8 +727,8 @@ def start_mdsd():
                 # and LAD still needs to reconfigure rsyslogd.
                 if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
                     with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
-                        new_port = mdsd_pid_port_file.readline()    # This is actually PID, so ignore.
-                        new_port = mdsd_pid_port_file.readline().strip()    # .strip() is important!
+                        mdsd_pid_port_file.readline()                    # This is actually PID, so ignore.
+                        new_port = mdsd_pid_port_file.readline().strip() # .strip() is important!
                         if default_port != new_port:
                             hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
                             reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port)
@@ -821,7 +815,7 @@ def start_mdsd():
         except Exception:
             pass
 
-    except Exception,e:
+    except Exception as e:
         if mdsd_log:
             hutil.error("Error :"+tail(mdsd_log_path))
         hutil.error(("Failed to launch mdsd with error:{0},"
@@ -865,7 +859,7 @@ def stop_mdsd():
 
     RunGetOutput("rm "+MDSDPidFile)
 
-    return 0, "Terminated" if terminated else "SIGKILLed"
+    return 0, "Terminated" if terminated else "SIGKILL'ed"
 
 
 def get_mdsd_process():
@@ -1098,7 +1092,7 @@ def get_deployment_id():
         if name:
             identity = name
             hutil.log("Deployment ID found: {0}.".format(identity))
-    except Exception, e:
+    except Exception as e:
         # use fallback identity
         hutil.error("Failed to retrieve deployment ID. Error:{0} {1}".format(e, traceback.format_exc()))
 

@@ -16,9 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import vmaccess
 import os
+import unittest
+
+import vmaccess
 from Utils.WAAgentUtil import waagent
 
 waagent.LoggerInit('/tmp/test.log','/dev/stdout')

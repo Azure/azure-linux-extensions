@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# Sample Extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import unittest
-import env
 import HandlerUtil as Util
 
 def mock_log(*args, **kwargs):

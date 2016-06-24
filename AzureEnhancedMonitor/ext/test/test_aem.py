@@ -15,15 +15,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-import unittest
-import env
+
+import datetime
 import os
 import json
-import datetime
-from Utils.WAAgentUtil import waagent
+import unittest
+
+import env
 import aem
-import handler
+from Utils.WAAgentUtil import waagent
 
 TestPublicConfig = """\
 {
@@ -359,10 +359,10 @@ class TestAEM(unittest.TestCase):
             self.assertEquals(str(counters[0]), content)
 
         testEventFile = "/dev/console"
-        print "=============================="
-        print "The warning below is expected."
+        print("==============================")
+        print("The warning below is expected.")
         self.assertRaises(IOError, writer.write, counters, 2, testEventFile)
-        print "=============================="
+        print("==============================")
 
     def test_easyHash(self):
         hashVal = aem.easyHash('a')
@@ -376,8 +376,8 @@ class TestAEM(unittest.TestCase):
     
     def test_get_ad_key_range(self):
         startKey, endKey = aem.getAzureDiagnosticKeyRange()
-        print startKey
-        print endKey
+        print(startKey)
+        print(endKey)
 
     def test_get_mds_timestamp(self):
         date = datetime.datetime(2015, 1, 26, 3, 54)

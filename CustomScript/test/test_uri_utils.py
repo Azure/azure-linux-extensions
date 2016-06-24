@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import unittest
-import env
 import customscript as cs
 
 

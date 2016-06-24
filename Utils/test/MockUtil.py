@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# Sample Extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -25,10 +25,10 @@ class MockUtil():
         return "/tmp"
 
     def log(self, msg):
-        print msg
+        print(msg)
 
     def error(self, msg):
-        print msg
+        print(msg)
 
     def get_seq_no(self):
         return "0"

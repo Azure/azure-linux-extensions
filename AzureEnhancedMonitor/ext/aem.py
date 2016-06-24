@@ -15,18 +15,15 @@
 
 import os
 import re
-import sys
 import socket
 import traceback
 import time
 import datetime
 import psutil
-import string
 import urlparse
 import xml.dom.minidom as minidom
 from azure.storage import TableService, Entity
 from Utils.WAAgentUtil import waagent, AddExtensionEvent
-import Utils.HandlerUtil as Util
 
 
 FAILED_TO_RETRIEVE_MDS_DATA="(03100)Failed to retrieve mds data"
@@ -1163,7 +1160,7 @@ class HvInfo(object):
         root_dir = os.path.dirname(__file__)
         cmd = os.path.join(root_dir, "bin/hvinfo")
         ret, output = waagent.RunGetOutput(cmd, chk_err=False)
-        print ret
+        print(ret)
         if ret ==0 and output is not None:
             lines = output.split("\n")
             if len(lines) >= 2:
@@ -1334,7 +1331,7 @@ class PerfCounterWriter(object):
                 waagent.Log(("Write {0} counters to event file."
                              "").format(len(counters)))
                 return
-            except IOError, e:
+            except IOError as e:
                 waagent.Warn((u"Write to perf counters file failed: {0}"
                               "").format(e))
                 waagent.Log("Retry: {0}".format(i))
@@ -1394,10 +1391,10 @@ class EnhancedMonitorConfig(object):
         flag = self.configData.get("verbose")
         return flag == "1" or flag == 1
 
-    def getVMSLAIOPS((self)):
+    def getVMSLAIOPS(self):
         return self.configData.get("vm.sla.iops")
 
-    def getVMSLAThroughput((self)):
+    def getVMSLAThroughput(self):
         return self.configData.get("vm.sla.throughput")
 
     def getOSDiskName(self):

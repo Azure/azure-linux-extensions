@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# Sample Extension
 #
 # Copyright 2014 Microsoft Corporation
 #

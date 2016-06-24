@@ -143,7 +143,7 @@ def dos2unix(src):
     args = ["dos2unix",src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-    print 'dos2unix %s ' % (src)
+    print('dos2unix %s ' % (src))
     child.wait()
 
 def zip(src, dst):
@@ -154,7 +154,7 @@ def zip(src, dst):
             absname = os.path.abspath(os.path.join(dirname, filename))
             dos2unix(absname)
             arcname = absname[len(abs_src) + 1:]
-            print 'zipping %s as %s' % (os.path.join(dirname, filename),arcname)
+            print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
             zf.write(absname, arcname)
     zf.close()
 

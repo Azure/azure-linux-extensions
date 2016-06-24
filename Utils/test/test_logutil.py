@@ -15,8 +15,8 @@
 # limitations under the License.
 
 import unittest
-import env
 import LogUtil as lu
+
 
 class TestLogUtil(unittest.TestCase):    
     def test_tail(self):
