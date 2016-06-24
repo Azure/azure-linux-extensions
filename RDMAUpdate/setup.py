@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 # To build:
 # python setup.py sdist
@@ -33,12 +30,8 @@
 
 from distutils.core import setup
 import os
-import shutil
-import tempfile
 import json
-import sys
 import subprocess
-from subprocess import call
 from zipfile import ZipFile
 from main.Common import CommonVariables
 
@@ -58,11 +51,6 @@ copy the dependency to the local
 copy the utils lib to local
 """
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
-#if os.path.isdir(target_utils_path):
-#    shutil.rmtree(target_utils_path)
-#print('copying')
-#shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
-#print('copying end')
 packages_array.append(target_utils_path)
 
 

@@ -15,10 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
-
 
 import array
 import base64
@@ -36,7 +32,7 @@ import urlparse
 import datetime
 import math
 
-#Main function is the only entrence to this extension handler
+
 def main():
     ticks = 635798839149570996
     
@@ -47,17 +43,6 @@ def main():
     print(str(timespan.total_seconds()))
     total_span_in_seconds = timespan.days * 24 * 60 * 60 + timespan.seconds
     print(str(total_span_in_seconds))
-
- #       p = subprocess.call(["fsfreeze", "-f", "/"])
- #       print(p)
- #       #out, err = p.communicate()
-	## test for the dummy code flow
- #       print('ssss')
-
-
- #       p = subprocess.call(["fsfreeze", "-u", "/"])
- #       print(p)
-        #out, err = p.communicate()
 
 if __name__ == '__main__' :
     main()
