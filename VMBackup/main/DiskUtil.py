@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import subprocess
 import os
 import os.path
@@ -104,7 +102,7 @@ class DiskUtil(object):
             out_lsblk_output = str(out_lsblk_output)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
-                self.logger.log(msg=str(err),level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=str(err))
             lines = out_lsblk_output.splitlines()
             for i in range(0,len(lines)):
                 item_value_str = lines[i].strip()

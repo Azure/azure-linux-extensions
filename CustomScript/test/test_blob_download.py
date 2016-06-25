@@ -15,14 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
 import unittest
-import env
-import os
-import tempfile
 import customscript as cs
 import blob as test_blob
 import blob_mooncake as test_blob_mooncake

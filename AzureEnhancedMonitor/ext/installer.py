@@ -13,13 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
-import os
 import imp
-import sys
+import os
 import shutil
 
 from Utils.WAAgentUtil import waagent
@@ -39,7 +35,7 @@ def find_psutil_build(buildDir):
             binary = os.path.join(build, '_psutil_linux.so')
             imp.load_dynamic('_psutil_linux', binary)
             return build
-        except Exception, e:
+        except Exception:
             pass
     raise Exception("Available build of psutil not found.")
 
@@ -63,7 +59,7 @@ def main():
                 if os.path.isdir(dest):
                     shutil.rmtree(dest)
                 shutil.copytree(src, dest)
-    except Exception, e:
+    except Exception as e:
         hutil.error("{0}, {1}").format(e, traceback.format_exc())
         hutil.do_exit(1, "Install", 'failed','0', 
                       'Install failed: {0}'.format(e))

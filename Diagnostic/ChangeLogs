@@ -1,0 +1,42 @@
+2016-06-21: LAD-2.3.9003
+    - Monitoring agent (mdsd) updates for a memory issue fix, a signal handler fix,
+      and a fix to avoid a spin loop under certain circumstances
+    - doesn't count non-quick crashes (>30 mins) towards retry limit
+    - OMI reconfiguration not to listen to port 1270
+    - Use systemd on Ubuntu 16.04 as well
+    - Validate mdsd XML config before starting mdsd, fails fast on invalid
+      config (with success)
+    - Small Python 2.6 bug fix (syslog.openlog())
+
+2016-06-06: LAD-2.3.9001
+    - Fix issue of syslog messages not collected by default on SLES 11
+    - Minor config syntactic fixes
+    - Logging fix to show correct extension version
+    - Monitoring agent kill is no longer SIGKILL, but SIGTERM.
+    - Monitoring agent listening port is now dynamic if the specified port (29131) is in use.
+    - Monitoring agent core dump is enabled (dumped on its current working directory)
+    - Newer monitoring agent bits with added features (not available on LAD yet)
+
+2016-05-04: LAD-2.3.9
+    - mdsd bits are now built as statically as possible, so that a single monolithic executable
+      can be used on as many distros/versions.
+    - OMI install result is checked and tried up to 3 times. If all fail, LAD install fails as well.
+    - OMI is checked periodically for its health and LAD will restart it if OMI is not up.
+
+2016-03-26: LAD-2.3.7
+    - mdsd http proxy config through waagent.conf
+    - OpenSUSE 13 support revival
+    - LAD no longer (re)starts apache/mysql invasively (restarts only when they were running)
+    - Bundle libglibmm*.so (no longer downloaded/installed when LAD is installed)
+    - AppInsights configuration changes
+
+2016-03-08: LAD-2.3.6
+    - mdsd http proxy support (mdsd binary change)
+    - Ubuntu 16.04 glibmm install issue fix
+    - Report success extension event for unsupported distros/versions
+
+2016-02-25: LAD-2.3.5. Reviving SUSE 11 support and consolidating binaries of diff versions of same distro
+
+2016-02-25: LAD-2.3.4. Hotfix for portal perf graphs not showing (xmlCfg parsing bug)
+
+2016-02-15: LAD-2.3.3. No changes on mdsd/LAD code. Just rebuilding to take in the most recent AISDK fixes

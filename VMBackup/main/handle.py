@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import array
 import base64
@@ -35,6 +32,7 @@ import traceback
 import httplib
 import xml.parsers.expat
 import datetime
+import ConfigParser
 from threading import Thread
 from time import sleep
 from os.path import join
@@ -69,7 +67,7 @@ def main():
     backup_logger = Backuplogger(hutil)
     MyPatching = GetMyPatching(logger = backup_logger)
     hutil.patching = MyPatching
-
+    
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -139,8 +137,6 @@ def snapshot():
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
         freeze_result = freezer.freezeall()
         backup_logger.log('T:S freeze result ' + str(freeze_result))
-
-        # check whether we freeze succeed first?
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
@@ -165,30 +161,26 @@ def snapshot():
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
     snapshot_done = True
-
-
-def freeze_watcher():
-    global backup_logger,run_status,error_msg,snapshot_done
-    #wait 5 minutes before the snapshoting.
-    for i in range(0, 50):
-        if(snapshot_done):
-            backup_logger.log('T:W snapshot is done', False)
-            break;
-        sleep(6)
-    if not snapshot_done:
-        run_result = CommonVariables.error
-        run_status = 'error'
-        error_msg = 'T:W Snapshot timeout'
-        backup_logger.log(error_msg, False, 'Warning')
-
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
     global_error_result = None
     # precheck
     freeze_called = False
+
+    configfile='/etc/azure/vmbackup.conf'
+    thread_timeout=str(60)
+    try:
+        config = ConfigParser.ConfigParser()
+        config.read(configfile)
+        thread_timeout= config.get('SnapshotThread','timeout')
+    except Exception as e:
+        errMsg='cannot read config file or file not present'
+        backup_logger.log(errMsg, False, 'Warning')
+    backup_logger.log("final thread timeout" + thread_timeout, True)
+
     try:
         # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
@@ -220,7 +212,7 @@ def daemon():
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
             utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
-            backup_logger.log('utcTicks in long format' + str(utcTicksLong))
+            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
             commandStartTime = convert_time(utcTicksLong)
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
@@ -255,12 +247,37 @@ def daemon():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
-                freeze_watcher_tread = Thread(target = freeze_watcher)
-                freeze_watcher_tread.start()
+                temp_status= 'transitioning'
+                temp_result=CommonVariables.success
+                temp_msg='Transitioning state in extension'
+                trans_report_msg = None
+                if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+                    trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
+                                    status_code=str(temp_result),\
+                                    message=temp_msg,\
+                                    taskId=para_parser.taskId,\
+                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                                    blobUri=para_parser.statusBlobUri)
+                    if(trans_report_msg is not None):
+                        backup_logger.log("trans status report message:")
+                        backup_logger.log(trans_report_msg)
+                    else:
+                        backup_logger.log("trans_report_msg is none")
+                hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
                 snapshot_thread = Thread(target = snapshot)
+                start_time=datetime.datetime.utcnow()
                 snapshot_thread.start()
-                freeze_watcher_tread.join()
+                snapshot_thread.join(float(thread_timeout))
+                if not snapshot_done:
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:W Snapshot timeout'
+                    backup_logger.log(error_msg, False, 'Warning')
+
+                end_time=datetime.datetime.utcnow()
+                time_taken=end_time-start_time
+                backup_logger.log('total time taken..' + str(time_taken))
                 
                 for i in range(0,3):
                     unfreeze_result = freezer.unfreezeall()

@@ -13,9 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
 import sys
 import re
@@ -24,18 +21,18 @@ import subprocess
 import traceback
 import time
 import aem
-import platform
 import string
 from Utils.WAAgentUtil import waagent, InitExtensionEventLog
 import Utils.HandlerUtil as util
 
 ExtensionShortName = 'AzureEnhancedMonitor'
+ExtensionFullName  = 'Microsoft.OSTCExtensions.AzureEnhancedMonitor'
+ExtensionVersion   = 'AzureEnhancedMonitor'
 
 def printable(s):
     return filter(lambda c : c in string.printable, str(s))
 
 def enable(hutil):
-    pid = None
     pidFile = os.path.join(aem.LibDir, "pid");
    
     #Check whether monitor process is running.
@@ -65,7 +62,6 @@ def enable(hutil):
                       'Azure Enhanced Monitor is enabled')
 
 def disable(hutil):
-    pid = None
     pidFile = os.path.join(aem.LibDir, "pid");
    
     #Check whether monitor process is running.
@@ -100,7 +96,7 @@ def daemon(hutil):
                                   config.getVmRoleInstance())
             hutil.do_status_report("Enable", "success", 0, message)
 
-        except Exception, e:
+        except Exception as e:
             waagent.Error("{0} {1}".format(printable(e), 
                                            traceback.format_exc()))
             hutil.do_status_report("Enable", "error", 0, "{0}".format(e))
@@ -116,7 +112,7 @@ def grace_exit(operation, status, msg):
     hutil.do_exit(0, operation, status, '0', msg)
 
 def parse_context(operation):
-    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, ExtensionFullName, ExtensionVersion)
     hutil.do_parse_context(operation)
     return hutil
 
@@ -145,7 +141,7 @@ def main():
             elif re.match("^([-/]*)(daemon)", command):
                 hutil = parse_context("enable")
                 daemon(hutil)
-        except Exception, e:
+        except Exception as e:
             hutil.error("{0}, {1}".format(e, traceback.format_exc()))
             hutil.do_exit(1, command, 'failed','0', 
                           '{0} failed:{1}'.format(command, e))

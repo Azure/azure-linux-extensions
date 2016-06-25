@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 # To build:
 # python setup.py sdist
@@ -31,15 +28,13 @@
 # To upload:
 # python setup.py sdist upload
 
-from distutils.core import setup
-import os
-import shutil
-import tempfile
+import codecs
 import json
-import sys
+import os
 import subprocess
-from subprocess import call
+from distutils.core import setup
 from zipfile import ZipFile
+
 from main.Common import CommonVariables
 
 packages_array = []
@@ -58,11 +53,6 @@ copy the dependency to the local
 copy the utils lib to local
 """
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
-#if os.path.isdir(target_utils_path):
-#    shutil.rmtree(target_utils_path)
-#print('copying')
-#shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
-#print('copying end')
 packages_array.append(target_utils_path)
 
 
@@ -93,14 +83,14 @@ manifest_file.close()
 generate the extension xml file
 """
 extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
+<ProviderNameSpace>Microsoft.Azure.Security</ProviderNameSpace>
 <Type>%s</Type>
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
 <MediaLink>%s</MediaLink>
 <Description>%s</Description>
-<IsInternalExtension>true</IsInternalExtension>
+<IsInternalExtension>false</IsInternalExtension>
 <Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
 <PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
@@ -146,8 +136,25 @@ def dos2unix(src):
     args = ["dos2unix",src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-    print 'dos2unix %s ' % (src)
+    print('dos2unix %s ' % (src))
     child.wait()
+
+def remove_utf8_bom(src):
+    print('removing utf-8 bom from %s ' % (src))
+
+    contents = None
+
+    with open(src, "r+b") as fp:
+        bincontents = fp.read()
+        if bincontents[:len(codecs.BOM_UTF8)] == codecs.BOM_UTF8:
+            contents = bincontents.decode('utf-8-sig')
+        elif bincontents[:3] == '\xef\x00\x00':
+            contents = bincontents[3:].decode('utf-8')
+        else:
+            contents = bincontents.decode('utf8')
+
+    with open(src, "wb") as fp:
+        fp.write(contents.encode('utf-8'))
 
 def zip(src, dst):
     zf = ZipFile("%s" % (dst), "w")
@@ -156,8 +163,9 @@ def zip(src, dst):
         for filename in files:
             absname = os.path.abspath(os.path.join(dirname, filename))
             dos2unix(absname)
+            remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
-            print 'zipping %s as %s' % (os.path.join(dirname, filename),arcname)
+            print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
             zf.write(absname, arcname)
     zf.close()
 

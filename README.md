@@ -10,7 +10,7 @@ You can read the document [about virtual machine extensions and features](https:
 
 | Name | Lastest Version | Description |
 |:---|:---|:---|
-| [Custom Script](./CustomScript) | 1.4 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
+| [Custom Script](./CustomScript) | 1.5 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
 | [DSC](./DSC) | 2.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
 | [OS Patching](./OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
 | [VM Access](./VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
@@ -31,3 +31,11 @@ Please refer to [**HERE**](./docs/contribution-guide.md).
   $vm = Get-AzureVM -ServiceName 'MyServiceName' -Name 'MyVMName'
   $vm.GetInstance().ProvisionGuestAgent = $true
   ```
+
+# Support
+
+The extensions in this repository are tested against Python 2.7 and higher.
+The extensions in this repository use OpenSSL 1.0 and higher.
+
+-----
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
