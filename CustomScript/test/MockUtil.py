@@ -15,13 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
-import unittest
-
-class MockUtil():
+class MockUtil:
     def __init__(self, test):
         self.test = test
 
@@ -29,10 +24,10 @@ class MockUtil():
         return "/tmp"
 
     def log(self, msg):
-        print msg
+        print(msg)
 
     def error(self, msg):
-        print msg
+        print(msg)
 
     def get_seq_no(self):
         return "0"

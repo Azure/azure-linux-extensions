@@ -1,15 +1,15 @@
-[{
-  "name": "LinuxAzureDiagnostic",
-  "version": 1.0,
-  "handlerManifest": {
-   "installCommand": "diagnostic.py -install",
-    "uninstallCommand": "diagnostic.py -uninstall",
-    "updateCommand": "diagnostic.py -update",
-    "enableCommand": "diagnostic.py -enable",
-    "disableCommand": "diagnostic.py -disable",
-    "rebootAfterInstall": false,
-    "reportHeartbeat": false,
-    "updateMode": "updatewithinstall"
-  },
-  "updateMode": "updatewithinstall"
-}]
+[
+  {
+    "version": 1.0,
+    "handlerManifest": {
+      "disableCommand": "diagnostic.py -disable",
+      "enableCommand": "diagnostic.py -enable",
+      "installCommand": "diagnostic.py -install",
+      "uninstallCommand": "diagnostic.py -uninstall",
+      "updateCommand": "diagnostic.py -update",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false,
+      "updateMode": "updatewithinstall"
+    }
+  }
+]

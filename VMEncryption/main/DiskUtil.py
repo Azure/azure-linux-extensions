@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import subprocess
 import os
 import os.path
@@ -128,7 +126,9 @@ class DiskUtil(object):
                 new_mount_content = mount_content_item
 
             with open(self.encryption_environment.azure_crypt_mount_config_path,'w') as wf:
+                wf.write('\n')
                 wf.write(new_mount_content)
+                wf.write('\n')
             return True
         except Exception as e:
             return False
@@ -143,10 +143,12 @@ class DiskUtil(object):
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 mount_lines = f.readlines()
 
-            filtered_mount_lines = filter(lambda line: crypt_item.mapper_name in mount_lines, mount_lines)
+            filtered_mount_lines = filter(lambda line: not crypt_item.mapper_name in line, mount_lines)
 
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+                wf.write('\n')
                 wf.write('\n'.join(filtered_mount_lines))
+                wf.write('\n')
 
             return True
 
@@ -333,6 +335,10 @@ class DiskUtil(object):
             wf.write(new_mount_content)
 
     def remove_mount_info(self, mount_point):
+        if not mount_point:
+            self.logger.log("remove_mount_info: mount_point is empty")
+            return
+
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
 
         filtered_contents = []
@@ -365,6 +371,10 @@ class DiskUtil(object):
         self.logger.log("fstab.azure.backup updated successfully")
 
     def restore_mount_info(self, mount_point):
+        if not mount_point:
+            self.logger.log("restore_mount_info: mount_point is empty")
+            return
+
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
 
         filtered_contents = []

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#OmsAgent extension
+# OmsAgent extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -15,23 +15,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
 import unittest
 import env
-import os
-import tempfile
-from MockUtil import MockUtil
-os.chdir(env.root)
 import omsagent as oa
+import os
+from MockUtil import MockUtil
+
+os.chdir(env.root)
+
 
 class TestInstall(unittest.TestCase):
-
     def test_install(self):
         hutil = MockUtil(self)
         oa.install(hutil)
+
 
 if __name__ == '__main__':
     unittest.main()

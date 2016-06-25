@@ -13,24 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.4+
 
-
-import os
-import sys
-import imp
-import base64
 import re
-import json
-import platform
-import shutil
-import time
-import traceback
-import datetime
 
 from Utils.WAAgentUtil import waagent
-import Utils.HandlerUtil as Util
 from AbstractPatching import AbstractPatching
 
 
