@@ -31,3 +31,11 @@ Please refer to [**HERE**](./docs/contribution-guide.md).
   $vm = Get-AzureVM -ServiceName 'MyServiceName' -Name 'MyVMName'
   $vm.GetInstance().ProvisionGuestAgent = $true
   ```
+
+# Support
+
+The extensions in this repository are tested against Python 2.7 and higher.
+The extensions in this repository use OpenSSL 1.0 and higher.
+
+-----
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.

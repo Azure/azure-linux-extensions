@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import httplib
 import urlparse
 import urllib
@@ -27,6 +25,7 @@ import base64
 import traceback
 from HttpUtil import HttpUtil
 from Common import *
+
 
 class KeyVaultUtil(object):
     def __init__(self,logger):

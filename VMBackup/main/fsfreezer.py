@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import subprocess
 from mounts import Mounts
 import datetime
@@ -123,7 +121,7 @@ class FsFreezer:
                 try:
                     thread = threading.Thread(target=self.freeze(mount,freeze_result))
                     thread_jobs.append(thread)
-                except Exception, e:
+                except Exception as e:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
@@ -134,7 +132,7 @@ class FsFreezer:
                 job.start()
             for job in thread_jobs:
                 job.join()
-        except Exception, e:
+        except Exception as e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
             freeze_result.errors.append(freezeError)
@@ -160,7 +158,7 @@ class FsFreezer:
                 try:
                     thread = threading.Thread(target=self.unfreeze(mount,unfreeze_result))
                     thread_jobs.append(thread)
-                except Exception,e:
+                except Exception:
                     freezeError = FreezeError()
                     freezeError.errorcode = -1
                     freezeError.path = mount.mount_point
@@ -170,7 +168,7 @@ class FsFreezer:
                 job.start()
             for job in thread_jobs:
                 job.join()
-        except Exception, e:
+        except Exception as e:
             freezeError = FreezeError()
             freezeError.errorcode = -1
             unfreeze_result.errors.append(freezeError)

@@ -16,40 +16,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.6+
-#
-
-
-import array
-import base64
 import os
 import os.path
 import re
-import string
+import shutil
 import subprocess
 import sys
-import imp
-import shlex
+import time
 import traceback
 import urllib2
 import urlparse
-import time
-import shutil
-import json
-from codecs import *
+
 from azure.storage import BlobService
-from Utils.WAAgentUtil import waagent
+from codecs import *
 from distutils.util import strtobool
+from Utils.WAAgentUtil import waagent
+
 import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
+ExtensionShortName = 'CustomScriptForLinux'
 
 # Global Variables
-mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
-with open(mfile,'r') as f:
-    manifest = json.loads(f.read())[0]
-    ExtensionShortName = manifest['name']
-    Version = manifest['version']
 DownloadDirectory = 'download'
 
 # CustomScript-specific Operation
@@ -59,7 +47,7 @@ RunScriptOp = "RunScript"
 # Change permission of log path
 ext_log_path = '/var/log/azure/'
 if os.path.exists(ext_log_path):
-    os.chmod('/var/log/azure/', 0700)
+    os.chmod('/var/log/azure/', 0o700)
 
 #Main function is the only entrence to this extension handler
 def main():
@@ -83,9 +71,8 @@ def main():
                 daemon(hutil)
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
-    except Exception, e:
-        err_msg = ("Failed with error: {0}, "
-                   "{1}").format(e, traceback.format_exc())
+    except Exception as e:
+        err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
         waagent.Error(err_msg)
         hutil.error(err_msg)
         hutil.do_exit(1, 'Enable','failed','0',
@@ -122,7 +109,7 @@ def download_files_with_retry(hutil, retry_count, wait):
         try:
             download_files(hutil)
             break
-        except Exception, e:
+        except Exception as e:
             error_msg = "{0}, retry = {1}, maxRetry = {2}.".format(e, download_retry_count, retry_count)
             hutil.error(error_msg)
             if download_retry_count < retry_count:
@@ -132,7 +119,7 @@ def download_files_with_retry(hutil, retry_count, wait):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=DownloadOp,
                                           isSuccess=False,
-                                          version=Version,
+                                          version=hutil.get_extension_version(),
                                           message="(01100)"+error_msg)
                 raise
 
@@ -142,7 +129,7 @@ def download_files_with_retry(hutil, retry_count, wait):
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=DownloadOp,
                               isSuccess=True,
-                              version=Version,
+                              version=hutil.get_extension_version(),
                               message="(01303)"+msg)
     return retry_count - download_retry_count
 
@@ -166,7 +153,7 @@ def check_idns_with_retry(hutil, retry_count, wait):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="CheckIDNS",
                                   isSuccess=True,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01306)"+msg)
     else:
         error_msg = ("Internal DNS is not ready, "
@@ -175,13 +162,13 @@ def check_idns_with_retry(hutil, retry_count, wait):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="CheckIDNS",
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01306)"+error_msg)
 
 
 def check_idns():
     ret = waagent.Run("host $(hostname)")
-    return (not ret)
+    return not ret
 
 
 def download_files(hutil):
@@ -208,7 +195,7 @@ def download_files(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=DownloadOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01001)"+error_msg)
         return
 
@@ -233,7 +220,7 @@ def download_files(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=DownloadOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01000)"+error_msg)
         raise ValueError(error_msg)
 
@@ -250,7 +237,7 @@ def start_daemon(hutil):
         # Redirect stdout and stderr to /dev/null. Otherwise daemon process
         # will throw Broke pipe exeception when parent process exit.
         devnull = open(os.devnull, 'w')
-        child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
+        subprocess.Popen(args, stdout=devnull, stderr=devnull)
         hutil.do_exit(0, 'Enable', 'transitioning', '0',
                       'Launching the script...')
     else:
@@ -259,7 +246,7 @@ def start_daemon(hutil):
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01002)"+error_msg)
         raise ValueError(error_msg)
 
@@ -290,14 +277,14 @@ def daemon(hutil):
     cmd = get_command_to_execute(hutil)
     args = ScriptUtil.parse_args(cmd)
     if args:
-        ScriptUtil.run_command(hutil, args, prepare_download_dir(hutil.get_seq_no()), 'Daemon', ExtensionShortName, Version)
+        ScriptUtil.run_command(hutil, args, prepare_download_dir(hutil.get_seq_no()), 'Daemon', ExtensionShortName, hutil.get_extension_version())
     else:
         error_msg = "commandToExecute is empty or invalid."
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=RunScriptOp,
                                   isSuccess=False,
-                                  version=Version,
+                                  version=hutil.get_extension_version(),
                                   message="(01002)"+error_msg)
         raise ValueError(error_msg)
 
@@ -321,23 +308,24 @@ def download_blob(storage_account_name, storage_account_key,
         result = download_and_save_blob(storage_account_name,
                                         storage_account_key,
                                         blob_uri,
-                                        download_dir)
+                                        download_dir,
+                                        hutil)
         blob_name, _, _, download_path = result
         preprocess_files(download_path, hutil)
         if command and blob_name in command:
-            os.chmod(download_path, 0100)
-    except Exception, e:
-        error_msg = ("Failed to download blob with uri: {0} "
-                     "with error {1}").format(blob_uri,e)
+            os.chmod(download_path, 0o100)
+    except Exception as e:
+        error_msg = "Failed to download blob with uri: {0} with error {1}".format(blob_uri, e)
         raise Exception(error_msg)
 
 
 def download_and_save_blob(storage_account_name,
                            storage_account_key,
                            blob_uri,
-                           download_dir):
-    container_name = get_container_name_from_uri(blob_uri)
-    blob_name = get_blob_name_from_uri(blob_uri)
+                           download_dir,
+                           hutil):
+    container_name = get_container_name_from_uri(blob_uri, hutil)
+    blob_name = get_blob_name_from_uri(blob_uri, hutil)
     host_base = get_host_base_from_uri(blob_uri)
     # If blob_name is a path, extract the file_name
     last_sep = blob_name.rfind('/')
@@ -352,7 +340,7 @@ def download_and_save_blob(storage_account_name,
                                storage_account_key,
                                host_base=host_base)
     blob_service.get_blob_to_path(container_name, blob_name, download_path)
-    return (blob_name, container_name, host_base, download_path)
+    return blob_name, container_name, host_base, download_path
 
 
 def download_external_files(uris, command, hutil):
@@ -371,8 +359,8 @@ def download_external_file(uri, command, hutil):
         download_and_save_file(uri, file_path)
         preprocess_files(file_path, hutil)
         if command and file_name in command:
-            os.chmod(file_path, 0100)
-    except Exception, e:
+            os.chmod(file_path, 0o100)
+    except Exception as e:
         error_msg = ("Failed to download external file with uri: {0} "
                      "with error {1}").format(uri, e)
         raise Exception(error_msg)
@@ -445,12 +433,12 @@ def remove_bom(file_path):
         shutil.move(temp_file_path, file_path)
 
 
-def get_blob_name_from_uri(uri):
-    return get_properties_from_uri(uri)['blob_name']
+def get_blob_name_from_uri(uri, hutil):
+    return get_properties_from_uri(uri, hutil)['blob_name']
 
 
-def get_container_name_from_uri(uri):
-    return get_properties_from_uri(uri)['container_name']
+def get_container_name_from_uri(uri, hutil):
+    return get_properties_from_uri(uri, hutil)['container_name']
 
 
 def get_host_base_from_uri(blob_uri):
@@ -461,7 +449,7 @@ def get_host_base_from_uri(blob_uri):
     return netloc[netloc.find('.'):]
 
 
-def get_properties_from_uri(uri):
+def get_properties_from_uri(uri, hutil):
     path = get_path_from_uri(uri)
     if path.endswith('/'):
         path = path[:-1]

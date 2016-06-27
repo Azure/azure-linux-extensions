@@ -1,9 +1,9 @@
 default: clean init build
 
 EXTENSIONS = \
- 	CustomScript \
- 	DSC \
- 	OSPatching \
+	CustomScript \
+	DSC \
+	OSPatching \
 	VMBackup
 
 clean:

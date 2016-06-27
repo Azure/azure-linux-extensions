@@ -398,8 +398,7 @@ class Test(unittest.TestCase):
         waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
         waagent.Log("%s started to handle." %(ExtensionShortName))
         global hutil
-        hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
-                                    ExtensionShortName)
+        hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
         hutil.do_parse_context('TEST')
 
         global MyPatching
@@ -786,8 +785,7 @@ def main():
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
     global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
-                                ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context('TEST')
     global MyPatching
     MyPatching = FakePatching(hutil)

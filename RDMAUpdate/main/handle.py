@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import array
 import base64
@@ -43,7 +40,8 @@ from urlparse import urlparse
 from RDMALogger import RDMALogger
 from CronUtil import *
 from SecondStageMarkConfig import SecondStageMarkConfig
-#Main function is the only entrence to this extension handler
+
+
 def main():
     global logger
     global hutil

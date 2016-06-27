@@ -15,25 +15,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
-#
 
-
-import array
-import base64
 import os
 import os.path
 import re
-import string
 import subprocess
 import sys
-import imp
 import traceback
 import urllib2
 import urlparse
 import time
-import shutil
 import platform
 
 from azure.storage import BlobService
@@ -79,7 +70,7 @@ def main():
     waagent.Log("%s started to handle." %(ExtensionShortName))    
 
     global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.try_parse_context()
 
     global public_settings
@@ -124,7 +115,7 @@ def install():
         remove_old_dsc_packages()
         install_dsc_packages()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
-    except Exception, e:
+    except Exception as e:
         hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '1', 'Install Failed.')
 
@@ -182,7 +173,7 @@ def enable():
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
-    except Exception, e:
+    except Exception as e:
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -191,7 +182,7 @@ def uninstall():
     try:
         uninstall_package('dsc')
         hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded')
-    except Exception, e:
+    except Exception as e:
         hutil.error('Failed to uninstall the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Uninstall', 'error', '1', 'Uninstall failed: {0}'.format(e))
 
@@ -379,7 +370,7 @@ def download_azure_blob(account_name, account_key, file_uri, download_dir):
     for retry in range(1, max_retry + 1):
         try:
             blob_service.get_blob_to_path(container_name, blob_name, download_path)
-        except Exception, e:
+        except Exception:
             hutil.error('Failed to download Azure blob, retry = ' + str(retry) + ', max_retry = ' + str(max_retry))
             if retry != max_retry:
                 hutil.log('Sleep 10 seconds')
@@ -425,7 +416,7 @@ def download_external_file(file_uri, download_dir):
         try:
             download_and_save_file(file_uri, file_path)
             return file_path
-        except Exception, e:
+        except Exception:
             hutil.error('Failed to download public file, retry = ' + str(retry) + ', max_retry = ' + str(max_retry))
             if retry != max_retry:
                 hutil.log('Sleep 10 seconds')
