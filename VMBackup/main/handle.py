@@ -161,6 +161,7 @@ def snapshot():
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
     snapshot_done = True
+
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
     #this is using the most recent file timestamp.
