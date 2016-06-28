@@ -33,6 +33,7 @@ sys.path.append(transitionsdir)
 
 from encryptstates import *
 from Common import *
+from CommandExecutor import *
 from DiskUtil import *
 from transitions import *
 
@@ -49,6 +50,11 @@ class OSEncryption(object):
     ]
 
     transitions = [
+        {
+            'trigger': 'skip_encryption',
+            'source': 'uninitialized',
+            'dest': 'completed'
+        },
         {
             'trigger': 'enter_prereq',
             'source': 'uninitialized',
@@ -117,6 +123,7 @@ class OSEncryption(object):
         self.distro_patcher = distro_patcher
         self.logger = logger
         self.encryption_environment = encryption_environment
+        self.command_executor = CommandExecutor(self.logger)
 
         context = OSEncryptionStateContext(hutil=self.hutil,
                                            distro_patcher=self.distro_patcher,
@@ -141,6 +148,18 @@ class OSEncryption(object):
         self.logger.log("======= MACHINE STATE: {0} =======".format(self.state))
 
     def start_encryption(self):
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(command_to_execute="mount",
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+        if '/dev/mapper/osencrypt' in proc_comm.stdout:
+            self.logger.log("OS volume is already encrypted")
+
+            self.skip_encryption()
+            self.log_machine_state()
+
+            return
+
         self.log_machine_state()
 
         self.enter_prereq()
