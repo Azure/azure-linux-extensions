@@ -572,16 +572,18 @@ def main(command):
 
         elif ExtensionOperationType is waagent.WALAExtensionOperation.Enable:
             if UseSystemdServiceManager:
-                hutil.exit_if_enabled()
                 install_service()
-                RunGetOutput('systemctl enable mdsd-lde && systemctl restart mdsd-lde')
+                RunGetOutput('systemctl enable mdsd-lde')
+                mdsd_lde_active = RunGetOutput('systemctl status mdsd-lde')[0] is 0
+                if not mdsd_lde_active or hutil.is_current_config_seq_greater_inused():
+                    RunGetOutput('systemctl restart mdsd-lde')
             else:
                 # if daemon process not runs
                 hutil.log("get pid:" + str(get_mdsd_process()))
                 if len(get_mdsd_process()) != 2 or hutil.is_current_config_seq_greater_inused():
                     stop_mdsd()
                     start_daemon()
-                hutil.set_inused_config_seq(hutil.get_seq_no())
+            hutil.set_inused_config_seq(hutil.get_seq_no())
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Enable succeeded")
 
         elif ExtensionOperationType is "Daemon":
