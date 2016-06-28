@@ -269,6 +269,8 @@ def enable():
     else:
         public_settings = public_settings_str
 
+    logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
+
     encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
     if encryption_operation == CommonVariables.EnableEncryption:
