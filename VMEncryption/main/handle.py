@@ -356,11 +356,21 @@ def enable_encryption():
             # verify the encryption mark
             logger.log(msg="encryption mark is there, starting daemon.", level=CommonVariables.InfoLevel)
             start_daemon('EnableEncryption')
-        else:
-            hutil.exit_if_same_seq()
-            hutil.save_seq()
-            
+        else:            
             encryption_config = EncryptionConfig(encryption_environment, logger)
+
+            exit_status = None
+            if encryption_config.config_file_exists():
+                exit_status = {
+                    'operation': 'EnableEncryption',
+                    'status': CommonVariables.extension_success_status,
+                    'status_code': str(CommonVariables.success),
+                    'message': encryption_config.get_secret_id()
+                }
+
+            hutil.exit_if_same_seq(exit_status)
+            hutil.save_seq()
+
             encryption_config.volume_type = extension_parameter.VolumeType
             encryption_config.commit()
 

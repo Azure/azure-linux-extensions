@@ -120,7 +120,7 @@ class HandlerUtility:
     def same_seq_as_last_run(self):
         return self.get_current_seq() == self.get_last_seq()
 
-    def exit_if_same_seq(self):
+    def exit_if_same_seq(self, exit_status=None):
         current_seq = int(self._context._seq_no)
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
@@ -129,6 +129,13 @@ class HandlerUtility:
                      str(current_seq) +
                      ", last=" +
                      str(last_seq))
+
+            if exit_status:
+                self.do_status_report(exit_status['operation'],
+                                      exit_status['status'],
+                                      exit_status['status_code'],
+                                      exit_status['message'])
+
             sys.exit(0)
 
     def log(self, message):
