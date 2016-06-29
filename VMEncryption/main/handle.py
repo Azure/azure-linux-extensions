@@ -1156,11 +1156,12 @@ def daemon_encrypt():
     if volume_type == CommonVariables.VolumeTypeData.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
         try:
-            daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
-                                        encryption_config=encryption_config,
-                                        disk_util=disk_util,
-                                        bek_util=bek_util,
-                                        bek_passphrase_file=bek_passphrase_file)
+            while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
+                                                  encryption_config=encryption_config,
+                                                  disk_util=disk_util,
+                                                  bek_util=bek_util,
+                                                  bek_passphrase_file=bek_passphrase_file):
+                logger.log("Calling daemon_encrypt_data_volumes again")
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
@@ -1232,6 +1233,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
         identified.
         """
         ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
+
         if(ongoing_item_config.config_file_exists()):
             logger.log("OngoingItemConfig exists.")
             ongoing_item_config.load_value_from_file()
@@ -1288,11 +1290,13 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
+
             if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)
                 raise Exception(message)
             else:
                 bek_util.umount_azure_passhprase(encryption_config)
+                return True
     except Exception as e:
         raise
 
