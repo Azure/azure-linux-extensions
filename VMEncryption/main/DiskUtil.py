@@ -26,8 +26,10 @@ import shlex
 import sys
 from subprocess import *
 import shutil
+import traceback
 import uuid
 import glob
+
 from TransactionalCopyTask import TransactionalCopyTask
 from Common import *
 
@@ -55,6 +57,9 @@ class DiskUtil(object):
             else:
                 returnCode = copy_task.begin_copy()
                 return returnCode
+        except Exception as e:
+            message = "Failed to perform dd copy: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
         finally:
             copy_task.clear_mem_fs()
 
