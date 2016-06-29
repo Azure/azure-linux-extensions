@@ -25,7 +25,6 @@ import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-from six import string_types   # NOTE Hopefully this doesn't cause issues on various distros' python installations
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
@@ -672,7 +671,7 @@ def start_mdsd():
         proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
     if not proxy_config:
         proxy_config = readPublicConfig(proxy_config_name)
-    if not isinstance(proxy_config, string_types):
+    if not isinstance(proxy_config, basestring):
         hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
     else:
         proxy_config = proxy_config.strip()
