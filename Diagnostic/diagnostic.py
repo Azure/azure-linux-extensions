@@ -487,7 +487,7 @@ def get_extension_operation_type(command):
     if re.match("^([-/]*)(disable)", command):
         return waagent.WALAEventOperation.Disable
     if re.match("^([-/]*)(uninstall)", command):
-        return waagent.WALAEventOperation.Uninstall
+        return waagent.WALAEventOperation.UnIsntall
     if re.match("^([-/]*)(update)", command):
         return waagent.WALAEventOperation.Update
 
@@ -544,7 +544,7 @@ def main(command):
                 stop_mdsd()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Disable succeeded")
 
-        elif ExtensionOperationType is waagent.WALAEventOperation.Uninstall:
+        elif ExtensionOperationType is waagent.WALAEventOperation.UnIsntall:
             if UseSystemdServiceManager:
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde ' +
                              '&& rm /lib/systemd/system/mdsd-lde.service')
