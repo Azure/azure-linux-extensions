@@ -297,19 +297,19 @@ def enable_encryption():
     disk_util = DiskUtil(hutil = hutil, patching = MyPatching, logger = logger, encryption_environment = encryption_environment)
     bek_util = BekUtil(disk_util, logger)
     
-    existed_passphrase_file = None
+    existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
     if(config_path_result != CommonVariables.process_success):
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
     if(encryption_config.config_file_exists()):
-        existed_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        if(existed_passphrase_file is not None):
+        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if(existing_passphrase_file is not None):
             mount_encrypted_disks(disk_util=disk_util,
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
-                                  passphrase_file=existed_passphrase_file)
+                                  passphrase_file=existing_passphrase_file)
         else:
             logger.log(msg="the config is there, but we could not get the bek file.",
                        level=CommonVariables.WarningLevel)
@@ -364,7 +364,7 @@ def enable_encryption():
             encryption_config.volume_type = extension_parameter.VolumeType
             encryption_config.commit()
 
-            if(encryption_config.config_file_exists() and existed_passphrase_file is not None):
+            if(encryption_config.config_file_exists() and existing_passphrase_file is not None):
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
@@ -399,7 +399,7 @@ def enable_encryption():
                 this is the fresh call case
                 """
                 #handle the passphrase related
-                if(existed_passphrase_file is None):
+                if(existing_passphrase_file is None):
                     if(extension_parameter.passphrase is None or extension_parameter.passphrase == ""):
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
