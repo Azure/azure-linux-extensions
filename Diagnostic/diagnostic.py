@@ -53,7 +53,7 @@ ExtensionOperationType = None
 def LogRunGetOutPut(cmd, should_log=True):
     if should_log:
         hutil.log("RunCmd "+cmd)
-    error, msg = waagent.RunGetOutput(cmd)
+    error, msg = waagent.RunGetOutput(cmd, log_cmd=should_log)
     if should_log:
         hutil.log("Return "+str(error)+":"+msg)
     return error, msg
@@ -948,7 +948,7 @@ def install_omi():
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
-        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
+        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'", should_log=False)
         shouldRestartOmi = True
 
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
