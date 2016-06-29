@@ -1,3 +1,8 @@
+2016-06-29: LAD-2.3.9004.1 (Test)
+    - Fixes non-starting monitoring agent issue on systemd-enabled distros (#180)
+    - HandlerUtil unified with other extensions
+    - Telemetry (logging) improvement
+
 2016-06-21: LAD-2.3.9003
     - Monitoring agent (mdsd) updates for a memory issue fix, a signal handler fix,
       and a fix to avoid a spin loop under certain circumstances
