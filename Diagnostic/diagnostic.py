@@ -576,7 +576,7 @@ def main(command):
                 install_service()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Install succeeded")
 
-        elif ExtensionOperationType is waagent.WALAExtensionOperation.Enable:
+        elif ExtensionOperationType is waagent.WALAEventOperation.Enable:
             if UseSystemdServiceManager:
                 install_service()
                 RunGetOutput('systemctl enable mdsd-lde')
@@ -595,7 +595,7 @@ def main(command):
         elif ExtensionOperationType is "Daemon":
             start_mdsd()
 
-        elif ExtensionOperationType is waagent.WALAExtensionOperation.Update:
+        elif ExtensionOperationType is waagent.WALAEventOperation.Update:
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Update succeeded")
 
     except Exception as e:
