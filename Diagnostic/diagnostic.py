@@ -564,7 +564,7 @@ def main(command):
                                           isSuccess=False,
                                           version=hutil.get_extension_version(),
                                           message="Install failed: " + msg)
-                return
+                sys.exit(error)  # Per extension specification, we must exit with a non-zero status code when install fails
 
             if UseSystemdServiceManager:
                 install_service()
