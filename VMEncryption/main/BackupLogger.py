@@ -34,6 +34,9 @@ class BackupLogger(object):
     """description of class"""
     def log(self, msg, level='Info'):
         log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
+        log_msg = filter(lambda c: c in string.printable, log_msg)
+        log_msg = msg.encode('ascii', 'ignore')
+
         self.hutil.log(log_msg)
         self.log_to_console(log_msg)
  
@@ -41,6 +44,6 @@ class BackupLogger(object):
         try:
             with open('/dev/console', 'w') as f:
                 msg = filter(lambda c: c in string.printable, msg)
-                f.write('[AzureDiskEncryption] ' + msg.encode('ascii', 'ignore') + '\n')
+                f.write('[AzureDiskEncryption] ' + msg + '\n')
         except IOError as e:
             pass
