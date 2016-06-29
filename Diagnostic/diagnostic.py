@@ -49,6 +49,12 @@ if not public_settings:
 if not private_settings:
     private_settings = {}
 ExtensionOperationType = None
+# Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
+if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
+    if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
+        waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
+    else:  # This shouldn't happen, but just in case...
+        waagent.WALAEventOperation.Uninstall = 'Uninstall'
 
 def LogRunGetOutPut(cmd, should_log=True):
     if should_log:
@@ -487,7 +493,7 @@ def get_extension_operation_type(command):
     if re.match("^([-/]*)(disable)", command):
         return waagent.WALAEventOperation.Disable
     if re.match("^([-/]*)(uninstall)", command):
-        return waagent.WALAEventOperation.UnIsntall
+        return waagent.WALAEventOperation.Uninstall
     if re.match("^([-/]*)(update)", command):
         return waagent.WALAEventOperation.Update
 
@@ -544,7 +550,7 @@ def main(command):
                 stop_mdsd()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Disable succeeded")
 
-        elif ExtensionOperationType is waagent.WALAEventOperation.UnIsntall:
+        elif ExtensionOperationType is waagent.WALAEventOperation.Uninstall:
             if UseSystemdServiceManager:
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde ' +
                              '&& rm /lib/systemd/system/mdsd-lde.service')
