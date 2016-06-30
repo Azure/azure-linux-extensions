@@ -70,6 +70,6 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup','lsscsi']
+        common_extras = ['cryptsetup', 'lsscsi', 'psmisc', 'cryptsetup-reencrypt', 'lvm2', 'uuid', 'at', 'patch', 'procps-ng', 'util-linux']
         for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+            self.logger.log("installation for " + extra + ', result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
