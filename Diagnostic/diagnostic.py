@@ -585,8 +585,9 @@ def main(command):
                     RunGetOutput('systemctl restart mdsd-lde')
             else:
                 # if daemon process not runs
-                hutil.log("get pid:" + str(get_mdsd_process()))
-                if len(get_mdsd_process()) != 2 or hutil.is_current_config_seq_greater_inused():
+                mdsd_procs = get_mdsd_process()
+                hutil.log("get pid:" + str(mdsd_procs))
+                if len(mdsd_procs) != 2 or hutil.is_current_config_seq_greater_inused():
                     stop_mdsd()
                     start_daemon()
             hutil.set_inused_config_seq(hutil.get_seq_no())
