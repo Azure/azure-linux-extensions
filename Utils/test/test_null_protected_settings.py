@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# Sample Extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -15,12 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import unittest
-import env
 import HandlerUtil as Util
 
 def mock_log(*args, **kwargs):
@@ -28,7 +24,7 @@ def mock_log(*args, **kwargs):
 
 class TestNullProtectedSettings(unittest.TestCase):
     def test_null_protected_settings(self):
-        hutil = Util.HandlerUtility(mock_log, mock_log, "UnitTest")
+        hutil = Util.HandlerUtility(mock_log, mock_log, "UnitTest", "HandlerUtil.UnitTest", "0.0.1")
         config = hutil._parse_config(Settings)
         handlerSettings = config['runtimeSettings'][0]['handlerSettings']
         self.assertEquals(handlerSettings["protectedSettings"], None)

@@ -13,11 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.6+
 
-import re;
-import os;
+import re
+import os
 
 code_start="""\
 //
@@ -93,8 +91,8 @@ if __name__ == "__main__":
                                                 type_name.lower(),
                                                 short_name)
                 head_out.write(head_snippet)
-                print "printf(\">>>>ap_metric_{0}_{1}\\n\");".format(type_name, short_name)
-                print "ap_metric_{0}_{1}(handler, &pc, 1);".format(type_name, short_name)
-                print "print_counter(&pc);"
+                print("printf(\">>>>ap_metric_{0}_{1}\\n\");".format(type_name, short_name))
+                print("ap_metric_{0}_{1}(handler, &pc, 1);".format(type_name, short_name))
+                print("print_counter(&pc);")
 
 

@@ -37,13 +37,10 @@ import Utils.HandlerUtil as Util
 from patch import *
 
 # Global variables definition
+ExtensionShortName = "DSCForLinux"
 DownloadDirectory = 'download'
 idleTestScriptName = "idleTest.py"
 healthyTestScriptName = "healthyTest.py"
-mfile = os.path.join(os.getcwd(), 'HandlerManifest.json')
-with open(mfile,'r') as f:
-    manifest = json.loads(f.read())[0]
-    ExtensionShortName = manifest['name']
 
 def install():
     hutil.do_parse_context('Install')
@@ -420,8 +417,7 @@ def main():
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
     global hutil
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error,
-                                ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
 
     global MyPatching
     MyPatching = GetMyPatching(hutil)

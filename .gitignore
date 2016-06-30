@@ -1,4 +1,4 @@
-led / optimized / DLL files
+compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 */.py[cod]
@@ -21,6 +21,9 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Editor
+*~
 
 # PyInstaller
 #  Usually these files are written by a python script from a template 

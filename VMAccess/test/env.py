@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
-#
 # Copyright 2014 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import sys
 import os
 
@@ -32,10 +28,10 @@ if os.path.exists(manifestFile):
     manifest = json.load(jsonData)
     jsonData.close()
     extName="{0}-{1}".format(manifest[0]["name"], manifest[0]["version"])
-    print "Start test: %s" %extName
-    
+    print("Start test: %s" % extName)
+
     extDir=os.path.join("/var/lib/waagent", extName)
     if(os.path.isdir(extDir)):
         os.chdir(extDir)
-        print "Switching to dir: %s" %os.getcwd()
+        print("Switching to dir: %s" % os.getcwd())
 

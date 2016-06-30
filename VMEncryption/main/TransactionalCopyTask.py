@@ -15,9 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
+
 import subprocess
 import os
 import os.path
@@ -28,6 +26,7 @@ from CommandExecutor import CommandExecutor
 from Common import CommonVariables
 from ConfigUtil import ConfigUtil
 from OnGoingItemConfig import *
+
 
 class TransactionalCopyTask(object):
     """
@@ -151,7 +150,6 @@ class TransactionalCopyTask(object):
         """
         check the device_item size first, cut it
         """
-        returnCode = CommonVariables.success
         self.resume_copy()
         if(self.from_end.lower() == 'true'):
             while(self.current_slice_index < self.total_slice_size):

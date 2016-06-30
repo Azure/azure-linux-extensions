@@ -16,10 +16,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
-
 
 import imp
 import os
@@ -40,8 +36,9 @@ def searchWAAgent():
             return agentPath
     return None
 
+waagent = None
 agentPath = searchWAAgent()
-if(agentPath):
+if agentPath:
     waagent = imp.load_source('waagent', agentPath)
 else:
     raise Exception("Can't load waagent.")
@@ -67,9 +64,47 @@ if not hasattr(waagent, "WALAEventOperation"):
         Update = "Update"           
     waagent.WALAEventOperation = _WALAEventOperation
 
-__ExtensionName__=None
+
+def GetWaagentHttpProxyConfigString():
+    """
+    Get http_proxy and https_proxy from waagent config.
+    Username and password is not supported now.
+    This code is adopted from /usr/sbin/waagent
+    """
+    host = None
+    port = None
+    try:
+        waagent.Config = waagent.ConfigurationProvider(None)  # Use default waagent conf file (most likely /etc/waagent.conf)
+
+        host = waagent.Config.get("HttpProxy.Host")
+        port = waagent.Config.get("HttpProxy.Port")
+    except Exception as e:
+        # waagent.ConfigurationProvider(None) will throw an exception on an old waagent
+        # Has to silently swallow because logging is not yet available here
+        # and we don't want to bring that in here. Also if the call fails, then there's
+        # no proxy config in waagent.conf anyway, so it's safe to silently swallow.
+        pass
+
+    result = ''
+    if host is not None:
+        result = "http://" + host
+        if port is not None:
+            result += ":" + port
+
+    return result
+
+
+waagent.HttpProxyConfigString = GetWaagentHttpProxyConfigString()
+
+# end: waagent http proxy config stuff
+
+__ExtensionName__ = None
+
+
 def InitExtensionEventLog(name):
-    __ExtensionName__=name
+    global __ExtensionName__
+    __ExtensionName__ = name
+
 
 def AddExtensionEvent(name=__ExtensionName__,
                       op=waagent.WALAEventOperation.Enable, 

@@ -6,22 +6,21 @@ import Utils.HandlerUtil as Util
 ExtensionShortName = "SampleExtension"
 
 def main():
-    #Global Variables definition
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    waagent.Log("%s started to handle." %(ExtensionShortName))
+    waagent.Log("%s started to handle." % ExtensionShortName)
 
-    operation = "uninstall"
+    operation = "disable"
     status = "success"
-    msg = "Uninstalled successfully."
+    msg = "Disabled successfully."
 
     hutil = parse_context(operation)
-    hutil.log("Start to uninstall.")
+    hutil.log("Start to disable.")
     hutil.log(msg)
     hutil.do_exit(0, operation, status, '0', msg)
 
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context(operation)
     return hutil
 

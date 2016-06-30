@@ -1,13 +1,14 @@
-[{
-  "name": "CustomScript",
-  "version": "1.5.1.0",
-  "handlerManifest": {
-    "installCommand": "customscript.py -install",
-    "uninstallCommand": "customscript.py -uninstall",
-    "updateCommand": "customscript.py -update",
-    "enableCommand": "customscript.py -enable",
-    "disableCommand": "customscript.py -disable",
-    "rebootAfterInstall": false,
-    "reportHeartbeat": false
+[
+  {
+    "version": 1.0,
+    "handlerManifest": {
+      "disableCommand": "customscript.py -disable",
+      "enableCommand": "customscript.py -enable",
+      "installCommand": "customscript.py -install",
+      "uninstallCommand": "customscript.py -uninstall",
+      "updateCommand": "customscript.py -update",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false
+    }
   }
-}]
+]

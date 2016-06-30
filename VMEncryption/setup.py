@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 # To build:
 # python setup.py sdist
@@ -31,16 +28,13 @@
 # To upload:
 # python setup.py sdist upload
 
-from distutils.core import setup
 import codecs
-import os
-import shutil
-import tempfile
 import json
-import sys
+import os
 import subprocess
-from subprocess import call
+from distutils.core import setup
 from zipfile import ZipFile
+
 from main.Common import CommonVariables
 
 packages_array = []
@@ -68,11 +62,6 @@ copy the dependency to the local
 copy the utils lib to local
 """
 target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
-#if os.path.isdir(target_utils_path):
-#    shutil.rmtree(target_utils_path)
-#print('copying')
-#shutil.copytree ('../' + CommonVariables.utils_path_name, target_utils_path)
-#print('copying end')
 packages_array.append(target_utils_path)
 
 
@@ -156,11 +145,11 @@ def dos2unix(src):
     args = ["dos2unix",src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-    print 'dos2unix %s ' % (src)
+    print('dos2unix %s ' % (src))
     child.wait()
 
 def remove_utf8_bom(src):
-    print 'removing utf-8 bom from %s ' % (src)
+    print('removing utf-8 bom from %s ' % (src))
 
     contents = None
 
@@ -185,7 +174,7 @@ def zip(src, dst):
             dos2unix(absname)
             remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
-            print 'zipping %s as %s' % (os.path.join(dirname, filename),arcname)
+            print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
             zf.write(absname, arcname)
     zf.close()
 

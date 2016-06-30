@@ -15,9 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Requires Python 2.7+
-#
 
 import array
 import base64
@@ -57,7 +54,6 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from __builtin__ import int
 
-#Main function is the only entrence to this extension handler
 
 def install():
     hutil.do_parse_context('Install')
@@ -591,6 +587,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
             if(not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]):
                 logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
                            level=CommonVariables.WarningLevel)
+
                 ongoing_item_config.clear_config()
                 return current_phase
 

@@ -1,13 +1,14 @@
-[{
-  "name": "VMAccess",
-  "version": "1.4.1.0",
-  "handlerManifest": {
-    "installCommand": "./vmaccess.py -install",
-    "uninstallCommand": "./vmaccess.py -uninstall",
-    "updateCommand": "./vmaccess.py -update",
-    "enableCommand": "./vmaccess.py -enable",
-    "disableCommand": "./vmaccess.py -disable",
-    "rebootAfterInstall": false,
-    "reportHeartbeat": false
+[
+  {
+    "version": 1.0,
+    "handlerManifest": {
+      "disableCommand": "./vmaccess.py -disable",
+      "enableCommand": "./vmaccess.py -enable",
+      "installCommand": "./vmaccess.py -install",
+      "uninstallCommand": "./vmaccess.py -uninstall",
+      "updateCommand": "./vmaccess.py -update",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false
+    }
   }
-}]
+]

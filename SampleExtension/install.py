@@ -10,18 +10,18 @@ def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
 
-    operation = "update"
+    operation = "install"
     status = "success"
-    msg = "Updated successfully."
+    msg = "Installed successfully."
 
     hutil = parse_context(operation)
-    hutil.log("Start to update.")
+    hutil.log("Start to install.")
     hutil.log(msg)
     hutil.do_exit(0, operation, status, '0', msg)
 
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context(operation)
     return hutil
 
