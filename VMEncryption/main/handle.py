@@ -1285,7 +1285,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
             if not encryption_marker.config_file_exists():
                 logger.log("Data volumes are not marked for encryption")
                 bek_util.umount_azure_passhprase(encryption_config)
-                return
+                return True
 
             if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
                 failed_item = enable_encryption_all_in_place(passphrase_file=bek_passphrase_file,
