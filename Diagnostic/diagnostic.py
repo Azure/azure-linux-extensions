@@ -41,6 +41,7 @@ waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
 waagent.Log("LinuxAzureDiagnostic started to handle.")
 hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
 hutil.try_parse_context()
+hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
 public_settings = hutil.get_public_settings()
 private_settings = hutil.get_protected_settings()
 if not public_settings:
@@ -58,7 +59,7 @@ if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
 def LogRunGetOutPut(cmd, should_log=True):
     if should_log:
         hutil.log("RunCmd "+cmd)
-    error, msg = waagent.RunGetOutput(cmd, log_cmd=should_log)
+    error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
     if should_log:
         hutil.log("Return "+str(error)+":"+msg)
     return error, msg
