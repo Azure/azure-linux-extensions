@@ -95,7 +95,9 @@ class PatchBootSystemState(OSEncryptionState):
         patchpath = os.path.join(patchesdir, 'rhel-72-dracut.patch')
 
         if not os.path.exists(patchpath):
-            self.context.logger.log("Patch not found at path: {0}".format(patchpath))
+            message = "Patch not found at path: {0}".format(patchpath)
+            self.context.logger.log(message)
+            raise Exception(message)
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
