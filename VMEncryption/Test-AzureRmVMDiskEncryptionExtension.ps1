@@ -15,7 +15,8 @@
 	[string] $SshPubKey,
     [string] $SshPrivKeyPath,
     [string] $Location="eastus",
-    [string] $VolumeType="data"
+    [string] $VolumeType="data",
+    [string] $GalleryImage="RedHat:RHEL:7.2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -109,7 +110,13 @@ $VirtualMachine = Set-AzureRmVMOperatingSystem -VM $VirtualMachine -Linux -Compu
 
 Write-Host "Set AzureRmVMOperatingSystem successfully"
 
-$VirtualMachine = Set-AzureRmVMSourceImage -VM $VirtualMachine -PublisherName "RedHat" -Offer "RHEL" -Skus "7.2" -Version "latest"
+$PublisherName = $GalleryImage.Split(":")[0]
+$Offer = $GalleryImage.Split(":")[1]
+$Skus = $GalleryImage.Split(":")[2]
+
+Write-Host "PublisherName: $PublisherName, Offer: $Offer, Skus: $Skus"
+
+$VirtualMachine = Set-AzureRmVMSourceImage -VM $VirtualMachine -PublisherName $PublisherName -Offer $Offer -Skus $Skus -Version "latest"
 
 Write-Host "Set AzureVMSourceImage successfully"
 
