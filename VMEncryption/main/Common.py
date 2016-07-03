@@ -38,7 +38,6 @@ class CommonVariables:
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
     disk_by_id_root = '/dev/disk/by-id'
-    BekVolumeFileSystem = 'vfat'
 
     """
     parameter key names
@@ -50,7 +49,6 @@ class CommonVariables:
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
-    BekVolumeFileSystemKey = "BekVolumeFileSystem"
 
     """
     value for VolumeType could be OS or Data

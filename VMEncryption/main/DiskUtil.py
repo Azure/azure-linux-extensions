@@ -428,7 +428,7 @@ class DiskUtil(object):
 
         self.logger.log("fstab updated successfully")
 
-    def mount_filesystem(self,dev_path,mount_point,file_system=None):
+    def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
         """

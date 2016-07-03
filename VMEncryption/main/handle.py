@@ -103,7 +103,7 @@ def disable_encryption():
 
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
 
-        disk_util = DiskUtil(hutil=hutil, patching=MyPatching, logger=logger, encryption_environment=encryption_environment)
+        disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -175,7 +175,7 @@ def none_or_empty(obj):
         return False
 
 def toggle_se_linux_for_centos7(disable):
-    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
         if(disable):
             se_linux_status = encryption_environment.get_se_linux()
             if(se_linux_status.lower() == 'enforcing'):
@@ -193,7 +193,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
             crypt_item = crypt_items[i]
             #add walkaround for the centos 7.0
             se_linux_status = None
-            if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                 se_linux_status = encryption_environment.get_se_linux()
                 if(se_linux_status.lower() == 'enforcing'):
                     encryption_environment.disable_se_linux()
@@ -203,7 +203,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
                                                    header_file=crypt_item.luks_header_path,
                                                    uses_cleartext_key=crypt_item.uses_cleartext_key)
             logger.log("luks open result is {0}".format(luks_open_result))
-            if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                 if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
                     encryption_environment.enable_se_linux()
             if(crypt_item.mount_point != 'None'):
@@ -215,17 +215,17 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         bek_util.umount_azure_passhprase(encryption_config)
 
 def main():
-    global hutil, MyPatching, logger, encryption_environment
+    global hutil, DistroPatcher, logger, encryption_environment
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
     
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     logger = BackupLogger(hutil)
-    MyPatching = GetMyPatching(logger)
-    hutil.patching = MyPatching
+    DistroPatcher = GetDistroPatcher(logger)
+    hutil.patching = DistroPatcher
 
-    encryption_environment = EncryptionEnvironment(patching=MyPatching,logger=logger)
-    if MyPatching is None:
+    encryption_environment = EncryptionEnvironment(patching=DistroPatcher,logger=logger)
+    if DistroPatcher is None:
         hutil.do_exit(exit_code=0,
                       operation='Enable',
                       status=CommonVariables.extension_error_status,
@@ -257,6 +257,9 @@ def mark_encryption(command,volume_type,disk_format_query):
 def enable():
     hutil.do_parse_context('Enable')
     logger.log('Enabling extension')
+
+    logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
 
     public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
@@ -290,15 +293,17 @@ def enable_encryption():
     """
     trying to mount the crypted items.
     """
-    disk_util = DiskUtil(hutil = hutil, patching = MyPatching, logger = logger, encryption_environment = encryption_environment)
+    disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
     
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
+
     if(config_path_result != CommonVariables.process_success):
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
+
     if(encryption_config.config_file_exists()):
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if(existing_passphrase_file is not None):
@@ -307,7 +312,7 @@ def enable_encryption():
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
         else:
-            logger.log(msg="the config is there, but we could not get the bek file.",
+            logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
                        level=CommonVariables.WarningLevel)
             exit_without_status_report()
 
@@ -487,13 +492,13 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
-                    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+                    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                         se_linux_status = encryption_environment.get_se_linux()
                         if(se_linux_status.lower() == 'enforcing'):
                             encryption_environment.disable_se_linux()
                     encrypt_result = disk_util.encrypt_disk(dev_path = device_to_encrypt_uuid_path, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
                 finally:
-                    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+                    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                         if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
                             encryption_environment.enable_se_linux()
 
@@ -1025,7 +1030,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         else:
             encrypted_items.append(device_item.uuid)
             logger.log(msg=("encrypting: {0}".format(device_item)))
-            no_header_file_support = not_support_header_option_distro(MyPatching)
+            no_header_file_support = not_support_header_option_distro(DistroPatcher)
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
                                                                     len(device_items_to_encrypt))
 
@@ -1139,9 +1144,9 @@ def daemon_encrypt():
     """
     search for the bek volume, then mount it:)
     """
-    disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    disk_util = DiskUtil(hutil, DistroPatcher, logger, encryption_environment)
 
-    encryption_config = EncryptionConfig(encryption_environment,logger)
+    encryption_config = EncryptionConfig(encryption_environment, logger)
     bek_passphrase_file = None
     """
     try to find the attached bek volume, and use the file to mount the crypted volumes,
@@ -1187,7 +1192,7 @@ def daemon_encrypt():
        volume_type == CommonVariables.VolumeTypeAll.lower():
 
         os_encryption = OSEncryption(hutil=hutil,
-                                     distro_patcher=MyPatching,
+                                     distro_patcher=DistroPatcher,
                                      logger=logger,
                                      encryption_environment=encryption_environment)
 
@@ -1226,9 +1231,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
         """
         check whether there's a scheduled encryption task
         """
-        logger.log("Installing pre-requisites")
-        MyPatching.install_extras()
-
         mount_all_result = disk_util.mount_all()
 
         if(mount_all_result != CommonVariables.process_success):
@@ -1320,7 +1322,7 @@ def daemon_decrypt():
     # in order to set-up all the mapper devices
     # we don't need the BEK since all the drives that need decryption were made cleartext-key unlockable by first call to disable
 
-    disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    disk_util = DiskUtil(hutil, DistroPatcher, logger, encryption_environment)
     encryption_config = EncryptionConfig(encryption_environment, logger)
     mount_encrypted_disks(disk_util=disk_util,
                           bek_util=None,

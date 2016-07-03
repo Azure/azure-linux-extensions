@@ -27,7 +27,6 @@ class EncryptionConfig(object):
     def __init__(self, encryption_environment, logger):
         self.encryptionEnvironment = encryption_environment
         self.passphrase_file_name = None
-        self.bek_filesystem = None
         self.volume_type = None
         self.secret_id = None
         self.encryption_config = ConfigUtil(encryption_environment.encryption_config_file_path,
@@ -45,9 +44,6 @@ class EncryptionConfig(object):
     def get_volume_type(self):
         return self.encryption_config.get_config(CommonVariables.VolumeTypeKey)
 
-    def get_bek_filesystem(self):
-        return self.encryption_config.get_config(CommonVariables.BekVolumeFileSystemKey)
-
     def get_secret_id(self):
         return self.encryption_config.get_config(CommonVariables.SecretUriKey)
 
@@ -55,8 +51,6 @@ class EncryptionConfig(object):
         key_value_pairs = []
         command = ConfigKeyValuePair(CommonVariables.PassphraseFileNameKey, self.passphrase_file_name)
         key_value_pairs.append(command)
-        bek_file_system = ConfigKeyValuePair(CommonVariables.BekVolumeFileSystemKey, CommonVariables.BekVolumeFileSystem)
-        key_value_pairs.append(bek_file_system)
         volume_type = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
         parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey, self.secret_id)
