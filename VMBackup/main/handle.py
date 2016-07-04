@@ -85,6 +85,9 @@ def main():
 def install():
     global hutil
     hutil.do_parse_context('Install')
+    finalpath=str(os.getcwd())
+    commandToExecute ="chmod -R +x "+finalpath
+    subprocess.call(commandToExecute,shell=True)
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
 def timedelta_total_seconds(delta):
@@ -205,48 +208,10 @@ def daemon():
         backup_logger.log('starting to enable', True)
 
         # handle the restoring scenario.
-        mi = MachineIdentity()
-        stored_identity = mi.stored_identity()
-        if(stored_identity is None):
-            mi.save_identity()
-        else:
-            current_identity = mi.current_identity()
-            if(current_identity != stored_identity):
-                current_seq_no = -1
-                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_last_seq(current_seq_no)
-                mi.save_identity()
-
-        hutil.exit_if_same_seq()
-        hutil.save_seq()
-
-        """
-        protectedSettings is the privateConfig passed from Powershell.
-        WATCHOUT that, the _context_config are using the most freshest timestamp.
-        if the time sync is alive, this should be right.
-        """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
-        if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
-            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
-            commandStartTime = convert_time(utcTicksLong)
-            utcNow = datetime.datetime.utcnow()
-            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
-            timespan = utcNow - commandStartTime
-            THIRTY_MINUTES = 30 * 60 # in seconds
-            # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timedelta_total_seconds(timespan)
-            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
-            if(abs(total_span_in_seconds) > THIRTY_MINUTES):
-                error_msg = 'the call time stamp is out of date. so skip it.'
-                exit_with_commit_log(error_msg, para_parser)
-
-        if(para_parser.taskId is not None and para_parser.taskId != ""):
-            taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
         if(commandToExecute.lower() == CommonVariables.iaas_install_command):
@@ -348,6 +313,75 @@ def update():
 
 def enable():
     hutil.do_parse_context('Enable')
+    try:
+        # we need to freeze the file system first
+        backup_logger.log('starting to enable', True)
+
+        # handle the restoring scenario.
+        mi = MachineIdentity()
+        stored_identity = mi.stored_identity()
+        if(stored_identity is None):
+            mi.save_identity()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = -1
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
+                hutil.set_last_seq(current_seq_no)
+                mi.save_identity()
+
+        hutil.exit_if_same_seq()
+        hutil.save_seq()
+
+        """
+        protectedSettings is the privateConfig passed from Powershell.
+        WATCHOUT that, the _context_config are using the most freshest timestamp.
+        if the time sync is alive, this should be right.
+        """
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+        para_parser = ParameterParser(protected_settings, public_settings)
+
+        if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+            utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
+            commandStartTime = convert_time(utcTicksLong)
+            utcNow = datetime.datetime.utcnow()
+            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
+            timespan = utcNow - commandStartTime
+            THIRTY_MINUTES = 30 * 60 # in seconds
+            # handle the machine identity for the restoration scenario.
+            total_span_in_seconds = timedelta_total_seconds(timespan)
+            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+            if(abs(total_span_in_seconds) > THIRTY_MINUTES):
+                error_msg = 'the call time stamp is out of date. so skip it.'
+                exit_with_commit_log(error_msg, para_parser)
+
+        if(para_parser.taskId is not None and para_parser.taskId != ""):
+            taskIdentity = TaskIdentity()
+            taskIdentity.save_identity(para_parser.taskId)
+        temp_status= 'transitioning'
+        temp_result=0
+        temp_msg='Transitioning state in extension'
+        trans_report_msg = None
+        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+            trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
+                                    status_code=str(temp_result),\
+                                    message=temp_msg,\
+                                    taskId=para_parser.taskId,\
+                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                                    blobUri=para_parser.statusBlobUri)
+            if(trans_report_msg is not None):
+                backup_logger.log("trans status report message:")
+                backup_logger.log(trans_report_msg)
+            else:
+                backup_logger.log("trans_report_msg is none")
+        hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
+    except Exception as e:
+        errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, False, 'Error')
+        global_error_result = e
+
     start_daemon();
 
 def start_daemon():
