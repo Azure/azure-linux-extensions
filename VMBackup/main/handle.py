@@ -85,10 +85,13 @@ def main():
 def install():
     global hutil
     hutil.do_parse_context('Install')
-    finalpath=str(os.getcwd())
-    commandToExecute ="chmod -R +x "+finalpath
-    subprocess.call(commandToExecute,shell=True)
-    hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
+    try:
+        finalpath=str(os.getcwd())
+        commandToExecute ="chmod -R +x "+finalpath
+        subprocess.call(commandToExecute,shell=True)
+        hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
+    except Exception as e:
+        hutil.do_exit(0, 'Install','success','0', 'Install Succeeded but permissions not changed')
 
 def timedelta_total_seconds(delta):
     if not hasattr(datetime.timedelta, 'total_seconds'):
@@ -205,7 +208,12 @@ def daemon():
 
     try:
         # we need to freeze the file system first
-        backup_logger.log('starting to enable', True)
+        backup_logger.log('starting daemon', True)
+        """
+        protectedSettings is the privateConfig passed from Powershell.
+        WATCHOUT that, the _context_config are using the most freshest timestamp.
+        if the time sync is alive, this should be right.
+        """
 
         # handle the restoring scenario.
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
@@ -312,9 +320,12 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
+    global backup_logger,hutil,error_msg,para_parser
     hutil.do_parse_context('Enable')
+    finalpath=str(os.getcwd())
+    commandToExecuteTmp ="chmod -R +x "+finalpath
+    subprocess.call(commandToExecuteTmp,shell=True)
     try:
-        # we need to freeze the file system first
         backup_logger.log('starting to enable', True)
 
         # handle the restoring scenario.
