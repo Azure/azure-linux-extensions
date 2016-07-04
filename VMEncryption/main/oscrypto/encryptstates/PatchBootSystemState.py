@@ -106,11 +106,11 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
 
-        self._append_contents_to_file('\nadd_drivers+=" vfat nls_cp437 nls_iso8859-1"\n',
+        self._append_contents_to_file('\nadd_drivers+=" fuse vfat nls_cp437 nls_iso8859-1"\n',
                                       '/etc/dracut.conf')
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                       '/etc/dracut.conf')
 
-        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
+        self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
         self.command_executor.Execute('grub2-install /dev/sda', True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
