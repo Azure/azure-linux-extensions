@@ -44,7 +44,6 @@ from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
-from oscrypto import *
 from BekUtil import *
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -1190,7 +1189,9 @@ def daemon_encrypt():
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
-
+        # import OSEncryption here instead of at the top because it relies
+        # on pre-req packages being installed (specifically, python-six on Ubuntu)
+        from oscrypto import OSEncryption
         os_encryption = OSEncryption(hutil=hutil,
                                      distro_patcher=DistroPatcher,
                                      logger=logger,
