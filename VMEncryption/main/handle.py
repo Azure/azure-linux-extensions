@@ -1216,9 +1216,9 @@ def daemon_encrypt():
 
         message = ''
         if volume_type == CommonVariables.VolumeTypeAll.lower():
-            message = 'Encryption succeeded for OS volume'
-        else:
             message = 'Encryption succeeded for all volumes'
+        else:
+            message = 'Encryption succeeded for OS volume'
 
         logger.log(msg=message)
         hutil.do_status_report(operation='EnableEncryptionOSVolume',
