@@ -176,7 +176,6 @@ def daemon():
     global_error_result = None
     # precheck
     freeze_called = False
-
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
     try:
@@ -197,7 +196,6 @@ def daemon():
         if the time sync is alive, this should be right.
         """
 
-        # handle the restoring scenario.
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
@@ -223,7 +221,7 @@ def daemon():
                 """
                 temp_status= 'transitioning'
                 temp_result=CommonVariables.success
-                temp_msg='Transitioning state in extension'
+                temp_msg='Transitioning state in extension daemon'
                 trans_report_msg = None
                 if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
                     trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
@@ -323,9 +321,12 @@ def update():
 def enable():
     global backup_logger,hutil,error_msg,para_parser
     hutil.do_parse_context('Enable')
-    finalpath=str(os.getcwd())
-    commandToExecuteTmp ="chmod -R +x "+finalpath
-    subprocess.call(commandToExecuteTmp,shell=True)
+    try:
+        finalpath=str(os.getcwd())
+        commandToExec ="chmod -R +x "+finalpath
+        subprocess.call(commandToExec,shell=True)
+    except Exception as e:
+        backup_logger.log('In enable permissions not changed', True)
     try:
         backup_logger.log('starting to enable', True)
 
@@ -374,7 +375,7 @@ def enable():
             taskIdentity.save_identity(para_parser.taskId)
         temp_status= 'transitioning'
         temp_result=0
-        temp_msg='Transitioning state in extension'
+        temp_msg='Transitioning state in enable'
         trans_report_msg = None
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
             trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
@@ -389,12 +390,11 @@ def enable():
             else:
                 backup_logger.log("trans_report_msg is none")
         hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
+        start_daemon();
     except Exception as e:
-        errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
         global_error_result = e
-
-    start_daemon();
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]
