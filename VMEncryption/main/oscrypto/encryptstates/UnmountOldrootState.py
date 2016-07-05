@@ -89,8 +89,8 @@ class UnmountOldrootState(OSEncryptionState):
 
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
-                self.context.logger.log("Skipping suicide")
-                continue
+                self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
+                self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
