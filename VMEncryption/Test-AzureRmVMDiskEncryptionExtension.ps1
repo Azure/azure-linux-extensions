@@ -16,7 +16,8 @@
     [string] $SshPrivKeyPath,
     [string] $Location="eastus",
     [string] $VolumeType="data",
-    [string] $GalleryImage="RedHat:RHEL:7.2"
+    [string] $GalleryImage="RedHat:RHEL:7.2",
+    [string] $VMSize="Standard_D2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,7 +89,6 @@ Write-Host "Created AzureNetworkInterface successfully: $InterfaceName"
 ## Compute
 $global:VMName = $ResourcePrefix + "VM"
 $global:ComputerName = $ResourcePrefix + "VM"
-$global:VMSize = "Standard_D2"
 $global:OSDiskName = $VMName + "OsDisk"
 $global:OSDiskUri = $StorageAccount.PrimaryEndpoints.Blob.ToString() + "vhds/" + $OSDiskName + ".vhd"
 $global:DataDisk1Name = $VMName + "DataDisk1"
