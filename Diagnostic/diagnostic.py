@@ -2,7 +2,7 @@
 #
 # Azure Linux extension
 #
-# Linux Azure Diagnostic Extension (see below for version)
+# Linux Azure Diagnostic Extension (Current version is specified in manifest.xml)
 # Copyright (c) Microsoft Corporation
 # All rights reserved.   
 # MIT License  
@@ -25,7 +25,6 @@ import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-from six import string_types
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
@@ -33,28 +32,34 @@ import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 
-ExtensionShortName = 'LinuxAzureDiagnostic'
 WorkDir = os.getcwd()
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-waagent.Log("%s started to handle." %(ExtensionShortName))
+waagent.Log("LinuxAzureDiagnostic started to handle.")
 hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
 hutil.try_parse_context()
+hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
 public_settings = hutil.get_public_settings()
 private_settings = hutil.get_protected_settings()
 if not public_settings:
     public_settings = {}
 if not private_settings:
     private_settings = {}
-
+ExtensionOperationType = None
+# Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
+if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
+    if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
+        waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
+    else:  # This shouldn't happen, but just in case...
+        waagent.WALAEventOperation.Uninstall = 'Uninstall'
 
 def LogRunGetOutPut(cmd, should_log=True):
     if should_log:
         hutil.log("RunCmd "+cmd)
-    error, msg = waagent.RunGetOutput(cmd)
+    error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
     if should_log:
         hutil.log("Return "+str(error)+":"+msg)
     return error, msg
@@ -89,7 +94,7 @@ UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                      'packages':()
                     }.items())
 
-# For SUSE11, we need to create a CA certs file for our bundled OpenSSL 1.0 libs
+# For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
 SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
 SuseConfig11 = dict(RedhatConfig.items()+
@@ -478,15 +483,30 @@ def install_service():
     RunGetOutput('systemctl daemon-reload')
 
 
+def get_extension_operation_type(command):
+    if re.match("^([-/]*)(enable)", command):
+        return waagent.WALAEventOperation.Enable
+    if re.match("^([-/]*)(daemon)", command):   # LAD-specific extension operation (invoked from "./diagnostic.py -enable")
+        return "Daemon"
+    if re.match("^([-/]*)(install)", command):
+        return waagent.WALAEventOperation.Install
+    if re.match("^([-/]*)(disable)", command):
+        return waagent.WALAEventOperation.Disable
+    if re.match("^([-/]*)(uninstall)", command):
+        return waagent.WALAEventOperation.Uninstall
+    if re.match("^([-/]*)(update)", command):
+        return waagent.WALAEventOperation.Update
+
+
 def main(command):
     #Global Variables definition
 
     global EnableSyslog, UseSystemdServiceManager
-    if readPublicConfig('enableSyslog').lower() == 'false' or readPublicConfig('EnableSyslog').lower() == 'false':
-        # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
-        EnableSyslog = False
-    else:
-        EnableSyslog = True
+
+    # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
+    EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
+
+    ExtensionOperationType = get_extension_operation_type(command)
 
     config_valid, config_invalid_reason = configSettings()
     if not config_valid:
@@ -494,11 +514,12 @@ def main(command):
                              ". Install will proceed, but enable can't proceed, " \
                              "in which case it's still considered a success as it's an external error."
         hutil.log(config_invalid_log)
-        if re.match("^([-/]*)(enable)", command):
-            hutil.do_status_report("Enable", "success", '0', config_invalid_log)
+        if ExtensionOperationType is waagent.WALAEventOperation.Enable:
+            hutil.do_status_report(ExtensionOperationType, "success", '0', config_invalid_log)
             waagent.AddExtensionEvent(name=hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
+                                      op=ExtensionOperationType,
                                       isSuccess=True,
+                                      version=hutil.get_extension_version(),
                                       message=config_invalid_log)
             return
 
@@ -506,82 +527,82 @@ def main(command):
         code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent", chk_err=False)
         if code == 0 and str_ret.find(notsupport) > -1:
             hutil.log("cannot run this extension on  " + notsupport)
-            hutil.do_status_report("Install", "error", '1', "cannot run this extension on  " + notsupport)
+            hutil.do_status_report(ExtensionOperationType, "error", '1', "cannot run this extension on  " + notsupport)
             return
 
     if distConfig is None:
         unsupported_distro_version_log = "LAD can't be installed on this distro/version (" + str(platform.dist()) + "), as it's not supported. This extension install/enable operation is still considered a success as it's an external error."
         hutil.log(unsupported_distro_version_log)
-        hutil.do_status_report("Install", "success", '0', unsupported_distro_version_log)
+        hutil.do_status_report(ExtensionOperationType, "success", '0', unsupported_distro_version_log)
         waagent.AddExtensionEvent(name=hutil.get_name(),
-                                  op=waagent.WALAEventOperation.Install,
+                                  op=ExtensionOperationType,
                                   isSuccess=True,
-                                  message="(LAD-" + hutil.get_extension_version() + ") Can't be installed on this OS " + str(platform.dist()))
+                                  version=hutil.get_extension_version(),
+                                  message="Can't be installed on this OS "+str(platform.dist()))
         return
     try:
         hutil.log("Dispatching command:" + command)
-        if UseSystemdServiceManager:
-            if re.match("^([-/]*)(disable)", command):
+
+        if ExtensionOperationType is waagent.WALAEventOperation.Disable:
+            if UseSystemdServiceManager:
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde')
-                hutil.do_status_report("Disable", "success", '0',"Disable succeeded")
-            elif re.match("^([-/]*)(uninstall)", command):
+            else:
+                stop_mdsd()
+            hutil.do_status_report(ExtensionOperationType, "success", '0', "Disable succeeded")
+
+        elif ExtensionOperationType is waagent.WALAEventOperation.Uninstall:
+            if UseSystemdServiceManager:
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde ' +
                              '&& rm /lib/systemd/system/mdsd-lde.service')
-                error,msg = uninstall_omi()
-                if EnableSyslog:
-                    error,msg = uninstall_rsyslogom()
-                hutil.do_status_report("Uninstall", "success",'0', "Uninstall succeeded")
-            elif re.match("^([-/]*)(install)", command):
-                error, msg = setup(True)
-                install_service()
-                if error != 0:
-                    hutil.do_status_report("Install", "error", error, msg)
-                    sys.exit(error)
-                else:
-                    hutil.do_status_report("Install", "success",'0', "Install succeeded")
-            elif re.match("^([-/]*)(enable)", command):
-                hutil.exit_if_enabled()
-                install_service()
-                RunGetOutput('systemctl enable mdsd-lde && systemctl restart mdsd-lde')
-                hutil.do_status_report("Enable","success",'0',"Enable succeeded")
-            elif re.match("^([-/]*)(daemon)", command):
-                start_mdsd()
-            elif re.match("^([-/]*)(update)", command):
-                hutil.do_status_report("Update", "success",'0', "Update succeeded")
-        else:
-            if re.match("^([-/]*)(disable)", command):
-                error,msg = stop_mdsd()
-                hutil.do_status_report("Disable", "success", '0',"Disable succeeded")
-            elif re.match("^([-/]*)(uninstall)", command):
+            else:
                 stop_mdsd()
-                error,msg = uninstall_omi()
-                if EnableSyslog:
-                    error,msg = uninstall_rsyslogom()
-                hutil.do_status_report("Uninstall", "success",'0', "Uninstall succeeded")
-            elif re.match("^([-/]*)(install)", command):
-                error, msg = setup(True)
-                if error != 0:
-                    hutil.do_status_report("Install", "error", error, msg)
-                    sys.exit(error)
-                else:
-                    hutil.do_status_report("Install", "success",'0', "Install succeeded")
-            elif re.match("^([-/]*)(enable)", command):
+            uninstall_omi()
+            if EnableSyslog:
+                uninstall_rsyslogom()
+            hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
+
+        elif ExtensionOperationType is waagent.WALAEventOperation.Install:
+            error, msg = setup(should_install_required_package=True)
+            if error != 0:
+                hutil.do_status_report(ExtensionOperationType, "error", error, msg)
+                waagent.AddExtensionEvent(name=hutil.get_name(),
+                                          op=ExtensionOperationType,
+                                          isSuccess=False,
+                                          version=hutil.get_extension_version(),
+                                          message="Install failed: " + msg)
+                sys.exit(error)  # Per extension specification, we must exit with a non-zero status code when install fails
+
+            if UseSystemdServiceManager:
+                install_service()
+            hutil.do_status_report(ExtensionOperationType, "success", '0', "Install succeeded")
+
+        elif ExtensionOperationType is waagent.WALAEventOperation.Enable:
+            if UseSystemdServiceManager:
+                install_service()
+                RunGetOutput('systemctl enable mdsd-lde')
+                mdsd_lde_active = RunGetOutput('systemctl status mdsd-lde')[0] is 0
+                if not mdsd_lde_active or hutil.is_current_config_seq_greater_inused():
+                    RunGetOutput('systemctl restart mdsd-lde')
+            else:
                 # if daemon process not runs
-                hutil.log("get pid:"+str(get_mdsd_process()))
-                if len(get_mdsd_process())!=2 or  hutil.is_current_config_seq_greater_inused():
+                mdsd_procs = get_mdsd_process()
+                hutil.log("get pid:" + str(mdsd_procs))
+                if len(mdsd_procs) != 2 or hutil.is_current_config_seq_greater_inused():
                     stop_mdsd()
                     start_daemon()
-                hutil.set_inused_config_seq(hutil.get_seq_no())
-                hutil.do_status_report("Enable","success",'0',"Enable succeeded")
-            elif re.match("^([-/]*)(daemon)", command):
-                start_mdsd()
-            elif re.match("^([-/]*)(update)", command):
-                hutil.do_status_report("Update", "success",'0', "Update succeeded")
+            hutil.set_inused_config_seq(hutil.get_seq_no())
+            hutil.do_status_report(ExtensionOperationType, "success", '0', "Enable succeeded")
+
+        elif ExtensionOperationType is "Daemon":
+            start_mdsd()
+
+        elif ExtensionOperationType is waagent.WALAEventOperation.Update:
+            hutil.do_status_report(ExtensionOperationType, "success", '0', "Update succeeded")
 
     except Exception as e:
-        hutil.error(("Failed to enable the extension with error:{0}, {1}").format(e, traceback.format_exc()))
-        hutil.do_status_report('Enable','error','0',
-                      'Enable failed:{0}'.format(e))
+        hutil.error(("Failed to perform extension operation {0} with error:{1}, {2}").format(ExtensionOperationType, e, traceback.format_exc()))
+        hutil.do_status_report(ExtensionOperationType,'error','0',
+                      'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
 def update_selinux_port_setting_for_rsyslogomazuremds(action, port):
@@ -611,7 +632,7 @@ def start_mdsd():
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup(False)
+    setup(should_install_required_package=False)
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
@@ -652,7 +673,7 @@ def start_mdsd():
         proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
     if not proxy_config:
         proxy_config = readPublicConfig(proxy_config_name)
-    if not isinstance(proxy_config, string_types):
+    if not isinstance(proxy_config, basestring):
         hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
     else:
         proxy_config = proxy_config.strip()
@@ -778,7 +799,7 @@ def start_mdsd():
                 last_error = tail(monitor_file_path)
                 if len(last_error) > 0 and (datetime.datetime.now() - last_error_time) < datetime.timedelta(minutes=30):
                     hutil.log("Error in MDSD:"+last_error)
-                    hutil.do_status_report("Enable","success",'1',"message in /var/log/mdsd.err:"+str(last_error_time)+":"+last_error)
+                    hutil.do_status_report(ExtensionOperationType, "success", '1', "message in /var/log/mdsd.err:"+str(last_error_time)+":"+last_error)
 
             # mdsd terminated.
             if mdsd_log:
@@ -790,7 +811,7 @@ def start_mdsd():
             # we just continue by restarting mdsd.
             mdsd_up_time = datetime.datetime.now() - last_mdsd_start_time
             if mdsd_up_time > datetime.timedelta(minutes=30):
-                mdsd_terminated_msg = "MDSD("+hutil.get_extension_version()+") terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
+                mdsd_terminated_msg = "MDSD terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
                 hutil.log(mdsd_terminated_msg)
                 num_quick_consecutive_crashes = 0
                 continue
@@ -798,19 +819,20 @@ def start_mdsd():
             # It's a quick crash. Log error and add an extension event.
             num_quick_consecutive_crashes += 1
 
-            error = "MDSD("+hutil.get_extension_version()+") crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
+            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
 
             # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
             install_rsyslogom()
 
         # mdsd all 3 allowed quick/consecutive crashes exhausted
-        hutil.do_status_report("Enable","error",'1',"mdsd stopped:"+error)
+        hutil.do_status_report(ExtensionOperationType, "error", '1', "mdsd stopped:"+error)
 
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
-                                      op=waagent.WALAEventOperation.Enable,
+                                      op=ExtensionOperationType,
                                       isSuccess=False,
+                                      version=hutil.get_extension_version(),
                                       message=error)
         except Exception:
             pass
@@ -820,12 +842,12 @@ def start_mdsd():
             hutil.error("Error :"+tail(mdsd_log_path))
         hutil.error(("Failed to launch mdsd with error:{0},"
                      "stacktrace:{1}").format(e, traceback.format_exc()))
-        hutil.do_status_report('Enable', 'error', '1',
-                      'Lanch script failed:{0}'.format(e))
+        hutil.do_status_report(ExtensionOperationType, 'error', '1', 'Launch script failed:{0}'.format(e))
         waagent.AddExtensionEvent(name=hutil.get_name(),
-                                  op=waagent.WALAEventOperation.Enable,
+                                  op=ExtensionOperationType,
                                   isSuccess=False,
-                                  message="MDSD("+hutil.get_extension_version()+") Crash2:"+str(e))
+                                  version=hutil.get_extension_version(),
+                                  message="Launch script failed:"+str(e))
     finally:
         if mdsd_log:
             mdsd_log.close()
@@ -863,7 +885,6 @@ def stop_mdsd():
 
 
 def get_mdsd_process():
-
     mdsd_pids = []
     if not os.path.exists(MDSDPidFile):
         return mdsd_pids
@@ -934,7 +955,7 @@ def install_omi():
         mysqladdress=readPrivateConfig("mysqladdress")
         mysqlusername=readPrivateConfig("mysqlusername")
         mysqlpassword=readPrivateConfig("mysqlpassword")
-        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'")
+        RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'", should_log=False)
         shouldRestartOmi = True
 
     if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
@@ -1070,6 +1091,7 @@ def install_required_package():
             return errorcode,str(output_all)
     return 0,"not pacakge need install"
 
+
 def tail(log_file, output_size = OutputSize):
     if not os.path.exists(log_file):
         return ""
@@ -1079,6 +1101,7 @@ def tail(log_file, output_size = OutputSize):
         buf = log.read(output_size)
         buf = filter(lambda x: x in string.printable, buf)
         return buf.decode("ascii", "ignore")
+
 
 def get_deployment_id():
     identity = "unknown"
@@ -1097,6 +1120,7 @@ def get_deployment_id():
         hutil.error("Failed to retrieve deployment ID. Error:{0} {1}".format(e, traceback.format_exc()))
 
     return identity
+
 
 if __name__ == '__main__' :
     if len(sys.argv) > 1:
