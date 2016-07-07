@@ -90,8 +90,19 @@ class UnmountOldrootState(OSEncryptionState):
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
                 self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
-                self.command_executor.Execute('umount {0}'.format(self.bek_util.bek_filesystem_mount_point))
-                self.command_executor.ExecuteInBash('sleep 15 && systemctl restart systemd-udevd &', True)
+                
+                # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
+                # needs to be restarted and the drive mounted/unmounted.
+                # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
+
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                self.bek_util.umount_azure_passhprase(self.encryption_config)
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+
+                self.bek_util.get_bek_passphrase_file(self.encryption_config)
+                self.bek_util.umount_azure_passhprase(self.encryption_config)
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
 
             if int(victim) == 1:
