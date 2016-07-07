@@ -91,6 +91,7 @@ class UnmountOldrootState(OSEncryptionState):
             if int(victim) == os.getpid():
                 self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
                 self.command_executor.Execute('umount {0}'.format(self.bek_util.bek_filesystem_mount_point))
+                self.command_executor.ExecuteInBash('sleep 15 && systemctl restart systemd-udevd &', True)
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
 
             if int(victim) == 1:
