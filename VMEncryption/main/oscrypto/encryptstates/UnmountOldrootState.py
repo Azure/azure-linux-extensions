@@ -96,11 +96,11 @@ class UnmountOldrootState(OSEncryptionState):
                 # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
 
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
-                self.bek_util.umount_azure_passhprase(self.encryption_config)
+                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
 
                 self.bek_util.get_bek_passphrase_file(self.encryption_config)
-                self.bek_util.umount_azure_passhprase(self.encryption_config)
+                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
 
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
