@@ -69,7 +69,7 @@ class BekUtil(object):
 
         return None
 
-    def umount_azure_passhprase(self, encryption_config):
+    def umount_azure_passhprase(self, encryption_config, force=False):
         passphrase_file = self.get_bek_passphrase_file(encryption_config)
         if force or (passphrase_file and os.path.exists(passphrase_file)):
             self.disk_util.umount(self.bek_filesystem_mount_point)
