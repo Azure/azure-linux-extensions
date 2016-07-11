@@ -48,8 +48,8 @@ packages_array.append(patch_folder)
 oscrypto_folder = main_folder + '/oscrypto'
 packages_array.append(oscrypto_folder)
 
-encryptstates_folder = oscrypto_folder + '/encryptstates'
-packages_array.append(encryptstates_folder)
+packages_array.append(oscrypto_folder + '/rhel_72')
+packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')
 
 transitions_folder = 'transitions/transitions'
 packages_array.append(transitions_folder)

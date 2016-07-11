@@ -16,6 +16,16 @@
 # Requires Python 2.7+
 #
 
+import inspect
+import os
+import sys
+import traceback
+from time import sleep
+
+scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
+sys.path.append(oscryptodir)
+
 from OSEncryptionState import *
 from PrereqState import *
 from SelinuxState import *

@@ -13,5 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from OSEncryptionState import *
-from OSEncryptionStateMachine import *
+from RHEL72EncryptionStateMachine import *

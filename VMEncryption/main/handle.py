@@ -1190,11 +1190,25 @@ def daemon_encrypt():
        volume_type == CommonVariables.VolumeTypeAll.lower():
         # import OSEncryption here instead of at the top because it relies
         # on pre-req packages being installed (specifically, python-six on Ubuntu)
-        from oscrypto import OSEncryption
-        os_encryption = OSEncryption(hutil=hutil,
-                                     distro_patcher=DistroPatcher,
-                                     logger=logger,
-                                     encryption_environment=encryption_environment)
+        distro_name = DistroPatcher.distro_info[0]
+        distro_version = DistroPatcher.distro_info[1]
+
+        if ((distro_name == 'redhat' and distro_version == '7.2') or
+            (distro_name == 'centos' and distro_version == '7.2.1511')):
+            from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
+            os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
+        else:
+            message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
+                                                                                distro_version)
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=0,
+                          operation='EnableEncryptionOSVolume',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message=message)
 
         try:
             os_encryption.start_encryption()

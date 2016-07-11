@@ -30,7 +30,7 @@
     <Content Include="MANIFEST.in" />
     <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
-    <Content Include="main\oscrypto\encryptpatches\rhel-72-dracut.patch" />
+    <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -74,16 +74,18 @@
     </Compile>
     <Compile Include="main\handle.py" />
     <Compile Include="main\ExtensionParameter.py" />
-    <Compile Include="main\oscrypto\encrypt.py" />
     <Compile Include="main\oscrypto\__init__.py" />
-    <Compile Include="main\oscrypto\encryptstates\OSEncryptionState.py" />
-    <Compile Include="main\oscrypto\encryptstates\PrereqState.py" />
-    <Compile Include="main\oscrypto\encryptstates\SelinuxState.py" />
-    <Compile Include="main\oscrypto\encryptstates\StripdownState.py" />
-    <Compile Include="main\oscrypto\encryptstates\UnmountOldrootState.py" />
-    <Compile Include="main\oscrypto\encryptstates\EncryptBlockDeviceState.py" />
-    <Compile Include="main\oscrypto\encryptstates\PatchBootSystemState.py" />
-    <Compile Include="main\oscrypto\encryptstates\__init__.py" />
+    <Compile Include="main\oscrypto\OSEncryptionState.py" />
+    <Compile Include="main\oscrypto\OSEncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\rhel_72\RHEL72EncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\rhel_72\__init__.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\PrereqState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\SelinuxState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\StripdownState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\UnmountOldrootState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\EncryptBlockDeviceState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\PatchBootSystemState.py" />
+    <Compile Include="main\oscrypto\rhel_72\encryptstates\__init__.py" />
     <Compile Include="main\patch\AbstractPatching.py" />
     <Compile Include="main\patch\centosPatching.py" />
     <Compile Include="main\patch\redhatPatching.py" />
@@ -98,9 +100,9 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
-    <Folder Include="main\oscrypto\" />
-    <Folder Include="main\oscrypto\encryptstates\" />
-    <Folder Include="main\oscrypto\encryptpatches\" />
+    <Folder Include="main\oscrypto\rhel_72\" />
+    <Folder Include="main\oscrypto\rhel_72\encryptstates\" />
+    <Folder Include="main\oscrypto\rhel_72\encryptpatches\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
   </ItemGroup>

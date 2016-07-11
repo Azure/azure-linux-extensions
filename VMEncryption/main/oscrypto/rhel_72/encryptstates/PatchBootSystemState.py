@@ -92,7 +92,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         patchesdir = os.path.join(scriptdir, '../encryptpatches')
-        patchpath = os.path.join(patchesdir, 'rhel-72-dracut.patch')
+        patchpath = os.path.join(patchesdir, 'rhel_72_dracut.patch')
 
         if not os.path.exists(patchpath):
             message = "Patch not found at path: {0}".format(patchpath)
