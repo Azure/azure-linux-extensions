@@ -238,7 +238,7 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message):
+    def do_status_report(self, operation, status, sub_status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
@@ -248,6 +248,7 @@ class HandlerUtility:
                 "name" : self._context._name,
                 "operation" : operation,
                 "status" : status,
+                "sub_status" : sub_status,
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
@@ -284,9 +285,9 @@ class HandlerUtility:
                 except Exception as e:
                     self.log("failed to rename the status file.")
 
-    def do_exit(self, exit_code, operation,status,code,message):
+    def do_exit(self, exit_code, operation,status,sub_status,code,message):
         try:
-            self.do_status_report(operation, status,code,message)
+            self.do_status_report(operation, status,sub_status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
