@@ -1193,6 +1193,8 @@ def daemon_encrypt():
         distro_name = DistroPatcher.distro_info[0]
         distro_version = DistroPatcher.distro_info[1]
 
+        os_encryption = None
+
         if ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
@@ -1200,6 +1202,12 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
+        elif distro_name == 'Ubuntu' and distro_version == '16.04':
+            from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
+            os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
         else:
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)

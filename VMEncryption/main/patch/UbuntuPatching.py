@@ -52,6 +52,7 @@ class UbuntuPatching(AbstractPatching):
         self.openssl_path = '/usr/bin/openssl'
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/bin/umount'
+        self.touch_path = '/usr/bin/touch'
 
     def install_extras(self):
         """
