@@ -238,7 +238,7 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, sub_status, status_code, message):
+    def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
@@ -248,7 +248,7 @@ class HandlerUtility:
                 "name" : self._context._name,
                 "operation" : operation,
                 "status" : status,
-                "sub_status" : sub_status,
+                "sub_status" : [],
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
@@ -257,6 +257,31 @@ class HandlerUtility:
             }
         }]
         stat_rept = json.dumps(stat)
+	if self._context._config['runtimeSettings'][0]['handlerSettings']['publicSettings']['vmType'] == 'microsoft.compute/virtualmachines' :
+		sub_stat = stat_rept
+		stat = [{
+			"version" : self._context._version,
+                        "timestampUTC" : tstamp,
+                        "status" : {
+                                "name" : self._context._name,
+                                "operation" : operation,
+                                "status" : "success",
+                                "sub_status" :
+                                [
+                                        {
+                                        "code" : "0",
+                                        "name" : sub_stat,
+                                        "status" : "success"
+                                        }
+                                ],
+                                "code" : status_code,
+                                "formattedMessage" : {
+                                        "lang" : "en-US",
+                                        "message" : message
+                                }
+                        }
+                }]
+                stat_rept = json.dumps(stat)
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
@@ -285,9 +310,9 @@ class HandlerUtility:
                 except Exception as e:
                     self.log("failed to rename the status file.")
 
-    def do_exit(self, exit_code, operation,status,sub_status,code,message):
+    def do_exit(self, exit_code, operation,status,code,message):
         try:
-            self.do_status_report(operation, status,sub_status,code,message)
+            self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)

@@ -34,11 +34,15 @@ class CommonVariables:
     iaas_vmbackup_command = 'snapshot'
     iaas_install_command = 'install'
     locale = 'locale'
+    vmType = 'vmType'
+    VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
+    VmTypeV2 = 'microsoft.compute/virtualmachines'
 
     """
     error code definitions
     """
     success = 1
+    ExtensionTempTerminalState = 4
     error_parameter = 11
     error_12 = 12
     error_wrong_time = 13

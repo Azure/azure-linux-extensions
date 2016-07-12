@@ -93,7 +93,7 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def do_backup_status_report(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
+def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
     global backup_logger,hutil
     backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
     time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
@@ -107,7 +107,7 @@ def do_backup_status_report(operation, status, sub_status, status_code, message,
             "name" : hutil._context._name,
             "operation" : operation,
             "status" : status,
-            "sub_status" : sub_status,
+            "sub_status" : [],
             "code" : status_code,
             "taskId": taskId,
             "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
@@ -118,10 +118,54 @@ def do_backup_status_report(operation, status, sub_status, status_code, message,
         }
     }]
     status_report_msg = json.dumps(stat)
+    if para_parser.vmType == CommonVariables.VmTypeV2 :
+		sub_stat = stat
+		stat = [{
+			"version" : hutil._context._version,
+			"timestampUTC" : date_place_holder,
+			"status" : {
+				"name" : hutil._context._name,
+				"operation" : operation,
+				"status" : "success",
+				"sub_status" : 
+				[
+					{
+					"code" : "0",
+					"name" : sub_stat,
+					"status" : "success"
+					}
+				],
+				"code" : status_code,
+				"taskId": taskId,
+				"commandStartTimeUTCTicks":commandStartTimeUTCTicks,
+				"formattedMessage" : {
+					"lang" : "en-US",
+					"message" : message
+				}
+        		}
+    		}]
+		status_report_msg = json.dumps(stat)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
     blobWriter.WriteBlob(status_report_msg,blobUri)
     return status_report_msg
+
+def status_report(status,status_code,message):
+	global backup_logger,hutil,para_parser
+	trans_report_msg = None
+	if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+		trans_report_msg = do_backup_status_report(operation='Enable',status=status,\
+				status_code=str(status_code),\
+				message=message,\
+				taskId=para_parser.taskId,\
+				commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+				blobUri=para_parser.statusBlobUri)
+		if(trans_report_msg is not None):
+			backup_logger.log("trans status report message:")
+			backup_logger.log(trans_report_msg)
+		else:
+			backup_logger.log("trans_report_msg is none")
+
 
 def exit_with_commit_log(error_msg, para_parser):
     global backup_logger
@@ -252,22 +296,8 @@ def daemon():
                 temp_status= 'transitioning'
                 temp_result=CommonVariables.success
                 temp_msg='Transitioning state in extension'
-                trans_report_msg = None
-                temp_sub_status='None'
-                if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-                    trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
-                                    sub_status=temp_sub_status,\
-                                    status_code=str(temp_result),\
-                                    message=temp_msg,\
-                                    taskId=para_parser.taskId,\
-                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                                    blobUri=para_parser.statusBlobUri)
-                    if(trans_report_msg is not None):
-                        backup_logger.log("trans status report message:")
-                        backup_logger.log(trans_report_msg)
-                    else:
-                        backup_logger.log("trans_report_msg is none")
-                hutil.do_status_report('Enable', temp_status, temp_sub_status, str(temp_result), temp_msg)
+		status_report(temp_status,temp_result,temp_msg)
+                hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
                 snapshot_thread = Thread(target = snapshot)
                 start_time=datetime.datetime.utcnow()
@@ -318,27 +348,14 @@ def daemon():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
     status_report_msg = None
-    run_sub_status = 'None'
-    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        status_report_msg = do_backup_status_report(operation='Enable',status=run_status,\
-                                sub_status=run_sub_status,\
-                                status_code=str(run_result),\
-                                message=error_msg,\
-                                taskId=para_parser.taskId,\
-                                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                                blobUri=para_parser.statusBlobUri)
-    if(status_report_msg is not None):
-        backup_logger.log("status report message:")
-        backup_logger.log(status_report_msg)
-    else:
-        backup_logger.log("status_report_msg is none")
+    status_report(run_status,run_result,error_msg)
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
 
-    hutil.do_exit(0, 'Enable', run_status, run_sub_status, str(run_result), error_msg)
+    hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
