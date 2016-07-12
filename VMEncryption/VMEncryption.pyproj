@@ -32,6 +32,7 @@
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
     <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
+    <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\azure_crypt_key.sh" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -116,6 +117,7 @@
     <Folder Include="main\oscrypto\ubuntu_1604\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptstates\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptpatches\" />
+    <Folder Include="main\oscrypto\ubuntu_1604\encryptscripts\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
   </ItemGroup>
