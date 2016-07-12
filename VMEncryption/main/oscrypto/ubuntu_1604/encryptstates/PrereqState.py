@@ -19,6 +19,7 @@
 # Requires Python 2.7+
 #
 
+import inspect
 import os
 import re
 import sys
@@ -46,7 +47,53 @@ class PrereqState(OSEncryptionState):
 
         self.context.logger.log("Entering prereq state")
 
+        distro_info = self.context.distro_patcher.distro_info
+        self.context.logger.log("Distro info: {0}".format(distro_info))
+
+        if distro_info[0] == 'Ubuntu' and distro_info[1] == '16.04':
+            self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
+                                                                                      distro_info[1]))
+        else:
+            raise Exception("Ubuntu1604EncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
+                                                                                                distro_info[1]))
+
+        self.context.distro_patcher.install_extras()
+
+        self._patch_walinuxagent()
+        self.command_executor.Execute('systemctl daemon-reload', True)
+
+        self._copy_key_script()
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
+
+    def _patch_walinuxagent(self):
+        self.context.logger.log("Patching walinuxagent")
+
+        contents = None
+
+        with open('/lib/systemd/system/walinuxagent.service', 'r') as f:
+            contents = f.read()
+
+        contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
+
+        with open('/lib/systemd/system/walinuxagent.service', 'w') as f:
+            f.write(contents)
+
+        self.context.logger.log("walinuxagent patched successfully")
+
+    def _copy_key_script(self):
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        encryptscriptsdir = os.path.join(scriptdir, '../encryptscripts')
+        keyscriptpath = os.path.join(encryptscriptsdir, 'azure_crypt_key.sh')
+
+        if not os.path.exists(keyscriptpath):
+            message = "Key script not found at path: {0}".format(keyscriptpath)
+            self.context.logger.log(message)
+            raise Exception(message)
+        else:
+            self.context.logger.log("Key script found at path: {0}".format(keyscriptpath))
+
+        self.command_executor.Execute('cp {0} /usr/sbin/azure_crypt_key.sh'.format(keyscriptpath), True)

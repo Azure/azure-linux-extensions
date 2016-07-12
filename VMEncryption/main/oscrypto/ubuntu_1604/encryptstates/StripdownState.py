@@ -37,6 +37,9 @@ class StripdownState(OSEncryptionState):
             return False
         
         self.context.logger.log("Performing enter checks for stripdown state")
+
+        self.command_executor.Execute('rm -rf /tmp/tmproot', True)
+        self.command_executor.ExecuteInBash('! [ -e "/oldroot" ]', True)
                 
         return True
 
@@ -46,7 +49,39 @@ class StripdownState(OSEncryptionState):
 
         self.context.logger.log("Entering stripdown state")
 
+        self.command_executor.Execute('umount -a')
+        self.command_executor.Execute('mkdir /tmp/tmproot', True)
+        self.command_executor.Execute('mount -t tmpfs none /tmp/tmproot', True)
+        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot boot; do mkdir /tmp/tmproot/$i; done', True)
+        self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
+        self.command_executor.ExecuteInBash('for i in bin sbin lib share; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
+        self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
+        self.command_executor.ExecuteInBash('mkdir /tmp/tmproot/var/log', True)
+        self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
+        self.command_executor.Execute('mount --make-rprivate /', True)
+        self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
+        self.command_executor.Execute('systemctl stop walinuxagent', True)
+        self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
+        self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit stripdown state")
 
-        return super(StripdownState, self).should_exit()
+        if not os.path.exists(self.state_marker):
+            self.context.logger.log("First call to stripdown state (pid={0}), restarting process".format(os.getpid()))
+
+            # create the marker, but do not advance the state machine
+            super(StripdownState, self).should_exit()
+
+            # the restarted process shall see the marker and advance the state machine
+            # self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
+            self.command_executor.ExecuteInBash('sleep 30 && /var/lib/waagent/Microsoft.Azure.Security.ADEForLinuxTest-0.1.0.999163/main/handle.py -enable &', True)
+
+            self.context.hutil.do_exit(exit_code=0,
+                                       operation='EnableEncryptionOSVolume',
+                                       status=CommonVariables.extension_error_status,
+                                       code=CommonVariables.encryption_failed,
+                                       message="Restarted extension from stripped down OS")
+        else:
+            self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
+            return True
