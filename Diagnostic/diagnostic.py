@@ -82,7 +82,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python',),  # This is needed for /usr/sbin/semanage on Redhat.
+                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python is needed for /usr/sbin/semanage on Redhat. Also, some RH-based distros really don't have tar (e.g. OracleLinux 7).
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
