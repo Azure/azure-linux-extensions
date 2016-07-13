@@ -293,8 +293,12 @@ def daemon():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
-                temp_status= 'transitioning'
-                temp_result=CommonVariables.success
+		if para_parser.vmType == CommonVariables.VmTypeV1 :
+                	temp_status= 'success'
+                	temp_result=CommonVariables.ExtensionTempTerminalState
+		else :
+                	temp_status= 'transitioning'
+                	temp_result=CommonVariables.success
                 temp_msg='Transitioning state in extension'
 		status_report(temp_status,temp_result,temp_msg)
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
