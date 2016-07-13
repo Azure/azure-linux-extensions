@@ -74,8 +74,9 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            # self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
-            self.command_executor.ExecuteInBash('sleep 30 && /var/lib/waagent/Microsoft.Azure.Security.ADEForLinuxTest-0.1.0.999163/main/handle.py -enable &', True)
+            # REVERT
+            self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
+            # self.command_executor.ExecuteInBash('sleep 30 && /var/lib/waagent/Microsoft.Azure.Security.ADEForLinuxTest-0.1.0.999163/main/handle.py -enable &', True)
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',
