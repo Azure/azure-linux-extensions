@@ -1,0 +1,26 @@
+diff -Naur hooks.orig/cryptroot hooks/cryptroot
+--- hooks.orig/cryptroot	2016-07-13 01:42:13.158023800 -0700
++++ hooks/cryptroot	2016-07-13 01:42:36.122470000 -0700
+@@ -521,14 +521,14 @@
+ 				mkdir -p "$DESTDIR/conf/conf.d/cryptheader"
+ 			fi
+ 
+-			#if [ -e "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" ]; then
+-			#	copy_exec "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" /conf/conf.d/cryptheader >&2
+-			#elif [ -e "$CRYPTHEADER" ]; then
+-			#	copy_exec "$CRYPTHEADER" /conf/conf.d/cryptheader >&2
+-			#else
+-			#	echo "cryptsetup: WARNING: failed to find LUKS header $CRYPTHEADER" >&2
+-			#	continue
+-			#fi
++			if [ -e "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" ]; then
++				copy_exec "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" /conf/conf.d/cryptheader >&2
++			elif [ -e "$CRYPTHEADER" ]; then
++				copy_exec "$CRYPTHEADER" /conf/conf.d/cryptheader >&2
++			else
++				echo "cryptsetup: WARNING: failed to find LUKS header $CRYPTHEADER" >&2
++				continue
++			fi
+ 		fi
+ 		
+ 

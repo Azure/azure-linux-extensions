@@ -33,6 +33,7 @@
     <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\azure_crypt_key.sh" />
+    <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\inject_luks_header.sh" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">

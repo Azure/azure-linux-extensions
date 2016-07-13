@@ -13,5 +13,5 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
-cp -p /boot/luks/osluksheader ${DESTDIR}/osluksheader
-
+mkdir -p ${DESTDIR}/boot/luks
+copy_exec /boot/luks/osluksheader /boot/luks
