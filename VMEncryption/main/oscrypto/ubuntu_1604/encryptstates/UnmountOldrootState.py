@@ -110,8 +110,8 @@ class UnmountOldrootState(OSEncryptionState):
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
 
                 # REVERT
-                # self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
-                self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
+                self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
+                # self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")

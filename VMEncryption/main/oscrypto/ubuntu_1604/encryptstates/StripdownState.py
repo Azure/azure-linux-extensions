@@ -75,8 +75,8 @@ class StripdownState(OSEncryptionState):
 
             # the restarted process shall see the marker and advance the state machine
             # REVERT
-            # self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
-            self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
+            self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
+            # self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',
