@@ -112,18 +112,6 @@ class UnmountOldrootState(OSEncryptionState):
 
             if int(victim) == os.getpid():
                 self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
-                
-                # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
-                # needs to be restarted and the drive mounted/unmounted.
-                # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
-
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
-
-                self.bek_util.get_bek_passphrase_file(self.encryption_config)
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
 
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
