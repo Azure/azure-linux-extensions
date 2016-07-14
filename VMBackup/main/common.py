@@ -37,6 +37,10 @@ class CommonVariables:
     vmType = 'vmType'
     VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
     VmTypeV2 = 'microsoft.compute/virtualmachines'
+    status_transitioning = 'transitioning'
+    status_warning = 'warning'
+    status_success = 'success'
+    status_error = 'error'
 
     """
     error code definitions
@@ -50,7 +54,10 @@ class CommonVariables:
     error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
-
+    
+    @staticmethod
+    def isTerminalStatus(status):
+        return (status==CommonVariables.status_success or status==CommonVariables.status_warning)
 class DeviceItem(object):
     def __init__(self):
         #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL

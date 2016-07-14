@@ -64,6 +64,8 @@ from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
 import logging.handlers
+sys.path.append("/var/lib/waagent/Microsoft.Azure.RecoveryServices.VMSnapshotLinux-1.0.91.0/main")
+from common import CommonVariables
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -238,8 +240,7 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+    def do_status_json(self, operation, status, sub_status, status_code, message):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
@@ -248,7 +249,7 @@ class HandlerUtility:
                 "name" : self._context._name,
                 "operation" : operation,
                 "status" : status,
-                "sub_status" : [],
+                "substatus" : sub_status,
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
@@ -256,32 +257,17 @@ class HandlerUtility:
                 }
             }
         }]
-        stat_rept = json.dumps(stat)
-	if self._context._config['runtimeSettings'][0]['handlerSettings']['publicSettings']['vmType'] == 'microsoft.compute/virtualmachines' :
-		sub_stat = stat_rept
-		stat = [{
-			"version" : self._context._version,
-                        "timestampUTC" : tstamp,
-                        "status" : {
-                                "name" : self._context._name,
-                                "operation" : operation,
-                                "status" : "success",
-                                "sub_status" :
-                                [
-                                        {
-                                        "code" : "0",
-                                        "name" : sub_stat,
-                                        "status" : "success"
-                                        }
-                                ],
-                                "code" : status_code,
-                                "formattedMessage" : {
-                                        "lang" : "en-US",
-                                        "message" : message
-                                }
-                        }
-                }]
-                stat_rept = json.dumps(stat)
+	return json.dumps(stat)
+
+    def do_status_report(self, operation, status, status_code, message):
+        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+	sub_stat = []
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+	#CommonVariables_instance = CommonVariables()
+	if self._context._config['runtimeSettings'][0]['handlerSettings']['publicSettings'][CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+                sub_stat = [ { "code" : "0", "name" : stat_rept, "status" : "success", "formattedMessage" : None } ]
+		stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence

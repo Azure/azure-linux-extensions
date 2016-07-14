@@ -107,7 +107,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             "name" : hutil._context._name,
             "operation" : operation,
             "status" : status,
-            "sub_status" : [],
+            "substatus" : [],
             "code" : status_code,
             "taskId": taskId,
             "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
@@ -118,33 +118,6 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
         }
     }]
     status_report_msg = json.dumps(stat)
-    if para_parser.vmType == CommonVariables.VmTypeV2 :
-		sub_stat = stat
-		stat = [{
-			"version" : hutil._context._version,
-			"timestampUTC" : date_place_holder,
-			"status" : {
-				"name" : hutil._context._name,
-				"operation" : operation,
-				"status" : "success",
-				"sub_status" : 
-				[
-					{
-					"code" : "0",
-					"name" : sub_stat,
-					"status" : "success"
-					}
-				],
-				"code" : status_code,
-				"taskId": taskId,
-				"commandStartTimeUTCTicks":commandStartTimeUTCTicks,
-				"formattedMessage" : {
-					"lang" : "en-US",
-					"message" : message
-				}
-        		}
-    		}]
-		status_report_msg = json.dumps(stat)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
     blobWriter.WriteBlob(status_report_msg,blobUri)
