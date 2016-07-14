@@ -119,6 +119,10 @@ class UnmountOldrootState(OSEncryptionState):
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
                 # self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
 
+                # Kill any other daemons that are blocked and would be executed after this process commits
+                # suicide
+                self.command_executor.Execute('pkill -f .*ForLinux.*handle.py.*daemon.*')
+
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
                 continue
