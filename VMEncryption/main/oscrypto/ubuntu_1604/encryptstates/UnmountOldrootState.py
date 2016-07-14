@@ -100,6 +100,16 @@ class UnmountOldrootState(OSEncryptionState):
         procs_to_kill = reversed(sorted(procs_to_kill))
 
         for victim in procs_to_kill:
+            proc_name = ""
+
+            try:
+                with open("/proc/{0}/cmdline".format(victim)) as f:
+                    proc_name = f.read()
+            except IOError as e:
+                self.context.logger.log("Proc {0} is already dead".format(victim))
+
+            self.context.logger.log("Killing process: {0} ({1})".format(proc_name, victim))
+
             if int(victim) == os.getpid():
                 self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
                 
