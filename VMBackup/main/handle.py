@@ -85,13 +85,7 @@ def main():
 def install():
     global hutil
     hutil.do_parse_context('Install')
-    try:
-        finalpath=str(os.getcwd())
-        commandToExecute ="chmod -R +x "+finalpath
-        subprocess.call(commandToExecute,shell=True)
-        hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
-    except Exception as e:
-        hutil.do_exit(0, 'Install','success','0', 'Install Succeeded but permissions not changed')
+    hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
 def timedelta_total_seconds(delta):
     if not hasattr(datetime.timedelta, 'total_seconds'):
@@ -322,12 +316,6 @@ def enable():
     global backup_logger,hutil,error_msg,para_parser
     hutil.do_parse_context('Enable')
     try:
-        finalpath=str(os.getcwd())
-        commandToExec ="chmod -R +x "+finalpath
-        subprocess.call(commandToExec,shell=True)
-    except Exception as e:
-        backup_logger.log('In enable permissions not changed', True)
-    try:
         backup_logger.log('starting to enable', True)
 
         # handle the restoring scenario.
@@ -374,7 +362,7 @@ def enable():
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         temp_status= 'transitioning'
-        temp_result=0
+        temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
         trans_report_msg = None
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
