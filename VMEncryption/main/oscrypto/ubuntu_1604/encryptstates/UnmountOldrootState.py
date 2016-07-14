@@ -79,8 +79,14 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists("/oldroot/mnt"):
             self.command_executor.Execute('umount /oldroot/mnt')
 
+        if os.path.exists("/oldroot/mnt/azure_bek_disk"):
+            self.command_executor.Execute('umount /oldroot/mnt/azure_bek_disk')
+
         if os.path.exists("/mnt"):
             self.command_executor.Execute('umount /mnt')
+
+        if os.path.exists("/mnt/azure_bek_disk"):
+            self.command_executor.Execute('umount /mnt/azure_bek_disk')
 
         proc_comm = ProcessCommunicator()
 
