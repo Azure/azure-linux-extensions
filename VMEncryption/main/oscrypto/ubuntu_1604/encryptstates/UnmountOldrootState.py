@@ -115,13 +115,11 @@ class UnmountOldrootState(OSEncryptionState):
                 self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
 
-                # REVERT
-                self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
-                # self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
-
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
-                self.command_executor.Execute('pkill -f .*ForLinux.*handle.py.*daemon.*')
+                self.command_executor.ExecuteInBash('sleep 30 && pkill -f .*ForLinux.*handle.py.*daemon.* && systemctl start walinuxagent &', True)
+                # REVERT
+                # self.command_executor.ExecuteInBash('/usr/sbin/adeforlinuxtestlauncher.sh &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
