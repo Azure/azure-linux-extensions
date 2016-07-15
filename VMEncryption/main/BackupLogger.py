@@ -32,7 +32,7 @@ class BackupLogger(object):
     def log(self, msg, level='Info'):
         log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
         log_msg = filter(lambda c: c in string.printable, log_msg)
-        log_msg = msg.encode('ascii', 'ignore')
+        log_msg = log_msg.encode('ascii', 'ignore')
 
         self.hutil.log(log_msg)
         self.log_to_console(log_msg)
