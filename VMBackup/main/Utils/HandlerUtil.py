@@ -64,7 +64,6 @@ from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
 import logging.handlers
-sys.path.append("/var/lib/waagent/Microsoft.Azure.RecoveryServices.VMSnapshotLinux-1.0.91.0/main")
 from common import CommonVariables
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
@@ -263,8 +262,7 @@ class HandlerUtility:
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
 	sub_stat = []
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
-	#CommonVariables_instance = CommonVariables()
-	if self._context._config['runtimeSettings'][0]['handlerSettings']['publicSettings'][CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+	if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
                 sub_stat = [ { "code" : "0", "name" : stat_rept, "status" : "success", "formattedMessage" : None } ]
 		stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
 

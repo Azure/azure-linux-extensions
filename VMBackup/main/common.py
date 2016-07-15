@@ -37,6 +37,8 @@ class CommonVariables:
     vmType = 'vmType'
     VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
     VmTypeV2 = 'microsoft.compute/virtualmachines'
+
+
     status_transitioning = 'transitioning'
     status_warning = 'warning'
     status_success = 'success'
@@ -57,7 +59,7 @@ class CommonVariables:
     
     @staticmethod
     def isTerminalStatus(status):
-        return (status==CommonVariables.status_success or status==CommonVariables.status_warning)
+        return (status==CommonVariables.status_success or status==CommonVariables.status_error)
 class DeviceItem(object):
     def __init__(self):
         #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL
