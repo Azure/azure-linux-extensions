@@ -123,6 +123,10 @@ class UnmountOldrootState(OSEncryptionState):
                 self.context.logger.log("Skipping init")
                 continue
 
+            if "ntfs-3g" in proc_name:
+                self.context.logger.log("Skipping ntfs-3g")
+                continue
+
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         self.command_executor.Execute('telinit u', True)
