@@ -53,14 +53,11 @@ from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,unfreeze_result,snapshot_result,snapshot_done
-    snapshot_done = False
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result
     run_result = CommonVariables.success
     run_status = 'success'
     error_msg = ''
     freeze_result = None
-    unfreeze_result = None
-    snapshot_result = None
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -81,6 +78,7 @@ def main():
             update()
         elif re.match("^([-/]*)(daemon)", a):
             daemon()
+
 
 def install():
     global hutil
@@ -132,10 +130,10 @@ def exit_with_commit_log(error_msg, para_parser):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
-def snapshot():
+def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
-        freeze_result = freezer.freezeall()
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
+        freeze_result = freezer.freeze_and_snapshot(timeout,para_parser)
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
@@ -143,7 +141,7 @@ def snapshot():
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
             backup_logger.log(error_msg, False, 'Warning')
         else:
-            backup_logger.log('T:S doing snapshot now...')
+            '''backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
             snapshot_result = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
@@ -152,15 +150,15 @@ def snapshot():
                 run_result = CommonVariables.error
                 run_status = 'error'
                 backup_logger.log(error_msg, False, 'Error')
-            else:
-                run_result = CommonVariables.success
-                run_status = 'success'
-                error_msg = 'Enable Succeeded'
-                backup_logger.log("T:S " + error_msg)
+            else:'''
+            run_result = CommonVariables.success
+            run_status = 'success'
+            error_msg = 'Enable Succeeded'
+            backup_logger.log("T:S " + error_msg)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
-    snapshot_done = True
+    #snapshot_done = True
 
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
@@ -231,7 +229,8 @@ def daemon():
                         backup_logger.log("trans_report_msg is none")
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
-                snapshot_thread = Thread(target = snapshot)
+                freeze_snapshot(thread_timeout)
+                '''snapshot_thread = Thread(target = snapshot)
                 start_time=datetime.datetime.utcnow()
                 snapshot_thread.start()
                 snapshot_thread.join(float(thread_timeout))
@@ -255,7 +254,7 @@ def daemon():
                         else:
                             backup_logger.log('unfreeze result is None')
                             break;
-                backup_logger.log('unfreeze ends...')
+                backup_logger.log('unfreeze ends...')'''
                 
         else:
             run_status = 'error'
@@ -316,6 +315,12 @@ def enable():
     global backup_logger,hutil,error_msg,para_parser
     hutil.do_parse_context('Enable')
     try:
+        finalpath=str(os.getcwd())
+        commandToExec ="chmod -R +x "+finalpath
+        subprocess.call(commandToExec,shell=True)
+    except Exception as e:
+        backup_logger.log('In enable permissions not changed', True)
+    try:
         backup_logger.log('starting to enable', True)
 
         # handle the restoring scenario.
@@ -362,7 +367,7 @@ def enable():
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         temp_status= 'transitioning'
-        temp_result=CommonVariables.success
+        temp_result=0
         temp_msg='Transitioning state in enable'
         trans_report_msg = None
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
