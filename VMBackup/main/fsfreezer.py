@@ -43,8 +43,8 @@ class FreezeResult(object):
             error_str+=(str(error)) + "\n"
         return error_str
 
-class FreezeHandler(object,logger):
-    def __init__(self):
+class FreezeHandler(object):
+    def __init__(self,logger):
         # fd valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
         self.fd = 0
         self.child= None
@@ -55,16 +55,15 @@ class FreezeHandler(object,logger):
         self.fd=1
 
     def signhandler(self,signal, frame):
-        self.logger.log('unable to freeze')
-        tim=0
+        self.logger.log('some child process terminated')
         if(self.child.poll() is not None):
             self.logger.log("child terminated",True)
             self.fd=2
-        while(self.child.poll() is None and tim<100):
+        '''while(self.child.poll() is None and tim<100):
             tim=tim+1
             time.sleep(1)
         self.logger.log("child terminate timed out")
-        self.fd=2
+        self.fd=2'''
 
     def startproc(self,args):
         self.child = subprocess.Popen(args, stdout=subprocess.PIPE)
@@ -106,7 +105,7 @@ class FsFreezer:
             if(mount.mount_point == '/'):
                 self.root_seen = True
                 self.root_mount = mount
-            elif(mount.mount_point and not should_skip(mount)):
+            elif(mount.mount_point and not self.should_skip(mount)):
                 arg.append(str(mount.mount_point))
         setarg=set(arg)
         arg_list=list(setarg)
@@ -115,6 +114,7 @@ class FsFreezer:
             args.append(argi)
         if(self.root_seen):
             args.append('/')
+        self.logger.log(str(args))
         freeze_handler=FreezeHandler(self.logger)
         freeze_handler.signal_receiver()
         self.logger.log("proceeded for accepting signals")
