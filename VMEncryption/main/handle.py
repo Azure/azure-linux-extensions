@@ -315,6 +315,13 @@ def enable_encryption():
                        level=CommonVariables.WarningLevel)
             exit_without_status_report()
 
+    ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ps_stdout, ps_stderr = ps.communicate()
+    if re.search(r"dd.*of=/dev/mapper/osencrypt", ps_stdout):
+        logger.log(msg="OS disk encryption already in progress, exiting",
+                   level=CommonVariables.WarningLevel)
+        exit_without_status_report()
+
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
