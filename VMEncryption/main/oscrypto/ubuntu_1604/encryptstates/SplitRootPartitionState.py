@@ -150,6 +150,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /oldroot/$i /$i; done", True)
         self.command_executor.Execute("systemctl restart rsyslog", True)
         self.command_executor.Execute("systemctl restart systemd-udevd", True)
+        self.command_executor.Execute("systemctl restart walinuxagent", True)
         self.command_executor.Execute("umount /oldroot/boot", True)
         self.command_executor.Execute("umount /oldroot", True)
         
