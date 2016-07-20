@@ -93,12 +93,8 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
-    global backup_logger,hutil
-    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
-    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-    time_span = timedelta_total_seconds(time_delta) * 1000
-    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks):
+    global hutil
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
     stat = [{
         "version" : hutil._context._version,
@@ -107,7 +103,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             "name" : hutil._context._name,
             "operation" : operation,
             "status" : status,
-            "substatus" : [],
+            "substatus" : sub_status,
             "code" : status_code,
             "taskId": taskId,
             "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
@@ -117,7 +113,21 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             }
         }
     }]
-    status_report_msg = json.dumps(stat)
+    return json.dumps(stat)
+
+def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
+    global backup_logger,hutil
+    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
+    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+    time_span = timedelta_total_seconds(time_delta) * 1000
+    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+    date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+    sub_stat = []
+    distr_info = hutil.get_dist_info()
+    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
+    sub_stat = hutil.substat_new_entry(sub_stat,'0',status_report_msg,'success',None)
+    sub_stat = hutil.substat_new_entry(sub_stat,'0',distr_info,'success',None)
+    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
     blobWriter.WriteBlob(status_report_msg,blobUri)
@@ -349,7 +359,7 @@ def enable():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
             timespan = utcNow - commandStartTime
-            THIRTY_MINUTES = 3000 * 60 # in seconds
+            THIRTY_MINUTES = 30 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
