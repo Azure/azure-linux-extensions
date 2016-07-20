@@ -35,6 +35,7 @@ import tempfile
 import json
 import sys
 import subprocess
+import shutil
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
@@ -42,6 +43,7 @@ from main.common import CommonVariables
 packages_array = []
 main_folder = 'main'
 main_entry = main_folder + '/handle.py'
+binary_entry = main_folder + '/safefreeze'
 packages_array.append(main_folder)
 
 patch_folder = main_folder + '/patch'
@@ -158,6 +160,11 @@ def zip(src, dst):
             zf.write(absname, arcname)
     zf.close()
 
+def copybinary(src, dst):
+    shutil.copytree(src, dst)
+
 final_folder_path = target_zip_file_location + target_folder_name
+final_binary_path= final_folder_path + '/main/safefreeze'
+copybinary(binary_entry, final_binary_path)
 zip(final_folder_path, target_zip_file_path)
 

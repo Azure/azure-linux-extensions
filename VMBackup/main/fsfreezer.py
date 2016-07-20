@@ -21,7 +21,6 @@ from mounts import Mounts
 import datetime
 import threading
 import os
-from snapshotter import Snapshotter
 import time
 import sys
 import signal
@@ -45,37 +44,35 @@ class FreezeResult(object):
 
 class FreezeHandler(object):
     def __init__(self,logger):
-        # fd valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
-        self.fd = 0
+        # sig_handle valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
+        self.sig_handle = 0
         self.child= None
         self.logger=logger
 
-    def signal_handler(self,signal, frame):
+    def sigusr1_handler(self,signal,frame):
         self.logger.log('freezed',False)
-        self.fd=1
+        self.sig_handle=1
 
-    def signhandler(self,signal, frame):
+    def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
         if(self.child.poll() is not None):
-            self.logger.log("child terminated",True)
-            self.fd=2
-        '''while(self.child.poll() is None and tim<100):
-            tim=tim+1
-            time.sleep(1)
-        self.logger.log("child terminate timed out")
-        self.fd=2'''
+            self.logger.log("binary child terminated",True)
+            self.sig_handle=2
 
     def startproc(self,args):
-        self.child = subprocess.Popen(args, stdout=subprocess.PIPE)
-        while(self.fd==0):
-            self.logger.log("inside while with fd "+str(self.fd))
-            time.sleep(3)
-        self.logger.log("Binary output for signal handled: "+str(self.fd)+"  "+str(self.child.stdout))
-        return self.fd
+        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+        for i in range(0,30):
+            if(self.sig_handle==0):
+                self.logger.log("inside while with sig_handle "+str(self.sig_handle))
+                time.sleep(2)
+            else:
+                break;
+        self.logger.log("Binary output for signal handled: "+str(self.sig_handle)+"  "+str(self.child.stdout))
+        return self.sig_handle
 
     def signal_receiver(self):
-        signal.signal(signal.SIGUSR1, self.signal_handler)
-        signal.signal(signal.SIGCHLD, self.signhandler)
+        signal.signal(signal.SIGUSR1,self.sigusr1_handler)
+        signal.signal(signal.SIGCHLD,self.sigchld_handler)
 
 class FsFreezer:
     def __init__(self, patching, logger):
@@ -86,6 +83,7 @@ class FsFreezer:
         self.mounts = Mounts(patching = self.patching, logger = self.logger)
         self.frozen_items = set()
         self.unfrozen_items = set()
+        self.freeze_handler = FreezeHandler(self.logger)
 
 
     def should_skip(self, mount):
@@ -94,11 +92,11 @@ class FsFreezer:
         else:
             return True
     
-    def freeze_and_snapshot(self,timeout,para_parser):
+    def freeze_safe(self,timeout):
         self.root_seen = False
         error_msg=''
         freeze_result = FreezeResult()
-        freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"freezetest.o")
+        freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
         args=[freezebin,str(timeout)]
         arg=[]
         for mount in self.mounts.mounts:
@@ -107,47 +105,38 @@ class FsFreezer:
                 self.root_mount = mount
             elif(mount.mount_point and not self.should_skip(mount)):
                 arg.append(str(mount.mount_point))
-        setarg=set(arg)
-        arg_list=list(setarg)
-        arg_list.sort(reverse=True)
-        for argi in arg_list:
-            args.append(argi)
+        mount_set=set(arg)
+        mount_list=list(mount_set)
+        mount_list.sort(reverse=True)
+        for mount_itr in mount_list:
+            args.append(mount_itr)
         if(self.root_seen):
             args.append('/')
         self.logger.log(str(args))
-        freeze_handler=FreezeHandler(self.logger)
-        freeze_handler.signal_receiver()
+        self.freeze_handler.signal_receiver()
         self.logger.log("proceeded for accepting signals")
-        fd=freeze_handler.startproc(args)
-        if(fd==1):
-            snap_shotter = Snapshotter(self.logger) 
-            snapshot_result = snap_shotter.snapshotall(para_parser) 
-            self.logger.log('T:S snapshotall ends...') 
-            if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
-                freeze_result=snapshot_result
-                self.logger.log("Snapshot failed")
-            else: 
-                self.logger.log("snapshot done")
-                if(freeze_handler.child.poll() is None):
-                    self.logger.log("child process still running")
-                    freeze_handler.child.send_signal(signal.SIGUSR1)
-                    while(freeze_handler.child.poll() is None):
-                        self.logger.log("child still running sigusr1 sent")
-                        time.sleep(1)
-                    if(freeze_handler.child.returncode!=0):
-                        error_msg = 'snapshot result inconsistent'
-                        freeze_result.errors.append(error_msg)
-                        self.logger.log(error_msg, False, 'Error')
-                else:
-                    error_msg = 'snapshot result inconsistent'
-                    freeze_result.errors.append(error_msg)
-                    self.logger.log(error_msg, False, 'Error')
-        else:
-            error_msg = 'failed to freeze '
+        sig_handle=self.freeze_handler.startproc(args)
+        if(sig_handle != 1):
+            error_msg="freeze failed for some mount"
             freeze_result.errors.append(error_msg)
-            self.logger.log(error_msg, False, 'Error')
-            if(freeze_handler.child.poll() is None):
-                self.logger.log("how is child alive")
-            self.logger.log(freeze_handler.child.returncode)
+            self.logger.log(error_msg, True, 'Error')
         return freeze_result
+
+    def thaw_safe(self):
+        thaw_result = FreezeResult()
+        if(self.freeze_handler.child.poll() is None):
+            self.logger.log("child process still running")
+            self.freeze_handler.child.send_signal(signal.SIGUSR1)
+            while(self.freeze_handler.child.poll() is None):
+                self.logger.log("child still running sigusr1 sent")
+                time.sleep(1)
+            if(self.freeze_handler.child.returncode!=0):
+                error_msg = 'snapshot result inconsistent'
+                thaw_result.errors.append(error_msg)
+                self.logger.log(error_msg, True, 'Error')
+        else:
+            error_msg = 'snapshot result inconsistent'
+            thaw_result.errors.append(error_msg)
+            self.logger.log(error_msg, True, 'Error')
+        return thaw_result
 

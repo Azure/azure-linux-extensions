@@ -133,15 +133,15 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
-        freeze_result = freezer.freeze_and_snapshot(timeout,para_parser)
+        freeze_result = freezer.freeze_safe(timeout)
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            backup_logger.log(error_msg, False, 'Warning')
+            backup_logger.log(error_msg, True, 'Warning')
         else:
-            '''backup_logger.log('T:S doing snapshot now...')
+            backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
             snapshot_result = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
@@ -150,11 +150,19 @@ def freeze_snapshot(timeout):
                 run_result = CommonVariables.error
                 run_status = 'error'
                 backup_logger.log(error_msg, False, 'Error')
-            else:'''
-            run_result = CommonVariables.success
-            run_status = 'success'
-            error_msg = 'Enable Succeeded'
-            backup_logger.log("T:S " + error_msg)
+            else:
+                thaw_result=freezer.thaw_safe()
+                backup_logger.log('T:S thaw result ' + str(thaw_result))
+                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                    backup_logger.log(error_msg, True, 'Warning')
+                else:   
+                    run_result = CommonVariables.success
+                    run_status = 'success'
+                    error_msg = 'Enable Succeeded'
+                    backup_logger.log("T:S " + error_msg)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
