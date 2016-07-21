@@ -39,6 +39,7 @@ class ParameterParser(object):
         self.logsBlobUri = public_settings.get(CommonVariables.logs_blob_uri)
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
+        self.vmType = public_settings.get(CommonVariables.vmType)
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):

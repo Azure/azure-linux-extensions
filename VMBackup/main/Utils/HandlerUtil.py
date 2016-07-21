@@ -64,6 +64,9 @@ from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
 import logging.handlers
+from common import CommonVariables
+import platform
+import subprocess
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -238,8 +241,7 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+    def do_status_json(self, operation, status, sub_status, status_code, message):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
@@ -248,6 +250,7 @@ class HandlerUtility:
                 "name" : self._context._name,
                 "operation" : operation,
                 "status" : status,
+                "substatus" : sub_status,
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
@@ -255,7 +258,43 @@ class HandlerUtility:
                 }
             }
         }]
-        stat_rept = json.dumps(stat)
+        return json.dumps(stat)
+
+    def get_wala_version(self):
+        file_pointer = open('/var/log/waagent.log','r')
+        waagent_version = ''
+        for line in file_pointer:
+            if 'Azure Linux Agent Version' in line:
+                waagent_version = line.split(':')[-1]
+        return waagent_version[:-1] #for removing the trailing '\n' character
+
+    def get_dist_info(self):
+        if 'FreeBSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = 'Distro=FireeBSD,Kernel=' + release + 'WALA=' + self.get_wala_version()
+            return distinfo
+        if 'linux_distribution' in dir(platform):
+            distinfo = list(platform.linux_distribution(full_distribution_name=0))
+            # remove trailing whitespace in distro name
+            distinfo[0] = distinfo[0].strip()
+            return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + ',WALA=' + self.get_wala_version()
+        else:
+            distinfo = platform.dist()
+            return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + 'WALA=' + self.get_wala_version()
+
+    def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
+        sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
+        return sub_status
+
+    def do_status_report(self, operation, status, status_code, message):
+        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        sub_stat = []
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
+        sub_stat = self.substat_new_entry(sub_stat,'0',self.get_dist_info(),'success',None)
+        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+            status = CommonVariables.success
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
