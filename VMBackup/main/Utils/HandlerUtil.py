@@ -261,26 +261,39 @@ class HandlerUtility:
         return json.dumps(stat)
 
     def get_wala_version(self):
-        file_pointer = open('/var/log/waagent.log','r')
-        waagent_version = ''
-        for line in file_pointer:
-            if 'Azure Linux Agent Version' in line:
-                waagent_version = line.split(':')[-1]
-        return waagent_version[:-1] #for removing the trailing '\n' character
+        try:
+            file_pointer = open('/var/log/waagent.log','r')
+            waagent_version = ''
+            for line in file_pointer:
+                if 'Azure Linux Agent Version' in line:
+                    waagent_version = line.split(':')[-1]
+            return waagent_version[:-1] #for removing the trailing '\n' character
+        except Exception as e:
+            errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            waagent_version="Unknown"
+            return waagent_version
 
     def get_dist_info(self):
-        if 'FreeBSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
-            distinfo = 'Distro=FireeBSD,Kernel=' + release + 'WALA=' + self.get_wala_version()
+        wala_ver=self.get_wala_version()
+        try:
+            if 'FreeBSD' in platform.system():
+                release = re.sub('\-.*\Z', '', str(platform.release()))
+                distinfo = 'Distro=FireeBSD,Kernel=' + release + 'WALA=' + wala_ver
+                return distinfo
+            if 'linux_distribution' in dir(platform):
+                distinfo = list(platform.linux_distribution(full_distribution_name=0))
+                # remove trailing whitespace in distro name
+                distinfo[0] = distinfo[0].strip()
+                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + ',WALA=' + wala_ver
+            else:
+                distinfo = platform.dist()
+                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + 'WALA=' + wala_ver
+        except Exception as e:
+            errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            distinfo = 'Distro=Unknown,Kernel=Unknown,WALA=' + wala_ver
             return distinfo
-        if 'linux_distribution' in dir(platform):
-            distinfo = list(platform.linux_distribution(full_distribution_name=0))
-            # remove trailing whitespace in distro name
-            distinfo[0] = distinfo[0].strip()
-            return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + ',WALA=' + self.get_wala_version()
-        else:
-            distinfo = platform.dist()
-            return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + 'WALA=' + self.get_wala_version()
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
         sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })

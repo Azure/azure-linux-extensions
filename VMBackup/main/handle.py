@@ -156,6 +156,36 @@ def exit_with_commit_log(error_msg, para_parser):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
+def snapshot(): 
+    try: 
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser 
+        freeze_result = freezer.freezeall() 
+        backup_logger.log('T:S freeze result ' + str(freeze_result)) 
+        if(freeze_result is not None and len(freeze_result.errors) > 0): 
+            run_result = CommonVariables.error 
+            run_status = 'error' 
+            error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
+            backup_logger.log(error_msg, False, 'Warning') 
+        else: 
+            backup_logger.log('T:S doing snapshot now...') 
+            snap_shotter = Snapshotter(backup_logger) 
+            snapshot_result = snap_shotter.snapshotall(para_parser) 
+            backup_logger.log('T:S snapshotall ends...') 
+            if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
+                error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
+                run_result = CommonVariables.error 
+                run_status = 'error' 
+                backup_logger.log(error_msg, False, 'Error') 
+            else: 
+                run_result = CommonVariables.success 
+                run_status = 'success' 
+                error_msg = 'Enable Succeeded' 
+                backup_logger.log("T:S " + error_msg) 
+    except Exception as e: 
+        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc()) 
+        backup_logger.log(errMsg, False, 'Error') 
+    snapshot_done = True 
+
 def freeze_snapshot(timeout):
     try:
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
@@ -204,14 +234,17 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
+    safe_freeze_on = True
     try:
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
+        safe_freeze_on=config.get('SnapshotThread','safefreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, False, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
+    backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
 
     try:
         # we need to freeze the file system first
@@ -255,32 +288,32 @@ def daemon():
                 status_report(temp_status,temp_result,temp_msg)
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
-                freeze_snapshot(thread_timeout)
-                '''snapshot_thread = Thread(target = snapshot)
-                start_time=datetime.datetime.utcnow()
-                snapshot_thread.start()
-                snapshot_thread.join(float(thread_timeout))
-                if not snapshot_done:
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:W Snapshot timeout'
-                    backup_logger.log(error_msg, False, 'Warning')
-
-                end_time=datetime.datetime.utcnow()
-                time_taken=end_time-start_time
-                backup_logger.log('total time taken..' + str(time_taken))
-                
-                for i in range(0,3):
-                    unfreeze_result = freezer.unfreezeall()
-                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
-                    if(unfreeze_result is not None):
-                        if len(unfreeze_result.errors) > 0:
-                            error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                            backup_logger.log(error_msg, False, 'Warning')
-                        else:
-                            backup_logger.log('unfreeze result is None')
-                            break;
-                backup_logger.log('unfreeze ends...')'''
+                if(safe_freeze_on==True):
+                    freeze_snapshot(thread_timeout)
+                else:
+                    snapshot_thread = Thread(target = snapshot)
+                    start_time=datetime.datetime.utcnow()
+                    snapshot_thread.start()
+                    snapshot_thread.join(float(thread_timeout))
+                    if not snapshot_done:
+                        run_result = CommonVariables.error
+                        run_status = 'error'
+                        error_msg = 'T:W Snapshot timeout'
+                        backup_logger.log(error_msg, False, 'Warning')
+                    end_time=datetime.datetime.utcnow()
+                    time_taken=end_time-start_time
+                    backup_logger.log('total time taken..' + str(time_taken))
+                    for i in range(0,3):
+                        unfreeze_result = freezer.unfreezeall()
+                        backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                        if(unfreeze_result is not None):
+                            if len(unfreeze_result.errors) > 0:
+                                error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
+                                backup_logger.log(error_msg, False, 'Warning')
+                            else:
+                                backup_logger.log('unfreeze result is None')
+                                break;
+                    backup_logger.log('unfreeze ends...')
                 
         else:
             run_status = 'error'
