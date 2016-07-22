@@ -257,7 +257,14 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
-        self.log("[StatusReport] op: {0}, status: {1}, code: {2}, msg: {3}".format(operation, status, status_code, message))
+        message = filter(lambda c: c in string.printable, message)
+        message = message.encode('ascii', 'ignore')
+
+        self.log("[StatusReport] op: {0}, status: {1}, code: {2}, msg: {3}".format(operation,
+                                                                                   status,
+                                                                                   status_code,
+                                                                                   message))
+
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
