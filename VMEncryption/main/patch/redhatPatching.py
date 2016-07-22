@@ -76,7 +76,7 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        return_code = subprocess.call(['yum', 'install','-y', 'epel-release'])
+        return_code = subprocess.call(['yum', 'install','-y', 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm'])
         self.logger.log("Enabling epel, result: " + str(return_code))
 
         packages = ['ntfs-3g',
