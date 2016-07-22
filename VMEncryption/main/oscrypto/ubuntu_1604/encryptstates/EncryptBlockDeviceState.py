@@ -73,6 +73,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
         return super(EncryptBlockDeviceState, self).should_exit()
 
     def _luks_format(self, bek_path):
+        self.command_executor.Execute('rm -rf /boot/luks', True)
         self.command_executor.Execute('mkdir /boot/luks', True)
         self.command_executor.Execute('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
         self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} {1} -q'.format(bek_path,
