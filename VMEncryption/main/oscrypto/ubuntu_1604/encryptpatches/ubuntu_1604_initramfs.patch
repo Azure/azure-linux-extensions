@@ -1,7 +1,15 @@
 diff -Naur hooks.orig/cryptroot hooks/cryptroot
---- hooks.orig/cryptroot	2016-07-13 01:42:13.158023800 -0700
-+++ hooks/cryptroot	2016-07-13 01:42:36.122470000 -0700
-@@ -521,14 +521,14 @@
+--- hooks.orig/cryptroot	2016-07-22 00:28:33.079103643 +0000
++++ hooks/cryptroot	2016-07-22 00:27:38.464712385 +0000
+@@ -1,5 +1,7 @@
+ #!/bin/sh
+ 
++set -x
++
+ PREREQ=""
+ 
+ prereqs()
+@@ -521,14 +523,14 @@
  				mkdir -p "$DESTDIR/conf/conf.d/cryptheader"
  			fi
  
@@ -24,3 +32,13 @@ diff -Naur hooks.orig/cryptroot hooks/cryptroot
  		fi
  		
  
+@@ -627,6 +629,9 @@
+ 	if [ -z "$rootdevs" ]; then
+ 		echo "cryptsetup: WARNING: could not determine root device from /etc/fstab" >&2
+ 	fi
++	if ! echo "$rootdevs" | grep -q "osencrypt"; then
++		rootdevs="$rootdevs osencrypt"
++	fi
+ 	usrdevs=$(get_fs_devices /usr)
+ 	resumedevs=$(get_resume_devices)
+ 	initramfsdevs=$(get_initramfs_devices)
