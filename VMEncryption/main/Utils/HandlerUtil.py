@@ -54,12 +54,14 @@ Example Status Report:
 
 import os
 import os.path
+import string
 import sys
 import imp
 import base64
 import json
 import tempfile
 import time
+
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
