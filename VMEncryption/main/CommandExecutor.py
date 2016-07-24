@@ -40,8 +40,8 @@ class CommandExecutor(object):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
-        return_code = proc.wait()
         stdout, stderr = proc.communicate()
+        return_code = proc.returncode
 
         if isinstance(communicator, ProcessCommunicator):
             communicator.stdout, communicator.stderr = stdout, stderr
