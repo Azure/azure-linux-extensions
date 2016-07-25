@@ -1037,10 +1037,12 @@ def install_rsyslogom():
 
 def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
     files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
+    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
+    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
 
     for f in files_to_modify:
         RunGetOutput(cmd_to_run.format(new_port, f))
+        RunGetOutput(cmd2_to_run.format(new_port, f))
 
     update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
     update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
