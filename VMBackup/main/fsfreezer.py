@@ -67,7 +67,7 @@ class FreezeHandler(object):
                 time.sleep(2)
             else:
                 break;
-        self.logger.log("Binary output for signal handled: "+str(self.sig_handle)+"  "+str(self.child.stdout))
+        self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
         return self.sig_handle
 
     def signal_receiver(self):
@@ -133,12 +133,25 @@ class FsFreezer:
                     time.sleep(1)
                 else:
                     break;
-            self.logger.log("Binary output after process end: "+str(self.freeze_handler.child.stdout))
+            self.logger.log("Binary output after process end: ")
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
             if(self.freeze_handler.child.returncode!=0):
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         else:
+            self.logger.log("Binary output after process end when no thaw sent: ")
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
             error_msg = 'snapshot result inconsistent'
             thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')

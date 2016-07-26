@@ -126,6 +126,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
+        printf("freezing the mount: %s\n", mountPoint);
 
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
@@ -164,6 +165,7 @@ CLEANUP:
             if (fileSystemDescriptors[i] >= 0)
             {
                 char *mountPoint = argv[i + 2];
+                printf("unfreezing the mount: %s\n", mountPoint);
 
                 if (ioctl(fileSystemDescriptors[i], FITHAW, 0) != 0)
                 {
