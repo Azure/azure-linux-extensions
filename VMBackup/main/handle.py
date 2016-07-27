@@ -53,14 +53,11 @@ from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,unfreeze_result,snapshot_result,snapshot_done
-    snapshot_done = False
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result
     run_result = CommonVariables.success
     run_status = 'success'
     error_msg = ''
     freeze_result = None
-    unfreeze_result = None
-    snapshot_result = None
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -93,12 +90,8 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
-    global backup_logger,hutil
-    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
-    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-    time_span = timedelta_total_seconds(time_delta) * 1000
-    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks):
+    global hutil
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
     stat = [{
         "version" : hutil._context._version,
@@ -107,6 +100,7 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             "name" : hutil._context._name,
             "operation" : operation,
             "status" : status,
+            "substatus" : sub_status,
             "code" : status_code,
             "taskId": taskId,
             "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
@@ -116,11 +110,41 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
             }
         }
     }]
-    status_report_msg = json.dumps(stat)
+    return json.dumps(stat)
+
+def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
+    global backup_logger,hutil
+    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
+    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+    time_span = timedelta_total_seconds(time_delta) * 1000
+    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+    date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+    sub_stat = []
+    distr_info = hutil.get_dist_info()
+    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
+    sub_stat = hutil.substat_new_entry(sub_stat,'0',status_report_msg,'success',None)
+    sub_stat = hutil.substat_new_entry(sub_stat,'0',distr_info,'success',None)
+    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
     blobWriter.WriteBlob(status_report_msg,blobUri)
     return status_report_msg
+
+def status_report(status,status_code,message):
+    global backup_logger,hutil,para_parser
+    trans_report_msg = None
+    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        trans_report_msg = do_backup_status_report(operation='Enable',status=status,\
+                status_code=str(status_code),\
+                message=message,\
+                taskId=para_parser.taskId,\
+                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                blobUri=para_parser.statusBlobUri)
+        if(trans_report_msg is not None):
+            backup_logger.log("trans status report message:")
+            backup_logger.log(trans_report_msg)
+        else:
+            backup_logger.log("trans_report_msg is none")
 
 def exit_with_commit_log(error_msg, para_parser):
     global backup_logger
@@ -132,16 +156,46 @@ def exit_with_commit_log(error_msg, para_parser):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
-def snapshot():
+def snapshot(): 
+    try: 
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser 
+        freeze_result = freezer.freezeall() 
+        backup_logger.log('T:S freeze result ' + str(freeze_result)) 
+        if(freeze_result is not None and len(freeze_result.errors) > 0): 
+            run_result = CommonVariables.error 
+            run_status = 'error' 
+            error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
+            backup_logger.log(error_msg, False, 'Warning') 
+        else: 
+            backup_logger.log('T:S doing snapshot now...') 
+            snap_shotter = Snapshotter(backup_logger) 
+            snapshot_result = snap_shotter.snapshotall(para_parser) 
+            backup_logger.log('T:S snapshotall ends...') 
+            if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
+                error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
+                run_result = CommonVariables.error 
+                run_status = 'error' 
+                backup_logger.log(error_msg, False, 'Error') 
+            else: 
+                run_result = CommonVariables.success 
+                run_status = 'success' 
+                error_msg = 'Enable Succeeded' 
+                backup_logger.log("T:S " + error_msg) 
+    except Exception as e: 
+        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc()) 
+        backup_logger.log(errMsg, False, 'Error') 
+    snapshot_done = True 
+
+def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser
-        freeze_result = freezer.freezeall()
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
+        freeze_result = freezer.freeze_safe(timeout)
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            backup_logger.log(error_msg, False, 'Warning')
+            backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
@@ -153,14 +207,22 @@ def snapshot():
                 run_status = 'error'
                 backup_logger.log(error_msg, False, 'Error')
             else:
-                run_result = CommonVariables.success
-                run_status = 'success'
-                error_msg = 'Enable Succeeded'
-                backup_logger.log("T:S " + error_msg)
+                thaw_result=freezer.thaw_safe()
+                backup_logger.log('T:S thaw result ' + str(thaw_result))
+                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:S Enable failed with error: ' + str(thaw_result)
+                    backup_logger.log(error_msg, True, 'Warning')
+                else:   
+                    run_result = CommonVariables.success
+                    run_status = 'success'
+                    error_msg = 'Enable Succeeded'
+                    backup_logger.log("T:S " + error_msg)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
-    snapshot_done = True
+    #snapshot_done = True
 
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
@@ -172,14 +234,17 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
+    safe_freeze_on = True
     try:
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
+        safe_freeze_on=config.get('SnapshotThread','safefreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, False, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
+    backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
 
     try:
         # we need to freeze the file system first
@@ -213,49 +278,42 @@ def daemon():
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
-                temp_status= 'transitioning'
-                temp_result=CommonVariables.success
-                temp_msg='Transitioning state in extension daemon'
-                trans_report_msg = None
-                if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-                    trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
-                                    status_code=str(temp_result),\
-                                    message=temp_msg,\
-                                    taskId=para_parser.taskId,\
-                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                                    blobUri=para_parser.statusBlobUri)
-                    if(trans_report_msg is not None):
-                        backup_logger.log("trans status report message:")
-                        backup_logger.log(trans_report_msg)
-                    else:
-                        backup_logger.log("trans_report_msg is none")
+                if para_parser.vmType == CommonVariables.VmTypeV1 :
+                    temp_status= 'success'
+                    temp_result=CommonVariables.ExtensionTempTerminalState
+                else :
+                    temp_status= 'transitioning'
+                    temp_result=CommonVariables.success
+                temp_msg='Transitioning state in extension'
+                status_report(temp_status,temp_result,temp_msg)
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
-                snapshot_thread = Thread(target = snapshot)
-                start_time=datetime.datetime.utcnow()
-                snapshot_thread.start()
-                snapshot_thread.join(float(thread_timeout))
-                if not snapshot_done:
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:W Snapshot timeout'
-                    backup_logger.log(error_msg, False, 'Warning')
-
-                end_time=datetime.datetime.utcnow()
-                time_taken=end_time-start_time
-                backup_logger.log('total time taken..' + str(time_taken))
-                
-                for i in range(0,3):
-                    unfreeze_result = freezer.unfreezeall()
-                    backup_logger.log('unfreeze result ' + str(unfreeze_result))
-                    if(unfreeze_result is not None):
-                        if len(unfreeze_result.errors) > 0:
-                            error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                            backup_logger.log(error_msg, False, 'Warning')
-                        else:
-                            backup_logger.log('unfreeze result is None')
-                            break;
-                backup_logger.log('unfreeze ends...')
+                if(safe_freeze_on==True):
+                    freeze_snapshot(thread_timeout)
+                else:
+                    snapshot_thread = Thread(target = snapshot)
+                    start_time=datetime.datetime.utcnow()
+                    snapshot_thread.start()
+                    snapshot_thread.join(float(thread_timeout))
+                    if not snapshot_done:
+                        run_result = CommonVariables.error
+                        run_status = 'error'
+                        error_msg = 'T:W Snapshot timeout'
+                        backup_logger.log(error_msg, False, 'Warning')
+                    end_time=datetime.datetime.utcnow()
+                    time_taken=end_time-start_time
+                    backup_logger.log('total time taken..' + str(time_taken))
+                    for i in range(0,3):
+                        unfreeze_result = freezer.unfreezeall()
+                        backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                        if(unfreeze_result is not None):
+                            if len(unfreeze_result.errors) > 0:
+                                error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
+                                backup_logger.log(error_msg, False, 'Warning')
+                            else:
+                                backup_logger.log('unfreeze result is None')
+                                break;
+                    backup_logger.log('unfreeze ends...')
                 
         else:
             run_status = 'error'
@@ -280,18 +338,7 @@ def daemon():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
     status_report_msg = None
-    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        status_report_msg = do_backup_status_report(operation='Enable',status=run_status,\
-                                status_code=str(run_result),\
-                                message=error_msg,\
-                                taskId=para_parser.taskId,\
-                                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                                blobUri=para_parser.statusBlobUri)
-    if(status_report_msg is not None):
-        backup_logger.log("status report message:")
-        backup_logger.log(status_report_msg)
-    else:
-        backup_logger.log("status_report_msg is none")
+    status_report(run_status,run_result,error_msg)
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
@@ -364,19 +411,7 @@ def enable():
         temp_status= 'transitioning'
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
-        trans_report_msg = None
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-            trans_report_msg = do_backup_status_report(operation='Enable',status=temp_status,\
-                                    status_code=str(temp_result),\
-                                    message=temp_msg,\
-                                    taskId=para_parser.taskId,\
-                                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                                    blobUri=para_parser.statusBlobUri)
-            if(trans_report_msg is not None):
-                backup_logger.log("trans status report message:")
-                backup_logger.log(trans_report_msg)
-            else:
-                backup_logger.log("trans_report_msg is none")
+        status_report(temp_status,temp_result,temp_msg)
         hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
         start_daemon();
     except Exception as e:
