@@ -258,7 +258,7 @@ class HandlerUtility:
                 }
             }
         }]
-        return json.dumps(stat)
+        return stat
 
     def get_wala_version(self):
         try:
@@ -302,12 +302,16 @@ class HandlerUtility:
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
-        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        sub_stat = self.substat_new_entry(sub_stat,'0',self.get_dist_info(),'success',None)
+        stat_rept = []
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            status = CommonVariables.success
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+            stat_rept[0]["timestampUTC"] = None
+            stat_rept = json.dumps(stat_rept)
+            status_code = '1'
+            status = CommonVariables.status_success
+            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+        stat_rept = json.dumps(stat_rept)
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence

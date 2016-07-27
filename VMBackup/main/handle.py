@@ -120,10 +120,6 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
     date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
     sub_stat = []
-    distr_info = hutil.get_dist_info()
-    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
-    sub_stat = hutil.substat_new_entry(sub_stat,'0',status_report_msg,'success',None)
-    sub_stat = hutil.substat_new_entry(sub_stat,'0',distr_info,'success',None)
     status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
