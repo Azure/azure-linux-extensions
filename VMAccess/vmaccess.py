@@ -61,7 +61,7 @@ def main():
 def install():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0, 'Install', 'Installed', '0', 'Install Succeeded')
+    hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
