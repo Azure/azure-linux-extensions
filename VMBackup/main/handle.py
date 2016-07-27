@@ -212,7 +212,7 @@ def freeze_snapshot(timeout):
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
                     run_result = CommonVariables.error
                     run_status = 'error'
-                    error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                    error_msg = 'T:S Enable failed with error: ' + str(thaw_result)
                     backup_logger.log(error_msg, True, 'Warning')
                 else:   
                     run_result = CommonVariables.success

@@ -117,6 +117,12 @@ class FsFreezer:
         self.logger.log("proceeded for accepting signals")
         sig_handle=self.freeze_handler.startproc(args)
         if(sig_handle != 1):
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
             error_msg="freeze failed for some mount"
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
