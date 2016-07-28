@@ -67,6 +67,7 @@ import logging.handlers
 from common import CommonVariables
 import platform
 import subprocess
+import datetime
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -258,7 +259,7 @@ class HandlerUtility:
                 }
             }
         }]
-        return json.dumps(stat)
+        return stat
 
     def get_wala_version(self):
         try:
@@ -299,15 +300,30 @@ class HandlerUtility:
         sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
         return sub_status
 
+    def timedelta_total_seconds(self, delta):
+        if not hasattr(datetime.timedelta, 'total_seconds'):
+            return delta.days * 86400 + delta.seconds
+        else:
+            return delta.total_seconds()
+
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
-        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        sub_stat = self.substat_new_entry(sub_stat,'0',self.get_dist_info(),'success',None)
+        stat_rept = []
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            status = CommonVariables.success
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+            time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+            time_span = self.timedelta_total_seconds(time_delta) * 1000
+            date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+            stat_rept[0]["timestampUTC"] = date_place_holder
+            stat_rept = json.dumps(stat_rept)
+            date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+            stat_rept = stat_rept.replace(date_place_holder,date_string)
+            status_code = '1'
+            status = CommonVariables.status_success
+            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+        stat_rept = json.dumps(stat_rept)
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
