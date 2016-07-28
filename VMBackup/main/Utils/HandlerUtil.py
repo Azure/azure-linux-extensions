@@ -312,11 +312,13 @@ class HandlerUtility:
         stat_rept = []
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
             stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
-            stat_rept[0]["timestampUTC"] = None
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
             time_span = timedelta_total_seconds(time_delta) * 1000
-            stat_rept[0]["timestampUTC"] = r'\/Date(' + str((int)(time_span)) + r')\/'
+            date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+            stat_rept[0]["timestampUTC"] = date_place_holder
             stat_rept = json.dumps(stat_rept)
+            date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+            stat_rept = stat_rept.replace(date_place_holder,date_string)
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
