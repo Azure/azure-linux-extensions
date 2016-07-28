@@ -88,7 +88,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                   version=version,
                                   message="(01101)"+error_msg)
         exit_code = 1                                  
-        msg = 'Lanch command failed: {0}'.format(e)
+        msg = 'Lanuch command failed: {0}'.format(e)
         
         log_or_exit(hutil, exit_after_run, exit_code, operation, msg)
     finally:        
