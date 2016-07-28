@@ -67,6 +67,7 @@ import logging.handlers
 from common import CommonVariables
 import platform
 import subprocess
+import datetime
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -298,6 +299,12 @@ class HandlerUtility:
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
         sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
         return sub_status
+
+    def timedelta_total_seconds(self, delta):
+        if not hasattr(datetime.timedelta, 'total_seconds'):
+            return delta.days * 86400 + delta.seconds
+        else:
+            return delta.total_seconds()
 
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
