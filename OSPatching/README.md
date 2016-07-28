@@ -303,7 +303,7 @@ No need to provide protected settings.
   "disabled": false,
   "stop": false,
   "rebootAfterPatch": "RebootIfNeed",
-  "one-off": true,
+  "oneoff": true,
   "category": "ImportantAndRecommended",
   "installDuration": "00:30"
 }
