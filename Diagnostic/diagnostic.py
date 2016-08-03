@@ -33,8 +33,9 @@ import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 
 WorkDir = os.getcwd()
-MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
+MDSDFileResourcesPrefix = os.path.join(WorkDir, 'mdsd')
+MDSDPidFile = MDSDFileResourcesPrefix + '.pid'
+MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -695,11 +696,11 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
-        MDSDPidPortFile,
+        MDSDFileResourcesPrefix,
         monitor_file_path,
         warn_file_path,
         info_file_path).split(" ")
