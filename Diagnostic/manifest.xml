@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-  <ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
-  <Type>LinuxDiagnostic</Type>
-  <Version>2.3.9007</Version>
+  <ProviderNameSpace>Microsoft.Azure.Extensions</ProviderNameSpace>
+  <Type>TestLAD</Type>
+  <Version>2.3.9008.1</Version>
   <Label>Microsoft Azure Diagnostic Extension for Linux Virtual Machines</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
