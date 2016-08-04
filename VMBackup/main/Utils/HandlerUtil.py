@@ -268,7 +268,26 @@ class HandlerUtility:
             for line in file_pointer:
                 if 'Azure Linux Agent Version' in line:
                     waagent_version = line.split(':')[-1]
-            return waagent_version[:-1] #for removing the trailing '\n' character
+            if waagent_version[:-1]=="": #for removing the trailing '\n' character
+                waagent_version = self.get_wala_version_from_file()
+                return waagent_version
+            else:
+                return waagent_version[:-1]
+        except Exception as e:
+            errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            waagent_version="Unknown"
+            return waagent_version
+
+    def get_wala_version_from_file(self):
+        try:
+            file_pointer = open('/usr/sbin/waagent','r')
+            waagent_version = ''
+            for line in file_pointer:
+                if 'GuestAgentVersion' in line:
+                    waagent_version = line.split('\"')[1]
+                    break
+            return waagent_version #for removing the trailing '\n' character
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
@@ -322,6 +341,8 @@ class HandlerUtility:
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
+        distinfo=self.get_dist_info()
+        message=message+";"+distinfo
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
         stat_rept = json.dumps(stat_rept)
         # rename all other status files, or the WALA would report the wrong
