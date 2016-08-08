@@ -160,6 +160,7 @@ class Snapshotter(object):
                 self.logger.log("the blobs are None")
                 return snapshot_result
         except Exception as e:
+            self.logger.log("Do sequential snapshoting")
             blobs = paras.blobs
             if blobs is not None:
                 for blob in blobs:

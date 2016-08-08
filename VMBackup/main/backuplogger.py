@@ -79,6 +79,8 @@ class Backuplogger(object):
             errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.hutil.log(errMsg)
         blobWriter.WriteBlob(self.msg, logbloburi)
+        self.log_message = ''
+        self.msg = ''
 
     def commit_to_local(self):
         self.hutil.log(self.msg)
