@@ -218,6 +218,9 @@ def freeze_snapshot(timeout):
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
+        run_result = CommonVariables.error
+        run_status = 'error'
+        error_msg = 'T:S Enable failed with error: ' + errMsg
     #snapshot_done = True
 
 def daemon():
