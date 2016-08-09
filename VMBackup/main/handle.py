@@ -220,7 +220,7 @@ def freeze_snapshot(timeout):
         backup_logger.log(errMsg, False, 'Error')
         run_result = CommonVariables.error
         run_status = 'error'
-        error_msg = 'T:S Enable failed with error: ' + errMsg
+        error_msg = 'Enable failed with exception in freeze or snapshot ' 
     #snapshot_done = True
 
 def daemon():
@@ -289,10 +289,9 @@ def daemon():
                 backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-                    backup_logger.commit(para_parser.logsBlobUri)
+                    backup_logger.commit_to_blob(para_parser.logsBlobUri)
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
-                    backup_logger.commit_to_local() 
                 if(safe_freeze_on==True):
                     freeze_snapshot(thread_timeout)
                 else:

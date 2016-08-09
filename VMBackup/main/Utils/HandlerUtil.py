@@ -290,7 +290,7 @@ class HandlerUtility:
             return waagent_version #for removing the trailing '\n' character
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            backup_logger.log(errMsg, False, 'Warning')
             waagent_version="Unknown"
             return waagent_version
 
