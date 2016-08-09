@@ -1,18 +1,18 @@
 ﻿Param(
     [Parameter(Mandatory=$true)]
-	[string] $SubscriptionId,
+    [string] $SubscriptionId,
     [Parameter(Mandatory=$true)]
-	[string] $AadClientId,
+    [string] $AadClientId,
     [Parameter(Mandatory=$true)]
-	[string] $AadClientSecret,
+    [string] $AadClientSecret,
     [Parameter(Mandatory=$true)]
-	[string] $ResourcePrefix,
+    [string] $ResourcePrefix,
     [Parameter(Mandatory=$true)]
-	[string] $Username,
+    [string] $Username,
     [Parameter(Mandatory=$true)]
-	[string] $Password,
-	[string] $ExtensionName="AzureDiskEncryptionForLinux",
-	[string] $SshPubKey,
+    [string] $Password,
+    [string] $ExtensionName="AzureDiskEncryptionForLinux",
+    [string] $SshPubKey,
     [string] $SshPrivKeyPath,
     [string] $Location="eastus",
     [string] $VolumeType="data",
