@@ -719,7 +719,8 @@ class DiskUtil(object):
             f.close()
             if(class_id.strip() == self.ide_class_id):
                 device_sdx_path = self.find_block_sdx_path(vmbus)
-                self.logger.log("found one ide with vmbus: {0} and the sdx path is:".format(vmbus,device_sdx_path))
+                self.logger.log("found one ide with vmbus: {0} and the sdx path is: {1}".format(vmbus,
+                                                                                                device_sdx_path))
                 ide_devices.append(device_sdx_path)
         return ide_devices
 
