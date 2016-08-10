@@ -303,7 +303,7 @@ No need to provide protected settings.
   "disabled": false,
   "stop": false,
   "rebootAfterPatch": "RebootIfNeed",
-  "one-off": true,
+  "oneoff": true,
   "category": "ImportantAndRecommended",
   "installDuration": "00:30"
 }
@@ -366,7 +366,6 @@ If you want to switch to manual OS update temporarily, you can set the `disable`
 - Oracle Linux 6.4.0.0.0 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
-- FreeBSD
 
 ## Debug
 

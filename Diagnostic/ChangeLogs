@@ -1,3 +1,8 @@
+2016-07-14: LAD-2.3.9007
+    - Fixes install issues on some RH-based distros (e.g., OracleLinux 7) due
+      to lack of tar.
+    - Fixes duplicate logging (on /var/log/syslog) issue on fileCfg
+
 2016-06-30: LAD-2.3.9005
     - Fixes non-starting monitoring agent issue on systemd-enabled distros (#180)
     - HandlerUtil unified with other extensions
