@@ -218,6 +218,9 @@ def freeze_snapshot(timeout):
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
+        run_result = CommonVariables.error
+        run_status = 'error'
+        error_msg = 'Enable failed with exception in freeze or snapshot ' 
     #snapshot_done = True
 
 def daemon():
@@ -284,6 +287,11 @@ def daemon():
                 status_report(temp_status,temp_result,temp_msg)
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
+                #partial logging before freeze
+                if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+                    backup_logger.commit_to_blob(para_parser.logsBlobUri)
+                else:
+                    backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 if(safe_freeze_on==True):
                     freeze_snapshot(thread_timeout)
                 else:
