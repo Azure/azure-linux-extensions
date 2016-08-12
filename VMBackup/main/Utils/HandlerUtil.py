@@ -305,10 +305,10 @@ class HandlerUtility:
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
                 distinfo[0] = distinfo[0].strip()
-                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + ',WALA=' + wala_ver
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
             else:
                 distinfo = platform.dist()
-                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + 'WALA=' + wala_ver
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
@@ -329,6 +329,8 @@ class HandlerUtility:
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
+        distinfo=self.get_dist_info()
+        message=message+";"+distinfo
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
             stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
@@ -341,8 +343,6 @@ class HandlerUtility:
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        distinfo=self.get_dist_info()
-        message=message+";"+distinfo
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
         stat_rept = json.dumps(stat_rept)
         # rename all other status files, or the WALA would report the wrong
