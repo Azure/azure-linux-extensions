@@ -296,7 +296,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement)
+        XmlUtil.addElement(tree,'Events/OMI[1]',perfElement)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
@@ -329,7 +329,7 @@ def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
             perfCfgList = readPublicConfig('perfCfg')
         if not perfCfgList and not hasPublicConfig('perfCfg'):
             perfCfgList = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
+                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
                     {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
                     {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
                   ]
