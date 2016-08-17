@@ -396,6 +396,18 @@ def setEventVolume(mdsdCfg,ladCfg):
             
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
+def getStorageAccountEndPoint(account):
+    endpoint = readPrivateConfig('storageAccountEndPoint')
+    if endpoint:
+        parts = endpoint.split('//', 1)
+	if len(parts) > 1:
+	    endpoint = parts[0]+'//'+account+".table."+parts[1]
+	else:
+	    endpoint = 'https://'+account+".table."+parts[0]
+    else:
+	endpoint = 'https://'+account+'.table.core.windows.net'
+    return endpoint
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -458,10 +470,7 @@ def configSettings():
     key = readPrivateConfig('storageAccountKey')
     if not key:
         return False, "Empty storageAccountKey"
-    endpoint = readPrivateConfig('endpoint')
-    if not endpoint:
-        endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint
+    endpoint = getStorageAccountEndPoint(account)
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
