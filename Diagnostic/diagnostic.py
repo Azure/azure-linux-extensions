@@ -400,12 +400,12 @@ def getStorageAccountEndPoint(account):
     endpoint = readPrivateConfig('storageAccountEndPoint')
     if endpoint:
         parts = endpoint.split('//', 1)
-	if len(parts) > 1:
-	    endpoint = parts[0]+'//'+account+".table."+parts[1]
-	else:
-	    endpoint = 'https://'+account+".table."+parts[0]
+        if len(parts) > 1:
+            endpoint = parts[0]+'//'+account+".table."+parts[1]
+        else:
+            endpoint = 'https://'+account+".table."+parts[0]
     else:
-	endpoint = 'https://'+account+'.table.core.windows.net'
+        endpoint = 'https://'+account+'.table.core.windows.net'
     return endpoint
 
 def configSettings():
