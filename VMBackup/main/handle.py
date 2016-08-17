@@ -43,6 +43,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
+from Utils import Status
 from urlparse import urlparse
 from snapshotter import Snapshotter
 from backuplogger import Backuplogger
@@ -93,24 +94,10 @@ def timedelta_total_seconds(delta):
 def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks):
     global hutil
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-    stat = [{
-        "version" : hutil._context._version,
-        "timestampUTC" : date_place_holder,
-        "status" : {
-            "name" : hutil._context._name,
-            "operation" : operation,
-            "status" : status,
-            "substatus" : sub_status,
-            "code" : status_code,
-            "taskId": taskId,
-            "commandStartTimeUTCTicks":commandStartTimeUTCTicks,
-            "formattedMessage" : {
-                "lang" : "en-US",
-                "message" : message
-            }
-        }
-    }]
-    return json.dumps(stat)
+    stat_obj = Status.StatusObj(hutil._context._name, operation, status, sub_status, status_code, message,  taskId, commandStartTimeUTCTicks)
+    top_stat_obj = Status.TopLevelStatus(hutil._context._version, date_place_holder, stat_obj)
+    hutil.add_telemetry_data(top_stat_obj.status)
+    return json.dumps(top_stat_obj, cls = Status.ComplexEncoder)
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
     global backup_logger,hutil
