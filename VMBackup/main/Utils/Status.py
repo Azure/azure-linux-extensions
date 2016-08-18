@@ -10,19 +10,34 @@ class TopLevelStatus:
                     return dict(version = self.version, timestampUTC = self.timestampUTC, status = self.status)
 
 class StatusObj:
-        def __init__(self, name, operation, status, substatus, code, message, taskId = None, commandStartTimeUTCTicks = None):
+        def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, taskId = None, commandStartTimeUTCTicks = None):
             self.name = name
             self.operation = operation
             self.status = status
             self.substatus = substatus
             self.code = code
+            self.formattedMessage = formattedMessage
+            self.telemetryData = telemetrydata
             self.taskId = taskId
-            self.formattedMessage = {
-                    "lang" : "en-US",
-                    "message" : message
-                    }
             self.commandStartTimeUTCTicks = commandStartTimeUTCTicks
-            self.telemetryData = {}
+        
+        def reprJSON(self):
+                    return dict(name= self.name, operation = self.operation, status = self.status, substatus = self.substatus, code = self.code, taskId = self.taskId, formattedMessage = self.formattedMessage,commandStartTimeUTCTicks = self.commandStartTimeUTCTicks, telemetryData = self.telemetryData)
+
+class SubstatusObj:
+    def __init__(self, code, name, status, formattedMessage):
+        self.code = code
+        self.name = name
+        self.status = status
+        self.formattedMessage = formattedMessage
+        
+        def reprJSON(self):
+                    return dict(code = self.code, name = self.name, status = self.status, formattedMessage = self.formattedMessage)
+
+class FormattedMessage:
+    def __init__(self, lang, message):
+        self.lang = lang
+        self.message = message
 
 class ComplexEncoder(json.JSONEncoder):
         def default(self, obj):

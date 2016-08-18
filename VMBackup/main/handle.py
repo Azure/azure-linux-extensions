@@ -91,12 +91,12 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks):
+def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks, telemetry_data):
     global hutil
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-    stat_obj = Status.StatusObj(hutil._context._name, operation, status, sub_status, status_code, message,  taskId, commandStartTimeUTCTicks)
+    formattedMessage = Status.FormattedMessage("en-US",message)
+    stat_obj = Status.StatusObj(hutil._context._name, operation, status, sub_status, status_code, formattedMessage, telemetry_data,  taskId, commandStartTimeUTCTicks)
     top_stat_obj = Status.TopLevelStatus(hutil._context._version, date_place_holder, stat_obj)
-    hutil.add_telemetry_data(top_stat_obj.status)
     return json.dumps(top_stat_obj, cls = Status.ComplexEncoder)
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
@@ -107,7 +107,9 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
     date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
     sub_stat = []
-    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
+    telemetry_data = {}
+    hutil.add_telemetry_data(telemetry_data)
+    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks, telemetry_data)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
     blobWriter.WriteBlob(status_report_msg,blobUri)
@@ -388,7 +390,7 @@ def enable():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
             timespan = utcNow - commandStartTime
-            THIRTY_MINUTES = 30 * 60 # in seconds
+            THIRTY_MINUTES = 3000 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))

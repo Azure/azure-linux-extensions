@@ -243,11 +243,11 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_json(self, operation, status, sub_status, status_code, message):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, message)
+        formattedMessage = Status.FormattedMessage("en-US",message)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
-        self.add_telemetry_data(top_stat_obj.status)
         return top_stat_obj
 
     def get_extension_version(self):
@@ -317,7 +317,8 @@ class HandlerUtility:
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
-        sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
+        sub_status_obj = Status.SubstatusObj(code,name,status,formattedmessage)
+        sub_status.append(sub_status_obj)
         return sub_status
 
     def timedelta_total_seconds(self, delta):
@@ -326,18 +327,20 @@ class HandlerUtility:
         else:
             return delta.total_seconds()
 
-    def add_telemetry_data(self,statobj):
-        statobj.telemetryData["AgentVersion"] = self.get_wala_version()
-        statobj.telemetryData["ExtensionVersion"] = self.get_extension_version()
-        statobj.telemetryData["OSVersion"],statobj.telemetryData["KernelVersion"] = self.get_dist_info()
+    def add_telemetry_data(self,telemetry_data):
+        telemetry_data["AgentVersion"] = self.get_wala_version()
+        telemetry_data["ExtensionVersion"] = self.get_extension_version()
+        telemetry_data["OSVersion"],telemetry_data["KernelVersion"] = self.get_dist_info()
 
 
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
+        telemetry_data = {}
+        self.add_telemetry_data(telemetry_data)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, telemetry_data)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
             time_span = self.timedelta_total_seconds(time_delta) * 1000
             date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -348,7 +351,7 @@ class HandlerUtility:
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, telemetry_data)
         stat_rept = json.dumps(stat_rept, cls = Status.ComplexEncoder)
         # rename all other status files, or the WALA would report the wrong
         # status file.
