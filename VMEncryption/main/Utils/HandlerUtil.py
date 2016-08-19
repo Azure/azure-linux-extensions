@@ -62,6 +62,7 @@ import json
 import tempfile
 import time
 
+from Common import *
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
@@ -82,6 +83,8 @@ class HandlerUtility:
         self._error = error
         self._short_name = short_name
         self.patching = None
+        self.disk_util = None
+        self.find_last_nonquery_operation = False
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -214,6 +217,8 @@ class HandlerUtility:
         if type(handler_env) == list:
             handler_env = handler_env[0]
 
+        self.log("Parsing context, find_last_nonquery_operation={0}".format(self.find_last_nonquery_operation))
+
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
@@ -227,22 +232,46 @@ class HandlerUtility:
             self.error("Unable to locate a .settings file!")
             return None
         self._context._seq_no = str(self._context._seq_no)
-        self.log('sequence number is ' + self._context._seq_no)
         self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
-        self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-        self.log("setting file path is" + self._context._settings_file)
-        ctxt = None
-        ctxt = waagent.GetFileContents(self._context._settings_file)
-        if ctxt == None :
-            error_msg = 'Unable to read ' + self._context._settings_file + '. '
-            self.error(error_msg)
-            return None
-        else:
-            if(self.operation is not None and self.operation.lower() == "enable"):
-                # we should keep the current status file
-                self.backup_settings_status_file(self._context._seq_no)
 
-        self._context._config = self._parse_config(ctxt)
+        encryption_operation = None
+        
+        while not encryption_operation:
+            self.log('Parsing context for sequence number: ' + self._context._seq_no)
+            
+            self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
+
+            if not os.path.exists(self._context._settings_file):
+                self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '_settings')
+
+            self.log("setting file path is" + self._context._settings_file)
+            ctxt = None
+            ctxt = waagent.GetFileContents(self._context._settings_file)
+            if ctxt == None :
+                error_msg = 'Unable to read ' + self._context._settings_file + '. '
+                self.error(error_msg)
+                return None
+            else:
+                if(self.operation is not None and self.operation.lower() == "enable"):
+                    # we should keep the current status file
+                    # self.backup_settings_status_file(self._context._seq_no)
+                    pass
+
+            self._context._config = self._parse_config(ctxt)
+
+            public_settings_str = self._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+            if(isinstance(public_settings_str, basestring)):
+                public_settings = json.loads(public_settings_str)
+            else:
+                public_settings = public_settings_str
+            encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+            self.log("Encryption operation: {0}".format(encryption_operation))
+
+            if self.find_last_nonquery_operation and encryption_operation == CommonVariables.QueryEncryptionStatus:
+                self.log("find_last_nonquery_operation was True and encryption_operation was query, decrementing sequence number")
+                encryption_operation = None
+                self._context._seq_no = str(int(self._context._seq_no) - 1)
+
         return self._context
 
     def _change_log_file(self):
@@ -282,6 +311,21 @@ class HandlerUtility:
                 }
             }
         }]
+
+        if self.disk_util:
+            substat = [{
+                "name" : self._context._name,
+                "operation" : operation,
+                "status" : status,
+                "code" : status_code,
+                "formattedMessage" : {
+                    "lang" : "en-US",
+                    "message" : self.disk_util.get_encryption_status()
+                }
+            }]
+
+            stat[0]["status"]["substatus"] = substat
+
         stat_rept = json.dumps(stat)
         # rename all other status files, or the WALA would report the wrong
         # status file.

@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import subprocess
+import json
 import os
 import os.path
 import re
@@ -28,6 +29,8 @@ import traceback
 import uuid
 import glob
 
+from EncryptionConfig import EncryptionConfig
+from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
 from Common import *
 
@@ -472,6 +475,73 @@ class DiskUtil(object):
         proc = Popen(mount_all_cmd_args)
         returnCode = proc.wait()
         return returnCode
+
+    def get_mount_items(self):
+        items = []
+
+        for line in file('/proc/mounts'):
+            line = [s.decode('string_escape') for s in line.split()]
+            item = {
+                "src": line[0],
+                "dest": line[1],
+                "fs": line[2]
+            }
+            items.append(item)
+
+        return items
+
+    def get_encryption_status(self):
+        encryption_status = {
+            "data": "NotEncrypted",
+            "os": "NotEncrypted"
+        }
+
+        mount_items = self.get_mount_items()
+
+        os_drive_encrypted = False
+        data_drives_found = False
+        data_drives_encrypted = True
+        for mount_item in mount_items:
+            if mount_item["fs"] == "ext4" and \
+                not "/oldroot/mnt/resource" == mount_item["dest"] and \
+                not "/oldroot/boot" == mount_item["dest"] and \
+                not "/mnt/resource" == mount_item["dest"] and \
+                not "/boot" == mount_item["dest"]:
+
+                data_drives_found = True
+
+                if not "/dev/mapper" in mount_item["src"]:
+                    self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
+                    data_drives_encrypted = False
+
+            if mount_item["dest"] == "/" and \
+                "/dev/mapper" in mount_item["src"]:
+                self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
+                os_drive_encrypted = True
+    
+        if not data_drives_found:
+            encryption_status["data"] = "NotMounted"
+        elif data_drives_encrypted:
+            encryption_status["data"] = "Encrypted"
+        if os_drive_encrypted:
+            encryption_status["os"] = "Encrypted"
+
+        encryption_marker = EncryptionMarkConfig(self.logger, self.encryption_environment)
+        if encryption_marker.config_file_exists():
+            encryption_config = EncryptionConfig(self.encryption_environment, self.logger)
+            volume_type = encryption_config.get_volume_type().lower()
+
+            if volume_type == CommonVariables.VolumeTypeData.lower() or \
+                volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["data"] = "EncryptionInProgress"
+
+            if volume_type == CommonVariables.VolumeTypeOS.lower() or \
+                volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["os"] = "EncryptionInProgress"
+        elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
+            encryption_status["os"] = "VMRestartPending"
+
+        return json.dumps(encryption_status)
 
     def query_dev_sdx_path_by_scsi_id(self,scsi_number): 
         p = Popen([self.patching.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)

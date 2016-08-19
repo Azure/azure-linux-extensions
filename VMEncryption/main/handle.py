@@ -224,6 +224,10 @@ def main():
     hutil.patching = DistroPatcher
 
     encryption_environment = EncryptionEnvironment(patching=DistroPatcher,logger=logger)
+
+    disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+    hutil.disk_util = disk_util
+
     if DistroPatcher is None:
         hutil.do_exit(exit_code=0,
                       operation='Enable',
@@ -253,35 +257,67 @@ def mark_encryption(command,volume_type,disk_format_query):
     encryption_marker.commit()
     return encryption_marker
 
+def is_daemon_running():
+    handler_path = os.path.join(os.getcwd(), __file__)
+    daemon_arg = "-daemon"
+
+    psproc = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE)
+    pslist, _ = psproc.communicate()
+
+    for line in pslist.split("\n"):
+        if handler_path in line and daemon_arg in line:
+            return True
+
+    return False
+
 def enable():
-    hutil.do_parse_context('Enable')
-    logger.log('Enabling extension')
+    enable_success = False
 
-    logger.log("Installing pre-requisites")
-    DistroPatcher.install_extras()
+    while not enable_success:
+        hutil.do_parse_context('Enable')
+        logger.log('Enabling extension')
 
-    public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+        public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
-    if(isinstance(public_settings_str, basestring)):
-        public_settings = json.loads(public_settings_str)
-    else:
-        public_settings = public_settings_str
+        if(isinstance(public_settings_str, basestring)):
+            public_settings = json.loads(public_settings_str)
+        else:
+            public_settings = public_settings_str
 
-    logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
+        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
 
-    encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
-    if encryption_operation == CommonVariables.EnableEncryption:
-        enable_encryption()
-    elif encryption_operation == CommonVariables.DisableEncryption:
-        disable_encryption()
-    else:
-        logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
-        hutil.do_exit(exit_code=0,
-                      operation='Enable',
-                      status=CommonVariables.extension_error_status,
-                      code=(CommonVariables.unknown_error),
-                      message='Enable failed.')
+        if encryption_operation == CommonVariables.EnableEncryption:
+            logger.log("handle.py found enable encryption operation")
+
+            logger.log("Installing pre-requisites")
+            DistroPatcher.install_extras()
+
+            enable_encryption()
+        elif encryption_operation == CommonVariables.DisableEncryption:
+            logger.log("handle.py found disable encryption operation")
+
+            logger.log("Installing pre-requisites")
+            DistroPatcher.install_extras()
+
+            disable_encryption()
+        elif encryption_operation == CommonVariables.QueryEncryptionStatus:
+            logger.log("handle.py found query operation")
+
+            if is_daemon_running():
+                logger.log("A daemon is already running, exiting without status report")
+                exit_without_status_report()
+            else:
+                logger.log("No daemon found, trying to find the last non-query operation")
+                hutil.find_last_nonquery_operation = True
+        else:
+            logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
+            hutil.do_exit(exit_code=0,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.unknown_error),
+                          message='Enable failed.')
 
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
@@ -1231,6 +1267,8 @@ def daemon_encrypt():
 
             if not os_encryption.state == 'completed':
                 raise Exception("did not reach completed state")
+            else:
+                encryption_marker.clear_config()
 
         except Exception as e:
             message = "Failed to encrypt OS volume with error: {0}, stack trace: {1}, machine state: {2}".format(e,
@@ -1394,6 +1432,7 @@ def daemon_decrypt():
                           message='Decryption succeeded')
 
 def daemon():
+    hutil.find_last_nonquery_operation = True
     hutil.do_parse_context('Executing')
     lock = ProcessLock(logger, encryption_environment.daemon_lock_file_path)
     if not lock.try_lock():
