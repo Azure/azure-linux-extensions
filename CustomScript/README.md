@@ -13,7 +13,7 @@ CustomScript Extension can:
 * Remove BOM in Shell and Python scripts automatically
 * Protect sensitive data in `commandToExecute`
 
-**Note:** The timeout for script download is 200 seconds. There is no timeout period for script execution.
+**Note:** The timeout for script download is 200 seconds. There is a 90-minute timeout period for script execution.”.
 
 # User Guide
 
