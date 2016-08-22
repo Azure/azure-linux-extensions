@@ -51,9 +51,10 @@ Example Status Report:
 
 """
 
-
+import glob
 import os
 import os.path
+import re
 import string
 import sys
 import imp
@@ -116,6 +117,13 @@ class HandlerUtility:
             if(seq):
                 return int(seq)
         return -1
+
+    def get_latest_seq(self):
+        settings_files = glob.glob(os.path.join(self._context._config_dir, '*.settings'))
+        settings_files = [os.path.basename(f) for f in settings_files]
+        seq_nums = [int(re.findall(r'(\d+)\.settings', f)[0]) for f in settings_files]
+
+        return max(seq_nums)
 
     def get_current_seq(self):
         return int(self._context._seq_no)
@@ -232,7 +240,6 @@ class HandlerUtility:
             self.error("Unable to locate a .settings file!")
             return None
         self._context._seq_no = str(self._context._seq_no)
-        self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
 
         encryption_operation = None
         
@@ -288,13 +295,16 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
+        latest_seq = str(self.get_latest_seq())
+        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+
         message = filter(lambda c: c in string.printable, message)
         message = message.encode('ascii', 'ignore')
 
-        self.log("[StatusReport] op: {0}, status: {1}, code: {2}, msg: {3}".format(operation,
-                                                                                   status,
-                                                                                   status_code,
-                                                                                   message))
+        self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
+        self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
+        self.log("[StatusReport ({0})] code: {1}".format(latest_seq, status_code))
+        self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, message))
 
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
@@ -313,6 +323,10 @@ class HandlerUtility:
         }]
 
         if self.disk_util:
+            encryption_status = self.disk_util.get_encryption_status()
+
+            self.log("[StatusReport ({0})] substatus: {1}".format(latest_seq, encryption_status))
+
             substat = [{
                 "name" : self._context._name,
                 "operation" : operation,
@@ -320,7 +334,7 @@ class HandlerUtility:
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
-                    "message" : self.disk_util.get_encryption_status()
+                    "message" : encryption_status
                 }
             }]
 
