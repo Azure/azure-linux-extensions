@@ -271,9 +271,7 @@ def is_daemon_running():
     return False
 
 def enable():
-    enable_success = False
-
-    while not enable_success:
+    while True:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
