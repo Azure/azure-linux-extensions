@@ -305,6 +305,7 @@ def enable():
 
             if is_daemon_running():
                 logger.log("A daemon is already running, exiting without status report")
+                hutil.redo_last_status()
                 exit_without_status_report()
             else:
                 logger.log("No daemon found, trying to find the last non-query operation")

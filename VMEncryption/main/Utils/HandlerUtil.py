@@ -55,7 +55,9 @@ import glob
 import os
 import os.path
 import re
+import shutil
 import string
+import subprocess
 import sys
 import imp
 import base64
@@ -293,6 +295,16 @@ class HandlerUtility:
 
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
+
+    def redo_last_status(self):
+        latest_seq = str(self.get_latest_seq())
+        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+
+        previous_seq = str(self.get_latest_seq() - 1)
+        previous_status_file = os.path.join(self._context._status_dir, previous_seq + '.status')
+
+        shutil.copy2(previous_status_file, self._context._status_file)
+        self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
 
     def do_status_report(self, operation, status, status_code, message):
         latest_seq = str(self.get_latest_seq())
