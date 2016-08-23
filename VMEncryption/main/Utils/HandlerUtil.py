@@ -250,9 +250,6 @@ class HandlerUtility:
             
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
 
-            if not os.path.exists(self._context._settings_file):
-                self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '_settings')
-
             self.log("setting file path is" + self._context._settings_file)
             ctxt = None
             ctxt = waagent.GetFileContents(self._context._settings_file)
