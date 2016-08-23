@@ -256,6 +256,11 @@ class HandlerUtility:
             if ctxt == None :
                 error_msg = 'Unable to read ' + self._context._settings_file + '. '
                 self.error(error_msg)
+
+                if self._context._seq_no != '0':
+                    self._context._seq_no = str(int(self._context._seq_no) - 1)
+                    continue
+
                 return None
             else:
                 if(self.operation is not None and self.operation.lower() == "enable"):
