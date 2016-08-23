@@ -76,8 +76,8 @@ class StripdownState(OSEncryptionState):
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',
-                                       status=CommonVariables.extension_error_status,
-                                       code=CommonVariables.encryption_failed,
+                                       status=CommonVariables.extension_success_status,
+                                       code=str(CommonVariables.success),
                                        message="Restarted extension from stripped down OS")
         else:
             self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
