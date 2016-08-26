@@ -82,7 +82,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python',),  # This is needed for /usr/sbin/semanage on Redhat.
+                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python is needed for /usr/sbin/semanage on Redhat. Also, some RH-based distros really don't have tar (e.g. OracleLinux 7).
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -296,7 +296,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement)
+        XmlUtil.addElement(tree,'Events/OMI[1]',perfElement)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
@@ -329,7 +329,7 @@ def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
             perfCfgList = readPublicConfig('perfCfg')
         if not perfCfgList and not hasPublicConfig('perfCfg'):
             perfCfgList = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
+                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
                     {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
                     {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
                   ]
@@ -396,6 +396,18 @@ def setEventVolume(mdsdCfg,ladCfg):
             
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
+def getStorageAccountEndPoint(account):
+    endpoint = readPrivateConfig('storageAccountEndPoint')
+    if endpoint:
+        parts = endpoint.split('//', 1)
+        if len(parts) > 1:
+            endpoint = parts[0]+'//'+account+".table."+parts[1]
+        else:
+            endpoint = 'https://'+account+".table."+parts[0]
+    else:
+        endpoint = 'https://'+account+'.table.core.windows.net'
+    return endpoint
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -445,7 +457,7 @@ def configSettings():
     #fileCfg = [{"file":"/var/log/waagent.log","table":"waagent"},{"file":"/var/log/waagent2.log","table":"waagent3"}]
     try:
         if fileCfg:
-           syslogCfg =  createEventFileSettings(mdsdCfg,fileCfg)+syslogCfg
+           syslogCfg = createEventFileSettings(mdsdCfg,fileCfg)+syslogCfg
 
         with open(omfileconfig,'w') as hfile:
                 hfile.write(syslogCfg)
@@ -458,10 +470,7 @@ def configSettings():
     key = readPrivateConfig('storageAccountKey')
     if not key:
         return False, "Empty storageAccountKey"
-    endpoint = readPrivateConfig('endpoint')
-    if not endpoint:
-        endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint
+    endpoint = getStorageAccountEndPoint(account)
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
@@ -976,6 +985,9 @@ def uninstall_omi():
     return 0, "do nothing"
 
 
+rsyslog_om_mdsd_syslog_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds.conf"
+rsyslog_om_mdsd_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-fileom.conf"
+
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
@@ -985,10 +997,10 @@ def uninstall_rsyslogom():
        rsyslog_om_path = match.group(1)
     if rsyslog_om_path == None:
         return 1,"rsyslog not installed"
-    if os.path.exists("/etc/rsyslog.d/omazurelinuxmds.conf"):
-        RunGetOutput("rm "+rsyslog_om_path+"/omazuremdslegacy.so")
-        RunGetOutput("rm /etc/rsyslog.d/omazurelinuxmds.conf")
-        RunGetOutput("rm /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
+    if os.path.exists(rsyslog_om_mdsd_syslog_conf_path):
+        RunGetOutput("rm -f {0}/omazuremdslegacy.so {1} {2}".format(rsyslog_om_path,
+                                                                    rsyslog_om_mdsd_syslog_conf_path,
+                                                                    rsyslog_om_mdsd_file_conf_path))
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1015,12 +1027,15 @@ def install_rsyslogom():
             rsyslog_om_folder = v[1]
 
     if rsyslog_om_folder and rsyslog_om_path:
-        RunGetOutput("\cp -f "+rsyslog_om_folder+"/omazuremdslegacy.so"+" "+rsyslog_om_path)
-        RunGetOutput("\cp -f "+rsyslog_om_folder+"/omazurelinuxmds.conf"+" /etc/rsyslog.d/omazurelinuxmds.conf")
-        RunGetOutput("\cp -f "+omfileconfig+" /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
+        # Remove old-path conf files to avoid confusion
+        RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
+        # Copy necesssary files
+        RunGetOutput("cp -f {0}/omazuremdslegacy.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
+        RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
+        RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
 
     else:
-        return 1,"rsyslog version can't be deteced"
+        return 1,"rsyslog version can't be detected"
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1030,7 +1045,7 @@ def install_rsyslogom():
 
 
 def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
-    files_to_modify = ['/etc/rsyslog.d/omazurelinuxmds.conf', '/etc/rsyslog.d/omazurelinuxmds_fileom.conf']
+    files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
     cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
 
     for f in files_to_modify:

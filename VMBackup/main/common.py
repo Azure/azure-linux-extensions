@@ -20,9 +20,9 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "0.1.0.996"
+    extension_version = "0.1.0.999"
     extension_type = extension_name
-    extension_media_link = 'https://andliu.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
+    extension_media_link = 'https://sopattna.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
     extension_description = extension_label
     object_str = 'objectStr'
@@ -34,11 +34,21 @@ class CommonVariables:
     iaas_vmbackup_command = 'snapshot'
     iaas_install_command = 'install'
     locale = 'locale'
+    vmType = 'vmType'
+    VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
+    VmTypeV2 = 'microsoft.compute/virtualmachines'
+
+
+    status_transitioning = 'transitioning'
+    status_warning = 'warning'
+    status_success = 'success'
+    status_error = 'error'
 
     """
     error code definitions
     """
     success = 1
+    ExtensionTempTerminalState = 4
     error_parameter = 11
     error_12 = 12
     error_wrong_time = 13
@@ -46,6 +56,10 @@ class CommonVariables:
     error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
+    
+    @staticmethod
+    def isTerminalStatus(status):
+        return (status==CommonVariables.status_success or status==CommonVariables.status_error)
 
 class DeviceItem(object):
     def __init__(self):

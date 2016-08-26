@@ -29,6 +29,7 @@ from Utils.WAAgentUtil import waagent
 class Backuplogger(object):
     def __init__(self, hutil):
         self.msg = ''
+        self.log_message = ''
         self.con_path = '/dev/console'
         self.hutil = hutil
 
@@ -37,6 +38,7 @@ class Backuplogger(object):
         log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
         self.log_to_con(log_msg)
         if(local):
+            self.log_message += log_msg
             self.hutil.log(log_msg)
         else:
             self.msg += log_msg
@@ -52,6 +54,13 @@ class Backuplogger(object):
     def commit(self, logbloburi):
         #commit to local file system first, then commit to the network.
         self.hutil.log(self.msg)
+        self.commit_to_blob(logbloburi)
+
+    def commit_to_local(self):
+        self.hutil.log(self.msg)
+
+    def commit_to_blob(self, logbloburi):
+        log_to_blob = ""
         blobWriter = BlobWriter(self.hutil)
         # append the wala log at the end.
         try:
@@ -72,11 +81,8 @@ class Backuplogger(object):
                     seek_len_abs = length
                 file.seek(0 - seek_len_abs, os.SEEK_END)
                 tail_wala_log = file.read()
-                self.msg = self.msg + "Tail of WALA Log:" + tail_wala_log
+                log_to_blob = self.log_message + self.msg + "Tail of WALA Log:" + tail_wala_log
         except Exception as e:
             errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.hutil.log(errMsg)
-        blobWriter.WriteBlob(self.msg, logbloburi)
-
-    def commit_to_local(self):
-        self.hutil.log(self.msg)
+        blobWriter.WriteBlob(log_to_blob, logbloburi)
