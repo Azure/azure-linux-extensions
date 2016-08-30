@@ -92,31 +92,82 @@ class Snapshotter(object):
         global_error_logger.put(error_logger)
         snapshot_result_error.put(snapshot_error)
 
+    def snapshot_seq(self, sasuri, meta_data):
+        result = None
+        snapshot_error = SnapshotError()
+        if(sasuri is None):
+            self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
+            snapshot_error.errorcode = CommonVariables.error
+            snapshot_error.sasuri = sasuri
+        try:
+            sasuri_obj = urlparse.urlparse(sasuri)
+            if(sasuri_obj is None or sasuri_obj.hostname is None):
+                self.logger.log("Failed to parse the sasuri",False,'Error')
+                snapshot_error.errorcode = CommonVariables.error
+                snapshot_error.sasuri = sasuri
+            else:
+                body_content = ''
+                headers = {}
+                headers["Content-Length"] = '0'
+                for meta in meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
+                self.logger.log(str(headers))
+                http_util = HttpUtil(self.logger)
+                sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                self.logger.log("start calling the snapshot rest api")
+                result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
+                self.logger.log("snapshot api returned: {0}".format(result))
+                if(result != CommonVariables.success):
+                    snapshot_error.errorcode = result
+                    snapshot_error.sasuri = sasuri
+        except Exception as e:
+            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, False, 'Error')
+            snapshot_error.errorcode = CommonVariables.error
+            snapshot_error.sasuri = sasuri
+        return snapshot_error
+
+
     def snapshotall(self, paras):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
-        mp_jobs = []
-        global_logger = mp.Queue() 
-        global_error_logger = mp.Queue()
-        snapshot_result_error = mp.Queue()
-        blobs = paras.blobs
-        if blobs is not None:
-            mp_jobs = [mp.Process(target=self.snapshot,args=(blob, paras.backup_metadata,snapshot_result_error,global_logger,global_error_logger)) for blob in blobs]
-            for job in mp_jobs:
-                job.start()
-            for job in mp_jobs:
-                job.join()
-                self.logger.log('end of snapshot process')
-            logging = [global_logger.get() for job in mp_jobs]
-            self.logger.log(str(logging))
-            error_logging = [global_error_logger.get() for job in mp_jobs]
-            self.logger.log(error_logging,False,'Error')
-            if not snapshot_result_error.empty(): 
-                results = [snapshot_result_error.get() for job in mp_jobs]
-                for result in results:
-                    if(result.errorcode != CommonVariables.success):
-                        snapshot_result.errors.append(result)
-            return snapshot_result
-        else:
-            self.logger.log("the blobs are None")
-            return snapshot_result
+        try:
+            mp_jobs = []
+            global_logger = mp.Queue() 
+            global_error_logger = mp.Queue()
+            snapshot_result_error = mp.Queue()
+            blobs = paras.blobs
+            if blobs is not None:
+                mp_jobs = [mp.Process(target=self.snapshot,args=(blob, paras.backup_metadata,snapshot_result_error,global_logger,global_error_logger)) for blob in blobs]
+                for job in mp_jobs:
+                    job.start()
+                for job in mp_jobs:
+                    job.join()
+                    self.logger.log('end of snapshot process')
+                logging = [global_logger.get() for job in mp_jobs]
+                self.logger.log(str(logging))
+                error_logging = [global_error_logger.get() for job in mp_jobs]
+                self.logger.log(error_logging,False,'Error')
+                if not snapshot_result_error.empty(): 
+                    results = [snapshot_result_error.get() for job in mp_jobs]
+                    for result in results:
+                        if(result.errorcode != CommonVariables.success):
+                            snapshot_result.errors.append(result)
+                return snapshot_result
+            else:
+                self.logger.log("the blobs are None")
+                return snapshot_result
+        except Exception as e:
+            self.logger.log("Do sequential snapshoting")
+            blobs = paras.blobs
+            if blobs is not None:
+                for blob in blobs:
+                    snapshotError = self.snapshot_seq(blob, paras.backup_metadata)
+                    if(snapshotError.errorcode != CommonVariables.success):
+                        snapshot_result.errors.append(snapshotError)
+                return snapshot_result
+            else:
+                self.logger.log("the blobs are None")
+                return snapshot_result

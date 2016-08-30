@@ -64,6 +64,10 @@ from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
 import logging.handlers
+from common import CommonVariables
+import platform
+import subprocess
+import datetime
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -238,8 +242,7 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+    def do_status_json(self, operation, status, sub_status, status_code, message):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
@@ -248,6 +251,7 @@ class HandlerUtility:
                 "name" : self._context._name,
                 "operation" : operation,
                 "status" : status,
+                "substatus" : sub_status,
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
@@ -255,7 +259,92 @@ class HandlerUtility:
                 }
             }
         }]
-        stat_rept = json.dumps(stat)
+        return stat
+
+    def get_wala_version(self):
+        try:
+            file_pointer = open('/var/log/waagent.log','r')
+            waagent_version = ''
+            for line in file_pointer:
+                if 'Azure Linux Agent Version' in line:
+                    waagent_version = line.split(':')[-1]
+            if waagent_version[:-1]=="": #for removing the trailing '\n' character
+                waagent_version = self.get_wala_version_from_file()
+                return waagent_version
+            else:
+                return waagent_version[:-1]
+        except Exception as e:
+            errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            waagent_version="Unknown"
+            return waagent_version
+
+    def get_wala_version_from_file(self):
+        try:
+            file_pointer = open('/usr/sbin/waagent','r')
+            waagent_version = ''
+            for line in file_pointer:
+                if 'GuestAgentVersion' in line:
+                    waagent_version = line.split('\"')[1]
+                    break
+            return waagent_version #for removing the trailing '\n' character
+        except Exception as e:
+            errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Warning')
+            waagent_version="Unknown"
+            return waagent_version
+
+    def get_dist_info(self):
+        wala_ver=self.get_wala_version()
+        try:
+            if 'FreeBSD' in platform.system():
+                release = re.sub('\-.*\Z', '', str(platform.release()))
+                distinfo = 'Distro=FireeBSD,Kernel=' + release + 'WALA=' + wala_ver
+                return distinfo
+            if 'linux_distribution' in dir(platform):
+                distinfo = list(platform.linux_distribution(full_distribution_name=0))
+                # remove trailing whitespace in distro name
+                distinfo[0] = distinfo[0].strip()
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
+            else:
+                distinfo = platform.dist()
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
+        except Exception as e:
+            errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            distinfo = 'Distro=Unknown,Kernel=Unknown,WALA=' + wala_ver
+            return distinfo
+
+    def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
+        sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
+        return sub_status
+
+    def timedelta_total_seconds(self, delta):
+        if not hasattr(datetime.timedelta, 'total_seconds'):
+            return delta.days * 86400 + delta.seconds
+        else:
+            return delta.total_seconds()
+
+    def do_status_report(self, operation, status, status_code, message):
+        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        sub_stat = []
+        stat_rept = []
+        distinfo=self.get_dist_info()
+        message=message+";"+distinfo
+        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+            time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+            time_span = self.timedelta_total_seconds(time_delta) * 1000
+            date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+            stat_rept[0]["timestampUTC"] = date_place_holder
+            stat_rept = json.dumps(stat_rept)
+            date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+            stat_rept = stat_rept.replace(date_place_holder,date_string)
+            status_code = '1'
+            status = CommonVariables.status_success
+            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+        stat_rept = json.dumps(stat_rept)
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence

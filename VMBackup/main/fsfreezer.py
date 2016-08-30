@@ -20,6 +20,10 @@ import subprocess
 from mounts import Mounts
 import datetime
 import threading
+import os
+import time
+import sys
+import signal
 
 class FreezeError(object):
     def __init__(self):
@@ -38,15 +42,131 @@ class FreezeResult(object):
             error_str+=(str(error)) + "\n"
         return error_str
 
+class FreezeHandler(object):
+    def __init__(self,logger):
+        # sig_handle valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
+        self.sig_handle = 0
+        self.child= None
+        self.logger=logger
+
+    def sigusr1_handler(self,signal,frame):
+        self.logger.log('freezed',False)
+        self.sig_handle=1
+
+    def sigchld_handler(self,signal,frame):
+        self.logger.log('some child process terminated')
+        if(self.child.poll() is not None):
+            self.logger.log("binary child terminated",True)
+            self.sig_handle=2
+
+    def startproc(self,args):
+        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+        for i in range(0,30):
+            if(self.sig_handle==0):
+                self.logger.log("inside while with sig_handle "+str(self.sig_handle))
+                time.sleep(2)
+            else:
+                break;
+        self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
+        return self.sig_handle
+
+    def signal_receiver(self):
+        signal.signal(signal.SIGUSR1,self.sigusr1_handler)
+        signal.signal(signal.SIGCHLD,self.sigchld_handler)
+
 class FsFreezer:
     def __init__(self, patching, logger):
         """
         """
         self.patching = patching
         self.logger = logger
-        self.mounts = Mounts(patching = self.patching, logger = self.logger)
+        try:
+            self.mounts = Mounts(patching = self.patching, logger = self.logger)
+        except Exception as e:
+            errMsg="Failed to retrieve mount points"
+            self.logger.log(errMsg,True,'Warning')
+            self.mounts = None
         self.frozen_items = set()
         self.unfrozen_items = set()
+        self.freeze_handler = FreezeHandler(self.logger)
+
+
+    def should_skip(self, mount):
+        if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
+            return False
+        else:
+            return True
+    
+    def freeze_safe(self,timeout):
+        self.root_seen = False
+        error_msg=''
+        freeze_result = FreezeResult()
+        freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
+        args=[freezebin,str(timeout)]
+        arg=[]
+        for mount in self.mounts.mounts:
+            if(mount.mount_point == '/'):
+                self.root_seen = True
+                self.root_mount = mount
+            elif(mount.mount_point and not self.should_skip(mount)):
+                arg.append(str(mount.mount_point))
+        mount_set=set(arg)
+        mount_list=list(mount_set)
+        mount_list.sort(reverse=True)
+        for mount_itr in mount_list:
+            args.append(mount_itr)
+        if(self.root_seen):
+            args.append('/')
+        self.logger.log(str(args))
+        self.freeze_handler.signal_receiver()
+        self.logger.log("proceeded for accepting signals")
+        sig_handle=self.freeze_handler.startproc(args)
+        if(sig_handle != 1):
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
+            error_msg="freeze failed for some mount"
+            freeze_result.errors.append(error_msg)
+            self.logger.log(error_msg, True, 'Error')
+        return freeze_result
+
+    def thaw_safe(self):
+        thaw_result = FreezeResult()
+        if(self.freeze_handler.child.poll() is None):
+            self.logger.log("child process still running")
+            self.freeze_handler.child.send_signal(signal.SIGUSR1)
+            for i in range(0,30):
+                if(self.freeze_handler.child.poll() is None):
+                    self.logger.log("child still running sigusr1 sent")
+                    time.sleep(1)
+                else:
+                    break;
+            self.logger.log("Binary output after process end: ")
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
+            if(self.freeze_handler.child.returncode!=0):
+                error_msg = 'snapshot result inconsistent'
+                thaw_result.errors.append(error_msg)
+                self.logger.log(error_msg, True, 'Error')
+        else:
+            self.logger.log("Binary output after process end when no thaw sent: ")
+            while True:
+                line=self.freeze_handler.child.stdout.readline()
+                if(line != ''):
+                    self.logger.log(line.rstrip())
+                else:
+                    break
+            error_msg = 'snapshot result inconsistent'
+            thaw_result.errors.append(error_msg)
+            self.logger.log(error_msg, True, 'Error')
+        return thaw_result
 
     def freeze(self, mount):
         """
@@ -99,12 +219,6 @@ class FsFreezer:
         if(unfreeze_return_code != 0):
             freeze_error.path = path
         return freeze_error
-
-    def should_skip(self, mount):
-        if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
-            return False
-        else:
-            return True
 
     def freezeall(self):
         global unfreeze_done
@@ -162,3 +276,4 @@ class FsFreezer:
             if(freezeError.errorcode != 0):
                 unfreeze_result.errors.append(freezeError)
         return unfreeze_result
+
