@@ -134,8 +134,13 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('umount /oldroot', True)
 
         sleep(3)
+        
+        attempt = 1
 
         while True:
+            if attempt > 10:
+                raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
+
             self.context.logger.log("Restarting systemd-udevd")
             self.command_executor.Execute('systemctl restart systemd-udevd')
             self.context.logger.log("Restarting systemd-timesyncd")
@@ -145,6 +150,8 @@ class UnmountOldrootState(OSEncryptionState):
 
             if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
                 break
+
+            attempt += 1
 
         self.command_executor.Execute('e2fsck -yf {0}'.format(self.rootfs_block_device), True)
 
