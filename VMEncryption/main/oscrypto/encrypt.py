@@ -180,6 +180,8 @@ class OSEncryption(object):
             try:
                 if attempt == 1:
                     self.enter_unmount_oldroot()
+                elif attempt > 10:
+                    raise Exception("Could not unmount /oldroot in 10 attempts")
                 else:
                     self.retry_unmount_oldroot()
 
