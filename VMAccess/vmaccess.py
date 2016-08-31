@@ -34,7 +34,7 @@ ExtensionShortName = 'VMAccess'
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
-
+SshdConfigPath = '/etc/ssh/sshd_config'
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
@@ -81,21 +81,32 @@ def enable():
             hutil.log("Succeeded in check and open ssh port.")
 
         hutil.exit_if_enabled()
+        if _is_sshd_config_modified(protect_settings):
+            _backup_sshd_config(SshdConfigPath)
 
         if reset_ssh:
-            _reset_sshd_config("/etc/ssh/sshd_config")
+            _reset_sshd_config(SshdConfigPath)
             hutil.log("Succeeded in reset sshd_config.")
+
         if remove_user:
             _remove_user_account(remove_user, hutil)
+
         _set_user_account_pub_key(protect_settings, hutil)
 
-        check_and_repair_disk(hutil)
+        if _is_sshd_config_modified(protect_settings):
+            waagent.MyDistro.restartSshService()
 
+        check_and_repair_disk(hutil)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
+
+def _is_sshd_config_modified(protected_settings):
+    result = protected_settings.get('reset_ssh') or protected_settings.get('password')
+    return result is not None
 
 
 def uninstall():
@@ -112,7 +123,7 @@ def disable():
 
 def update():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    hutil.do_parse_context('Upadate')
+    hutil.do_parse_context('Update')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 
@@ -140,17 +151,18 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
+    expiration = protect_settings.get('expiration')
     no_convert = False
-    if(not(user_pass) and not(cert_txt) and not(ovf_env.SshPublicKeys)):
+    if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
 
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
     error_string = waagent.MyDistro.CreateAccount(
-        user_name, user_pass, None, None)
+        user_name, user_pass, expiration, None)
     _save_other_sudoers(sudoers)
 
-    if error_string != None:
+    if error_string is not None:
         err_msg = "Failed to create the account or set the password"
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent.WALAEventOperation.Enable,
@@ -171,8 +183,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
             pub_path = os.path.join('/home/', user_name, '.ssh',
                 'authorized_keys')
             ovf_env.UserName = user_name
-            if(no_convert):
-                if(cert_txt):
+            if no_convert:
+                if cert_txt:
                     pub_path = ovf_env.PrepareDir(pub_path)
                     final_cert_txt = cert_txt
                     if(not cert_txt.endswith("\n")):
@@ -236,11 +248,10 @@ def _save_other_sudoers(sudoers):
 
 
 def _allow_password_auth():
-    configPath = '/etc/ssh/sshd_config'
-    config = waagent.GetFileContents(configPath).split("\n")
+    config = waagent.GetFileContents(SshdConfigPath).split("\n")
     _set_sshd_config(config, "PasswordAuthentication", "yes")
     _set_sshd_config(config, "ChallengeResponseAuthentication", "yes")
-    waagent.ReplaceFileContentsAtomic(configPath, "\n".join(config))
+    waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
 
 
 def _set_sshd_config(config, name, val):
@@ -266,7 +277,6 @@ def _reset_sshd_config(sshd_file_path):
         config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' % (distro_name, 'default'))
         if not(os.path.exists(config_file_path)):
             config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
-    _backup_sshd_config(sshd_file_path)
 
     if distro_name == "CoreOS":
         # Parse sshd port from config_file_path
@@ -301,9 +311,9 @@ def _reset_sshd_config(sshd_file_path):
         cfg_content += "      [Socket]\n"
         cfg_content += "      ListenStream={0}\n".format(sshd_port)
         cfg_content += "      Accept=yes\n"
-        
+
         waagent.SetFileContents(cfg_tempfile, cfg_content)
-        
+
         waagent.Run("coreos-cloudinit -from-file " + cfg_tempfile, chk_err=False)
         os.remove(cfg_tempfile)
     else:
@@ -312,7 +322,7 @@ def _reset_sshd_config(sshd_file_path):
 
 
 def _backup_sshd_config(sshd_file_path):
-    if(os.path.exists(sshd_file_path)):
+    if os.path.exists(sshd_file_path):
         backup_file_name = '%s_%s' % (
             sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         shutil.copyfile(sshd_file_path, backup_file_name)
@@ -320,10 +330,10 @@ def _backup_sshd_config(sshd_file_path):
 
 def _save_cert_str_as_file(cert_txt, file_name):
     cert_start = cert_txt.find(BeginCertificateTag)
-    if(cert_start >= 0):
+    if cert_start >= 0:
         cert_txt = cert_txt[cert_start + len(BeginCertificateTag):]
     cert_end = cert_txt.find(EndCertificateTag)
-    if(cert_end >= 0):
+    if cert_end >= 0:
         cert_txt = cert_txt[:cert_end]
     cert_txt = cert_txt.strip()
     cert_txt = "{0}\n{1}\n{2}\n".format(BeginCertificateTag, cert_txt, EndCertificateTag)
@@ -345,7 +355,6 @@ def _open_ssh_port():
 
 
 def _del_rule_if_exists(rule_string):
-    match_string = '-A %s' % rule_string
     cmd_result = waagent.RunGetOutput("iptables-save")
     while cmd_result[0] == 0 and (rule_string in cmd_result[1]):
         waagent.Run("iptables -D %s" % rule_string)
@@ -353,10 +362,10 @@ def _del_rule_if_exists(rule_string):
 
 
 def _insert_rule_if_not_exists(rule_string):
-    match_string = '-A %s' % rule_string
     cmd_result = waagent.RunGetOutput("iptables-save")
     if cmd_result[0] == 0 and (rule_string not in cmd_result[1]):
         waagent.Run("iptables -I %s" % rule_string)
+
 
 def check_and_repair_disk(hutil):
     public_settings = hutil.get_public_settings()
@@ -381,6 +390,7 @@ def check_and_repair_disk(hutil):
             hutil.log("Repaired and remounted disk")
             return outdata
 
+
 def _fsck_check(hutil):
     try:
         retcode = waagent.Run("fsck -As -y")
@@ -399,14 +409,14 @@ def _fsck_repair(hutil, disk_name):
     # first unmount disks and loop devices lazy + forced
     try:
         cmd_result = waagent.Run("umount -f /%s" % disk_name)
-        if cmd_result!=0:
+        if cmd_result != 0:
             # Fail fast
             hutil.log("Failed to unmount disk: %s" % disk_name)
             # run repair
             retcode = waagent.Run("fsck -AR -y")
             hutil.log("Ran fsck with return code: %d" % retcode)
         if retcode == 0:
-            retcode,output = waagent.RunGetOutput("mount")
+            retcode, output = waagent.RunGetOutput("mount")
             hutil.log(output)
             return output
         else:

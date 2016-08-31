@@ -296,7 +296,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement)
+        XmlUtil.addElement(tree,'Events/OMI[1]',perfElement)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
@@ -329,7 +329,7 @@ def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
             perfCfgList = readPublicConfig('perfCfg')
         if not perfCfgList and not hasPublicConfig('perfCfg'):
             perfCfgList = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
+                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
                     {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
                     {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
                   ]
@@ -396,6 +396,18 @@ def setEventVolume(mdsdCfg,ladCfg):
             
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
+def getStorageAccountEndPoint(account):
+    endpoint = readPrivateConfig('storageAccountEndPoint')
+    if endpoint:
+        parts = endpoint.split('//', 1)
+        if len(parts) > 1:
+            endpoint = parts[0]+'//'+account+".table."+parts[1]
+        else:
+            endpoint = 'https://'+account+".table."+parts[0]
+    else:
+        endpoint = 'https://'+account+'.table.core.windows.net'
+    return endpoint
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -411,9 +423,10 @@ def configSettings():
     mdsdCfg = ET.ElementTree()
     mdsdCfg._setroot(XmlUtil.createElement(mdsdCfgstr))
 
-    # update deployment id
+    # Add DeploymentId (if available) to identity columns
     deployment_id = get_deployment_id()
-    XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
+    if deployment_id:
+        XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
 
     try:
         resourceId = getResourceId()
@@ -458,10 +471,7 @@ def configSettings():
     key = readPrivateConfig('storageAccountKey')
     if not key:
         return False, "Empty storageAccountKey"
-    endpoint = readPrivateConfig('endpoint')
-    if not endpoint:
-        endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint
+    endpoint = getStorageAccountEndPoint(account)
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
@@ -1112,6 +1122,10 @@ def tail(log_file, output_size = OutputSize):
 def get_deployment_id():
     identity = "unknown"
     env_cfg_path = os.path.join(WorkDir, os.pardir, "HostingEnvironmentConfig.xml")
+    if not os.path.exists(env_cfg_path):
+        hutil.log("No Deployment ID (not running in a hosted environment")
+        return None
+
     try:
         with open(env_cfg_path, 'r') as env_cfg_file:
             xml_text = env_cfg_file.read()
