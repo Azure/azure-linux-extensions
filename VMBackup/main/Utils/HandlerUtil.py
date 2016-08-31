@@ -268,10 +268,29 @@ class HandlerUtility:
             for line in file_pointer:
                 if 'Azure Linux Agent Version' in line:
                     waagent_version = line.split(':')[-1]
-            return waagent_version[:-1] #for removing the trailing '\n' character
+            if waagent_version[:-1]=="": #for removing the trailing '\n' character
+                waagent_version = self.get_wala_version_from_file()
+                return waagent_version
+            else:
+                return waagent_version[:-1]
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
+            waagent_version="Unknown"
+            return waagent_version
+
+    def get_wala_version_from_file(self):
+        try:
+            file_pointer = open('/usr/sbin/waagent','r')
+            waagent_version = ''
+            for line in file_pointer:
+                if 'GuestAgentVersion' in line:
+                    waagent_version = line.split('\"')[1]
+                    break
+            return waagent_version #for removing the trailing '\n' character
+        except Exception as e:
+            errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Warning')
             waagent_version="Unknown"
             return waagent_version
 
@@ -286,10 +305,10 @@ class HandlerUtility:
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
                 distinfo[0] = distinfo[0].strip()
-                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + ',WALA=' + wala_ver
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
             else:
                 distinfo = platform.dist()
-                return 'Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release() + 'WALA=' + wala_ver
+                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
@@ -310,6 +329,8 @@ class HandlerUtility:
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
+        distinfo=self.get_dist_info()
+        message=message+";"+distinfo
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
             stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)

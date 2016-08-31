@@ -120,6 +120,8 @@ def do_backup_status_report(operation, status, status_code, message, taskId, com
     date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
     date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
     sub_stat = []
+    distinfo=hutil.get_dist_info()
+    message=message+";"+distinfo
     status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks)
     status_report_msg = status_report_msg.replace(date_place_holder,date_string)
     blobWriter = BlobWriter(hutil)
@@ -218,6 +220,9 @@ def freeze_snapshot(timeout):
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, False, 'Error')
+        run_result = CommonVariables.error
+        run_status = 'error'
+        error_msg = 'Enable failed with exception in freeze or snapshot ' 
     #snapshot_done = True
 
 def daemon():
@@ -284,6 +289,11 @@ def daemon():
                 status_report(temp_status,temp_result,temp_msg)
                 hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
+                #partial logging before freeze
+                if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+                    backup_logger.commit_to_blob(para_parser.logsBlobUri)
+                else:
+                    backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 if(safe_freeze_on==True):
                     freeze_snapshot(thread_timeout)
                 else:

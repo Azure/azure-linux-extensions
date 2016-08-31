@@ -36,7 +36,7 @@ class centosPatching(redhatPatching):
     def __init__(self,logger,distro_info):
         super(centosPatching,self).__init__(logger,distro_info)
         self.logger = logger
-        if(distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5"):
+        if(distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5" or distro_info[1] == "6.9" or distro_info[1] == "6.3"):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
