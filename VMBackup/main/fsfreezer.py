@@ -80,7 +80,12 @@ class FsFreezer:
         """
         self.patching = patching
         self.logger = logger
-        self.mounts = Mounts(patching = self.patching, logger = self.logger)
+        try:
+            self.mounts = Mounts(patching = self.patching, logger = self.logger)
+        except Exception as e:
+            errMsg="Failed to retrieve mount points"
+            self.logger.log(errMsg,True,'Warning')
+            self.mounts = None
         self.frozen_items = set()
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger)

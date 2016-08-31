@@ -119,14 +119,21 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
+        attempt = 1
+
         while True:
-            self.context.logger.log("Restarting systemd-udevd")
+            if attempt > 10:
+                raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
+
+            self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
             self.command_executor.Execute('systemctl restart systemd-udevd')
 
             sleep(10)
 
             if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
                 break
+
+            attempt += 1
 
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
 
