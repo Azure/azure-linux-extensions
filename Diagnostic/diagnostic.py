@@ -409,6 +409,24 @@ def getStorageAccountEndPoint(account):
         endpoint = 'https://'+account+'.table.core.windows.net'
     return endpoint
 
+
+def logPrivateSettingsKeys():
+    try:
+        msg = "Keys in privateSettings (and some non-secret values): "
+        first = True
+        for key in private_settings:
+            if first:
+                first = False
+            else:
+                msg += ", "
+            msg += key
+            if key == 'storageAccountEndPoint':
+                msg += ":" + private_settings[key]
+        hutil.log(msg)
+    except Exception as e:
+        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
+
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -465,6 +483,8 @@ def configSettings():
                 hfile.write(syslogCfg)
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
+
+    logPrivateSettingsKeys()
 
     account = readPrivateConfig('storageAccountName')
     if not account:
