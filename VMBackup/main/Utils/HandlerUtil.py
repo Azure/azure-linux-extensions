@@ -79,6 +79,7 @@ class HandlerContext:
         return
 
 class HandlerUtility:
+    telemetry_data = []
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -327,20 +328,28 @@ class HandlerUtility:
         else:
             return delta.total_seconds()
 
-    def add_telemetry_data(self,telemetry_data):
-        telemetry_data["AgentVersion"] = self.get_wala_version()
-        telemetry_data["ExtensionVersion"] = self.get_extension_version()
-        telemetry_data["OSVersion"],telemetry_data["KernelVersion"] = self.get_dist_info()
+    @staticmethod
+    def add_to_telemetery_data(key,value):
+        temp_dict = {}
+        temp_dict["Value"] = value
+        temp_dict["Key"] = key
+        if(temp_dict not in HandlerUtility.telemetry_data):
+            HandlerUtility.telemetry_data.append(temp_dict)
 
+    def add_telemetry_data(self):
+        os_version,kernel_version = self.get_dist_info()
+        HandlerUtility.add_to_telemetery_data("GuestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("ExtensionVersion",self.get_extension_version())
+        HandlerUtility.add_to_telemetery_data("OSVersion",os_version)
+        HandlerUtility.add_to_telemetery_data("KernelVersion",kernel_version)
 
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
-        telemetry_data = {}
-        self.add_telemetry_data(telemetry_data)
+        self.add_telemetry_data()
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, telemetry_data)
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
             time_span = self.timedelta_total_seconds(time_delta) * 1000
             date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -351,7 +360,7 @@ class HandlerUtility:
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, telemetry_data)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data)
         stat_rept = json.dumps(stat_rept, cls = Status.ComplexEncoder)
         # rename all other status files, or the WALA would report the wrong
         # status file.
