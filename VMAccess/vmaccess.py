@@ -254,7 +254,6 @@ def _save_other_sudoers(sudoers):
 def _allow_password_auth():
     config = waagent.GetFileContents(SshdConfigPath).split("\n")
     _set_sshd_config(config, "PasswordAuthentication", "yes")
-    _set_sshd_config(config, "ChallengeResponseAuthentication", "yes")
     waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
 
 

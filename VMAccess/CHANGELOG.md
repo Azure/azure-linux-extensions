@@ -1,3 +1,7 @@
+## 1.4.4.0 (2016-09-06)
+- Do not set ChallengeResponseAuthenticaiton.  This value should not
+  be changed by VMAccess.
+
 ## 1.4.3.0 (2016-09-05)
 - Reject zero length passwords.
 
