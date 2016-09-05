@@ -1,3 +1,6 @@
+## 1.4.3.0 (2016-09-05)
+- Reject zero length passwords.
+
 ## 1.4.2.0 (2016-08-25)
 - Ensure expiration (if specified) is used when creating an account
 - Backup sshd_config before any edits are made.
