@@ -156,6 +156,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
 
+    if len(user_pass) == 0:
+        user_pass = None
+        hutil.log("empty passwords are not allowed, ignoring password reset")
+
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
     error_string = waagent.MyDistro.CreateAccount(
