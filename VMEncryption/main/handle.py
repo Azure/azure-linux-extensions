@@ -135,8 +135,6 @@ def disable_encryption():
         decryption_marker.volume_type = extension_parameter.VolumeType
         decryption_marker.commit()
 
-        start_daemon('DisableEncryption')
-
         hutil.do_exit(exit_code=0,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_success_status,
