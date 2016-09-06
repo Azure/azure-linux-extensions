@@ -82,8 +82,15 @@ def disable_encryption():
                       status=CommonVariables.extension_success_status,
                       code=str(CommonVariables.success),
                       message='Decryption started')
-    
-    hutil.exit_if_same_seq()
+
+    exit_status = {
+        'operation': 'DisableEncryption',
+        'status': CommonVariables.extension_success_status,
+        'status_code': str(CommonVariables.success),
+        'message': 'Decryption completed'
+    }
+
+    hutil.exit_if_same_seq(exit_status)
     hutil.save_seq()
 
     try:
