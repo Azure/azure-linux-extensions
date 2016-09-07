@@ -125,7 +125,7 @@ CentosConfig = dict(RedhatConfig.items()+
                     }.items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig,
+All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
