@@ -34,7 +34,7 @@ ExtensionShortName = 'VMAccess'
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
-
+SshdConfigPath = '/etc/ssh/sshd_config'
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
@@ -81,21 +81,32 @@ def enable():
             hutil.log("Succeeded in check and open ssh port.")
 
         hutil.exit_if_enabled()
+        if _is_sshd_config_modified(protect_settings):
+            _backup_sshd_config(SshdConfigPath)
 
         if reset_ssh:
-            _reset_sshd_config("/etc/ssh/sshd_config")
+            _reset_sshd_config(SshdConfigPath)
             hutil.log("Succeeded in reset sshd_config.")
+
         if remove_user:
             _remove_user_account(remove_user, hutil)
+
         _set_user_account_pub_key(protect_settings, hutil)
 
-        check_and_repair_disk(hutil)
+        if _is_sshd_config_modified(protect_settings):
+            waagent.MyDistro.restartSshService()
 
+        check_and_repair_disk(hutil)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
+
+def _is_sshd_config_modified(protected_settings):
+    result = protected_settings.get('reset_ssh') or protected_settings.get('password')
+    return result is not None
 
 
 def uninstall():
@@ -112,7 +123,7 @@ def disable():
 
 def update():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    hutil.do_parse_context('Upadate')
+    hutil.do_parse_context('Update')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 
@@ -145,6 +156,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
 
+    if len(user_pass) == 0:
+        user_pass = None
+        hutil.log("empty passwords are not allowed, ignoring password reset")
+
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
     error_string = waagent.MyDistro.CreateAccount(
@@ -172,7 +187,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
             pub_path = os.path.join('/home/', user_name, '.ssh',
                 'authorized_keys')
             ovf_env.UserName = user_name
-            if(no_convert):
+            if no_convert:
                 if cert_txt:
                     pub_path = ovf_env.PrepareDir(pub_path)
                     final_cert_txt = cert_txt
@@ -237,11 +252,9 @@ def _save_other_sudoers(sudoers):
 
 
 def _allow_password_auth():
-    configPath = '/etc/ssh/sshd_config'
-    config = waagent.GetFileContents(configPath).split("\n")
+    config = waagent.GetFileContents(SshdConfigPath).split("\n")
     _set_sshd_config(config, "PasswordAuthentication", "yes")
-    _set_sshd_config(config, "ChallengeResponseAuthentication", "yes")
-    waagent.ReplaceFileContentsAtomic(configPath, "\n".join(config))
+    waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
 
 
 def _set_sshd_config(config, name, val):
@@ -267,7 +280,6 @@ def _reset_sshd_config(sshd_file_path):
         config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' % (distro_name, 'default'))
         if not(os.path.exists(config_file_path)):
             config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
-    _backup_sshd_config(sshd_file_path)
 
     if distro_name == "CoreOS":
         # Parse sshd port from config_file_path

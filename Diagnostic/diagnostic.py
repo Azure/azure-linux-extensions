@@ -125,7 +125,7 @@ CentosConfig = dict(RedhatConfig.items()+
                     }.items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig,
+All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
@@ -423,9 +423,10 @@ def configSettings():
     mdsdCfg = ET.ElementTree()
     mdsdCfg._setroot(XmlUtil.createElement(mdsdCfgstr))
 
-    # update deployment id
+    # Add DeploymentId (if available) to identity columns
     deployment_id = get_deployment_id()
-    XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
+    if deployment_id:
+        XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
 
     try:
         resourceId = getResourceId()
@@ -1121,6 +1122,10 @@ def tail(log_file, output_size = OutputSize):
 def get_deployment_id():
     identity = "unknown"
     env_cfg_path = os.path.join(WorkDir, os.pardir, "HostingEnvironmentConfig.xml")
+    if not os.path.exists(env_cfg_path):
+        hutil.log("No Deployment ID (not running in a hosted environment")
+        return None
+
     try:
         with open(env_cfg_path, 'r') as env_cfg_file:
             xml_text = env_cfg_file.read()
