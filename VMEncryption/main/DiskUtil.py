@@ -503,6 +503,8 @@ class DiskUtil(object):
         data_drives_encrypted = True
         for mount_item in mount_items:
             if mount_item["fs"] == "ext4" and \
+                not "/mnt" == mount_item["dest"] and \
+                not "/" == mount_item["dest"] and \
                 not "/oldroot/mnt/resource" == mount_item["dest"] and \
                 not "/oldroot/boot" == mount_item["dest"] and \
                 not "/mnt/resource" == mount_item["dest"] and \

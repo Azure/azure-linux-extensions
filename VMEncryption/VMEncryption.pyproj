@@ -112,6 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
+    <Folder Include="main\oscrypto\" />
     <Folder Include="main\oscrypto\rhel_72\" />
     <Folder Include="main\oscrypto\rhel_72\encryptstates\" />
     <Folder Include="main\oscrypto\rhel_72\encryptpatches\" />
