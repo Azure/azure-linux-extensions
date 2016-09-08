@@ -1,3 +1,7 @@
+## 1.4.5.0 (2016-09-07)
+- Check for None before checking the lenght of a user's password.  This is 
+  fallout from allowing and rejecting empty passwords.
+
 ## 1.4.4.0 (2016-09-06)
 - Do not set ChallengeResponseAuthenticaiton.  This value should not
   be changed by VMAccess.
