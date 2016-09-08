@@ -30,7 +30,7 @@ import Utils.ScriptUtil as ScriptUtil
 ExtensionShortName = "OmsAgentForLinux"
 
 PackagesDirectory = "packages"
-BundleFileName = 'omsagent-1.1.0-217.universal.x64.sh'
+BundleFileName = 'omsagent-1.2.0-25.universal.x64.sh'
 
 # always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
 InstallCommandTemplate = './{0} --upgrade --force'
