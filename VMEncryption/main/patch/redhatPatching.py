@@ -34,9 +34,10 @@ from Common import *
 
 
 class redhatPatching(AbstractPatching):
-    def __init__(self,logger,distro_info):
-        super(redhatPatching,self).__init__(distro_info)
+    def __init__(self, logger, distro_info):
+        super(redhatPatching, self).__init__(distro_info)
         self.logger = logger
+        self.distro_info = distro_info
         if(distro_info[1].startswith("6.")):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -76,7 +77,7 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        if(distro_info[1].startswith("6.")):
+        if(self.distro_info[1].startswith("6.")):
             return_code = subprocess.call(['yum', 'install','-y', 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm'])
             self.logger.log("Enabling epel, result: " + str(return_code))
         else:
