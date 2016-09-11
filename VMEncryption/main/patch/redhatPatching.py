@@ -37,7 +37,7 @@ class redhatPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
         super(redhatPatching,self).__init__(distro_info)
         self.logger = logger
-        if(distro_info[1] == "6.7"):
+        if(distro_info[1].startswith("6.")):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
@@ -76,8 +76,12 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        return_code = subprocess.call(['yum', 'install','-y', 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm'])
-        self.logger.log("Enabling epel, result: " + str(return_code))
+        if(distro_info[1].startswith("6.")):
+            return_code = subprocess.call(['yum', 'install','-y', 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm'])
+            self.logger.log("Enabling epel, result: " + str(return_code))
+        else:
+            return_code = subprocess.call(['yum', 'install','-y', 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm'])
+            self.logger.log("Enabling epel, result: " + str(return_code))
 
         packages = ['ntfs-3g',
                     'cryptsetup',
