@@ -30,6 +30,7 @@ import uuid
 import glob
 
 from EncryptionConfig import EncryptionConfig
+from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
 from Common import *
@@ -529,7 +530,10 @@ class DiskUtil(object):
             encryption_status["os"] = "Encrypted"
 
         encryption_marker = EncryptionMarkConfig(self.logger, self.encryption_environment)
-        if encryption_marker.config_file_exists():
+        decryption_marker = DecryptionMarkConfig(self.logger, self.encryption_environment)
+        if decryption_marker.config_file_exists():
+            encryption_status["data"] = "DecryptionInProgress"
+        elif encryption_marker.config_file_exists():
             encryption_config = EncryptionConfig(self.encryption_environment, self.logger)
             volume_type = encryption_config.get_volume_type().lower()
 
