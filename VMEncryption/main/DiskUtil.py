@@ -61,7 +61,7 @@ class DiskUtil(object):
                 return returnCode
         except Exception as e:
             message = "Failed to perform dd copy: {0}, stack trace: {1}".format(e, traceback.format_exc())
-            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            self.logger.log(msg=message, level=CommonVariables.ErrorLevel)
         finally:
             copy_task.clear_mem_fs()
 
