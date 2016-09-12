@@ -50,7 +50,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.command_executor.Execute('systemctl restart systemd-udevd', False)
         self.command_executor.Execute('systemctl restart systemd-timesyncd', False)
 
-        self._find_bek_and_execute_action('_dump_passphrase')
+        # self._find_bek_and_execute_action('_dump_passphrase')
         self._find_bek_and_execute_action('_luks_format')
         self._find_bek_and_execute_action('_luks_open')
 
