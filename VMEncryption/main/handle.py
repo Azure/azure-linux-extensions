@@ -666,7 +666,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                     logger.log(msg="the header slice file is there, remove it.", level = CommonVariables.WarningLevel)
                     os.remove(encryption_environment.copy_header_slice_file_path)
 
-                copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)
+                copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
 
                 if(copy_result != CommonVariables.process_success):
                     logger.log(msg="copy the header block failed, return code is: {0}".format(copy_result),
