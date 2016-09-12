@@ -2,6 +2,17 @@
 
 Allow the owner of the Azure Virtual Machines to run customized scripts in the VM.
 
+
+# :warning: New Version Notice :warning:
+
+A new version of **Custom Script Extension** is available at https://github.com/Azure/custom-script-extension-linux. The new `v2.0` version offers better reliability and wider Linux distro support. 
+
+Please consider switching your new deployments to use the new version (`Microsoft.Azure.Extensions.CustomScript`) instead. The new version is intended to be a drop-in replacement. Therefore, the migration is as easy as changing the name and version, you do not need to change your extension configuration.
+
+-----------------------------
+
+This user guide is for `Microsoft.OSTCExtensions.CustomScript` extension.
+
 You can read the User Guide below.
 * [Automate Linux VM Customization Tasks Using CustomScript Extension (outdated, needs to update)](https://azure.microsoft.com/en-us/blog/automate-linux-vm-customization-tasks-using-customscript-extension/)
 
