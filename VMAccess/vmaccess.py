@@ -75,6 +75,14 @@ def enable():
             reset_ssh = protect_settings.get('reset_ssh')
             remove_user = protect_settings.get('remove_user')
 
+        if reset_ssh and remove_user:
+            hutil.error("Cannot reset sshd_config and remove a user in one operation.")
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=False,
+                                      message="(03002)Argument error, conflicting operations")
+            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
         # check port each time the VM boots up
         if reset_ssh:
             _open_ssh_port()
