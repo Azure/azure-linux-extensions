@@ -150,6 +150,7 @@ class CommonVariables:
     tmpfs_error = 20
     backup_slice_file_error = 21
     unmount_oldroot_error = 22
+    operation_lookback_failed = 23
     unknown_error = 100
 
 class TestHooks:
