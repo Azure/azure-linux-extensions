@@ -33,8 +33,9 @@ import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 
 WorkDir = os.getcwd()
-MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
+MDSDFileResourcesPrefix = os.path.join(WorkDir, 'mdsd')
+MDSDPidFile = MDSDFileResourcesPrefix + '.pid'
+MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -408,6 +409,24 @@ def getStorageAccountEndPoint(account):
         endpoint = 'https://'+account+'.table.core.windows.net'
     return endpoint
 
+
+def logPrivateSettingsKeys():
+    try:
+        msg = "Keys in privateSettings (and some non-secret values): "
+        first = True
+        for key in private_settings:
+            if first:
+                first = False
+            else:
+                msg += ", "
+            msg += key
+            if key == 'storageAccountEndPoint':
+                msg += ":" + private_settings[key]
+        hutil.log(msg)
+    except Exception as e:
+        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
+
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -464,6 +483,8 @@ def configSettings():
                 hfile.write(syslogCfg)
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
+
+    logPrivateSettingsKeys()
 
     account = readPrivateConfig('storageAccountName')
     if not account:
@@ -705,14 +726,16 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
+    eventhub_persist_dir_path = os.path.join(WorkDir, "eventhub"); # LAD doesn't use this yet, but mdsd just creates this directory
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6} -S {7}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
-        MDSDPidPortFile,
+        MDSDFileResourcesPrefix,
         monitor_file_path,
         warn_file_path,
-        info_file_path).split(" ")
+        info_file_path,
+        eventhub_persist_dir_path).split(" ")
 
     try:
         num_quick_consecutive_crashes = 0
@@ -1047,10 +1070,12 @@ def install_rsyslogom():
 
 def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
     files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
+    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
+    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
 
     for f in files_to_modify:
         RunGetOutput(cmd_to_run.format(new_port, f))
+        RunGetOutput(cmd2_to_run.format(new_port, f))
 
     update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
     update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
