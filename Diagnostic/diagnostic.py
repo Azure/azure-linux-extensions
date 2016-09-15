@@ -726,14 +726,16 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
+    eventhub_persist_dir_path = os.path.join(WorkDir, "eventhub"); # LAD doesn't use this yet, but mdsd just creates this directory
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6} -S {7}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
         MDSDFileResourcesPrefix,
         monitor_file_path,
         warn_file_path,
-        info_file_path).split(" ")
+        info_file_path,
+        eventhub_persist_dir_path).split(" ")
 
     try:
         num_quick_consecutive_crashes = 0
