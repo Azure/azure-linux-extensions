@@ -27,7 +27,7 @@ def getXmlValue(xml,path,property):
         return element.get(property)
 
 
-def addElement(xml,path,el,addOnlyOnce=False,selector=[]):
+def addElement(xml,path,el,selector=[],addOnlyOnce=False):
     elements = xml.findall(path)
     for element in elements:
         if selector and element.get(selector[0])!=selector[1]:
