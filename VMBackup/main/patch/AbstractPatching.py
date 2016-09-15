@@ -37,6 +37,7 @@ class AbstractPatching(object):
     """
     def __init__(self,distro_info):
         self.distro_info = distro_info
+        self.usr_flag = 1
         self.base64_path = '/usr/bin/base64'
         self.bash_path = '/bin/bash'
         self.blkid_path = '/usr/bin/blkid'

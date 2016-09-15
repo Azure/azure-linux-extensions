@@ -97,7 +97,7 @@ def do_json(operation, status, sub_status, status_code, message, taskId, command
     formattedMessage = Status.FormattedMessage("en-US",message)
     stat_obj = Status.StatusObj(hutil._context._name, operation, status, sub_status, status_code, formattedMessage, telemetry_data,  taskId, commandStartTimeUTCTicks)
     top_stat_obj = Status.TopLevelStatus(hutil._context._version, date_place_holder, stat_obj)
-    return json.dumps(top_stat_obj, cls = Status.ComplexEncoder)
+    return "[" + json.dumps(top_stat_obj, cls = Status.ComplexEncoder) + "]"
 
 def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
     global backup_logger,hutil

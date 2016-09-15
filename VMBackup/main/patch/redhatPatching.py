@@ -48,7 +48,8 @@ class redhatPatching(AbstractPatching):
             self.echo_path = '/bin/echo'
             self.getenforce_path = '/usr/sbin/getenforce'
             self.setenforce_path = '/usr/sbin/setenforce'
-            self.lsblk_path = '/bin/lsblk' 
+            self.lsblk_path = '/bin/lsblk'
+            self.usr_flag = 0
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/bin/mkdir'
             self.mount_path = '/bin/mount'
@@ -67,6 +68,7 @@ class redhatPatching(AbstractPatching):
             self.getenforce_path = '/usr/sbin/getenforce'
             self.setenforce_path = '/usr/sbin/setenforce'
             self.lsblk_path = '/usr/bin/lsblk'
+            self.usr_flag = 1
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/usr/bin/mkdir'
             self.mount_path = '/usr/bin/mount'

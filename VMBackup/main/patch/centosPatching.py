@@ -45,7 +45,8 @@ class centosPatching(redhatPatching):
             self.dd_path = '/bin/dd'
             self.e2fsck_path = '/sbin/e2fsck'
             self.echo_path = '/bin/echo'
-            self.lsblk_path = '/bin/lsblk' 
+            self.lsblk_path = '/bin/lsblk'
+            self.usr_flag = 0
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/bin/mkdir'
             self.mount_path = '/bin/mount'
@@ -62,6 +63,7 @@ class centosPatching(redhatPatching):
             self.e2fsck_path = '/sbin/e2fsck'
             self.echo_path = '/usr/bin/echo'
             self.lsblk_path = '/usr/bin/lsblk'
+            self.usr_flag = 1
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/usr/bin/mkdir'
             self.mount_path = '/usr/bin/mount'

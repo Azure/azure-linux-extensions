@@ -354,14 +354,14 @@ class HandlerUtility:
             time_span = self.timedelta_total_seconds(time_delta) * 1000
             date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
             stat_rept.timestampUTC = date_place_holder
-            stat_rept = json.dumps(stat_rept, cls = Status.ComplexEncoder)
+            stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
             date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
             stat_rept = stat_rept.replace(date_place_holder,date_string)
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data)
-        stat_rept = json.dumps(stat_rept, cls = Status.ComplexEncoder)
+        stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence

@@ -51,9 +51,9 @@ class HttpUtil(object):
             header_str = header_str + '-H ' + '"' + str(key) + ':' + str(value) + '"'
 
         if(self.proxyHost == None or self.proxyPort == None):
-            commandToExecute = 'curl --request PUT --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
+            commandToExecute = 'curl --request PUT --connect-timeout 10 --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"' + ' -v'
         else:
-            commandToExecute = 'curl --request PUT --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
+            commandToExecute = 'curl --request PUT --connect-timeout 10 --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
         args = shlex.split(commandToExecute.encode('ascii'))
         proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -93,7 +93,7 @@ class HttpUtil(object):
                 self.logger.log("resp status: " + str(resp.status))
                 if(responseBody is not None):
                     self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
-                return CommonVariables.error_http_failure
+                return resp.status
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
