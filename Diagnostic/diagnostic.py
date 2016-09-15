@@ -297,7 +297,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI[1]',perfElement)
+        XmlUtil.addElementToFirstMatchingPathOnly(tree,'Events/OMI',perfElement)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
