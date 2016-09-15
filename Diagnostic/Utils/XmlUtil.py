@@ -26,18 +26,15 @@ def getXmlValue(xml,path,property):
     if element is not None:
         return element.get(property)
 
-def addElement(xml,path,el,selector=[]):
+
+def addElement(xml,path,el,addOnlyOnce=False,selector=[]):
     elements = xml.findall(path)
     for element in elements:
         if selector and element.get(selector[0])!=selector[1]:
             continue
         element.append(el)
-
-
-def addElementToFirstMatchingPathOnly(xml, path, el):
-    element = xml.find(path)
-    if element is not None:
-        element.append(el)
+        if addOnlyOnce:
+            return
 
 
 def createElement(schema):
