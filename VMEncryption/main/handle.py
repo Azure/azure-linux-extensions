@@ -1473,11 +1473,12 @@ def daemon():
                           status=CommonVariables.extension_error_status,
                           code=str(CommonVariables.encryption_failed),
                           message=error_msg)
-        finally:
-            logger.log("clearing the decryption mark.")
+        else:
+            logger.log("clearing the decryption mark after successful decryption")
             decryption_marker.clear_config()
+        finally:
             lock.release_lock()
-            logger.log("returned to daemon successfully after decryption")
+            logger.log("returned to daemon")
             logger.log("exiting daemon")
                 
             return
