@@ -197,8 +197,14 @@ class HandlerUtility:
         self.operation = operation
         _context = self.try_parse_context()
         if not _context:
-            self.log("maybe no new settings file found")
-            sys.exit(0)
+            self.log("no settings file found")
+
+            self.do_exit(1,
+                         'QueryEncryptionStatus',
+                         CommonVariables.extension_error_status,
+                         str(CommonVariables.operation_lookback_failed),
+                         'No operation found, find_last_nonquery_operation={0}'.format(self.find_last_nonquery_operation))
+
         return _context
 
     def try_parse_context(self):
@@ -257,7 +263,7 @@ class HandlerUtility:
                 error_msg = 'Unable to read ' + self._context._settings_file + '. '
                 self.error(error_msg)
 
-                if self._context._seq_no != '0':
+                if int(self._context._seq_no) > 0:
                     self._context._seq_no = str(int(self._context._seq_no) - 1)
                     continue
 
@@ -279,7 +285,12 @@ class HandlerUtility:
             self.log("Encryption operation: {0}".format(encryption_operation))
 
             if self.find_last_nonquery_operation and encryption_operation == CommonVariables.QueryEncryptionStatus:
-                self.log("find_last_nonquery_operation was True and encryption_operation was query, decrementing sequence number")
+                self.log("find_last_nonquery_operation was True and encryption_operation was query")
+                if int(self._context._seq_no) <= 0:
+                    self.log("reached zero, returning")
+                    return None
+
+                self.log("decrementing sequence number")
                 encryption_operation = None
                 self._context._seq_no = str(int(self._context._seq_no) - 1)
 
