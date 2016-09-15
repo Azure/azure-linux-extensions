@@ -999,8 +999,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size and \
-       raw_device_item.size - mapper_device_item.size != CommonVariables.old_luks_header_size:
+    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
                    level=CommonVariables.ErrorLevel)
         logger.log(msg="raw_device_item: {0}".format(raw_device_item),
