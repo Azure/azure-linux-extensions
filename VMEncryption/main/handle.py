@@ -1444,6 +1444,8 @@ def daemon_decrypt():
                           message='Decryption failed for {0}'.format(failed_item))
         else:
             encryption_config.clear_config()
+            logger.log("clearing the decryption mark after successful decryption")
+            decryption_marker.clear_config()
 
             hutil.do_exit(exit_code=0,
                           operation='Disable',
@@ -1479,9 +1481,6 @@ def daemon():
                           status=CommonVariables.extension_error_status,
                           code=str(CommonVariables.encryption_failed),
                           message=error_msg)
-        else:
-            logger.log("clearing the decryption mark after successful decryption")
-            decryption_marker.clear_config()
         finally:
             lock.release_lock()
             logger.log("returned to daemon")
