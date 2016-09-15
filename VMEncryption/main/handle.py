@@ -315,13 +315,6 @@ def enable():
                 logger.log("A daemon is already running, exiting without status report")
                 hutil.redo_last_status()
                 exit_without_status_report()
-            elif int(hutil._context._seq_no) <= 0:
-                logger.log(msg="Query called without any prior EnableEncryption/DisableEncryption call")
-                hutil.do_exit(exit_code=0,
-                              operation='Enable',
-                              status=CommonVariables.extension_success_status,
-                              code=(CommonVariables.success),
-                              message='EnableEncryption not called on the running VM')
             else:
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
