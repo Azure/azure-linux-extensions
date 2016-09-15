@@ -36,7 +36,7 @@ def addElement(xml,path,el,selector=[]):
 
 def addElementToFirstMatchingPathOnly(xml, path, el):
     element = xml.find(path)
-    if element:
+    if element is not None:
         element.append(el)
 
 
