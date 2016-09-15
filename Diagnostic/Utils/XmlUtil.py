@@ -26,12 +26,16 @@ def getXmlValue(xml,path,property):
     if element is not None:
         return element.get(property)
 
-def addElement(xml,path,el,selector=[]):
+
+def addElement(xml,path,el,selector=[],addOnlyOnce=False):
     elements = xml.findall(path)
     for element in elements:
         if selector and element.get(selector[0])!=selector[1]:
             continue
         element.append(el)
+        if addOnlyOnce:
+            return
+
 
 def createElement(schema):
     return ET.fromstring(schema)
