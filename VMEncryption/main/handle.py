@@ -51,6 +51,7 @@ from EncryptionEnvironment import EncryptionEnvironment
 from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
+from CommandExecutor import *
 from __builtin__ import int
 
 
@@ -999,7 +1000,13 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
+    proc_comm = ProcessCommunicator()
+    executor = CommandExecutor(logger)
+    executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
+
+    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
+
+    if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
                    level=CommonVariables.ErrorLevel)
         logger.log(msg="raw_device_item: {0}".format(raw_device_item),
