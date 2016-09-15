@@ -449,6 +449,13 @@ def enable_encryption():
                 """
                 if(extension_parameter.VolumeType is None or
                    not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in CommonVariables.SupportedVolumeTypes])):
+                    if(encryption_config.config_file_exists()):
+                        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+                        
+                        if existing_passphrase_file is None:
+                            logger.log("Unsupported volume type specified and BEK volume does not exist, clearing encryption config")
+                            encryption_config.clear_config()
+
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
