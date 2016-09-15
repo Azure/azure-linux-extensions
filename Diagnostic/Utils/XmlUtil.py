@@ -34,11 +34,10 @@ def addElement(xml,path,el,selector=[]):
         element.append(el)
 
 
-def addElementToFirstMatchingPathOnly(xml, path, el, selector=[]):
+def addElementToFirstMatchingPathOnly(xml, path, el):
     element = xml.find(path)
-    if selector and element.get(selector[0]) != selector[1]:
-        return
-    element.append(el)
+    if element:
+        element.append(el)
 
 
 def createElement(schema):
