@@ -57,6 +57,7 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
+    hutil.copy_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
