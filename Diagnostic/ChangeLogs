@@ -1,3 +1,8 @@
+2016-09-16: LAD-2.3.9009
+    - Underlying monitoring agent binary (mdsd) upgrade with many fixes and
+      improvements
+    - Fixes storage end point bug (affected Mooncake and Blackforest)
+
 2016-07-14: LAD-2.3.9007
     - Fixes install issues on some RH-based distros (e.g., OracleLinux 7) due
       to lack of tar.
