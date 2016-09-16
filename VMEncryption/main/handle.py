@@ -295,7 +295,7 @@ def enable():
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
-        if encryption_operation == CommonVariables.EnableEncryption:
+        if encryption_operation == CommonVariables.EnableEncryption or encryption_operation == CommonVariables.EnableEncryptionFormat:
             logger.log("handle.py found enable encryption operation")
 
             logger.log("Installing pre-requisites")
