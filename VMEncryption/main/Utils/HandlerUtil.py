@@ -414,4 +414,11 @@ class HandlerUtility:
                     self.log("Copying {0} to {1}".format(src, dest))
 
                     shutil.copy2(src, dest)
+            
+            seq_nos = []
+            for file in fnmatch.filter(files, '*mrseq'):
+                if CommonVariables.extension_type in root and CommonVariables.extension_version not in root:
+                    seq_file = os.path.join(root, file)
+                    seq_nos.append(int(open(file).read()))
 
+                self.set_last_seq(max(seq_nos))
