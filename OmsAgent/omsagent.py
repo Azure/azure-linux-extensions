@@ -36,8 +36,7 @@ BundleFileName = 'omsagent-1.2.0-25.universal.x64.sh'
 InstallCommandTemplate = './{0} --upgrade --force'
 UninstallCommandTemplate = './{0} --remove'
 OmsAdminWorkingDirectory = '/opt/microsoft/omsagent/bin'
-OnboardCommandTemplate = './omsadmin.sh -w {0} -s {1}'
-OnboardWithProxyCommandTemplate = './omsadmin.sh -w {0} -s {1} -p {2}'
+OnboardCommandWithOptionalParamsTemplate = './omsadmin.sh -w {0} -s {1} {2}'
 ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
 DisableOmsAgentServiceCommand = './service_control disable'
 EnableOmsAgentServiceCommand = './service_control enable'
@@ -116,16 +115,23 @@ def enable(hutil):
     workspaceId = public_settings.get("workspaceId")
     workspaceKey = protected_settings.get("workspaceKey")
     proxy = protected_settings.get("proxy")
+    vmResourceId = protected_settings.get("vmResourceId")
     if workspaceId is None:
         raise ValueError("Workspace ID cannot be None.")
     if workspaceKey is None:
         raise ValueError("Workspace key cannot be None.")
 
-    if proxy is None:
-        cmd = OnboardCommandTemplate.format(workspaceId, workspaceKey)
-    else:
-        cmd = OnboardWithProxyCommandTemplate.format(workspaceId, workspaceKey, proxy)
+    proxyParam = ""
+    if proxy is not None:
+        proxyParam = "-p {0}".format(proxy)
         
+    vmResourceIdParam = ""
+    if vmResourceId is not None:
+        vmResourceIdParam = "-a {0}".format(vmResourceId)
+
+    optionalParams = "{0} {1}".format(proxyParam, vmResourceIdParam)
+    cmd = OnboardCommandWithOptionalParamsTemplate.format(workspaceId, workspaceKey, optionalParams)
+
     exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), OmsAdminWorkingDirectory, 'Onboard', ExtensionShortName, hutil.get_extension_version(), False)
 
     # if onboard succeeds we continue, otherwise fail fast
