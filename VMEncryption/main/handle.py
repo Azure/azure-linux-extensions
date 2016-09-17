@@ -57,7 +57,7 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
-    hutil.copy_old_configs()
+    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -66,6 +66,7 @@ def disable():
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
+    hutil.archive_old_configs()
     hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
 
 def disable_encryption():

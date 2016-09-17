@@ -89,6 +89,7 @@ class HandlerUtility:
         self.patching = None
         self.disk_util = None
         self.find_last_nonquery_operation = False
+        self.config_archive_folder = '/var/lib/azure_disk_encryption_archive'
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -402,27 +403,38 @@ class HandlerUtility:
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
 
-    def copy_old_configs(self):
-        waagent_folder = os.path.abspath(os.path.join(self._context._config_dir, '../../'))
+    def archive_old_configs(self):
+        if not os.path.exists(self.config_archive_folder):
+            os.makedirs(self.config_archive_folder)
 
-        for root, dirs, files in os.walk(waagent_folder):
-            for file in fnmatch.filter(files, '*.settings'):
-                if CommonVariables.extension_type in root and CommonVariables.extension_version not in root:
+        for root, dirs, files in os.walk(os.path.join(self._context._config_dir, '..')):
+            for file in files:
+                if file.endswith('.settings') or file == 'mrseq':
+                    src = os.path.join(root, file)
+                    dest = os.path.join(self.config_archive_folder, file)
+
+                    self.log("Copying {0} to {1}".format(src, dest))
+
+                    shutil.copy2(src, dest)
+
+    def restore_old_configs(self):
+        if not os.path.exists(self.config_archive_folder):
+            return
+
+        for root, dirs, files in os.walk(self.config_archive_folder):
+            for file in files:
+                if file.endswith('.settings'):
                     src = os.path.join(root, file)
                     dest = os.path.join(self._context._config_dir, file)
 
                     self.log("Copying {0} to {1}".format(src, dest))
 
                     shutil.copy2(src, dest)
-            
-            seq_nos = []
-            for file in fnmatch.filter(files, '*mrseq'):
-                if CommonVariables.extension_type in root and CommonVariables.extension_version not in root:
-                    seq_file = os.path.join(root, file)
-                    seq_nos.append(int(open(file).read()))
 
-            if not seq_nos:
-                return
+                if file == 'mrseq':
+                    src = os.path.join(root, file)
+                    dest = os.path.join(os.path.join(self._context._config_dir, '..'), file)
 
-            self.log("Copying old sequence number: {0}".format(max(seq_nos)))
-            self.set_last_seq(max(seq_nos))
+                    self.log("Copying {0} to {1}".format(src, dest))
+
+                    shutil.copy2(src, dest)
