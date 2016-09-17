@@ -421,5 +421,8 @@ class HandlerUtility:
                     seq_file = os.path.join(root, file)
                     seq_nos.append(int(open(file).read()))
 
+            if not seq_nos:
+                return
+
             self.log("Copying old sequence number: {0}".format(max(seq_nos)))
             self.set_last_seq(max(seq_nos))
