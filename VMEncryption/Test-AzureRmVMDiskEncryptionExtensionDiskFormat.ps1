@@ -243,7 +243,7 @@ Read-Host "Press Enter to continue..."
 
 $global:Settings = @{
     "AADClientID" = $AadClientId;
-    "DiskFormatQuery" = "[{`"scsi`":`"[5:0:0:0]`",`"filesystem`":`"ext4`",`"mount_point`":`"/mnt/data1`"}]";
+    "DiskFormatQuery" = "[{`"scsi`":`"[6:0:0:0]`",`"filesystem`":`"ext4`",`"mount_point`":`"/mnt/data1`"}]";
     "EncryptionOperation" = "EnableEncryptionFormat";
     "KeyEncryptionAlgorithm" = "RSA-OAEP";
     "KeyEncryptionKeyURL" = $DiskEncryptionKey.Id;
