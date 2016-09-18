@@ -178,29 +178,9 @@ exit
     Write-Host "Copied SSH public key for root"
 
     $commands = @"
-parted /dev/sdc
-mklabel msdos
-mkpart pri ext2 0% 100%
-quit
-
-parted /dev/sdd
-mklabel msdos
-mkpart pri ext2 0% 100%
-quit
-
-mkfs.ext4 /dev/sdc1
-mkfs.ext4 /dev/sdd1
-
-UUID1="`$(blkid -s UUID -o value /dev/sdc1)"
-UUID2="`$(blkid -s UUID -o value /dev/sdd1)"
-
-echo "UUID=`$UUID1 /data1 ext4 defaults 0 0" >>/etc/fstab
-echo "UUID=`$UUID2 /data2 ext4 defaults 0 0" >>/etc/fstab
-
-mkdir /data1
-mkdir /data2
-
-mount -a
+mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/sdc /dev/sdd
+mkdir -p /etc/madm
+mdadm --detail --scan > /etc/mdadm/mdadm.conf
 exit
 "@
 
@@ -240,6 +220,20 @@ reboot
     }
 
     Write-Host "SELinux disabled"
+
+    $commands = @"
+lsblk
+exit
+"@
+
+    $commands | Out-File -Encoding ascii $commandFileName
+    dos2unix $commandFileName
+    $stdout = cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <$commandFileName"
+    Remove-Item $commandFileName
+
+    $global:RaidBlockDevice = "/dev/" + [regex]::Match($stdout, '(md\d+)').Captures.Groups[0].Value
+
+    Write-Host "Encrypting RAID device: $RaidBlockDevice"
 }
 
 ## Encryption
@@ -248,7 +242,7 @@ Read-Host "Press Enter to continue..."
 
 $global:Settings = @{
     "AADClientID" = $AadClientId;
-    "DiskFormatQuery" = "[{`"scsi`":`"[6:0:0:0]`",`"filesystem`":`"ext4`",`"mount_point`":`"/mnt/data1`"}]";
+    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext3`",`"name`":`"dataraid`"}]";
     "EncryptionOperation" = "EnableEncryptionFormat";
     "KeyEncryptionAlgorithm" = "RSA-OAEP";
     "KeyEncryptionKeyURL" = $DiskEncryptionKey.Id;
