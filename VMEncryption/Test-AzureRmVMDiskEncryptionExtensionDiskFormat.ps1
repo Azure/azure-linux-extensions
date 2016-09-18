@@ -143,8 +143,8 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 
 Write-Host "Fetched VM successfully"
 
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 1 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 10 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 10 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
 
 Write-Host "Added DataDisks successfully: $DataDisk1Name, $DataDisk2Name"
 
