@@ -181,7 +181,7 @@ exit
 apt-get install -yq mdadm
 yum install -y mdadm
 mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/sdc /dev/sdd
-mkdir -p /etc/madm
+mkdir -p /etc/mdadm
 mdadm --detail --scan > /etc/mdadm/mdadm.conf
 exit
 "@
@@ -191,7 +191,7 @@ exit
     cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <$commandFileName"
     Remove-Item $commandFileName
 
-    Write-Host "Mounted data partitions"
+    Write-Host "Created RAID array"
 
     $commands = @"
 sed -i 's/SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
