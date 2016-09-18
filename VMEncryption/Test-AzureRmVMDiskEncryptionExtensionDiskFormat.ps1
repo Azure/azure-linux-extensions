@@ -43,11 +43,11 @@ Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $Res
 
 Write-Host "Set AzureRmKeyVaultAccessPolicy successfully"
 
-Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "diskencryptionkey" -Destination Software
+Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "keyencryptionkey" -Destination Software
 
 Write-Host "Added AzureRmKeyVaultKey successfully"
 
-$global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
+$global:KeyEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "keyencryptionkey"
 
 Write-Host "Fetched DiskEncryptionKey successfully"
 
@@ -258,7 +258,7 @@ $global:Settings = @{
     "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext3`",`"name`":`"dataraid`"}]";
     "EncryptionOperation" = "EnableEncryptionFormat";
     "KeyEncryptionAlgorithm" = "RSA-OAEP";
-    "KeyEncryptionKeyURL" = $DiskEncryptionKey.Id;
+    "KeyEncryptionKeyURL" = $KeyEncryptionKey.Id;
     "KeyVaultURL" = $KeyVault.VaultUri;
     "SequenceVersion" = "1";
     "VolumeType" = "Data";

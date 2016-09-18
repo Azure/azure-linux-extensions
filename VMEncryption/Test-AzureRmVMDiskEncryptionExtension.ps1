@@ -44,11 +44,11 @@ Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $Res
 
 Write-Host "Set AzureRmKeyVaultAccessPolicy successfully"
 
-Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "diskencryptionkey" -Destination Software
+Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "keyencryptionkey" -Destination Software
 
 Write-Host "Added AzureRmKeyVaultKey successfully"
 
-$global:DiskEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "diskencryptionkey"
+$global:KeyEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "keyencryptionkey"
 
 Write-Host "Fetched DiskEncryptionKey successfully"
 
@@ -256,7 +256,7 @@ $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
     -DiskEncryptionKeyVaultId $KeyVault.ResourceId `
     -DiskEncryptionKeyVaultUrl $KeyVault.VaultUri `
     -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
-    -KeyEncryptionKeyURL $DiskEncryptionKey.Id `
+    -KeyEncryptionKeyURL $KeyEncryptionKey.Id `
     -KeyEncryptionAlgorithm "RSA-OAEP" `
     -VolumeType $VolumeType `
     -SequenceVersion "1" 3>&1 | Out-String
