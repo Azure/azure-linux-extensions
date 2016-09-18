@@ -162,6 +162,11 @@ if ($SshPrivKeyPath)
     $commands = @"
 sudo mkdir /root/.ssh
 sudo cp .ssh/authorized_keys /root/.ssh/
+sudo chmod 700 /root/.ssh
+sudo chmod 600 /root/.ssh/authorized_keys 
+sudo restorecon -R -v /root/.ssh
+sudo echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
+sudo service sshd restart
 exit
 "@
 
