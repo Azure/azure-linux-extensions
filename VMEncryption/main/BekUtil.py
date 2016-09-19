@@ -21,19 +21,21 @@ from Common import *
 import base64
 import os.path
 import os
+import traceback
+
 """
 add retry-logic to the network api call.
 """
 class BekUtil(object):
     """description of class"""
-    def __init__(self,disk_util,logger):
+    def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
         self.passphrase_device = None
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
 
-    def generate_passphrase(self,algorithm):
-        if(TestHooks.use_hard_code_passphrase):
+    def generate_passphrase(self, algorithm):
+        if TestHooks.use_hard_code_passphrase:
             return TestHooks.hard_code_passphrase
         else:
             with open("/dev/urandom", "rb") as _random_source:
@@ -43,41 +45,31 @@ class BekUtil(object):
 
     def get_bek_passphrase_file(self, encryption_config):
         bek_filename = encryption_config.get_bek_filename()
-        bek_filesystem = encryption_config.get_bek_filesystem()
-        pass_phrase = None
+
         if TestHooks.search_not_only_ide:
             self.logger.log("TESTHOOK: search not only ide set")
             azure_devices = self.disk_util.get_device_items(None)
         else:
             azure_devices = self.disk_util.get_azure_devices()
 
-        for i in range(0,len(azure_devices)):
-            azure_device = azure_devices[i]
-            if(str(azure_device.file_system).lower() == str(bek_filesystem).lower()):
-                #TODO handle the failure case
-                self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name), self.bek_filesystem_mount_point, bek_filesystem)
-                #search for the passphrase file.
-                if(os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename))):
-                    return os.path.join(self.bek_filesystem_mount_point, bek_filename)
+        for azure_device in azure_devices:
+            fstype = str(azure_device.file_system).lower()
+            if fstype in ['vfat', 'ntfs']:
+                try:
+                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
+                                                    self.bek_filesystem_mount_point,
+                                                    fstype)
+
+                    if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
+                        return os.path.join(self.bek_filesystem_mount_point, bek_filename)
+                except Exception as e:
+                    message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
+                    self.logger.log(message)
+
         return None
 
-    def umount_azure_passhprase(self, encryption_config):
-        bek_filename = encryption_config.get_bek_filename()
-        bek_filesystem = encryption_config.get_bek_filesystem()
-        pass_phrase = None
-        if TestHooks.search_not_only_ide:
-            self.logger.log("TESTHOOK: search not only ide set")
-            azure_devices = self.disk_util.get_device_items(None)
-        else:
-            azure_devices = self.disk_util.get_azure_devices()
-
-        for i in range(0,len(azure_devices)):
-            azure_device = azure_devices[i]
-            if(str(azure_device.file_system).lower() == str(bek_filesystem).lower()):
-                #TODO handle the failure case
-                self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name), self.bek_filesystem_mount_point, bek_filesystem)
-                #search for the passphrase file.
-                if(os.path.exists(os.path.join(self.bek_filesystem_mount_point,bek_filename))):
-                    self.disk_util.umount(self.bek_filesystem_mount_point)
+    def umount_azure_passhprase(self, encryption_config, force=False):
+        passphrase_file = self.get_bek_passphrase_file(encryption_config)
+        if force or (passphrase_file and os.path.exists(passphrase_file)):
+            self.disk_util.umount(self.bek_filesystem_mount_point)

@@ -45,6 +45,17 @@ packages_array.append(main_folder)
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+oscrypto_folder = main_folder + '/oscrypto'
+packages_array.append(oscrypto_folder)
+
+packages_array.append(oscrypto_folder + '/rhel_72')
+packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')
+packages_array.append(oscrypto_folder + '/ubuntu_1604')
+packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')
+
+transitions_folder = 'transitions/transitions'
+packages_array.append(transitions_folder)
+
 """
 copy the dependency to the local
 """

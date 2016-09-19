@@ -51,15 +51,22 @@ Example Status Report:
 
 """
 
-
+import fnmatch
+import glob
 import os
 import os.path
+import re
+import shutil
+import string
+import subprocess
 import sys
 import imp
 import base64
 import json
 import tempfile
 import time
+
+from Common import *
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
@@ -80,6 +87,9 @@ class HandlerUtility:
         self._error = error
         self._short_name = short_name
         self.patching = None
+        self.disk_util = None
+        self.find_last_nonquery_operation = False
+        self.config_archive_folder = '/var/lib/azure_disk_encryption_archive'
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -112,18 +122,42 @@ class HandlerUtility:
                 return int(seq)
         return -1
 
-    def exit_if_same_seq(self):
+    def get_latest_seq(self):
+        settings_files = glob.glob(os.path.join(self._context._config_dir, '*.settings'))
+        settings_files = [os.path.basename(f) for f in settings_files]
+        seq_nums = [int(re.findall(r'(\d+)\.settings', f)[0]) for f in settings_files]
+
+        return max(seq_nums)
+
+    def get_current_seq(self):
+        return int(self._context._seq_no)
+
+    def same_seq_as_last_run(self):
+        return self.get_current_seq() == self.get_last_seq()
+
+    def exit_if_same_seq(self, exit_status=None):
         current_seq = int(self._context._seq_no)
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
-            self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
+            self.log("the sequence numbers are same, so skipping daemon"+
+                     ", current=" +
+                     str(current_seq) +
+                     ", last=" +
+                     str(last_seq))
+
+            if exit_status:
+                self.do_status_report(exit_status['operation'],
+                                      exit_status['status'],
+                                      exit_status['status_code'],
+                                      exit_status['message'])
+
             sys.exit(0)
 
     def log(self, message):
-        self._log(self._get_log_prefix() + message)
+        self._log(self._get_log_prefix() + ': ' + message)
 
     def error(self, message):
-        self._error(self._get_log_prefix() + message)
+        self._error(self._get_log_prefix() + ': ' + message)
 
     def _parse_config(self, ctxt):
         config = None
@@ -165,8 +199,14 @@ class HandlerUtility:
         self.operation = operation
         _context = self.try_parse_context()
         if not _context:
-            self.log("maybe no new settings file found")
-            sys.exit(0)
+            self.log("no settings file found")
+
+            self.do_exit(1,
+                         'QueryEncryptionStatus',
+                         CommonVariables.extension_error_status,
+                         str(CommonVariables.operation_lookback_failed),
+                         'No operation found, find_last_nonquery_operation={0}'.format(self.find_last_nonquery_operation))
+
         return _context
 
     def try_parse_context(self):
@@ -195,6 +235,8 @@ class HandlerUtility:
         if type(handler_env) == list:
             handler_env = handler_env[0]
 
+        self.log("Parsing context, find_last_nonquery_operation={0}".format(self.find_last_nonquery_operation))
+
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
@@ -208,22 +250,52 @@ class HandlerUtility:
             self.error("Unable to locate a .settings file!")
             return None
         self._context._seq_no = str(self._context._seq_no)
-        self.log('sequence number is ' + self._context._seq_no)
-        self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
-        self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-        self.log("setting file path is" + self._context._settings_file)
-        ctxt = None
-        ctxt = waagent.GetFileContents(self._context._settings_file)
-        if ctxt == None :
-            error_msg = 'Unable to read ' + self._context._settings_file + '. '
-            self.error(error_msg)
-            return None
-        else:
-            if(self.operation is not None and self.operation.lower() == "enable"):
-                # we should keep the current status file
-                self.backup_settings_status_file(self._context._seq_no)
 
-        self._context._config = self._parse_config(ctxt)
+        encryption_operation = None
+        
+        while not encryption_operation:
+            self.log('Parsing context for sequence number: ' + self._context._seq_no)
+            
+            self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
+
+            self.log("setting file path is" + self._context._settings_file)
+            ctxt = None
+            ctxt = waagent.GetFileContents(self._context._settings_file)
+            if ctxt == None :
+                error_msg = 'Unable to read ' + self._context._settings_file + '. '
+                self.error(error_msg)
+
+                if int(self._context._seq_no) > 0:
+                    self._context._seq_no = str(int(self._context._seq_no) - 1)
+                    continue
+
+                return None
+            else:
+                if(self.operation is not None and self.operation.lower() == "enable"):
+                    # we should keep the current status file
+                    # self.backup_settings_status_file(self._context._seq_no)
+                    pass
+
+            self._context._config = self._parse_config(ctxt)
+
+            public_settings_str = self._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+            if(isinstance(public_settings_str, basestring)):
+                public_settings = json.loads(public_settings_str)
+            else:
+                public_settings = public_settings_str
+            encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+            self.log("Encryption operation: {0}".format(encryption_operation))
+
+            if self.find_last_nonquery_operation and encryption_operation == CommonVariables.QueryEncryptionStatus:
+                self.log("find_last_nonquery_operation was True and encryption_operation was query")
+                if int(self._context._seq_no) <= 0:
+                    self.log("reached zero, returning")
+                    return None
+
+                self.log("decrementing sequence number")
+                encryption_operation = None
+                self._context._seq_no = str(int(self._context._seq_no) - 1)
+
         return self._context
 
     def _change_log_file(self):
@@ -239,8 +311,28 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
+    def redo_last_status(self):
+        latest_seq = str(self.get_latest_seq())
+        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+
+        previous_seq = str(self.get_latest_seq() - 1)
+        previous_status_file = os.path.join(self._context._status_dir, previous_seq + '.status')
+
+        shutil.copy2(previous_status_file, self._context._status_file)
+        self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
+
     def do_status_report(self, operation, status, status_code, message):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        latest_seq = str(self.get_latest_seq())
+        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+
+        message = filter(lambda c: c in string.printable, message)
+        message = message.encode('ascii', 'ignore')
+
+        self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
+        self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
+        self.log("[StatusReport ({0})] code: {1}".format(latest_seq, status_code))
+        self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, message))
+
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
             "version" : self._context._version,
@@ -256,6 +348,25 @@ class HandlerUtility:
                 }
             }
         }]
+
+        if self.disk_util:
+            encryption_status = self.disk_util.get_encryption_status()
+
+            self.log("[StatusReport ({0})] substatus: {1}".format(latest_seq, encryption_status))
+
+            substat = [{
+                "name" : self._context._name,
+                "operation" : operation,
+                "status" : status,
+                "code" : status_code,
+                "formattedMessage" : {
+                    "lang" : "en-US",
+                    "message" : encryption_status
+                }
+            }]
+
+            stat[0]["status"]["substatus"] = substat
+
         stat_rept = json.dumps(stat)
         # rename all other status files, or the WALA would report the wrong
         # status file.
@@ -276,9 +387,9 @@ class HandlerUtility:
                 except Exception as e:
                     self.log("failed to rename the settings file.")
 
-    def do_exit(self, exit_code, operation,status,code,message):
+    def do_exit(self, exit_code, operation, status, code, message):
         try:
-            self.do_status_report(operation, status,code,message)
+            self.do_status_report(operation, status, code, message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
@@ -291,3 +402,39 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
+
+    def archive_old_configs(self):
+        if not os.path.exists(self.config_archive_folder):
+            os.makedirs(self.config_archive_folder)
+
+        for root, dirs, files in os.walk(os.path.join(self._context._config_dir, '..')):
+            for file in files:
+                if file.endswith('.settings') or file == 'mrseq':
+                    src = os.path.join(root, file)
+                    dest = os.path.join(self.config_archive_folder, file)
+
+                    self.log("Copying {0} to {1}".format(src, dest))
+
+                    shutil.copy2(src, dest)
+
+    def restore_old_configs(self):
+        if not os.path.exists(self.config_archive_folder):
+            return
+
+        for root, dirs, files in os.walk(self.config_archive_folder):
+            for file in files:
+                if file.endswith('.settings'):
+                    src = os.path.join(root, file)
+                    dest = os.path.join(self._context._config_dir, file)
+
+                    self.log("Copying {0} to {1}".format(src, dest))
+
+                    shutil.copy2(src, dest)
+
+                if file == 'mrseq':
+                    src = os.path.join(root, file)
+                    dest = os.path.join(os.path.join(self._context._config_dir, '..'), file)
+
+                    self.log("Copying {0} to {1}".format(src, dest))
+
+                    shutil.copy2(src, dest)
