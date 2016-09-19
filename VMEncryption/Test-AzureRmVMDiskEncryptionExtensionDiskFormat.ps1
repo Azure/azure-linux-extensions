@@ -49,7 +49,7 @@ Write-Host "Added AzureRmKeyVaultKey successfully"
 
 $global:KeyEncryptionKey = Get-AzureKeyVaultKey -VaultName $KeyVault.OriginalVault.Name -Name "keyencryptionkey"
 
-Write-Host "Fetched DiskEncryptionKey successfully"
+Write-Host "Fetched KeyEncryptionKey successfully"
 
 ## Storage
 $global:StorageName = ($ResourcePrefix + "Storage").ToLower()
