@@ -68,6 +68,8 @@ def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context('Enable')
     try:
+        _forcibly_reset_chap(hutil)
+
         reset_ssh = None
         remove_user = None
         protect_settings = hutil.get_protected_settings()
@@ -102,6 +104,21 @@ def enable():
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
+
+def _forcibly_reset_chap(hutil):
+    name = "ChallengeResponseAuthentication"
+    config = waagent.GetFileContents(SshdConfigPath).split("\n")
+    for i in range(0, len(config)):
+        if config[i].startswith(name) and "no" in config[i].lower():
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="sshd", isSuccess=True, message="ChallengeResponseAuthentication no")
+            return
+
+    waagent.AddExtensionEvent(name=hutil.get_name(), op="sshd", isSuccess=True, message="ChallengeResponseAuthentication yes")
+    _backup_sshd_config(SshdConfigPath)
+    _set_sshd_config(config, name, "no")
+    waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
+    waagent.MyDistro.restartSshService()
 
 
 def _is_sshd_config_modified(protected_settings):
@@ -155,6 +172,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
+
+    if user_pass is not None and len(user_pass) == 0:
+        user_pass = None
+        hutil.log("empty passwords are not allowed, ignoring password reset")
 
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
@@ -250,7 +271,6 @@ def _save_other_sudoers(sudoers):
 def _allow_password_auth():
     config = waagent.GetFileContents(SshdConfigPath).split("\n")
     _set_sshd_config(config, "PasswordAuthentication", "yes")
-    _set_sshd_config(config, "ChallengeResponseAuthentication", "yes")
     waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
 
 
