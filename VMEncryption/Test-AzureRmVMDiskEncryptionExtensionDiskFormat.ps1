@@ -15,6 +15,7 @@
     [string] $SshPubKey,
     [string] $SshPrivKeyPath,
     [string] $Location="eastus",
+    [string] $VolumeType="data",
     [string] $GalleryImage="RedHat:RHEL:7.2",
     [string] $VMSize="Standard_D2"
 )
@@ -261,7 +262,7 @@ $global:Settings = @{
     "KeyEncryptionKeyURL" = $KeyEncryptionKey.Id;
     "KeyVaultURL" = $KeyVault.VaultUri;
     "SequenceVersion" = "1";
-    "VolumeType" = "Data";
+    "VolumeType" = $VolumeType;
 }
 
 $global:ProtectedSettings = @{
