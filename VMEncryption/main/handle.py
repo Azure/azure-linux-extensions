@@ -483,6 +483,7 @@ def enable_encryption():
                                                                            DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
                     if(kek_secret_id_created is None):
+                        encryption_config.clear_config()
                         hutil.do_exit(exit_code=0,
                                       operation='EnableEncryption',
                                       status=CommonVariables.extension_error_status,
