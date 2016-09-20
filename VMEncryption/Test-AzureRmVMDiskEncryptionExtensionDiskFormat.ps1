@@ -255,7 +255,7 @@ Read-Host "Press Enter to continue..."
 
 $global:Settings = @{
     "AADClientID" = $AadClientId;
-    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext3`",`"name`":`"dataraid`"}]";
+    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext4`",`"name`":`"encryptedraid`"}]";
     "EncryptionOperation" = "EnableEncryptionFormat";
     "KeyEncryptionAlgorithm" = "RSA-OAEP";
     "KeyEncryptionKeyURL" = $KeyEncryptionKey.Id;
