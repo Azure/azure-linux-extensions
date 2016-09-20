@@ -367,6 +367,9 @@ class HandlerUtility:
 
             stat[0]["status"]["substatus"] = substat
 
+            if encryption_status["os"] == "VMRestartPending":
+                stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
+
         stat_rept = json.dumps(stat)
         # rename all other status files, or the WALA would report the wrong
         # status file.
