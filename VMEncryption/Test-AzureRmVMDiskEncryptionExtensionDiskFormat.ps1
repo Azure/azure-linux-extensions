@@ -285,7 +285,7 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 $global:InstanceView = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Status
 
 $KVSecretRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultSecretReference -ArgumentList @($InstanceView.Extensions[0].Statuses[0].Message, $KeyVault.ResourceId)
-$KVKeyRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference -ArgumentList @($DiskEncryptionKey.Id, $KeyVault.ResourceId)
+$KVKeyRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference -ArgumentList @($KeyEncryptionKey.Id, $KeyVault.ResourceId)
 $VirtualMachine.StorageProfile.OsDisk.EncryptionSettings = New-Object Microsoft.Azure.Management.Compute.Models.DiskEncryptionSettings -ArgumentList @($KVSecretRef, $KVKeyRef, $true)
 
 Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
