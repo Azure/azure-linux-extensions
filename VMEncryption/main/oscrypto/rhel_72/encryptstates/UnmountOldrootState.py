@@ -53,6 +53,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
         self.command_executor.ExecuteInBash('systemctl restart sshd.service')
+        self.command_executor.ExecuteInBash('dhclient')
         
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="systemctl list-units",
