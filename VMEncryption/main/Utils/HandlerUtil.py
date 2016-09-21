@@ -367,7 +367,7 @@ class HandlerUtility:
 
             stat[0]["status"]["substatus"] = substat
 
-            if encryption_status["os"] == "VMRestartPending":
+            if "VMRestartPending" in encryption_status:
                 stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
 
         stat_rept = json.dumps(stat)
