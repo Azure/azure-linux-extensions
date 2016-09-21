@@ -6,11 +6,11 @@ class TopLevelStatus:
             self.timestampUTC = timestampUTC
             self.status = status
 
-        def reprJSON(self):
+        def convertToDictionary(self):
                     return dict(version = self.version, timestampUTC = self.timestampUTC, status = self.status)
 
 class StatusObj:
-        def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, taskId = None, commandStartTimeUTCTicks = None):
+        def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, taskId, commandStartTimeUTCTicks):
             self.name = name
             self.operation = operation
             self.status = status
@@ -21,7 +21,7 @@ class StatusObj:
             self.taskId = taskId
             self.commandStartTimeUTCTicks = commandStartTimeUTCTicks
         
-        def reprJSON(self):
+        def convertToDictionary(self):
                     return dict(name= self.name, operation = self.operation, status = self.status, substatus = self.substatus, code = self.code, taskId = self.taskId, formattedMessage = self.formattedMessage,commandStartTimeUTCTicks = self.commandStartTimeUTCTicks, telemetryData = self.telemetryData)
 
 class SubstatusObj:
@@ -31,7 +31,7 @@ class SubstatusObj:
         self.status = status
         self.formattedMessage = formattedMessage
         
-        def reprJSON(self):
+        def convertToDictionary(self):
                     return dict(code = self.code, name = self.name, status = self.status, formattedMessage = self.formattedMessage)
 
 class FormattedMessage:
@@ -41,7 +41,7 @@ class FormattedMessage:
 
 class ComplexEncoder(json.JSONEncoder):
         def default(self, obj):
-            if hasattr(obj,'reprJSON'):
-                return obj.reprJSON()
+            if hasattr(obj,'convertToDictionary'):
+                return obj.convertToDictionary()
             else:
                 return obj.__dict__

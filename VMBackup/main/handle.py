@@ -91,39 +91,17 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def do_json(operation, status, sub_status, status_code, message, taskId, commandStartTimeUTCTicks, telemetry_data):
-    global hutil
-    date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-    formattedMessage = Status.FormattedMessage("en-US",message)
-    stat_obj = Status.StatusObj(hutil._context._name, operation, status, sub_status, status_code, formattedMessage, telemetry_data,  taskId, commandStartTimeUTCTicks)
-    top_stat_obj = Status.TopLevelStatus(hutil._context._version, date_place_holder, stat_obj)
-    return "[" + json.dumps(top_stat_obj, cls = Status.ComplexEncoder) + "]"
-
-def do_backup_status_report(operation, status, status_code, message, taskId, commandStartTimeUTCTicks, blobUri):
-    global backup_logger,hutil
-    backup_logger.log(msg="{0},{1},{2},{3}".format(operation, status, status_code, message),local=True)
-    time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-    time_span = timedelta_total_seconds(time_delta) * 1000
-    date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-    date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-    sub_stat = []
-    hutil.add_telemetry_data()
-    status_report_msg = do_json(operation, status, sub_stat, status_code, message, taskId, commandStartTimeUTCTicks, HandlerUtil.HandlerUtility.telemetry_data)
-    status_report_msg = status_report_msg.replace(date_place_holder,date_string)
-    blobWriter = BlobWriter(hutil)
-    blobWriter.WriteBlob(status_report_msg,blobUri)
-    return status_report_msg
-
 def status_report(status,status_code,message):
     global backup_logger,hutil,para_parser
     trans_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        trans_report_msg = do_backup_status_report(operation='Enable',status=status,\
+        trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                 status_code=str(status_code),\
                 message=message,\
                 taskId=para_parser.taskId,\
-                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                blobUri=para_parser.statusBlobUri)
+                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks)
+        blobWriter = BlobWriter(hutil)
+        blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
         if(trans_report_msg is not None):
             backup_logger.log("trans status report message:")
             backup_logger.log(trans_report_msg)
@@ -269,7 +247,6 @@ def daemon():
                 temp_result=CommonVariables.ExtensionTempTerminalState
                 temp_msg='Transitioning state in extension'
                 status_report(temp_status,temp_result,temp_msg)
-                hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
                 backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -400,7 +377,6 @@ def enable():
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
         status_report(temp_status,temp_result,temp_msg)
-        hutil.do_status_report('Enable', temp_status, str(temp_result), temp_msg)
         start_daemon();
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())

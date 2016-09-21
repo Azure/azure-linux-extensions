@@ -244,10 +244,10 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, taskId, commandStartTimeUTCTicks)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
         return top_stat_obj
 
@@ -343,13 +343,13 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("OSVersion",os_version)
         HandlerUtility.add_to_telemetery_data("KernelVersion",kernel_version)
 
-    def do_status_report(self, operation, status, status_code, message):
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data)
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
             time_span = self.timedelta_total_seconds(time_delta) * 1000
             date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -360,7 +360,7 @@ class HandlerUtility:
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
         stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
         # rename all other status files, or the WALA would report the wrong
         # status file.
@@ -369,6 +369,8 @@ class HandlerUtility:
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
+
+        return stat_rept
 
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)

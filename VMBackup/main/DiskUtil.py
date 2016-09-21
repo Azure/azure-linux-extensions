@@ -100,18 +100,21 @@ class DiskUtil(object):
                 else:
                     p = Popen([self.patching.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except Exception as e:
-                if self.patching.usr_flag == 1:
-                    self.logger.log("lsblk path is wrong.removing /usr prefix", False, 'Warning')
-            	    if(dev_path is None):
-                        p = Popen(["/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if(self.patching.distro_info[0].lower() == 'centos' or self.patching.distro_info[0].lower() == 'redhat'):
+                    if self.patching.usr_flag == 1:
+                        self.logger.log("lsblk path is wrong.removing /usr prefix", False, 'Warning')
+                        if(dev_path is None):
+                            p = Popen(["/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        else:
+                            p = Popen(["/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     else:
-                        p = Popen(["/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        self.logger.log("lsblk path is wrong.Adding /usr prefix", False, 'Warning')
+                        if(dev_path is None):
+                            p = Popen(["usr/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        else:
+                            p = Popen(["usr/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 else:
-                    self.logger.log("lsblk path is wrong.Adding /usr prefix", False, 'Warning')
-            	    if(dev_path is None):
-                        p = Popen(["usr/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    else:
-                        p = Popen(["usr/bin/lsblk", '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    raise Exception("lsblk path is wrong")
 
             out_lsblk_output, err = p.communicate()
             out_lsblk_output = str(out_lsblk_output)
