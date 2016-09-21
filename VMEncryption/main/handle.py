@@ -527,15 +527,15 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
     logger.log('enable_encryption_format')
     encryption_parameters = encryption_marker.get_encryption_disk_format_query()
     logger.log('disk format query is {0}'.format(encryption_parameters))
-    json_parsed = json.loads(encryption_parameters)
 
     if type(json_parsed) is dict:
+        json_parsed = json.loads(encryption_parameters)
         encryption_format_items = [json_parsed,]
     elif type(json_parsed) is list:
         encryption_format_items = json_parsed
     else:
+        encryption_marker.clear_config()
         raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
-
 
     for encryption_item in encryption_format_items:
         dev_path_in_query = None
