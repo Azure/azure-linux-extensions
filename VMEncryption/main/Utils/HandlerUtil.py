@@ -201,10 +201,10 @@ class HandlerUtility:
         if not _context:
             self.log("no settings file found")
 
-            self.do_exit(1,
+            self.do_exit(0,
                          'QueryEncryptionStatus',
-                         CommonVariables.extension_error_status,
-                         str(CommonVariables.operation_lookback_failed),
+                         CommonVariables.extension_success_status,
+                         str(CommonVariables.success),
                          'No operation found, find_last_nonquery_operation={0}'.format(self.find_last_nonquery_operation))
 
         return _context
