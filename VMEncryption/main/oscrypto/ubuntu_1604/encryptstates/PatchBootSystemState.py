@@ -123,7 +123,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
         self.command_executor.Execute('update-grub', True)
-        self.command_executor.Execute('grub-install /dev/sda', True)
+        self.command_executor.Execute('grub-install --recheck --force /dev/sda', True)
 
     def _get_uuid(self, partition_name):
         proc_comm = ProcessCommunicator()

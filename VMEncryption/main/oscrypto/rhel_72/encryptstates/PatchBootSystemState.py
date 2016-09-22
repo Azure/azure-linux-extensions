@@ -113,5 +113,5 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf')
 
         self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
-        self.command_executor.Execute('grub2-install /dev/sda', True)
+        self.command_executor.Execute('grub2-install --recheck --force /dev/sda', True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
