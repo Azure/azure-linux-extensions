@@ -64,6 +64,7 @@ VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
 VMBackup/VMBackupForLinuxExtension-*.xml
+VMBackup\HandlerManifest.json
 
 # CustomScript ignors
 CustomScript/test/download/0/stdout
