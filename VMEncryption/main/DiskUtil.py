@@ -436,6 +436,7 @@ class DiskUtil(object):
         """
         mount the file system.
         """
+        self.make_sure_path_exists(mount_point)
         returnCode = -1
         if file_system is None:
             mount_cmd = self.patching.mount_path + ' ' + dev_path + ' ' + mount_point

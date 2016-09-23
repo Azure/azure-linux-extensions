@@ -15,6 +15,7 @@
     [string] $SshPubKey,
     [string] $SshPrivKeyPath,
     [string] $Location="eastus",
+    [string] $VolumeType="data",
     [string] $GalleryImage="RedHat:RHEL:7.2",
     [string] $VMSize="Standard_D2"
 )
@@ -255,13 +256,13 @@ Read-Host "Press Enter to continue..."
 
 $global:Settings = @{
     "AADClientID" = $AadClientId;
-    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext3`",`"name`":`"dataraid`"}]";
+    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext4`",`"name`":`"encryptedraid`"}]";
     "EncryptionOperation" = "EnableEncryptionFormat";
     "KeyEncryptionAlgorithm" = "RSA-OAEP";
     "KeyEncryptionKeyURL" = $KeyEncryptionKey.Id;
     "KeyVaultURL" = $KeyVault.VaultUri;
     "SequenceVersion" = "1";
-    "VolumeType" = "Data";
+    "VolumeType" = $VolumeType;
 }
 
 $global:ProtectedSettings = @{
@@ -285,7 +286,7 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 $global:InstanceView = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Status
 
 $KVSecretRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultSecretReference -ArgumentList @($InstanceView.Extensions[0].Statuses[0].Message, $KeyVault.ResourceId)
-$KVKeyRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference -ArgumentList @($DiskEncryptionKey.Id, $KeyVault.ResourceId)
+$KVKeyRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference -ArgumentList @($KeyEncryptionKey.Id, $KeyVault.ResourceId)
 $VirtualMachine.StorageProfile.OsDisk.EncryptionSettings = New-Object Microsoft.Azure.Management.Compute.Models.DiskEncryptionSettings -ArgumentList @($KVSecretRef, $KVKeyRef, $true)
 
 Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine

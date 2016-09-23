@@ -483,6 +483,7 @@ def enable_encryption():
                                                                            DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
                     if(kek_secret_id_created is None):
+                        encryption_config.clear_config()
                         hutil.do_exit(exit_code=0,
                                       operation='EnableEncryption',
                                       status=CommonVariables.extension_error_status,
@@ -526,12 +527,30 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
     logger.log('enable_encryption_format')
     encryption_parameters = encryption_marker.get_encryption_disk_format_query()
     logger.log('disk format query is {0}'.format(encryption_parameters))
-    encryption_format_items = json.loads(encryption_parameters)
+
+    try:
+        json_parsed = json.loads(encryption_parameters)
+
+        if type(json_parsed) is dict:
+            encryption_format_items = [json_parsed,]
+        elif type(json_parsed) is list:
+            encryption_format_items = json_parsed
+        else:
+            raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+    except Exception:
+        encryption_marker.clear_config()
+        raise
+
     for encryption_item in encryption_format_items:
+        dev_path_in_query = None
+        
         if encryption_item.has_key("scsi") and encryption_item["scsi"] != '':
             dev_path_in_query = disk_util.query_dev_sdx_path_by_scsi_id(encryption_item["scsi"])
         if encryption_item.has_key("dev_path") and encryption_item["dev_path"] != '':
             dev_path_in_query = encryption_item["dev_path"]
+
+        if not dev_path_in_query:
+            raise Exception("Could not parse diskFormatQuery: {0}".format(encryption_parameters))
 
         devices = disk_util.get_device_items(dev_path_in_query)
         if(len(devices) != 1):
