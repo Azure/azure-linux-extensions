@@ -1,3 +1,8 @@
+2016-09-26: LAD-2.3.9011
+    - Update OpenSSL library to the latest
+    - Update rsyslog8 config and related code for the latest changes and
+      improvements
+
 2016-09-16: LAD-2.3.9009
     - Underlying monitoring agent binary (mdsd) upgrade with many fixes and
       improvements
