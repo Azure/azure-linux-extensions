@@ -359,6 +359,7 @@ def enable_encryption():
         else:
             logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
                        level=CommonVariables.WarningLevel)
+            hutil.redo_last_status()
             exit_without_status_report()
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
