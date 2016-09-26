@@ -321,12 +321,13 @@ def enable():
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
         else:
-            logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
+            msg = "Encryption operation {0} is not supported".format(encryption_operation)
+            logger.log(msg)
             hutil.do_exit(exit_code=0,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.unknown_error),
-                          message='Enable failed.')
+                          message=msg)
 
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
