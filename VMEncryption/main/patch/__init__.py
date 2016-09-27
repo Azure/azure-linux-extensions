@@ -41,9 +41,9 @@ def DistInfo():
     else:
         return platform.dist()
 
-def GetMyPatching(logger):
+def GetDistroPatcher(logger):
     """
-    Return MyPatching object.
+    Return DistroPatcher object.
     NOTE: Logging is not initialized at this point.
     """
     dist_info = DistInfo()

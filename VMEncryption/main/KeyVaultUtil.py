@@ -98,7 +98,7 @@ class KeyVaultUtil(object):
         result_content = result.read()
         if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
             self.logger.log(str(result_content))
-            return CommonVariables.create_encryption_secret_failed
+            return None
         http_util.connection.close()
 
         result_json = json.loads(result_content)

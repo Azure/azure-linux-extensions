@@ -1,3 +1,7 @@
+## 1.4.6.0 (2016-09-16)
+- Forcibly reset ChallengeAuthenticationResponse to no.  This value was inadvertently set
+  in previous releases, and is forcibly reset.
+
 ## 1.4.5.0 (2016-09-07)
 - Check for None before checking the lenght of a user's password.  This is 
   fallout from allowing and rejecting empty passwords.

@@ -144,8 +144,8 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 
 Write-Host "Fetched VM successfully"
 
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 1 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 10 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
+Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 10 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
 
 Write-Host "Added DataDisks successfully: $DataDisk1Name, $DataDisk2Name"
 
@@ -179,29 +179,8 @@ exit
     Write-Host "Copied SSH public key for root"
 
     $commands = @"
-parted /dev/sdc
-mklabel msdos
-mkpart pri ext2 0% 100%
-quit
-
-parted /dev/sdd
-mklabel msdos
-mkpart pri ext2 0% 100%
-quit
-
-mkfs.ext4 /dev/sdc1
-mkfs.ext4 /dev/sdd1
-
-UUID1="`$(blkid -s UUID -o value /dev/sdc1)"
-UUID2="`$(blkid -s UUID -o value /dev/sdd1)"
-
-echo "UUID=`$UUID1 /data1 ext4 defaults 0 0" >>/etc/fstab
-echo "UUID=`$UUID2 /data2 ext4 defaults 0 0" >>/etc/fstab
-
-mkdir /data1
-mkdir /data2
-
-mount -a
+apt-get install -yq mdadm
+yum install -y mdadm
 exit
 "@
 
@@ -210,7 +189,21 @@ exit
     cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <$commandFileName"
     Remove-Item $commandFileName
 
-    Write-Host "Mounted data partitions"
+    Write-Host "Installed mdadm"
+
+    $commands = @"
+mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/sdc /dev/sdd
+mkdir -p /etc/mdadm
+mdadm --detail --scan > /etc/mdadm/mdadm.conf
+exit
+"@
+
+    $commands | Out-File -Encoding ascii $commandFileName
+    dos2unix $commandFileName
+    cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <$commandFileName"
+    Remove-Item $commandFileName
+
+    Write-Host "Created RAID array"
 
     $commands = @"
 sed -i 's/SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
@@ -241,26 +234,61 @@ reboot
     }
 
     Write-Host "SELinux disabled"
+
+    $commands = @"
+lsblk
+exit
+"@
+
+    $commands | Out-File -Encoding ascii $commandFileName
+    dos2unix $commandFileName
+    $stdout = cmd /c "ssh -o UserKnownHostsFile=C:\Windows\System32\NUL -o StrictHostKeyChecking=no -i $SshPrivKeyPath root@${Hostname} <$commandFileName"
+    Remove-Item $commandFileName
+
+    $global:RaidBlockDevice = "/dev/" + [regex]::Match($stdout, '(md\d+)').Captures.Groups[0].Value
+
+    Write-Host "Encrypting RAID device: $RaidBlockDevice"
 }
 
 ## Encryption
 
 Read-Host "Press Enter to continue..."
 
-$global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
-    -ExtensionName $ExtensionName `
+$global:Settings = @{
+    "AADClientID" = $AadClientId;
+    "DiskFormatQuery" = "[{`"dev_path`":`"$RaidBlockDevice`",`"file_system`":`"ext4`",`"name`":`"encryptedraid`"}]";
+    "EncryptionOperation" = "EnableEncryptionFormat";
+    "KeyEncryptionAlgorithm" = "RSA-OAEP";
+    "KeyEncryptionKeyURL" = $KeyEncryptionKey.Id;
+    "KeyVaultURL" = $KeyVault.VaultUri;
+    "SequenceVersion" = "1";
+    "VolumeType" = $VolumeType;
+}
+
+$global:ProtectedSettings = @{
+    "AADClientSecret" = $AadClientSecret;
+}
+
+Set-AzureRmVMExtension `
     -ResourceGroupName $ResourceGroupName `
+    -Location $Location `
     -VMName $VMName `
-    -AadClientID $AadClientId `
-    -AadClientSecret $AadClientSecret `
-    -DiskEncryptionKeyVaultId $KeyVault.ResourceId `
-    -DiskEncryptionKeyVaultUrl $KeyVault.VaultUri `
-    -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
-    -KeyEncryptionKeyURL $KeyEncryptionKey.Id `
-    -KeyEncryptionAlgorithm "RSA-OAEP" `
-    -VolumeType $VolumeType `
-    -SequenceVersion "1" 3>&1 | Out-String
+    -Name $ExtensionName `
+    -Publisher "Microsoft.Azure.Security" `
+    -Type "AzureDiskEncryptionForLinux" `
+    -TypeHandlerVersion "0.1" `
+    -Settings $Settings `
+    -ProtectedSettings $ProtectedSettings
 
-Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
+Write-Host "Set AzureRmVMExtension successfully"
 
-$global:BackupTag = [regex]::match($EncryptionEnableOutput, '(AzureEnc.*?),').Groups[1].Value
+$VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName
+$global:InstanceView = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Status
+
+$KVSecretRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultSecretReference -ArgumentList @($InstanceView.Extensions[0].Statuses[0].Message, $KeyVault.ResourceId)
+$KVKeyRef = New-Object Microsoft.Azure.Management.Compute.Models.KeyVaultKeyReference -ArgumentList @($KeyEncryptionKey.Id, $KeyVault.ResourceId)
+$VirtualMachine.StorageProfile.OsDisk.EncryptionSettings = New-Object Microsoft.Azure.Management.Compute.Models.DiskEncryptionSettings -ArgumentList @($KVSecretRef, $KVKeyRef, $true)
+
+Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
+
+Write-Host "Updated VM successfully"

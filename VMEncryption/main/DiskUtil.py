@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import subprocess
+import json
 import os
 import os.path
 import re
@@ -24,8 +25,13 @@ import shlex
 import sys
 from subprocess import *
 import shutil
+import traceback
 import uuid
 import glob
+
+from EncryptionConfig import EncryptionConfig
+from DecryptionMarkConfig import DecryptionMarkConfig
+from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
 from Common import *
 
@@ -38,8 +44,14 @@ class DiskUtil(object):
         self.ide_class_id = "{32412632-86cb-44a2-9b5c-50d1417354f5}"
         self.vmbus_sys_path = '/sys/bus/vmbus/devices'
 
-    def copy(self, ongoing_item_config):
-        copy_task = TransactionalCopyTask(logger = self.logger, disk_util = self, ongoing_item_config = ongoing_item_config, patching=self.patching, encryption_environment = self.encryption_environment)
+    def copy(self, ongoing_item_config, status_prefix=''):
+        copy_task = TransactionalCopyTask(logger=self.logger,
+                                          disk_util=self,
+                                          hutil=self.hutil,
+                                          ongoing_item_config=ongoing_item_config,
+                                          patching=self.patching,
+                                          encryption_environment=self.encryption_environment,
+                                          status_prefix=status_prefix)
         try:
             mem_fs_result = copy_task.prepare_mem_fs()
             if(mem_fs_result != CommonVariables.process_success):
@@ -47,6 +59,9 @@ class DiskUtil(object):
             else:
                 returnCode = copy_task.begin_copy()
                 return returnCode
+        except Exception as e:
+            message = "Failed to perform dd copy: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            self.logger.log(msg=message, level=CommonVariables.ErrorLevel)
         finally:
             copy_task.clear_mem_fs()
 
@@ -67,9 +82,17 @@ class DiskUtil(object):
         returnCode = proc.wait()
         return returnCode
 
-    def make_sure_path_exists(self,path):
+    def make_sure_path_exists(self, path):
         mkdir_cmd = self.patching.mkdir_path + ' -p ' + path
-        self.logger.log("make sure path exists, execute:{0}".format(mkdir_cmd))
+        self.logger.log("make sure path exists, executing: {0}".format(mkdir_cmd))
+        mkdir_cmd_args = shlex.split(mkdir_cmd)
+        proc = Popen(mkdir_cmd_args)
+        returnCode = proc.wait()
+        return returnCode
+
+    def touch_file(self, path):
+        mkdir_cmd = self.patching.touch_path + ' ' + path
+        self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
         mkdir_cmd_args = shlex.split(mkdir_cmd)
         proc = Popen(mkdir_cmd_args)
         returnCode = proc.wait()
@@ -108,6 +131,9 @@ class DiskUtil(object):
         <target name> <source device> <key file> <options>
         """
         try:
+            if not crypt_item.luks_header_path:
+                crypt_item.luks_header_path = "None"
+
             mount_content_item = (crypt_item.mapper_name + " " +
                                   crypt_item.dev_path + " " +
                                   crypt_item.luks_header_path + " " +
@@ -406,10 +432,11 @@ class DiskUtil(object):
 
         self.logger.log("fstab updated successfully")
 
-    def mount_filesystem(self,dev_path,mount_point,file_system=None):
+    def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
         """
+        self.make_sure_path_exists(mount_point)
         returnCode = -1
         if file_system is None:
             mount_cmd = self.patching.mount_path + ' ' + dev_path + ' ' + mount_point
@@ -450,6 +477,78 @@ class DiskUtil(object):
         proc = Popen(mount_all_cmd_args)
         returnCode = proc.wait()
         return returnCode
+
+    def get_mount_items(self):
+        items = []
+
+        for line in file('/proc/mounts'):
+            line = [s.decode('string_escape') for s in line.split()]
+            item = {
+                "src": line[0],
+                "dest": line[1],
+                "fs": line[2]
+            }
+            items.append(item)
+
+        return items
+
+    def get_encryption_status(self):
+        encryption_status = {
+            "data": "NotEncrypted",
+            "os": "NotEncrypted"
+        }
+
+        mount_items = self.get_mount_items()
+
+        os_drive_encrypted = False
+        data_drives_found = False
+        data_drives_encrypted = True
+        for mount_item in mount_items:
+            if mount_item["fs"] == "ext4" and \
+                not "/mnt" == mount_item["dest"] and \
+                not "/" == mount_item["dest"] and \
+                not "/oldroot/mnt/resource" == mount_item["dest"] and \
+                not "/oldroot/boot" == mount_item["dest"] and \
+                not "/mnt/resource" == mount_item["dest"] and \
+                not "/boot" == mount_item["dest"]:
+
+                data_drives_found = True
+
+                if not "/dev/mapper" in mount_item["src"]:
+                    self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
+                    data_drives_encrypted = False
+
+            if mount_item["dest"] == "/" and \
+                "/dev/mapper" in mount_item["src"]:
+                self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
+                os_drive_encrypted = True
+    
+        if not data_drives_found:
+            encryption_status["data"] = "NotMounted"
+        elif data_drives_encrypted:
+            encryption_status["data"] = "Encrypted"
+        if os_drive_encrypted:
+            encryption_status["os"] = "Encrypted"
+
+        encryption_marker = EncryptionMarkConfig(self.logger, self.encryption_environment)
+        decryption_marker = DecryptionMarkConfig(self.logger, self.encryption_environment)
+        if decryption_marker.config_file_exists():
+            encryption_status["data"] = "DecryptionInProgress"
+        elif encryption_marker.config_file_exists():
+            encryption_config = EncryptionConfig(self.encryption_environment, self.logger)
+            volume_type = encryption_config.get_volume_type().lower()
+
+            if volume_type == CommonVariables.VolumeTypeData.lower() or \
+                volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["data"] = "EncryptionInProgress"
+
+            if volume_type == CommonVariables.VolumeTypeOS.lower() or \
+                volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["os"] = "EncryptionInProgress"
+        elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
+            encryption_status["os"] = "VMRestartPending"
+
+        return json.dumps(encryption_status)
 
     def query_dev_sdx_path_by_scsi_id(self,scsi_number): 
         p = Popen([self.patching.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -697,7 +796,8 @@ class DiskUtil(object):
             f.close()
             if(class_id.strip() == self.ide_class_id):
                 device_sdx_path = self.find_block_sdx_path(vmbus)
-                self.logger.log("found one ide with vmbus: {0} and the sdx path is:".format(vmbus,device_sdx_path))
+                self.logger.log("found one ide with vmbus: {0} and the sdx path is: {1}".format(vmbus,
+                                                                                                device_sdx_path))
                 ide_devices.append(device_sdx_path)
         return ide_devices
 
