@@ -1057,6 +1057,10 @@ def install_rsyslogom():
         RunGetOutput("cp -f {0}/omazuremdslegacy.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
+        # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog 8 module
+        mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
+        cmd_to_run = "sed -i 's#__MDSD_SOCKET_FILE_PATH__#{0}#g' {1}"
+        RunGetOutput(cmd_to_run.format(mdsd_json_socket_file_path, rsyslog_om_mdsd_syslog_conf_path))
 
     else:
         return 1,"rsyslog version can't be detected"
@@ -1071,13 +1075,13 @@ def install_rsyslogom():
 def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
     files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
     cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
-    cmd2_to_run = "sed -i 's/__MDSD_SOCKET_FILE_PATH__/{0}/g' {1}"  # For rsyslog 8
+    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
 
     mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
 
     for f in files_to_modify:
         RunGetOutput(cmd_to_run.format(new_port, f))
-        RunGetOutput(cmd2_to_run.format(mdsd_json_socket_file_path, f))
+        RunGetOutput(cmd2_to_run.format(new_port, f))
 
     update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
     update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
