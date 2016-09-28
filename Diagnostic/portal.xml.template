@@ -18,7 +18,7 @@
     </Unpivot> </OMIQuery>
 
      <OMIQuery cqlQuery="SELECT PercentIdleTime,PercentUserTime,PercentNiceTime,PercentPrivilegedTime,PercentInterruptTime,PercentDPCTime,PercentProcessorTime,PercentIOWaitTime from SCX_ProcessorStatisticalInformation where Name=&apos;_Total&apos;" eventName="cpuStats" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
-       <Unpivot columnName="CounterName" columnValue="Value" columns=" PercentUserTime,PercentNiceTime,PercentPrivilegedTime,PercentInterruptTime,PercentDPCTime,PercentProcessorTime,PercentIOWaitTime">
+       <Unpivot columnName="CounterName" columnValue="Value" columns="PercentIdleTime,PercentUserTime,PercentNiceTime,PercentPrivilegedTime,PercentInterruptTime,PercentDPCTime,PercentProcessorTime,PercentIOWaitTime">
        <MapName name="PercentIdleTime">\Processor\PercentIdleTime</MapName>
 <MapName name="PercentUserTime">\Processor\PercentUserTime</MapName>
 <MapName name="PercentNiceTime">\Processor\PercentNiceTime</MapName>

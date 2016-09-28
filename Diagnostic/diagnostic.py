@@ -33,8 +33,9 @@ import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 
 WorkDir = os.getcwd()
-MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
+MDSDFileResourcesPrefix = os.path.join(WorkDir, 'mdsd')
+MDSDPidFile = MDSDFileResourcesPrefix + '.pid'
+MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -125,7 +126,7 @@ CentosConfig = dict(RedhatConfig.items()+
                     }.items())
 
 RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig,
+All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
@@ -296,7 +297,7 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI',perfElement)
+        XmlUtil.addElement(xml=tree,path='Events/OMI',el=perfElement,addOnlyOnce=True)
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
@@ -329,7 +330,7 @@ def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
             perfCfgList = readPublicConfig('perfCfg')
         if not perfCfgList and not hasPublicConfig('perfCfg'):
             perfCfgList = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory ,PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
+                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
                     {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
                     {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
                   ]
@@ -396,6 +397,36 @@ def setEventVolume(mdsdCfg,ladCfg):
             
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
         
+def getStorageAccountEndPoint(account):
+    endpoint = readPrivateConfig('storageAccountEndPoint')
+    if endpoint:
+        parts = endpoint.split('//', 1)
+        if len(parts) > 1:
+            endpoint = parts[0]+'//'+account+".table."+parts[1]
+        else:
+            endpoint = 'https://'+account+".table."+parts[0]
+    else:
+        endpoint = 'https://'+account+'.table.core.windows.net'
+    return endpoint
+
+
+def logPrivateSettingsKeys():
+    try:
+        msg = "Keys in privateSettings (and some non-secret values): "
+        first = True
+        for key in private_settings:
+            if first:
+                first = False
+            else:
+                msg += ", "
+            msg += key
+            if key == 'storageAccountEndPoint':
+                msg += ":" + private_settings[key]
+        hutil.log(msg)
+    except Exception as e:
+        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
+
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -411,9 +442,10 @@ def configSettings():
     mdsdCfg = ET.ElementTree()
     mdsdCfg._setroot(XmlUtil.createElement(mdsdCfgstr))
 
-    # update deployment id
+    # Add DeploymentId (if available) to identity columns
     deployment_id = get_deployment_id()
-    XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
+    if deployment_id:
+        XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
 
     try:
         resourceId = getResourceId()
@@ -452,16 +484,15 @@ def configSettings():
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
+    logPrivateSettingsKeys()
+
     account = readPrivateConfig('storageAccountName')
     if not account:
         return False, "Empty storageAccountName"
     key = readPrivateConfig('storageAccountKey')
     if not key:
         return False, "Empty storageAccountKey"
-    endpoint = readPrivateConfig('endpoint')
-    if not endpoint:
-        endpoint = 'table.core.windows.net'
-    endpoint = 'https://'+account+"."+endpoint
+    endpoint = getStorageAccountEndPoint(account)
 
     createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
 
@@ -695,14 +726,16 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
+    eventhub_persist_dir_path = os.path.join(WorkDir, "eventhub"); # LAD doesn't use this yet, but mdsd just creates this directory
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6} -S {7}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
         default_port,
-        MDSDPidPortFile,
+        MDSDFileResourcesPrefix,
         monitor_file_path,
         warn_file_path,
-        info_file_path).split(" ")
+        info_file_path,
+        eventhub_persist_dir_path).split(" ")
 
     try:
         num_quick_consecutive_crashes = 0
@@ -1037,10 +1070,12 @@ def install_rsyslogom():
 
 def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
     files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
+    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
+    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
 
     for f in files_to_modify:
         RunGetOutput(cmd_to_run.format(new_port, f))
+        RunGetOutput(cmd2_to_run.format(new_port, f))
 
     update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
     update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
@@ -1112,6 +1147,10 @@ def tail(log_file, output_size = OutputSize):
 def get_deployment_id():
     identity = "unknown"
     env_cfg_path = os.path.join(WorkDir, os.pardir, "HostingEnvironmentConfig.xml")
+    if not os.path.exists(env_cfg_path):
+        hutil.log("No Deployment ID (not running in a hosted environment")
+        return None
+
     try:
         with open(env_cfg_path, 'r') as env_cfg_file:
             xml_text = env_cfg_file.read()

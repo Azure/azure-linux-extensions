@@ -51,11 +51,13 @@ from EncryptionEnvironment import EncryptionEnvironment
 from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
+from CommandExecutor import *
 from __builtin__ import int
 
 
 def install():
     hutil.do_parse_context('Install')
+    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -64,6 +66,7 @@ def disable():
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
+    hutil.archive_old_configs()
     hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
 
 def disable_encryption():
@@ -82,8 +85,15 @@ def disable_encryption():
                       status=CommonVariables.extension_success_status,
                       code=str(CommonVariables.success),
                       message='Decryption started')
-    
-    hutil.exit_if_same_seq()
+
+    exit_status = {
+        'operation': 'DisableEncryption',
+        'status': CommonVariables.extension_success_status,
+        'status_code': str(CommonVariables.success),
+        'message': 'Decryption completed'
+    }
+
+    hutil.exit_if_same_seq(exit_status)
     hutil.save_seq()
 
     try:
@@ -102,7 +112,7 @@ def disable_encryption():
 
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
 
-        disk_util = DiskUtil(hutil=hutil, patching=MyPatching, logger=logger, encryption_environment=encryption_environment)
+        disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -174,7 +184,7 @@ def none_or_empty(obj):
         return False
 
 def toggle_se_linux_for_centos7(disable):
-    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
         if(disable):
             se_linux_status = encryption_environment.get_se_linux()
             if(se_linux_status.lower() == 'enforcing'):
@@ -192,7 +202,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
             crypt_item = crypt_items[i]
             #add walkaround for the centos 7.0
             se_linux_status = None
-            if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                 se_linux_status = encryption_environment.get_se_linux()
                 if(se_linux_status.lower() == 'enforcing'):
                     encryption_environment.disable_se_linux()
@@ -202,7 +212,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
                                                    header_file=crypt_item.luks_header_path,
                                                    uses_cleartext_key=crypt_item.uses_cleartext_key)
             logger.log("luks open result is {0}".format(luks_open_result))
-            if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                 if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
                     encryption_environment.enable_se_linux()
             if(crypt_item.mount_point != 'None'):
@@ -214,22 +224,26 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         bek_util.umount_azure_passhprase(encryption_config)
 
 def main():
-    global hutil,MyPatching,logger,encryption_environment
+    global hutil, DistroPatcher, logger, encryption_environment
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
     
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     logger = BackupLogger(hutil)
-    MyPatching = GetMyPatching(logger)
-    hutil.patching = MyPatching
+    DistroPatcher = GetDistroPatcher(logger)
+    hutil.patching = DistroPatcher
 
-    encryption_environment = EncryptionEnvironment(patching=MyPatching,logger=logger)
-    if MyPatching is None:
+    encryption_environment = EncryptionEnvironment(patching=DistroPatcher,logger=logger)
+
+    disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+    hutil.disk_util = disk_util
+
+    if DistroPatcher is None:
         hutil.do_exit(exit_code=0,
                       operation='Enable',
                       status=CommonVariables.extension_error_status,
                       code=(CommonVariables.os_not_supported),
-                      message='the os is not supported')
+                      message='Enable failed: the os is not supported')
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -253,30 +267,66 @@ def mark_encryption(command,volume_type,disk_format_query):
     encryption_marker.commit()
     return encryption_marker
 
+def is_daemon_running():
+    handler_path = os.path.join(os.getcwd(), __file__)
+    daemon_arg = "-daemon"
+
+    psproc = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE)
+    pslist, _ = psproc.communicate()
+
+    for line in pslist.split("\n"):
+        if handler_path in line and daemon_arg in line:
+            return True
+
+    return False
+
 def enable():
-    hutil.do_parse_context('Enable')
-    logger.log('Enabling extension')
+    while True:
+        hutil.do_parse_context('Enable')
+        logger.log('Enabling extension')
 
-    public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+        public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
-    if(isinstance(public_settings_str, basestring)):
-        public_settings = json.loads(public_settings_str)
-    else:
-        public_settings = public_settings_str
+        if(isinstance(public_settings_str, basestring)):
+            public_settings = json.loads(public_settings_str)
+        else:
+            public_settings = public_settings_str
 
-    encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
 
-    if encryption_operation == CommonVariables.EnableEncryption:
-        enable_encryption()
-    elif encryption_operation == CommonVariables.DisableEncryption:
-        disable_encryption()
-    else:
-        logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
-        hutil.do_exit(exit_code=0,
-                      operation='Enable',
-                      status=CommonVariables.extension_error_status,
-                      code=(CommonVariables.unknown_error),
-                      message='Enable failed.')
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+
+        if encryption_operation == CommonVariables.EnableEncryption or encryption_operation == CommonVariables.EnableEncryptionFormat:
+            logger.log("handle.py found enable encryption operation")
+
+            logger.log("Installing pre-requisites")
+            DistroPatcher.install_extras()
+
+            enable_encryption()
+        elif encryption_operation == CommonVariables.DisableEncryption:
+            logger.log("handle.py found disable encryption operation")
+
+            logger.log("Installing pre-requisites")
+            DistroPatcher.install_extras()
+
+            disable_encryption()
+        elif encryption_operation == CommonVariables.QueryEncryptionStatus:
+            logger.log("handle.py found query operation")
+
+            if is_daemon_running():
+                logger.log("A daemon is already running, exiting without status report")
+                hutil.redo_last_status()
+                exit_without_status_report()
+            else:
+                logger.log("No daemon found, trying to find the last non-query operation")
+                hutil.find_last_nonquery_operation = True
+        else:
+            logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
+            hutil.do_exit(exit_code=0,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.unknown_error),
+                          message='Enable failed.')
 
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
@@ -287,24 +337,35 @@ def enable_encryption():
     """
     trying to mount the crypted items.
     """
-    disk_util = DiskUtil(hutil = hutil, patching = MyPatching, logger = logger, encryption_environment = encryption_environment)
+    disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
     
-    existed_passphrase_file = None
-    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger = logger)
+    existing_passphrase_file = None
+    encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
+
     if(config_path_result != CommonVariables.process_success):
-        logger.log(msg="azure encryption path creation failed.",level=CommonVariables.ErrorLevel)
+        logger.log(msg="azure encryption path creation failed.",
+                   level=CommonVariables.ErrorLevel)
+
     if(encryption_config.config_file_exists()):
-        existed_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        if(existed_passphrase_file is not None):
+        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if(existing_passphrase_file is not None):
             mount_encrypted_disks(disk_util=disk_util,
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
-                                  passphrase_file=existed_passphrase_file)
+                                  passphrase_file=existing_passphrase_file)
         else:
-            logger.log(msg="the config is there, but we could not get the bek file.",level=CommonVariables.WarningLevel)
+            logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
+                       level=CommonVariables.WarningLevel)
             exit_without_status_report()
+
+    ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ps_stdout, ps_stderr = ps.communicate()
+    if re.search(r"dd.*of=/dev/mapper/osencrypt", ps_stdout):
+        logger.log(msg="OS disk encryption already in progress, exiting",
+                   level=CommonVariables.WarningLevel)
+        exit_without_status_report()
 
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
@@ -318,7 +379,9 @@ def enable_encryption():
             current_identity = machine_identity.current_identity()
             if(current_identity != stored_identity):
                 current_seq_no = -1
-                backup_logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity, current_identity, current_seq_no))
+                logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity,
+                                                                                                 current_identity,
+                                                                                                 current_seq_no))
                 hutil.set_last_seq(current_seq_no)
                 machine_identity.save_identity()
                 # we should be careful about proceed for this case, we just
@@ -345,14 +408,29 @@ def enable_encryption():
             # verify the encryption mark
             logger.log(msg="encryption mark is there, starting daemon.", level=CommonVariables.InfoLevel)
             start_daemon('EnableEncryption')
-        else:
-            hutil.exit_if_same_seq()
+        else:            
+            encryption_config = EncryptionConfig(encryption_environment, logger)
+
+            exit_status = None
+            if encryption_config.config_file_exists():
+                exit_status = {
+                    'operation': 'EnableEncryption',
+                    'status': CommonVariables.extension_success_status,
+                    'status_code': str(CommonVariables.success),
+                    'message': encryption_config.get_secret_id()
+                }
+
+            hutil.exit_if_same_seq(exit_status)
             hutil.save_seq()
-            if(encryption_config.config_file_exists() and existed_passphrase_file is not None):
+
+            encryption_config.volume_type = extension_parameter.VolumeType
+            encryption_config.commit()
+
+            if(encryption_config.config_file_exists() and existing_passphrase_file is not None):
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
-                encryption_marker = mark_encryption(command=extension_parameter.command, \
-                                                  volume_type=extension_parameter.VolumeType, \
-                                                  disk_format_query=extension_parameter.DiskFormatQuery)
+                encryption_marker = mark_encryption(command=extension_parameter.command,
+                                                    volume_type=extension_parameter.VolumeType,
+                                                    disk_format_query=extension_parameter.DiskFormatQuery)
                 start_daemon('EnableEncryption')
             else:
                 """
@@ -364,37 +442,45 @@ def enable_encryption():
                 """
                 validate the parameters
                 """
-                if(extension_parameter.VolumeType is None or extension_parameter.VolumeType.lower() != 'data'):
+                if(extension_parameter.VolumeType is None or
+                   not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in CommonVariables.SupportedVolumeTypes])):
+                    if(encryption_config.config_file_exists()):
+                        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+                        
+                        if existing_passphrase_file is None:
+                            logger.log("Unsupported volume type specified and BEK volume does not exist, clearing encryption config")
+                            encryption_config.clear_config()
+
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
                                   code=str(CommonVariables.volue_type_not_support),
-                                  message='VolumeType {0} is not supported'.format(extension_parameter.VolumeType))
+                                  message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
 
                 if(extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat]):
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
                                   code=str(CommonVariables.command_not_support),
-                                  message='Command {0} is not supported'.format(extension_parameter.command))
+                                  message='Command "{0}" is not supported'.format(extension_parameter.command))
 
                 """
                 this is the fresh call case
                 """
                 #handle the passphrase related
-                if(existed_passphrase_file is None):
+                if(existing_passphrase_file is None):
                     if(extension_parameter.passphrase is None or extension_parameter.passphrase == ""):
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
-                    kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase = extension_parameter.passphrase,
-                                                                           KeyVaultURL = extension_parameter.KeyVaultURL,
-                                                                           KeyEncryptionKeyURL = extension_parameter.KeyEncryptionKeyURL,
-                                                                           AADClientID = extension_parameter.AADClientID,
-                                                                           KeyEncryptionAlgorithm = extension_parameter.KeyEncryptionAlgorithm,
-                                                                           AADClientSecret = extension_parameter.AADClientSecret,
-                                                                           DiskEncryptionKeyFileName = extension_parameter.DiskEncryptionKeyFileName)
+                    kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
+                                                                           KeyVaultURL=extension_parameter.KeyVaultURL,
+                                                                           KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
+                                                                           AADClientID=extension_parameter.AADClientID,
+                                                                           KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
+                                                                           AADClientSecret=extension_parameter.AADClientSecret,
+                                                                           DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
                     if(kek_secret_id_created is None):
                         hutil.do_exit(exit_code=0,
@@ -404,13 +490,13 @@ def enable_encryption():
                                       message='Enable failed.')
                     else:
                         encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-                        encryption_config.bek_filesystem = CommonVariables.BekVolumeFileSystem
+                        encryption_config.volume_type = extension_parameter.VolumeType
                         encryption_config.secret_id = kek_secret_id_created
                         encryption_config.commit()
    
-                encryption_marker = mark_encryption(command=extension_parameter.command, \
-                                                  volume_type=extension_parameter.VolumeType, \
-                                                  disk_format_query=extension_parameter.DiskFormatQuery)
+                encryption_marker = mark_encryption(command=extension_parameter.command,
+                                                    volume_type=extension_parameter.VolumeType,
+                                                    disk_format_query=extension_parameter.DiskFormatQuery)
 
                 if(kek_secret_id_created != None):
                     hutil.do_exit(exit_code=0,
@@ -428,12 +514,13 @@ def enable_encryption():
                                   code=str(CommonVariables.encrypttion_already_enabled),
                                   message=str(kek_secret_id_created))
     except Exception as e:
-        logger.log(msg="Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()), level=CommonVariables.ErrorLevel)
+        message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
         hutil.do_exit(exit_code=0,
                       operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
-                      message='Enable failed.')
+                      message=message)
 
 def enable_encryption_format(passphrase, encryption_marker, disk_util):
     logger.log('enable_encryption_format')
@@ -462,13 +549,13 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
-                    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+                    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                         se_linux_status = encryption_environment.get_se_linux()
                         if(se_linux_status.lower() == 'enforcing'):
                             encryption_environment.disable_se_linux()
                     encrypt_result = disk_util.encrypt_disk(dev_path = device_to_encrypt_uuid_path, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
                 finally:
-                    if(MyPatching.distro_info[0].lower() == 'centos' and MyPatching.distro_info[1].startswith('7.0')):
+                    if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
                         if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
                             encryption_environment.enable_se_linux()
 
@@ -510,7 +597,12 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
             else:
                 logger.log(msg=("the item fstype is not empty {0}".format(device_item.file_system)))
 
-def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, disk_util, bek_util, ongoing_item_config=None):
+def encrypt_inplace_without_seperate_header_file(passphrase_file,
+                                                 device_item,
+                                                 disk_util,
+                                                 bek_util,
+                                                 status_prefix='',
+                                                 ongoing_item_config=None):
     """
     if ongoing_item_config is not None, then this is a resume case.
     this function will return the phase 
@@ -535,7 +627,8 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
         ongoing_item_config.phase = CommonVariables.EncryptionPhaseBackupHeader
         ongoing_item_config.commit()
     else:
-        logger.log(msg = "ongoing item config is not none, this is resuming, info: {0}".format(ongoing_item_config), level = CommonVariables.WarningLevel)
+        logger.log(msg="ongoing item config is not none, this is resuming, info: {0}".format(ongoing_item_config),
+                   level=CommonVariables.WarningLevel)
 
     logger.log(msg=("encrypting device item: {0}".format(ongoing_item_config.get_original_dev_path())))
     # we only support ext file systems.
@@ -550,16 +643,23 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
 
     while(current_phase != CommonVariables.EncryptionPhaseDone):
         if(current_phase == CommonVariables.EncryptionPhaseBackupHeader):
-            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader)), level = CommonVariables.InfoLevel)
+            logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
+                       level=CommonVariables.InfoLevel)
+            
             if(not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]):
-                logger.log(msg = "we only support ext file systems for centos 6.5/6.6/6.7/6.8 and redhat 6.7", level = CommonVariables.WarningLevel)
+                logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
+                           level=CommonVariables.WarningLevel)
+
                 ongoing_item_config.clear_config()
                 return current_phase
 
             chk_shrink_result = disk_util.check_shrink_fs(dev_path = original_dev_path, size_shrink_to = size_shrink_to)
+
             if(chk_shrink_result != CommonVariables.process_success):
-                logger.log(msg = ("check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path)), level = CommonVariables.ErrorLevel)
-                logger.log(msg = "your file system may not have enough space to do the encryption.")
+                logger.log(msg="check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path),
+                           level=CommonVariables.ErrorLevel)
+                logger.log(msg="your file system may not have enough space to do the encryption.")
+
                 #remove the ongoing item.
                 ongoing_item_config.clear_config()
                 return current_phase
@@ -576,19 +676,27 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                     logger.log(msg="the header slice file is there, remove it.", level = CommonVariables.WarningLevel)
                     os.remove(encryption_environment.copy_header_slice_file_path)
 
-                copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)
+                copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
 
                 if(copy_result != CommonVariables.process_success):
-                    logger.log(msg=("copy the header block failed, return code is: {0}".format(copy_result)),level=CommonVariables.ErrorLevel)
+                    logger.log(msg="copy the header block failed, return code is: {0}".format(copy_result),
+                               level=CommonVariables.ErrorLevel)
                     return current_phase
                 else:
                     ongoing_item_config.current_slice_index = 0
                     ongoing_item_config.phase = CommonVariables.EncryptionPhaseEncryptDevice
                     ongoing_item_config.commit()
                     current_phase = CommonVariables.EncryptionPhaseEncryptDevice
+
         elif(current_phase == CommonVariables.EncryptionPhaseEncryptDevice):
-            logger.log(msg=("the current phase is {0}".format(CommonVariables.EncryptionPhaseEncryptDevice)),level = CommonVariables.InfoLevel)
-            encrypt_result = disk_util.encrypt_disk(dev_path = original_dev_path, passphrase_file = passphrase_file, mapper_name = mapper_name, header_file = None)
+            logger.log(msg="the current phase is {0}".format(CommonVariables.EncryptionPhaseEncryptDevice),
+                       level=CommonVariables.InfoLevel)
+
+            encrypt_result = disk_util.encrypt_disk(dev_path=original_dev_path,
+                                                    passphrase_file=passphrase_file,
+                                                    mapper_name=mapper_name,
+                                                    header_file=None)
+
             # after the encrypt_disk without seperate header, then the uuid
             # would change.
             if(encrypt_result != CommonVariables.process_success):
@@ -601,7 +709,8 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 current_phase = CommonVariables.EncryptionPhaseCopyData
 
         elif(current_phase == CommonVariables.EncryptionPhaseCopyData):
-            logger.log(msg=("the current phase is {0}".format(CommonVariables.EncryptionPhaseCopyData)),level = CommonVariables.InfoLevel)
+            logger.log(msg="the current phase is {0}".format(CommonVariables.EncryptionPhaseCopyData),
+                       level=CommonVariables.InfoLevel)
             device_mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
             ongoing_item_config.current_destination = device_mapper_path
             ongoing_item_config.current_source_path = original_dev_path
@@ -610,9 +719,10 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
             ongoing_item_config.phase = CommonVariables.EncryptionPhaseCopyData
             ongoing_item_config.commit()
 
-            copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)
+            copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
             if(copy_result != CommonVariables.process_success):
-                logger.log(msg = ("copy the main content block failed, return code is: {0}".format(copy_result)),level = CommonVariables.ErrorLevel)
+                logger.log(msg="copy the main content block failed, return code is: {0}".format(copy_result),
+                           level=CommonVariables.ErrorLevel)
                 return current_phase
             else:
                 ongoing_item_config.phase = CommonVariables.EncryptionPhaseRecoverHeader
@@ -620,7 +730,8 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                 current_phase = CommonVariables.EncryptionPhaseRecoverHeader
 
         elif(current_phase == CommonVariables.EncryptionPhaseRecoverHeader):
-            logger.log(msg=("the current phase is " + str(CommonVariables.EncryptionPhaseRecoverHeader)),level = CommonVariables.InfoLevel)
+            logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseRecoverHeader),
+                       level=CommonVariables.InfoLevel)
             ongoing_item_config.from_end = False
             backed_up_header_slice_file_path = ongoing_item_config.get_header_slice_file_path()
             ongoing_item_config.current_slice_index = 0
@@ -630,7 +741,8 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
             ongoing_item_config.current_total_copy_size = CommonVariables.default_block_size
             ongoing_item_config.commit()
 
-            copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)
+            copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
+
             if(copy_result == CommonVariables.process_success):
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
@@ -648,10 +760,11 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
                     crypt_item_to_update.mount_point = mount_point
                 update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
                 if(not update_crypt_item_result):
-                    logger.log(msg="update crypt item failed",level = CommonVariables.ErrorLevel)
+                    logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
                 if mount_point:
-                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                    logger.log(msg="removing entry for unencrypted drive from fstab",
+                               level=CommonVariables.InfoLevel)
                     disk_util.remove_mount_info(mount_point)
                 else:
                     logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
@@ -672,20 +785,28 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file, device_item, d
 
                 ongoing_item_config.clear_config()
                 if(expand_fs_result != CommonVariables.process_success):
-                    logger.log(msg=("expand fs result is: {0}".format(expand_fs_result)),level = CommonVariables.ErrorLevel)
+                    logger.log(msg="expand fs result is: {0}".format(expand_fs_result),
+                               level=CommonVariables.ErrorLevel)
                 return current_phase
             else:
-                logger.log(msg=("recover header failed result is: {0}".format(copy_result)),level = CommonVariables.ErrorLevel)
+                logger.log(msg="recover header failed result is: {0}".format(copy_result),
+                           level=CommonVariables.ErrorLevel)
                 return current_phase
 
-def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk_util, bek_util, ongoing_item_config=None):
+def encrypt_inplace_with_seperate_header_file(passphrase_file,
+                                              device_item,
+                                              disk_util,
+                                              bek_util,
+                                              status_prefix='',
+                                              ongoing_item_config=None):
     """
     if ongoing_item_config is not None, then this is a resume case.
     """
     logger.log("encrypt_inplace_with_seperate_header_file")
     current_phase = CommonVariables.EncryptionPhaseEncryptDevice
     if(ongoing_item_config is None):
-        ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment,logger=logger)
+        ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment,
+                                                logger=logger)
         mapper_name = str(uuid.uuid4())
         ongoing_item_config.current_block_size = CommonVariables.default_block_size
         ongoing_item_config.current_slice_index = 0
@@ -708,7 +829,8 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
             ongoing_item_config.phase = CommonVariables.EncryptionPhaseEncryptDevice
             ongoing_item_config.commit()
     else:
-        logger.log(msg = "ongoing item config is not none, this is resuming: {0}".format(ongoing_item_config), level = CommonVariables.WarningLevel)
+        logger.log(msg="ongoing item config is not none, this is resuming: {0}".format(ongoing_item_config),
+                   level=CommonVariables.WarningLevel)
         current_phase = ongoing_item_config.get_phase()
 
     while(current_phase != CommonVariables.EncryptionPhaseDone):
@@ -719,10 +841,15 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                 original_dev_path = ongoing_item_config.get_original_dev_path()
                 luks_header_file_path = ongoing_item_config.get_header_file_path()
                 disabled = toggle_se_linux_for_centos7(True)
-                encrypt_result = disk_util.encrypt_disk(dev_path = original_dev_path, passphrase_file = passphrase_file, \
-                                                        mapper_name = mapper_name, header_file = luks_header_file_path)
+
+                encrypt_result = disk_util.encrypt_disk(dev_path=original_dev_path,
+                                                        passphrase_file=passphrase_file,
+                                                        mapper_name=mapper_name,
+                                                        header_file=luks_header_file_path)
+
                 if(encrypt_result != CommonVariables.process_success):
-                    logger.log(msg=("the encrypton for {0} failed".format(original_dev_path)),level=CommonVariables.ErrorLevel)
+                    logger.log(msg="the encrypton for {0} failed".format(original_dev_path),
+                               level=CommonVariables.ErrorLevel)
                     return current_phase
                 else:
                     ongoing_item_config.phase = CommonVariables.EncryptionPhaseCopyData
@@ -747,10 +874,12 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                                                       uses_cleartext_key=False)
 
                     if(open_result != CommonVariables.process_success):
-                        logger.log(msg=("the luks open for {0} failed.".format(original_dev_path)),level = CommonVariables.ErrorLevel)
+                        logger.log(msg="the luks open for {0} failed.".format(original_dev_path),
+                                   level=CommonVariables.ErrorLevel)
                         return current_phase
                 else:
-                    logger.log(msg = "the device mapper path existed, so skip the luks open.", level = CommonVariables.InfoLevel)
+                    logger.log(msg="the device mapper path existed, so skip the luks open.",
+                               level=CommonVariables.InfoLevel)
 
                 device_size = ongoing_item_config.get_device_size()
 
@@ -763,7 +892,8 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                 ongoing_item_config.from_end = True
                 ongoing_item_config.commit()
 
-                copy_result = disk_util.copy(ongoing_item_config = ongoing_item_config)
+                copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
+
                 if(copy_result != CommonVariables.success):
                     error_message = "the copying result is {0} so skip the mounting".format(copy_result)
                     logger.log(msg = (error_message), level = CommonVariables.ErrorLevel)
@@ -772,10 +902,11 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                    crypt_item_to_update.dev_path = original_dev_name_path
+                    crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                     crypt_item_to_update.uses_cleartext_key = False
+
                     # if the original mountpoint is empty, then leave
                     # it as None
                     mount_point = ongoing_item_config.get_mount_point()
@@ -792,7 +923,8 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file, device_item, disk
                         logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
 
                     if mount_point:
-                        logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
+                        logger.log(msg="removing entry for unencrypted drive from fstab",
+                                   level=CommonVariables.InfoLevel)
                         disk_util.remove_mount_info(mount_point)
                     else:
                         logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
@@ -811,6 +943,7 @@ def decrypt_inplace_copy_data(passphrase_file,
                               raw_device_item,
                               mapper_device_item,
                               disk_util,
+                              status_prefix='',
                               ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_copy_data")
 
@@ -838,7 +971,7 @@ def decrypt_inplace_copy_data(passphrase_file,
                    level=CommonVariables.InfoLevel)
 
         if current_phase == CommonVariables.DecryptionPhaseCopyData:
-            copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config)
+            copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
             if(copy_result == CommonVariables.process_success):
                 mount_point = ongoing_item_config.get_mount_point()
                 if mount_point and mount_point != "None":
@@ -865,10 +998,17 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  raw_device_item,
                                                  mapper_device_item,
                                                  disk_util,
+                                                 status_prefix='',
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    if raw_device_item.size - mapper_device_item.size != CommonVariables.luks_header_size:
+    proc_comm = ProcessCommunicator()
+    executor = CommandExecutor(logger)
+    executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
+
+    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
+
+    if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
                    level=CommonVariables.ErrorLevel)
         logger.log(msg="raw_device_item: {0}".format(raw_device_item),
@@ -883,6 +1023,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                      raw_device_item,
                                      mapper_device_item,
                                      disk_util,
+                                     status_prefix,
                                      ongoing_item_config)
 
 def decrypt_inplace_with_separate_header_file(passphrase_file,
@@ -890,6 +1031,7 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                               raw_device_item,
                                               mapper_device_item,
                                               disk_util,
+                                              status_prefix='',
                                               ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_with_separate_header_file")
 
@@ -908,6 +1050,7 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      raw_device_item,
                                      mapper_device_item,
                                      disk_util,
+                                     status_prefix,
                                      ongoing_item_config)
 
 def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
@@ -916,41 +1059,67 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
     """
     logger.log(msg="executing the enableencryption_all_inplace command.")
     device_items = disk_util.get_device_items(None)
+    device_items_to_encrypt = []
     encrypted_items = []
     error_message = ""
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
         should_skip = disk_util.should_skip_for_inplace_encryption(device_item)
-        if(not should_skip):
+        if not should_skip:
             if(device_item.name == bek_util.passphrase_device):
                 logger.log("skip for the passphrase disk ".format(device_item))
                 should_skip = True
             if(device_item.uuid in encrypted_items):
                 logger.log("already did a operation {0} so skip it".format(device_item))
                 should_skip = True
-        if(not should_skip):
-            umount_status_code = CommonVariables.success
-            if(device_item.mount_point is not None and device_item.mount_point != ""):
-                umount_status_code = disk_util.umount(device_item.mount_point)
-            if(umount_status_code != CommonVariables.success):
-                logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
+        if not should_skip and \
+           not any(di.name == device_item.name for di in device_items_to_encrypt):
+            device_items_to_encrypt.append(device_item)
+
+    msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
+    logger.log(msg);
+
+    hutil.do_status_report(operation='EnableEncryption',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message=msg)
+
+    for device_num, device_item in enumerate(device_items_to_encrypt):
+        umount_status_code = CommonVariables.success
+        if(device_item.mount_point is not None and device_item.mount_point != ""):
+            umount_status_code = disk_util.umount(device_item.mount_point)
+        if(umount_status_code != CommonVariables.success):
+            logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
+        else:
+            encrypted_items.append(device_item.uuid)
+            logger.log(msg=("encrypting: {0}".format(device_item)))
+            no_header_file_support = not_support_header_option_distro(DistroPatcher)
+            status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
+                                                                    len(device_items_to_encrypt))
+
+            #TODO check the file system before encrypting it.
+            if(no_header_file_support):
+                logger.log(msg="this is the centos 6 or redhat 6 or sles 11 series, need to resize data drive",
+                           level=CommonVariables.WarningLevel)
+
+                encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file=passphrase_file,
+                                                                                       device_item=device_item,
+                                                                                       disk_util=disk_util,
+                                                                                       bek_util=bek_util,
+                                                                                       status_prefix=status_prefix)
             else:
-                encrypted_items.append(device_item.uuid)
-                logger.log(msg=("encrypting:{0}".format(device_item)))
-                no_header_file_support = not_support_header_option_distro(MyPatching)
-                #TODO check the file system before encrypting it.
-                if(no_header_file_support):
-                    logger.log(msg="this is the centos 6 or redhat 6 or sles 11 series , need special handling.", level=CommonVariables.WarningLevel)
-                    encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file = passphrase_file, device_item = device_item,disk_util = disk_util, bek_util = bek_util)
-                else:
-                    encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file = passphrase_file, device_item = device_item,disk_util = disk_util, bek_util = bek_util)
+                encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file=passphrase_file,
+                                                                                    device_item=device_item,
+                                                                                    disk_util=disk_util,
+                                                                                    bek_util=bek_util,
+                                                                                    status_prefix=status_prefix)
                 
-                if(encryption_result_phase == CommonVariables.EncryptionPhaseDone):
-                    continue
-                else:
-                    # do exit to exit from this round
-                    return device_item
+            if(encryption_result_phase == CommonVariables.EncryptionPhaseDone):
+                continue
+            else:
+                # do exit to exit from this round
+                return device_item
     return None
 
 
@@ -964,9 +1133,15 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     device_items = disk_util.get_device_items(None)
     crypt_items = disk_util.get_crypt_items()
 
-    logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
+    msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
+    logger.log(msg);
 
-    for crypt_item in crypt_items:
+    hutil.do_status_report(operation='DisableEncryption',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message=msg)
+
+    for crypt_item_num, crypt_item in enumerate(crypt_items):
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
@@ -991,18 +1166,24 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         decryption_result_phase = None
 
+        
+        status_prefix = "Decrypting data volume {0}/{1}".format(crypt_item_num + 1,
+                                                                len(crypt_items))
+
         if crypt_item.luks_header_path:
             decryption_result_phase = decrypt_inplace_with_separate_header_file(passphrase_file=passphrase_file,
-                                                                                   crypt_item=crypt_item,
-                                                                                   raw_device_item=raw_device_item,
-                                                                                   mapper_device_item=mapper_device_item,
-                                                                                   disk_util=disk_util)
-        else:
-            decryption_result_phase = decrypt_inplace_without_separate_header_file(passphrase_file=passphrase_file,
                                                                                 crypt_item=crypt_item,
                                                                                 raw_device_item=raw_device_item,
                                                                                 mapper_device_item=mapper_device_item,
-                                                                                disk_util=disk_util)
+                                                                                disk_util=disk_util,
+                                                                                status_prefix=status_prefix)
+        else:
+            decryption_result_phase = decrypt_inplace_without_separate_header_file(passphrase_file=passphrase_file,
+                                                                                   crypt_item=crypt_item,
+                                                                                   raw_device_item=raw_device_item,
+                                                                                   mapper_device_item=mapper_device_item,
+                                                                                   disk_util=disk_util,
+                                                                                   status_prefix=status_prefix)
         
         if(decryption_result_phase == CommonVariables.DecryptionPhaseDone):
             disk_util.luks_close(crypt_item.mapper_name)
@@ -1027,9 +1208,9 @@ def daemon_encrypt():
     """
     search for the bek volume, then mount it:)
     """
-    disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    disk_util = DiskUtil(hutil, DistroPatcher, logger, encryption_environment)
 
-    encryption_config = EncryptionConfig(encryption_environment,logger)
+    encryption_config = EncryptionConfig(encryption_environment, logger)
     bek_passphrase_file = None
     """
     try to find the attached bek volume, and use the file to mount the crypted volumes,
@@ -1041,78 +1222,182 @@ def daemon_encrypt():
 
     if(bek_passphrase_file is None):
         hutil.do_exit(exit_code=0,
-                      operation='Enable',
+                      operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=CommonVariables.passphrase_file_not_found,
                       message='Passphrase file not found.')
-    else:
+
+    volume_type = encryption_config.get_volume_type().lower()
+
+    if volume_type == CommonVariables.VolumeTypeData.lower() or \
+       volume_type == CommonVariables.VolumeTypeAll.lower():
+        try:
+            while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
+                                                  encryption_config=encryption_config,
+                                                  disk_util=disk_util,
+                                                  bek_util=bek_util,
+                                                  bek_passphrase_file=bek_passphrase_file):
+                logger.log("Calling daemon_encrypt_data_volumes again")
+        except Exception as e:
+            message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=0,
+                          operation='EnableEncryptionDataVolumes',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message=message)
+        else:
+            hutil.do_status_report(operation='EnableEncryptionDataVolumes',
+                                   status=CommonVariables.extension_success_status,
+                                   status_code=str(CommonVariables.success),
+                                   message='Encryption succeeded for data volumes')
+
+    if volume_type == CommonVariables.VolumeTypeOS.lower() or \
+       volume_type == CommonVariables.VolumeTypeAll.lower():
+        # import OSEncryption here instead of at the top because it relies
+        # on pre-req packages being installed (specifically, python-six on Ubuntu)
+        distro_name = DistroPatcher.distro_info[0]
+        distro_version = DistroPatcher.distro_info[1]
+
+        os_encryption = None
+
+        if ((distro_name == 'redhat' and distro_version == '7.2') or
+            (distro_name == 'centos' and distro_version == '7.2.1511')):
+            from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
+            os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
+        elif distro_name == 'Ubuntu' and distro_version == '16.04':
+            from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
+            os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
+        else:
+            message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
+                                                                                distro_version)
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=0,
+                          operation='EnableEncryptionOSVolume',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message=message)
+
+        try:
+            os_encryption.start_encryption()
+
+            if not os_encryption.state == 'completed':
+                raise Exception("did not reach completed state")
+            else:
+                encryption_marker.clear_config()
+
+        except Exception as e:
+            message = "Failed to encrypt OS volume with error: {0}, stack trace: {1}, machine state: {2}".format(e,
+                                                                                                                 traceback.format_exc(),
+                                                                                                                 os_encryption.state)
+            logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=0,
+                          operation='EnableEncryptionOSVolume',
+                          status=CommonVariables.extension_error_status,
+                          code=CommonVariables.encryption_failed,
+                          message=message)
+
+        message = ''
+        if volume_type == CommonVariables.VolumeTypeAll.lower():
+            message = 'Encryption succeeded for all volumes'
+        else:
+            message = 'Encryption succeeded for OS volume'
+
+        logger.log(msg=message)
+        hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                               status=CommonVariables.extension_success_status,
+                               status_code=str(CommonVariables.success),
+                               message=message)
+
+
+def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util, bek_util, bek_passphrase_file):
+    try:
         """
         check whether there's a scheduled encryption task
         """
-        logger.log("trying to install the extras")
-        MyPatching.install_extras()
-
         mount_all_result = disk_util.mount_all()
 
         if(mount_all_result != CommonVariables.process_success):
-            logger.log(msg=("mount all failed with code:{0}".format(mount_all_result)), level=CommonVariables.ErrorLevel)
+            logger.log(msg="mount all failed with code:{0}".format(mount_all_result),
+                       level=CommonVariables.ErrorLevel)
         """
         TODO: resuming the encryption for rebooting suddenly scenario
         we need the special handling is because the half done device can be a error state: say, the file system header missing.so it could be 
         identified.
         """
         ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
+
         if(ongoing_item_config.config_file_exists()):
-            logger.log("ongoing item config exists.")
+            logger.log("OngoingItemConfig exists.")
             ongoing_item_config.load_value_from_file()
             header_file_path = ongoing_item_config.get_header_file_path()
             mount_point = ongoing_item_config.get_mount_point()
+            status_prefix = "Resuming encryption after reboot"
             if(not none_or_empty(mount_point)):
                 logger.log("mount point is not empty {0}, trying to unmount it first.".format(mount_point))
                 umount_status_code = disk_util.umount(mount_point)
                 logger.log("unmount return code is {0}".format(umount_status_code))
             if(none_or_empty(header_file_path)):
-                encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
-                    disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
+                encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file=bek_passphrase_file,
+                                                                                       device_item=None,
+                                                                                       disk_util=disk_util,
+                                                                                       bek_util=bek_util,
+                                                                                       status_prefix=status_prefix,
+                                                                                       ongoing_item_config=ongoing_item_config)
                 #TODO mount it back when shrink failed
             else:
-                encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file = bek_passphrase_file, device_item = None,\
-                    disk_util = disk_util, bek_util = bek_util, ongoing_item_config = ongoing_item_config)
+                encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file=bek_passphrase_file,
+                                                                                    device_item=None,
+                                                                                    disk_util=disk_util,
+                                                                                    bek_util=bek_util,
+                                                                                    status_prefix=status_prefix,
+                                                                                    ongoing_item_config=ongoing_item_config)
             """
             if the resuming failed, we should fail.
             """
             if(encryption_result_phase != CommonVariables.EncryptionPhaseDone):
-                original_dev_path = ongoing_item_config.get_original_dev_path()
-                hutil.do_exit(exit_code=0,
-                              operation='Enable',
-                              status=CommonVariables.extension_error_status,
-                              code=CommonVariables.encryption_failed,
-                              message='resuming encryption for {0} failed'.format(original_dev_path))
+                original_dev_path = ongoing_item_config.get_original_dev_path
+                message='EnableEncryption: resuming encryption for {0} failed'.format(original_dev_path)
+                raise Exception(message)
             else:
                 ongoing_item_config.clear_config()
         else:
-            logger.log("ongoing item config not exists.")
+            logger.log("OngoingItemConfig does not exist")
             failed_item = None
+
+            if not encryption_marker.config_file_exists():
+                logger.log("Data volumes are not marked for encryption")
+                bek_util.umount_azure_passhprase(encryption_config)
+                return True
+
             if(encryption_marker.get_current_command() == CommonVariables.EnableEncryption):
-                failed_item = enable_encryption_all_in_place(passphrase_file= bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util, bek_util = bek_util)
+                failed_item = enable_encryption_all_in_place(passphrase_file=bek_passphrase_file,
+                                                             encryption_marker=encryption_marker,
+                                                             disk_util=disk_util,
+                                                             bek_util=bek_util)
             elif(encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat):
-                failed_item = enable_encryption_format(passphrase = bek_passphrase_file, encryption_marker = encryption_marker, disk_util = disk_util)
+                failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
+                                                       encryption_marker=encryption_marker,
+                                                       disk_util=disk_util)
             else:
-                logger.log(msg = ("command {0} not supported.".format(encryption_marker.get_current_command())), level = CommonVariables.ErrorLevel)
-                #TODO do exit here
-            if(failed_item != None):
-                hutil.do_exit(exit_code=0,
-                              operation='Enable',
-                              status=CommonVariables.extension_error_status,
-                              code=CommonVariables.encryption_failed,
-                              message='encryption failed for {0}'.format(failed_item))
+                message = "Command {0} not supported.".format(encryption_marker.get_current_command())
+                logger.log(msg=message, level=CommonVariables.ErrorLevel)
+                raise Exception(message)
+
+            if failed_item:
+                message = 'Encryption failed for {0}'.format(failed_item)
+                raise Exception(message)
             else:
                 bek_util.umount_azure_passhprase(encryption_config)
-                hutil.do_exit(exit_code=0,
-                              operation='Enable',
-                              status=CommonVariables.extension_success_status,
-                              code=str(CommonVariables.success),
-                              message='encryption succeeded')
+                return True
+    except Exception as e:
+        raise
 
 def daemon_decrypt():
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
@@ -1127,7 +1412,7 @@ def daemon_decrypt():
     # in order to set-up all the mapper devices
     # we don't need the BEK since all the drives that need decryption were made cleartext-key unlockable by first call to disable
 
-    disk_util = DiskUtil(hutil, MyPatching, logger, encryption_environment)
+    disk_util = DiskUtil(hutil, DistroPatcher, logger, encryption_environment)
     encryption_config = EncryptionConfig(encryption_environment, logger)
     mount_encrypted_disks(disk_util=disk_util,
                           bek_util=None,
@@ -1158,17 +1443,20 @@ def daemon_decrypt():
                           operation='Disable',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
-                          message='decryption failed for {0}'.format(failed_item))
+                          message='Decryption failed for {0}'.format(failed_item))
         else:
             encryption_config.clear_config()
+            logger.log("clearing the decryption mark after successful decryption")
+            decryption_marker.clear_config()
 
             hutil.do_exit(exit_code=0,
                           operation='Disable',
                           status=CommonVariables.extension_success_status,
                           code=str(CommonVariables.success),
-                          message='decryption succeeded')
+                          message='Decryption succeeded')
 
 def daemon():
+    hutil.find_last_nonquery_operation = True
     hutil.do_parse_context('Executing')
     lock = ProcessLock(logger, encryption_environment.daemon_lock_file_path)
     if not lock.try_lock():
@@ -1176,6 +1464,9 @@ def daemon():
         return
 
     logger.log("daemon lock acquired sucessfully.")
+    
+    logger.log("waiting for 2 minutes before continuing the daemon")
+    time.sleep(120)
 
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     if decryption_marker.config_file_exists():
@@ -1193,10 +1484,8 @@ def daemon():
                           code=str(CommonVariables.encryption_failed),
                           message=error_msg)
         finally:
-            logger.log("clearing the decryption mark.")
-            decryption_marker.clear_config()
             lock.release_lock()
-            logger.log("returned to daemon successfully after decryption")
+            logger.log("returned to daemon")
             logger.log("exiting daemon")
                 
             return
@@ -1213,13 +1502,14 @@ def daemon():
                         status=CommonVariables.extension_error_status,
                         code=str(CommonVariables.encryption_failed),
                         message=error_msg)
-    finally:
+    else:
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
         #TODO not remove it, backed it up.
+        logger.log("returned to daemon successfully after encryption")
         logger.log("clearing the encryption mark.")
         encryption_marker.clear_config()
+    finally:
         lock.release_lock()
-        logger.log("returned to daemon successfully after encryption")
         logger.log("exiting daemon")
 
 def start_daemon(operation):
@@ -1240,13 +1530,13 @@ def start_daemon(operation):
                       operation=operation,
                       status=CommonVariables.extension_success_status,
                       code=str(CommonVariables.success),
-                      message=operation + ' started')
+                      message=encryption_config.get_secret_id())
     else:
         hutil.do_exit(exit_code=0,
                       operation=operation,
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.encryption_failed),
-                      message='encryption config not found.')
+                      message='Encryption config not found.')
 
 if __name__ == '__main__' :
     main()
