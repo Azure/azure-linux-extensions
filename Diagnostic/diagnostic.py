@@ -1022,9 +1022,9 @@ def uninstall_rsyslogom():
     if rsyslog_om_path == None:
         return 1,"rsyslog not installed"
     if os.path.exists(rsyslog_om_mdsd_syslog_conf_path):
-        RunGetOutput("rm -f {0}/omazuremdslegacy.so {1} {2}".format(rsyslog_om_path,
-                                                                    rsyslog_om_mdsd_syslog_conf_path,
-                                                                    rsyslog_om_mdsd_file_conf_path))
+        RunGetOutput("rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path,
+                                                              rsyslog_om_mdsd_syslog_conf_path,
+                                                              rsyslog_om_mdsd_file_conf_path))
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1054,7 +1054,7 @@ def install_rsyslogom():
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
         # Copy necesssary files
-        RunGetOutput("cp -f {0}/omazuremdslegacy.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
+        RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
         # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog 8 module
