@@ -595,7 +595,7 @@ def main(command):
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
 
         elif ExtensionOperationType is waagent.WALAEventOperation.Install:
-            error, msg = setup(should_install_required_package=True)
+            error, msg = setup(should_install_required_package=False)  # Don't install dependencies on Install (to avoid delaying VM deployment completion)
             if error != 0:
                 hutil.do_status_report(ExtensionOperationType, "error", error, msg)
                 waagent.AddExtensionEvent(name=hutil.get_name(),
@@ -665,7 +665,7 @@ def start_mdsd():
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup(should_install_required_package=False)
+    setup(should_install_required_package=True)  # We didn't install dependencies on Install, so they must be installed now.
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
