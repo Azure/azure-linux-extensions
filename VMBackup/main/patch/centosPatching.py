@@ -36,6 +36,7 @@ class centosPatching(redhatPatching):
     def __init__(self,logger,distro_info):
         super(centosPatching,self).__init__(logger,distro_info)
         self.logger = logger
+        self.usr_flag = 0
         if(distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5" or distro_info[1] == "6.9" or distro_info[1] == "6.3"):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -45,7 +46,8 @@ class centosPatching(redhatPatching):
             self.dd_path = '/bin/dd'
             self.e2fsck_path = '/sbin/e2fsck'
             self.echo_path = '/bin/echo'
-            self.lsblk_path = '/bin/lsblk' 
+            self.lsblk_path = '/bin/lsblk'
+            self.usr_flag = 0
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/bin/mkdir'
             self.mount_path = '/bin/mount'
@@ -62,6 +64,7 @@ class centosPatching(redhatPatching):
             self.e2fsck_path = '/sbin/e2fsck'
             self.echo_path = '/usr/bin/echo'
             self.lsblk_path = '/usr/bin/lsblk'
+            self.usr_flag = 1
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/usr/bin/mkdir'
             self.mount_path = '/usr/bin/mount'

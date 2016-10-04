@@ -1,4 +1,4 @@
-﻿#
+#
 # Handler library for Linux IaaS
 #
 # Copyright 2014 Microsoft Corporation
@@ -68,6 +68,7 @@ from common import CommonVariables
 import platform
 import subprocess
 import datetime
+import Status
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -78,6 +79,7 @@ class HandlerContext:
         return
 
 class HandlerUtility:
+    telemetry_data = []
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -242,24 +244,24 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_json(self, operation, status, sub_status, status_code, message):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
-        stat = [{
-            "version" : self._context._version,
-            "timestampUTC" : tstamp,
-            "status" : {
-                "name" : self._context._name,
-                "operation" : operation,
-                "status" : status,
-                "substatus" : sub_status,
-                "code" : status_code,
-                "formattedMessage" : {
-                    "lang" : "en-US",
-                    "message" : message
-                }
-            }
-        }]
-        return stat
+        formattedMessage = Status.FormattedMessage("en-US",message)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, taskId, commandStartTimeUTCTicks)
+        top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
+        return top_stat_obj
+
+    def get_extension_version(self):
+        try:
+            cur_dir = os.getcwd()
+            cur_extension = cur_dir.split("/")[-1]
+            extension_version = cur_extension.split("-")[-1]
+            return extension_version
+        except Exception as e:
+            errMsg = 'Failed to retrieve the Extension version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(errMsg, False, 'Error')
+            extension_version="Unknown"
+            return extension_version
 
     def get_wala_version(self):
         try:
@@ -269,25 +271,28 @@ class HandlerUtility:
                 if 'Azure Linux Agent Version' in line:
                     waagent_version = line.split(':')[-1]
             if waagent_version[:-1]=="": #for removing the trailing '\n' character
-                waagent_version = self.get_wala_version_from_file()
+                waagent_version = self.get_wala_version_from_command()
                 return waagent_version
             else:
-                return waagent_version[:-1]
+                waagent_version = waagent_version[:-1].split("-")[-1] #getting only version number
+                return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
             waagent_version="Unknown"
             return waagent_version
 
-    def get_wala_version_from_file(self):
+    def get_wala_version_from_command(self):
         try:
-            file_pointer = open('/usr/sbin/waagent','r')
-            waagent_version = ''
-            for line in file_pointer:
-                if 'GuestAgentVersion' in line:
-                    waagent_version = line.split('\"')[1]
-                    break
-            return waagent_version #for removing the trailing '\n' character
+            cur_dir = os.getcwd()
+            os.chdir("..")
+            p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
+            out = p.stdout.read()
+            out =  out.split(" ")
+            waagent = out[0]
+            waagent_version = waagent.split("-")[-1] #getting only version number
+            os.chdir(cur_dir)
+            return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Warning')
@@ -295,28 +300,26 @@ class HandlerUtility:
             return waagent_version
 
     def get_dist_info(self):
-        wala_ver=self.get_wala_version()
         try:
             if 'FreeBSD' in platform.system():
                 release = re.sub('\-.*\Z', '', str(platform.release()))
-                distinfo = 'Distro=FireeBSD,Kernel=' + release + 'WALA=' + wala_ver
-                return distinfo
+                return "FreeBSD",release
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
                 distinfo[0] = distinfo[0].strip()
-                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
+                return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
                 distinfo = platform.dist()
-                return 'WALA=' + wala_ver + ',Distro=' + distinfo[0]+'-'+distinfo[1]+',Kernel=release-'+platform.release()
+                return  distinfo[0]+"-"+distinfo[1],platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(errMsg, False, 'Error')
-            distinfo = 'Distro=Unknown,Kernel=Unknown,WALA=' + wala_ver
-            return distinfo
+            return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
-        sub_status.append({ "code" : code, "name" : name, "status" : status, "formattedMessage" : formattedmessage })
+        sub_status_obj = Status.SubstatusObj(code,name,status,formattedmessage)
+        sub_status.append(sub_status_obj)
         return sub_status
 
     def timedelta_total_seconds(self, delta):
@@ -325,26 +328,40 @@ class HandlerUtility:
         else:
             return delta.total_seconds()
 
-    def do_status_report(self, operation, status, status_code, message):
+    @staticmethod
+    def add_to_telemetery_data(key,value):
+        temp_dict = {}
+        temp_dict["Value"] = value
+        temp_dict["Key"] = key
+        if(temp_dict not in HandlerUtility.telemetry_data):
+            HandlerUtility.telemetry_data.append(temp_dict)
+
+    def add_telemetry_data(self):
+        os_version,kernel_version = self.get_dist_info()
+        HandlerUtility.add_to_telemetery_data("GuestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("ExtensionVersion",self.get_extension_version())
+        HandlerUtility.add_to_telemetery_data("OSVersion",os_version)
+        HandlerUtility.add_to_telemetery_data("KernelVersion",kernel_version)
+
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
-        distinfo=self.get_dist_info()
-        message=message+";"+distinfo
+        self.add_telemetry_data()
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
+            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
             time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
             time_span = self.timedelta_total_seconds(time_delta) * 1000
             date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-            stat_rept[0]["timestampUTC"] = date_place_holder
-            stat_rept = json.dumps(stat_rept)
+            stat_rept.timestampUTC = date_place_holder
+            stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
             date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
             stat_rept = stat_rept.replace(date_place_holder,date_string)
             status_code = '1'
             status = CommonVariables.status_success
             sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message)
-        stat_rept = json.dumps(stat_rept)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
+        stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
@@ -352,6 +369,8 @@ class HandlerUtility:
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
                 f.write(stat_rept)
+
+        return stat_rept
 
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
