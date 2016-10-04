@@ -31,12 +31,14 @@ Schema for the public configuration file looks like this:
 Schema for the protected configuration file looks like this:
 
 * `workspaceKey`: (required, string) the primary/secondary shared key of the workspace
-* `proxy`: (optional, string) the proxy connection string of the form \[user:pass@\]host\[:port\]
+* `proxy`: (optional, string) the proxy connection string - of the form \[user:pass@\]host\[:port\]
+* `vmResourceId`: (optional, string) the full azure resource id of the vm - of the form /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/virtualMachines/{vmName}
 
 ```json
 {
   "workspaceKey": "<workspace-key>",
-  "proxy": "<proxy-string>"
+  "proxy": "<proxy-string>",
+  "vmResourceId": "<vm-resource-id>"
 }
 ```
 
@@ -115,7 +117,8 @@ $PublicConf = '{
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
-    "proxy": "<proxy string>"
+    "proxy": "<proxy string>",
+    "vmResourceId": "< vm resource id>"
 }'
 
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
@@ -150,7 +153,8 @@ $PublicConf = '{
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
-    "proxy": "<proxy string>"
+    "proxy": "<proxy string>",
+    "vmResourceId": "<vm resource id>"
 }'
 
 Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
@@ -178,7 +182,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
     },
     "protectedSettings": {
       "workspaceKey": "<workspace key>",
-      "proxy": "<proxy string>"
+      "proxy": "<proxy string>",
+      "vmResourceId": "<vm resource id>"
     }
   }
 }
@@ -195,7 +200,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 ```json
 {
   "workspaceKey": "MyWorkspaceKey",
-  "proxy": "proxyuser:proxypassword@proxyserver:8080"
+  "proxy": "proxyuser:proxypassword@proxyserver:8080",
+  "vmResourceId": "/subscriptions/c90fcea1-7cd5-4255-9e2e-25d627a2a259/resourceGroups/RGName/providers/Microsoft.Compute/virtualMachines/VMName"
 }
 ```
 
