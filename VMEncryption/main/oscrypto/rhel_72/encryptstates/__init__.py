@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-#
-# VMEncryption extension
 #
 # Copyright 2015 Microsoft Corporation
 #
@@ -15,22 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Requires Python 2.7+
+#
 
-import subprocess
+import inspect
 import os
-import os.path
-import shlex
 import sys
-from subprocess import *
+import traceback
+from time import sleep
 
-class CommandExecuter(object):
-    """description of class"""
-    def __init__(self,logger):
-        self.logger = logger
+scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
+sys.path.append(oscryptodir)
 
-    def Execute(self,command_to_execute):
-        self.logger.log("Executing: {0}".format(command_to_execute))
-        args = shlex.split(command_to_execute)
-        proc = Popen(args)
-        returnCode = proc.wait()
-        return returnCode
+from OSEncryptionState import *
+from PrereqState import *
+from SelinuxState import *
+from StripdownState import *
+from UnmountOldrootState import *
+from EncryptBlockDeviceState import *
+from PatchBootSystemState import *

@@ -68,6 +68,8 @@ def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context('Enable')
     try:
+        _forcibly_reset_chap(hutil)
+
         reset_ssh = None
         remove_user = None
         protect_settings = hutil.get_protected_settings()
@@ -110,6 +112,21 @@ def enable():
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
+
+def _forcibly_reset_chap(hutil):
+    name = "ChallengeResponseAuthentication"
+    config = waagent.GetFileContents(SshdConfigPath).split("\n")
+    for i in range(0, len(config)):
+        if config[i].startswith(name) and "no" in config[i].lower():
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="sshd", isSuccess=True, message="ChallengeResponseAuthentication no")
+            return
+
+    waagent.AddExtensionEvent(name=hutil.get_name(), op="sshd", isSuccess=True, message="ChallengeResponseAuthentication yes")
+    _backup_sshd_config(SshdConfigPath)
+    _set_sshd_config(config, name, "no")
+    waagent.ReplaceFileContentsAtomic(SshdConfigPath, "\n".join(config))
+    waagent.MyDistro.restartSshService()
 
 
 def _is_sshd_config_modified(protected_settings):

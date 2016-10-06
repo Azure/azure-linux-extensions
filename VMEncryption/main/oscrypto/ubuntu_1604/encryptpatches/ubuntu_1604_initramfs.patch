@@ -1,0 +1,36 @@
+diff -Naur hooks.orig/cryptroot hooks/cryptroot
+--- hooks.orig/cryptroot	2016-07-24 04:00:35.707468106 +0000
++++ hooks/cryptroot	2016-07-24 04:00:58.251574341 +0000
+@@ -521,14 +521,14 @@
+ 				mkdir -p "$DESTDIR/conf/conf.d/cryptheader"
+ 			fi
+ 
+-			#if [ -e "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" ]; then
+-			#	copy_exec "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" /conf/conf.d/cryptheader >&2
+-			#elif [ -e "$CRYPTHEADER" ]; then
+-			#	copy_exec "$CRYPTHEADER" /conf/conf.d/cryptheader >&2
+-			#else
+-			#	echo "cryptsetup: WARNING: failed to find LUKS header $CRYPTHEADER" >&2
+-			#	continue
+-			#fi
++			if [ -e "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" ]; then
++				copy_exec "$CONFDIR/conf.d/cryptheader/$CRYPTHEADER" /conf/conf.d/cryptheader >&2
++			elif [ -e "$CRYPTHEADER" ]; then
++				copy_exec "$CRYPTHEADER" /conf/conf.d/cryptheader >&2
++			else
++				echo "cryptsetup: WARNING: failed to find LUKS header $CRYPTHEADER" >&2
++				continue
++			fi
+ 		fi
+ 		
+ 
+@@ -627,6 +627,9 @@
+ 	if [ -z "$rootdevs" ]; then
+ 		echo "cryptsetup: WARNING: could not determine root device from /etc/fstab" >&2
+ 	fi
++	if ! echo "$rootdevs" | grep -q "osencrypt"; then
++		rootdevs="$rootdevs osencrypt"
++	fi
+ 	usrdevs=$(get_fs_devices /usr)
+ 	resumedevs=$(get_resume_devices)
+ 	initramfsdevs=$(get_initramfs_devices)

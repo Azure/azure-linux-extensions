@@ -37,6 +37,7 @@ class redhatPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
         super(redhatPatching,self).__init__(distro_info)
         self.logger = logger
+        self.usr_flag = 0
         if(distro_info is not None and len(distro_info) > 0 and distro_info[1].startswith("6.")):
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -48,7 +49,8 @@ class redhatPatching(AbstractPatching):
             self.echo_path = '/bin/echo'
             self.getenforce_path = '/usr/sbin/getenforce'
             self.setenforce_path = '/usr/sbin/setenforce'
-            self.lsblk_path = '/bin/lsblk' 
+            self.lsblk_path = '/bin/lsblk'
+            self.usr_flag = 0
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/bin/mkdir'
             self.mount_path = '/bin/mount'
@@ -67,6 +69,7 @@ class redhatPatching(AbstractPatching):
             self.getenforce_path = '/usr/sbin/getenforce'
             self.setenforce_path = '/usr/sbin/setenforce'
             self.lsblk_path = '/usr/bin/lsblk'
+            self.usr_flag = 1
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/usr/bin/mkdir'
             self.mount_path = '/usr/bin/mount'

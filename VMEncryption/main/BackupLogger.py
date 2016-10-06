@@ -21,6 +21,7 @@ import traceback
 import urlparse
 import httplib
 import os
+import string
 
 class BackupLogger(object):
     def __init__(self, hutil):
@@ -29,5 +30,17 @@ class BackupLogger(object):
 
     """description of class"""
     def log(self, msg, level='Info'):
-        log_msg = "{0}: {1} {2}".format(self.current_process_id, level, msg)
+        log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
+        log_msg = filter(lambda c: c in string.printable, log_msg)
+        log_msg = log_msg.encode('ascii', 'ignore')
+
         self.hutil.log(log_msg)
+        self.log_to_console(log_msg)
+ 
+    def log_to_console(self, msg):
+        try:
+            with open('/dev/console', 'w') as f:
+                msg = filter(lambda c: c in string.printable, msg)
+                f.write('[AzureDiskEncryption] ' + msg + '\n')
+        except IOError as e:
+            pass
