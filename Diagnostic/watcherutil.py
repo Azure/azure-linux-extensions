@@ -42,7 +42,7 @@ class Watcher():
             # Only try to mount if it's been at least 1 minute since the 
             # change to fstab was done, to prevent spewing out erroneous spew
             if (currentModTime != self.lastModTime and
-                currentModDateTime < currentModDateTime +
+                datetime.now() > currentModDateTime +
                     datetime.timedelta(minutes=1)):
                 tryMount = True
                 self.lastModTime = currentModTime
