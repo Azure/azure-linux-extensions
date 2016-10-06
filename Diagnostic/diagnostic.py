@@ -743,7 +743,7 @@ def start_mdsd():
         # Create monitor object that encapsulates monitoring activities
         watcher = Watcher(hutil._err, hutil._log)
         # Start a thread to monitor /etc/fstab
-        threadObj = threading.Thread(target=watcher.watch, args=(watcher))
+        threadObj = threading.Thread(target=watcher.watch)
         threadObj.daemon = True
         threadObj.start()
 
@@ -1217,7 +1217,7 @@ class Watcher():
 
     def watch(self):
         while (True):
-            handle_fstab(self) 
+            self.handle_fstab() 
             time.sleep(60 * 5) # Sleep 5 minutes
         pass
 
