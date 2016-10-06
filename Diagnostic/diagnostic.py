@@ -1190,13 +1190,22 @@ class Watcher():
         ch.setLevel(logging.INFO)
         self.logger.addHandler(ch)
 
-    def handle_fstab(self):
-        currentModTime = os.path.getmtime('/etc/fstab')
-        currentModDateTime = datetime.datetime.fromtimestamp(currentModTime)
+    def handle_fstab(self, ignoremtime=False):
+        tryMount = False
+        if ignoremtime == True:
+            tryMount = True
+        else:
+            currentModTime = os.path.getmtime('/etc/fstab')
+            currentModDateTime = datetime.datetime.fromtimestamp(currentModTime)
+            
+            if (currentModTime != self.lastModTime and 
+                currentModDateTime < currentModDateTime + 
+                    datetime.timedelta(minutes=1)): 
+                tryMount = True
+                self.lastModTime = currentModTime
+
         ret = 0
-        if (currentModTime != self.lastModTime and 
-            currentModDateTime < currentModDateTime + 
-                datetime.timedelta(minutes=1)): 
+        if (tryMount == True):
             ret = subprocess.call(['sudo', 'mount', '-a', '-vf'])
             if (ret != 0):
                 # There was an error running mount, so log
@@ -1204,8 +1213,6 @@ class Watcher():
             else:
                 # No errors
                 self.logger.info('fstab modification passed mount validation')
-
-        self.lastModTime = currentModTime
         return ret
 
     def watch(self):

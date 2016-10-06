@@ -3,6 +3,8 @@ import diagnostic
 import sys
 import subprocess
 import os
+import errno
+import pdb
 
 class FStabUnitTests(unittest.TestCase):
     _watcher = None
@@ -14,13 +16,15 @@ class FStabUnitTests(unittest.TestCase):
         try:
             os.mkdir(self._datapath)
         except OSError as e:
+            if (e.errno != errno.EEXIST):
+                raise
             pass
 
         # mount an overlay so that we can make changes to /etc/fstab
         subprocess.call(['sudo', 
-            'mount', '-t', 'overlayfs',
+            'mount', '-t', 'overlayfs', 'overlayfs',
             '-olowerdir=/etc,upperdir=' + self._datapath,
-            'overlayfs', '/etc'])
+            '/etc'])
         pass
 
     def tearDown(self):
@@ -31,34 +35,36 @@ class FStabUnitTests(unittest.TestCase):
             pass
 
     def test_fstab_basic(self):
-        self.assertEqual(self._watcher.handle_fstab(), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
        
     def test_fstab_touch(self):
         subprocess.call(['sudo', 'touch', '/etc/fstab'])
-        self.assertEqual(self._watcher.handle_fstab(), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
 
     def addFstabEntry(self, fstabentry):
-        subprocess.call(['sudo',
-            'echo', fstabentry, '>>', '/etc/fstab'])
+        with open(self._datapath + '/fstab', 'w') as f:
+            f.write(fstabentry)
+            f.write('\n')
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_baduuid(self):
         self.addFstabEntry('UUID=1111111-1111-1111-1111-111111111111 /test ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(), 0)
+        pdb.set_trace()
+        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_baddevicename(self):
         self.addFstabEntry('/dev/foobar /test ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_malformedentry(self):
         self.addFstabEntry('/test /dev/foobar ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
 
     def test_fstab_goodentry(self):
         self.addFstabEntry('/dev/sdb1 /test ext4 defaults 0 0')
-        self.assertEqual(self._watcher.handle_fstab(), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
 
 
 
