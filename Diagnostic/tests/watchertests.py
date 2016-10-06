@@ -4,7 +4,7 @@ import sys
 import subprocess
 import os
 import errno
-import pdb
+import watcherutil
 
 
 class FStabUnitTests(unittest.TestCase):
@@ -12,7 +12,7 @@ class FStabUnitTests(unittest.TestCase):
     _datapath = os.path.join(os.getcwd(), 'utdata')
 
     def setUp(self):
-        self._watcher = diagnostic.Watcher(sys.stderr, sys.stdout)
+        self._watcher = watcherutil.Watcher(sys.stderr, sys.stdout)
 
         try:
             os.mkdir(self._datapath)
@@ -36,11 +36,11 @@ class FStabUnitTests(unittest.TestCase):
             pass
 
     def test_fstab_basic(self):
-        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
        
     def test_fstab_touch(self):
         subprocess.call(['sudo', 'touch', '/etc/fstab'])
-        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
 
     def addFstabEntry(self, fstabentry):
         with open(self._datapath + '/fstab', 'w') as f:
@@ -51,21 +51,21 @@ class FStabUnitTests(unittest.TestCase):
     def test_fstab_baduuid(self):
         self.addFstabEntry('UUID=1111111-1111-1111-1111-111111111111 /test ext4 defaults 0 0')
         pdb.set_trace()
-        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_baddevicename(self):
         self.addFstabEntry('/dev/foobar /test ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_malformedentry(self):
         self.addFstabEntry('/test /dev/foobar ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
 
     def test_fstab_goodentry(self):
         self.addFstabEntry('/dev/sdb1 /test ext4 defaults 0 0')
-        self.assertEqual(self._watcher.handle_fstab(ignoremtime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
 
 
 

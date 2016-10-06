@@ -33,6 +33,7 @@ import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
+import watcherutil
 
 WorkDir = os.getcwd()
 MDSDFileResourcesPrefix = os.path.join(WorkDir, 'mdsd')
@@ -741,7 +742,7 @@ def start_mdsd():
 
     try:
         # Create monitor object that encapsulates monitoring activities
-        watcher = Watcher(hutil._err, hutil._log)
+        watcher = watcherutil.Watcher(hutil._err, hutil._log)
         # Start a thread to monitor /etc/fstab
         threadObj = threading.Thread(target=watcher.watch)
         threadObj.daemon = True
@@ -1175,51 +1176,7 @@ def get_deployment_id():
 
     return identity
 
-class Watcher():
-    lastModTime = os.path.getmtime('/etc/fstab')
-    logger = None
 
-    def __init__(self, errorStream, outputStream):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
-
-        ch = logging.StreamHandler(errorStream)
-        ch.setLevel(logging.WARNING)
-        self.logger.addHandler(ch)
-        ch = logging.StreamHandler(outputStream)
-        ch.setLevel(logging.INFO)
-        self.logger.addHandler(ch)
-
-    def handle_fstab(self, ignoremtime=False):
-        tryMount = False
-        if ignoremtime == True:
-            tryMount = True
-        else:
-            currentModTime = os.path.getmtime('/etc/fstab')
-            currentModDateTime = datetime.datetime.fromtimestamp(currentModTime)
-            
-            if (currentModTime != self.lastModTime and 
-                currentModDateTime < currentModDateTime + 
-                    datetime.timedelta(minutes=1)): 
-                tryMount = True
-                self.lastModTime = currentModTime
-
-        ret = 0
-        if (tryMount == True):
-            ret = subprocess.call(['sudo', 'mount', '-a', '-vf'])
-            if (ret != 0):
-                # There was an error running mount, so log
-                self.logger.error('fstab modification failed mount validation.  Please correct before reboot.')
-            else:
-                # No errors
-                self.logger.info('fstab modification passed mount validation')
-        return ret
-
-    def watch(self):
-        while (True):
-            self.handle_fstab() 
-            time.sleep(60 * 5) # Sleep 5 minutes
-        pass
 
 if __name__ == '__main__' :
     if len(sys.argv) > 1:

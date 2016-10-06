@@ -1,5 +1,5 @@
 #!/bin/bash
 
 
-python diagnostic_ut.py
+python -m tests.watchertests
 

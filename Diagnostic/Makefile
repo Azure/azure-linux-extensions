@@ -5,7 +5,8 @@ all: package
 
 LADSOURCES = \
 	diagnostic.py \
-	diagnostic_ut.py \
+	watcherutil.py \
+	tests \
 	HandlerManifest.json \
 	license.txt \
 	manifest.xml \
