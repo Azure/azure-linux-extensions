@@ -25,6 +25,8 @@ import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+import threading
+import logging
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
@@ -738,6 +740,13 @@ def start_mdsd():
         eventhub_persist_dir_path).split(" ")
 
     try:
+        # Create monitor object that encapsulates monitoring activities
+        watcher = Watcher(hutil._err, hutil._log)
+        # Start a thread to monitor /etc/fstab
+        threadObj = threading.Thread(target=watcher.watch)
+        threadObj.daemon = True
+        threadObj.start()
+
         num_quick_consecutive_crashes = 0
 
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
@@ -1166,6 +1175,44 @@ def get_deployment_id():
 
     return identity
 
+class Watcher():
+    lastModTime = os.path.getmtime('/etc/fstab')
+    logger = None
+
+    def __init__(self, errorStream, outputStream):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+        ch = logging.StreamHandler(errorStream)
+        ch.setLevel(logging.WARNING)
+        self.logger.addHandler(ch)
+        ch = logging.StreamHandler(outputStream)
+        ch.setLevel(logging.INFO)
+        self.logger.addHandler(ch)
+
+    def handle_fstab(self):
+        currentModTime = os.path.getmtime('/etc/fstab')
+        currentModDateTime = datetime.datetime.fromtimestamp(currentModTime)
+        ret = 0
+        if (currentModTime != self.lastModTime and 
+            currentModDateTime < currentModDateTime + 
+                datetime.timedelta(minutes=1)): 
+            ret = subprocess.call(['sudo', 'mount', '-a', '-vf'])
+            if (ret != 0):
+                # There was an error running mount, so log
+                self.logger.error('fstab modification failed mount validation.  Please correct before reboot.')
+            else:
+                # No errors
+                self.logger.info('fstab modification passed mount validation')
+
+        self.lastModTime = currentModTime
+        return ret
+
+    def watch(self):
+        while (True):
+            handle_fstab(self) 
+            time.sleep(60 * 5) # Sleep 5 minutes
+        pass
 
 if __name__ == '__main__' :
     if len(sys.argv) > 1:
