@@ -743,7 +743,6 @@ def start_mdsd():
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
 
             RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
-            mdsd_pid_port_file_checked = False
             mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
@@ -775,18 +774,6 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
-
-                # Issue #137 Can't start mdsd if port 29131 is in use.
-                # mdsd now binds to another randomly available port,
-                # and LAD still needs to reconfigure rsyslogd.
-                if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
-                    with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
-                        mdsd_pid_port_file.readline()                    # This is actually PID, so ignore.
-                        new_port = mdsd_pid_port_file.readline().strip() # .strip() is important!
-                        if default_port != new_port:
-                            hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
-                            reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port)
-                        mdsd_pid_port_file_checked = True
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
@@ -1057,7 +1044,7 @@ def install_rsyslogom():
         RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
-        # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog 8 module
+        # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog module (5/7/8)
         mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
         cmd_to_run = "sed -i 's#__MDSD_SOCKET_FILE_PATH__#{0}#g' {1}"
         RunGetOutput(cmd_to_run.format(mdsd_json_socket_file_path, rsyslog_om_mdsd_syslog_conf_path))
@@ -1070,26 +1057,6 @@ def install_rsyslogom():
     else:
         RunGetOutput("service rsyslog restart")
     return 0,"install mdsdom completed"
-
-
-def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
-    files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
-    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
-
-    mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
-
-    for f in files_to_modify:
-        RunGetOutput(cmd_to_run.format(new_port, f))
-        RunGetOutput(cmd2_to_run.format(new_port, f))
-
-    update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
-
-    if distConfig.has_key("restartrsyslog"):
-        RunGetOutput(distConfig["restartrsyslog"])
-    else:
-        RunGetOutput("service rsyslog restart")
 
 
 def install_required_package():
