@@ -85,7 +85,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python is needed for /usr/sbin/semanage on Redhat. Also, some RH-based distros really don't have tar (e.g. OracleLinux 7).
+                 "packages":('tar',),  # Some RH-based distros really don't have tar (e.g. OracleLinux 7).
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -638,14 +638,6 @@ def main(command):
                       'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
-def update_selinux_port_setting_for_rsyslogomazuremds(action, port):
-    # This is needed for Redhat-based distros.
-    # 'action' param should be '-a' for adding and '-d' for deleting.
-    # Caller is responsible to make sure a correct action param is passed.
-    if os.path.exists("/usr/sbin/semanage"):
-        RunGetOutput('semanage port {0} -t syslogd_port_t -p tcp {1};echo ignore already added or not found'.format(action, port))
-
-
 def start_daemon():
     args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
@@ -688,7 +680,6 @@ def start_mdsd():
 
 
     default_port = RSYSLOG_OM_PORT
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', default_port)
 
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
