@@ -124,7 +124,7 @@ SuseConfig12 = dict(RedhatConfig.items()+
 
 CentosConfig = dict(RedhatConfig.items()+
                     {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)
+                     "packages":()
                     }.items())
 
 RSYSLOG_OM_PORT='29131'
@@ -205,9 +205,10 @@ def setup(should_install_required_package):
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
-    omi_err, omi_msg = install_omi()
-    if omi_err is not 0:
-        return 4, omi_msg
+    if should_install_required_package:
+        omi_err, omi_msg = install_omi()
+        if omi_err is not 0:
+            return 4, omi_msg
 
     return 0, 'success'
 
