@@ -56,6 +56,16 @@ class CommonVariables:
     error_http_failure = 15
     error_upload_status_blob = 16
     error = 2
+
+    """
+    Pre-Post Plugin error code definitions
+    """
+    PrePost_PluginStatus_Success = 0
+    PrePost_PluginStatus_Timeout = 5
+    PrePost_PluginStatus_ConfigNotFound = 10
+    PrePost_ScriptStatus_Success = 0
+    PrePost_ScriptStatus_Error = 1
+    PrePost_ScriptStatus_Warning = 2
     
     @staticmethod
     def isTerminalStatus(status):

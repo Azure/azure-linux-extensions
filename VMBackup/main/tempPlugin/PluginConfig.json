@@ -1,0 +1,11 @@
+{
+	"pluginName" : "ScriptRunner",
+	"timeout" : 10,
+	"continueBackupOnFailure" : false,
+	"preScriptLocation" : "/etc/azure/preScript.sh",
+	"postScriptLocation" : "/etc/azure/postScript.sh",
+	"preScriptNoOfRetries" : 0,
+	"postScriptNoOfRetries" : 0,
+	"preScriptParams" : ["preparam1", "preParam2"],
+	"postScriptParams" : ["postparam1", "postParam2"]
+}

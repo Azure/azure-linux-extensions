@@ -50,22 +50,26 @@ from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
+from PluginHost import PluginHost
 
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,g_fsfreeze_on
     run_result = CommonVariables.success
     run_status = 'success'
     error_msg = ''
     freeze_result = None
+    g_fsfreeze_on = True
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     backup_logger = Backuplogger(hutil)
     MyPatching = GetMyPatching(logger = backup_logger)
     hutil.patching = MyPatching
-    
+
+    sleep(1)    
+
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -103,10 +107,10 @@ def status_report(status,status_code,message):
         blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
         if(trans_report_msg is not None):
-            backup_logger.log("trans status report message:")
+            backup_logger.log("trans status report message:", True)
             backup_logger.log(trans_report_msg)
         else:
-            backup_logger.log("trans_report_msg is none")
+            backup_logger.log("trans_report_msg is none", True)
 
 def exit_with_commit_log(error_msg, para_parser):
     global backup_logger
@@ -118,11 +122,14 @@ def exit_with_commit_log(error_msg, para_parser):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
-def snapshot(): 
+def snapshot():
     try: 
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser 
-        freeze_result = freezer.freezeall() 
-        backup_logger.log('T:S freeze result ' + str(freeze_result)) 
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,g_fsfreeze_on
+        
+        if (g_fsfreeze_on=="True"):
+            freeze_result = freezer.freezeall() 
+            backup_logger.log('T:S freeze result ' + str(freeze_result)) 
+
         if(freeze_result is not None and len(freeze_result.errors) > 0): 
             run_result = CommonVariables.error 
             run_status = 'error' 
@@ -150,9 +157,46 @@ def snapshot():
 
 def freeze_snapshot(timeout):
     try:
+        snapshot_thread = Thread(target = snapshot)
+        start_time=datetime.datetime.utcnow()
+        snapshot_thread.start()
+        snapshot_thread.join(float(timeout))
+        if not snapshot_done:
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'T:W Snapshot timeout'
+            backup_logger.log(error_msg, False, 'Warning')
+        end_time=datetime.datetime.utcnow()
+        time_taken=end_time-start_time
+        backup_logger.log('total time taken..' + str(time_taken))
+    
+        if (g_fsfreeze_on=="True"):
+            for i in range(0,3):
+                unfreeze_result = freezer.unfreezeall()
+                backup_logger.log('unfreeze result ' + str(unfreeze_result))
+                if(unfreeze_result is not None):
+                    if len(unfreeze_result.errors) > 0:
+                        error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
+                        backup_logger.log(error_msg, False, 'Warning')
+                    else:
+                        backup_logger.log('unfreeze result is None')
+                        break;
+            backup_logger.log('unfreeze ends...')
+    except Exception as e:
+        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, False, 'Error')
+        run_result = CommonVariables.error
+        run_status = 'error'
+        error_msg = 'Enable failed with exception in safe freeze or snapshot '
+
+def safe_freeze_snapshot(timeout):
+    try:
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
-        freeze_result = freezer.freeze_safe(timeout)
-        backup_logger.log('T:S freeze result ' + str(freeze_result))
+        
+        if (g_fsfreeze_on=="True"):
+            freeze_result = freezer.freeze_safe(timeout)
+            backup_logger.log('T:S freeze result ' + str(freeze_result))
+
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
@@ -169,8 +213,9 @@ def freeze_snapshot(timeout):
                 run_status = 'error'
                 backup_logger.log(error_msg, False, 'Error')
             else:
-                thaw_result=freezer.thaw_safe()
-                backup_logger.log('T:S thaw result ' + str(thaw_result))
+                if (g_fsfreeze_on=="True"):
+                    thaw_result=freezer.thaw_safe()
+                    backup_logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
                     run_result = CommonVariables.error
                     run_status = 'error'
@@ -186,11 +231,11 @@ def freeze_snapshot(timeout):
         backup_logger.log(errMsg, False, 'Error')
         run_result = CommonVariables.error
         run_status = 'error'
-        error_msg = 'Enable failed with exception in freeze or snapshot ' 
+        error_msg = 'Enable failed with exception in safe freeze or snapshot ' 
     #snapshot_done = True
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,g_fsfreeze_on
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
@@ -204,11 +249,13 @@ def daemon():
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
+        g_fsfreeze_on = config.get('SnapshotThread','fsfreeze')
         safe_freeze_on=config.get('SnapshotThread','safefreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, False, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
+    backup_logger.log(" fsfreeze flag " + str(g_fsfreeze_on), True)
     backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
 
     try:
@@ -253,32 +300,29 @@ def daemon():
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
-                if(safe_freeze_on==True):
-                    freeze_snapshot(thread_timeout)
-                else:
-                    snapshot_thread = Thread(target = snapshot)
-                    start_time=datetime.datetime.utcnow()
-                    snapshot_thread.start()
-                    snapshot_thread.join(float(thread_timeout))
-                    if not snapshot_done:
-                        run_result = CommonVariables.error
-                        run_status = 'error'
-                        error_msg = 'T:W Snapshot timeout'
-                        backup_logger.log(error_msg, False, 'Warning')
-                    end_time=datetime.datetime.utcnow()
-                    time_taken=end_time-start_time
-                    backup_logger.log('total time taken..' + str(time_taken))
-                    for i in range(0,3):
-                        unfreeze_result = freezer.unfreezeall()
-                        backup_logger.log('unfreeze result ' + str(unfreeze_result))
-                        if(unfreeze_result is not None):
-                            if len(unfreeze_result.errors) > 0:
-                                error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                                backup_logger.log(error_msg, False, 'Warning')
-                            else:
-                                backup_logger.log('unfreeze result is None')
-                                break;
-                    backup_logger.log('unfreeze ends...')
+                
+                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+
+                PluginHostObj = PluginHost(logger=backup_logger)
+                preResult = PluginHostObj.pre_script()
+                dobackup = preResult.continueBackup
+                if preResult.continueBackup:
+                    if(safe_freeze_on==True):
+                        safe_freeze_snapshot(thread_timeout)
+                    else:
+                        freeze_snapshot(thread_timeout)
+                postResult = PluginHostObj.post_script()
+                if not postResult.continueBackup:
+                    dobackup = False
+
+                if not dobackup:
+                    run_status = 'error'
+                    run_result = CommonVariables.error
+                    error_msg = 'Scripts failed and backup also failed'
+                    backup_logger.log(error_msg,False,'Error')
+                elif preResult.anyScriptFailed or postResult.anyScriptFailed:
+                    error_msg = 'Scripts failed but continue backup'
+                    backup_logger.log(error_msg,False,'Error')
                 
         else:
             run_status = 'error'
@@ -360,9 +404,9 @@ def enable():
             backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
             commandStartTime = convert_time(utcTicksLong)
             utcNow = datetime.datetime.utcnow()
-            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
+            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
             timespan = utcNow - commandStartTime
-            THIRTY_MINUTES = 30 * 60 # in seconds
+            THIRTY_MINUTES = 3000 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
