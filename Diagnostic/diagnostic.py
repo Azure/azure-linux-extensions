@@ -127,7 +127,7 @@ CentosConfig = dict(RedhatConfig.items()+
                      "packages":()
                     }.items())
 
-RSYSLOG_OM_PORT='29131'
+MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
 All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
@@ -629,6 +629,17 @@ def main(command):
                       'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
+def update_selinux_settings_for_rsyslogomazuremds():
+    # This is still needed for Redhat-based distros, which still require SELinux to be allowed
+    # for even Unix domain sockets.
+    # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
+    # We instead compile from the bundled SELinux module def for lad_mdsd
+    if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
+        RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule -i {0}/lad_mdsd.pp'.format(WorkDir))
+
+
 def start_daemon():
     args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
@@ -669,8 +680,7 @@ def start_mdsd():
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
-
-    default_port = RSYSLOG_OM_PORT
+    update_selinux_settings_for_rsyslogomazuremds()
 
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
@@ -713,7 +723,7 @@ def start_mdsd():
     command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
-        default_port,
+        MDSD_LISTEN_PORT,
         MDSDRoleName,
         monitor_file_path,
         warn_file_path,

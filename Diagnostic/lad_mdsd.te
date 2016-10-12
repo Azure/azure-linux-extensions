@@ -1,0 +1,18 @@
+# SELinux policy for mdsd on LAD, obtained by "grep mdsd /var/log/audit/audit.log | audit2allow -m lad_mdsd.te"
+# Note it combines different types (unconfined_t and initrc_t) to support both Redhat policy and CentOS policy
+
+module lad_mdsd 1.0;
+
+require {
+	type unconfined_t;
+	type initrc_t;
+	type syslogd_t;
+	type var_run_t;
+	class sock_file write;
+	class unix_stream_socket connectto;
+}
+
+#============= syslogd_t ==============
+allow syslogd_t unconfined_t:unix_stream_socket connectto;
+allow syslogd_t initrc_t:unix_stream_socket connectto;
+allow syslogd_t var_run_t:sock_file write;
