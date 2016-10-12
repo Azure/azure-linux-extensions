@@ -85,7 +85,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":(),
+                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -127,16 +127,11 @@ CentosConfig = dict(RedhatConfig.items()+
                      "packages":('policycoreutils-python',)  # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
                     }.items())
 
-OracleConfig = dict(RedhatConfig.items()+
-                    {
-                     "packages":('policycoreutils-python', 'tar')  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
-                    }.items())
-
 MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
 All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
-           'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':OracleConfig,
+           'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
            'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12, 'SuSE':SuseConfig12}
 distConfig = None
 dist = platform.dist()
