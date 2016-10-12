@@ -172,27 +172,27 @@ def parse_context(operation):
     return
 
 
-def setup(should_install_required_package):
+def setup_dependencies_and_mdsd():
     global EnableSyslog
 
-    if should_install_required_package:
-        install_package_error = ""
-        retry = 3
-        while retry > 0:
-            error, msg = install_required_package()
-            hutil.log(msg)
-            if error == 0:
-                break
-            else:
-                retry -= 1
-                hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error = msg
-                time.sleep(60)
-        if install_package_error:
-            if len(install_package_error) > 1024:
-                install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
-            hutil.error(install_package_error)
-            return 2, install_package_error
+    # Install dependencies
+    install_package_error = ""
+    retry = 3
+    while retry > 0:
+        error, msg = install_required_package()
+        hutil.log(msg)
+        if error == 0:
+            break
+        else:
+            retry -= 1
+            hutil.log("Sleep 60 retry "+str(retry))
+            install_package_error = msg
+            time.sleep(60)
+    if install_package_error:
+        if len(install_package_error) > 1024:
+            install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
+        hutil.error(install_package_error)
+        return 2, install_package_error
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
@@ -200,15 +200,15 @@ def setup(should_install_required_package):
             hutil.error(msg)
             return 3, msg
 
-    # Run prep commands
+    # Run mdsd prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
-    if should_install_required_package:
-        omi_err, omi_msg = install_omi()
-        if omi_err is not 0:
-            return 4, omi_msg
+    # Install/start OMI
+    omi_err, omi_msg = install_omi()
+    if omi_err is not 0:
+        return 4, omi_msg
 
     return 0, 'success'
 
@@ -596,16 +596,6 @@ def main(command):
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
 
         elif ExtensionOperationType is waagent.WALAEventOperation.Install:
-            error, msg = setup(should_install_required_package=False)  # Don't install dependencies on Install (to avoid delaying VM deployment completion)
-            if error != 0:
-                hutil.do_status_report(ExtensionOperationType, "error", error, msg)
-                waagent.AddExtensionEvent(name=hutil.get_name(),
-                                          op=ExtensionOperationType,
-                                          isSuccess=False,
-                                          version=hutil.get_extension_version(),
-                                          message="Install failed: " + msg)
-                sys.exit(error)  # Per extension specification, we must exit with a non-zero status code when install fails
-
             if UseSystemdServiceManager:
                 install_service()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Install succeeded")
@@ -658,7 +648,7 @@ def start_mdsd():
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup(should_install_required_package=True)  # We didn't install dependencies on Install, so they must be installed now.
+    setup_dependencies_and_mdsd()
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
