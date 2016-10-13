@@ -348,27 +348,33 @@ class HandlerUtility:
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
+
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
+        time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+        time_span = self.timedelta_total_seconds(time_delta) * 1000
+        date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+        stat_rept.timestampUTC = date_place_holder
+        date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+        stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+        stat_rept = stat_rept.replace(date_place_holder,date_string)
+        stat_rept_file = stat_rept
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
-            time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-            time_span = self.timedelta_total_seconds(time_delta) * 1000
-            date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-            stat_rept.timestampUTC = date_place_holder
-            stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
-            date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-            stat_rept = stat_rept.replace(date_place_holder,date_string)
             status_code = '1'
             status = CommonVariables.status_success
-            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
-        stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept_file,'success',None)
+            stat_rept_v2 = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks)
+            stat_rept_v2.timestampUTC = date_place_holder
+            stat_rept_v2 =  "[" + json.dumps(stat_rept_v2, cls = Status.ComplexEncoder) + "]"
+            stat_rept_v2 = stat_rept_v2.replace(date_place_holder,date_string)
+            stat_rept_file =  stat_rept_v2
+
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept)
+                f.write(stat_rept_file)
 
         return stat_rept
 
