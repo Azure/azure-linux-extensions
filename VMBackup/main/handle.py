@@ -226,6 +226,7 @@ def daemon():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
+        backup_logger.log(commandToExecute,True)
         if(commandToExecute.lower() == CommonVariables.iaas_install_command):
             backup_logger.log('install succeed.',True)
             run_status = 'success'
@@ -362,11 +363,11 @@ def enable():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
             timespan = utcNow - commandStartTime
-            THIRTY_MINUTES = 30 * 60 # in seconds
+            MAX_TIMESPAN = 150 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
-            if(abs(total_span_in_seconds) > THIRTY_MINUTES):
+            if(abs(total_span_in_seconds) > MAX_TIMESPAN):
                 error_msg = 'the call time stamp is out of date. so skip it.'
                 exit_with_commit_log(error_msg, para_parser)
 
