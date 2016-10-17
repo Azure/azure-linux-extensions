@@ -311,7 +311,7 @@ def daemon():
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
 
-    hutil.do_exit(0, 'Enable', run_status, str(run_result), error_msg)
+    sys.exit(0)
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
