@@ -85,6 +85,8 @@ class HandlerUtility:
         self._error = error
         self._short_name = short_name
         self.patching = None
+        self.storageDetailsObj = None
+        self.partitioncount = 0
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -244,10 +246,53 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
+    def get_machine_id(self):
+        machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
+        store_identity_file = "./machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C"
+        machine_id = ""
+        try:
+            if os.path.exists(os.path.dirname(machine_id_file)):
+                file_pointer = open(machine_id_file, "r")
+                machine_id = file_pointer.readline()
+                file_pointer.close()
+            else:
+                file_pointer = open(store_identity_file, "r")
+                machine_id = file_pointer.readline()[1:-1] #to remove curly braces present in the storage identity file
+                file_pointer.close()
+                os.makedirs(os.path.dirname(machine_id_file))
+                file_pointer2 = open(machine_id_file, "w")
+                file_pointer2.write(machine_id)
+                file_pointer2.close()
+        except:
+            errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg, False, 'Error')
+ 
+        return machine_id
+
+    def get_total_used_size(self):
+        try:
+            df = subprocess.Popen(["df"], stdout=subprocess.PIPE)
+            output = df.communicate()[0]
+            output = output.split("\n")
+            total_used = 0
+            for i in range(1,len(output)-1):
+                device, size, used, available, percent, mountpoint = output[i].split()
+                total_used = total_used + int(used) #return in KB
+
+            return total_used * 1024,False #Converting into Bytes
+        except:
+            return 0,True
+
+    def get_storage_details(self):
+        if(self.storageDetailsObj == None):
+            total_size,failure_flag = self.get_total_used_size()
+            self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag, self.get_machine_id())
+        return self.storageDetailsObj
+
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, taskId, commandStartTimeUTCTicks)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), taskId, commandStartTimeUTCTicks)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
         return top_stat_obj
 
@@ -259,7 +304,7 @@ class HandlerUtility:
             return extension_version
         except Exception as e:
             errMsg = 'Failed to retrieve the Extension version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg, False, 'Error')
             extension_version="Unknown"
             return extension_version
 
@@ -278,7 +323,7 @@ class HandlerUtility:
                 return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg, False, 'Error')
             waagent_version="Unknown"
             return waagent_version
 
@@ -295,7 +340,7 @@ class HandlerUtility:
             return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Warning')
+            self.log(errMsg, False, 'Warning')
             waagent_version="Unknown"
             return waagent_version
 
@@ -314,7 +359,7 @@ class HandlerUtility:
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg, False, 'Error')
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
