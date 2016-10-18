@@ -33,8 +33,10 @@ import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 
 WorkDir = os.getcwd()
-MDSDFileResourcesPrefix = os.path.join(WorkDir, 'mdsd')
-MDSDPidFile = MDSDFileResourcesPrefix + '.pid'
+MDSDFileResourcesDir = "/var/run/mdsd"
+MDSDRoleName = 'lad_mdsd'
+MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
+MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
 MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
 OutputSize = 1024
 EnableSyslog = True
@@ -83,7 +85,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python is needed for /usr/sbin/semanage on Redhat. Also, some RH-based distros really don't have tar (e.g. OracleLinux 7).
+                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -91,7 +93,7 @@ RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
-                        '||apt-get install -y PACKAGES',
+                        '|| apt-get install -y PACKAGES',
                      'packages':()
                     }.items())
 
@@ -121,11 +123,11 @@ SuseConfig12 = dict(RedhatConfig.items()+
                   }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
-                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)
+                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install -y PACKAGE; fi',
+                     "packages":('policycoreutils-python',)  # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
                     }.items())
 
-RSYSLOG_OM_PORT='29131'
+MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
 All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
@@ -170,27 +172,27 @@ def parse_context(operation):
     return
 
 
-def setup(should_install_required_package):
+def setup_dependencies_and_mdsd():
     global EnableSyslog
 
-    if should_install_required_package:
-        install_package_error = ""
-        retry = 3
-        while retry > 0:
-            error, msg = install_required_package()
-            hutil.log(msg)
-            if error == 0:
-                break
-            else:
-                retry -= 1
-                hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error = msg
-                time.sleep(60)
-        if install_package_error:
-            if len(install_package_error) > 1024:
-                install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
-            hutil.error(install_package_error)
-            return 2, install_package_error
+    # Install dependencies
+    install_package_error = ""
+    retry = 3
+    while retry > 0:
+        error, msg = install_required_package()
+        hutil.log(msg)
+        if error == 0:
+            break
+        else:
+            retry -= 1
+            hutil.log("Sleep 60 retry "+str(retry))
+            install_package_error = msg
+            time.sleep(60)
+    if install_package_error:
+        if len(install_package_error) > 1024:
+            install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
+        hutil.error(install_package_error)
+        return 2, install_package_error
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
@@ -198,11 +200,12 @@ def setup(should_install_required_package):
             hutil.error(msg)
             return 3, msg
 
-    # Run prep commands
+    # Run mdsd prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
+    # Install/start OMI
     omi_err, omi_msg = install_omi()
     if omi_err is not 0:
         return 4, omi_msg
@@ -593,16 +596,6 @@ def main(command):
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
 
         elif ExtensionOperationType is waagent.WALAEventOperation.Install:
-            error, msg = setup(should_install_required_package=True)
-            if error != 0:
-                hutil.do_status_report(ExtensionOperationType, "error", error, msg)
-                waagent.AddExtensionEvent(name=hutil.get_name(),
-                                          op=ExtensionOperationType,
-                                          isSuccess=False,
-                                          version=hutil.get_extension_version(),
-                                          message="Install failed: " + msg)
-                sys.exit(error)  # Per extension specification, we must exit with a non-zero status code when install fails
-
             if UseSystemdServiceManager:
                 install_service()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Install succeeded")
@@ -636,12 +629,15 @@ def main(command):
                       'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
-def update_selinux_port_setting_for_rsyslogomazuremds(action, port):
-    # This is needed for Redhat-based distros.
-    # 'action' param should be '-a' for adding and '-d' for deleting.
-    # Caller is responsible to make sure a correct action param is passed.
-    if os.path.exists("/usr/sbin/semanage"):
-        RunGetOutput('semanage port {0} -t syslogd_port_t -p tcp {1};echo ignore already added or not found'.format(action, port))
+def update_selinux_settings_for_rsyslogomazuremds():
+    # This is still needed for Redhat-based distros, which still require SELinux to be allowed
+    # for even Unix domain sockets.
+    # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
+    # We instead compile from the bundled SELinux module def for lad_mdsd
+    if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
+        RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule -i {0}/lad_mdsd.pp'.format(WorkDir))
 
 
 def start_daemon():
@@ -663,7 +659,7 @@ def start_mdsd():
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup(should_install_required_package=False)
+    setup_dependencies_and_mdsd()
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
@@ -684,9 +680,7 @@ def start_mdsd():
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
-
-    default_port = RSYSLOG_OM_PORT
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', default_port)
+    update_selinux_settings_for_rsyslogomazuremds()
 
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
@@ -726,16 +720,14 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    eventhub_persist_dir_path = os.path.join(WorkDir, "eventhub"); # LAD doesn't use this yet, but mdsd just creates this directory
-    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6} -S {7}'.format(
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
-        default_port,
-        MDSDFileResourcesPrefix,
+        MDSD_LISTEN_PORT,
+        MDSDRoleName,
         monitor_file_path,
         warn_file_path,
-        info_file_path,
-        eventhub_persist_dir_path).split(" ")
+        info_file_path).split(" ")
 
     try:
         num_quick_consecutive_crashes = 0
@@ -743,7 +735,6 @@ def start_mdsd():
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
 
             RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
-            mdsd_pid_port_file_checked = False
             mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
@@ -775,18 +766,6 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
-
-                # Issue #137 Can't start mdsd if port 29131 is in use.
-                # mdsd now binds to another randomly available port,
-                # and LAD still needs to reconfigure rsyslogd.
-                if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
-                    with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
-                        mdsd_pid_port_file.readline()                    # This is actually PID, so ignore.
-                        new_port = mdsd_pid_port_file.readline().strip() # .strip() is important!
-                        if default_port != new_port:
-                            hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
-                            reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port)
-                        mdsd_pid_port_file_checked = True
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
@@ -1022,9 +1001,9 @@ def uninstall_rsyslogom():
     if rsyslog_om_path == None:
         return 1,"rsyslog not installed"
     if os.path.exists(rsyslog_om_mdsd_syslog_conf_path):
-        RunGetOutput("rm -f {0}/omazuremdslegacy.so {1} {2}".format(rsyslog_om_path,
-                                                                    rsyslog_om_mdsd_syslog_conf_path,
-                                                                    rsyslog_om_mdsd_file_conf_path))
+        RunGetOutput("rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path,
+                                                              rsyslog_om_mdsd_syslog_conf_path,
+                                                              rsyslog_om_mdsd_file_conf_path))
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1054,9 +1033,13 @@ def install_rsyslogom():
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
         # Copy necesssary files
-        RunGetOutput("cp -f {0}/omazuremdslegacy.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
+        RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
+        # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog module (5/7/8)
+        mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
+        cmd_to_run = "sed -i 's#__MDSD_SOCKET_FILE_PATH__#{0}#g' {1}"
+        RunGetOutput(cmd_to_run.format(mdsd_json_socket_file_path, rsyslog_om_mdsd_syslog_conf_path))
 
     else:
         return 1,"rsyslog version can't be detected"
@@ -1066,24 +1049,6 @@ def install_rsyslogom():
     else:
         RunGetOutput("service rsyslog restart")
     return 0,"install mdsdom completed"
-
-
-def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
-    files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"  # For rsyslog 5 & 7
-    cmd2_to_run = "sed -i 's/mdsdport=\"[0-9]*\"/mdsdport=\"{0}\"/g' {1}"  # For rsyslog 8
-
-    for f in files_to_modify:
-        RunGetOutput(cmd_to_run.format(new_port, f))
-        RunGetOutput(cmd2_to_run.format(new_port, f))
-
-    update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
-
-    if distConfig.has_key("restartrsyslog"):
-        RunGetOutput(distConfig["restartrsyslog"])
-    else:
-        RunGetOutput("service rsyslog restart")
 
 
 def install_required_package():
