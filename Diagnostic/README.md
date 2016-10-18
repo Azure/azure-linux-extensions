@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.9009.
+Latest version is 2.3.9011.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -244,6 +244,11 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 
 ## Supported Linux Distributions
+
+Please note that the distros/versions listed below apply only to Azure-endorsed Linux vendor
+images. 3rd party BYOL/BYOS images (e.g., appliances) are not generally supported for the
+Linux Diagnostic extension.
+
 - Ubuntu 12.04 and higher. Ubuntu 16.04 support is currently not official, as our OMI dependency is not officially supported on Ubuntu 16.04 as of LAD 2.3.9. Also as of the same version, MySQL monitoring using OMI/SCX is not working on Ubuntu 16.04, due to the fact that Ubuntu 16.04's MySQL build is changed in a way that current OMI/SCX doesn't support.
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
