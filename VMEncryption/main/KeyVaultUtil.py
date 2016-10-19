@@ -23,9 +23,11 @@ import json
 import uuid
 import base64
 import traceback
+import re
+
 from HttpUtil import HttpUtil
 from Common import *
-
+from urlparse import urlparse
 
 class KeyVaultUtil(object):
     def __init__(self,logger):
@@ -63,7 +65,12 @@ class KeyVaultUtil(object):
             if(authorize_uri is None):
                 self.logger.log("the authorize uri is None")
                 return None
-            access_token = self.get_access_token(authorize_uri, AADClientID, AADClientSecret)
+
+            parsed_url = urlparse(KeyVaultURL)
+            vault_domain = re.findall(r".*(vault.*)", parsed_url.netloc)[0]
+            kv_resource_name = parsed_url.scheme + '://' + vault_domain
+
+            access_token = self.get_access_token(kv_resource_name, authorize_uri, AADClientID, AADClientSecret)
             if(access_token is None):
                 self.logger.log("the access token is None")
                 return None
@@ -86,10 +93,9 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None
 
-    def get_access_token(self,AuthorizeUri,AADClientID,AADClientSecret):
-        keyvault_resource_name = "https://vault.azure.net"
+    def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientSecret):
         token_uri = AuthorizeUri + "/oauth2/token"
-        request_content = "resource=" + urllib.quote(keyvault_resource_name) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
+        request_content = "resource=" + urllib.quote(KeyVaultResourceName) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
         headers = {}
         http_util = HttpUtil(self.logger)
         result = http_util.Call(method='POST', http_uri=token_uri, data=request_content, headers=headers)
