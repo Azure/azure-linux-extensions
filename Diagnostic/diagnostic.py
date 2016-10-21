@@ -637,7 +637,7 @@ def update_selinux_settings_for_rsyslogomazuremds():
     if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
         RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
         RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
-        RunGetOutput('semodule -i {0}/lad_mdsd.pp'.format(WorkDir))
+        RunGetOutput('semodule -u {0}/lad_mdsd.pp'.format(WorkDir))
 
 
 def start_daemon():
