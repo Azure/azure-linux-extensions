@@ -71,7 +71,7 @@ rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-1.6.2-241.universal.x64.sh'
+omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
