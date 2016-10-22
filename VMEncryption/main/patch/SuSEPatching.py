@@ -73,9 +73,20 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup','lsscsi']
+        common_extras = ['cryptsetup', 'lsscsi']
         for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
+            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install', '-l', '--non-interactive', extra])))
+        
+        if not distro_info[1] == "11":
+            common_extras = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
+            for extra in common_extras:
+                self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install', '-l', '--non-interactive', extra])))
+        
+            return_code = subprocess.call(['pip', 'install', 'jwt'])
+            self.logger.log("Pip jwt installation result: " + str(return_code))
+        
+            return_code = subprocess.call(['pip', 'install', 'adal'])
+            self.logger.log("Pip adal installation result: " + str(return_code))
 
         #if(paras.filesystem == "btrfs"):
         #    extras = ['btrfs-tools']
