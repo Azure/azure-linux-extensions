@@ -98,7 +98,8 @@ class redhatPatching(AbstractPatching):
                     'python-pip',
                     'gcc',
                     'libffi-devel',
-                    'openssl-devel']
+                    'openssl-devel',
+                    'python-devel']
 
         return_code = subprocess.call(['yum', 'install', '-y'] + packages)
         self.logger.log("Installing packages: " + " ".join(packages))
