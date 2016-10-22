@@ -104,7 +104,7 @@ class KeyVaultUtil(object):
         if AADClientCertThumbprint:
             try:
                 import adal
-            except ImportError:
+            except:
                 raise Exception("adal library is not available on the VM")
 
             import waagent
