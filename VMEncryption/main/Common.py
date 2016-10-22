@@ -46,6 +46,7 @@ class CommonVariables:
     KeyEncryptionKeyURLKey = 'KeyEncryptionKeyURL'
     KeyVaultURLKey = 'KeyVaultURL'
     AADClientIDKey = 'AADClientID'
+    AADClientCertThumbprintKey = 'AADClientCertThumbprint'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'

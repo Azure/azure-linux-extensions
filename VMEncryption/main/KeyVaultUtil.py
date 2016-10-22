@@ -24,6 +24,7 @@ import uuid
 import base64
 import traceback
 import re
+import os
 
 from HttpUtil import HttpUtil
 from Common import *
@@ -45,7 +46,7 @@ class KeyVaultUtil(object):
     The Passphrase is a plain encoded string. before the encryption it would be base64encoding.
     return the secret uri if creation successfully.
     """
-    def create_kek_secret(self, Passphrase, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret, DiskEncryptionKeyFileName):
+    def create_kek_secret(self, Passphrase, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, AADClientCertThumbprint, KeyEncryptionAlgorithm, AADClientSecret, DiskEncryptionKeyFileName):
         try:
             self.logger.log("start creating kek secret")
             passphrase_encoded = base64.standard_b64encode(Passphrase)
@@ -70,7 +71,7 @@ class KeyVaultUtil(object):
             vault_domain = re.findall(r".*(vault.*)", parsed_url.netloc)[0]
             kv_resource_name = parsed_url.scheme + '://' + vault_domain
 
-            access_token = self.get_access_token(kv_resource_name, authorize_uri, AADClientID, AADClientSecret)
+            access_token = self.get_access_token(kv_resource_name, authorize_uri, AADClientID, AADClientCertThumbprint, AADClientSecret)
             if(access_token is None):
                 self.logger.log("the access token is None")
                 return None
@@ -93,7 +94,30 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None
 
-    def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientSecret):
+    def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
+        if not AADClientSecret and not AADClientCertThumbprint:
+            raise Exception("Neither AADClientSecret nor AADClientCertThumbprint were specified")
+
+        if AADClientSecret and AADClientCertThumbprint:
+            raise Exception("Both AADClientSecret nor AADClientCertThumbprint were specified")
+
+        if AADClientCertThumbprint:
+            try:
+                import adal
+            except ImportError:
+                raise Exception("adal library is not available on the VM")
+
+            import waagent
+
+            prv_path = os.path.join(waagent.LibDir, AADClientCertThumbprint.upper() + '.prv')
+            prv_data = waagent.GetFileContents(prv_path)
+
+            context = adal.AuthenticationContext(AuthorizeUri)
+            result_json = context.acquire_token_with_client_certificate(KeyVaultResourceName, AADClientID, prv_data, AADClientCertThumbprint)
+            access_token = result_json["accessToken"]
+            return access_token
+
+
         token_uri = AuthorizeUri + "/oauth2/token"
         request_content = "resource=" + urllib.quote(KeyVaultResourceName) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
         headers = {}

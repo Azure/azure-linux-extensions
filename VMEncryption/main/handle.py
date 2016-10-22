@@ -480,6 +480,7 @@ def enable_encryption():
                                                                            KeyVaultURL=extension_parameter.KeyVaultURL,
                                                                            KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
                                                                            AADClientID=extension_parameter.AADClientID,
+                                                                           AADClientCertThumbprint=extension_parameter.AADClientCertThumbprint,
                                                                            KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
                                                                            AADClientSecret=extension_parameter.AADClientSecret,
                                                                            DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
