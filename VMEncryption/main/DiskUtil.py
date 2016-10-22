@@ -509,6 +509,7 @@ class DiskUtil(object):
                 not "/" == mount_item["dest"] and \
                 not "/oldroot/mnt/resource" == mount_item["dest"] and \
                 not "/oldroot/boot" == mount_item["dest"] and \
+                not "/oldroot" == mount_item["dest"] and \
                 not "/mnt/resource" == mount_item["dest"] and \
                 not "/boot" == mount_item["dest"]:
 

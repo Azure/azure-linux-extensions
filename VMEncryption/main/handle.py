@@ -1529,6 +1529,7 @@ def daemon():
         logger.log("returned to daemon successfully after encryption")
         logger.log("clearing the encryption mark.")
         encryption_marker.clear_config()
+        hutil.redo_current_status()
     finally:
         lock.release_lock()
         logger.log("exiting daemon")

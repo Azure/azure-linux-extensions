@@ -321,6 +321,15 @@ class HandlerUtility:
         shutil.copy2(previous_status_file, self._context._status_file)
         self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
 
+    def redo_current_status(self):
+        stat_rept = waagent.GetFileContents(self._context._status_file)
+        stat = json.loads(stat_rept)
+
+        self.do_status_report(stat[0]["status"]["operation"],
+                              stat[0]["status"]["status"],
+                              stat[0]["status"]["code"],
+                              stat[0]["status"]["formattedMessage"]["message"])
+
     def do_status_report(self, operation, status, status_code, message):
         latest_seq = str(self.get_latest_seq())
         self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
