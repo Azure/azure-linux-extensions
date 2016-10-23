@@ -34,8 +34,11 @@ from Common import *
 
 
 class SuSEPatching(AbstractPatching):
-    def __init__(self,logger,distro_info):
+    def __init__(self, logger, distro_info):
         super(SuSEPatching,self).__init__(distro_info)
+
+        self.distro_info = distro_info
+
         if(distro_info[1] == "11"):
             self.logger = logger
             self.base64_path = '/usr/bin/base64'
@@ -73,14 +76,16 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup', 'lsscsi']
-        for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install', '-l', '--non-interactive', extra])))
+        packages = ['cryptsetup', 'lsscsi']
+        return_code = subprocess.call(['zypper', 'install', '-l', '-y'] + packages)
+        self.logger.log("Installing packages: " + " ".join(packages))
+        self.logger.log("Installation result: " + str(return_code))
         
-        if not distro_info[1] == "11":
-            common_extras = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
-            for extra in common_extras:
-                self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install', '-l', '--non-interactive', extra])))
+        if not self.distro_info[1] == "11":
+            packages = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
+            return_code = subprocess.call(['zypper', 'install', '-l', '-y'] + packages)
+            self.logger.log("Installing packages: " + " ".join(packages))
+            self.logger.log("Installation result: " + str(return_code))
         
             return_code = subprocess.call(['pip', 'install', 'jwt'])
             self.logger.log("Pip jwt installation result: " + str(return_code))
