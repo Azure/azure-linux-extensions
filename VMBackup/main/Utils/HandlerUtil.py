@@ -267,6 +267,7 @@ class HandlerUtility:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
+        self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
 
     def get_total_used_size(self):
@@ -279,14 +280,18 @@ class HandlerUtility:
                 device, size, used, available, percent, mountpoint = output[i].split()
                 total_used = total_used + int(used) #return in KB
 
+            self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
         except:
+            self.log("Unable to fetch total used space")
             return 0,True
 
     def get_storage_details(self):
         if(self.storageDetailsObj == None):
             total_size,failure_flag = self.get_total_used_size()
             self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+
+        self.log("Partition Count : {0}, Total used size : {1}, is storage spent : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
@@ -305,7 +310,7 @@ class HandlerUtility:
             return extension_version
         except Exception as e:
             errMsg = 'Failed to retrieve the Extension version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg)
             extension_version="Unknown"
             return extension_version
 
@@ -324,7 +329,7 @@ class HandlerUtility:
                 return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg)
             waagent_version="Unknown"
             return waagent_version
 
@@ -341,7 +346,7 @@ class HandlerUtility:
             return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Warning')
+            self.log(errMsg)
             waagent_version="Unknown"
             return waagent_version
 
@@ -360,7 +365,7 @@ class HandlerUtility:
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg)
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
@@ -384,10 +389,10 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
-        HandlerUtility.add_to_telemetery_data("GuestAgentVersion",self.get_wala_version())
-        HandlerUtility.add_to_telemetery_data("ExtensionVersion",self.get_extension_version())
-        HandlerUtility.add_to_telemetery_data("OSVersion",os_version)
-        HandlerUtility.add_to_telemetery_data("KernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
+        HandlerUtility.add_to_telemetery_data("osVersion",os_version)
+        HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
 
     def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))

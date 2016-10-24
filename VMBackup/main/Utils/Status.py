@@ -37,14 +37,14 @@ class SubstatusObj:
         return dict(code = self.code, name = self.name, status = self.status, formattedMessage = self.formattedMessage)
 
 class StorageDetails:
-    def __init__(self, partitionCount, totalUsedSize, isStoragespacePresent, isSizeComputationFailed):
+    def __init__(self, partitionCount, totalUsedSizeInBytes, isStoragespacePresent, isSizeComputationFailed):
         self.partitionCount =  partitionCount
-        self.totalUsedSize = totalUsedSize
+        self.totalUsedSizeInBytes = totalUsedSizeInBytes
         self.isStoragespacePresent = isStoragespacePresent
         self.isSizeComputationFailed = isSizeComputationFailed
 
     def convertToDictionary(self):
-        return dict(partitionCount = self.partitionCount, totalUsedSize = self.totalUsedSize, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
+        return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class FormattedMessage:
     def __init__(self, lang, message):
