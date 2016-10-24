@@ -194,7 +194,8 @@ def daemon():
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
-    hutil.partitioncount = len(freezer.mounts.mounts)
+    if(freezer.mounts is not None):
+        hutil.partitioncount = len(freezer.mounts.mounts)
     global_error_result = None
     # precheck
     freeze_called = False

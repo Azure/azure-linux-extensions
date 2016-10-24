@@ -271,7 +271,7 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
@@ -288,7 +288,7 @@ class HandlerUtility:
             /dev/sdb1        7092664   16120   6693216   1% /mnt
 
             '''
-            output = df.communicate()[0]
+            output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
             for i in range(1,len(output)-1):
