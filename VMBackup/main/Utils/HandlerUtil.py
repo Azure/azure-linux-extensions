@@ -249,7 +249,6 @@ class HandlerUtility:
 
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
-        store_identity_file = "./machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C"
         machine_id = ""
         try:
             if os.path.exists(os.path.dirname(machine_id_file)):
@@ -308,7 +307,7 @@ class HandlerUtility:
             total_size,failure_flag = self.get_total_used_size()
             self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
-        self.log("Partition Count : {0}, Total used size : {1}, is storage spent : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
+        self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
