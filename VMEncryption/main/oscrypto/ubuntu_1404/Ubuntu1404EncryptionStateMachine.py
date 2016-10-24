@@ -130,8 +130,8 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
         }
 
         self.state_machine = Machine(model=self,
-                                     states=Ubuntu1604EncryptionStateMachine.states,
-                                     transitions=Ubuntu1604EncryptionStateMachine.transitions,
+                                     states=Ubuntu1404EncryptionStateMachine.states,
+                                     transitions=Ubuntu1404EncryptionStateMachine.transitions,
                                      initial='uninitialized')
 
     def start_encryption(self):
