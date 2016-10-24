@@ -111,14 +111,14 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
     ]
 
     def on_enter_state(self):
-        super(Ubuntu1604EncryptionStateMachine, self).on_enter_state()
+        super(Ubuntu1404EncryptionStateMachine, self).on_enter_state()
 
     def should_exit_previous_state(self):
         # when this is called, self.state is still the "source" state in the transition
-        return super(Ubuntu1604EncryptionStateMachine, self).should_exit_previous_state()
+        return super(Ubuntu1404EncryptionStateMachine, self).should_exit_previous_state()
 
     def __init__(self, hutil, distro_patcher, logger, encryption_environment):
-        super(Ubuntu1604EncryptionStateMachine, self).__init__(hutil, distro_patcher, logger, encryption_environment)
+        super(Ubuntu1404EncryptionStateMachine, self).__init__(hutil, distro_patcher, logger, encryption_environment)
 
         self.state_objs = {
             'prereq': PrereqState(self.context),
