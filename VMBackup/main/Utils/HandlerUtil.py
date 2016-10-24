@@ -69,6 +69,7 @@ import platform
 import subprocess
 import datetime
 import Status
+from MachineIdentity import MachineIdentity
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -256,13 +257,12 @@ class HandlerUtility:
                 machine_id = file_pointer.readline()
                 file_pointer.close()
             else:
-                file_pointer = open(store_identity_file, "r")
-                machine_id = file_pointer.readline()[1:-1] #to remove curly braces present in the storage identity file
-                file_pointer.close()
+                mi = MachineIdentity()
+                machine_id = mi.stored_identity()[1:-1]
                 os.makedirs(os.path.dirname(machine_id_file))
-                file_pointer2 = open(machine_id_file, "w")
-                file_pointer2.write(machine_id)
-                file_pointer2.close()
+                file_pointer = open(machine_id_file, "w")
+                file_pointer.write(machine_id)
+                file_pointer.close()
         except:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
@@ -273,11 +273,28 @@ class HandlerUtility:
     def get_total_used_size(self):
         try:
             df = subprocess.Popen(["df"], stdout=subprocess.PIPE)
+            '''
+            Sample output of the df command
+
+            Filesystem     1K-blocks    Used Available Use% Mounted on
+            udev             1756684      12   1756672   1% /dev
+            tmpfs             352312     420    351892   1% /run
+            /dev/sda1       30202916 2598292  26338592   9% /
+            none                   4       0         4   0% /sys/fs/cgroup
+            none                5120       0      5120   0% /run/lock
+            none             1761552       0   1761552   0% /run/shm
+            none              102400       0    102400   0% /run/user
+            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
+            tmpfs                  4       4         0 100% /etc/ruxitagentproc
+            /dev/sdb1        7092664   16120   6693216   1% /mnt
+
+            '''
             output = df.communicate()[0]
             output = output.split("\n")
             total_used = 0
             for i in range(1,len(output)-1):
                 device, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} used space in KB : {1}".format(device,used))
                 total_used = total_used + int(used) #return in KB
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
