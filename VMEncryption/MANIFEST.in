@@ -2,4 +2,6 @@ include HandlerManifest.json handler.py
 recursive-include main/oscrypto/rhel_72/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1604/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1604/encryptscripts *.sh
+recursive-include main/oscrypto/ubuntu_1404/encryptpatches *.patch
+recursive-include main/oscrypto/ubuntu_1404/encryptscripts *.sh
 prune test

@@ -1,0 +1,13 @@
+diff -Naur hooks.orig/cryptroot hooks/cryptroot
+--- hooks.orig/cryptroot	2016-10-24 23:06:13.340262055 +0000
++++ hooks/cryptroot	2016-10-24 23:06:56.263850965 +0000
+@@ -515,6 +515,9 @@
+ 	if [ -z "$rootdev" ]; then
+ 		echo "cryptsetup: WARNING: could not determine root device from /etc/fstab" >&2
+ 	fi
++	if ! echo "$rootdevs" | grep -q "osencrypt"; then
++		rootdevs="$rootdevs osencrypt"
++	fi
+ 	resumedevs=$(get_resume_devices)
+ fi
+ 
