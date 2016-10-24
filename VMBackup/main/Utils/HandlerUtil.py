@@ -288,7 +288,7 @@ class HandlerUtility:
             /dev/sdb1        7092664   16120   6693216   1% /mnt
 
             '''
-            df.wait()
+            df.wait(30) #30 seconds timeout for the process
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
@@ -355,7 +355,7 @@ class HandlerUtility:
             cur_dir = os.getcwd()
             os.chdir("..")
             p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
-            p.wait()
+            p.wait(30) #30 seconds time out for the process to complete
             out = p.stdout.read()
             out =  out.split(" ")
             waagent = out[0]
