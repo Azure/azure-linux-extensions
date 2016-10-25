@@ -130,6 +130,10 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
+        self.command_executor.Execute('umount -a', False)
+
+        sleep(3)
+
         self.command_executor.Execute('umount /oldroot', True)
 
         sleep(3)
