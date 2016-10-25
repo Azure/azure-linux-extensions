@@ -52,7 +52,6 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
         
         self.command_executor.Execute('service ssh restart', True)
-        self.command_executor.Execute('service walinuxagent restart', True)
         
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="initctl list",
