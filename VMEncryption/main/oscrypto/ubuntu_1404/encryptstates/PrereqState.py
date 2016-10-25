@@ -59,7 +59,6 @@ class PrereqState(OSEncryptionState):
 
         self.context.distro_patcher.install_extras()
 
-        self._patch_walinuxagent()
         self.command_executor.Execute('telinit u', True)
 
         self._copy_key_script()
@@ -68,21 +67,6 @@ class PrereqState(OSEncryptionState):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
-
-    def _patch_walinuxagent(self):
-        self.context.logger.log("Patching walinuxagent")
-
-        contents = None
-
-        with open('/lib/systemd/system/walinuxagent.service', 'r') as f:
-            contents = f.read()
-
-        contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
-
-        with open('/lib/systemd/system/walinuxagent.service', 'w') as f:
-            f.write(contents)
-
-        self.context.logger.log("walinuxagent patched successfully")
 
     def _copy_key_script(self):
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
