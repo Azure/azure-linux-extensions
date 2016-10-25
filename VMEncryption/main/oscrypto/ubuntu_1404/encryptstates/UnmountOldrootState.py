@@ -52,7 +52,7 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
         
         self.command_executor.Execute('service ssh restart', True)
-        self.command_executor.ExecuteInBash('killall -s KILL waagent && /usr/sbin/waagent -daemon', True)
+        self.command_executor.Execute('service walinuxagent restart', True)
         
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="initctl list",
@@ -114,7 +114,7 @@ class UnmountOldrootState(OSEncryptionState):
 
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
-                self.command_executor.ExecuteInBash('sleep 30 && pkill -f .*ForLinux.*handle.py.*daemon.* && killall -s KILL waagent && /usr/sbin/waagent -daemon &', True)
+                self.command_executor.ExecuteInBash('sleep 30 && pkill -f .*ForLinux.*handle.py.*daemon.* && service walinuxagent restart &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
