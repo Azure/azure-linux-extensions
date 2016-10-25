@@ -212,7 +212,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.context.logger.log("Resized root filesystem size (sectors): {0}".format(resized_root_fs_size))
 
         # we should only fail when shrinking fails
-        if not desired_root_fs_size < resized_root_fs_size:
+        if desired_root_fs_size > resized_root_fs_size:
             raise Exception("resize2fs failed, desired: {0}, resized: {1}".format(desired_root_fs_size,
                                                                                   resized_root_fs_size))
 
