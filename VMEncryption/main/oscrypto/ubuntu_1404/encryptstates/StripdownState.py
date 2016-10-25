@@ -74,7 +74,11 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            self.command_executor.ExecuteInBash('sleep 30 && /usr/sbin/waagent -daemon &', True)
+            self.command_executor.Execute('service atd restart', True)
+            os.chdir('/')
+            with open("/restart-wala.sh", "w") as f:
+                f.write("service walinuxagent restart\n")
+            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',
