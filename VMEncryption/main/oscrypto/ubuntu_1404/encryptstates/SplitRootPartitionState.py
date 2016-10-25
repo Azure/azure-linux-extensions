@@ -78,7 +78,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.context.logger.log("Desired root partition end (sectors): {0}".format(desired_root_partition_end))
         self.context.logger.log("Desired root partition size (sectors): {0}".format(desired_root_partition_size))
 
-        if desired_root_partition_size > desired_root_fs_size:
+        if desired_root_partition_size < desired_root_fs_size:
             # in case partition is shorter than the fs, resize fs again
             self.context.logger.log("Desired root partition size (sectors) {0} is greater than filesystem size {1}".format(desired_root_partition_size,
                                                                                                                            desired_root_fs_size))
