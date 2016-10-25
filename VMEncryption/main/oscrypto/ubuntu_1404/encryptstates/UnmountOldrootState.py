@@ -62,7 +62,7 @@ class UnmountOldrootState(OSEncryptionState):
             if not "running" in line:
                 continue
 
-            if "walinuxagent" in line or "ssh" in line:
+            if "walinuxagent" in line or "ssh" in line or "cryptdisks" in line:
                 continue
 
             splitted = line.split()
