@@ -51,7 +51,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.context.logger.log("Entering split_root_partition state")
 
         device = parted.getDevice('/dev/sda')
-        disk = parted.newDisk(device)
+        disk = parted.Disk(device)
 
         original_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
         self.context.logger.log("Original root filesystem size (sectors): {0}".format(original_root_fs_size))
