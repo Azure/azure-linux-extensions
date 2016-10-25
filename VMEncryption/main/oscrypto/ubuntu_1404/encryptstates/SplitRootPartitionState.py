@@ -58,21 +58,9 @@ class SplitRootPartitionState(OSEncryptionState):
 
         desired_boot_partition_size = parted.sizeToSectors(256, 'MiB', device.sectorSize)
         self.context.logger.log("Desired boot partition size (sectors): {0}".format(desired_boot_partition_size))
-      
+
         desired_root_fs_size = original_root_fs_size - desired_boot_partition_size
-        self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
-
-        self.command_executor.Execute("resize2fs /dev/sda1 {0}s".format(desired_root_fs_size), True)
-
-        resized_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
-
-        self.context.logger.log("Resized root filesystem size (sectors): {0}".format(resized_root_fs_size))
-
-        if not desired_root_fs_size == resized_root_fs_size:
-            raise Exception("resize2fs failed, desired: {0}, resized: {1}".format(desired_root_fs_size,
-                                                                                  resized_root_fs_size))
-
-        self.context.logger.log("Root filesystem resized successfully")
+        self._resize_root_fs_to_sectors(desired_root_fs_size, device.sectorSize)
 
         root_partition = disk.partitions[0]
 
@@ -89,6 +77,11 @@ class SplitRootPartitionState(OSEncryptionState):
         self.context.logger.log("Desired root partition start (sectors): {0}".format(desired_root_partition_start))
         self.context.logger.log("Desired root partition end (sectors): {0}".format(desired_root_partition_end))
         self.context.logger.log("Desired root partition size (sectors): {0}".format(desired_root_partition_size))
+
+        if desired_root_partition_size > desired_root_fs_size:
+            # in case partition is shorter than the fs, resize fs again
+            desired_root_fs_size = desired_root_partition_size
+            self._resize_root_fs_to_sectors(desired_root_fs_size, device.sectorSize)
 
         desired_root_partition_geometry = parted.Geometry(device=device,
                                                           start=desired_root_partition_start,
@@ -205,3 +198,18 @@ class SplitRootPartitionState(OSEncryptionState):
         root_fs_size = parted.sizeToSectors(root_fs_block_count * root_fs_block_size, 'B', sector_size)
 
         return root_fs_size
+
+    def _resize_root_fs_to_sectors(self, desired_root_fs_size, sectorSize):
+        self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
+
+        self.command_executor.Execute("resize2fs /dev/sda1 {0}s".format(desired_root_fs_size), True)
+
+        resized_root_fs_size = self._get_root_fs_size_in(sectorSize)
+
+        self.context.logger.log("Resized root filesystem size (sectors): {0}".format(resized_root_fs_size))
+
+        if not desired_root_fs_size == resized_root_fs_size:
+            raise Exception("resize2fs failed, desired: {0}, resized: {1}".format(desired_root_fs_size,
+                                                                                  resized_root_fs_size))
+
+        self.context.logger.log("Root filesystem resized successfully")
