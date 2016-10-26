@@ -24,6 +24,7 @@ import os
 import sys
 
 from time import sleep
+from CommandExecutor import *
 from OSEncryptionState import *
 
 class PatchBootSystemState(OSEncryptionState):
@@ -121,6 +122,15 @@ class PatchBootSystemState(OSEncryptionState):
         self._append_contents_to_file(entry, '/etc/crypttab')
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
+
+        proc_comm = ProcessCommunicator()
+        self.command_executor.ExecuteInBash(command_to_execute="lsinitramfs /boot/initrd*",
+                                            raise_exception_on_failure=True,
+                                            communicator=proc_comm)
+
+        if not "azure_crypt_key.sh" in proc_comm.stdout:
+            raise Exception("initramfs update failed")
+
         self.command_executor.Execute('update-grub', True)
         self.command_executor.Execute('grub-install --recheck --force /dev/sda', True)
 
