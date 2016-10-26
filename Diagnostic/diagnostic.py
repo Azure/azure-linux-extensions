@@ -952,12 +952,15 @@ def install_omi():
 
     shouldRestartOmi = False
 
-    # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
-    omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
-    if omi_listens_to_nonzero_port:
-        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
-        RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-        shouldRestartOmi = True
+    # Issue #265. OMI httpsport shouldn't be reconfigured if omsagent is installed
+    omsagent_installed = RunGetOutput("dpkg -l omsagent || rpm -qi omsagent")[0] is 0
+    if not omsagent_installed:
+        # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
+        omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+        if omi_listens_to_nonzero_port:
+            RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
+            RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
+            shouldRestartOmi = True
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
