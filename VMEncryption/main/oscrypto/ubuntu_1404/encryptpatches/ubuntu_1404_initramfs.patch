@@ -1,13 +1,16 @@
-diff -Naur hooks.orig/cryptroot hooks/cryptroot
---- hooks.orig/cryptroot	2016-10-24 23:06:13.340262055 +0000
-+++ hooks/cryptroot	2016-10-24 23:06:56.263850965 +0000
-@@ -515,6 +515,9 @@
- 	if [ -z "$rootdev" ]; then
- 		echo "cryptsetup: WARNING: could not determine root device from /etc/fstab" >&2
+diff -Naur initramfs-tools.orig/scripts/local-top/cryptroot initramfs-tools/scripts/local-top/cryptroot
+--- initramfs-tools.orig/scripts/local-top/cryptroot	2016-10-26 20:02:34.029016244 +0000
++++ initramfs-tools/scripts/local-top/cryptroot	2016-10-26 20:03:04.661581564 +0000
+@@ -229,11 +229,7 @@
+ 	if [ "$cryptdiscard" = "yes" ]; then
+ 		cryptcreate="$cryptcreate --allow-discards"
  	fi
-+	if ! echo "$rootdevs" | grep -q "osencrypt"; then
-+		rootdevs="$rootdevs osencrypt"
-+	fi
- 	resumedevs=$(get_resume_devices)
- fi
+-	if /sbin/cryptsetup isLuks $cryptsource >/dev/null 2>&1; then
+-		cryptcreate="$cryptcreate luksOpen $cryptsource $crypttarget"
+-	else
+-		cryptcreate="$cryptcreate -c $cryptcipher -s $cryptsize -h $crypthash create $crypttarget $cryptsource"
+-	fi
++	cryptcreate="$cryptcreate luksOpen $cryptsource $crypttarget --header=/boot/luks/osluksheader"
+ 	cryptremove="/sbin/cryptsetup remove $crypttarget"
+ 	NEWROOT="/dev/mapper/$crypttarget"
  

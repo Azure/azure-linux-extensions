@@ -116,7 +116,7 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
         
-        self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools/hooks -p1 <{0}'.format(patchpath), True)
+        self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools -p1 <{0}'.format(patchpath), True)
         
         entry = 'osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'
         self._append_contents_to_file(entry, '/etc/crypttab')
