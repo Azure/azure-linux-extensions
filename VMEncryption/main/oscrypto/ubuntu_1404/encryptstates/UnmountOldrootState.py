@@ -135,7 +135,7 @@ class UnmountOldrootState(OSEncryptionState):
         sleep(3)
 
         for mount_item in self.disk_util.get_mount_items():
-            if "/oldroot" in mount_item["dest"]:
+            if "/oldroot/" in mount_item["dest"]:
                 self.command_executor.Execute('umount ' + mount_item["dest"], True)
 
         self.command_executor.Execute('umount /oldroot', True)
