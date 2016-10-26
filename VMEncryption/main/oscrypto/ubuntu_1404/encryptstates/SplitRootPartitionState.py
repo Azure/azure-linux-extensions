@@ -139,7 +139,6 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /oldroot/$i /$i; done", True)
         self.command_executor.Execute("service rsyslog restart", True)
         self.command_executor.Execute("service udev restart", True)
-        self.command_executor.Execute("service walinuxagent restart", True)
         self.command_executor.Execute("umount /oldroot/boot", True)
         self.command_executor.Execute("umount /oldroot", True)
         
