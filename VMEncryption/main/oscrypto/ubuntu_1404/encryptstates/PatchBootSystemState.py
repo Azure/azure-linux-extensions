@@ -75,7 +75,6 @@ class PatchBootSystemState(OSEncryptionState):
                                           True)
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
-            self.command_executor.Execute('systemctl restart walinuxagent')
 
             self.context.logger.log("Pivoted back into memroot successfully")
 
@@ -107,7 +106,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         patchesdir = os.path.join(scriptdir, '../encryptpatches')
-        patchpath = os.path.join(patchesdir, 'ubuntu_1604_initramfs.patch')
+        patchpath = os.path.join(patchesdir, 'ubuntu_1404_initramfs.patch')
 
         if not os.path.exists(patchpath):
             message = "Patch not found at path: {0}".format(patchpath)
