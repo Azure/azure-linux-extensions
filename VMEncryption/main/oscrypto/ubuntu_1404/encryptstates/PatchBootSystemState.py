@@ -128,7 +128,7 @@ class PatchBootSystemState(OSEncryptionState):
                                             raise_exception_on_failure=True,
                                             communicator=proc_comm)
 
-        if not "azure_crypt_key.sh" in proc_comm.stdout:
+        if not "azure_crypt_key.sh" in proc_comm.stdout or not "osluksheader" in proc_comm.stdout:
             raise Exception("initramfs update failed")
 
         self.command_executor.Execute('update-grub', True)
