@@ -251,14 +251,16 @@ class HandlerUtility:
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
         machine_id = ""
         try:
-            if os.path.exists(os.path.dirname(machine_id_file)):
+            if not os.path.exists(os.path.dirname(machine_id_file)):
+                os.makedirs(os.path.dirname(machine_id_file))
+
+            if os.path.exists(machine_id_file):
                 file_pointer = open(machine_id_file, "r")
                 machine_id = file_pointer.readline()
                 file_pointer.close()
             else:
                 mi = MachineIdentity()
                 machine_id = mi.stored_identity()[1:-1]
-                os.makedirs(os.path.dirname(machine_id_file))
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
@@ -288,7 +290,11 @@ class HandlerUtility:
             /dev/sdb1        7092664   16120   6693216   1% /mnt
 
             '''
-            df.wait(30) #30 seconds timeout for the process
+            process_wait_time = 30
+            while(process_wait_time >0 and df.poll() is None):
+                time.sleep(1)
+                process_wait_time -= 1
+
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
@@ -355,7 +361,10 @@ class HandlerUtility:
             cur_dir = os.getcwd()
             os.chdir("..")
             p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
-            p.wait(30) #30 seconds time out for the process to complete
+            process_wait_time = 30
+            while(process_wait_time > 0 and p.poll() is None):
+                time.sleep(1)
+                process_wait_time -= 1
             out = p.stdout.read()
             out =  out.split(" ")
             waagent = out[0]
