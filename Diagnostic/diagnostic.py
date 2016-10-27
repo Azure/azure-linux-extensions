@@ -923,6 +923,7 @@ def get_dist_config():
 
 def install_omi():
     need_install_omi = 0
+    need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
@@ -952,9 +953,9 @@ def install_omi():
 
     shouldRestartOmi = False
 
-    # Issue #265. OMI httpsport shouldn't be reconfigured if omsagent is installed
-    omsagent_installed = RunGetOutput("dpkg -l omsagent || rpm -qi omsagent")[0] is 0
-    if not omsagent_installed:
+    # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
+    # In other words, OMI httpsport config should be updated only on a fresh OMI install.
+    if need_fresh_install_omi:
         # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
         omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
         if omi_listens_to_nonzero_port:
