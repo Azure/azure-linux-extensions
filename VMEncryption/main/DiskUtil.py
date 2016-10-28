@@ -520,7 +520,8 @@ class DiskUtil(object):
                     data_drives_encrypted = False
 
             if mount_item["dest"] == "/" and \
-                "/dev/mapper" in mount_item["src"]:
+                "/dev/mapper" in mount_item["src"] or \
+                "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
     
