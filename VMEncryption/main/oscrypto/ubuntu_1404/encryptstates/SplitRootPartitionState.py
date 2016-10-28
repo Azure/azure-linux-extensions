@@ -140,7 +140,16 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.Execute("service rsyslog restart", True)
         self.command_executor.Execute("service udev restart", True)
         self.command_executor.Execute("umount /oldroot/boot", True)
-        self.command_executor.Execute("umount /oldroot", True)
+
+        try:
+            self.command_executor.Execute("umount /oldroot", True)
+        except:
+            self.context.logger.log("Could not unmount /oldroot, attempting to restart WALA and unmount again")
+
+            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
+            self.command_executor.Execute('killall -s KILL waagent', True)
+
+            self.command_executor.Execute("umount /oldroot", True)
         
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
