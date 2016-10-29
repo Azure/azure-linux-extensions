@@ -1494,7 +1494,7 @@ def daemon():
     logger.log("daemon lock acquired sucessfully.")
     
     logger.log("waiting for 2 minutes before continuing the daemon")
-    time.sleep(30)
+    time.sleep(120)
 
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     if decryption_marker.config_file_exists():
