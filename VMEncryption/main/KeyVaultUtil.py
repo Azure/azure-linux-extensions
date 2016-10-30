@@ -138,47 +138,26 @@ class KeyVaultUtil(object):
     """
     return the encrypted secret uri if success. else return None
     """
-    def encrypt_passphrase(self,AccessToken,Passphrase, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret):
+    def encrypt_passphrase(self, AccessToken, Passphrase, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret):
         try:
             """
-            api for encrypt use key is https://msdn.microsoft.com/en-us/library/azure/dn878060.aspx
-            get the key information, to get the key id, so we can use that key to do encryption
-            https://mykeyvault.vault.azure.net/keys/{key-name}?api-version={api-version}
-            https://msdn.microsoft.com/en-us/library/azure/dn878080.aspx
+            wrap our passphrase using the encryption key
+            api ref for wrapkey: https://msdn.microsoft.com/en-us/library/azure/dn878066.aspx
             """
-            self.logger.log("getting the info of the key.")
-            http_util = HttpUtil(self.logger)
-            headers = {}
-            headers["Authorization"] = "Bearer " + AccessToken
-            result = http_util.Call(method='GET', http_uri=KeyEncryptionKeyURL + '?api-version=' + self.api_version, data=None, headers=headers)
-
-            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
-            if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
-                return None
-            result_content = result.read()
-            self.logger.log("result_content is {0}".format(result_content))
-            http_util.connection.close()
-            result_json = json.loads(result_content)
-            key_id = result_json["key"]["kid"]
-
-            """
-            encrypt our passphrase using the encryption key
-            api for encrypt use key is https://msdn.microsoft.com/en-us/library/azure/dn878060.aspx
-            """
-            self.logger.log("encrypting the secret using key: " + str(key_id))
+            self.logger.log("encrypting the secret using key: " + KeyEncryptionKeyURL)
 
             request_content = '{"alg":"' + str(KeyEncryptionAlgorithm) + '","value":"' + str(Passphrase) + '"}'
             headers = {}
             headers["Content-Type"] = "application/json"
             headers["Authorization"] = "Bearer " + str(AccessToken)
-            relative_path=key_id+"/encrypt" + '?api-version=' + self.api_version
+            relative_path = KeyEncryptionKeyURL + "/wrapkey" + '?api-version=' + self.api_version
             http_util = HttpUtil(self.logger)
-            result = http_util.Call(method='POST',http_uri=relative_path,data=request_content,headers=headers)
+            result = http_util.Call(method='POST', http_uri=relative_path, data=request_content, headers=headers)
 
             result_content = result.read()
             self.logger.log("result_content is: {0}".format(result_content))
             self.logger.log("{0} {1}".format(result.status, result.getheaders()))
-            if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
+            if result.status != httplib.OK and result.status != httplib.ACCEPTED:
                 return None
             http_util.connection.close()
             result_json = json.loads(result_content)
