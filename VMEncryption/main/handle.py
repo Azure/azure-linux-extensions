@@ -321,12 +321,13 @@ def enable():
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
         else:
-            logger.log(msg="Encryption operation {0} is not supported".format(encryption_operation))
+            msg = "Encryption operation {0} is not supported".format(encryption_operation)
+            logger.log(msg)
             hutil.do_exit(exit_code=0,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.unknown_error),
-                          message='Enable failed.')
+                          message=msg)
 
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
@@ -358,6 +359,7 @@ def enable_encryption():
         else:
             logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
                        level=CommonVariables.WarningLevel)
+            hutil.redo_last_status()
             exit_without_status_report()
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -478,6 +480,7 @@ def enable_encryption():
                                                                            KeyVaultURL=extension_parameter.KeyVaultURL,
                                                                            KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
                                                                            AADClientID=extension_parameter.AADClientID,
+                                                                           AADClientCertThumbprint=extension_parameter.AADClientCertThumbprint,
                                                                            KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
                                                                            AADClientSecret=extension_parameter.AADClientSecret,
                                                                            DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
@@ -1293,6 +1296,12 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+        elif distro_name == 'Ubuntu' and distro_version == '14.04':
+            from oscrypto.ubuntu_1404 import Ubuntu1404EncryptionStateMachine
+            os_encryption = Ubuntu1404EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
         else:
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)
@@ -1527,6 +1536,7 @@ def daemon():
         logger.log("returned to daemon successfully after encryption")
         logger.log("clearing the encryption mark.")
         encryption_marker.clear_config()
+        hutil.redo_current_status()
     finally:
         lock.release_lock()
         logger.log("exiting daemon")
