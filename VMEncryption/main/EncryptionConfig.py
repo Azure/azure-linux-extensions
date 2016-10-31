@@ -29,6 +29,7 @@ class EncryptionConfig(object):
         self.passphrase_file_name = None
         self.volume_type = None
         self.secret_id = None
+        self.secret_seq_num = None
         self.encryption_config = ConfigUtil(encryption_environment.encryption_config_file_path,
                                             'azure_crypt_config',
                                             logger)
@@ -54,6 +55,8 @@ class EncryptionConfig(object):
         volume_type = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
         parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey, self.secret_id)
+        key_value_pairs.append(parameters)
+        parameters = ConfigKeyValuePair(CommonVariables.SecretSeqNum, self.secret_seq_num)
         key_value_pairs.append(parameters)
         self.encryption_config.save_configs(key_value_pairs)
 

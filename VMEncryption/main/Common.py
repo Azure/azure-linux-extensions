@@ -19,7 +19,7 @@
 
 class CommonVariables:
     utils_path_name = 'Utils'
-    extension_name = 'AzureDiskEncryptionForLinux'
+    extension_name = 'AzureDiskEncryptionForLinuxTest'
     extension_version = '0.1.0.999205'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
@@ -57,6 +57,7 @@ class CommonVariables:
     VolumeTypeKey = 'VolumeType'
     AADClientSecretKey = 'AADClientSecret'
     SecretUriKey = 'SecretUri'
+    SecretSeqNum = 'SecretSeqNum'
 
     VolumeTypeOS = 'OS'
     VolumeTypeData = 'Data'
@@ -69,6 +70,7 @@ class CommonVariables:
     """
     EnableEncryption = 'EnableEncryption'
     EnableEncryptionFormat = 'EnableEncryptionFormat'
+    UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
 

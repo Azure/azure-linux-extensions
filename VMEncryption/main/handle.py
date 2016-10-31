@@ -496,6 +496,7 @@ def enable_encryption():
                         encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
                         encryption_config.volume_type = extension_parameter.VolumeType
                         encryption_config.secret_id = kek_secret_id_created
+                        encryption_config.secret_seq_num = hutil.get_current_seq()
                         encryption_config.commit()
    
                 encryption_marker = mark_encryption(command=extension_parameter.command,
