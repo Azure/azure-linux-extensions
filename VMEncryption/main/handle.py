@@ -174,22 +174,70 @@ def update_encryption_settings():
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
     logger.log("The update call is operation #{0}".format(update_call_seq_num))
 
-    if current_secret_seq_num < update_call_seq_num:
-        logger.log('Recreating secret to store in the KeyVault')
+    try:
+        protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
-        encryption_config.secret_seq_num = update_call_seq_num
-        encryption_config.commit()
-    else:
-        logger.log('Secret has already been updated')
-        hutil.exit_if_same_seq()
-        logger.log('Removing old protectors')
-        hutil.save_seq()
+        if isinstance(public_settings_str, basestring):
+            public_settings = json.loads(public_settings_str)
+        else:
+            public_settings = public_settings_str
 
-    hutil.do_exit(exit_code=0,
-                    operation='UpdateEncryptionSettings',
-                    status=CommonVariables.extension_success_status,
-                    code=str(CommonVariables.success),
-                    message='Encryption settings updated')
+        if isinstance(protected_settings_str, basestring):
+            protected_settings = json.loads(protected_settings_str)
+        else:
+            protected_settings = protected_settings_str
+
+        extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
+
+        if current_secret_seq_num < update_call_seq_num:
+            logger.log('Recreating secret to store in the KeyVault')
+
+            kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
+                                                                   KeyVaultURL=extension_parameter.KeyVaultURL,
+                                                                   KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
+                                                                   AADClientID=extension_parameter.AADClientID,
+                                                                   AADClientCertThumbprint=extension_parameter.AADClientCertThumbprint,
+                                                                   KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
+                                                                   AADClientSecret=extension_parameter.AADClientSecret,
+                                                                   DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
+
+            if kek_secret_id_created is None:
+                hutil.do_exit(exit_code=0,
+                                operation='UpdateEncryptionSettings',
+                                status=CommonVariables.extension_error_status,
+                                code=str(CommonVariables.create_encryption_secret_failed),
+                                message='UpdateEncryptionSettings failed.')
+            else:
+                encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+                encryption_config.secret_id = kek_secret_id_created
+                encryption_config.secret_seq_num = hutil.get_current_seq()
+                encryption_config.commit()
+
+                hutil.do_exit(exit_code=0,
+                              operation='UpdateEncryptionSettings',
+                              status=CommonVariables.extension_success_status,
+                              code=str(CommonVariables.success),
+                              message=str(kek_secret_id_created))
+        else:
+            logger.log('Secret has already been updated')
+            hutil.exit_if_same_seq()
+            logger.log('Removing old protectors')
+            hutil.save_seq()
+
+        hutil.do_exit(exit_code=0,
+                        operation='UpdateEncryptionSettings',
+                        status=CommonVariables.extension_success_status,
+                        code=str(CommonVariables.success),
+                        message='Encryption settings updated')
+    except Exception as e:
+        message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
+        hutil.do_exit(exit_code=0,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.unknown_error),
+                      message=message)
 
 def update():
     hutil.do_parse_context('Upadate')
@@ -429,15 +477,16 @@ def enable_encryption():
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        if(isinstance(public_settings_str,basestring)):
+        if isinstance(public_settings_str, basestring):
             public_settings = json.loads(public_settings_str)
         else:
             public_settings = public_settings_str
 
-        if(isinstance(protected_settings_str,basestring)):
+        if isinstance(protected_settings_str, basestring):
             protected_settings = json.loads(protected_settings_str)
         else:
             protected_settings = protected_settings_str
+
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
         
         kek_secret_id_created = None
@@ -522,7 +571,7 @@ def enable_encryption():
                                                                            AADClientSecret=extension_parameter.AADClientSecret,
                                                                            DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
-                    if(kek_secret_id_created is None):
+                    if kek_secret_id_created is None:
                         encryption_config.clear_config()
                         hutil.do_exit(exit_code=0,
                                       operation='EnableEncryption',
@@ -540,7 +589,7 @@ def enable_encryption():
                                                     volume_type=extension_parameter.VolumeType,
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
 
-                if(kek_secret_id_created != None):
+                if kek_secret_id_created:
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_success_status,
