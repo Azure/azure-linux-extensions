@@ -48,6 +48,9 @@ class EncryptionConfig(object):
     def get_secret_id(self):
         return self.encryption_config.get_config(CommonVariables.SecretUriKey)
 
+    def get_secret_seq_num(self):
+        return self.encryption_config.get_config(CommonVariables.SecretSeqNum)
+
     def commit(self):
         key_value_pairs = []
         command = ConfigKeyValuePair(CommonVariables.PassphraseFileNameKey, self.passphrase_file_name)
