@@ -198,9 +198,30 @@ def update_encryption_settings():
 
             keyVaultUtil = KeyVaultUtil(logger)
 
+            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
             if not extension_parameter.passphrase:
-                existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
                 extension_parameter.passphrase = file(existing_passphrase_file).read()
+
+            temp_keyfile = tempfile.NamedTemporaryFile(delete=True)
+            temp_keyfile.write(extension_parameter.passphrase)
+            
+            for crypt_item in disk_util.get_crypt_items():
+                if not crypt_item:
+                    continue
+
+                logger.log("Adding new key for {0}".format(crypt_item.dev_path))
+
+                luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
+                                                         dev_path=crypt_item.dev_path,
+                                                         mapper_name=crypt_item.mapper_name,
+                                                         header_file=crypt_item.luks_header_path,
+                                                         new_key_path=temp_keyfile.name)
+
+                logger.log("luks add result is {0}".format(luks_add_result))
+
+            logger.log("New key successfully added to all encrypted devices")
+
+            temp_keyfile.close()
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
@@ -283,29 +304,32 @@ def toggle_se_linux_for_centos7(disable):
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
     #make sure the azure disk config path exists.
-    crypt_items = disk_util.get_crypt_items()
-    if(crypt_items is not None):
-        for i in range(0, len(crypt_items)):
-            crypt_item = crypt_items[i]
-            #add walkaround for the centos 7.0
-            se_linux_status = None
-            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
-                se_linux_status = encryption_environment.get_se_linux()
-                if(se_linux_status.lower() == 'enforcing'):
-                    encryption_environment.disable_se_linux()
-            luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
-                                                   dev_path=crypt_item.dev_path,
-                                                   mapper_name=crypt_item.mapper_name,
-                                                   header_file=crypt_item.luks_header_path,
-                                                   uses_cleartext_key=crypt_item.uses_cleartext_key)
-            logger.log("luks open result is {0}".format(luks_open_result))
-            if(DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0')):
-                if(se_linux_status is not None and se_linux_status.lower() == 'enforcing'):
-                    encryption_environment.enable_se_linux()
-            if(crypt_item.mount_point != 'None'):
-                disk_util.mount_crypt_item(crypt_item, passphrase_file)
-            else:
-                logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)),level=CommonVariables.WarningLevel)
+    for crypt_item in disk_util.get_crypt_items():
+        if not crypt_item:
+            continue
+
+        #add walkaround for the centos 7.0
+        se_linux_status = None
+        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+            se_linux_status = encryption_environment.get_se_linux()
+            if se_linux_status.lower() == 'enforcing':
+                encryption_environment.disable_se_linux()
+
+        luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                               dev_path=crypt_item.dev_path,
+                                               mapper_name=crypt_item.mapper_name,
+                                               header_file=crypt_item.luks_header_path,
+                                               uses_cleartext_key=crypt_item.uses_cleartext_key)
+
+        logger.log("luks open result is {0}".format(luks_open_result))
+
+        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+            if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
+                encryption_environment.enable_se_linux()
+        if crypt_item.mount_point != 'None':
+            disk_util.mount_crypt_item(crypt_item, passphrase_file)
+        else:
+            logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)),level=CommonVariables.WarningLevel)
 
     if bek_util:
         bek_util.umount_azure_passhprase(encryption_config)

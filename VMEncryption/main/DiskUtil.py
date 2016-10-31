@@ -293,6 +293,27 @@ class DiskUtil(object):
             returnCode = cryptsetup_p.wait()
             return returnCode
         
+    def luks_add_key(self, passphrase_file, dev_path, mapper_name, header_file, new_key_path):
+        """
+        return the return code of the process for error handling.
+        """
+        self.hutil.log("new key path: " + (new_key_path))
+
+        if not os.path.exists(new_key_path):
+            self.hutil.error("new key does not exist")
+            return None
+
+        if header_file is not None or header_file == "":
+            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, header_file, new_key_path, passphrase_file)
+        else:
+            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, dev_path, new_key_path, passphrase_file)
+
+        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
+        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
+        cryptsetup_p = Popen(cryptsetup_cmd_args)
+        returnCode = cryptsetup_p.wait()
+        return returnCode
+        
     def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
         """
         return the return code of the process for error handling.
@@ -301,20 +322,7 @@ class DiskUtil(object):
 
         self.hutil.log("cleartext key path: " + (cleartext_key_file_path))
 
-        if not os.path.exists(cleartext_key_file_path):
-            self.hutil.error("cleartext key does not exist")
-            return None
-
-        if(header_file is not None or header_file == ""):
-            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, header_file, cleartext_key_file_path, passphrase_file)
-        else:
-            cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.patching.cryptsetup_path, dev_path, cleartext_key_file_path, passphrase_file)
-
-        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
-        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-        cryptsetup_p = Popen(cryptsetup_cmd_args)
-        returnCode = cryptsetup_p.wait()
-        return returnCode
+        return self.luks_add_key(passphrase_file, dev_path, mapper_name, header_file, cleartext_key_file_path)
 
     def luks_open(self, passphrase_file, dev_path, mapper_name, header_file, uses_cleartext_key):
         """
