@@ -203,8 +203,9 @@ def update_encryption_settings():
             if not extension_parameter.passphrase:
                 extension_parameter.passphrase = file(existing_passphrase_file).read()
             else:
-                temp_keyfile = tempfile.NamedTemporaryFile(delete=True)
+                temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
                 temp_keyfile.write(extension_parameter.passphrase)
+                temp_keyfile.close()
             
                 for crypt_item in disk_util.get_crypt_items():
                     if not crypt_item:
@@ -222,7 +223,7 @@ def update_encryption_settings():
 
                 logger.log("New key successfully added to all encrypted devices")
 
-                temp_keyfile.close()
+                os.unlink(temp_keyfile.name)
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
