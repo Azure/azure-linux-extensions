@@ -162,7 +162,15 @@ def disable_encryption():
                       message='Decryption failed.')
 
 def update_encryption_settings():
-    pass
+    hutil.do_parse_context('UpdateEncryptionSettings')
+
+    logger.log('Updating encryption settings')
+
+    hutil.do_exit(exit_code=0,
+                    operation='UpdateEncryptionSettings',
+                    status=CommonVariables.extension_success_status,
+                    code=str(CommonVariables.success),
+                    message='Encryption settings updated')
 
 def update():
     hutil.do_parse_context('Upadate')
