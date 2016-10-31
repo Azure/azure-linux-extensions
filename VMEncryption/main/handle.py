@@ -193,12 +193,13 @@ def update_encryption_settings():
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
 
+        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
         if current_secret_seq_num < update_call_seq_num:
             logger.log('Recreating secret to store in the KeyVault')
 
             keyVaultUtil = KeyVaultUtil(logger)
 
-            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
             if not extension_parameter.passphrase:
                 extension_parameter.passphrase = file(existing_passphrase_file).read()
             else:
@@ -251,6 +252,7 @@ def update_encryption_settings():
                               message=str(kek_secret_id_created))
         else:
             logger.log('Secret has already been updated')
+            mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
             hutil.exit_if_same_seq()
             logger.log('Removing old protectors')
             hutil.save_seq()
