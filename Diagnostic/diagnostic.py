@@ -71,7 +71,7 @@ rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-1.6.2-241.universal.x64.sh'
+omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
@@ -637,7 +637,7 @@ def update_selinux_settings_for_rsyslogomazuremds():
     if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
         RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
         RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
-        RunGetOutput('semodule -i {0}/lad_mdsd.pp'.format(WorkDir))
+        RunGetOutput('semodule -u {0}/lad_mdsd.pp'.format(WorkDir))
 
 
 def start_daemon():
@@ -923,11 +923,12 @@ def get_dist_config():
 
 def install_omi():
     need_install_omi = 0
+    need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
-    if 'OMI-1.0.8-4' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
+    if 'OMI-1.0.8-6' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
     if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
         need_install_omi=1
@@ -952,12 +953,15 @@ def install_omi():
 
     shouldRestartOmi = False
 
-    # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
-    omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
-    if omi_listens_to_nonzero_port:
-        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
-        RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-        shouldRestartOmi = True
+    # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
+    # In other words, OMI httpsport config should be updated only on a fresh OMI install.
+    if need_fresh_install_omi:
+        # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
+        omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+        if omi_listens_to_nonzero_port:
+            RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
+            RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
+            shouldRestartOmi = True
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
