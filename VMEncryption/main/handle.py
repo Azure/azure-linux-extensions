@@ -161,6 +161,9 @@ def disable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message='Decryption failed.')
 
+def update_encryption_settings():
+    pass
+
 def update():
     hutil.do_parse_context('Upadate')
     hutil.do_exit(0,'Update',CommonVariables.extension_success_status,'0', 'Update Succeeded')
@@ -310,6 +313,13 @@ def enable():
             DistroPatcher.install_extras()
 
             disable_encryption()
+        elif encryption_operation == CommonVariables.UpdateEncryptionSettings:
+            logger.log("handle.py found disable encryption operation")
+
+            logger.log("Installing pre-requisites")
+            DistroPatcher.install_extras()
+
+            update_encryption_settings()
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
             logger.log("handle.py found query operation")
 
