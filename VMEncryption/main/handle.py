@@ -201,27 +201,27 @@ def update_encryption_settings():
             existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
             if not extension_parameter.passphrase:
                 extension_parameter.passphrase = file(existing_passphrase_file).read()
-
-            temp_keyfile = tempfile.NamedTemporaryFile(delete=True)
-            temp_keyfile.write(extension_parameter.passphrase)
+            else:
+                temp_keyfile = tempfile.NamedTemporaryFile(delete=True)
+                temp_keyfile.write(extension_parameter.passphrase)
             
-            for crypt_item in disk_util.get_crypt_items():
-                if not crypt_item:
-                    continue
+                for crypt_item in disk_util.get_crypt_items():
+                    if not crypt_item:
+                        continue
 
-                logger.log("Adding new key for {0}".format(crypt_item.dev_path))
+                    logger.log("Adding new key for {0}".format(crypt_item.dev_path))
 
-                luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
-                                                         dev_path=crypt_item.dev_path,
-                                                         mapper_name=crypt_item.mapper_name,
-                                                         header_file=crypt_item.luks_header_path,
-                                                         new_key_path=temp_keyfile.name)
+                    luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
+                                                             dev_path=crypt_item.dev_path,
+                                                             mapper_name=crypt_item.mapper_name,
+                                                             header_file=crypt_item.luks_header_path,
+                                                             new_key_path=temp_keyfile.name)
 
-                logger.log("luks add result is {0}".format(luks_add_result))
+                    logger.log("luks add result is {0}".format(luks_add_result))
 
-            logger.log("New key successfully added to all encrypted devices")
+                logger.log("New key successfully added to all encrypted devices")
 
-            temp_keyfile.close()
+                temp_keyfile.close()
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
