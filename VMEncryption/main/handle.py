@@ -62,12 +62,12 @@ def install():
 
 def disable():
     hutil.do_parse_context('Disable')
-    hutil.do_exit(0,'Disable',CommonVariables.extension_success_status,'0', 'Disable succeeded')
+    hutil.do_exit(0, 'Disable', CommonVariables.extension_success_status, '0', 'Disable succeeded')
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
     hutil.archive_old_configs()
-    hutil.do_exit(0,'Uninstall',CommonVariables.extension_success_status,'0', 'Uninstall succeeded')
+    hutil.do_exit(0, 'Uninstall', CommonVariables.extension_success_status, '0', 'Uninstall succeeded')
 
 def disable_encryption():
     hutil.do_parse_context('DisableEncryption')
@@ -166,7 +166,7 @@ def update_encryption_settings():
 
 def update():
     hutil.do_parse_context('Upadate')
-    hutil.do_exit(0,'Update',CommonVariables.extension_success_status,'0', 'Update Succeeded')
+    hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():
     sys.exit(0)
