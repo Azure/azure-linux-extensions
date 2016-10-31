@@ -190,8 +190,17 @@ def update_encryption_settings():
 
         extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
 
+        disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+        bek_util = BekUtil(disk_util, logger)
+
         if current_secret_seq_num < update_call_seq_num:
             logger.log('Recreating secret to store in the KeyVault')
+
+            keyVaultUtil = KeyVaultUtil(logger)
+
+            if not extension_parameter.passphrase:
+                existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+                extension_parameter.passphrase = file(existing_passphrase_file).read()
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
