@@ -180,8 +180,10 @@ def update_encryption_settings():
         encryption_config.secret_seq_num = update_call_seq_num
         encryption_config.commit()
     else:
-        hutil.exit_if_same_seq(exit_status)
-        logger.log('Secret has already been updated, removing old protectors')
+        logger.log('Secret has already been updated')
+        hutil.exit_if_same_seq()
+        logger.log('Removing old protectors')
+        hutil.save_seq()
 
     hutil.do_exit(exit_code=0,
                     operation='UpdateEncryptionSettings',
