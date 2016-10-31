@@ -1,4 +1,4 @@
-xxxx-xx-xx: LAD-2.3.9013
+2016-10-31: LAD-2.3.9013
     - Use semodule -u (upgrade) to reduce unnecessary SELinux policy
       re-install time
     - Use the latest scx package version (1.6.2-337)
