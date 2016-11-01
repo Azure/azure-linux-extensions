@@ -317,6 +317,23 @@ class DiskUtil(object):
         returnCode = cryptsetup_p.wait()
         return returnCode
         
+    def luks_kill_slot(self, passphrase_file, dev_path, header_file, keyslot):
+        """
+        return the return code of the process for error handling.
+        """
+        self.hutil.log("killing keyslot: ".format(keyslot))
+
+        if header_file:
+            cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, header_file, keyslot, passphrase_file)
+        else:
+            cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, keyslot, passphrase_file)
+
+        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
+        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
+        cryptsetup_p = Popen(cryptsetup_cmd_args)
+        returnCode = cryptsetup_p.wait()
+        return returnCode
+        
     def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
         """
         return the return code of the process for error handling.

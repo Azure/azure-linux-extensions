@@ -271,6 +271,21 @@ def update_encryption_settings():
                     else:
                         logger.log('Keyslot {0} is disabled'.format(index))
 
+                latest_keyslot = len(keyslots) - keyslots[::-1].index(True) - 1
+                logger.log('Latest keyslot is {0}'.format(latest_keyslot))
+
+                previous_keyslot = (latest_keyslot - 1) % len(keyslots)
+
+                if keyslots[previous_keyslot]:
+                    logger.log('Previous keyslot {0} is active, killing it'.format(previous_keyslot))
+                    luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
+                                                                dev_path=crypt_item.dev_path,
+                                                                header_file=crypt_item.luks_header_path,
+                                                                keyslot=previous_keyslot)
+
+                    logger.log("luks kill result is {0}".format(luks_kill_result))
+
+            logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()
 
         hutil.do_exit(exit_code=0,
