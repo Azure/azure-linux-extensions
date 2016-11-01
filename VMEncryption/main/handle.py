@@ -255,7 +255,22 @@ def update_encryption_settings():
             logger.log('Secret has already been updated')
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
             hutil.exit_if_same_seq()
-            logger.log('Removing old protectors')
+            logger.log('Removing old passphrase')
+
+            for crypt_item in disk_util.get_crypt_items():
+                if not crypt_item:
+                    continue
+
+                logger.log('Removing old passphrase from {0}'.format(crypt_item.dev_path))
+
+                keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+
+                for index, enabled in enumerate(keyslots):
+                    if enabled:
+                        logger.log('Keyslot {0} is enabled'.format(index))
+                    else:
+                        logger.log('Keyslot {0} is disabled'.format(index))
+
             hutil.save_seq()
 
         hutil.do_exit(exit_code=0,
