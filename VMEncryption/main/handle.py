@@ -167,8 +167,8 @@ def update_encryption_settings():
     logger.log('Updating encryption settings')
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
-
-    current_secret_seq_num = int(encryption_config.get_secret_seq_num())
+    config_secret_seq = encryption_config.get_secret_seq_num()
+    current_secret_seq_num = int(config_secret_seq if config_secret_seq else -1)
     update_call_seq_num = hutil.get_current_seq()
 
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
