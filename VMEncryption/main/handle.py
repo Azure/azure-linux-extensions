@@ -469,7 +469,7 @@ def enable():
 
             disable_encryption()
         elif encryption_operation == CommonVariables.UpdateEncryptionSettings:
-            logger.log("handle.py found disable encryption operation")
+            logger.log("handle.py found update encryption settings operation")
 
             logger.log("Installing pre-requisites")
             DistroPatcher.install_extras()
