@@ -80,18 +80,22 @@ class Snapshotter(object):
                 resp = http_util.HttpCall('PUT',sasuri_obj, body_content, headers = headers)
                 
                 if(resp != None):
-                    self.logger.log(str(sasuri_obj) + "resp-header: " + str(resp.getheaders()))
-                    self.logger.log("resp status: " + str(resp.status))
+                    self.logger.log("snapshot resp-header: " + str(resp.getheaders()))
+                    temp_logger = temp_logger + "snapshot resp-header: " + str(resp.getheaders())
+                    self.logger.log("snapshot resp status: " + str(resp.status))
+                    temp_logger = temp_logger + "snapshot resp status: " + str(resp.status)
                     responseBody = resp.read()
                     if(responseBody is not None):
-                        self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
+                        self.logger.log("snapshot responseBody: " + (responseBody).decode('utf-8-sig'))
+                        temp_logger = temp_logger + "snapshot responseBody: " + (responseBody).decode('utf-8-sig')
 
                     if(resp.status == 200 or resp.status == 201):
                         result = CommonVariables.success
                     else:
                         result = resp.status
                 else:
-                     self.logger.log(str(sasuri_obj) + "Http connection response is None")
+                    self.logger.log("snapshot Http connection response is None")
+                    temp_logger = temp_logger + "snapshot Http connection response is None"
 
                 temp_logger = temp_logger + ' snapshot api returned: {0} '.format(result)
                 end_time = datetime.datetime.utcnow()
