@@ -211,6 +211,10 @@ def update_encryption_settings():
                     if not crypt_item:
                         continue
 
+                    before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+
+                    logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+
                     logger.log("Adding new key for {0}".format(crypt_item.dev_path))
 
                     luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
@@ -220,6 +224,18 @@ def update_encryption_settings():
                                                              new_key_path=temp_keyfile.name)
 
                     logger.log("luks add result is {0}".format(luks_add_result))
+
+                    after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+
+                    logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+
+                    new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+
+                    logger.log("New key was added in keyslot {0}".format(new_keyslot))
+
+                    crypt_item.current_luks_slot = new_keyslot
+
+                    disk_util.update_crypt_item(crypt_item)
 
                 logger.log("New key successfully added to all encrypted devices")
 
@@ -268,22 +284,20 @@ def update_encryption_settings():
                 for index, enabled in enumerate(keyslots):
                     if enabled:
                         logger.log('Keyslot {0} is enabled'.format(index))
+
+                        if index != crypt_item.current_luks_slot:
+                            logger.log('Keyslot {0} is redundant, killing the slot'.format(index))
+
+                            luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
+                                                                        dev_path=crypt_item.dev_path,
+                                                                        header_file=crypt_item.luks_header_path,
+                                                                        keyslot=index)
+
+                            logger.log("luks kill result is {0}".format(luks_kill_result))
+                        else:
+                            logger.log('Keyslot {0} is currently active'.format(index))
                     else:
                         logger.log('Keyslot {0} is disabled'.format(index))
-
-                latest_keyslot = len(keyslots) - keyslots[::-1].index(True) - 1
-                logger.log('Latest keyslot is {0}'.format(latest_keyslot))
-
-                previous_keyslot = (latest_keyslot - 1) % len(keyslots)
-
-                if keyslots[previous_keyslot]:
-                    logger.log('Previous keyslot {0} is active, killing it'.format(previous_keyslot))
-                    luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
-                                                                dev_path=crypt_item.dev_path,
-                                                                header_file=crypt_item.luks_header_path,
-                                                                keyslot=previous_keyslot)
-
-                    logger.log("luks kill result is {0}".format(luks_kill_result))
 
             logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()

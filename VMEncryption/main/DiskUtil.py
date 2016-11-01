@@ -114,16 +114,25 @@ class DiskUtil(object):
                     crypt_mount_item = crypt_mount_items[i]
                     if(crypt_mount_item.strip() != ""):
                         crypt_mount_item_properties = crypt_mount_item.strip().split()
+
                         crypt_item = CryptItem()
                         crypt_item.mapper_name = crypt_mount_item_properties[0]
                         crypt_item.dev_path = crypt_mount_item_properties[1]
+
                         header_file_path = None
                         if(crypt_mount_item_properties[2] != "None"):
                             header_file_path = crypt_mount_item_properties[2]
+
                         crypt_item.luks_header_path = header_file_path
                         crypt_item.mount_point = crypt_mount_item_properties[3]
                         crypt_item.file_system = crypt_mount_item_properties[4]
                         crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
+
+                        try:
+                            crypt_item.current_luks_slot = int(crypt_mount_item_properties[6])
+                        except IndexError:
+                            crypt_item.current_luks_slot = -1
+
                         crypt_items.append(crypt_item)
         return crypt_items
 
@@ -142,7 +151,8 @@ class DiskUtil(object):
                                   crypt_item.luks_header_path + " " +
                                   crypt_item.mount_point + " " +
                                   crypt_item.file_system + " " +
-                                  str(crypt_item.uses_cleartext_key))
+                                  str(crypt_item.uses_cleartext_key) +
+                                  str(crypt_item.current_luks_slot))
 
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
@@ -185,6 +195,7 @@ class DiskUtil(object):
             return False
 
     def update_crypt_item(self, crypt_item):
+        self.logger.log("Updating entry for crypt item {0}".format(crypt_item))
         self.remove_crypt_item(crypt_item)
         self.add_crypt_item(crypt_item)
 
