@@ -151,7 +151,7 @@ class DiskUtil(object):
                                   crypt_item.luks_header_path + " " +
                                   crypt_item.mount_point + " " +
                                   crypt_item.file_system + " " +
-                                  str(crypt_item.uses_cleartext_key) +
+                                  str(crypt_item.uses_cleartext_key) + " " +
                                   str(crypt_item.current_luks_slot))
 
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
