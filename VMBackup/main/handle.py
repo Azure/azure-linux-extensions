@@ -91,7 +91,7 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def status_report(status,status_code,message):
+def status_report(status, status_code, message, snapshot_info):
     global backup_logger,hutil,para_parser
     trans_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -99,7 +99,8 @@ def status_report(status,status_code,message):
                 status_code=str(status_code),\
                 message=message,\
                 taskId=para_parser.taskId,\
-                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks)
+                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                snapshot_info=snapshot_info)
         blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
         if(trans_report_msg is not None):
@@ -116,10 +117,11 @@ def exit_with_commit_log(error_msg, para_parser):
     sys.exit(0)
 
 def exit_if_same_taskId(taskId):
+    global backup_logger
     taskIdentity = TaskIdentity()
     last_taskId = taskIdentity.stored_identity()
     if(taskId == last_taskId):
-        self.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId))
+        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)
         sys.exit(0)
 
 def convert_time(utcTicks):
@@ -256,7 +258,7 @@ def daemon():
                 temp_status= 'success'
                 temp_result=CommonVariables.ExtensionTempTerminalState
                 temp_msg='Transitioning state in extension'
-                status_report(temp_status,temp_result,temp_msg)
+                status_report(temp_status, temp_result, temp_msg, None)
                 backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -313,7 +315,7 @@ def daemon():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
     status_report_msg = None
-    status_report(run_status,run_result,error_msg)
+    status_report(run_status, run_result, error_msg, None)
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
@@ -381,6 +383,7 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
@@ -388,7 +391,7 @@ def enable():
         temp_status= 'transitioning'
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
-        status_report(temp_status,temp_result,temp_msg)
+        status_report(temp_status, temp_result, temp_msg, None)
         start_daemon();
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())

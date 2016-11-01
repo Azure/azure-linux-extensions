@@ -75,7 +75,24 @@ class Snapshotter(object):
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + 'start calling the snapshot rest api. '
-                result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
+                
+                result = CommonVariables.error_http_failure
+                resp = http_util.HttpCall('PUT',sasuri_obj, body_content, headers = headers)
+                
+                if(resp != None):
+                    self.logger.log(str(sasuri_obj) + "resp-header: " + str(resp.getheaders()))
+                    self.logger.log("resp status: " + str(resp.status))
+                    responseBody = resp.read()
+                    if(responseBody is not None):
+                        self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
+
+                    if(resp.status == 200 or resp.status == 201):
+                        result = CommonVariables.success
+                    else:
+                        result = resp.status
+                else:
+                     self.logger.log(str(sasuri_obj) + "Http connection response is None")
+
                 temp_logger = temp_logger + ' snapshot api returned: {0} '.format(result)
                 end_time = datetime.datetime.utcnow()
                 time_taken=end_time-start_time
