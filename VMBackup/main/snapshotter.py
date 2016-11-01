@@ -66,10 +66,11 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                for meta in meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
+                if(meta_data is not None):
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
@@ -109,10 +110,11 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                for meta in meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
+                if(meta_data is not None):
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')

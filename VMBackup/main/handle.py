@@ -115,6 +115,13 @@ def exit_with_commit_log(error_msg, para_parser):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
+def exit_if_same_taskId(taskId):
+    taskIdentity = TaskIdentity()
+    last_taskId = taskIdentity.stored_identity()
+    if(taskId == last_taskId):
+        self.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId))
+        sys.exit(0)
+
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
@@ -374,8 +381,10 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
+
         temp_status= 'transitioning'
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
