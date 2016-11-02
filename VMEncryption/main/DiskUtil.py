@@ -112,7 +112,7 @@ class DiskUtil(object):
                     if not line.strip():
                         continue
 
-                    crypt_mount_item_properties = crypt_mount_item.strip().split()
+                    crypt_mount_item_properties = line.strip().split()
 
                     crypt_item = CryptItem()
                     crypt_item.mapper_name = crypt_mount_item_properties[0]
