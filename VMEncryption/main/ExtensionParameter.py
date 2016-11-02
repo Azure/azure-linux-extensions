@@ -118,8 +118,8 @@ class ExtensionParameter(object):
         AADClientCertThumbprint = ConfigKeyValuePair(CommonVariables.AADClientCertThumbprintKey, self.AADClientCertThumbprint)
         key_value_pairs.append(AADClientCertThumbprint)
 
-        keyEncryptionAlgorithm = ConfigKeyValuePair(CommonVariables.KeyEncryptionAlgorithmKey, self.keyEncryptionAlgorithm)
-        key_value_pairs.append(keyEncryptionAlgorithm)
+        KeyEncryptionAlgorithm = ConfigKeyValuePair(CommonVariables.KeyEncryptionAlgorithmKey, self.KeyEncryptionAlgorithm)
+        key_value_pairs.append(KeyEncryptionAlgorithm)
 
         VolumeType = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.VolumeType)
         key_value_pairs.append(VolumeType)

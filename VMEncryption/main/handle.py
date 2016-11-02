@@ -674,6 +674,8 @@ def enable_encryption():
                         encryption_config.secret_id = kek_secret_id_created
                         encryption_config.secret_seq_num = hutil.get_current_seq()
                         encryption_config.commit()
+
+                        extension_parameter.commit()
    
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
