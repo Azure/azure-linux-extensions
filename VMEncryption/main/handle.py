@@ -110,7 +110,7 @@ def disable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
@@ -188,7 +188,7 @@ def update_encryption_settings():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
@@ -460,7 +460,14 @@ def enable():
             logger.log("Installing pre-requisites")
             DistroPatcher.install_extras()
 
-            enable_encryption()
+            extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+
+            if extension_parameter.config_changed():
+                logger.log("Config has changed, updating encryption settings")
+                update_encryption_settings()
+            else:
+                logger.log("First enable or config did not change, enabling encryption")
+                enable_encryption()
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
 
@@ -468,13 +475,6 @@ def enable():
             DistroPatcher.install_extras()
 
             disable_encryption()
-        elif encryption_operation == CommonVariables.UpdateEncryptionSettings:
-            logger.log("handle.py found update encryption settings operation")
-
-            logger.log("Installing pre-requisites")
-            DistroPatcher.install_extras()
-
-            update_encryption_settings()
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
             logger.log("handle.py found query operation")
 
@@ -567,7 +567,7 @@ def enable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
         
         kek_secret_id_created = None
 
