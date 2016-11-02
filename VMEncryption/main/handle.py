@@ -443,12 +443,18 @@ def enable():
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
+        protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
         if(isinstance(public_settings_str, basestring)):
             public_settings = json.loads(public_settings_str)
         else:
             public_settings = public_settings_str
+
+        if isinstance(protected_settings_str, basestring):
+            protected_settings = json.loads(protected_settings_str)
+        else:
+            protected_settings = protected_settings_str
 
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
 
@@ -557,6 +563,7 @@ def enable_encryption():
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+
         if isinstance(public_settings_str, basestring):
             public_settings = json.loads(public_settings_str)
         else:
