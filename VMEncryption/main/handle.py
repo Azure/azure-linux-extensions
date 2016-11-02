@@ -777,6 +777,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
                     crypt_item_to_update.uses_cleartext_key = False
+                    crypt_item_to_update.current_luks_slot = 0
 
                     if(encryption_item.has_key("name") and encryption_item["name"] != ""):
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
@@ -952,6 +953,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
+                crypt_item_to_update.current_luks_slot = 0
                 # if the original mountpoint is empty, then leave
                 # it as None
                 mount_point = ongoing_item_config.get_mount_point()
@@ -1107,6 +1109,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                     crypt_item_to_update.uses_cleartext_key = False
+                    crypt_item_to_update.current_luks_slot = 0
 
                     # if the original mountpoint is empty, then leave
                     # it as None
