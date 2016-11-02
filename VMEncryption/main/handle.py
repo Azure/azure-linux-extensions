@@ -468,12 +468,13 @@ def enable():
 
             extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
 
-            if extension_parameter.config_changed():
+            if not extension_parameter.config_file_exists():
+                logger.log("First call, enabling encryption")
+                enable_encryption()
+            elif extension_parameter.config_changed():
                 logger.log("Config has changed, updating encryption settings")
                 update_encryption_settings()
-            else:
-                logger.log("First enable or config did not change, enabling encryption")
-                enable_encryption()
+
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
 
@@ -481,6 +482,7 @@ def enable():
             DistroPatcher.install_extras()
 
             disable_encryption()
+
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
             logger.log("handle.py found query operation")
 
@@ -491,6 +493,7 @@ def enable():
             else:
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
+
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
             logger.log(msg)
