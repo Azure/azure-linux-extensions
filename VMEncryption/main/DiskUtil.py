@@ -332,7 +332,7 @@ class DiskUtil(object):
         """
         return the return code of the process for error handling.
         """
-        self.hutil.log("killing keyslot: ".format(keyslot))
+        self.hutil.log("killing keyslot: {0}".format(keyslot))
 
         if header_file:
             cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, header_file, keyslot, passphrase_file)
