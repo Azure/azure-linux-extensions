@@ -54,11 +54,12 @@ from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array
     run_result = CommonVariables.success
     run_status = 'success'
     error_msg = ''
     freeze_result = None
+    snapshot_info_array = None
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -129,7 +130,7 @@ def convert_time(utcTicks):
 
 def snapshot(): 
     try: 
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser 
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
         freeze_result = freezer.freezeall() 
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
         if(freeze_result is not None and len(freeze_result.errors) > 0): 
@@ -140,7 +141,7 @@ def snapshot():
         else: 
             backup_logger.log('T:S doing snapshot now...') 
             snap_shotter = Snapshotter(backup_logger) 
-            snapshot_result = snap_shotter.snapshotall(para_parser) 
+            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser) 
             backup_logger.log('T:S snapshotall ends...') 
             if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
@@ -159,7 +160,7 @@ def snapshot():
 
 def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
@@ -170,7 +171,7 @@ def freeze_snapshot(timeout):
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
@@ -199,7 +200,7 @@ def freeze_snapshot(timeout):
     #snapshot_done = True
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
@@ -221,6 +222,8 @@ def daemon():
         backup_logger.log(errMsg, False, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
     backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
+    
+    snapshot_info_array = None
 
     try:
         # we need to freeze the file system first
@@ -315,7 +318,7 @@ def daemon():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
     status_report_msg = None
-    status_report(run_status, run_result, error_msg, None)
+    status_report(run_status, run_result, error_msg, snapshot_info_array)
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:

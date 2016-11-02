@@ -23,6 +23,16 @@ import datetime
 import multiprocessing as mp
 from common import CommonVariables
 from HttpUtil import HttpUtil
+from Utils import Status
+
+class SnapshotInfoIndexerObj():
+    def __init__(self, index, isSuccessful, snapshotTs, errorMessage):
+        self.index = index
+        self.isSuccessful = isSuccessful
+        self.snapshotTs = snapshotTs
+        self.errorMessage = errorMessage
+    def __str__(self):
+        return 'index: ' + str(self.index) + ' isSuccessful: ' + str(self.isSuccessful) + ' snapshotTs: ' + str(self.snapshotTs) + ' errorMessage: ' + str(self.errorMessage)
 
 class SnapshotError(object):
     def __init__(self):
@@ -46,11 +56,12 @@ class Snapshotter(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def snapshot(self, sasuri, meta_data,snapshot_result_error,global_logger,global_error_logger):
+    def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         result = None
         temp_logger=''
         error_logger=''
         snapshot_error = SnapshotError()
+        snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         if(sasuri is None):
             error_logger = error_logger + " Failed to do the snapshot because sasuri is none "
             snapshot_error.errorcode = CommonVariables.error
@@ -71,7 +82,7 @@ class Snapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                self.logger.log(str(headers))
+                temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + 'start calling the snapshot rest api. '
@@ -80,21 +91,21 @@ class Snapshotter(object):
                 resp = http_util.HttpCall('PUT',sasuri_obj, body_content, headers = headers)
                 
                 if(resp != None):
-                    self.logger.log("snapshot resp-header: " + str(resp.getheaders()))
-                    temp_logger = temp_logger + "snapshot resp-header: " + str(resp.getheaders())
-                    self.logger.log("snapshot resp status: " + str(resp.status))
+                    resp_headers = resp.getheaders()
+                    temp_logger = temp_logger + "snapshot resp-header: " + str(resp_headers)
                     temp_logger = temp_logger + "snapshot resp status: " + str(resp.status)
                     responseBody = resp.read()
                     if(responseBody is not None):
-                        self.logger.log("snapshot responseBody: " + (responseBody).decode('utf-8-sig'))
                         temp_logger = temp_logger + "snapshot responseBody: " + (responseBody).decode('utf-8-sig')
 
                     if(resp.status == 200 or resp.status == 201):
                         result = CommonVariables.success
+                        snapshot_info_indexer.isSuccessful = True
+                        snapshot_info_indexer.snapshotTs = resp.getheader('x-ms-snapshot')
                     else:
                         result = resp.status
+                        snapshot_info_indexer.errorMessage = resp.status
                 else:
-                    self.logger.log("snapshot Http connection response is None")
                     temp_logger = temp_logger + "snapshot Http connection response is None"
 
                 temp_logger = temp_logger + ' snapshot api returned: {0} '.format(result)
@@ -113,10 +124,12 @@ class Snapshotter(object):
         global_logger.put(temp_logger)
         global_error_logger.put(error_logger)
         snapshot_result_error.put(snapshot_error)
+        snapshot_info_indexer_queue.put(snapshot_info_indexer)
 
-    def snapshot_seq(self, sasuri, meta_data):
+    def snapshot_seq(self, sasuri, sasuri_index, meta_data):
         result = None
         snapshot_error = SnapshotError()
+        snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         if(sasuri is None):
             self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
             snapshot_error.errorcode = CommonVariables.error
@@ -140,7 +153,26 @@ class Snapshotter(object):
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
-                result = http_util.Call('PUT',sasuri_obj, body_content, headers = headers)
+                result = CommonVariables.error_http_failure
+                resp = http_util.HttpCall('PUT',sasuri_obj, body_content, headers = headers)
+                if(resp != None):
+                    resp_headers = resp.getheaders()
+                    self.logger.log("snapshot resp-header: " + str(resp_headers))
+                    self.logger.log("snapshot resp status: " + str(resp.status))
+                    responseBody = resp.read()
+                    if(responseBody is not None):
+                        self.logger.log("snapshot responseBody: " + (responseBody).decode('utf-8-sig'))
+
+                    if(resp.status == 200 or resp.status == 201):
+                        result = CommonVariables.success
+                        snapshot_info_indexer.isSuccessful = True
+                        snapshot_info_indexer.snapshotTs = resp.getheader('x-ms-snapshot')
+                    else:
+                        result = resp.status
+                        snapshot_info_indexer.errorMessage = resp.status
+                else:
+                    self.logger.log("snapshot Http connection response is None")
+
                 self.logger.log("snapshot api returned: {0}".format(result))
                 if(result != CommonVariables.success):
                     snapshot_error.errorcode = result
@@ -150,25 +182,36 @@ class Snapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
-        return snapshot_error
+        return snapshot_error, snapshot_info_indexer
 
 
     def snapshotall(self, paras):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
+        snapshot_info_array = []
         try:
             mp_jobs = []
             global_logger = mp.Queue() 
             global_error_logger = mp.Queue()
             snapshot_result_error = mp.Queue()
+            snapshot_info_indexer_queue = mp.Queue()
             blobs = paras.blobs
             if blobs is not None:
-                mp_jobs = [mp.Process(target=self.snapshot,args=(blob, paras.backup_metadata,snapshot_result_error,global_logger,global_error_logger)) for blob in blobs]
+                # initialize snapshot_info_array
+                mp_jobs = []                
+                blob_index = 0
+                for blob in blobs:
+                    blobUri = blob.split("?sv=")[0] + "?snapshot="
+                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                    blob_index = blob_index + 1
+
                 for job in mp_jobs:
                     job.start()
                 for job in mp_jobs:
                     job.join()
-                    self.logger.log('end of snapshot process')
+                self.logger.log('end of snapshot process')
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
                 error_logging = [global_error_logger.get() for job in mp_jobs]
@@ -178,19 +221,47 @@ class Snapshotter(object):
                     for result in results:
                         if(result.errorcode != CommonVariables.success):
                             snapshot_result.errors.append(result)
-                return snapshot_result
+
+                if not snapshot_info_indexer_queue.empty():
+                    snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
+                    for snapshot_info_indexer in snapshot_info_indexers:
+                        self.logger.log("snapshot_info_indexer: " + str(snapshot_info_indexer))
+                        snapshot_index = snapshot_info_indexer.index
+                        snapshot_info_array[snapshot_index].isSuccessful = snapshot_info_indexer.isSuccessful
+                        if (snapshot_info_array[snapshot_index].isSuccessful == True):
+                            snapshot_info_array[snapshot_index].snapshotUri = snapshot_info_array[snapshot_index].snapshotUri + str(snapshot_info_indexer.snapshotTs)
+                        else:
+                            snapshot_info_array[snapshot_index].snapshotUri = None
+                        snapshot_info_array[snapshot_index].errorMessage = snapshot_info_indexer.errorMessage
+
+                return snapshot_result, snapshot_info_array
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result
+                return snapshot_result, snapshot_info_array
         except Exception as e:
+            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, False, 'Error')
             self.logger.log("Do sequential snapshoting")
             blobs = paras.blobs
             if blobs is not None:
+                blob_index = 0
                 for blob in blobs:
-                    snapshotError = self.snapshot_seq(blob, paras.backup_metadata)
+                    blobUri = blob.split("?sv=")[0] + "?snapshot="
+                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blob, None))
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blobUri, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
-                return snapshot_result
+                    self.logger.log("snapshot_info_indexer: " + str(snapshot_info_indexer))
+                    snapshot_index = snapshot_info_indexer.index
+                    snapshot_info_array[snapshot_index].isSuccessful = snapshot_info_indexer.isSuccessful
+                    if (snapshot_info_array[snapshot_index].isSuccessful == True):
+                        snapshot_info_array[snapshot_index].snapshotUri = snapshot_info_array[snapshot_index].snapshotUri + str(snapshot_info_indexer.snapshotTs)
+                    else:
+                        snapshot_info_array[snapshot_index].snapshotUri = None
+                    snapshot_info_array[snapshot_index].errorMessage = snapshot_info_indexer.errorMessage
+                    blob_index = blob_index + 1
+                return snapshot_result, snapshot_info_array
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result
+                return snapshot_result, snapshot_info_array
