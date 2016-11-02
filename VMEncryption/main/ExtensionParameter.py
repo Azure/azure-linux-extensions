@@ -115,6 +115,9 @@ class ExtensionParameter(object):
         AADClientID = ConfigKeyValuePair(CommonVariables.AADClientIDKey, self.AADClientID)
         key_value_pairs.append(AADClientID)
 
+        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, self.AADClientSecret)
+        key_value_pairs.append(AADClientSecret)
+
         AADClientCertThumbprint = ConfigKeyValuePair(CommonVariables.AADClientCertThumbprintKey, self.AADClientCertThumbprint)
         key_value_pairs.append(AADClientCertThumbprint)
 
@@ -152,5 +155,4 @@ class ExtensionParameter(object):
                self.AADClientCertThumbprint != self.get_aad_client_cert() or \
                self.VolumeType != self.get_volume_type() or \
                self.DiskFormatQuery != self.get_disk_format_query() or \
-               self.passphrase != self.get_passphrase() or \
                self.DiskEncryptionKeyFileName != self.get_bek_filename()
