@@ -108,32 +108,31 @@ class DiskUtil(object):
             self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
         else:
             with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
-                existing_content = f.read()
-                crypt_mount_items = existing_content.splitlines()
-                for i in range(0,len(crypt_mount_items)):
-                    crypt_mount_item = crypt_mount_items[i]
-                    if(crypt_mount_item.strip() != ""):
-                        crypt_mount_item_properties = crypt_mount_item.strip().split()
+                for line in f:
+                    if not line.strip():
+                        continue
 
-                        crypt_item = CryptItem()
-                        crypt_item.mapper_name = crypt_mount_item_properties[0]
-                        crypt_item.dev_path = crypt_mount_item_properties[1]
+                    crypt_mount_item_properties = crypt_mount_item.strip().split()
 
-                        header_file_path = None
-                        if(crypt_mount_item_properties[2] != "None"):
-                            header_file_path = crypt_mount_item_properties[2]
+                    crypt_item = CryptItem()
+                    crypt_item.mapper_name = crypt_mount_item_properties[0]
+                    crypt_item.dev_path = crypt_mount_item_properties[1]
 
-                        crypt_item.luks_header_path = header_file_path
-                        crypt_item.mount_point = crypt_mount_item_properties[3]
-                        crypt_item.file_system = crypt_mount_item_properties[4]
-                        crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
+                    header_file_path = None
+                    if crypt_mount_item_properties[2] and crypt_mount_item_properties[2] != "None":
+                        header_file_path = crypt_mount_item_properties[2]
 
-                        try:
-                            crypt_item.current_luks_slot = int(crypt_mount_item_properties[6])
-                        except IndexError:
-                            crypt_item.current_luks_slot = -1
+                    crypt_item.luks_header_path = header_file_path
+                    crypt_item.mount_point = crypt_mount_item_properties[3]
+                    crypt_item.file_system = crypt_mount_item_properties[4]
+                    crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
 
-                        crypt_items.append(crypt_item)
+                    try:
+                        crypt_item.current_luks_slot = int(crypt_mount_item_properties[6])
+                    except IndexError:
+                        crypt_item.current_luks_slot = -1
+
+                    crypt_items.append(crypt_item)
 
         return crypt_items
 
