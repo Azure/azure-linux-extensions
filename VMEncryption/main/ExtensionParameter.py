@@ -74,31 +74,28 @@ class ExtensionParameter(object):
         return self.params_config.get_config(CommonVariables.KeyEncryptionKeyURLKey)
 
     def get_keyvault_url(self):
-        return self.params_config.get_config(CommonVariables.KeyVaultURL)
+        return self.params_config.get_config(CommonVariables.KeyVaultURLKey)
 
     def get_aad_client_id(self):
-        return self.params_config.get_config(CommonVariables.AADClientID)
+        return self.params_config.get_config(CommonVariables.AADClientIDKey)
 
     def get_aad_client_secret(self):
-        return self.params_config.get_config(CommonVariables.AADClientSecret)
+        return self.params_config.get_config(CommonVariables.AADClientSecretKey)
 
     def get_aad_client_cert(self):
-        return self.params_config.get_config(CommonVariables.AADClientCertThumbprint)
+        return self.params_config.get_config(CommonVariables.AADClientCertThumbprintKey)
 
     def get_kek_algorithm(self):
-        return self.params_config.get_config(CommonVariables.KeyEncryptionAlgorithm)
+        return self.params_config.get_config(CommonVariables.KeyEncryptionAlgorithmKey)
 
     def get_volume_type(self):
-        return self.params_config.get_config(CommonVariables.VolumeType)
+        return self.params_config.get_config(CommonVariables.VolumeTypeKey)
 
     def get_disk_format_query(self):
-        return self.params_config.get_config(CommonVariables.DiskFormatQuery)
-
-    def get_passphrase(self):
-        return self.params_config.get_config(CommonVariables.passphrase)
+        return self.params_config.get_config(CommonVariables.DiskFormatQuerykey)
 
     def get_bek_filename(self):
-        return self.params_config.get_config(CommonVariables.DiskEncryptionKeyFileName)
+        return self.DiskEncryptionKeyFileName
 
     def commit(self):
         key_value_pairs = []
