@@ -519,11 +519,11 @@ def enable_encryption():
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
     config_path_result = disk_util.make_sure_path_exists(encryption_environment.encryption_config_path)
 
-    if(config_path_result != CommonVariables.process_success):
+    if config_path_result != CommonVariables.process_success:
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
 
-    if(encryption_config.config_file_exists()):
+    if encryption_config.config_file_exists():
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if(existing_passphrase_file is not None):
             mount_encrypted_disks(disk_util=disk_util,
@@ -546,7 +546,7 @@ def enable_encryption():
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-    if (not encryption_marker.config_file_exists()):
+    if not encryption_marker.config_file_exists():
         machine_identity = MachineIdentity()
         stored_identity = machine_identity.stored_identity()
         if(stored_identity is None):
