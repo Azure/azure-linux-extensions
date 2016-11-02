@@ -71,7 +71,7 @@ class ExtensionParameter(object):
         return self.params_config.get_config(CommonVariables.EncryptionEncryptionOperationKey)
 
     def get_kek_url(self):
-        return self.params_config.get_config(CommonVariables.KeyEncryptionKeyURL)
+        return self.params_config.get_config(CommonVariables.KeyEncryptionKeyURLKey)
 
     def get_keyvault_url(self):
         return self.params_config.get_config(CommonVariables.KeyVaultURL)
