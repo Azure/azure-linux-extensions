@@ -150,6 +150,5 @@ class ExtensionParameter(object):
                self.AADClientID != self.get_aad_client_id() or \
                self.AADClientSecret != self.get_aad_client_secret() or \
                self.AADClientCertThumbprint != self.get_aad_client_cert() or \
-               self.VolumeType != self.get_volume_type() or \
                self.DiskFormatQuery != self.get_disk_format_query() or \
                self.DiskEncryptionKeyFileName != self.get_bek_filename()
