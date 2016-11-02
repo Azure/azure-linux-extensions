@@ -127,7 +127,7 @@ class ExtensionParameter(object):
         DiskFormatQuery = ConfigKeyValuePair(CommonVariables.DiskFormatQuerykey, self.DiskFormatQuery)
         key_value_pairs.append(DiskFormatQuery)
 
-        self.encryption_config.save_configs(key_value_pairs)
+        self.params_config.save_configs(key_value_pairs)
 
     def clear_config(self):
         try:
