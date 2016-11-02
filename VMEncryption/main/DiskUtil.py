@@ -103,9 +103,9 @@ class DiskUtil(object):
 
     def get_crypt_items(self):
         crypt_items = []
+
         if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
             self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
-            return []
         else:
             with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
                 existing_content = f.read()
@@ -134,6 +134,7 @@ class DiskUtil(object):
                             crypt_item.current_luks_slot = -1
 
                         crypt_items.append(crypt_item)
+
         return crypt_items
 
     def add_crypt_item(self,crypt_item):
