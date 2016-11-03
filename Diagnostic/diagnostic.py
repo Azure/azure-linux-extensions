@@ -647,7 +647,7 @@ def start_daemon():
     subprocess.Popen(args, stdout=log, stderr=log)
     wait_n = 20
     while len(get_mdsd_process())==0 and wait_n >0:
-        time.sleep(10)
+        time.sleep(5)
         wait_n=wait_n-1
     if wait_n <=0:
         hutil.error("wait daemon start time out")
