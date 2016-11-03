@@ -659,7 +659,17 @@ def start_mdsd():
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup_dependencies_and_mdsd()
+    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
+    if dependencies_err != 0:
+        dependencies_err_log_msg = "Failed to set up mdsd dependencies: {0}".format(dependencies_msg)
+        hutil.error(dependencies_err_log_msg)
+        hutil.do_status_report(ExtensionOperationType, 'error', '1', dependencies_err_log_msg)
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=ExtensionOperationType,
+                                  isSuccess=False,
+                                  version=hutil.get_extension_version(),
+                                  message=dependencies_err_log_msg)
+        return
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
@@ -670,10 +680,6 @@ def start_mdsd():
 
     if not EnableSyslog:
         uninstall_rsyslogom()
-
-    #if EnableSyslog and distConfig.has_key("restartrsyslog"):
-    # sometimes after the mdsd is killed port 29131 is accopied by sryslog, don't know why
-    #    RunGetOutput(distConfig["restartrsyslog"])
 
     log_dir = hutil.get_log_dir()
     monitor_file_path = os.path.join(log_dir, 'mdsd.err')
