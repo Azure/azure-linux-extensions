@@ -80,10 +80,12 @@ class ExtensionParameter(object):
         return self.params_config.get_config(CommonVariables.AADClientIDKey)
 
     def get_aad_client_secret(self):
-        return self.params_config.get_config(CommonVariables.AADClientSecretKey)
+        secret = self.params_config.get_config(CommonVariables.AADClientSecretKey)
+        return secret if secret else None
 
     def get_aad_client_cert(self):
-        return self.params_config.get_config(CommonVariables.AADClientCertThumbprintKey)
+        cert = self.params_config.get_config(CommonVariables.AADClientCertThumbprintKey)
+        return cert if cert else None
 
     def get_kek_algorithm(self):
         return self.params_config.get_config(CommonVariables.KeyEncryptionAlgorithmKey)
@@ -92,7 +94,8 @@ class ExtensionParameter(object):
         return self.params_config.get_config(CommonVariables.VolumeTypeKey)
 
     def get_disk_format_query(self):
-        return self.params_config.get_config(CommonVariables.DiskFormatQuerykey)
+        query = self.params_config.get_config(CommonVariables.DiskFormatQuerykey)
+        return query if query else None
 
     def get_bek_filename(self):
         return self.DiskEncryptionKeyFileName
