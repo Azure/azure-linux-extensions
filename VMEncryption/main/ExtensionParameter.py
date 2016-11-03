@@ -144,11 +144,45 @@ class ExtensionParameter(object):
             return False
 
     def config_changed(self):
-        return self.command != self.get_command() or \
-               self.KeyEncryptionKeyURL != self.get_kek_url() or \
-               self.KeyVaultURL != self.get_keyvault_url() or \
-               self.AADClientID != self.get_aad_client_id() or \
-               self.AADClientSecret != self.get_aad_client_secret() or \
-               self.AADClientCertThumbprint != self.get_aad_client_cert() or \
-               self.DiskFormatQuery != self.get_disk_format_query() or \
-               self.DiskEncryptionKeyFileName != self.get_bek_filename()
+        if (self.command or self.get_command()) and \
+           (self.command != self.get_command()):
+            self.logger.log('Current config command {0} differs from effective config command {1}'.format(self.command, self.get_command()))
+            return True
+
+        if (self.KeyEncryptionKeyURL or self.get_kek_url()) and \
+           (self.KeyEncryptionKeyURL != self.get_kek_url()):
+            self.logger.log('Current config KeyEncryptionKeyURL {0} differs from effective config KeyEncryptionKeyURL {1}'.format(self.KeyEncryptionKeyURL, self.get_kek_url()))
+            return True
+
+        if (self.KeyVaultURL or self.get_keyvault_url()) and \
+           (self.KeyVaultURL != self.get_keyvault_url()):
+            self.logger.log('Current config KeyVaultURL {0} differs from effective config KeyVaultURL {1}'.format(self.KeyVaultURL, self.get_keyvault_url()))
+            return True
+
+        if (self.AADClientID or self.get_aad_client_id()) and \
+           (self.AADClientID != self.get_aad_client_id()):
+            self.logger.log('Current config AADClientID {0} differs from effective config AADClientID {1}'.format(self.AADClientID, self.get_aad_client_id()))
+            return True
+
+        if (self.AADClientSecret or self.get_aad_client_secret()) and \
+           (self.AADClientSecret != self.get_aad_client_secret()):
+            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(self.AADClientSecret, self.get_aad_client_secret()))
+            return True
+
+        if (self.AADClientCertThumbprint or self.get_aad_client_cert()) and \
+           (self.AADClientCertThumbprint != self.get_aad_client_cert()):
+            self.logger.log('Current config AADClientCertThumbprint {0} differs from effective config AADClientCertThumbprint {1}'.format(self.AADClientCertThumbprint, self.get_aad_client_cert()))
+            return True
+
+        if (self.KeyEncryptionAlgorithm or self.get_kek_algorithm()) and \
+           (self.KeyEncryptionAlgorithm != self.get_kek_algorithm()):
+            self.logger.log('Current config KeyEncryptionAlgorithm {0} differs from effective config KeyEncryptionAlgorithm {1}'.format(self.KeyEncryptionAlgorithm, self.get_kek_algorithm()))
+            return True
+
+        if (self.DiskFormatQuery or self.get_disk_format_query()) and \
+           (self.DiskFormatQuery != self.get_disk_format_query()):
+            self.logger.log('Current config DiskFormatQuery {0} differs from effective config DiskFormatQuery {1}'.format(self.DiskFormatQuery, self.get_disk_format_query()))
+            return True
+   
+        self.logger.log('Current config is not different from effective config')
+        return False
