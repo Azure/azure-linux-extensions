@@ -27,7 +27,7 @@ from ConfigUtil import ConfigKeyValuePair
 
 class EncryptionConfig(object):
     def __init__(self, encryption_environment, logger):
-        self.encryptionEnvironment = encryption_environment
+        self.encryption_environment = encryption_environment
         self.passphrase_file_name = None
         self.volume_type = None
         self.secret_id = None
