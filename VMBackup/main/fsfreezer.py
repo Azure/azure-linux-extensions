@@ -117,15 +117,15 @@ class FsFreezer:
             args.append(mount_itr)
         if(self.root_seen):
             args.append('/')
-        self.logger.log(str(args))
+        self.logger.log(str(args),True)
         self.freeze_handler.signal_receiver()
-        self.logger.log("proceeded for accepting signals")
+        self.logger.log("proceeded for accepting signals", True)
         sig_handle=self.freeze_handler.startproc(args)
         if(sig_handle != 1):
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
-                    self.logger.log(line.rstrip())
+                    self.logger.log(line.rstrip(), True)
                 else:
                     break
             error_msg="freeze failed for some mount"
@@ -144,11 +144,11 @@ class FsFreezer:
                     time.sleep(1)
                 else:
                     break;
-            self.logger.log("Binary output after process end: ")
+            self.logger.log("Binary output after process end: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
-                    self.logger.log(line.rstrip())
+                    self.logger.log(line.rstrip(), True)
                 else:
                     break
             if(self.freeze_handler.child.returncode!=0):
@@ -156,11 +156,11 @@ class FsFreezer:
                 thaw_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         else:
-            self.logger.log("Binary output after process end when no thaw sent: ")
+            self.logger.log("Binary output after process end when no thaw sent: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
-                    self.logger.log(line.rstrip())
+                    self.logger.log(line.rstrip(), True)
                 else:
                     break
             error_msg = 'snapshot result inconsistent'

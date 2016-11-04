@@ -55,6 +55,7 @@ class Backuplogger(object):
         #commit to local file system first, then commit to the network.
         self.hutil.log(self.msg)
         self.commit_to_blob(logbloburi)
+        self.msg = ''
 
     def commit_to_local(self):
         self.hutil.log(self.msg)
