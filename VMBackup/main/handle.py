@@ -107,8 +107,8 @@ def status_report(status,status_code,message):
     try:
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
             blobWriter = BlobWriter(hutil)
-            blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
             if(trans_report_msg is not None):
+                blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
                 backup_logger.log("trans status report message:",True)
                 backup_logger.log(trans_report_msg,True)
             else:
@@ -203,8 +203,6 @@ def daemon():
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
-    if(freezer.mounts is not None):
-        hutil.partitioncount = len(freezer.mounts.mounts)
     global_error_result = None
     # precheck
     freeze_called = False
@@ -212,6 +210,8 @@ def daemon():
     thread_timeout=str(60)
     safe_freeze_on = True
     try:
+        if(freezer.mounts is not None):
+            hutil.partitioncount = len(freezer.mounts.mounts)
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
