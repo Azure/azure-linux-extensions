@@ -17,11 +17,10 @@ import datetime
 
 
 class Watcher():
-    lastModTime = os.path.getmtime('/etc/fstab')
-    logger = None
-
 
     def __init__(self, errorStream, outputStream, logtoconsole=False):
+        self.lastModTime = os.path.getmtime('/etc/fstab')
+
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
