@@ -19,8 +19,9 @@ import datetime
 class Watcher():
     lastModTime = os.path.getmtime('/etc/fstab')
     logger = None
+    consoleStream = None
 
-    def __init__(self, errorStream, outputStream):
+    def __init__(self, errorStream, outputStream, logtoconsole=False):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
@@ -30,6 +31,11 @@ class Watcher():
         ch = logging.StreamHandler(outputStream)
         ch.setLevel(logging.INFO)
         self.logger.addHandler(ch)
+
+        if logtoconsole:
+            ch = logging.FileHandler('/dev/console')
+            ch.setLevel(logging.WARNING)
+            self.logger.addHandler(ch)
 
     def handle_fstab(self, ignoretime=False):
         tryMount = False
