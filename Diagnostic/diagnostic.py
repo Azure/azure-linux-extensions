@@ -25,12 +25,15 @@ import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+import threading
+import logging
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
+import watcherutil
 
 WorkDir = os.getcwd()
 MDSDFileResourcesDir = "/var/run/mdsd"
@@ -730,6 +733,13 @@ def start_mdsd():
         info_file_path).split(" ")
 
     try:
+        # Create monitor object that encapsulates monitoring activities
+        watcher = watcherutil.Watcher(hutil._error, hutil._log, logtoconsole=True)
+        # Start a thread to monitor /etc/fstab
+        threadObj = threading.Thread(target=watcher.watch)
+        threadObj.daemon = True
+        threadObj.start()
+
         num_quick_consecutive_crashes = 0
 
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
@@ -1134,6 +1144,7 @@ def get_deployment_id():
         hutil.error("Failed to retrieve deployment ID. Error:{0} {1}".format(e, traceback.format_exc()))
 
     return identity
+
 
 
 if __name__ == '__main__' :
