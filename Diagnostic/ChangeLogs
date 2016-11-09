@@ -2,6 +2,7 @@
     - Correctly fail Enable when mdsd dependency set up fails.
     - Added /etc/fstab watcher feature (logging to /dev/console so that issues
       can be found on serial logs)
+    - Add storage account SAS token support (replacing storage account key)
 
 2016-10-31: LAD-2.3.9013
     - Use semodule -u (upgrade) to reduce unnecessary SELinux policy

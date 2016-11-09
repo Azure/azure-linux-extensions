@@ -309,11 +309,19 @@ def createPerfSettngs(tree,perfs,forAI=False):
 # Updates existing default Account element with Azure table storage properties.
 # If an aikey is provided to the function, then it adds a new Account element for
 # Application Insights with the application insights key.
-def createAccountSettings(tree,account,key,endpoint,aikey=None):
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
-    
+def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
+    assert key or token, "Either key or token must be given."
+    if key:
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
+        XmlUtil.removeElement(tree, 'Accounts/SharedAccessSignature')
+    else:  # token
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token.replace("&", "&#38;"), ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
+        XmlUtil.removeElement(tree, 'Accounts/Account')
+
     if aikey:
         AIUtil.createAccountElement(tree,aikey)
 
@@ -496,11 +504,14 @@ def configSettings():
     if not account:
         return False, "Empty storageAccountName"
     key = readPrivateConfig('storageAccountKey')
-    if not key:
-        return False, "Empty storageAccountKey"
+    token = readPrivateConfig('storageAccountSasToken')
+    if not key and not token:
+        return False, "Neither storageAccountKey nor storageAccountSasToken is given"
+    if key and token:
+        return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
     endpoint = getStorageAccountEndPoint(account)
 
-    createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
+    createAccountSettings(mdsdCfg, account, key, token, endpoint, aikey)
 
     # Check and add new syslog RouteEvent for Application Insights.
     if aikey:
