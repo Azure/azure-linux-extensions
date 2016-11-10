@@ -56,7 +56,7 @@ class Backuplogger(object):
         try:
             self.hutil.log(self.msg)
         except Exception as e:
-            
+            pass 
         try:
             self.commit_to_blob(logbloburi)
         except Exception as e:
