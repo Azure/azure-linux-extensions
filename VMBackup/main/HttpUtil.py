@@ -84,14 +84,14 @@ class HttpUtil(object):
                 resp = connection.getresponse()
 
             if(resp != None):
-                self.logger.log(str(sasuri_obj) + "resp-header: " + str(resp.getheaders()))
+                self.logger.log("resp-header: " + str(resp.getheaders()))
             else:
-                self.logger.log(str(sasuri_obj) + "Http connection response is None")
+                self.logger.log("Http connection response is None")
 
             responseBody = resp.read()
             connection.close()
 
-            self.logger.log(str(sasuri_obj) + " resp status: " + str(resp.status))
+            self.logger.log(" resp status: " + str(resp.status))
             if(responseBody is not None):
                 self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
 
@@ -107,8 +107,9 @@ class HttpUtil(object):
             else:
                 return CommonVariables.error_http_failure
 
-    def HttpCall(self, method, sasuri_obj, data, headers):
+    def HttpCallGetResponse(self, method, sasuri_obj, data, headers):
         try:
+            resp = None
             if(self.proxyHost == None or self.proxyPort == None):
                 connection = httplib.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)

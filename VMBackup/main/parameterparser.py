@@ -61,6 +61,6 @@ class ParameterParser(object):
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
             if(self.logsBlobUri is None or self.logsBlobUri == ""):
-                self.logsBlobUri = self.private_config_obj['logsBlobUri']
+                self.logsBlobUri = self.private_config_obj[CommonVariables.logs_blob_uri]
             if(self.statusBlobUri is None or self.statusBlobUri == ""):
-                self.statusBlobUri = self.private_config_obj['statusBlobUri']
+                self.statusBlobUri = self.private_config_obj[CommonVariables.status_blob_uri]
