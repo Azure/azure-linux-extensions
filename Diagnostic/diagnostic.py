@@ -315,12 +315,12 @@ def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
         XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
         XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
         XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
-        XmlUtil.removeElement(tree, 'Accounts/SharedAccessSignature')
+        XmlUtil.removeElement(tree, 'Accounts', 'SharedAccessSignature')
     else:  # token
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token.replace("&", "&#38;"), ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
-        XmlUtil.removeElement(tree, 'Accounts/Account')
+        XmlUtil.removeElement(tree, 'Accounts', 'Account')
 
     if aikey:
         AIUtil.createAccountElement(tree,aikey)

@@ -43,7 +43,9 @@ def createElement(schema):
     return ET.fromstring(schema)
 
 
-def removeElement(xml, path):
-    elements = xml.findall(path)
-    for element in elements:
-        xml.remove(element)
+def removeElement(tree, parent_path, removed_element_name):
+    parents = tree.findall(parent_path)
+    for parent in parents:
+        removed_elements = parent.findall(removed_element_name)
+        for element in removed_elements:
+            parent.remove(element)
