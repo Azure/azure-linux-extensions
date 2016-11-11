@@ -1,4 +1,4 @@
-2016-xx-xx: LAD-2.3.9015
+2016-11-11: LAD-2.3.9015
     - Correctly fail Enable when mdsd dependency set up fails.
     - Added /etc/fstab watcher feature (logging to /dev/console so that issues
       can be found on serial logs)
