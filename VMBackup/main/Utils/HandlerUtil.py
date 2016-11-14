@@ -428,8 +428,6 @@ class HandlerUtility:
         self.add_telemetry_data()
 
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info)
-        stat_rept_file = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
- 
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -437,14 +435,13 @@ class HandlerUtility:
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
-
+        
+        # Add Status as sub-status for Status to be written on Status-File
+        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            status_code = '1'
             status = CommonVariables.status_success
-            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-            stat_rept_v2 = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, snapshot_info)
-            stat_rept_v2 =  "[" + json.dumps(stat_rept_v2, cls = Status.ComplexEncoder) + "]"
-            stat_rept_file =  stat_rept_v2
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None)
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
