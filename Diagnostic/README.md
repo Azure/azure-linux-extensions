@@ -83,7 +83,7 @@ Note that the `storageAccountKey` property may be deprecated in the near future.
 An account SAS token should be of the following format:
 
 ```
-sv=2015-12-11&ss=bt&srt=co&sp=wlacu&st=2016-11-09T00%3A04%3A00Z&se=9999-11-10T00%3A04%3A00Z&sig=[signed-signature-string]
+sv=2015-12-11&ss=bt&srt=co&sp=rwlacu&st=2016-11-09T00%3A04%3A00Z&se=9999-11-10T00%3A04%3A00Z&sig=[signed-signature-string]
 ```
 
 Details on how to construct an account SAS token can be found in [this document](https://msdn.microsoft.com/en-us/library/azure/mt584140.aspx). If you need to manually generate an account SAS token, we recommend using [the Microsoft Azure Storage Explorer](http://storageexplorer.com/). Just install/run the Explorer, login with your Azure account (or add a storage account explicitly), right-click on the storage account for which you want to generate an account SAS token, and click Get Shared Access Signature and follow the dialog.
@@ -91,7 +91,7 @@ Details on how to construct an account SAS token can be found in [this document]
 In order for the given account SAS to work with the Linux Azure Diagnostic extension, the following requirements must be met:
 
 * Services (ss) must include Blobs (b) and Tables (t).
-* Permissions (sp) must include Write (w), List (l), Add (a), Create (c), and Update (u).
+* Permissions (sp) must include Read (r), Write (w), List (l), Add (a), Create (c), and Update (u).
 * Resource Types (srt) must include Container (c) and Object (o).
 * Start time (st) and Expiry time (se) should be valid for the duration of time the SAS will be used. We recommend to set the Start time with today's date and to set the Expiry time with the date 9999-12-31. 
 
