@@ -11,6 +11,7 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
 
 import base64
+import binascii
 import datetime
 import os
 import os.path
@@ -305,25 +306,52 @@ def createPerfSettngs(tree,perfs,forAI=False):
             AIUtil.updateOMIQueryElement(perfElement)
         XmlUtil.addElement(xml=tree,path='Events/OMI',el=perfElement,addOnlyOnce=True)
 
+
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
 # If an aikey is provided to the function, then it adds a new Account element for
 # Application Insights with the application insights key.
 def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
     assert key or token, "Either key or token must be given."
+
+    def get_handler_cert_pkey_paths():
+        handler_settings = hutil.get_handler_settings()
+        thumbprint = handler_settings['protectedSettingsCertThumbprint']
+        cert_path = waagent.LibDir + '/' + thumbprint + '.crt'
+        pkey_path = waagent.LibDir + '/' + thumbprint + '.prv'
+        return cert_path, pkey_path
+
+    def encrypt_secret_with_cert(cert_path, secret):
+        encrypted_secret_tmp_file_path = os.path.join(WorkDir, "mdsd_secret.bin")
+        cmd_to_run = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}".format(secret, encrypted_secret_tmp_file_path, cert_path)
+        ret_status, ret_msg = RunGetOutput(cmd_to_run, should_log=False)
+        if ret_status is not 0:
+            hutil.error("Encrypting storage secret failed with the following message: " + ret_msg)
+            return None
+        with open(encrypted_secret_tmp_file_path, 'rb') as f:
+            encrypted_secret = f.read()
+        os.remove(encrypted_secret_tmp_file_path)
+        return binascii.b2a_hex(encrypted_secret).upper()
+
+    handler_cert_path, handler_pkey_path = get_handler_cert_pkey_paths()
     if key:
+        key = encrypt_secret_with_cert(handler_cert_path, key)
         XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
         XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/Account', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
         XmlUtil.removeElement(tree, 'Accounts', 'SharedAccessSignature')
     else:  # token
+        token = encrypt_secret_with_cert(handler_cert_path, token)
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/Account', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
         XmlUtil.removeElement(tree, 'Accounts', 'Account')
 
     if aikey:
         AIUtil.createAccountElement(tree,aikey)
+
 
 def config(xmltree,key,value,xmlpath,selector=[]):
     v = readPublicConfig(key)
