@@ -92,7 +92,7 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def status_report(status, status_code, message, snapshot_info):
+def status_report(status, status_code, message, snapshot_info = None):
     global backup_logger,hutil,para_parser
     trans_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):

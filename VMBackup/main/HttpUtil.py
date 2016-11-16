@@ -71,27 +71,14 @@ class HttpUtil(object):
 
     def Call(self, method, sasuri_obj, data, headers, fallback_to_curl = False):
         try:
-            if(self.proxyHost == None or self.proxyPort == None):
-                connection = httplib.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
-                connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
-                resp = connection.getresponse()
-            else:
-                connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
-                connection.set_tunnel(sasuri_obj.hostname, 443)
-                # If proxy is used, full url is needed.
-                path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
-                connection.request(method=method, url=(path), body=data, headers=headers)
-                resp = connection.getresponse()
-
+            resp = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
             if(resp != None):
                 self.logger.log("resp-header: " + str(resp.getheaders()))
             else:
                 self.logger.log("Http connection response is None")
 
-            responseBody = resp.read()
-            connection.close()
-
             self.logger.log(" resp status: " + str(resp.status))
+            responseBody = resp.read()
             if(responseBody is not None):
                 self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
 

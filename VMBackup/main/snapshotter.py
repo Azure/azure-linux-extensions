@@ -161,7 +161,7 @@ class Snapshotter(object):
                 mp_jobs = []                
                 blob_index = 0
                 for blob in blobs:
-                    blobUri = blob.split("?sv=")[0]
+                    blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
                     mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
@@ -187,6 +187,7 @@ class Snapshotter(object):
                     for snapshot_info_indexer in snapshot_info_indexers:
                         # update snapshot_info_array element properties from snapshot_info_indexer object
                         self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[snapshot_info_indexer.index])
+                        self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
                 return snapshot_result, snapshot_info_array
             else:
@@ -200,7 +201,7 @@ class Snapshotter(object):
             if blobs is not None:
                 blob_index = 0
                 for blob in blobs:
-                    blobUri = blob.split("?sv=")[0]
+                    blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     snapshot_info_array.append(Status.SnapshotInfoObj(False, blob, None))
                     snapshotError, snapshot_info_indexer = self.snapshot_seq(blobUri, blob_index, paras.backup_metadata)
