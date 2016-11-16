@@ -94,8 +94,16 @@ class redhatPatching(AbstractPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux']
+                    'util-linux',
+                    'python-pip',
+                    'gcc',
+                    'libffi-devel',
+                    'openssl-devel',
+                    'python-devel']
 
         return_code = subprocess.call(['yum', 'install', '-y'] + packages)
         self.logger.log("Installing packages: " + " ".join(packages))
         self.logger.log("Installation result: " + str(return_code))
+        
+        return_code = subprocess.call(['pip', 'install', 'adal'])
+        self.logger.log("Pip installation result: " + str(return_code))

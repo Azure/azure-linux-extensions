@@ -58,8 +58,14 @@ class UbuntuPatching(AbstractPatching):
         """
         install the sg_dd because the default dd do not support the sparse write
         """
-        packages = ['cryptsetup-bin', 'lsscsi', 'python-six', 'python-parted', 'procps', 'psmisc']
+        return_code = subprocess.call(['apt-get', 'update'])
+        self.logger.log("Apt-get update result: " + str(return_code))
+
+        packages = ['at', 'cryptsetup-bin', 'lsscsi', 'python-six', 'python-parted', 'procps', 'psmisc', 'gcc', 'libssl-dev', 'libffi-dev', 'python-dev', 'python-pip']
 
         return_code = subprocess.call(['apt-get', 'install', '-y'] + packages)
         self.logger.log("Installing packages: " + " ".join(packages))
         self.logger.log("Installation result: " + str(return_code))
+        
+        return_code = subprocess.call(['pip', 'install', 'adal'])
+        self.logger.log("Pip installation result: " + str(return_code))
