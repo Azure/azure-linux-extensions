@@ -71,28 +71,20 @@ class HttpUtil(object):
 
     def Call(self, method, sasuri_obj, data, headers, fallback_to_curl = False):
         try:
-            if(self.proxyHost == None or self.proxyPort == None):
-                connection = httplib.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
-                connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
-                resp = connection.getresponse()
-            else:
-                connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
-                connection.set_tunnel(sasuri_obj.hostname, 443)
-                # If proxy is used, full url is needed.
-                path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
-                connection.request(method=method, url=(path), body=data, headers=headers)
-                resp = connection.getresponse()
-
+            resp = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
             if(resp != None):
-                self.logger.log(str(resp.getheaders()))
+                self.logger.log("resp-header: " + str(resp.getheaders()))
+            else:
+                self.logger.log("Http connection response is None")
+
+            self.logger.log(" resp status: " + str(resp.status))
             responseBody = resp.read()
-            connection.close()
+            if(responseBody is not None):
+                self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
+
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
             else:
-                self.logger.log("resp status: " + str(resp.status))
-                if(responseBody is not None):
-                    self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
                 return resp.status
         except Exception as e:
             errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
@@ -101,3 +93,25 @@ class HttpUtil(object):
                 return self.CallUsingCurl(method,sasuri_obj,data,headers)
             else:
                 return CommonVariables.error_http_failure
+
+    def HttpCallGetResponse(self, method, sasuri_obj, data, headers):
+        try:
+            resp = None
+            if(self.proxyHost == None or self.proxyPort == None):
+                connection = httplib.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
+                connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
+                resp = connection.getresponse()
+                connection.close()
+            else:
+                connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
+                connection.set_tunnel(sasuri_obj.hostname, 443)
+                # If proxy is used, full url is needed.
+                path = "https://{0}:{1}{2}".format(sasuri_obj.hostname, 443, (sasuri_obj.path + '?' + sasuri_obj.query))
+                connection.request(method=method, url=(path), body=data, headers=headers)
+                resp = connection.getresponse()
+                connection.close()
+            return resp
+        except Exception as e:
+            errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+            return None

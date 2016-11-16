@@ -54,11 +54,12 @@ from MachineIdentity import MachineIdentity
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array
     run_result = CommonVariables.success
     run_status = 'success'
     error_msg = ''
     freeze_result = None
+    snapshot_info_array = None
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -91,7 +92,7 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def status_report(status,status_code,message):
+def status_report(status, status_code, message, snapshot_info = None):
     global backup_logger,hutil,para_parser
     trans_report_msg = None
     if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -99,7 +100,8 @@ def status_report(status,status_code,message):
                 status_code=str(status_code),\
                 message=message,\
                 taskId=para_parser.taskId,\
-                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks)
+                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                snapshot_info=snapshot_info)
         blobWriter = BlobWriter(hutil)
         blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
         if(trans_report_msg is not None):
@@ -115,12 +117,20 @@ def exit_with_commit_log(error_msg, para_parser):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
+def exit_if_same_taskId(taskId):
+    global backup_logger
+    taskIdentity = TaskIdentity()
+    last_taskId = taskIdentity.stored_identity()
+    if(taskId == last_taskId):
+        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)
+        sys.exit(0)
+
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
 def snapshot(): 
     try: 
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser 
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
         freeze_result = freezer.freezeall() 
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
         if(freeze_result is not None and len(freeze_result.errors) > 0): 
@@ -131,7 +141,7 @@ def snapshot():
         else: 
             backup_logger.log('T:S doing snapshot now...') 
             snap_shotter = Snapshotter(backup_logger) 
-            snapshot_result = snap_shotter.snapshotall(para_parser) 
+            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser) 
             backup_logger.log('T:S snapshotall ends...') 
             if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
@@ -150,7 +160,7 @@ def snapshot():
 
 def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser
+        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
@@ -161,7 +171,7 @@ def freeze_snapshot(timeout):
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
@@ -190,7 +200,7 @@ def freeze_snapshot(timeout):
     #snapshot_done = True
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
@@ -212,6 +222,8 @@ def daemon():
         backup_logger.log(errMsg, False, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
     backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
+    
+    snapshot_info_array = None
 
     try:
         # we need to freeze the file system first
@@ -249,7 +261,7 @@ def daemon():
                 temp_status= 'success'
                 temp_result=CommonVariables.ExtensionTempTerminalState
                 temp_msg='Transitioning state in extension'
-                status_report(temp_status,temp_result,temp_msg)
+                status_report(temp_status, temp_result, temp_msg, None)
                 backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -306,7 +318,7 @@ def daemon():
         run_status = 'error'
         error_msg  += ('Enable failed.' + str(global_error_result))
     status_report_msg = None
-    status_report(run_status,run_result,error_msg)
+    status_report(run_status, run_result, error_msg, snapshot_info_array)
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
@@ -374,12 +386,15 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
+
         temp_status= 'transitioning'
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
-        status_report(temp_status,temp_result,temp_msg)
+        status_report(temp_status, temp_result, temp_msg, None)
         start_daemon();
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
