@@ -345,7 +345,7 @@ def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
         token = encrypt_secret_with_cert(handler_cert_path, token)
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/Account', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
         XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
         XmlUtil.removeElement(tree, 'Accounts', 'Account')
 

@@ -46,6 +46,7 @@ def createElement(schema):
 def removeElement(tree, parent_path, removed_element_name):
     parents = tree.findall(parent_path)
     for parent in parents:
-        removed_elements = parent.findall(removed_element_name)
-        for element in removed_elements:
+        element = parent.find(removed_element_name)
+        while element is not None:
             parent.remove(element)
+            element = parent.find(removed_element_name)
