@@ -475,6 +475,7 @@ def enable():
             if extension_parameter.config_file_exists() and extension_parameter.config_changed():
                 logger.log("Config has changed, updating encryption settings")
                 update_encryption_settings()
+                extension_parameter.commit()
             else:
                 logger.log("Config did not change or first call, enabling encryption")
                 enable_encryption()
