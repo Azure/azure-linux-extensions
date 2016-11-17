@@ -1870,7 +1870,22 @@ class FreeBSDDistro(AbstractDistro):
         if userentry == None:
             command = "pw useradd " + user + " -m"
             if expiration != None:
-                command += " -e " + expiration.split('.')[0]
+                expdate = expiration.split('.')[0]
+                ddmmyyyy = expdate
+                ## date format check:
+                ## pw requires the format should be "dd-mm-yyyy",
+                ## but the parameter here is "yyyy-mm-dd" in order to align with Linux
+                try:
+                    yyyymmdd = datetime.datetime.strptime(expdate, '%Y-%m-%d')
+                    ddmmyyyy = yyyymmdd.strftime('%d-%m-%Y')
+                except:
+                    try:
+                        ddmmyyyydate = datetime.datetime.strptime(expdate, '%d-%m-%Y')
+                        ddmmyyyy = ddmmyyydate.strftime('%d-%m-%Y')
+                    except:
+                        Error("Valid expiration date fmt is YYYY-MM-DD or DD-MM-YYYY, but the input is '{0}'".expdate)
+                        return "Failed to create account with invalid expiration date fmt"
+                command += " -e " + ddmmyyyy
             if Run(command):
                 Error("Failed to create user account: " + user)
                 return "Failed to create user account: " + user + " (0x07)."
