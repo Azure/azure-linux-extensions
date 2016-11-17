@@ -307,6 +307,7 @@ If you need to run scripts repeatly, you can add a timestamp.
 
 ## Supported Linux Distributions
 - CentOS 6.5 and higher
+- Debian 8 and higher
 - FreeBSD
 - OpenSUSE 13.1 and higher
 - Oracle Linux 6.4 and higher

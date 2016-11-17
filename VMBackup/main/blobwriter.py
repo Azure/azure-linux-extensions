@@ -44,7 +44,7 @@ class BlobWriter(object):
                     self.hutil.log(str(headers))
                     result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = msg, headers = headers, fallback_to_curl = True)
                     if(result == CommonVariables.success):
-                        self.hutil.log("blob written succesfully to:"+str(blobUri))
+                        self.hutil.log("blob written succesfully")
                         retry_times = 0
                     else:
                         self.hutil.log("blob failed to write")
