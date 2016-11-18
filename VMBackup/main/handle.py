@@ -95,20 +95,29 @@ def timedelta_total_seconds(delta):
 def status_report(status, status_code, message, snapshot_info = None):
     global backup_logger,hutil,para_parser
     trans_report_msg = None
-    if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-        trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
-                status_code=str(status_code),\
-                message=message,\
-                taskId=para_parser.taskId,\
-                commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                snapshot_info=snapshot_info)
-        blobWriter = BlobWriter(hutil)
-        blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
-        if(trans_report_msg is not None):
-            backup_logger.log("trans status report message:")
-            backup_logger.log(trans_report_msg)
-        else:
-            backup_logger.log("trans_report_msg is none")
+    try:
+        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+            trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
+                    status_code=str(status_code),\
+                    message=message,\
+                    taskId=para_parser.taskId,\
+                    commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                    snapshot_info=snapshot_info)
+    except Exception as e:
+        err_msg='cannot write status to the status file'
+        backup_logger.log(err_msg, True, 'Warning')
+    try:
+        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+            blobWriter = BlobWriter(hutil)
+            if(trans_report_msg is not None):
+                blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
+                backup_logger.log("trans status report message:",True)
+                backup_logger.log(trans_report_msg,True)
+            else:
+                backup_logger.log("trans_report_msg is none",True)
+    except Exception as e:
+        err_msg='cannot write status to the status blob'
+        backup_logger.log(err_msg, True, 'Warning')
 
 def exit_with_commit_log(error_msg, para_parser):
     global backup_logger
@@ -137,7 +146,7 @@ def snapshot():
             run_result = CommonVariables.error 
             run_status = 'error' 
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
-            backup_logger.log(error_msg, False, 'Warning') 
+            backup_logger.log(error_msg, True, 'Warning') 
         else: 
             backup_logger.log('T:S doing snapshot now...') 
             snap_shotter = Snapshotter(backup_logger) 
@@ -147,15 +156,15 @@ def snapshot():
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
                 run_result = CommonVariables.error 
                 run_status = 'error' 
-                backup_logger.log(error_msg, False, 'Error') 
+                backup_logger.log(error_msg, True, 'Error') 
             else: 
                 run_result = CommonVariables.success 
                 run_status = 'success' 
                 error_msg = 'Enable Succeeded' 
-                backup_logger.log("T:S " + error_msg) 
+                backup_logger.log("T:S " + error_msg, True) 
     except Exception as e: 
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc()) 
-        backup_logger.log(errMsg, False, 'Error') 
+        backup_logger.log(errMsg, True, 'Error') 
     snapshot_done = True 
 
 def freeze_snapshot(timeout):
@@ -177,7 +186,7 @@ def freeze_snapshot(timeout):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
                 run_result = CommonVariables.error
                 run_status = 'error'
-                backup_logger.log(error_msg, False, 'Error')
+                backup_logger.log(error_msg, True, 'Error')
             else:
                 thaw_result=freezer.thaw_safe()
                 backup_logger.log('T:S thaw result ' + str(thaw_result))
@@ -190,10 +199,10 @@ def freeze_snapshot(timeout):
                     run_result = CommonVariables.success
                     run_status = 'success'
                     error_msg = 'Enable Succeeded'
-                    backup_logger.log("T:S " + error_msg)
+                    backup_logger.log("T:S " + error_msg, True)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-        backup_logger.log(errMsg, False, 'Error')
+        backup_logger.log(errMsg, True, 'Error')
         run_result = CommonVariables.error
         run_status = 'error'
         error_msg = 'Enable failed with exception in freeze or snapshot ' 
@@ -204,8 +213,6 @@ def daemon():
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
-    if(freezer.mounts is not None):
-        hutil.partitioncount = len(freezer.mounts.mounts)
     global_error_result = None
     # precheck
     freeze_called = False
@@ -213,13 +220,15 @@ def daemon():
     thread_timeout=str(60)
     safe_freeze_on = True
     try:
+        if(freezer.mounts is not None):
+            hutil.partitioncount = len(freezer.mounts.mounts)
         config = ConfigParser.ConfigParser()
         config.read(configfile)
         thread_timeout= config.get('SnapshotThread','timeout')
         safe_freeze_on=config.get('SnapshotThread','safefreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
-        backup_logger.log(errMsg, False, 'Warning')
+        backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
     backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
     
@@ -252,7 +261,7 @@ def daemon():
                 run_result = CommonVariables.error_parameter
                 run_status = 'error'
                 error_msg = 'required field empty or not correct'
-                backup_logger.log(error_msg, False, 'Error')
+                backup_logger.log(error_msg, True, 'Error')
             else:
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 """
@@ -279,17 +288,17 @@ def daemon():
                         run_result = CommonVariables.error
                         run_status = 'error'
                         error_msg = 'T:W Snapshot timeout'
-                        backup_logger.log(error_msg, False, 'Warning')
+                        backup_logger.log(error_msg, True, 'Warning')
                     end_time=datetime.datetime.utcnow()
                     time_taken=end_time-start_time
-                    backup_logger.log('total time taken..' + str(time_taken))
+                    backup_logger.log('total time taken..' + str(time_taken), True)
                     for i in range(0,3):
                         unfreeze_result = freezer.unfreezeall()
                         backup_logger.log('unfreeze result ' + str(unfreeze_result))
                         if(unfreeze_result is not None):
                             if len(unfreeze_result.errors) > 0:
                                 error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                                backup_logger.log(error_msg, False, 'Warning')
+                                backup_logger.log(error_msg, True, 'Warning')
                             else:
                                 backup_logger.log('unfreeze result is None')
                                 break;
@@ -299,26 +308,30 @@ def daemon():
             run_status = 'error'
             run_result = CommonVariables.error_parameter
             error_msg = 'command is not correct'
-            backup_logger.log(error_msg, False, 'Error')
+            backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-        backup_logger.log(errMsg, False, 'Error')
+        backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
 
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
-    if(global_error_result is not None):
-        if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
-            run_result = CommonVariables.error_12
-        elif(para_parser is None):
-            run_result = CommonVariables.error_parameter
-        else:
-            run_result = CommonVariables.error
-        run_status = 'error'
-        error_msg  += ('Enable failed.' + str(global_error_result))
-    status_report_msg = None
-    status_report(run_status, run_result, error_msg, snapshot_info_array)
+    try:
+        if(global_error_result is not None):
+            if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
+                run_result = CommonVariables.error_12
+            elif(para_parser is None):
+                run_result = CommonVariables.error_parameter
+            else:
+                run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg  += ('Enable failed.' + str(global_error_result))
+        status_report_msg = None
+        status_report(run_status,run_result,error_msg, snapshot_info_array)
+    except Exception as e:
+        errMsg = 'Failed to log status in extension'
+        backup_logger.log(errMsg, True, 'Error')
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
@@ -390,7 +403,8 @@ def enable():
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
-
+        if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+            backup_logger.commit(para_parser.logsBlobUri)
         temp_status= 'transitioning'
         temp_result=CommonVariables.success
         temp_msg='Transitioning state in enable'
@@ -398,8 +412,9 @@ def enable():
         start_daemon();
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-        backup_logger.log(errMsg, False, 'Error')
+        backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
+        exit_with_commit_log(errMsg, para_parser)
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]
