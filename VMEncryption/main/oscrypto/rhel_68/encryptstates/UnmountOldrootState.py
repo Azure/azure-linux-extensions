@@ -52,11 +52,11 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('systemctl restart sshd.service')
+        self.command_executor.ExecuteInBash('service sshd restart')
         self.command_executor.ExecuteInBash('dhclient')
         
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="systemctl list-units",
+        self.command_executor.Execute(command_to_execute="service --status-all",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
@@ -64,13 +64,13 @@ class UnmountOldrootState(OSEncryptionState):
             if not "running" in line:
                 continue
 
-            if "waagent.service" in line or "sshd.service" in line:
+            if "waagent" in line or "ssh" in line:
                 continue
 
-            match = re.search(r'\s(\S*?\.service)', line)
-            if match:
-                service = match.groups()[0]
-                self.command_executor.Execute('systemctl restart {0}'.format(service))
+            splitted = line.split()
+            if len(splitted):
+                service = splitted[0]
+                self.command_executor.Execute('service {0} restart'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
@@ -96,15 +96,15 @@ class UnmountOldrootState(OSEncryptionState):
                 # needs to be restarted and the drive mounted/unmounted.
                 # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
 
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
                 self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
 
                 self.bek_util.get_bek_passphrase_file(self.encryption_config)
                 self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
 
-                self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
+                self.command_executor.ExecuteInBash('sleep 30 && service waagent restart &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
@@ -113,6 +113,7 @@ class UnmountOldrootState(OSEncryptionState):
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         self.command_executor.Execute('telinit u', True)
+        self.command_executor.Execute('kill 1', True)
 
         sleep(3)
 
@@ -127,7 +128,7 @@ class UnmountOldrootState(OSEncryptionState):
                 raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
 
             self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
-            self.command_executor.Execute('systemctl restart systemd-udevd')
+            self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
 
             sleep(10)
 
@@ -136,7 +137,7 @@ class UnmountOldrootState(OSEncryptionState):
 
             attempt += 1
 
-        self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
+        self.command_executor.Execute('e2fsck -yf {0}'.format(self.rootfs_block_device), True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")
