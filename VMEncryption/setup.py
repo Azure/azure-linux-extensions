@@ -50,6 +50,8 @@ packages_array.append(oscrypto_folder)
 
 packages_array.append(oscrypto_folder + '/rhel_72')
 packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')
+packages_array.append(oscrypto_folder + '/rhel_68')
+packages_array.append(oscrypto_folder + '/rhel_68/encryptstates')
 packages_array.append(oscrypto_folder + '/ubuntu_1604')
 packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')
 packages_array.append(oscrypto_folder + '/ubuntu_1404')

@@ -31,6 +31,7 @@
     <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
     <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
+    <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\azure_crypt_key.sh" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\inject_luks_header.sh" />
@@ -92,6 +93,15 @@
     <Compile Include="main\oscrypto\rhel_72\encryptstates\EncryptBlockDeviceState.py" />
     <Compile Include="main\oscrypto\rhel_72\encryptstates\PatchBootSystemState.py" />
     <Compile Include="main\oscrypto\rhel_72\encryptstates\__init__.py" />
+    <Compile Include="main\oscrypto\rhel_68\RHEL68EncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\rhel_68\__init__.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\PrereqState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\SelinuxState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\StripdownState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\UnmountOldrootState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\EncryptBlockDeviceState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\PatchBootSystemState.py" />
+    <Compile Include="main\oscrypto\rhel_68\encryptstates\__init__.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\Ubuntu1604EncryptionStateMachine.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\__init__.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\encryptstates\PrereqState.py" />
@@ -128,6 +138,9 @@
     <Folder Include="main\oscrypto\rhel_72\" />
     <Folder Include="main\oscrypto\rhel_72\encryptstates\" />
     <Folder Include="main\oscrypto\rhel_72\encryptpatches\" />
+    <Folder Include="main\oscrypto\rhel_68\" />
+    <Folder Include="main\oscrypto\rhel_68\encryptstates\" />
+    <Folder Include="main\oscrypto\rhel_68\encryptpatches\" />
     <Folder Include="main\oscrypto\ubuntu_1604\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptstates\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptpatches\" />
