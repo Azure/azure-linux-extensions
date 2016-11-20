@@ -75,7 +75,7 @@ class PatchBootSystemState(OSEncryptionState):
                                           True)
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
-            self.command_executor.Execute('service waagent restart')
+            self.command_executor.Execute('systemctl restart waagent')
 
             self.context.logger.log("Pivoted back into memroot successfully")
 
