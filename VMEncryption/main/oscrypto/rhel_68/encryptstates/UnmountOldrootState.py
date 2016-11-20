@@ -53,11 +53,11 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
 
-        self.command_executor.Execute('service sshd restart')
+        self.command_executor.Execute('/sbin/service sshd restart')
         self.command_executor.Execute('dhclient')
         
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="service --status-all",
+        self.command_executor.Execute(command_to_execute="/sbin/service --status-all",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
@@ -71,7 +71,7 @@ class UnmountOldrootState(OSEncryptionState):
             splitted = line.split()
             if len(splitted):
                 service = splitted[0]
-                self.command_executor.Execute('service {0} restart'.format(service))
+                self.command_executor.Execute('/sbin/service {0} restart'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
@@ -97,6 +97,9 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('umount /oldroot/misc')
         self.command_executor.Execute('umount /oldroot/net')
 
+        self.command_executor.Execute('telinit u', True)
+        self.command_executor.Execute('kill 1', True)
+
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
@@ -110,12 +113,20 @@ class UnmountOldrootState(OSEncryptionState):
 
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
-                self.context.logger.log("Restarting WALA in before committing suicide")
+                self.context.logger.log("Restarting WALA before committing suicide")
+                self.context.logger.log("Current executable path: " + sys.executable)
+                self.context.logger.log("Current executable arguments: " + " ".join(sys.argv))
 
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
-                self.command_executor.Execute('service atd restart')
-                self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
+                self.command_executor.Execute('/sbin/service atd restart')
+
+                os.chdir('/')
+                with open("/delete-lock.sh", "w") as f:
+                    f.write("rm -f /var/lib/azure_disk_encryption_config/daemon_lock_file.lck\n")
+
+                self.command_executor.Execute('at -f /delete-lock.sh now + 1 minutes', True)
+                self.command_executor.Execute('at -f /restart-wala.sh now + 2 minutes', True)
                 self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
 
             if int(victim) == 1:
@@ -123,9 +134,6 @@ class UnmountOldrootState(OSEncryptionState):
                 continue
 
             self.command_executor.Execute('kill -9 {0}'.format(victim))
-
-        self.command_executor.Execute('telinit u', True)
-        self.command_executor.Execute('kill 1', True)
 
         sleep(3)
 
