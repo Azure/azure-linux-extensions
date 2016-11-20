@@ -52,8 +52,9 @@ class UnmountOldrootState(OSEncryptionState):
         self.context.logger.log("Entering unmount_oldroot state")
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('service sshd restart')
-        self.command_executor.ExecuteInBash('dhclient')
+
+        self.command_executor.Execute('service sshd restart')
+        self.command_executor.Execute('dhclient')
         
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="service --status-all",
@@ -74,18 +75,32 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.Execute('swapoff -a', True)
 
+        self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
+
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 
+        if os.path.exists("/oldroot/mnt"):
+            self.command_executor.Execute('umount /oldroot/mnt')
+
+        if os.path.exists("/oldroot/mnt/azure_bek_disk"):
+            self.command_executor.Execute('umount /oldroot/mnt/azure_bek_disk')
+
+        if os.path.exists("/mnt"):
+            self.command_executor.Execute('umount /mnt')
+
+        if os.path.exists("/mnt/azure_bek_disk"):
+            self.command_executor.Execute('umount /mnt/azure_bek_disk')
+
         self.command_executor.Execute('umount /oldroot/mnt/resource')
-        self.command_executor.Execute('umount /oldroot/mnt/boot')
-        self.command_executor.Execute('umount /oldroot/mnt/misc')
-        self.command_executor.Execute('umount /oldroot/mnt/net')
+        self.command_executor.Execute('umount /oldroot/boot')
+        self.command_executor.Execute('umount /oldroot/misc')
+        self.command_executor.Execute('umount /oldroot/net')
 
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
-                                      raise_exception_on_failure=True,
+                                      raise_exception_on_failure=False,
                                       communicator=proc_comm)
 
         self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout))
@@ -95,21 +110,13 @@ class UnmountOldrootState(OSEncryptionState):
 
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
-                self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
-                
-                # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
-                # needs to be restarted and the drive mounted/unmounted.
-                # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
+                self.context.logger.log("Restarting WALA in before committing suicide")
 
-                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
-
-                self.bek_util.get_bek_passphrase_file(self.encryption_config)
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
-
-                self.command_executor.ExecuteInBash('sleep 30 && service waagent restart &', True)
+                # Kill any other daemons that are blocked and would be executed after this process commits
+                # suicide
+                self.command_executor.Execute('service atd restart')
+                self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
+                self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
@@ -132,8 +139,10 @@ class UnmountOldrootState(OSEncryptionState):
             if attempt > 10:
                 raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
 
-            self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
-            self.command_executor.ExecuteInBash('killall -s KILL systemd-udevd && sleep 3 && /usr/lib/systemd/systemd-udevd --daemon && sleep 3')
+            self.context.logger.log("Attempt #{0} for reloading udev rules".format(attempt))
+            self.command_executor.ExecuteInBash('pkill -f .*udev.*')
+            self.command_executor.ExecuteInBash('udevd &')
+            self.command_executor.ExecuteInBash('udevadm control --reload-rules && sleep 3')
 
             sleep(10)
 

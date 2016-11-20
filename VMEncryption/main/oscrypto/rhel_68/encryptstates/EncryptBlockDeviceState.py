@@ -48,8 +48,6 @@ class EncryptBlockDeviceState(OSEncryptionState):
         
         self.command_executor.Execute('mount /boot', False)
         # self._find_bek_and_execute_action('_dump_passphrase')
-        self._find_bek_and_execute_action('_luks_format')
-        self._find_bek_and_execute_action('_luks_open')
 
         self.context.hutil.do_status_report(operation='EnableEncryptionDataVolumes',
                                             status=CommonVariables.extension_success_status,
@@ -68,18 +66,6 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.command_executor.Execute('umount /oldroot', True)
 
         return super(EncryptBlockDeviceState, self).should_exit()
-
-    def _luks_format(self, bek_path):
-        self.command_executor.Execute('mkdir /boot/luks', True)
-        self.command_executor.Execute('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
-        self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} {1} -q'.format(bek_path,
-                                                                                                                    self.rootfs_block_device),
-                                      raise_exception_on_failure=True)
-
-    def _luks_open(self, bek_path):
-        self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
-                                                                                                                         bek_path),
-                                      raise_exception_on_failure=True)
 
     def _luks_reencrypt(self, bek_path):
         self.command_executor.ExecuteInBash('cat {0} | cryptsetup-reencrypt -N --reduce-device-size 8192s {1} -v'.format(bek_path,
