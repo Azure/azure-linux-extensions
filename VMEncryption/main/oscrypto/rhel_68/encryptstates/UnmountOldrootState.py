@@ -53,7 +53,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
 
-        self.command_executor.Execute('/sbin/service sshd restart')
+        self.command_executor.Execute('service sshd restart')
         self.command_executor.Execute('dhclient')
         
         proc_comm = ProcessCommunicator()
@@ -71,7 +71,7 @@ class UnmountOldrootState(OSEncryptionState):
             splitted = line.split()
             if len(splitted):
                 service = splitted[0]
-                self.command_executor.Execute('/sbin/service {0} restart'.format(service))
+                self.command_executor.Execute('service {0} restart'.format(service))
 
         self.command_executor.Execute('swapoff -a', True)
 
@@ -119,7 +119,7 @@ class UnmountOldrootState(OSEncryptionState):
 
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
-                self.command_executor.Execute('/sbin/service atd restart')
+                self.command_executor.Execute('service atd restart')
 
                 os.chdir('/')
                 with open("/delete-lock.sh", "w") as f:
