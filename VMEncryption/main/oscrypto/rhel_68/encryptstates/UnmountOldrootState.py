@@ -77,6 +77,11 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 
+        self.command_executor.Execute('umount /oldroot/mnt/resource')
+        self.command_executor.Execute('umount /oldroot/mnt/boot')
+        self.command_executor.Execute('umount /oldroot/mnt/misc')
+        self.command_executor.Execute('umount /oldroot/mnt/net')
+
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",

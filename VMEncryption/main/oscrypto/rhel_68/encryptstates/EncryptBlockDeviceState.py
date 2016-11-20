@@ -56,7 +56,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                             status_code=str(CommonVariables.success),
                                             message='OS disk encryption started')
 
-        self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt bs=52428800'.format(self.rootfs_block_device), True)
+        self._find_bek_and_execute_action('_luks_reencrypt')
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
@@ -80,6 +80,11 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
                                                                                                                          bek_path),
                                       raise_exception_on_failure=True)
+
+    def _luks_reencrypt(self, bek_path):
+        self.command_executor.ExecuteInBash('cat {0} | cryptsetup-reencrypt -N --reduce-device-size 8192s {1} -v'.format(bek_path,
+                                                                                                                         self.rootfs_block_device),
+                                            raise_exception_on_failure=True)
 
     def _dump_passphrase(self, bek_path):
         proc_comm = ProcessCommunicator()
