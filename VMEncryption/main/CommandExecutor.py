@@ -39,7 +39,7 @@ class CommandExecutor(object):
     def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
-        proc = Popen(args, stdout=PIPE, stderr=PIPE)
+        proc = Popen(args, stdout=PIPE, stderr=PIPE, close_fds=True)
         stdout, stderr = proc.communicate()
         return_code = proc.returncode
 
