@@ -79,6 +79,14 @@ class PatchBootSystemState(OSEncryptionState):
             self.context.logger.log("Pivoted back into memroot successfully, restarting WALA")
 
             self.command_executor.Execute('service sshd restart')
+            self.command_executor.Execute('service atd restart')
+
+            with open("/restart-wala.sh", "w") as f:
+                f.write("service waagent restart\n")
+
+            with open("/delete-lock.sh", "w") as f:
+                f.write("rm -f /var/lib/azure_disk_encryption_config/daemon_lock_file.lck\n")
+
             self.command_executor.Execute('at -f /delete-lock.sh now + 1 minutes', True)
             self.command_executor.Execute('at -f /restart-wala.sh now + 2 minutes', True)
             self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
