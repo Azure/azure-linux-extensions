@@ -67,6 +67,10 @@ class EncryptBlockDeviceState(OSEncryptionState):
 
         return super(EncryptBlockDeviceState, self).should_exit()
 
+    def _luks_open(self, bek_path):
+        self.command_executor.Execute('cryptsetup luksOpen {0} osencrypt -d {1}'.format(self.rootfs_block_device, bek_path),
+                                      raise_exception_on_failure=True)
+
     def _luks_reencrypt(self, bek_path):
         self.command_executor.ExecuteInBash('cat {0} | cryptsetup-reencrypt -N --reduce-device-size 8192s {1} -v'.format(bek_path,
                                                                                                                          self.rootfs_block_device),
