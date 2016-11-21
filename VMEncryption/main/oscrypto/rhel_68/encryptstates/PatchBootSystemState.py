@@ -57,7 +57,6 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
 
         self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /memroot/$i /$i; done', True)
-        self.command_executor.ExecuteInBash('[ -e "/boot/luks" ]', True)
 
         try:
             self._modify_pivoted_oldroot()
