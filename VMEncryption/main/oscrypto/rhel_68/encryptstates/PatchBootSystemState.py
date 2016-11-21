@@ -119,7 +119,7 @@ class PatchBootSystemState(OSEncryptionState):
             contents = f.read()
 
         contents = re.sub(r"rd_NO_LUKS ", r"", contents)
-        contents = re.sub(r"root=(.*?)\s", r"root=/dev/mapper/osencrypt rd_LUKS_UUID=osencrypt ", contents)
+        contents = re.sub(r"root=(.*?)\s", r"root=/dev/mapper/osencrypt rd_LUKS_UUID=osencrypt rdinitdebug ", contents)
 
         with open("/boot/grub/grub.conf", "w") as f:
             f.write(contents)
