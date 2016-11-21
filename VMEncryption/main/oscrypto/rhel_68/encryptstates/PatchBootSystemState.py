@@ -50,8 +50,6 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.context.logger.log("Entering patch_boot_system state")
 
-        import pudb; pu.db
-
         self.command_executor.Execute('mount /boot', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
