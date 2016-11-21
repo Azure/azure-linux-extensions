@@ -20,6 +20,7 @@
 #
 
 import inspect
+import re
 import os
 import sys
 
@@ -102,8 +103,8 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
-        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
-                                      '/etc/default/grub')
+        self.disk_util.remove_mount_info('/')
+        self.disk_util.append_mount_info('/dev/mapper/osencrypt', '/')
 
         self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
 
@@ -112,6 +113,13 @@ class PatchBootSystemState(OSEncryptionState):
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                       '/etc/dracut.conf')
 
-        self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
-        self.command_executor.Execute('grub2-install --recheck --force /dev/sda', True)
-        self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
+        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
+
+        with open("/boot/grub/grub.conf", "r") as f:
+            contents = f.read()
+
+        contents = re.sub(r"rd_NO_LUKS ", r"", contents)
+        contents = re.sub(r"root=(.*?)\s", r"root=/dev/mapper/osencrypt rd_LUKS_UUID=osencrypt ", contents)
+
+        with open("/boot/grub/grub.conf", "w") as f:
+            f.write(contents)
