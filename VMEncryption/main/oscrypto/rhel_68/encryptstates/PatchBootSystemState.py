@@ -50,6 +50,8 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.context.logger.log("Entering patch_boot_system state")
 
+        import pudb; pu.db
+
         self.command_executor.Execute('mount /boot', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
@@ -106,14 +108,14 @@ class PatchBootSystemState(OSEncryptionState):
         self.disk_util.remove_mount_info('/')
         self.disk_util.append_mount_info('/dev/mapper/osencrypt', '/')
 
-        self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
+        self.command_executor.ExecuteInBash('patch -b -d /usr/share/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
 
         self._append_contents_to_file('\nadd_drivers+=" fuse vfat nls_cp437 nls_iso8859-1"\n',
                                       '/etc/dracut.conf')
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                       '/etc/dracut.conf')
 
-        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
+        self.command_executor.Execute('/sbin/dracut -f -v', True)
 
         with open("/boot/grub/grub.conf", "r") as f:
             contents = f.read()
