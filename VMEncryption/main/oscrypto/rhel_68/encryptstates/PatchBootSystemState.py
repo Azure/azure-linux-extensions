@@ -77,7 +77,12 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('service waagent restart')
 
-            self.context.logger.log("Pivoted back into memroot successfully")
+            self.context.logger.log("Pivoted back into memroot successfully, restarting WALA")
+
+            self.command_executor.Execute('service sshd restart')
+            self.command_executor.Execute('at -f /delete-lock.sh now + 1 minutes', True)
+            self.command_executor.Execute('at -f /restart-wala.sh now + 2 minutes', True)
+            self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
