@@ -49,7 +49,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
 
         self.context.logger.log("Resizing " + self.rootfs_block_device)
 
-        current_rootfs_size = self._get_root_fs_size_in_sectors()
+        current_rootfs_size = self._get_root_fs_size_in_sectors(sector_size=512)
         desired_rootfs_size = current_rootfs_size - 8192
 
         self.command_executor.Execute('resize2fs {0} {1}s'.format(self.rootfs_block_device, desired_rootfs_size), True)
