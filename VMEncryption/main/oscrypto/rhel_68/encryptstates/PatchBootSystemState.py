@@ -89,6 +89,9 @@ class PatchBootSystemState(OSEncryptionState):
 
             self.command_executor.Execute('at -f /delete-lock.sh now + 1 minutes', True)
             self.command_executor.Execute('at -f /restart-wala.sh now + 2 minutes', True)
+
+            self.should_exit()
+
             self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
 
     def should_exit(self):
