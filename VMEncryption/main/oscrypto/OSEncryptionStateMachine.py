@@ -35,6 +35,16 @@ from OSEncryptionState import *
 from Common import *
 from CommandExecutor import *
 from DiskUtil import *
+
+import logging
+
+class NullHandler(logging.Handler):
+    def emit(self, record):
+        pass
+
+logging.getLogger(__name__).addHandler(NullHandler())
+logging.NullHandler = NullHandler
+
 from transitions import *
 
 class OSEncryptionStateMachine(object):

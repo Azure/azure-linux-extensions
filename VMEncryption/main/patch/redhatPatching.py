@@ -55,6 +55,7 @@ class redhatPatching(AbstractPatching):
             self.mount_path = '/bin/mount'
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.touch_path = '/bin/touch'
             self.umount_path = '/bin/umount'
         else:
             self.base64_path = '/usr/bin/base64'
