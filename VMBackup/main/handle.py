@@ -141,20 +141,26 @@ def snapshot():
     try: 
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
         freeze_result = freezer.freezeall() 
+        all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
         if(freeze_result is not None and len(freeze_result.errors) > 0): 
             run_result = CommonVariables.error 
             run_status = 'error' 
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
+            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
             backup_logger.log(error_msg, True, 'Warning') 
         else: 
             backup_logger.log('T:S doing snapshot now...') 
             snap_shotter = Snapshotter(backup_logger) 
-            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser) 
+            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser) 
             backup_logger.log('T:S snapshotall ends...') 
             if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
-                run_result = CommonVariables.error 
+                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                if all_failed:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                else:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
                 run_status = 'error' 
                 backup_logger.log(error_msg, True, 'Error') 
             else: 
@@ -171,20 +177,26 @@ def freeze_snapshot(timeout):
     try:
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
+        all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
             backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                run_result = CommonVariables.error
+                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                if all_failed:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                else:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
             else:
