@@ -88,7 +88,7 @@ class Snapshotter(object):
                 # initiate http call for blob-snapshot and get http response
                 resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
                 # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index)
+                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
                 temp_logger = temp_logger + ' handle_snapshot_http_response message: ' + str(message)
                 
                 end_time = datetime.datetime.utcnow()
@@ -135,7 +135,7 @@ class Snapshotter(object):
                 # initiate http call for blob-snapshot and get http response
                 resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
                 # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index)
+                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
                 self.logger.log("get_snapshot_info: " + str(message))
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
@@ -149,6 +149,7 @@ class Snapshotter(object):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
+        all_failed= False
         try:
             mp_jobs = []
             global_logger = mp.Queue() 
@@ -178,10 +179,15 @@ class Snapshotter(object):
                 self.logger.log(error_logging,False,'Error')
                 if not snapshot_result_error.empty(): 
                     results = [snapshot_result_error.get() for job in mp_jobs]
+                    failed_count = 0
                     for result in results:
                         if(result.errorcode != CommonVariables.success):
+                            failed_count = failed_count + 1
                             snapshot_result.errors.append(result)
-
+                    if(failed_count == len(results)):
+                        all_failed = True
+                    else:
+                        all_failed = False
                 if not snapshot_info_indexer_queue.empty():
                     snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
                     for snapshot_info_indexer in snapshot_info_indexers:
@@ -189,10 +195,10 @@ class Snapshotter(object):
                         self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[snapshot_info_indexer.index])
                         self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
-                return snapshot_result, snapshot_info_array
+                return snapshot_result, snapshot_info_array, all_failed
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array
+                return snapshot_result, snapshot_info_array, all_failed
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
@@ -200,6 +206,7 @@ class Snapshotter(object):
             blobs = paras.blobs
             if blobs is not None:
                 blob_index = 0
+                failed_count = 0
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
@@ -207,15 +214,20 @@ class Snapshotter(object):
                     snapshotError, snapshot_info_indexer = self.snapshot_seq(blobUri, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
+                        failed_count = failed_count + 1
                     # update snapshot_info_array element properties from snapshot_info_indexer object
                     self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[blob_index])
                     blob_index = blob_index + 1
-                return snapshot_result, snapshot_info_array
+                if(failed_count == len(blobs)):
+                    all_failed = True
+                else:
+                    all_failed = False
+                return snapshot_result, snapshot_info_array, all_failed
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array
+                return snapshot_result, snapshot_info_array, all_failed
 
-    def httpresponse_get_snapshot_info(self, resp, sasuri_index):
+    def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         result = CommonVariables.error_http_failure
