@@ -149,7 +149,7 @@ class Snapshotter(object):
         self.logger.log("doing snapshotall now...")
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
-        all_failed= False
+        all_failed = True
         try:
             mp_jobs = []
             global_logger = mp.Queue() 
@@ -179,20 +179,17 @@ class Snapshotter(object):
                 self.logger.log(error_logging,False,'Error')
                 if not snapshot_result_error.empty(): 
                     results = [snapshot_result_error.get() for job in mp_jobs]
-                    failed_count = 0
                     for result in results:
                         if(result.errorcode != CommonVariables.success):
                             failed_count = failed_count + 1
                             snapshot_result.errors.append(result)
-                    if(failed_count == len(results)):
-                        all_failed = True
-                    else:
-                        all_failed = False
                 if not snapshot_info_indexer_queue.empty():
                     snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
                     for snapshot_info_indexer in snapshot_info_indexers:
                         # update snapshot_info_array element properties from snapshot_info_indexer object
                         self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[snapshot_info_indexer.index])
+                        if (snapshot_info_array[snapshot_info_indexer.index].isSuccessful == True):
+                            all_failed = False
                         self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
                 return snapshot_result, snapshot_info_array, all_failed
@@ -206,7 +203,6 @@ class Snapshotter(object):
             blobs = paras.blobs
             if blobs is not None:
                 blob_index = 0
-                failed_count = 0
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
@@ -217,11 +213,9 @@ class Snapshotter(object):
                         failed_count = failed_count + 1
                     # update snapshot_info_array element properties from snapshot_info_indexer object
                     self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[blob_index])
+                    if (snapshot_info_array[blob_index].isSuccessful == True):
+                        all_failed = False
                     blob_index = blob_index + 1
-                if(failed_count == len(blobs)):
-                    all_failed = True
-                else:
-                    all_failed = False
                 return snapshot_result, snapshot_info_array, all_failed
             else:
                 self.logger.log("the blobs are None")
