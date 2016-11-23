@@ -55,6 +55,7 @@ class redhatPatching(AbstractPatching):
             self.mount_path = '/bin/mount'
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.touch_path = '/bin/touch'
             self.umount_path = '/bin/umount'
         else:
             self.base64_path = '/usr/bin/base64'
@@ -94,8 +95,16 @@ class redhatPatching(AbstractPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux']
+                    'util-linux',
+                    'python-pip',
+                    'gcc',
+                    'libffi-devel',
+                    'openssl-devel',
+                    'python-devel']
 
         return_code = subprocess.call(['yum', 'install', '-y'] + packages)
         self.logger.log("Installing packages: " + " ".join(packages))
         self.logger.log("Installation result: " + str(return_code))
+        
+        return_code = subprocess.call(['pip', 'install', 'adal'])
+        self.logger.log("Pip installation result: " + str(return_code))
