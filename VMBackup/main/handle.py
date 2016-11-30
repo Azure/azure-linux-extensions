@@ -403,7 +403,6 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
-            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
