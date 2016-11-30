@@ -983,6 +983,13 @@ def install_omi():
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
+    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
+    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
+    if ('OMI-1.0.8-4' in RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]) \
+            and ('rpm' in distConfig['installrequiredpackage']):
+        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
+        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
+
     if 'OMI-1.0.8-6' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
     if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
