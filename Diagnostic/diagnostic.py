@@ -563,7 +563,7 @@ def get_extension_operation_type(command):
     if re.match("^([-/]*)(enable)", command):
         return waagent.WALAEventOperation.Enable
     if re.match("^([-/]*)(daemon)", command):   # LAD-specific extension operation (invoked from "./diagnostic.py -enable")
-        return "Daemon"
+        return waagent.WALAEventOperation.Enable
     if re.match("^([-/]*)(install)", command):
         return waagent.WALAEventOperation.Install
     if re.match("^([-/]*)(disable)", command):
@@ -577,7 +577,7 @@ def get_extension_operation_type(command):
 def main(command):
     #Global Variables definition
 
-    global EnableSyslog, UseSystemdServiceManager
+    global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
     EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
@@ -696,7 +696,7 @@ def start_daemon():
 
 
 def start_mdsd():
-    global EnableSyslog
+    global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
