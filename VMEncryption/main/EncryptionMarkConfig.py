@@ -48,11 +48,11 @@ class EncryptionMarkConfig(object):
     
     def commit(self):
         key_value_pairs = []
-        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey,self.command)
+        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey, self.command)
         key_value_pairs.append(command)
-        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey,self.volume_type)
+        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
-        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey,self.diskFormatQuery)
+        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey, self.diskFormatQuery)
         key_value_pairs.append(disk_format_query)
         self.encryption_mark_config.save_configs(key_value_pairs)
 

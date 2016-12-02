@@ -125,7 +125,7 @@ class DiskUtil(object):
 
         return crypt_items
 
-    def add_crypt_item(self,crypt_item):
+    def add_crypt_item(self, crypt_item):
         """
         TODO we should judge that the second time.
         format is like this:
@@ -228,14 +228,14 @@ class DiskUtil(object):
         expandfs_cmd = self.distro_patcher.resize2fs_path + " " + str(dev_path)
         return self.command_executor.Execute(expandfs_cmd)
 
-    def shrink_fs(self,dev_path, size_shrink_to):
+    def shrink_fs(self, dev_path, size_shrink_to):
         """
         size_shrink_to is in sector (512 byte)
         """
         shrinkfs_cmd = self.distro_patcher.resize2fs_path + ' ' + str(dev_path) + ' ' + str(size_shrink_to) + 's'
         return self.command_executor.Execute(shrinkfs_cmd)
 
-    def check_shrink_fs(self,dev_path, size_shrink_to):
+    def check_shrink_fs(self, dev_path, size_shrink_to):
         return_code = self.check_fs(dev_path)
         if return_code == CommonVariables.process_success:
             return_code = self.shrink_fs(dev_path = dev_path, size_shrink_to = size_shrink_to)
@@ -253,14 +253,14 @@ class DiskUtil(object):
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
             passphrase_cmd_args = shlex.split(passphrase_cmd)
             self.logger.log("passphrase_cmd is:{0}".format(passphrase_cmd))
-            passphrase_p = Popen(passphrase_cmd_args,stdout=subprocess.PIPE)
+            passphrase_p = Popen(passphrase_cmd_args, stdout=subprocess.PIPE)
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path , dev_path)
         else:
             if header_file is not None:
                 cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
             else:
-                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path ,dev_path , passphrase_file)
+                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path , dev_path , passphrase_file)
             
         return self.command_executor.Execute(cryptsetup_cmd)
         
@@ -331,7 +331,7 @@ class DiskUtil(object):
         self.hutil.log("keyfile: " + (passphrase_file))
 
         if header_file:
-            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path ,mapper_name, header_file ,passphrase_file)
+            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name, header_file , passphrase_file)
         else:
             cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name , passphrase_file)
 
@@ -444,7 +444,7 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper',crypt_item.mapper_name),crypt_item.mount_point,crypt_item.file_system)
+        mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
         self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
     def umount(self, path):
@@ -534,7 +534,7 @@ class DiskUtil(object):
 
         return json.dumps(encryption_status)
 
-    def query_dev_sdx_path_by_scsi_id(self,scsi_number): 
+    def query_dev_sdx_path_by_scsi_id(self, scsi_number): 
         p = Popen([self.distro_patcher.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity, err = p.communicate()
         # identity sample: [5:0:0:0] disk Msft Virtual Disk 1.0 /dev/sdc
@@ -562,8 +562,8 @@ class DiskUtil(object):
         """
         self.logger.log("querying the sdx path of:{0}".format(sdx_path))
         #blkid path
-        p = Popen([self.distro_patcher.blkid_path,sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        identity,err = p.communicate()
+        p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        identity, err = p.communicate()
         identity = identity.lower()
         self.logger.log("blkid output is: \n" + identity)
         uuid_pattern = 'uuid="'
@@ -574,9 +574,9 @@ class DiskUtil(object):
         if uuid.strip() == "":
             #TODO this is strange?  BUGBUG
             return sdx_path
-        return os.path.join("/dev/disk/by-uuid/",uuid)
+        return os.path.join("/dev/disk/by-uuid/", uuid)
 
-    def query_dev_uuid_path_by_scsi_number(self,scsi_number):
+    def query_dev_uuid_path_by_scsi_number(self, scsi_number):
         # find the scsi using the filter
         # TODO figure out why the disk formated using fdisk do not have uuid
         sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
@@ -595,15 +595,15 @@ class DiskUtil(object):
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             get_property_cmd_args = shlex.split(get_property_cmd)
             get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output,err = get_property_cmd_p.communicate()
+            output, err = get_property_cmd_p.communicate()
             return output.strip()
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             get_property_cmd_args = shlex.split(get_property_cmd)
             get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output,err = get_property_cmd_p.communicate()
+            output, err = get_property_cmd_p.communicate()
             lines = output.splitlines()
-            for i in range(0,len(lines)):
+            for i in range(0, len(lines)):
                 item_value_str = lines[i].strip()
                 if item_value_str != "":
                     disk_info_item_array = item_value_str.split()
@@ -625,7 +625,7 @@ class DiskUtil(object):
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         lines = out_lsblk_output.splitlines()
-        for i in range(0,len(lines)):
+        for i in range(0, len(lines)):
             item_value_str = lines[i].strip()
             if item_value_str != "":
                 disk_info_item_array = item_value_str.split()
@@ -654,7 +654,7 @@ class DiskUtil(object):
                 self.logger.log(msg="partition files exists")
                 if partition_files is not None and len(partition_files) > 0:
                     device_item.type = 'part'
-            size_string = self.get_device_items_property(dev_name=device_item.name,property_name='SIZE')
+            size_string = self.get_device_items_property(dev_name=device_item.name, property_name='SIZE')
             if size_string is not None and size_string != "":
                 device_item.size = int(size_string)
             if device_item.size is not None:
@@ -672,14 +672,14 @@ class DiskUtil(object):
             if dev_path is None:
                 p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE', dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out_lsblk_output, err = p.communicate()
             out_lsblk_output = str(out_lsblk_output)
             error_msg = str(err)
             if error_msg is not None and error_msg.strip() != "":
-                self.logger.log(msg=str(err),level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=str(err), level=CommonVariables.ErrorLevel)
             lines = out_lsblk_output.splitlines()
-            for i in range(0,len(lines)):
+            for i in range(0, len(lines)):
                 item_value_str = lines[i].strip()
                 if item_value_str != "":
                     disk_info_item_array = item_value_str.split()
@@ -730,29 +730,29 @@ class DiskUtil(object):
             return True
         else:
             if device_item.size < CommonVariables.min_filesystem_size_support:
-                self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.",level=CommonVariables.WarningLevel)
+                self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.", level=CommonVariables.WarningLevel)
                 return True
 
             supported_device_type = ["disk","part","raid0","raid1","raid5","raid10","lvm"]
             if device_item.type not in supported_device_type:
-                self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.",level=CommonVariables.WarningLevel)
+                self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.", level=CommonVariables.WarningLevel)
                 return True
 
             if device_item.uuid is None or device_item.uuid == "":
-                self.logger.log(msg="the device do not have the related uuid, so skip it.",level=CommonVariables.WarningLevel)
+                self.logger.log(msg="the device do not have the related uuid, so skip it.", level=CommonVariables.WarningLevel)
                 return True
             sub_items = self.get_device_items("/dev/" + device_item.name)
             if len(sub_items) > 1:
-                self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)), level=CommonVariables.WarningLevel)
                 return True
 
             azure_blk_items = self.get_azure_devices()
             if device_item.type == "crypt":
-                self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)), level=CommonVariables.WarningLevel)
                 return True
 
             if device_item.mount_point == "/":
-                self.logger.log(msg=("the mountpoint is root:{0}, so skip it.".format(device_item)),level=CommonVariables.WarningLevel)
+                self.logger.log(msg=("the mountpoint is root:{0}, so skip it.".format(device_item)), level=CommonVariables.WarningLevel)
                 return True
             for azure_blk_item in azure_blk_items:
                 if azure_blk_item.name == device_item.name:
@@ -785,9 +785,9 @@ class DiskUtil(object):
                 ide_devices.append(device_sdx_path)
         return ide_devices
 
-    def find_block_sdx_path(self,vmbus):
+    def find_block_sdx_path(self, vmbus):
         device = None
-        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path ,vmbus)):
+        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path , vmbus)):
             if root.endswith("/block"):
                 device = dirs[0]
             else : #older distros

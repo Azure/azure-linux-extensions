@@ -31,7 +31,7 @@ from Common import *
 from urlparse import urlparse
 
 class KeyVaultUtil(object):
-    def __init__(self,logger):
+    def __init__(self, logger):
         self.api_version = "2015-06-01"
         self.logger = logger
 
@@ -167,7 +167,7 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to encrypt_passphrase with error: {0}, stack trace: %s".format(e, traceback.format_exc()))
             return None
 
-    def create_secret(self,AccessToken,KeyVaultURL,secret_value,KeyEncryptionAlgorithm,DiskEncryptionKeyFileName):
+    def create_secret(self, AccessToken, KeyVaultURL, secret_value, KeyEncryptionAlgorithm, DiskEncryptionKeyFileName):
         """
         create secret api https://msdn.microsoft.com/en-us/library/azure/dn903618.aspx
         https://mykeyvault.vault.azure.net/secrets/{secret-name}?api-version={api-version}
@@ -178,15 +178,15 @@ class KeyVaultUtil(object):
             self.logger.log("secret_keyvault_uri is: {0} and keyvault_uri is:{1}".format(secret_keyvault_uri, KeyVaultURL))
             if KeyEncryptionAlgorithm is None:
                 request_content = '{{"value":"{0}","attributes":{{"enabled":"true"}},"tags":{{"DiskEncryptionKeyFileName":"{1}"}}}}'\
-                    .format(str(secret_value),DiskEncryptionKeyFileName)
+                    .format(str(secret_value), DiskEncryptionKeyFileName)
             else:
                 request_content = '{{"value":"{0}","attributes":{{"enabled":"true"}},"tags":{{"DiskEncryptionKeyEncryptionAlgorithm":"{1}","DiskEncryptionKeyFileName":"{2}"}}}}'\
-                    .format(str(secret_value),KeyEncryptionAlgorithm,DiskEncryptionKeyFileName)
+                    .format(str(secret_value), KeyEncryptionAlgorithm, DiskEncryptionKeyFileName)
             http_util = HttpUtil(self.logger)
             headers = {}
             headers["Content-Type"] = "application/json"
             headers["Authorization"] = "Bearer " + AccessToken
-            result = http_util.Call(method='PUT',http_uri=secret_keyvault_uri + '?api-version=' + self.api_version,data=request_content,headers=headers)
+            result = http_util.Call(method='PUT', http_uri=secret_keyvault_uri + '?api-version=' + self.api_version, data=request_content, headers=headers)
 
             self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             result_content = result.read()
@@ -202,7 +202,7 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to create_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return None
 
-    def get_authorize_uri(self,bearerHeader):
+    def get_authorize_uri(self, bearerHeader):
         """
         Bearer authorization="https://login.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47", resource="https://vault.azure.net"
         """

@@ -29,7 +29,7 @@ from Utils.WAAgentUtil import waagent
 
 class HttpUtil(object):
     """description of class"""
-    def __init__(self,logger):
+    def __init__(self, logger):
         self.logger = logger
         try:
             waagent.MyDistro = waagent.GetMyDistro()
@@ -46,7 +46,7 @@ class HttpUtil(object):
     snapshot also called this. so we should not write the file/read the file in this method.
     """
 
-    def Call(self,method,http_uri,data,headers):
+    def Call(self, method, http_uri, data, headers):
         try:
             uri_obj = urlparse.urlparse(http_uri)
             #parse the uri str here

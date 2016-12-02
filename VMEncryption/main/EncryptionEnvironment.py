@@ -23,7 +23,7 @@ from subprocess import *
 
 class EncryptionEnvironment(object):
     """description of class"""
-    def __init__(self,patching,logger):
+    def __init__(self, patching, logger):
         self.patching = patching
         self.logger = logger
         self.encryption_config_path = '/var/lib/azure_disk_encryption_config/'

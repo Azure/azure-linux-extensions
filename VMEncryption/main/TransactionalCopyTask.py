@@ -127,13 +127,13 @@ class TransactionalCopyTask(object):
         else:
             if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                 copy_slice_item_backup_file_size = os.path.getsize(self.encryption_environment.copy_slice_item_backup_file)
-                return_code = self.resume_copy_internal(copy_slice_item_backup_file_size,skip_block=skip_block, original_total_copy_size=self.block_size)
+                return_code = self.resume_copy_internal(copy_slice_item_backup_file_size, skip_block=skip_block, original_total_copy_size=self.block_size)
             else:
                 self.logger.log(msg="2. unfortunately the slice item backup file not exists.",
                                 level=CommonVariables.WarningLevel)
         return return_code
 
-    def copy_last_slice(self,skip_block):
+    def copy_last_slice(self, skip_block):
         block_size_of_last_slice = 512
         skip_of_last_slice = (skip_block * self.block_size) / block_size_of_last_slice
         count_of_last_slice = self.last_slice_size / block_size_of_last_slice
@@ -246,7 +246,7 @@ class TransactionalCopyTask(object):
 
         return_code = self.command_executer.Execute(dd_cmd)
         if return_code != CommonVariables.process_success:
-            self.logger.log(msg="{0} is {1}".format(dd_cmd,return_code), level=CommonVariables.ErrorLevel)
+            self.logger.log(msg="{0} is {1}".format(dd_cmd, return_code), level=CommonVariables.ErrorLevel)
             return return_code
         else:
             slice_file_size = os.path.getsize(self.slice_file_path)

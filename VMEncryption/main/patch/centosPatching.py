@@ -33,8 +33,8 @@ from redhatPatching import redhatPatching
 from Common import *
 
 class centosPatching(redhatPatching):
-    def __init__(self,logger,distro_info):
-        super(centosPatching,self).__init__(logger,distro_info)
+    def __init__(self, logger, distro_info):
+        super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
         if distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5":
             self.base64_path = '/usr/bin/base64'

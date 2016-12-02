@@ -21,7 +21,7 @@ from Common import *
 from ConfigParser import *
 
 class ConfigKeyValuePair(object):
-    def __init__(self,prop_name,prop_value):
+    def __init__(self, prop_name, prop_value):
         self.prop_name = prop_name
         self.prop_value = prop_value
 
@@ -62,7 +62,7 @@ class ConfigUtil(object):
         with open(self.config_file_path, 'wb') as configfile:
             config.write(configfile)
 
-    def get_config(self,prop_name):
+    def get_config(self, prop_name):
         # write the configs, the bek file name and so on.
         if os.path.exists(self.config_file_path):
             try:

@@ -35,7 +35,7 @@ from Common import *
 
 class SuSEPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
-        super(SuSEPatching,self).__init__(distro_info)
+        super(SuSEPatching, self).__init__(distro_info)
 
         self.distro_info = distro_info
 

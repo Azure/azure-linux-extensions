@@ -380,7 +380,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         if crypt_item.mount_point != 'None':
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
         else:
-            logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)),level=CommonVariables.WarningLevel)
+            logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
 
     if bek_util:
         bek_util.umount_azure_passhprase(encryption_config)
@@ -395,7 +395,7 @@ def main():
     DistroPatcher = GetDistroPatcher(logger)
     hutil.patching = DistroPatcher
 
-    encryption_environment = EncryptionEnvironment(patching=DistroPatcher,logger=logger)
+    encryption_environment = EncryptionEnvironment(patching=DistroPatcher, logger=logger)
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
@@ -421,7 +421,7 @@ def main():
         elif re.match("^([-/]*)(daemon)", a):
             daemon()
 
-def mark_encryption(command,volume_type,disk_format_query):
+def mark_encryption(command, volume_type, disk_format_query):
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
     encryption_marker.command = command
     encryption_marker.volume_type = volume_type
@@ -741,7 +741,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
 
         devices = disk_util.get_device_items(dev_path_in_query)
         if len(devices) != 1:
-            logger.log(msg=("the device with this path {0} have more than one sub device. so skip it.".format(dev_path_in_query)),level=CommonVariables.WarningLevel)
+            logger.log(msg=("the device with this path {0} have more than one sub device. so skip it.".format(dev_path_in_query)), level=CommonVariables.WarningLevel)
             continue
         else:
             device_item = devices[0]
@@ -773,9 +773,9 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         file_system = encryption_item["file_system"]
                     else:
                         file_system = CommonVariables.default_file_system
-                    format_disk_result = disk_util.format_disk(dev_path = encrypted_device_path,file_system = file_system)
+                    format_disk_result = disk_util.format_disk(dev_path = encrypted_device_path, file_system = file_system)
                     if format_disk_result != CommonVariables.process_success:
-                        logger.log(msg = ("format disk {0} failed".format(encrypted_device_path,format_disk_result)), level = CommonVariables.ErrorLevel)
+                        logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
@@ -1747,7 +1747,7 @@ def start_daemon(operation):
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
     
-    encryption_config = EncryptionConfig(encryption_environment,logger)
+    encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():
         hutil.do_exit(exit_code=0,
                       operation=operation,

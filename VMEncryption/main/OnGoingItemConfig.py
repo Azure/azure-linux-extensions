@@ -28,7 +28,7 @@ from ConfigUtil import ConfigKeyValuePair
 
 
 class OnGoingItemConfig(object):
-    def __init__(self, encryption_environment,logger):
+    def __init__(self, encryption_environment, logger):
         self.encryption_environment = encryption_environment
         self.logger = logger
         self.original_dev_name_path = None
@@ -197,4 +197,4 @@ class OnGoingItemConfig(object):
 
     def __str__(self):
         return "dev_uuid_path is {0}, mapper_name is {1}, luks_header_file_path is {2}, phase is {3}, header_slice_file_path is {4}, file system is {5}, mount_point is {6}, device size is {7}"\
-                .format(self.original_dev_path,self.mapper_name,self.luks_header_file_path,self.phase,self.header_slice_file_path,self.file_system,self.mount_point,self.device_size)
+                .format(self.original_dev_path, self.mapper_name, self.luks_header_file_path, self.phase, self.header_slice_file_path, self.file_system, self.mount_point, self.device_size)

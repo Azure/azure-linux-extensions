@@ -76,7 +76,7 @@ import logging.handlers
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 class HandlerContext:
-    def __init__(self,name):
+    def __init__(self, name):
         self._name = name
         self._version = '0.0'
         return
@@ -104,10 +104,10 @@ class HandlerUtility:
                     if file.endswith('.settings'):
                         cur_seq_no = int(os.path.basename(file).split('.')[0])
                         if freshest_time == None:
-                            freshest_time = os.path.getmtime(join(config_folder,file))
+                            freshest_time = os.path.getmtime(join(config_folder, file))
                             seq_no = cur_seq_no
                         else:
-                            current_file_m_time = os.path.getmtime(join(config_folder,file))
+                            current_file_m_time = os.path.getmtime(join(config_folder, file))
                             if current_file_m_time > freshest_time:
                                 freshest_time = current_file_m_time
                                 seq_no = cur_seq_no
@@ -180,7 +180,7 @@ class HandlerUtility:
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
                 f = tempfile.NamedTemporaryFile(delete=False)
                 f.close()
-                waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
+                waagent.SetFileContents(f.name, config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 if cleartxt == None:
@@ -308,7 +308,7 @@ class HandlerUtility:
         self.set_last_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
 
-    def set_last_seq(self,seq):
+    def set_last_seq(self, seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def redo_last_status(self):
@@ -395,7 +395,7 @@ class HandlerUtility:
                 try:
                     if file.endswith('.settings') and file != (_seq_no + ".settings"):
                         new_file_name = file.replace(".","_")
-                        os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
+                        os.rename(join(self._context._config_dir, file), join(self._context._config_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the settings file.")
 
