@@ -57,7 +57,7 @@ class DiskUtil(object):
                                           status_prefix=status_prefix)
         try:
             mem_fs_result = copy_task.prepare_mem_fs()
-            if(mem_fs_result != CommonVariables.process_success):
+            if mem_fs_result != CommonVariables.process_success:
                 return CommonVariables.tmpfs_error
             else:
                 return copy_task.begin_copy()
@@ -69,13 +69,13 @@ class DiskUtil(object):
 
     def format_disk(self, dev_path, file_system):
         mkfs_command = ""
-        if(file_system == "ext4"):
+        if file_system == "ext4":
             mkfs_command = "mkfs.ext4"
-        elif(file_system == "ext3"):
+        elif file_system == "ext3":
             mkfs_command = "mkfs.ext3"
-        elif(file_system == "xfs"):
+        elif file_system == "xfs":
             mkfs_command = "mkfs.xfs"
-        elif(file_system == "btrfs"):
+        elif file_system == "btrfs":
             mkfs_command = "mkfs.btrfs"
         mkfs_cmd = "{0} {1}".format(mkfs_command, dev_path)
         return self.command_executor.Execute(mkfs_cmd)
@@ -146,7 +146,7 @@ class DiskUtil(object):
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
                     existing_content = f.read()
-                    if(existing_content is not None and existing_content.strip() != ""):
+                    if existing_content is not None and existing_content.strip() != "":
                         new_mount_content = existing_content + "\n" + mount_content_item
                     else:
                         new_mount_content = mount_content_item
@@ -190,7 +190,7 @@ class DiskUtil(object):
 
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
-        if(os.path.exists(luks_header_file_path)):
+        if os.path.exists(luks_header_file_path):
             return luks_header_file_path
         else:
             dd_command = self.distro_patcher.dd_path + ' if=/dev/zero bs=33554432 count=1 > ' + luks_header_file_path
@@ -198,7 +198,7 @@ class DiskUtil(object):
 
     def create_cleartext_key(self, mapper_name):
         cleartext_key_file_path = self.encryption_environment.cleartext_key_base_path + mapper_name
-        if(os.path.exists(cleartext_key_file_path)):
+        if os.path.exists(cleartext_key_file_path):
             return cleartext_key_file_path
         else:
             dd_command = self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path
@@ -206,7 +206,7 @@ class DiskUtil(object):
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
-        if(return_code != CommonVariables.process_success):
+        if return_code != CommonVariables.process_success:
             self.logger.log(msg=('cryptsetup luksFormat failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
             return return_code
         else:
@@ -215,7 +215,7 @@ class DiskUtil(object):
                                         mapper_name=mapper_name,
                                         header_file=header_file,
                                         uses_cleartext_key=False)
-            if(return_code != CommonVariables.process_success):
+            if return_code != CommonVariables.process_success:
                 self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
             return return_code
 
@@ -257,7 +257,7 @@ class DiskUtil(object):
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path , dev_path)
         else:
-            if(header_file is not None):
+            if header_file is not None:
                 cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
             else:
                 cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path ,dev_path , passphrase_file)
@@ -540,7 +540,7 @@ class DiskUtil(object):
         # identity sample: [5:0:0:0] disk Msft Virtual Disk 1.0 /dev/sdc
         self.logger.log("lsscsi output is: {0}\n".format(identity))
         vals = identity.split()
-        if(vals is None or len(vals) == 0):
+        if vals is None or len(vals) == 0:
             return None
         sdx_path = vals[len(vals) - 1]
         return sdx_path
@@ -571,7 +571,7 @@ class DiskUtil(object):
         identity = identity[index_of_uuid + len(uuid_pattern):]
         index_of_quote = identity.find('"')
         uuid = identity[0:index_of_quote]
-        if(uuid.strip() == ""):
+        if uuid.strip() == "":
             #TODO this is strange?  BUGBUG
             return sdx_path
         return os.path.join("/dev/disk/by-uuid/",uuid)
@@ -605,10 +605,10 @@ class DiskUtil(object):
             lines = output.splitlines()
             for i in range(0,len(lines)):
                 item_value_str = lines[i].strip()
-                if(item_value_str != ""):
+                if item_value_str != "":
                     disk_info_item_array = item_value_str.split()
-                    if(dev_name == disk_info_item_array[0]):
-                        if(len(disk_info_item_array) > 1):
+                    if dev_name == disk_info_item_array[0]:
+                        if len(disk_info_item_array) > 1:
                             return disk_info_item_array[1]
         return None
 
@@ -617,7 +617,7 @@ class DiskUtil(object):
         device_items_to_return = []
         device_items = []
         #first get all the device names
-        if(dev_path is None):
+        if dev_path is None:
             get_device_cmd = self.distro_patcher.lsblk_path + " -b -nl -o NAME"
         else:
             get_device_cmd = "{0} -b -nl -o NAME {1}".format(self.distro_patcher.lsblk_path , dev_path)
@@ -627,7 +627,7 @@ class DiskUtil(object):
         lines = out_lsblk_output.splitlines()
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
-            if(item_value_str != ""):
+            if item_value_str != "":
                 disk_info_item_array = item_value_str.split()
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
@@ -641,75 +641,75 @@ class DiskUtil(object):
             device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
             # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
-            if(os.path.exists(model_file_path)):
+            if os.path.exists(model_file_path):
                 with open(model_file_path,'r') as f:
                     device_item.model = f.read().strip()
             else:
                 self.logger.log(msg=("no model file found for device {0}".format(device_item.name)))
-            if(device_item.model == 'Virtual Disk'):
+            if device_item.model == 'Virtual Disk':
                 self.logger.log(msg="model is virtual disk")
                 device_item.type = 'disk'
             else:
                 partition_files = glob.glob('/sys/block/*/' + device_item.name + '/partition')
                 self.logger.log(msg="partition files exists")
-                if(partition_files is not None and len(partition_files) > 0):
+                if partition_files is not None and len(partition_files) > 0:
                     device_item.type = 'part'
             size_string = self.get_device_items_property(dev_name=device_item.name,property_name='SIZE')
             if size_string is not None and size_string != "":
                 device_item.size = int(size_string)
-            if(device_item.size is not None):
+            if device_item.size is not None:
                 device_items_to_return.append(device_item)
             else:
                 self.logger.log(msg=("skip the device {0} because we could not get size of it.".format(device_item.name)))
         return device_items_to_return
 
     def get_device_items(self, dev_path):
-        if(self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11'):
+        if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
             return self.get_device_items_sles(dev_path)
         else:
             self.logger.log(msg=("getting the blk info from " + str(dev_path)))
             device_items = []
-            if(dev_path is None):
+            if dev_path is None:
                 p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
                 p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out_lsblk_output, err = p.communicate()
             out_lsblk_output = str(out_lsblk_output)
             error_msg = str(err)
-            if(error_msg is not None and error_msg.strip() != ""):
+            if error_msg is not None and error_msg.strip() != "":
                 self.logger.log(msg=str(err),level=CommonVariables.ErrorLevel)
             lines = out_lsblk_output.splitlines()
             for i in range(0,len(lines)):
                 item_value_str = lines[i].strip()
-                if(item_value_str != ""):
+                if item_value_str != "":
                     disk_info_item_array = item_value_str.split()
                     device_item = DeviceItem()
                     disk_info_item_array_length = len(disk_info_item_array)
                     for j in range(0, disk_info_item_array_length):
                         disk_info_property = disk_info_item_array[j]
                         property_item_pair = disk_info_property.split('=')
-                        if(property_item_pair[0] == 'SIZE'):
+                        if property_item_pair[0] == 'SIZE':
                             device_item.size = int(property_item_pair[1].strip('"'))
 
-                        if(property_item_pair[0] == 'NAME'):
+                        if property_item_pair[0] == 'NAME':
                             device_item.name = property_item_pair[1].strip('"')
 
-                        if(property_item_pair[0] == 'TYPE'):
+                        if property_item_pair[0] == 'TYPE':
                             device_item.type = property_item_pair[1].strip('"')
 
-                        if(property_item_pair[0] == 'FSTYPE'):
+                        if property_item_pair[0] == 'FSTYPE':
                             device_item.file_system = property_item_pair[1].strip('"')
                         
-                        if(property_item_pair[0] == 'MOUNTPOINT'):
+                        if property_item_pair[0] == 'MOUNTPOINT':
                             device_item.mount_point = property_item_pair[1].strip('"')
 
-                        if(property_item_pair[0] == 'LABEL'):
+                        if property_item_pair[0] == 'LABEL':
                             device_item.label = property_item_pair[1].strip('"')
 
-                        if(property_item_pair[0] == 'UUID'):
+                        if property_item_pair[0] == 'UUID':
                             device_item.uuid = property_item_pair[1].strip('"')
 
-                        if(property_item_pair[0] == 'MODEL'):
+                        if property_item_pair[0] == 'MODEL':
                             device_item.model = property_item_pair[1].strip('"')
 
                     device_items.append(device_item)
@@ -725,37 +725,37 @@ class DiskUtil(object):
         if the type is disk, then to check whether it have child-items, say the part, lvm or crypt luks.
         if the answer is yes, then skip it.
         """
-        if(device_item.file_system is None or device_item.file_system == ""):
+        if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
             return True
         else:
-            if(device_item.size < CommonVariables.min_filesystem_size_support):
+            if device_item.size < CommonVariables.min_filesystem_size_support:
                 self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.",level=CommonVariables.WarningLevel)
                 return True
 
             supported_device_type = ["disk","part","raid0","raid1","raid5","raid10","lvm"]
-            if(device_item.type not in supported_device_type):
+            if device_item.type not in supported_device_type:
                 self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.",level=CommonVariables.WarningLevel)
                 return True
 
-            if(device_item.uuid is None or device_item.uuid == ""):
+            if device_item.uuid is None or device_item.uuid == "":
                 self.logger.log(msg="the device do not have the related uuid, so skip it.",level=CommonVariables.WarningLevel)
                 return True
             sub_items = self.get_device_items("/dev/" + device_item.name)
-            if(len(sub_items) > 1):
+            if len(sub_items) > 1:
                 self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)),level=CommonVariables.WarningLevel)
                 return True
 
             azure_blk_items = self.get_azure_devices()
-            if(device_item.type == "crypt"):
+            if device_item.type == "crypt":
                 self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)),level=CommonVariables.WarningLevel)
                 return True
 
-            if(device_item.mount_point == "/"):
+            if device_item.mount_point == "/":
                 self.logger.log(msg=("the mountpoint is root:{0}, so skip it.".format(device_item)),level=CommonVariables.WarningLevel)
                 return True
             for azure_blk_item in azure_blk_items:
-                if(azure_blk_item.name == device_item.name):
+                if azure_blk_item.name == device_item.name:
                     self.logger.log(msg="the mountpoint is the azure disk root or resource, so skip it.")
                     return True
             return False
@@ -778,7 +778,7 @@ class DiskUtil(object):
             f = open('%s/%s/%s' % (self.vmbus_sys_path, vmbus, 'class_id'), 'r')
             class_id = f.read()
             f.close()
-            if(class_id.strip() == self.ide_class_id):
+            if class_id.strip() == self.ide_class_id:
                 device_sdx_path = self.find_block_sdx_path(vmbus)
                 self.logger.log("found one ide with vmbus: {0} and the sdx path is: {1}".format(vmbus,
                                                                                                 device_sdx_path))

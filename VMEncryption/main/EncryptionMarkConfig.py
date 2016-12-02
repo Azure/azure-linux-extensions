@@ -58,7 +58,7 @@ class EncryptionMarkConfig(object):
 
     def clear_config(self):
         try:
-            if(os.path.exists(self.encryption_environment.azure_crypt_request_queue_path)):
+            if os.path.exists(self.encryption_environment.azure_crypt_request_queue_path):
                 os.remove(self.encryption_environment.azure_crypt_request_queue_path)
             return True
         except OSError as e:

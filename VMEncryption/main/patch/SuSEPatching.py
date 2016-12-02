@@ -39,7 +39,7 @@ class SuSEPatching(AbstractPatching):
 
         self.distro_info = distro_info
 
-        if(distro_info[1] == "11"):
+        if distro_info[1] == "11":
             self.logger = logger
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -93,7 +93,7 @@ class SuSEPatching(AbstractPatching):
             return_code = subprocess.call(['pip', 'install', 'adal'])
             self.logger.log("Pip adal installation result: " + str(return_code))
 
-        #if(paras.filesystem == "btrfs"):
+        #if paras.filesystem == "btrfs":
         #    extras = ['btrfs-tools']
         #    for extra in extras:
         #        print("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))

@@ -63,7 +63,7 @@ class KeyVaultUtil(object):
             bearerHeader = result.getheader("www-authenticate")
 
             authorize_uri = self.get_authorize_uri(bearerHeader)
-            if(authorize_uri is None):
+            if authorize_uri is None:
                 self.logger.log("the authorize uri is None")
                 return None
 
@@ -72,18 +72,18 @@ class KeyVaultUtil(object):
             kv_resource_name = parsed_url.scheme + '://' + vault_domain
 
             access_token = self.get_access_token(kv_resource_name, authorize_uri, AADClientID, AADClientCertThumbprint, AADClientSecret)
-            if(access_token is None):
+            if access_token is None:
                 self.logger.log("the access token is None")
                 return None
 
             """
             we should skip encrypting the passphrase if the KeyVaultURL and KeyEncryptionKeyURL is empty
             """
-            if(KeyEncryptionKeyURL is None or KeyEncryptionKeyURL == ""):
+            if KeyEncryptionKeyURL is None or KeyEncryptionKeyURL == "":
                 secret_value = passphrase_encoded
             else:
                 secret_value = self.encrypt_passphrase(access_token, passphrase_encoded, KeyVaultURL, KeyEncryptionKeyURL, AADClientID, KeyEncryptionAlgorithm, AADClientSecret)
-            if(secret_value is None):
+            if secret_value is None:
                 self.logger.log("secret value is None")
                 return None
 
@@ -126,7 +126,7 @@ class KeyVaultUtil(object):
 
         self.logger.log("{0} {1}".format(result.status, result.getheaders()))
         result_content = result.read()
-        if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
+        if result.status != httplib.OK and result.status != httplib.ACCEPTED:
             self.logger.log(str(result_content))
             return None
         http_util.connection.close()
@@ -176,7 +176,7 @@ class KeyVaultUtil(object):
             secret_name = str(uuid.uuid4())
             secret_keyvault_uri = self.urljoin(KeyVaultURL, "secrets", secret_name)
             self.logger.log("secret_keyvault_uri is: {0} and keyvault_uri is:{1}".format(secret_keyvault_uri, KeyVaultURL))
-            if(KeyEncryptionAlgorithm is None):
+            if KeyEncryptionAlgorithm is None:
                 request_content = '{{"value":"{0}","attributes":{{"enabled":"true"}},"tags":{{"DiskEncryptionKeyFileName":"{1}"}}}}'\
                     .format(str(secret_value),DiskEncryptionKeyFileName)
             else:
@@ -194,7 +194,7 @@ class KeyVaultUtil(object):
             result_json = json.loads(result_content)
             secret_id = result_json["id"]
             http_util.connection.close()
-            if(result.status != httplib.OK and result.status != httplib.ACCEPTED):
+            if result.status != httplib.OK and result.status != httplib.ACCEPTED:
                 self.logger.log("the result status failed.")
                 return None
             return secret_id

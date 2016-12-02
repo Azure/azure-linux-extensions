@@ -77,14 +77,14 @@ class OnGoingItemConfig(object):
 
     def get_device_size(self):
         device_size_value = self.ongoing_item_config.get_config(CommonVariables.OngoingItemDeviceSizeKey)
-        if(device_size_value is None or device_size_value == ""):
+        if device_size_value is None or device_size_value == "":
             return None
         else:
             return long(device_size_value)
 
     def get_current_slice_index(self):
         current_slice_index_value = self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentSliceIndexKey)
-        if(current_slice_index_value is None or current_slice_index_value == ""):
+        if current_slice_index_value is None or current_slice_index_value == "":
             return None
         else:
             return long(current_slice_index_value)
@@ -94,7 +94,7 @@ class OnGoingItemConfig(object):
 
     def get_current_block_size(self):
         block_size_value = self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentBlockSizeKey)
-        if(block_size_value is None or block_size_value == ""):
+        if block_size_value is None or block_size_value == "":
             return None
         else:
             return long(block_size_value)
@@ -107,7 +107,7 @@ class OnGoingItemConfig(object):
     
     def get_current_total_copy_size(self):
         total_copy_size_value = self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentTotalCopySizeKey)
-        if(total_copy_size_value is None or total_copy_size_value == ""):
+        if total_copy_size_value is None or total_copy_size_value == "":
             return None
         else:
             return long(total_copy_size_value)
@@ -183,7 +183,7 @@ class OnGoingItemConfig(object):
 
     def clear_config(self):
         try:
-            if(os.path.exists(self.encryption_environment.azure_crypt_ongoing_item_config_path)):
+            if os.path.exists(self.encryption_environment.azure_crypt_ongoing_item_config_path):
                 self.logger.log(msg="archive the config file: {0}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path))
                 time_stamp = datetime.datetime.now()
                 new_name = "{0}_{1}".format(self.encryption_environment.azure_crypt_ongoing_item_config_path, time_stamp)

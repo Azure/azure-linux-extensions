@@ -50,9 +50,9 @@ class HttpUtil(object):
         try:
             uri_obj = urlparse.urlparse(http_uri)
             #parse the uri str here
-            if(self.proxyHost is None or self.proxyPort is None):
+            if self.proxyHost is None or self.proxyPort is None:
                 self.connection = httplib.HTTPSConnection(uri_obj.hostname, timeout = 10)
-                if(uri_obj.query is not None):
+                if uri_obj.query is not None:
                     self.connection.request(method = method, url=(uri_obj.path +'?'+ uri_obj.query), body = data, headers = headers)
                 else:
                     self.connection.request(method = method, url=(uri_obj.path), body = data, headers = headers)
@@ -60,7 +60,7 @@ class HttpUtil(object):
             else:
                 self.logger.log("proxyHost is not empty, so use the proxy to call the http.")
                 self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
-                if(uri_obj.scheme.lower() == "https"):
+                if uri_obj.scheme.lower() == "https":
                     self.connection.set_tunnel(uri_obj.hostname, 443)
                 else:
                     self.connection.set_tunnel(uri_obj.hostname, 80)
