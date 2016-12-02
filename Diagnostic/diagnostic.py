@@ -563,7 +563,7 @@ def get_extension_operation_type(command):
     if re.match("^([-/]*)(enable)", command):
         return waagent.WALAEventOperation.Enable
     if re.match("^([-/]*)(daemon)", command):   # LAD-specific extension operation (invoked from "./diagnostic.py -enable")
-        return waagent.WALAEventOperation.Enable
+        return "Daemon"
     if re.match("^([-/]*)(install)", command):
         return waagent.WALAEventOperation.Install
     if re.match("^([-/]*)(disable)", command):
@@ -700,6 +700,12 @@ def start_mdsd():
     with open(MDSDPidFile, "w") as pidfile:
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
+
+    # Assign correct ext op type for correct ext status/event reporting.
+    # start_mdsd() is called only through "./diagnostic.py -daemon"
+    # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
+    # type, so it needs to be reverted back to a standard one (which is "Enable").
+    ExtensionOperationType = waagent.WALAEventOperation.Enable
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
