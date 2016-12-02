@@ -190,19 +190,17 @@ class DiskUtil(object):
 
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
-        if os.path.exists(luks_header_file_path):
-            return luks_header_file_path
-        else:
+        if not os.path.exists(luks_header_file_path):
             dd_command = self.distro_patcher.dd_path + ' if=/dev/zero bs=33554432 count=1 > ' + luks_header_file_path
             self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
+        return luks_header_file_path
 
     def create_cleartext_key(self, mapper_name):
         cleartext_key_file_path = self.encryption_environment.cleartext_key_base_path + mapper_name
-        if os.path.exists(cleartext_key_file_path):
-            return cleartext_key_file_path
-        else:
+        if not os.path.exists(cleartext_key_file_path):
             dd_command = self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path
             self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
+        return cleartext_key_file_path
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
