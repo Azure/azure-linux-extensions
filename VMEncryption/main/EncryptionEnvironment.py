@@ -49,11 +49,11 @@ class EncryptionEnvironment(object):
     def disable_se_linux(self):
         self.logger.log("disabling se linux")
         proc = Popen([self.patching.setenforce_path,'0'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        returnCode = proc.wait()
-        return returnCode
+        return_code = proc.wait()
+        return return_code
 
     def enable_se_linux(self):
         self.logger.log("enabling se linux")
         proc = Popen([self.patching.setenforce_path,'1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        returnCode = proc.wait()
-        return returnCode
+        return_code = proc.wait()
+        return return_code

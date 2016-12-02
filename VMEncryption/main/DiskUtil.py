@@ -60,8 +60,7 @@ class DiskUtil(object):
             if(mem_fs_result != CommonVariables.process_success):
                 return CommonVariables.tmpfs_error
             else:
-                returnCode = copy_task.begin_copy()
-                return returnCode
+                return copy_task.begin_copy()
         except Exception as e:
             message = "Failed to perform dd copy: {0}, stack trace: {1}".format(e, traceback.format_exc())
             self.logger.log(msg=message, level=CommonVariables.ErrorLevel)
@@ -79,27 +78,17 @@ class DiskUtil(object):
         elif(file_system == "btrfs"):
             mkfs_command = "mkfs.btrfs"
         mkfs_cmd = "{0} {1}".format(mkfs_command, dev_path)
-        self.logger.log("command to execute:{0}".format(mkfs_cmd))
-        mkfs_cmd_args = shlex.split(mkfs_cmd)
-        proc = Popen(mkfs_cmd_args)
-        returnCode = proc.wait()
-        return returnCode
+        return self.command_executor.Execute(mkfs_cmd)
 
     def make_sure_path_exists(self, path):
         mkdir_cmd = self.distro_patcher.mkdir_path + ' -p ' + path
         self.logger.log("make sure path exists, executing: {0}".format(mkdir_cmd))
-        mkdir_cmd_args = shlex.split(mkdir_cmd)
-        proc = Popen(mkdir_cmd_args)
-        returnCode = proc.wait()
-        return returnCode
+        return self.command_executor.Execute(mkdir_cmd)
 
     def touch_file(self, path):
         mkdir_cmd = self.distro_patcher.touch_path + ' ' + path
         self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
-        mkdir_cmd_args = shlex.split(mkdir_cmd)
-        proc = Popen(mkdir_cmd_args)
-        returnCode = proc.wait()
-        return returnCode
+        return self.command_executor.Execute(mkdir_cmd)
 
     def get_crypt_items(self):
         crypt_items = []
@@ -204,79 +193,55 @@ class DiskUtil(object):
         if(os.path.exists(luks_header_file_path)):
             return luks_header_file_path
         else:
-            commandToExecute = self.distro_patcher.bash_path + ' -c "' + self.distro_patcher.dd_path + ' if=/dev/zero bs=33554432 count=1 > ' + luks_header_file_path + '"'
-            proc = Popen(commandToExecute, shell=True)
-            returnCode = proc.wait()
-            if(returnCode == CommonVariables.process_success):
-                return luks_header_file_path
-            else:
-                self.logger.log(msg=("make luks header failed and return code is:{0}".format(returnCode)), level=CommonVariables.ErrorLevel)
-                return None
+            dd_command = self.distro_patcher.dd_path + ' if=/dev/zero bs=33554432 count=1 > ' + luks_header_file_path
+            self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
 
     def create_cleartext_key(self, mapper_name):
         cleartext_key_file_path = self.encryption_environment.cleartext_key_base_path + mapper_name
         if(os.path.exists(cleartext_key_file_path)):
             return cleartext_key_file_path
         else:
-            commandToExecute = self.distro_patcher.bash_path + ' -c "' + self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path + '"'
-            proc = Popen(commandToExecute, shell=True)
-            returnCode = proc.wait()
-            if(returnCode == CommonVariables.process_success):
-                return cleartext_key_file_path
-            else:
-                self.logger.log(msg=("dd failed with return code: {0}".format(returnCode)), level=CommonVariables.ErrorLevel)
-                return None
+            dd_command = self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path
+            self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
-        returnCode = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
-        if(returnCode != CommonVariables.process_success):
-            self.logger.log(msg=('cryptsetup luksFormat failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
-            return returnCode
+        return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
+        if(return_code != CommonVariables.process_success):
+            self.logger.log(msg=('cryptsetup luksFormat failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+            return return_code
         else:
-            returnCode = self.luks_open(passphrase_file=passphrase_file,
+            return_code = self.luks_open(passphrase_file=passphrase_file,
                                         dev_path=dev_path,
                                         mapper_name=mapper_name,
                                         header_file=header_file,
                                         uses_cleartext_key=False)
-            if(returnCode != CommonVariables.process_success):
-                self.logger.log(msg=('cryptsetup luksOpen failed, returnCode is:{0}'.format(returnCode)), level=CommonVariables.ErrorLevel)
-            return returnCode
+            if(return_code != CommonVariables.process_success):
+                self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+            return return_code
 
     def check_fs(self, dev_path):
         self.logger.log("checking fs:" + str(dev_path))
         check_fs_cmd = self.distro_patcher.e2fsck_path + " -f -y " + dev_path
-        self.logger.log("check fs command is:{0}".format(check_fs_cmd))
-        check_fs_cmd_args = shlex.split(check_fs_cmd)
-        check_fs_cmd_p = Popen(check_fs_cmd_args)
-        returnCode = check_fs_cmd_p.wait()
-        return returnCode
+        return self.command_executor.Execute(check_fs_cmd)
 
     def expand_fs(self, dev_path):
         expandfs_cmd = self.distro_patcher.resize2fs_path + " " + str(dev_path)
-        self.logger.log("expand_fs command is:{0}".format(expandfs_cmd))
-        expandfs_cmd_args = shlex.split(expandfs_cmd)
-        expandfs_p = Popen(expandfs_cmd_args)
-        returnCode = expandfs_p.wait()
-        return returnCode
+        return self.command_executor.Execute(expandfs_cmd)
 
     def shrink_fs(self,dev_path, size_shrink_to):
         """
         size_shrink_to is in sector (512 byte)
         """
         shrinkfs_cmd = self.distro_patcher.resize2fs_path + ' ' + str(dev_path) + ' ' + str(size_shrink_to) + 's'
-        self.logger.log("shrink_fs command is {0}".format(shrinkfs_cmd))
-        shrinkfs_cmd_args = shlex.split(shrinkfs_cmd)
-        shrinkfs_p = Popen(shrinkfs_cmd_args)
-        returnCode = shrinkfs_p.wait()
-        return returnCode
+        return self.command_executor.Execute(shrinkfs_cmd)
 
     def check_shrink_fs(self,dev_path, size_shrink_to):
-        returnCode = self.check_fs(dev_path)
-        if returnCode == CommonVariables.process_success:
-            returnCode = self.shrink_fs(dev_path = dev_path, size_shrink_to = size_shrink_to)
-            return returnCode
+        return_code = self.check_fs(dev_path)
+        if return_code == CommonVariables.process_success:
+            return_code = self.shrink_fs(dev_path = dev_path, size_shrink_to = size_shrink_to)
+            return return_code
         else:
-            return returnCode
+            return return_code
 
     def luks_format(self, passphrase_file, dev_path, header_file):
         """
@@ -291,21 +256,13 @@ class DiskUtil(object):
             passphrase_p = Popen(passphrase_cmd_args,stdout=subprocess.PIPE)
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path , dev_path)
-            self.logger.log("cryptsetup_cmd is:{0}".format(cryptsetup_cmd))
-            cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-            cryptsetup_p = Popen(cryptsetup_cmd_args,stdin=passphrase_p.stdout)
-            returnCode = cryptsetup_p.wait()
-            return returnCode
         else:
             if(header_file is not None):
                 cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
             else:
                 cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path ,dev_path , passphrase_file)
-            self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
-            cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-            cryptsetup_p = Popen(cryptsetup_cmd_args)
-            returnCode = cryptsetup_p.wait()
-            return returnCode
+            
+        return self.command_executor.Execute(cryptsetup_cmd)
         
     def luks_add_key(self, passphrase_file, dev_path, mapper_name, header_file, new_key_path):
         """
@@ -322,11 +279,7 @@ class DiskUtil(object):
         else:
             cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, new_key_path, passphrase_file)
 
-        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
-        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-        cryptsetup_p = Popen(cryptsetup_cmd_args)
-        returnCode = cryptsetup_p.wait()
-        return returnCode
+        return self.command_executor.Execute(cryptsetup_cmd)
         
     def luks_kill_slot(self, passphrase_file, dev_path, header_file, keyslot):
         """
@@ -339,11 +292,7 @@ class DiskUtil(object):
         else:
             cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, keyslot, passphrase_file)
 
-        self.logger.log("cryptsetup_cmd is: " + cryptsetup_cmd)
-        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-        cryptsetup_p = Popen(cryptsetup_cmd_args)
-        returnCode = cryptsetup_p.wait()
-        return returnCode
+        return self.command_executor.Execute(cryptsetup_cmd)
         
     def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
         """
@@ -385,11 +334,8 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path ,mapper_name, header_file ,passphrase_file)
         else:
             cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name , passphrase_file)
-        self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
-        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-        cryptsetup_p = Popen(cryptsetup_cmd_args)
-        returnCode = cryptsetup_p.wait()
-        return returnCode
+
+        return self.command_executor.Execute(cryptsetup_cmd)
 
     def luks_close(self, mapper_name):
         """
@@ -397,11 +343,8 @@ class DiskUtil(object):
         """
         self.hutil.log("dev mapper name to cryptsetup luksOpen " + (mapper_name))
         cryptsetup_cmd = "{0} luksClose {1} -q".format(self.distro_patcher.cryptsetup_path, mapper_name)
-        self.logger.log("cryptsetup_cmd is:" + cryptsetup_cmd)
-        cryptsetup_cmd_args = shlex.split(cryptsetup_cmd)
-        cryptsetup_p = Popen(cryptsetup_cmd_args)
-        returnCode = cryptsetup_p.wait()
-        return returnCode
+
+        return self.command_executor.Execute(cryptsetup_cmd)
 
     #TODO error handling.
     def append_mount_info(self, dev_path, mount_point):
@@ -491,20 +434,13 @@ class DiskUtil(object):
         mount the file system.
         """
         self.make_sure_path_exists(mount_point)
-        returnCode = -1
+        return_code = -1
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
-            self.logger.log("mount file system, execute:{0}".format(mount_cmd))
-            mount_cmd_args = shlex.split(mount_cmd)
-            proc = Popen(mount_cmd_args)
-            returnCode = proc.wait()
         else: 
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point + ' -t ' + file_system
-            self.logger.log("mount file system, execute:{0}".format(mount_cmd))
-            mount_cmd_args = shlex.split(mount_cmd)
-            proc = Popen(mount_cmd_args)
-            returnCode = proc.wait()
-        return returnCode
+
+        return self.command_executor.Execute(mount_cmd)
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
@@ -513,11 +449,7 @@ class DiskUtil(object):
 
     def umount(self, path):
         umount_cmd = self.distro_patcher.umount_path + ' ' + path
-        self.logger.log("umount, execute:{0}".format(umount_cmd))
-        umount_cmd_args = shlex.split(umount_cmd)
-        proc = Popen(umount_cmd_args)
-        returnCode = proc.wait()
-        return returnCode
+        return self.command_executor.Execute(umount_cmd)
 
     def umount_all_crypt_items(self):
         for crypt_item in self.get_crypt_items():
@@ -526,11 +458,7 @@ class DiskUtil(object):
 
     def mount_all(self):
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
-        self.logger.log("command to execute:{0}".format(mount_all_cmd))
-        mount_all_cmd_args = shlex.split(mount_all_cmd)
-        proc = Popen(mount_all_cmd_args)
-        returnCode = proc.wait()
-        return returnCode
+        return self.command_executor.Execute(mount_all_cmd)
 
     def get_mount_items(self):
         items = []
