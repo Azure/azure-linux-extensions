@@ -34,8 +34,8 @@ from Common import *
 
 
 class debianPatching(AbstractPatching):
-    def __init__(self,logger,distro_info):
-        super(debianPatching,self).__init__(distro_info)
+    def __init__(self, logger, distro_info):
+        super(debianPatching, self).__init__(distro_info)
         self.logger = logger
         self.base64_path = '/usr/bin/base64'
         self.bash_path = '/bin/bash'

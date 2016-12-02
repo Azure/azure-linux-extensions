@@ -131,7 +131,7 @@ class ExtensionParameter(object):
 
     def clear_config(self):
         try:
-            if(os.path.exists(self.encryption_environment.encryption_config_file_path)):
+            if os.path.exists(self.encryption_environment.encryption_config_file_path):
                 self.logger.log(msg="archiving the encryption config file: {0}".format(self.encryption_environment.encryption_config_file_path))
                 time_stamp = datetime.datetime.now()
                 new_name = "{0}_{1}".format(self.encryption_environment.encryption_config_file_path, time_stamp)

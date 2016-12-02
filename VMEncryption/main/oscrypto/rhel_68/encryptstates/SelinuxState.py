@@ -42,7 +42,7 @@ class SelinuxState(OSEncryptionState):
         self.context.logger.log("Entering selinux state")
 
         se_linux_status = self.context.encryption_environment.get_se_linux()
-        if(se_linux_status.lower() == 'enforcing'):
+        if se_linux_status.lower() == 'enforcing':
             self.context.logger.log("SELinux is in enforcing mode, disabling")
             self.context.encryption_environment.disable_se_linux()
 
