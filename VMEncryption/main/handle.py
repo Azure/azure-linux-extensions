@@ -848,7 +848,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
     luks_header_size = CommonVariables.luks_header_size
     size_shrink_to = (device_size - luks_header_size) / CommonVariables.sector_size
 
-    while(current_phase != CommonVariables.EncryptionPhaseDone):
+    while current_phase != CommonVariables.EncryptionPhaseDone:
         if current_phase == CommonVariables.EncryptionPhaseBackupHeader:
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
@@ -1041,7 +1041,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                    level=CommonVariables.WarningLevel)
         current_phase = ongoing_item_config.get_phase()
 
-    while(current_phase != CommonVariables.EncryptionPhaseDone):
+    while current_phase != CommonVariables.EncryptionPhaseDone:
         if current_phase == CommonVariables.EncryptionPhaseEncryptDevice:
             disabled = False
             try:
@@ -1175,7 +1175,7 @@ def decrypt_inplace_copy_data(passphrase_file,
 
     current_phase = ongoing_item_config.get_phase()
 
-    while(current_phase != CommonVariables.DecryptionPhaseDone):
+    while current_phase != CommonVariables.DecryptionPhaseDone:
         logger.log(msg=("the current phase is {0}".format(CommonVariables.EncryptionPhaseBackupHeader)),
                    level=CommonVariables.InfoLevel)
 

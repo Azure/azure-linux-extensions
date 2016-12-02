@@ -152,7 +152,7 @@ class TransactionalCopyTask(object):
         """
         self.resume_copy()
         if self.from_end.lower() == 'true':
-            while(self.current_slice_index < self.total_slice_size):
+            while self.current_slice_index < self.total_slice_size:
                 skip_block = (self.total_slice_size - self.current_slice_index - 1)
 
                 if self.current_slice_index == 0:
@@ -189,7 +189,7 @@ class TransactionalCopyTask(object):
 
             return CommonVariables.process_success
         else:
-            while(self.current_slice_index < self.total_slice_size):
+            while self.current_slice_index < self.total_slice_size:
                 skip_block = self.current_slice_index
 
                 if self.current_slice_index == (self.total_slice_size - 1):
