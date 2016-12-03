@@ -85,34 +85,35 @@ class BlobWriter(object):
             retry_times = 3
             while(retry_times > 0):
                 try:
-                    PAGE_UPLOAD_LIMIT_BYTES = 10240 # 2097152 # 4194304
+                    PAGE_SIZE_BYTES = 512
+                    PAGE_UPLOAD_LIMIT_BYTES = 4194304 # 4 MB
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
+                    # Get Blob-properties to know content-length
+                    blobProperties = self.GetBlobProperties(blobUri)
+                    blobContentLength = int(blobProperties.contentLength)
+                    #self.hutil.log("WritePageBlob contentLength:"+str(blobContentLength))
                     # Add padding to message to make its legth multiple of 512
-                    loopIndex = 0
-                    while(loopIndex < 6):
-                        msg = msg + msg
-                        loopIndex = loopIndex + 1
                     msgLen = len(msg)
-                    self.hutil.log("msgLen:"+str(msgLen))
-                    remainder = msgLen % 512
-                    if(remainder != 0):
-                        msgLen = msgLen + (512 - remainder)
-                    msg = msg.ljust(msgLen)
-                    self.hutil.log("msgLen:"+str(len(msg)))
+                    self.hutil.log("msg length:"+str(msgLen))
+                    if(msgLen > blobContentLength):
+                        msg = msg[msgLen-blobContentLength:msgLen]
+                    elif((msgLen % PAGE_SIZE_BYTES) != 0):
+                        paddedLen = msgLen + (512 - (msgLen % PAGE_SIZE_BYTES))
+                        msg = msg.ljust(paddedLen)
+                    msgLen = len(msg)
+                    self.hutil.log("msg length after aligning:"+str(len(msg)))
                     # Write Pages
                     result = CommonVariables.error
-                    index = 0
                     bytes_sent = 0
                     while (bytes_sent < msgLen):
                         bytes_remaining = msgLen - bytes_sent
                         pageContent = None
                         if(bytes_remaining > PAGE_UPLOAD_LIMIT_BYTES): # more than 4 MB
-                            pageContent = msg[index:index+PAGE_UPLOAD_LIMIT_BYTES]
+                            pageContent = msg[bytes_sent:bytes_sent+PAGE_UPLOAD_LIMIT_BYTES]
                         else:
-                            pageContent = msg[index:msgLen]
+                            pageContent = msg[bytes_sent:msgLen]
                         self.hutil.log("pageContentLen:"+str(len(pageContent)))
-                        self.hutil.log("pageContent:"+pageContent)
                         result = self.put_page_update(pageContent, blobUri, bytes_sent)
                         if(result == CommonVariables.success):
                             self.hutil.log("page written succesfully")
@@ -142,7 +143,7 @@ class BlobWriter(object):
                     # Get Blob-properties to know content-length
                     blobProperties = self.GetBlobProperties(blobUri)
                     contentLength = int(blobProperties.contentLength)
-                    self.hutil.log("ClearPageBlob contentLength:"+str(contentLength))
+                    #self.hutil.log("ClearPageBlob contentLength:"+str(contentLength))
                     # Clear Pages
                     if(contentLength > 0):
                         result = self.put_page_clear(blobUri, 0, contentLength)
@@ -181,6 +182,7 @@ class BlobWriter(object):
                     headers = {}
                     httpResp = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
                     blobProperties = self.httpresponse_get_blob_properties(httpResp)
+                    self.hutil.log("blobProperties :" + str(blobProperties))
                     retry_times = 0
                 except Exception as e:
                     self.hutil.log("Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
@@ -195,7 +197,7 @@ class BlobWriter(object):
          headers["x-ms-page-write"] = 'clear'
          headers["x-ms-range"] = 'bytes={}-{}'.format(pageBlobIndex, pageBlobIndex + clearLength - 1)
          headers["Content-Length"] = 0
-         self.hutil.log(str(headers))
+         #self.hutil.log(str(headers))
          result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = None, headers = headers, fallback_to_curl = False)
          return result
 
@@ -206,7 +208,7 @@ class BlobWriter(object):
          headers["x-ms-page-write"] = 'update'
          headers["x-ms-range"] = 'bytes={}-{}'.format(pageBlobIndex, pageBlobIndex + len(pageContent) - 1)
          headers["Content-Length"] = len(str(pageContent))
-         self.hutil.log(str(headers))
+         #self.hutil.log(str(headers))
          result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = pageContent, headers = headers, fallback_to_curl = False)
          return result
 
@@ -216,7 +218,7 @@ class BlobWriter(object):
             self.hutil.log("Blob-properties response status:"+str(httpResp.status))
             if(httpResp.status == 200):
                 resp_headers = httpResp.getheaders()
-                self.hutil.log("Blob-properties resp_headers:"+str(resp_headers))
+                #self.hutil.log("Blob-properties resp_headers:"+str(resp_headers))
                 blobType = httpResp.getheader('x-ms-blob-type')
                 contentLength = httpResp.getheader('Content-Length')
                 blobProperties = BlobProperties(blobType, contentLength)
