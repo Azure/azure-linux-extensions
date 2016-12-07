@@ -275,15 +275,15 @@ def update_encryption_settings():
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
             hutil.exit_if_same_seq()
 
+            # remount bek volume
+            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
             if extension_parameter.passphrase and extension_parameter.passphrase != file(existing_passphrase_file).read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
                 logger.log("Skipping removal of old passphrase")
                 exit_without_status_report()
 
             logger.log('Removing old passphrase')
-
-            # remount bek volume
-            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
             for crypt_item in disk_util.get_crypt_items():
                 if not crypt_item:
