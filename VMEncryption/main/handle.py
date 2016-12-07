@@ -173,6 +173,9 @@ def update_encryption_settings():
 
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
     logger.log("The update call is operation #{0}".format(update_call_seq_num))
+    
+    executor = CommandExecutor(logger)
+    executor.Execute("mount /boot")
 
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
