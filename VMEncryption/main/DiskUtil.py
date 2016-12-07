@@ -92,6 +92,7 @@ class DiskUtil(object):
 
     def get_crypt_items(self):
         crypt_items = []
+        rootfs_crypt_item_found = False
 
         if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
             self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
@@ -113,6 +114,10 @@ class DiskUtil(object):
 
                     crypt_item.luks_header_path = header_file_path
                     crypt_item.mount_point = crypt_mount_item_properties[3]
+
+                    if crypt_item.mount_point == "/":
+                        rootfs_crypt_item_found = True
+
                     crypt_item.file_system = crypt_mount_item_properties[4]
                     crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
 
@@ -122,6 +127,26 @@ class DiskUtil(object):
                         crypt_item.current_luks_slot = -1
 
                     crypt_items.append(crypt_item)
+
+            encryption_status = json.loads(self.get_encryption_status())
+
+            if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+                crypt_item = CryptItem()
+                crypt_item.mapper_name = "osencrypt"
+
+                rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
+                crypt_item.dev_path = rootfs_dev["src"]
+                crypt_item.file_system = rootfs_dev["fs"]
+
+                if not crypt_item.dev_path:
+                    raise Exception("Could not locate block device for rootfs")
+
+                crypt_item.luks_header_path = "/boot/luks/osluksheader"
+                crypt_item.mount_point = "/"
+                crypt_item.uses_cleartext_key = False
+                crypt_item.current_luks_slot = -1
+
+                crypt_items.append(crypt_item)
 
         return crypt_items
 
