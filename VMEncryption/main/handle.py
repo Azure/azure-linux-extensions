@@ -264,6 +264,7 @@ def update_encryption_settings():
                 encryption_config.secret_id = kek_secret_id_created
                 encryption_config.secret_seq_num = hutil.get_current_seq()
                 encryption_config.commit()
+                extension_parameter.commit()
 
                 hutil.do_exit(exit_code=0,
                               operation='UpdateEncryptionSettings',
