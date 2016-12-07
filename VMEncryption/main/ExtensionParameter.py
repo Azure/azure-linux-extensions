@@ -167,7 +167,8 @@ class ExtensionParameter(object):
 
         if (self.AADClientSecret or self.get_aad_client_secret()) and \
            (hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest() != self.get_aad_client_secret()):
-            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(self.AADClientSecret, self.get_aad_client_secret()))
+            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest(),
+                                                                                                                          self.get_aad_client_secret()))
             return True
 
         if (self.AADClientCertThumbprint or self.get_aad_client_cert()) and \
