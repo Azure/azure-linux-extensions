@@ -122,7 +122,7 @@ class BlobWriter(object):
                         msg = msg[msgLen-blobContentLength:msgLen]
                         msgLen = len(msg)
                         self.hutil.log("WritePageBlob: msg length after aligning to blobContentLength:"+str(msgLen))
-                    # Write Page512s
+                    # Write Pages
                     result = CommonVariables.error
                     bytes_sent = 0
                     while (bytes_sent < msgLen):
