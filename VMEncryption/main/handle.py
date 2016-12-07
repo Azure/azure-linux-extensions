@@ -230,7 +230,7 @@ def update_encryption_settings():
 
                     after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
 
-                    logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+                    logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
                     new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
 
