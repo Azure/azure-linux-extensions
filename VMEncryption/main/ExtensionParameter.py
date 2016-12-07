@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import xml.parsers.expat
 
 from Utils import HandlerUtil
@@ -112,7 +113,7 @@ class ExtensionParameter(object):
         AADClientID = ConfigKeyValuePair(CommonVariables.AADClientIDKey, self.AADClientID)
         key_value_pairs.append(AADClientID)
 
-        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, self.AADClientSecret)
+        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest())
         key_value_pairs.append(AADClientSecret)
 
         AADClientCertThumbprint = ConfigKeyValuePair(CommonVariables.AADClientCertThumbprintKey, self.AADClientCertThumbprint)
@@ -165,7 +166,7 @@ class ExtensionParameter(object):
             return True
 
         if (self.AADClientSecret or self.get_aad_client_secret()) and \
-           (self.AADClientSecret != self.get_aad_client_secret()):
+           (hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest() != self.get_aad_client_secret()):
             self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(self.AADClientSecret, self.get_aad_client_secret()))
             return True
 
