@@ -23,13 +23,15 @@ from ConfigUtil import *
 from Common import CommonVariables
 
 class EncryptionMarkConfig(object):
-    def __init__(self,logger,encryption_environment):
+    def __init__(self, logger, encryption_environment):
         self.logger = logger
         self.encryption_environment = encryption_environment
         self.command = None
         self.volume_type = None
         self.diskFormatQuery = None
-        self.encryption_mark_config = ConfigUtil(self.encryption_environment.azure_crypt_request_queue_path,'encryption_request_queue',self.logger)
+        self.encryption_mark_config = ConfigUtil(self.encryption_environment.azure_crypt_request_queue_path,
+                                                 'encryption_request_queue',
+                                                 self.logger)
 
     def get_current_command(self):
         return self.encryption_mark_config.get_config(CommonVariables.EncryptionEncryptionOperationKey)
@@ -46,17 +48,17 @@ class EncryptionMarkConfig(object):
     
     def commit(self):
         key_value_pairs = []
-        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey,self.command)
+        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey, self.command)
         key_value_pairs.append(command)
-        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey,self.volume_type)
+        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
-        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey,self.diskFormatQuery)
+        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey, self.diskFormatQuery)
         key_value_pairs.append(disk_format_query)
         self.encryption_mark_config.save_configs(key_value_pairs)
 
     def clear_config(self):
         try:
-            if(os.path.exists(self.encryption_environment.azure_crypt_request_queue_path)):
+            if os.path.exists(self.encryption_environment.azure_crypt_request_queue_path):
                 os.remove(self.encryption_environment.azure_crypt_request_queue_path)
             return True
         except OSError as e:

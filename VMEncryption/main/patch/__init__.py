@@ -41,9 +41,9 @@ def DistInfo():
     else:
         return platform.dist()
 
-def GetMyPatching(logger):
+def GetDistroPatcher(logger):
     """
-    Return MyPatching object.
+    Return DistroPatcher object.
     NOTE: Logging is not initialized at this point.
     """
     dist_info = DistInfo()
@@ -59,5 +59,5 @@ def GetMyPatching(logger):
     if not globals().has_key(patching_class_name):
         logger.log('{0} is not a supported distribution.'.format(Distro))
         return None
-    patchingInstance = globals()[patching_class_name](logger,dist_info)
+    patchingInstance = globals()[patching_class_name](logger, dist_info)
     return patchingInstance

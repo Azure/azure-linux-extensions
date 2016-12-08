@@ -27,17 +27,17 @@ import os.path
 #
 def searchWAAgent():
     agentPath = '/usr/sbin/waagent'
-    if(os.path.isfile(agentPath)):
+    if os.path.isfile(agentPath):
         return agentPath
     user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
     for user_path in user_paths:
         agentPath = os.path.join(user_path, 'waagent')
-        if(os.path.isfile(agentPath)):
+        if os.path.isfile(agentPath):
             return agentPath
     return None
 
 agentPath = searchWAAgent()
-if(agentPath):
+if agentPath:
     waagent = imp.load_source('waagent', agentPath)
 else:
     raise Exception("Can't load waagent.")

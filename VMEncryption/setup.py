@@ -45,6 +45,21 @@ packages_array.append(main_folder)
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+oscrypto_folder = main_folder + '/oscrypto'
+packages_array.append(oscrypto_folder)
+
+packages_array.append(oscrypto_folder + '/rhel_72')
+packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')
+packages_array.append(oscrypto_folder + '/rhel_68')
+packages_array.append(oscrypto_folder + '/rhel_68/encryptstates')
+packages_array.append(oscrypto_folder + '/ubuntu_1604')
+packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')
+packages_array.append(oscrypto_folder + '/ubuntu_1404')
+packages_array.append(oscrypto_folder + '/ubuntu_1404/encryptstates')
+
+transitions_folder = 'transitions/transitions'
+packages_array.append(transitions_folder)
+
 """
 copy the dependency to the local
 """
@@ -96,7 +111,7 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
 <IsJsonExtension>true</IsJsonExtension>
 <CompanyName>Microsoft Open Source Technology Center</CompanyName>
-</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
+</ExtensionImage>""" % (CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_media_link, CommonVariables.extension_description)
 
 extension_xml_file = open(CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.xml', 'w')
 extension_xml_file.write(extension_xml_file_content)
@@ -133,7 +148,7 @@ target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
 
 def dos2unix(src):
-    args = ["dos2unix",src]
+    args = ["dos2unix", src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
     print('dos2unix %s ' % (src))

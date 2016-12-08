@@ -73,6 +73,15 @@ class HandlerContext:
     def __init__(self,name):
         self._name = name
         self._version = '0.0'
+        self._config_dir = None
+        self._log_dir = None
+        self._log_file = None
+        self._status_dir = None
+        self._heartbeat_file = None
+        self._seq_no = -1
+        self._status_file = None
+        self._settings_file = None
+        self._config = None
         return
 
 class HandlerUtility:
@@ -331,11 +340,18 @@ class HandlerUtility:
         return self._context._log_dir
 
     def get_handler_settings(self):
-        return self._context._config['runtimeSettings'][0]['handlerSettings']
+        if (self._context._config != None):
+            return self._context._config['runtimeSettings'][0]['handlerSettings']
+        return None
 
     def get_protected_settings(self):
-        return self.get_handler_settings().get('protectedSettings')
+        if (self._context._config != None):
+            return self.get_handler_settings().get('protectedSettings')
+        return None
 
     def get_public_settings(self):
-        return self.get_handler_settings().get('publicSettings')
+        handlerSettings = self.get_handler_settings()
+        if (handlerSettings != None):
+            return self.get_handler_settings().get('publicSettings')
+        return None
 

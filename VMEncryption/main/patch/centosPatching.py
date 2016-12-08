@@ -33,10 +33,10 @@ from redhatPatching import redhatPatching
 from Common import *
 
 class centosPatching(redhatPatching):
-    def __init__(self,logger,distro_info):
-        super(centosPatching,self).__init__(logger,distro_info)
+    def __init__(self, logger, distro_info):
+        super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
-        if(distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5"):
+        if distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5":
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
@@ -70,6 +70,21 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup','lsscsi']
-        for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+        return_code = subprocess.call(['yum', 'install','-y', 'epel-release'])
+        self.logger.log("Enabling epel, result: " + str(return_code))
+
+        packages = ['ntfs-3g',
+                    'cryptsetup',
+                    'lsscsi',
+                    'psmisc',
+                    'cryptsetup-reencrypt',
+                    'lvm2',
+                    'uuid',
+                    'at',
+                    'patch',
+                    'procps-ng',
+                    'util-linux']
+
+        return_code = subprocess.call(['yum', 'install', '-y'] + packages)
+        self.logger.log("Installing packages: " + " ".join(packages))
+        self.logger.log("Installation result: " + str(return_code))

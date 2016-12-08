@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.9007.
+Latest version is 2.3.9015.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -59,7 +59,7 @@ Schema for the protected configuration file looks like this:
 
 
 * `storageAccountName`: (required) the name of storage account
-* `storageAccountKey`: (required) the access key of storage account
+* `storageAccountSasToken` or `storageAccountKey`: (required) a valid account SAS token for the storage acocunt or the access key of storage account. Only one of these two should be given. Note that `storageAccountKey` may be deprecated in some future. For the `storageAccountSasToken` requirements, please see below.
 * `mdsdHttpProxy`: (optional) http proxy configuration for mdsd. Format: "http://username:password@proxy_host:proxy_port". "http:" part is optional. You may specify username and password here. If this is specified both on public and protected configurations, this protected configuration will prevail.
 
 ```json
@@ -69,6 +69,40 @@ Schema for the protected configuration file looks like this:
   "mdsdHttpProxy":"http://proxy_username:password@your_proxy_host:3128"
 }
 ```
+
+Note that the `storageAccountKey` property may be deprecated in the near future. We strongly recommend that an account SAS token is given as follows:
+
+```json
+{
+  "storageAccountName": "<storage-account-name>",
+  "storageAccountSasToken": "<storage-account-sas-token>",
+  "mdsdHttpProxy":"http://proxy_username:password@your_proxy_host:3128"
+}
+```
+
+An account SAS token should be of the following format:
+
+```
+sv=2015-12-11&ss=bt&srt=co&sp=rwlacu&st=2016-11-09T00%3A04%3A00Z&se=9999-11-10T00%3A04%3A00Z&sig=[signed-signature-string]
+```
+
+Details on how to construct an account SAS token can be found in
+[this document](https://msdn.microsoft.com/en-us/library/azure/mt584140.aspx). If you need
+to manually generate an account SAS token, we recommend using
+[the Microsoft Azure Storage Explorer](http://storageexplorer.com/). Just install/run
+the Explorer, login with your Azure account (or add a storage account explicitly),
+right-click on the storage account for which you want to generate an account SAS token,
+and click Get Shared Access Signature and follow the dialog.
+
+In order for the given account SAS to work with the Linux Azure Diagnostic extension,
+the following requirements must be met:
+
+* Services (ss) must include Blobs (b) and Tables (t).
+* Permissions (sp) must include Read (r), Write (w), List (l), Add (a), Create (c), and Update (u).
+* Resource Types (srt) must include Container (c) and Object (o).
+* Start time (st) and Expiry time (se) should be valid for the duration of time
+the SAS will be used. We recommend to set the Start time with today's date and
+to set the Expiry time with the date 9999-12-31. 
 
 **NOTE:**
 
@@ -244,6 +278,11 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 
 ## Supported Linux Distributions
+
+Please note that the distros/versions listed below apply only to Azure-endorsed Linux vendor
+images. 3rd party BYOL/BYOS images (e.g., appliances) are not generally supported for the
+Linux Diagnostic extension.
+
 - Ubuntu 12.04 and higher. Ubuntu 16.04 support is currently not official, as our OMI dependency is not officially supported on Ubuntu 16.04 as of LAD 2.3.9. Also as of the same version, MySQL monitoring using OMI/SCX is not working on Ubuntu 16.04, due to the fact that Ubuntu 16.04's MySQL build is changed in a way that current OMI/SCX doesn't support.
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher

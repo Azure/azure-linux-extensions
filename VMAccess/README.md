@@ -49,6 +49,7 @@ Schema for the protected configuration file looks like this:
 * `ssh_key`: (optional, string) the public key of the user
 * `reset_ssh`: (optional, boolean) whether or not reset the ssh
 * `remove_user`: (optional, string) the user name to remove
+* `expiration`: (options, string) expiration of the account, defaults to never, e.g. 2016-01-01.
 
 ```json
 {
@@ -56,7 +57,8 @@ Schema for the protected configuration file looks like this:
   "password": "<password>",
   "ssh_key": "<cert-contents>",
   "reset_ssh": true,
-  "remove_user": "<username-to-remove>"
+  "remove_user": "<username-to-remove>",
+  "expiration": "<yyyy-mm-dd>"
 }
 ```
 
@@ -218,6 +220,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
     "typeHandlerVersion": "1.4",
+    "autoUpgradeMinorVersion": true,
     "settings": {},
     "protectedSettings": {
       "username": "<username>",
@@ -227,7 +230,6 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
       "remove_user": "<username-to-remove>"
     }
   }
-
 }
 ```
 
@@ -240,41 +242,59 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ### 3.1 Resetting the password
 ```json
 {
-  "username":"currentusername",
-  "password":"newpassword"
+  "username": "currentusername",
+  "password": "newpassword"
 }
 ```
 
 ### 3.2 Resetting the SSH key
 ```json
 { 
-  "username":"currentusername", 
-  "ssh_key":"contentofsshkey",   
+  "username": "currentusername", 
+  "ssh_key": "contentofsshkey"
 }
 ```
 
 ### 3.3 Resetting the password and the SSH key
 ```json
 {
-  "username":"currentusername",
-  "ssh_key":"contentofsshkey",
-  "password":"newpassword",
+  "username": "currentusername",
+  "ssh_key": "contentofsshkey",
+  "password": "newpassword",
 }
 ```
 
 ### 3.4 Creating a new sudo user account with the password
 ```json
 {
-  "username":"newusername",
-  "password":"newpassword"
+  "username": "newusername",
+  "password": "newpassword"
+}
+```
+
+#### 3.4.1 Creating a new sudo user account with a password and expiration date.
+```json
+{
+  "username": "newusername",
+  "password": "newpassword",
+  "expiration": "2016-12-31"
 }
 ```
 
 ### 3.5 Creating a new sudo user account with the SSH key
 ```json
 {
-  "username":"newusername",
-  "ssh_key":"contentofsshkey"
+  "username": "newusername",
+  "ssh_key": "contentofsshkey"
+}
+```
+
+#### 3.5.1 Creating a new sudo user account with the SSH key
+```json
+{
+  "username": "newusername",
+  "ssh_key": "contentofsshkey",
+  "expiration": "2016-12-31"
 }
 ```
 
@@ -288,14 +308,14 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ### 3.7 Removing an existing user
 ```json
 {
-  "remove_user":"usertoberemoveed",
+  "remove_user": "usertoberemoveed",
 }
 ```
 
 ### 3.8 Checking added disks on VM
 ```json
 {
-    "check_disk":"true"
+    "check_disk": "true"
 }
 ```
 
@@ -319,19 +339,6 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 * The status of the extension is reported back to Azure so that user can
 see the status on Azure Portal
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
-
-## Changelog
-
-```
-# 1.4.1.0 (2016-01-22)
-- Bumped waagent version from 2.0.14 to 2.0.16
-
-# 1.4.0.0 (2015-12-18)
-- Added support for checking and repairing disks
-
-# 1.3 (2015-09-08)
-- Added waagent to extension package
-```
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/

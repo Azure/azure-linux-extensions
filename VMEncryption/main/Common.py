@@ -19,8 +19,8 @@
 
 class CommonVariables:
     utils_path_name = 'Utils'
-    extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999116'
+    extension_name = 'AzureDiskEncryptionForLinuxTest'
+    extension_version = '0.1.0.999220'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -38,7 +38,6 @@ class CommonVariables:
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
     disk_by_id_root = '/dev/disk/by-id'
-    BekVolumeFileSystem = 'vfat'
 
     """
     parameter key names
@@ -47,10 +46,10 @@ class CommonVariables:
     KeyEncryptionKeyURLKey = 'KeyEncryptionKeyURL'
     KeyVaultURLKey = 'KeyVaultURL'
     AADClientIDKey = 'AADClientID'
+    AADClientCertThumbprintKey = 'AADClientCertThumbprint'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
-    BekVolumeFileSystemKey = "BekVolumeFileSystem"
 
     """
     value for VolumeType could be OS or Data
@@ -58,13 +57,22 @@ class CommonVariables:
     VolumeTypeKey = 'VolumeType'
     AADClientSecretKey = 'AADClientSecret'
     SecretUriKey = 'SecretUri'
+    SecretSeqNum = 'SecretSeqNum'
+
+    VolumeTypeOS = 'OS'
+    VolumeTypeData = 'Data'
+    VolumeTypeAll = 'All'
+
+    SupportedVolumeTypes = [ VolumeTypeOS, VolumeTypeData, VolumeTypeAll ]
 
     """
     command types
     """
     EnableEncryption = 'EnableEncryption'
     EnableEncryptionFormat = 'EnableEncryptionFormat'
+    UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
+    QueryEncryptionStatus = 'QueryEncryptionStatus'
 
     """
     encryption config keys
@@ -144,6 +152,8 @@ class CommonVariables:
     encryption_failed = 19
     tmpfs_error = 20
     backup_slice_file_error = 21
+    unmount_oldroot_error = 22
+    operation_lookback_failed = 23
     unknown_error = 100
 
 class TestHooks:
@@ -163,7 +173,10 @@ class DeviceItem(object):
         self.model = None
         self.size = None
     def __str__(self):
-        return "name:" + str(self.name) + " type:" + str(self.type) + " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) + " label:" + str(self.label) + " model:" + str(self.model)
+        return ("name:" + str(self.name) + " type:" + str(self.type) +
+                " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
+                " label:" + str(self.label) + " model:" + str(self.model) +
+                " size:" + str(self.size))
 
 class CryptItem(object):
     def __init__(self):
@@ -173,9 +186,11 @@ class CryptItem(object):
         self.file_system = None
         self.luks_header_path = None
         self.uses_cleartext_key = None
+        self.current_luks_slot = None
         
     def __str__(self):
         return ("name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) +
                 " mount_point:" + str(self.mount_point) + " file_system:" + str(self.file_system) +
                 " luks_header_path:" + str(self.luks_header_path) +
-                " uses_cleartext_key:" + str(self.uses_cleartext_key))
+                " uses_cleartext_key:" + str(self.uses_cleartext_key) +
+                " current_luks_slot:" + str(self.current_luks_slot))

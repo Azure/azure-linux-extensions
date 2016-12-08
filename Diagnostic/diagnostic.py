@@ -11,6 +11,7 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
 
 import base64
+import binascii
 import datetime
 import os
 import os.path
@@ -25,16 +26,22 @@ import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+import threading
+import logging
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
+import watcherutil
 
 WorkDir = os.getcwd()
+MDSDFileResourcesDir = "/var/run/mdsd"
+MDSDRoleName = 'lad_mdsd'
+MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
 MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = os.path.join(WorkDir, 'mdsd.pidport')
+MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
 OutputSize = 1024
 EnableSyslog = True
 waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
@@ -68,7 +75,7 @@ rsyslog_ommodule_for_check = 'omprog.so'
 RunGetOutput = LogRunGetOutPut
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-1.6.2-241.universal.x64.sh'
+omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
 
 omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
@@ -82,7 +89,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python is needed for /usr/sbin/semanage on Redhat. Also, some RH-based distros really don't have tar (e.g. OracleLinux 7).
+                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -90,7 +97,7 @@ RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 
 UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
                     {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
-                        '||apt-get install -y PACKAGES',
+                        '|| apt-get install -y PACKAGES',
                      'packages':()
                     }.items())
 
@@ -120,12 +127,12 @@ SuseConfig12 = dict(RedhatConfig.items()+
                   }.items())
 
 CentosConfig = dict(RedhatConfig.items()+
-                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install  -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)
+                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install -y PACKAGE; fi',
+                     "packages":('policycoreutils-python',)  # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
                     }.items())
 
-RSYSLOG_OM_PORT='29131'
-All_Dist= {'debian':DebianConfig,
+MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
+All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
            'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
            'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
            'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
@@ -169,27 +176,27 @@ def parse_context(operation):
     return
 
 
-def setup(should_install_required_package):
+def setup_dependencies_and_mdsd():
     global EnableSyslog
 
-    if should_install_required_package:
-        install_package_error = ""
-        retry = 3
-        while retry > 0:
-            error, msg = install_required_package()
-            hutil.log(msg)
-            if error == 0:
-                break
-            else:
-                retry -= 1
-                hutil.log("Sleep 60 retry "+str(retry))
-                install_package_error = msg
-                time.sleep(60)
-        if install_package_error:
-            if len(install_package_error) > 1024:
-                install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
-            hutil.error(install_package_error)
-            return 2, install_package_error
+    # Install dependencies
+    install_package_error = ""
+    retry = 3
+    while retry > 0:
+        error, msg = install_required_package()
+        hutil.log(msg)
+        if error == 0:
+            break
+        else:
+            retry -= 1
+            hutil.log("Sleep 60 retry "+str(retry))
+            install_package_error = msg
+            time.sleep(60)
+    if install_package_error:
+        if len(install_package_error) > 1024:
+            install_package_error = install_package_error[0:512]+install_package_error[-512:-1]
+        hutil.error(install_package_error)
+        return 2, install_package_error
 
     if EnableSyslog:
         error, msg = install_rsyslogom()
@@ -197,11 +204,12 @@ def setup(should_install_required_package):
             hutil.error(msg)
             return 3, msg
 
-    # Run prep commands
+    # Run mdsd prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
             RunGetOutput(cmd)
 
+    # Install/start OMI
     omi_err, omi_msg = install_omi()
     if omi_err is not 0:
         return 4, omi_msg
@@ -296,19 +304,54 @@ def createPerfSettngs(tree,perfs,forAI=False):
         perfElement.set('omiNamespace',namespace)
         if forAI:
             AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(tree,'Events/OMI[1]',perfElement)
+        XmlUtil.addElement(xml=tree,path='Events/OMI',el=perfElement,addOnlyOnce=True)
+
 
 # Updates the MDSD configuration Account elements.
 # Updates existing default Account element with Azure table storage properties.
 # If an aikey is provided to the function, then it adds a new Account element for
 # Application Insights with the application insights key.
-def createAccountSettings(tree,account,key,endpoint,aikey=None):
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
-    XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
-    
+def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
+    assert key or token, "Either key or token must be given."
+
+    def get_handler_cert_pkey_paths():
+        handler_settings = hutil.get_handler_settings()
+        thumbprint = handler_settings['protectedSettingsCertThumbprint']
+        cert_path = waagent.LibDir + '/' + thumbprint + '.crt'
+        pkey_path = waagent.LibDir + '/' + thumbprint + '.prv'
+        return cert_path, pkey_path
+
+    def encrypt_secret_with_cert(cert_path, secret):
+        encrypted_secret_tmp_file_path = os.path.join(WorkDir, "mdsd_secret.bin")
+        cmd_to_run = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}".format(secret, encrypted_secret_tmp_file_path, cert_path)
+        ret_status, ret_msg = RunGetOutput(cmd_to_run, should_log=False)
+        if ret_status is not 0:
+            hutil.error("Encrypting storage secret failed with the following message: " + ret_msg)
+            return None
+        with open(encrypted_secret_tmp_file_path, 'rb') as f:
+            encrypted_secret = f.read()
+        os.remove(encrypted_secret_tmp_file_path)
+        return binascii.b2a_hex(encrypted_secret).upper()
+
+    handler_cert_path, handler_pkey_path = get_handler_cert_pkey_paths()
+    if key:
+        key = encrypt_secret_with_cert(handler_cert_path, key)
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/Account', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
+        XmlUtil.removeElement(tree, 'Accounts', 'SharedAccessSignature')
+    else:  # token
+        token = encrypt_secret_with_cert(handler_cert_path, token)
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
+        XmlUtil.removeElement(tree, 'Accounts', 'Account')
+
     if aikey:
         AIUtil.createAccountElement(tree,aikey)
+
 
 def config(xmltree,key,value,xmlpath,selector=[]):
     v = readPublicConfig(key)
@@ -408,6 +451,24 @@ def getStorageAccountEndPoint(account):
         endpoint = 'https://'+account+'.table.core.windows.net'
     return endpoint
 
+
+def logPrivateSettingsKeys():
+    try:
+        msg = "Keys in privateSettings (and some non-secret values): "
+        first = True
+        for key in private_settings:
+            if first:
+                first = False
+            else:
+                msg += ", "
+            msg += key
+            if key == 'storageAccountEndPoint':
+                msg += ":" + private_settings[key]
+        hutil.log(msg)
+    except Exception as e:
+        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
+
+
 def configSettings():
     '''
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -465,15 +526,20 @@ def configSettings():
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
+    logPrivateSettingsKeys()
+
     account = readPrivateConfig('storageAccountName')
     if not account:
         return False, "Empty storageAccountName"
     key = readPrivateConfig('storageAccountKey')
-    if not key:
-        return False, "Empty storageAccountKey"
+    token = readPrivateConfig('storageAccountSasToken')
+    if not key and not token:
+        return False, "Neither storageAccountKey nor storageAccountSasToken is given"
+    if key and token:
+        return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
     endpoint = getStorageAccountEndPoint(account)
 
-    createAccountSettings(mdsdCfg,account,key,endpoint,aikey)
+    createAccountSettings(mdsdCfg, account, key, token, endpoint, aikey)
 
     # Check and add new syslog RouteEvent for Application Insights.
     if aikey:
@@ -511,7 +577,7 @@ def get_extension_operation_type(command):
 def main(command):
     #Global Variables definition
 
-    global EnableSyslog, UseSystemdServiceManager
+    global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
     EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
@@ -572,16 +638,6 @@ def main(command):
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
 
         elif ExtensionOperationType is waagent.WALAEventOperation.Install:
-            error, msg = setup(should_install_required_package=True)
-            if error != 0:
-                hutil.do_status_report(ExtensionOperationType, "error", error, msg)
-                waagent.AddExtensionEvent(name=hutil.get_name(),
-                                          op=ExtensionOperationType,
-                                          isSuccess=False,
-                                          version=hutil.get_extension_version(),
-                                          message="Install failed: " + msg)
-                sys.exit(error)  # Per extension specification, we must exit with a non-zero status code when install fails
-
             if UseSystemdServiceManager:
                 install_service()
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Install succeeded")
@@ -615,12 +671,15 @@ def main(command):
                       'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
-def update_selinux_port_setting_for_rsyslogomazuremds(action, port):
-    # This is needed for Redhat-based distros.
-    # 'action' param should be '-a' for adding and '-d' for deleting.
-    # Caller is responsible to make sure a correct action param is passed.
-    if os.path.exists("/usr/sbin/semanage"):
-        RunGetOutput('semanage port {0} -t syslogd_port_t -p tcp {1};echo ignore already added or not found'.format(action, port))
+def update_selinux_settings_for_rsyslogomazuremds():
+    # This is still needed for Redhat-based distros, which still require SELinux to be allowed
+    # for even Unix domain sockets.
+    # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
+    # We instead compile from the bundled SELinux module def for lad_mdsd
+    if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
+        RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
+        RunGetOutput('semodule -u {0}/lad_mdsd.pp'.format(WorkDir))
 
 
 def start_daemon():
@@ -630,19 +689,35 @@ def start_daemon():
     subprocess.Popen(args, stdout=log, stderr=log)
     wait_n = 20
     while len(get_mdsd_process())==0 and wait_n >0:
-        time.sleep(10)
+        time.sleep(5)
         wait_n=wait_n-1
     if wait_n <=0:
         hutil.error("wait daemon start time out")
 
 
 def start_mdsd():
-    global EnableSyslog
+    global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
 
-    setup(should_install_required_package=False)
+    # Assign correct ext op type for correct ext status/event reporting.
+    # start_mdsd() is called only through "./diagnostic.py -daemon"
+    # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
+    # type, so it needs to be reverted back to a standard one (which is "Enable").
+    ExtensionOperationType = waagent.WALAEventOperation.Enable
+
+    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
+    if dependencies_err != 0:
+        dependencies_err_log_msg = "Failed to set up mdsd dependencies: {0}".format(dependencies_msg)
+        hutil.error(dependencies_err_log_msg)
+        hutil.do_status_report(ExtensionOperationType, 'error', '1', dependencies_err_log_msg)
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=ExtensionOperationType,
+                                  isSuccess=False,
+                                  version=hutil.get_extension_version(),
+                                  message=dependencies_err_log_msg)
+        return
 
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
@@ -654,18 +729,12 @@ def start_mdsd():
     if not EnableSyslog:
         uninstall_rsyslogom()
 
-    #if EnableSyslog and distConfig.has_key("restartrsyslog"):
-    # sometimes after the mdsd is killed port 29131 is accopied by sryslog, don't know why
-    #    RunGetOutput(distConfig["restartrsyslog"])
-
     log_dir = hutil.get_log_dir()
     monitor_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
-
-    default_port = RSYSLOG_OM_PORT
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', default_port)
+    update_selinux_settings_for_rsyslogomazuremds()
 
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
@@ -705,22 +774,28 @@ def start_mdsd():
         return
 
     # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -p {2} -r {3} -e {4} -w {5} -o {6}'.format(
+    command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
-        default_port,
-        MDSDPidPortFile,
+        MDSD_LISTEN_PORT,
+        MDSDRoleName,
         monitor_file_path,
         warn_file_path,
         info_file_path).split(" ")
 
     try:
+        # Create monitor object that encapsulates monitoring activities
+        watcher = watcherutil.Watcher(hutil._error, hutil._log, logtoconsole=True)
+        # Start a thread to monitor /etc/fstab
+        threadObj = threading.Thread(target=watcher.watch)
+        threadObj.daemon = True
+        threadObj.start()
+
         num_quick_consecutive_crashes = 0
 
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
 
             RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
-            mdsd_pid_port_file_checked = False
             mdsd_log = open(mdsd_log_path,"w")
             hutil.log("Start mdsd "+str(command))
             mdsd = subprocess.Popen(command,
@@ -752,18 +827,6 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
-
-                # Issue #137 Can't start mdsd if port 29131 is in use.
-                # mdsd now binds to another randomly available port,
-                # and LAD still needs to reconfigure rsyslogd.
-                if not mdsd_pid_port_file_checked and os.path.isfile(MDSDPidPortFile):
-                    with open(MDSDPidPortFile, 'r') as mdsd_pid_port_file:
-                        mdsd_pid_port_file.readline()                    # This is actually PID, so ignore.
-                        new_port = mdsd_pid_port_file.readline().strip() # .strip() is important!
-                        if default_port != new_port:
-                            hutil.log("Specified mdsd port ({0}) is in use, so a randomly available port ({1}) was picked, and now reconfiguring omazurelinuxmds".format(default_port, new_port))
-                            reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port)
-                        mdsd_pid_port_file_checked = True
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
@@ -921,11 +984,19 @@ def get_dist_config():
 
 def install_omi():
     need_install_omi = 0
+    need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
-    if 'OMI-1.0.8-4' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
+    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
+    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
+    if ('OMI-1.0.8-4' in RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]) \
+            and ('rpm' in distConfig['installrequiredpackage']):
+        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
+        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
+
+    if 'OMI-1.0.8-6' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
     if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
         need_install_omi=1
@@ -950,12 +1021,15 @@ def install_omi():
 
     shouldRestartOmi = False
 
-    # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
-    omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
-    if omi_listens_to_nonzero_port:
-        RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
-        RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-        shouldRestartOmi = True
+    # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
+    # In other words, OMI httpsport config should be updated only on a fresh OMI install.
+    if need_fresh_install_omi:
+        # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
+        omi_listens_to_nonzero_port = RunGetOutput(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+        if omi_listens_to_nonzero_port:
+            RunGetOutput("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
+            RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
+            shouldRestartOmi = True
 
     # Quick and dirty way of checking if mysql/apache process is running
     isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
@@ -999,9 +1073,9 @@ def uninstall_rsyslogom():
     if rsyslog_om_path == None:
         return 1,"rsyslog not installed"
     if os.path.exists(rsyslog_om_mdsd_syslog_conf_path):
-        RunGetOutput("rm -f {0}/omazuremdslegacy.so {1} {2}".format(rsyslog_om_path,
-                                                                    rsyslog_om_mdsd_syslog_conf_path,
-                                                                    rsyslog_om_mdsd_file_conf_path))
+        RunGetOutput("rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path,
+                                                              rsyslog_om_mdsd_syslog_conf_path,
+                                                              rsyslog_om_mdsd_file_conf_path))
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1031,9 +1105,13 @@ def install_rsyslogom():
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
         # Copy necesssary files
-        RunGetOutput("cp -f {0}/omazuremdslegacy.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
+        RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
+        # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog module (5/7/8)
+        mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
+        cmd_to_run = "sed -i 's#__MDSD_SOCKET_FILE_PATH__#{0}#g' {1}"
+        RunGetOutput(cmd_to_run.format(mdsd_json_socket_file_path, rsyslog_om_mdsd_syslog_conf_path))
 
     else:
         return 1,"rsyslog version can't be detected"
@@ -1043,22 +1121,6 @@ def install_rsyslogom():
     else:
         RunGetOutput("service rsyslog restart")
     return 0,"install mdsdom completed"
-
-
-def reconfigure_omazurelinuxmds_and_restart_rsyslog(default_port, new_port):
-    files_to_modify = [rsyslog_om_mdsd_syslog_conf_path, rsyslog_om_mdsd_file_conf_path]
-    cmd_to_run = "sed -i 's/$legacymdsport [0-9]*/$legacymdsport {0}/g' {1}"
-
-    for f in files_to_modify:
-        RunGetOutput(cmd_to_run.format(new_port, f))
-
-    update_selinux_port_setting_for_rsyslogomazuremds('-d', default_port)
-    update_selinux_port_setting_for_rsyslogomazuremds('-a', new_port)
-
-    if distConfig.has_key("restartrsyslog"):
-        RunGetOutput(distConfig["restartrsyslog"])
-    else:
-        RunGetOutput("service rsyslog restart")
 
 
 def install_required_package():
@@ -1140,6 +1202,7 @@ def get_deployment_id():
         hutil.error("Failed to retrieve deployment ID. Error:{0} {1}".format(e, traceback.format_exc()))
 
     return identity
+
 
 
 if __name__ == '__main__' :
