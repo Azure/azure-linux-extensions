@@ -56,6 +56,10 @@ class ExtensionParameter(object):
         private settings
         """
         self.AADClientSecret = protected_settings.get(CommonVariables.AADClientSecretKey)
+
+        if self.AADClientSecret is None:
+            self.AADClientSecret = ''
+
         self.passphrase = protected_settings.get(CommonVariables.PassphraseKey)
 
         self.DiskEncryptionKeyFileName = "LinuxPassPhraseFileName"
