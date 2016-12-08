@@ -560,23 +560,7 @@ def enable_encryption():
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-    if not encryption_marker.config_file_exists():
-        machine_identity = MachineIdentity()
-        stored_identity = machine_identity.stored_identity()
-        if stored_identity is None:
-            machine_identity.save_identity()
-        else:
-            current_identity = machine_identity.current_identity()
-            if current_identity != stored_identity:
-                current_seq_no = -1
-                logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity,
-                                                                                                 current_identity,
-                                                                                                 current_seq_no))
-                hutil.set_last_seq(current_seq_no)
-                machine_identity.save_identity()
-                # we should be careful about proceed for this case, we just
-                # failed this time to wait for customers' retry.
-                exit_without_status_report()
+
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
