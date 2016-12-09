@@ -27,8 +27,6 @@ import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
 import threading
-import logging
-
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
