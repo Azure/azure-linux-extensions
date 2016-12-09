@@ -203,9 +203,6 @@ def update_encryption_settings():
 
             keyVaultUtil = KeyVaultUtil(logger)
 
-            if not extension_parameter.passphrase:
-                extension_parameter.passphrase = file(existing_passphrase_file).read()
-
             temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
             temp_keyfile.write(extension_parameter.passphrase)
             temp_keyfile.close()
