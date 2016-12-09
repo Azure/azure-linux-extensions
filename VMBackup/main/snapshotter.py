@@ -203,8 +203,8 @@ class Snapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blob, None))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blobUri, blob_index, paras.backup_metadata)
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update snapshot_info_array element properties from snapshot_info_indexer object
