@@ -205,44 +205,44 @@ def update_encryption_settings():
 
             if not extension_parameter.passphrase:
                 extension_parameter.passphrase = file(existing_passphrase_file).read()
-            else:
-                temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
-                temp_keyfile.write(extension_parameter.passphrase)
-                temp_keyfile.close()
+
+            temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+            temp_keyfile.write(extension_parameter.passphrase)
+            temp_keyfile.close()
             
-                for crypt_item in disk_util.get_crypt_items():
-                    if not crypt_item:
-                        continue
+            for crypt_item in disk_util.get_crypt_items():
+                if not crypt_item:
+                    continue
 
-                    before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
 
-                    logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+                logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
 
-                    logger.log("Adding new key for {0}".format(crypt_item.dev_path))
+                logger.log("Adding new key for {0}".format(crypt_item.dev_path))
 
-                    luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
-                                                             dev_path=crypt_item.dev_path,
-                                                             mapper_name=crypt_item.mapper_name,
-                                                             header_file=crypt_item.luks_header_path,
-                                                             new_key_path=temp_keyfile.name)
+                luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
+                                                            dev_path=crypt_item.dev_path,
+                                                            mapper_name=crypt_item.mapper_name,
+                                                            header_file=crypt_item.luks_header_path,
+                                                            new_key_path=temp_keyfile.name)
 
-                    logger.log("luks add result is {0}".format(luks_add_result))
+                logger.log("luks add result is {0}".format(luks_add_result))
 
-                    after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
 
-                    logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
+                logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
-                    new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+                new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
 
-                    logger.log("New key was added in keyslot {0}".format(new_keyslot))
+                logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
-                    crypt_item.current_luks_slot = new_keyslot
+                crypt_item.current_luks_slot = new_keyslot
 
-                    disk_util.update_crypt_item(crypt_item)
+                disk_util.update_crypt_item(crypt_item)
 
-                logger.log("New key successfully added to all encrypted devices")
+            logger.log("New key successfully added to all encrypted devices")
 
-                os.unlink(temp_keyfile.name)
+            os.unlink(temp_keyfile.name)
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
