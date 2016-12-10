@@ -191,10 +191,13 @@ def update_encryption_settings():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
-
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
+
+        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+
+        if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
+            extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
