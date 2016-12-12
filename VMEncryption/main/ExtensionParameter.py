@@ -42,7 +42,7 @@ class ExtensionParameter(object):
         self.encryption_environment = encryption_environment
 
         self.disk_util = DiskUtil(hutil=hutil, patching=distro_patcher, logger=logger, encryption_environment=encryption_environment)
-        self.bek_util = BekUtil(disk_util, logger)
+        self.bek_util = BekUtil(self.disk_util, logger)
         self.encryption_config = EncryptionConfig(encryption_environment, logger)
 
         self.command = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
