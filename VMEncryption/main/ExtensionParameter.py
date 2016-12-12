@@ -19,6 +19,9 @@
 import hashlib
 import xml.parsers.expat
 
+from DiskUtil import DiskUtil
+from BekUtil import BekUtil
+from EncryptionConfig import EncryptionConfig
 from Utils import HandlerUtil
 from Common import *
 from ConfigParser import ConfigParser
@@ -29,13 +32,18 @@ from ConfigUtil import ConfigKeyValuePair
 #{"command":"enableencryption","query":[{"source_scsi_number":"[5:0:0:0]","target_scsi_number":"[5:0:0:2]"},{"source_scsi_number":"[5:0:0:1]","target_scsi_number":"[5:0:0:3]"}],
 #"force":"true", "passphrase":"User@123"}
 class ExtensionParameter(object):
-    def __init__(self, hutil, logger, encryption_environment, protected_settings, public_settings):
+    def __init__(self, hutil, logger, distro_patcher, encryption_environment, protected_settings, public_settings):
         """
         TODO: we should validate the parameter first
         """
         self.hutil = hutil
         self.logger = logger
+        self.distro_patcher = distro_patcher
         self.encryption_environment = encryption_environment
+
+        self.disk_util = DiskUtil(hutil=hutil, patching=distro_patcher, logger=logger, encryption_environment=encryption_environment)
+        self.bek_util = BekUtil(disk_util, logger)
+        self.encryption_config = EncryptionConfig(encryption_environment, logger)
 
         self.command = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         self.KeyEncryptionKeyURL = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
@@ -188,6 +196,14 @@ class ExtensionParameter(object):
         if (self.DiskFormatQuery or self.get_disk_format_query()) and \
            (self.DiskFormatQuery != self.get_disk_format_query()):
             self.logger.log('Current config DiskFormatQuery {0} differs from effective config DiskFormatQuery {1}'.format(self.DiskFormatQuery, self.get_disk_format_query()))
+            return True
+
+        bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        bek_passphrase = file(bek_passphrase_file).read()
+
+        if (self.passphrase or bek_passphrase) and \
+           (self.passphrase != bek_passphrase):
+            self.logger.log('Current config passphrase differs from effective config passphrase')
             return True
    
         self.logger.log('Current config is not different from effective config')

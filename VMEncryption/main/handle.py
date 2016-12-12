@@ -110,7 +110,7 @@ def disable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
@@ -194,7 +194,7 @@ def update_encryption_settings():
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
         if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
             extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
@@ -479,7 +479,7 @@ def enable():
             logger.log("Installing pre-requisites")
             DistroPatcher.install_extras()
 
-            extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+            extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
             if extension_parameter.config_file_exists() and extension_parameter.config_changed():
                 logger.log("Config has changed, updating encryption settings")
@@ -575,7 +575,7 @@ def enable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
         
         kek_secret_id_created = None
 
