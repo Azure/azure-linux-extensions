@@ -201,7 +201,7 @@ class ExtensionParameter(object):
         bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
         bek_passphrase = file(bek_passphrase_file).read()
 
-        if (self.passphrase or bek_passphrase) and \
+        if (self.passphrase and bek_passphrase) and \
            (self.passphrase != bek_passphrase):
             self.logger.log('Current config passphrase differs from effective config passphrase')
             return True
