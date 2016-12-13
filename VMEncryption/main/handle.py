@@ -265,6 +265,10 @@ def update_encryption_settings():
                 encryption_config.secret_seq_num = hutil.get_current_seq()
                 encryption_config.commit()
 
+                with open(encryption_environment.update_encryption_marker_path, 'w') as f:
+                    logger.log("Touching update marker at {0}".format(encryption_environment.update_encryption_marker_path))
+                    pass
+
                 hutil.do_exit(exit_code=0,
                               operation='UpdateEncryptionSettings',
                               status=CommonVariables.extension_success_status,
@@ -314,6 +318,7 @@ def update_encryption_settings():
             logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()
             extension_parameter.commit()
+            os.unlink(encryption_environment.update_encryption_marker_path)
 
         hutil.do_exit(exit_code=0,
                         operation='UpdateEncryptionSettings',
@@ -481,7 +486,7 @@ def enable():
 
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-            if extension_parameter.config_file_exists() and extension_parameter.config_changed():
+            if os.path.exists(encryption_environment.update_encryption_marker_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
                 logger.log("Config has changed, updating encryption settings")
                 update_encryption_settings()
                 extension_parameter.commit()
