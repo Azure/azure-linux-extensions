@@ -76,11 +76,10 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                for meta in meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
@@ -123,11 +122,10 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                for meta in meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
@@ -181,7 +179,6 @@ class Snapshotter(object):
                     results = [snapshot_result_error.get() for job in mp_jobs]
                     for result in results:
                         if(result.errorcode != CommonVariables.success):
-                            failed_count = failed_count + 1
                             snapshot_result.errors.append(result)
                 if not snapshot_info_indexer_queue.empty():
                     snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
@@ -206,11 +203,10 @@ class Snapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blob, None))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blobUri, blob_index, paras.backup_metadata)
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
-                        failed_count = failed_count + 1
                     # update snapshot_info_array element properties from snapshot_info_indexer object
                     self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[blob_index])
                     if (snapshot_info_array[blob_index].isSuccessful == True):

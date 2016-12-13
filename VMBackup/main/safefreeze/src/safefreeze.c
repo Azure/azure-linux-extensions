@@ -35,6 +35,7 @@ int gThaw = 0;
 
 void globalSignalHandler(int signum)
 {
+    printf("SignalHandler signum: %d\n", signum);
     if (signum == SIGUSR1)
     {
         gThaw = 1;
