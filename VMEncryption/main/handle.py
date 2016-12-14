@@ -196,12 +196,12 @@ def update_encryption_settings():
 
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-        if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-            extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
-
-        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-
         if current_secret_seq_num < update_call_seq_num:
+            if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
+                extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+
+            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
             logger.log('Recreating secret to store in the KeyVault')
 
             keyVaultUtil = KeyVaultUtil(logger)
@@ -221,10 +221,10 @@ def update_encryption_settings():
                 logger.log("Adding new key for {0}".format(crypt_item.dev_path))
 
                 luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
-                                                            dev_path=crypt_item.dev_path,
-                                                            mapper_name=crypt_item.mapper_name,
-                                                            header_file=crypt_item.luks_header_path,
-                                                            new_key_path=temp_keyfile.name)
+                                                         dev_path=crypt_item.dev_path,
+                                                         mapper_name=crypt_item.mapper_name,
+                                                         header_file=crypt_item.luks_header_path,
+                                                         new_key_path=temp_keyfile.name)
 
                 logger.log("luks add result is {0}".format(luks_add_result))
 
