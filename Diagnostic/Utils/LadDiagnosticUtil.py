@@ -4,15 +4,22 @@
 #
 # Copyright (c) Microsoft Corporation  
 # All rights reserved.   
-# MIT License  
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.  
-# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
+# MIT License
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the ""Software""), to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above
+# copyright notice and this permission notice shall be included in all copies or substantial portions of the
+# Software. THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+# LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+# SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+#  CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
 
 from collections import defaultdict
 
-class queryParameter:
-    queryCondition = None
+
+class QueryParameter:
     def __init__(self):
         self.querySelectParameters = []
     def append(self, parameter):
@@ -24,11 +31,12 @@ class queryParameter:
 # In order to avoid confusion to users we would allow user to specify both the OMI accepted 
 # class names as well as the class names used in performance counters in metrics table
 classNameMapping = {
-    'processor' : 'scx_processorstatisticalinformation',
-    'memory' : 'scx_memorystatisticalinformation',
-    'physicaldisk' : 'scx_diskdrivestatisticalinformation',
-    'networkinterface' : 'scx_ethernetportstatistics',
+    'processor': 'scx_processorstatisticalinformation',
+    'memory': 'scx_memorystatisticalinformation',
+    'physicaldisk': 'scx_diskdrivestatisticalinformation',
+    'networkinterface': 'scx_ethernetportstatistics'
 }
+
 
 # Checks for the mapping in classNameMapping, else checks if the class name is allowed class name, else throws exception
 def getOmiClassName(name):
@@ -67,8 +75,9 @@ def generateOMIQueries(omiQueryConfiguration):
                         perfCfg['query'] = queryWithClause.format(selectParameters[:-1], getOmiClassName(className), clause)
                     else:
                         perfCfg['query'] = query.format(selectParameters[:-1], getOmiClassName(className))
-                perfCfgList.append(perfCfg)
+                    perfCfgList.append(perfCfg)
     return perfCfgList
+
 
 # Generates omi query configuration from the json config, required to generate the OMI queries
 # We parse the configuration based on following rules
@@ -85,47 +94,50 @@ def generateOMIQueries(omiQueryConfiguration):
 # 'LinuxDisk': defaultdict({'root/scx':defaultdict({'scx_diskdrivestatisticalinformation': {'queryCondition':'Name=/'_TOTAL/'','querySelectParameters':['AverageWriteTime']}})}), 
 # 'LinuxCpu1': defaultdict({'root/scx':defaultdict({'scx_processorstatisticalinformation': {'queryCondition':None,'querySelectParameters':['PercentProcessorTime']}})})}
 def generateOmiQueryConfiguration(performanceCounterConfiguration):
-    omiQueryConfiguration = defaultdict(defaultdict)
-    for performanceCounter in performanceCounterConfiguration['performanceCounterConfiguration']:
-        if 'table' not in performanceCounter or 'counterSpecifier' not in performanceCounter or 'class' not in performanceCounter:
+    omi_queries = defaultdict(defaultdict)
+    for performance_counter in performanceCounterConfiguration['performanceCounterConfiguration']:
+        if 'table' not in performance_counter or 'counterSpecifier' not in performance_counter or 'class' not in performance_counter:
             raise Exception("Incomplete performance counter configuration")
-        className = getOmiClassName(performanceCounter['class'])
-        tableName = performanceCounter['table']
-        if 'condition' in performanceCounter:
-            condition = performanceCounter['condition']
+        class_name = getOmiClassName(performance_counter['class'])
+        table_name = performance_counter['table']
+        if 'condition' in performance_counter:
+            condition = performance_counter['condition']
         else:
             condition = None
-        if 'namespace' in performanceCounter:
-            namespace = performanceCounter['namespace']
+        if 'namespace' in performance_counter:
+            namespace = performance_counter['namespace']
         else:
             namespace = 'root/scx'
-        if not tableName in omiQueryConfiguration:
-            omiQueryConfiguration[tableName] = defaultdict(defaultdict)
-        if not namespace in omiQueryConfiguration[tableName]:
-            omiQueryConfiguration[tableName][namespace] = defaultdict(queryParameter)
-        if not className in omiQueryConfiguration[tableName][namespace]:
-            omiQueryConfiguration[tableName][namespace][className] = queryParameter()
-            omiQueryConfiguration[tableName][namespace][className].queryCondition = condition
+        if not table_name in omi_queries:
+            omi_queries[table_name] = defaultdict(defaultdict)
+        if not namespace in omi_queries[table_name]:
+            omi_queries[table_name][namespace] = defaultdict(QueryParameter)
+        if not class_name in omi_queries[table_name][namespace]:
+            omi_queries[table_name][namespace][class_name] = QueryParameter()
+            omi_queries[table_name][namespace][class_name].queryCondition = condition
         else:
-            if omiQueryConfiguration[tableName][namespace][className].queryCondition != condition:
+            if omi_queries[table_name][namespace][class_name].queryCondition != condition:
                 raise Exception('Cannot have two different conditions on same table')
-        if not performanceCounter['counterSpecifier'] in omiQueryConfiguration[tableName][namespace][className].querySelectParameters:
-            omiQueryConfiguration[tableName][namespace][className].append(performanceCounter['counterSpecifier'])
-    return omiQueryConfiguration
+        if not performance_counter['counterSpecifier'] in omi_queries[table_name][namespace][class_name].querySelectParameters:
+            omi_queries[table_name][namespace][class_name].append(performance_counter['counterSpecifier'])
+    return omi_queries
+
 
 # Get elements from DiagnosticsMonitorConfiguration in LadCfg based on element name
 def getDiagnosticsMonitorConfigurationElement(ladCfg, elementName):
-    if ladCfg:
-        if 'diagnosticMonitorConfiguration' in ladCfg:
-            if elementName in ladCfg['diagnosticMonitorConfiguration']:
-                return ladCfg['diagnosticMonitorConfiguration'][elementName]
+    if ladCfg and 'diagnosticMonitorConfiguration' in ladCfg:
+        if elementName in ladCfg['diagnosticMonitorConfiguration']:
+            return ladCfg['diagnosticMonitorConfiguration'][elementName]
+    return None
+
 
 # Get fileCfg form FileLogs in LadCfg
 def getFileCfgFromLadCfg(ladCfg):
     fileLogs = getDiagnosticsMonitorConfigurationElement(ladCfg, 'fileLogs')
-    if fileLogs:
-        if 'fileLogConfiguration' in fileLogs:
-            return fileLogs['fileLogConfiguration']
+    if fileLogs and 'fileLogConfiguration' in fileLogs:
+        return fileLogs['fileLogConfiguration']
+    return None
+
 
 # Generates OMI queries from LadCfg
 def generatePerformanceCounterConfigurationFromLadCfg(ladCfg):
@@ -134,14 +146,15 @@ def generatePerformanceCounterConfigurationFromLadCfg(ladCfg):
         omiQueryConfiguration = generateOmiQueryConfiguration(performanceCounters)
         return generateOMIQueries(omiQueryConfiguration)
 
+
 # Get resource Id from LadCfg
 def getResourceIdFromLadCfg(ladCfg):
     metricsConfiguration = getDiagnosticsMonitorConfigurationElement(ladCfg, 'metrics')
-    if metricsConfiguration:
-        if 'resourceId' in metricsConfiguration:
-            return metricsConfiguration['resourceId']
+    if metricsConfiguration and 'resourceId' in metricsConfiguration:
+        return metricsConfiguration['resourceId']
+    return None
+
 
 # Get event volume from LadCfg
 def getEventVolumeFromLadCfg(ladCfg):
     return getDiagnosticsMonitorConfigurationElement(ladCfg, 'eventVolume')
-
