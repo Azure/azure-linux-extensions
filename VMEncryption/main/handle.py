@@ -485,7 +485,13 @@ def enable():
 
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-            enable_encryption()
+            if os.path.exists(encryption_environment.update_encryption_marker_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
+                logger.log("Config has changed, updating encryption settings")
+                update_encryption_settings()
+                extension_parameter.commit()
+            else:
+                logger.log("Config did not change or first call, enabling encryption")
+                enable_encryption()
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
