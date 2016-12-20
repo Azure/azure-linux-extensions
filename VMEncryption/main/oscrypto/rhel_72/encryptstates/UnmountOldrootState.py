@@ -137,6 +137,7 @@ class UnmountOldrootState(OSEncryptionState):
             attempt += 1
 
         self.command_executor.Execute('systemctl restart NetworkManager', True)
+        self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
         sleep(3)
 
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
