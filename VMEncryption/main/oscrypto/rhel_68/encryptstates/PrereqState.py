@@ -54,6 +54,7 @@ class PrereqState(OSEncryptionState):
                                                                                             distro_info[1]))
 
         self.context.distro_patcher.install_extras()
+        self._patch_waagent()
 
         self.command_executor.Execute('telinit u', True)
 
@@ -61,3 +62,18 @@ class PrereqState(OSEncryptionState):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
+
+    def _patch_waagent(self):
+        self.context.logger.log("Patching waagent")
+
+        contents = None
+
+        with open('/etc/waagent.conf', 'r') as f:
+            contents = f.read()
+
+        contents = re.sub(r'ResourceDisk.EnableSwap=.', 'ResourceDisk.EnableSwap=n', contents)
+
+        with open('/etc/waagent.conf', 'w') as f:
+            f.write(contents)
+
+        self.context.logger.log("waagent patched successfully")
