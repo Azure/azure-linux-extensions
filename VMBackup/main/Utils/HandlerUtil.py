@@ -317,10 +317,10 @@ class HandlerUtility:
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
@@ -421,15 +421,13 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
 
-    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None):
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
 
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
-        stat_rept_file = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
- 
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -437,14 +435,13 @@ class HandlerUtility:
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
-
+        
+        # Add Status as sub-status for Status to be written on Status-File
+        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            status_code = '1'
             status = CommonVariables.status_success
-            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-            stat_rept_v2 = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks)
-            stat_rept_v2 =  "[" + json.dumps(stat_rept_v2, cls = Status.ComplexEncoder) + "]"
-            stat_rept_file =  stat_rept_v2
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None)
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.

@@ -10,7 +10,7 @@ class TopLevelStatus:
         return dict(version = self.version, timestampUTC = self.timestampUTC, status = self.status)
 
 class StatusObj:
-    def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, storageDetails, uniqueMachineId, taskId, commandStartTimeUTCTicks):
+    def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, storageDetails, uniqueMachineId, taskId, commandStartTimeUTCTicks, snapshotInfo):
         self.name = name
         self.operation = operation
         self.status = status
@@ -22,9 +22,10 @@ class StatusObj:
         self.uniqueMachineId = uniqueMachineId
         self.taskId = taskId
         self.commandStartTimeUTCTicks = commandStartTimeUTCTicks
+        self.snapshotInfo = snapshotInfo
         
     def convertToDictionary(self):
-        return dict(name = self.name, operation = self.operation, status = self.status, substatus = self.substatus, code = self.code, taskId = self.taskId, formattedMessage = self.formattedMessage, storageDetails = self.storageDetails, commandStartTimeUTCTicks = self.commandStartTimeUTCTicks, telemetryData = self.telemetryData, uniqueMachineId = self.uniqueMachineId)
+        return dict(name = self.name, operation = self.operation, status = self.status, substatus = self.substatus, code = self.code, taskId = self.taskId, formattedMessage = self.formattedMessage, storageDetails = self.storageDetails, commandStartTimeUTCTicks = self.commandStartTimeUTCTicks, telemetryData = self.telemetryData, uniqueMachineId = self.uniqueMachineId, snapshotInfo = self.snapshotInfo)
 
 class SubstatusObj:
     def __init__(self, code, name, status, formattedMessage):
@@ -45,6 +46,15 @@ class StorageDetails:
 
     def convertToDictionary(self):
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
+
+class SnapshotInfoObj:
+    def __init__(self, isSuccessful, snapshotUri, errorMessage):
+        self.isSuccessful = isSuccessful
+        self.snapshotUri = snapshotUri
+        self.errorMessage = errorMessage
+
+    def convertToDictionary(self):
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage)
 
 class FormattedMessage:
     def __init__(self, lang, message):

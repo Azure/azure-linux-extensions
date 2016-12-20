@@ -1,6 +1,7 @@
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
  <Accounts>
  <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+ <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
  </Accounts>
   <Management defaultRetentionInDays="90" eventVolume="">
     <Identity>

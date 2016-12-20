@@ -1,3 +1,21 @@
+2016-11-30: LAD-2.3.9017
+    - Fix scx upgrade issue on RPM-based distros when apache or mysql is
+      installed.
+
+2016-11-11: LAD-2.3.9015
+    - Correctly fail Enable when mdsd dependency set up fails.
+    - Added /etc/fstab watcher feature (logging to /dev/console so that issues
+      can be found on serial logs)
+    - Add storage account SAS token support (replacing storage account key)
+    - Encrypt storage secret in xmlCfg.xml
+
+2016-10-31: LAD-2.3.9013
+    - Use semodule -u (upgrade) to reduce unnecessary SELinux policy
+      re-install time
+    - Use the latest scx package version (1.6.2-337)
+    - Issue #265: Don't remove port 1270 from omiserver.conf if omsagent is
+      installed.
+
 2016-10-07: LAD-2.3.9011
     - Update OpenSSL library to the latest
     - Update rsyslog output modules for all versions of rsyslog (5/7/8) to use
