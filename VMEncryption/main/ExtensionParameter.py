@@ -16,8 +16,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import xml.parsers.expat
 
+from DiskUtil import DiskUtil
+from BekUtil import BekUtil
+from EncryptionConfig import EncryptionConfig
 from Utils import HandlerUtil
 from Common import *
 from ConfigParser import ConfigParser
@@ -28,13 +32,18 @@ from ConfigUtil import ConfigKeyValuePair
 #{"command":"enableencryption","query":[{"source_scsi_number":"[5:0:0:0]","target_scsi_number":"[5:0:0:2]"},{"source_scsi_number":"[5:0:0:1]","target_scsi_number":"[5:0:0:3]"}],
 #"force":"true", "passphrase":"User@123"}
 class ExtensionParameter(object):
-    def __init__(self, hutil, logger, encryption_environment, protected_settings, public_settings):
+    def __init__(self, hutil, logger, distro_patcher, encryption_environment, protected_settings, public_settings):
         """
         TODO: we should validate the parameter first
         """
         self.hutil = hutil
         self.logger = logger
+        self.distro_patcher = distro_patcher
         self.encryption_environment = encryption_environment
+
+        self.disk_util = DiskUtil(hutil=hutil, patching=distro_patcher, logger=logger, encryption_environment=encryption_environment)
+        self.bek_util = BekUtil(self.disk_util, logger)
+        self.encryption_config = EncryptionConfig(encryption_environment, logger)
 
         self.command = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         self.KeyEncryptionKeyURL = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
@@ -55,6 +64,10 @@ class ExtensionParameter(object):
         private settings
         """
         self.AADClientSecret = protected_settings.get(CommonVariables.AADClientSecretKey)
+
+        if self.AADClientSecret is None:
+            self.AADClientSecret = ''
+
         self.passphrase = protected_settings.get(CommonVariables.PassphraseKey)
 
         self.DiskEncryptionKeyFileName = "LinuxPassPhraseFileName"
@@ -112,7 +125,7 @@ class ExtensionParameter(object):
         AADClientID = ConfigKeyValuePair(CommonVariables.AADClientIDKey, self.AADClientID)
         key_value_pairs.append(AADClientID)
 
-        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, self.AADClientSecret)
+        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest())
         key_value_pairs.append(AADClientSecret)
 
         AADClientCertThumbprint = ConfigKeyValuePair(CommonVariables.AADClientCertThumbprintKey, self.AADClientCertThumbprint)
@@ -165,8 +178,9 @@ class ExtensionParameter(object):
             return True
 
         if (self.AADClientSecret or self.get_aad_client_secret()) and \
-           (self.AADClientSecret != self.get_aad_client_secret()):
-            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(self.AADClientSecret, self.get_aad_client_secret()))
+           (hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest() != self.get_aad_client_secret()):
+            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest(),
+                                                                                                                          self.get_aad_client_secret()))
             return True
 
         if (self.AADClientCertThumbprint or self.get_aad_client_cert()) and \
@@ -182,6 +196,14 @@ class ExtensionParameter(object):
         if (self.DiskFormatQuery or self.get_disk_format_query()) and \
            (self.DiskFormatQuery != self.get_disk_format_query()):
             self.logger.log('Current config DiskFormatQuery {0} differs from effective config DiskFormatQuery {1}'.format(self.DiskFormatQuery, self.get_disk_format_query()))
+            return True
+
+        bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        bek_passphrase = file(bek_passphrase_file).read()
+
+        if (self.passphrase and bek_passphrase) and \
+           (self.passphrase != bek_passphrase):
+            self.logger.log('Current config passphrase differs from effective config passphrase')
             return True
    
         self.logger.log('Current config is not different from effective config')
