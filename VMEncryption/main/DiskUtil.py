@@ -134,14 +134,21 @@ class DiskUtil(object):
                 crypt_item = CryptItem()
                 crypt_item.mapper_name = "osencrypt"
 
+                proc_comm = ProcessCommunicator()
+                self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm, raise_exception_on_failure=True)
+                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+
                 rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
-                crypt_item.dev_path = rootfs_dev["src"]
                 crypt_item.file_system = rootfs_dev["fs"]
 
                 if not crypt_item.dev_path:
                     raise Exception("Could not locate block device for rootfs")
 
                 crypt_item.luks_header_path = "/boot/luks/osluksheader"
+
+                if not os.path.exists(crypt_item.luks_header_path):
+                    crypt_item.luks_header_path = crypt_item.dev_path
+
                 crypt_item.mount_point = "/"
                 crypt_item.uses_cleartext_key = False
                 crypt_item.current_luks_slot = -1
