@@ -242,7 +242,7 @@ def update_encryption_settings():
             logger.log("New key successfully added to all encrypted devices")
 
             if DistroPatcher.distro_info[0] == "Ubuntu":
-                executor.Execute("update-initramfs -u -k all")
+                executor.Execute("update-initramfs -u -k all", True)
 
             os.unlink(temp_keyfile.name)
 
