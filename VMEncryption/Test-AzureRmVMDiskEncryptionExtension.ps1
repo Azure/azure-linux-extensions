@@ -214,9 +214,10 @@ Write-Host "Updated VM successfully"
 
 ## SSH preparation
 
+$global:Hostname = $PublicIp.DnsSettings.Fqdn.ToString()
+
 if ($SshPrivKeyPath -and !$DryRun)
 {
-    $global:Hostname = $PublicIp.DnsSettings.Fqdn.ToString()
     $commandFileName = $ResourcePrefix + "Commands.txt"
 
     $commands = @"
