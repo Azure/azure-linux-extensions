@@ -18,6 +18,7 @@
 
 import array
 import base64
+import filecmp
 import httplib
 import imp
 import json
@@ -267,9 +268,8 @@ def update_encryption_settings():
                 encryption_config.secret_seq_num = hutil.get_current_seq()
                 encryption_config.commit()
 
-                with open(encryption_environment.update_encryption_marker_path, 'w') as f:
-                    logger.log("Touching update marker at {0}".format(encryption_environment.update_encryption_marker_path))
-                    pass
+                shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
+                logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
 
                 hutil.do_exit(exit_code=0,
                               operation='UpdateEncryptionSettings',
@@ -295,32 +295,27 @@ def update_encryption_settings():
                 if not crypt_item:
                     continue
 
+                if filecmp.cmp(existing_passphrase_file, encryption_environment.bek_backup_path):
+                    logger.log('Current BEK and backup are the same, skipping removal')
+                    continue
+
                 logger.log('Removing old passphrase from {0}'.format(crypt_item.dev_path))
 
                 keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots before removal: {0}".format(keyslots))
+                
+                luks_remove_result = disk_util.luks_remove_key(passphrase_file=existing_passphrase_file,
+                                                               dev_path=crypt_item.dev_path,
+                                                               header_file=crypt_item.luks_header_path)
+                logger.log("luks remove result is {0}".format(luks_remove_result))
 
-                for index, enabled in enumerate(keyslots):
-                    if enabled:
-                        logger.log('Keyslot {0} is enabled'.format(index))
-
-                        if index != crypt_item.current_luks_slot:
-                            logger.log('Keyslot {0} is redundant, killing the slot'.format(index))
-
-                            luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
-                                                                        dev_path=crypt_item.dev_path,
-                                                                        header_file=crypt_item.luks_header_path,
-                                                                        keyslot=index)
-
-                            logger.log("luks kill result is {0}".format(luks_kill_result))
-                        else:
-                            logger.log('Keyslot {0} is currently active'.format(index))
-                    else:
-                        logger.log('Keyslot {0} is disabled'.format(index))
+                keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots after removal: {0}".format(keyslots))
 
             logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()
             extension_parameter.commit()
-            os.unlink(encryption_environment.update_encryption_marker_path)
+            os.unlink(encryption_environment.bek_backup_path)
 
         hutil.do_exit(exit_code=0,
                         operation='UpdateEncryptionSettings',
@@ -488,7 +483,7 @@ def enable():
 
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-            if os.path.exists(encryption_environment.update_encryption_marker_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
+            if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
                 logger.log("Config has changed, updating encryption settings")
                 update_encryption_settings()
                 extension_parameter.commit()

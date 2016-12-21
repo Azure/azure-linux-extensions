@@ -311,6 +311,19 @@ class DiskUtil(object):
 
         return self.command_executor.Execute(cryptsetup_cmd)
         
+    def luks_remove_key(self, passphrase_file, dev_path, header_file):
+        """
+        return the return code of the process for error handling.
+        """
+        self.hutil.log("removing keyslot: {0}".format(passphrase_file))
+
+        if header_file:
+            cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, header_file, passphrase_file)
+        else:
+            cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
+
+        return self.command_executor.Execute(cryptsetup_cmd)
+        
     def luks_kill_slot(self, passphrase_file, dev_path, header_file, keyslot):
         """
         return the return code of the process for error handling.
