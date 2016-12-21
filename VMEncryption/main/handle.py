@@ -304,7 +304,7 @@ def update_encryption_settings():
                 keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
                 logger.log("Keyslots before removal: {0}".format(keyslots))
                 
-                luks_remove_result = disk_util.luks_remove_key(passphrase_file=existing_passphrase_file,
+                luks_remove_result = disk_util.luks_remove_key(passphrase_file=encryption_environment.bek_backup_path,
                                                                dev_path=crypt_item.dev_path,
                                                                header_file=crypt_item.luks_header_path)
                 logger.log("luks remove result is {0}".format(luks_remove_result))
