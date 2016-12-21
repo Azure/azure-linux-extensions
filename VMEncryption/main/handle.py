@@ -241,6 +241,9 @@ def update_encryption_settings():
 
             logger.log("New key successfully added to all encrypted devices")
 
+            if DistroPatcher.distro_info[0] == "Ubuntu":
+                executor.Execute("update-initramfs -u -k all")
+
             os.unlink(temp_keyfile.name)
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
