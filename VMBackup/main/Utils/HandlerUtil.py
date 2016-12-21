@@ -70,6 +70,7 @@ import subprocess
 import datetime
 import Status
 from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -81,6 +82,7 @@ class HandlerContext:
 
 class HandlerUtility:
     telemetry_data = []
+    ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -317,10 +319,14 @@ class HandlerUtility:
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
+    def SetExtErrorCode(self, extErrorCode):
+        if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
+            self.ExtErrorCode = extErrorCode
+
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, (ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]).value)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
@@ -476,6 +482,7 @@ class HandlerUtility:
     def do_exit(self, exit_code, operation,status,code,message):
         try:
             self.do_status_report(operation, status,code,message)
+            HandlerUtility.add_to_telemetery_data("extErrorCode",self.ExtErrorCode)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)

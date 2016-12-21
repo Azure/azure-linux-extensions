@@ -50,6 +50,7 @@ from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
 
 #Main function is the only entrence to this extension handler
 
@@ -139,7 +140,9 @@ def snapshot():
             run_result = CommonVariables.error 
             run_status = 'error' 
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
-            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            #error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
             backup_logger.log(error_msg, True, 'Warning') 
         else: 
             backup_logger.log('T:S doing snapshot now...') 
@@ -150,9 +153,13 @@ def snapshot():
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 if all_failed:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    #error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 else:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    #error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error' 
                 backup_logger.log(error_msg, True, 'Error') 
             else: 
@@ -175,7 +182,9 @@ def freeze_snapshot(timeout):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            #error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
             backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
@@ -186,9 +195,13 @@ def freeze_snapshot(timeout):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 if all_failed:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    #error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 else:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    #error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
             else:
@@ -263,6 +276,7 @@ def daemon():
         elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
             if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
                 run_result = CommonVariables.error_parameter
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'
                 error_msg = 'required field empty or not correct'
                 backup_logger.log(error_msg, True, 'Error')
@@ -290,6 +304,7 @@ def daemon():
                     snapshot_thread.join(float(thread_timeout))
                     if not snapshot_done:
                         run_result = CommonVariables.error
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.CommonVariables.error)
                         run_status = 'error'
                         error_msg = 'T:W Snapshot timeout'
                         backup_logger.log(error_msg, True, 'Warning')
@@ -311,6 +326,7 @@ def daemon():
         else:
             run_status = 'error'
             run_result = CommonVariables.error_parameter
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
@@ -325,13 +341,17 @@ def daemon():
         if(global_error_result is not None):
             if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
                 run_result = CommonVariables.error_12
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_12)
             elif(para_parser is None):
                 run_result = CommonVariables.error_parameter
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
             else:
                 run_result = CommonVariables.error
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
             run_status = 'error'
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode",hutil.ExtErrorCode.name)
         status_report(run_status,run_result,error_msg, snapshot_info_array)
     except Exception as e:
         errMsg = 'Failed to log status in extension'
