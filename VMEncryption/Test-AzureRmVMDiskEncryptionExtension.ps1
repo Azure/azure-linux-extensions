@@ -17,7 +17,8 @@
     [string] $Location="eastus",
     [string] $VolumeType="data",
     [string] $GalleryImage="RedHat:RHEL:7.2",
-    [string] $VMSize="Standard_D2"
+    [string] $VMSize="Standard_D2",
+    [switch] $DryRun=$false
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,23 +29,40 @@ Write-Host "Set AzureRmContext successfully"
 
 ## Resource Group
 $global:ResourceGroupName = $ResourcePrefix + "ResourceGroup"
-New-AzureRmResourceGroup -Name $ResourceGroupName -Location $Location
+
+if(!$DryRun)
+{
+    New-AzureRmResourceGroup -Name $ResourceGroupName -Location $Location
+}
 
 Write-Host "Created ResourceGroup successfully: $ResourceGroupName"
 
 ## KeyVault
 $global:KeyVaultName = $ResourcePrefix + "KeyVault"
 
-$global:KeyVault = New-AzureRmKeyVault -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -Location $Location
+if(!$DryRun)
+{
+    $global:KeyVault = New-AzureRmKeyVault -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -Location $Location
+}
+else
+{
+    $global:KeyVault = Get-AzureRmKeyVault -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName
+}
 
 Write-Host "Created KeyVault successfully: $KeyVaultName"
 
-Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -ServicePrincipalName $AadClientId -PermissionsToKeys all -PermissionsToSecrets all
-Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -EnabledForDiskEncryption
+if(!$DryRun)
+{
+    Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -ServicePrincipalName $AadClientId -PermissionsToKeys all -PermissionsToSecrets all
+    Set-AzureRmKeyVaultAccessPolicy -VaultName $KeyVaultName -ResourceGroupName $ResourceGroupName -EnabledForDiskEncryption
+}
 
 Write-Host "Set AzureRmKeyVaultAccessPolicy successfully"
 
-Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "keyencryptionkey" -Destination Software
+if(!$DryRun)
+{
+    Add-AzureKeyVaultKey -VaultName $KeyVaultName -Name "keyencryptionkey" -Destination Software
+}
 
 Write-Host "Added AzureRmKeyVaultKey successfully"
 
@@ -57,7 +75,14 @@ $global:StorageName = ($ResourcePrefix + "Storage").ToLower()
 $global:StorageType = "Standard_GRS"
 $global:ContainerName = "vhds"
 
-$global:StorageAccount = New-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageName -Type $StorageType -Location $Location
+if(!$DryRun)
+{
+    $global:StorageAccount = New-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageName -Type $StorageType -Location $Location
+}
+else
+{
+    $global:StorageAccount = Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageName
+}
 
 Write-Host "Created StorageAccount successfully: $StorageName"
 
@@ -70,19 +95,44 @@ $global:VNetAddressPrefix = "10.0.0.0/16"
 $global:VNetSubnetAddressPrefix = "10.0.0.0/24"
 $global:DomainNameLabel = ($ResourcePrefix + "VM").ToLower()
 
-$global:PublicIp = New-AzureRmPublicIpAddress -Name $PublicIpName -ResourceGroupName $ResourceGroupName -Location $Location -AllocationMethod Dynamic -DomainNameLabel $DomainNameLabel
+if(!$DryRun)
+{
+    $global:PublicIp = New-AzureRmPublicIpAddress -Name $PublicIpName -ResourceGroupName $ResourceGroupName -Location $Location -AllocationMethod Dynamic -DomainNameLabel $DomainNameLabel
+}
+else
+{
+    $global:PublicIp = Get-AzureRmPublicIpAddress -Name $PublicIpName -ResourceGroupName $ResourceGroupName
+}
 
 Write-Host "Created PublicIp successfully: " $PublicIp.DnsSettings.Fqdn.ToString()
 
-$global:SubnetConfig = New-AzureRmVirtualNetworkSubnetConfig -Name $SubnetName -AddressPrefix $VNetSubnetAddressPrefix
+if(!$DryRun)
+{
+    $global:SubnetConfig = New-AzureRmVirtualNetworkSubnetConfig -Name $SubnetName -AddressPrefix $VNetSubnetAddressPrefix
+}
 
 Write-Host "Created SubnetConfig successfully: $SubnetName"
 
-$global:VNet = New-AzureRmVirtualNetwork -Name $VNetName -ResourceGroupName $ResourceGroupName -Location $Location -AddressPrefix $VNetAddressPrefix -Subnet $SubnetConfig
+if(!$DryRun)
+{
+    $global:VNet = New-AzureRmVirtualNetwork -Name $VNetName -ResourceGroupName $ResourceGroupName -Location $Location -AddressPrefix $VNetAddressPrefix -Subnet $SubnetConfig
+}
+else
+{
+    $global:VNet = Get-AzureRmVirtualNetwork -Name $VNetName -ResourceGroupName $ResourceGroupName
+    $global:SubnetConfig = Get-AzureRmVirtualNetworkSubnetConfig -Name $SubnetName -VirtualNetwork $VNet
+}
 
 Write-Host "Created AzureRmVirtualNetwork successfully: $VNetName"
 
-$global:Interface = New-AzureRmNetworkInterface -Name $InterfaceName -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $VNet.Subnets[0].Id -PublicIpAddressId $PublicIp.Id
+if(!$DryRun)
+{
+    $global:Interface = New-AzureRmNetworkInterface -Name $InterfaceName -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $VNet.Subnets[0].Id -PublicIpAddressId $PublicIp.Id
+}
+else
+{
+    $global:Interface = Get-AzureRmNetworkInterface -Name $InterfaceName -ResourceGroupName $ResourceGroupName
+}
 
 Write-Host "Created AzureNetworkInterface successfully: $InterfaceName"
 
@@ -136,7 +186,10 @@ if ($SshPubKey)
 }
 
 ## Create the VM in Azure
-New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $VirtualMachine
+if(!$DryRun)
+{
+    New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $VirtualMachine
+}
 
 Write-Host "Created AzureVM successfully: $VMName"
 
@@ -144,18 +197,24 @@ $VirtualMachine = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMN
 
 Write-Host "Fetched VM successfully"
 
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
-Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 1 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
+if(!$DryRun)
+{
+    Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk1Name -Caching None -DiskSizeInGB 1 -Lun 0 -VhdUri $DataDisk1Uri -CreateOption Empty
+    Add-AzureRmVMDataDisk -VM $VirtualMachine -Name $DataDisk2Name -Caching None -DiskSizeInGB 1 -Lun 1 -VhdUri $DataDisk2Uri -CreateOption Empty
+}
 
 Write-Host "Added DataDisks successfully: $DataDisk1Name, $DataDisk2Name"
 
-Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
+if(!$DryRun)
+{
+    Update-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VirtualMachine
+}
 
 Write-Host "Updated VM successfully"
 
 ## SSH preparation
 
-if ($SshPrivKeyPath)
+if ($SshPrivKeyPath -and !$DryRun)
 {
     $global:Hostname = $PublicIp.DnsSettings.Fqdn.ToString()
     $commandFileName = $ResourcePrefix + "Commands.txt"
@@ -245,22 +304,25 @@ reboot
 
 ## Encryption
 
-Read-Host "Press Enter to continue..."
+if(!$DryRun)
+{
+    Read-Host "Press Enter to continue..."
 
-$global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
-    -ExtensionName $ExtensionName `
-    -ResourceGroupName $ResourceGroupName `
-    -VMName $VMName `
-    -AadClientID $AadClientId `
-    -AadClientSecret $AadClientSecret `
-    -DiskEncryptionKeyVaultId $KeyVault.ResourceId `
-    -DiskEncryptionKeyVaultUrl $KeyVault.VaultUri `
-    -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
-    -KeyEncryptionKeyURL $KeyEncryptionKey.Id `
-    -KeyEncryptionAlgorithm "RSA-OAEP" `
-    -VolumeType $VolumeType `
-    -SequenceVersion "1" 3>&1 | Out-String
+    $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
+        -ExtensionName $ExtensionName `
+        -ResourceGroupName $ResourceGroupName `
+        -VMName $VMName `
+        -AadClientID $AadClientId `
+        -AadClientSecret $AadClientSecret `
+        -DiskEncryptionKeyVaultId $KeyVault.ResourceId `
+        -DiskEncryptionKeyVaultUrl $KeyVault.VaultUri `
+        -KeyEncryptionKeyVaultId $KeyVault.ResourceId `
+        -KeyEncryptionKeyURL $KeyEncryptionKey.Id `
+        -KeyEncryptionAlgorithm "RSA-OAEP" `
+        -VolumeType $VolumeType `
+        -SequenceVersion "1" 3>&1 | Out-String
 
-Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
+    Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
 
-$global:BackupTag = [regex]::match($EncryptionEnableOutput, '(AzureEnc.*?),').Groups[1].Value
+    $global:BackupTag = [regex]::match($EncryptionEnableOutput, '(AzureEnc.*?),').Groups[1].Value
+}
