@@ -36,11 +36,11 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
+    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
-        proc = Popen(args, stdout=PIPE, stderr=PIPE, close_fds=True)
-        stdout, stderr = proc.communicate()
+        proc = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE, close_fds=True)
+        stdout, stderr = proc.communicate(input=input)
         return_code = proc.returncode
 
         if isinstance(communicator, ProcessCommunicator):
