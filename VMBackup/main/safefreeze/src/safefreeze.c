@@ -35,16 +35,16 @@ void logger(const char *logstr,...)
 {
     time_t mytime;
     struct tm * timeinfo;
-    char buffer [80];
+    char buffer[80];
     time(&mytime);
     timeinfo = localtime(&mytime);
-    strftime (buffer,80,"%F %X",timeinfo);
+    strftime(buffer, 80, "%F %X", timeinfo);
     va_list arg;
     int done;
-    printf("%s : ", buffer);
+    printf("%s ", buffer);
     va_start(arg, logstr);
-    done = vfprintf (stdout,  logstr, arg);
-    va_end (arg);
+    done = vfprintf(stdout,  logstr, arg);
+    va_end(arg);
 }
 
 int gThaw = 0;
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
-        logger("freezing the mount: %s\n", mountPoint);
+        logger("Freezing: %s\n", mountPoint);
 
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
@@ -192,7 +192,7 @@ CLEANUP:
             if (fileSystemDescriptors[i] >= 0)
             {
                 char *mountPoint = argv[i + 2];
-                logger("unfreezing the mount: %s\n", mountPoint);
+                logger("Thawing: %s\n", mountPoint);
 
                 if (ioctl(fileSystemDescriptors[i], FITHAW, 0) != 0)
                 {
