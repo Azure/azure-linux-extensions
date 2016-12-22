@@ -50,8 +50,6 @@ class ParameterParser(object):
             self.backup_metadata = self.public_config_obj['backupMetadata']
         if(self.logsBlobUri is None or self.logsBlobUri == ""):
             self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
-        if(self.statusBlobUri is None or self.statusBlobUri == ""):
-            self.statusBlobUri = protected_settings.get(CommonVariables.status_blob_uri)
 
         """
         first get the protected configuration

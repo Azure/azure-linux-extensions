@@ -36,6 +36,7 @@ Schema for the public configuration file looks like this:
 
 * `fileUris`: (optional, string array) the uri list of the scripts
 * `commandToExecute`: (required, string) the entrypoint script to execute
+* `enableInternalDNSCheck`: (optional, bool) default is True, set to False to disable DNS check.
  
 ```json
 {

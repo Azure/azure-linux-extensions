@@ -126,14 +126,6 @@ def exit_with_commit_log(error_msg, para_parser):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
-def exit_if_same_taskId(taskId):
-    global backup_logger
-    taskIdentity = TaskIdentity()
-    last_taskId = taskIdentity.stored_identity()
-    if(taskId == last_taskId):
-        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)
-        sys.exit(0)
-
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
@@ -141,20 +133,26 @@ def snapshot():
     try: 
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
         freeze_result = freezer.freezeall() 
+        all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
         if(freeze_result is not None and len(freeze_result.errors) > 0): 
             run_result = CommonVariables.error 
             run_status = 'error' 
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
+            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
             backup_logger.log(error_msg, True, 'Warning') 
         else: 
             backup_logger.log('T:S doing snapshot now...') 
             snap_shotter = Snapshotter(backup_logger) 
-            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser) 
+            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser) 
             backup_logger.log('T:S snapshotall ends...') 
             if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
-                run_result = CommonVariables.error 
+                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                if all_failed:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                else:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
                 run_status = 'error' 
                 backup_logger.log(error_msg, True, 'Error') 
             else: 
@@ -171,20 +169,26 @@ def freeze_snapshot(timeout):
     try:
         global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
+        all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
             backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                run_result = CommonVariables.error
+                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                if all_failed:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                else:
+                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
             else:
@@ -399,8 +403,6 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
-            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):

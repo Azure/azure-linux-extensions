@@ -115,7 +115,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         disk.commit()
         
-        self.command_executor.Execute("partprobe", True)
+        self.command_executor.Execute("partprobe", False)
         self.command_executor.Execute("mkfs.ext2 /dev/sda2", True)
         
         boot_partition_uuid = self._get_uuid("/dev/sda2")
