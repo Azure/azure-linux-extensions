@@ -135,8 +135,20 @@ class DiskUtil(object):
                 crypt_item.mapper_name = "osencrypt"
 
                 proc_comm = ProcessCommunicator()
-                self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm, raise_exception_on_failure=True)
-                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+                grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+
+                if grep_result == 0:
+                    crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+                else:
+                    proc_comm = ProcessCommunicator()
+                    self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
+
+                    for line in proc_comm.stdout.splitlines():
+                        if 'osencrypt' in line:
+                            majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
+                            src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
+                            crypt_item.dev_path = '/dev/' + src_device.name
+                            break
 
                 rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
                 crypt_item.file_system = rootfs_dev["fs"]
