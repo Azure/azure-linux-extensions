@@ -16,11 +16,14 @@
 
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <linux/fs.h>
 #include <sys/ioctl.h>
+#include <time.h>
+#include <string.h>
 
 
 #define JUMPWITHSTATUS(x)        \
@@ -28,7 +31,21 @@
     status = (x);                \
     if (status) goto CLEANUP;    \
 }
-
+time_t mytime;
+struct tm * timeinfo;
+char buffer [80];
+void logger(const char *logstr,...)
+{
+    time(&mytime);
+    timeinfo = localtime(&mytime);
+    strftime (buffer,80,"%F %X",timeinfo);
+    va_list arg;
+    int done;
+    printf("%s : ", buffer);
+    va_start(arg, logstr);
+    done = vfprintf (stdout,  logstr, arg);
+    va_end (arg);
+}
 
 int gThaw = 0;
 
@@ -44,7 +61,7 @@ void globalSignalHandler(int signum)
 
 void printUsage()
 {
-    printf("Usage: safefreeze TimeoutInSeconds MountPoint1 [MountPoint2 [MountPoint3 [..]]]\n");
+    logger("Usage: safefreeze TimeoutInSeconds MountPoint1 [MountPoint2 [MountPoint3 [..]]]\n");
 }
 
 
@@ -84,7 +101,7 @@ int main(int argc, char *argv[])
 
         if ((fileSystemDescriptors[i] = open(mountPoint, O_RDONLY)) < 0)
         {
-            printf("Failed to open: %s\n", mountPoint);
+            logger("Failed to open: %s\n", mountPoint);
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
 
@@ -92,13 +109,13 @@ int main(int argc, char *argv[])
 
         if (fstat(fileSystemDescriptors[i], &sb) == -1)
         {
-            printf("Failed to stat: %s\n", mountPoint);
+            logger("Failed to stat: %s\n", mountPoint);
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
 
         if ((sb.st_mode & S_IFDIR) == 0)
         {
-            printf("Path not a directory: %s\n", mountPoint);
+            logger("Path not a directory: %s\n", mountPoint);
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
     }
@@ -119,18 +136,18 @@ int main(int argc, char *argv[])
         sigaction(SIGTTOU, &globalSignalAction, NULL)
        )
     {
-        printf("Failed to setup signal handlers\n");
+        logger("Failed to setup signal handlers\n");
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
-        printf("freezing the mount: %s\n", mountPoint);
+        logger("freezing the mount: %s\n", mountPoint);
 
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
-            printf("Failed to FIFREEZE: %s\n", mountPoint);
+            logger("Failed to FIFREEZE: %s\n", mountPoint);
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
     }
@@ -138,21 +155,32 @@ int main(int argc, char *argv[])
 
     if (kill(getppid(), SIGUSR1) != 0)
     {
-        printf("Failed to send FreezeCompletion to parent process\n");
+        logger("Failed to send FreezeCompletion to parent process\n");
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
+    time_t starttime,currenttime,endtime; 
     for (i = 0; i < timeout; i++)
     {
-        if (gThaw == 1 || sleep(1) != 0)
+        if (gThaw == 1 )
         {
             break;
+        }
+        else if (sleep(1) != 0)
+	{
+           currenttime=time(NULL);
+           starttime=time(NULL);
+           endtime=starttime+1;
+	   while(currenttime<endtime)
+           {
+                currenttime=time(NULL);
+           }
         }
     }
 
     if (gThaw != 1)
     {
-        printf("Failed to receive timely Thaw from parent process\n");
+        logger("Failed to receive timely Thaw from parent process\n");
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
     
@@ -160,16 +188,16 @@ CLEANUP:
 
     if (fileSystemDescriptors != NULL)
     {
-        for (i = 0; i < numFileSystems; i++)
+        for (i = numFileSystems-1 ; i >= 0; i--)
         {
             if (fileSystemDescriptors[i] >= 0)
             {
                 char *mountPoint = argv[i + 2];
-                printf("unfreezing the mount: %s\n", mountPoint);
+                logger("unfreezing the mount: %s\n", mountPoint);
 
                 if (ioctl(fileSystemDescriptors[i], FITHAW, 0) != 0)
                 {
-                    printf("Failed to FITHAW: %s\n", mountPoint);
+                    logger("Failed to FITHAW: %s\n", mountPoint);
                     status = EXIT_FAILURE;
                 }
 
