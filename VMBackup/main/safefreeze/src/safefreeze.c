@@ -31,11 +31,11 @@
     status = (x);                \
     if (status) goto CLEANUP;    \
 }
-time_t mytime;
-struct tm * timeinfo;
-char buffer [80];
 void logger(const char *logstr,...)
 {
+    time_t mytime;
+    struct tm * timeinfo;
+    char buffer [80];
     time(&mytime);
     timeinfo = localtime(&mytime);
     strftime (buffer,80,"%F %X",timeinfo);
@@ -159,7 +159,9 @@ int main(int argc, char *argv[])
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
-    time_t starttime,currenttime,endtime; 
+    time_t starttime,currenttime; 
+    currenttime=time(NULL);
+    starttime=time(NULL);
     for (i = 0; i < timeout; i++)
     {
         if (gThaw == 1 )
@@ -167,11 +169,8 @@ int main(int argc, char *argv[])
             break;
         }
         else if (sleep(1) != 0)
-	{
-           currenttime=time(NULL);
-           starttime=time(NULL);
-           endtime=starttime+1;
-	   while(currenttime<endtime)
+        {
+           while(currenttime<starttime+i+1)
            {
                 currenttime=time(NULL);
            }
