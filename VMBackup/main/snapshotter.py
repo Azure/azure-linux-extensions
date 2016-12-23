@@ -80,7 +80,6 @@ class Snapshotter(object):
                     key = meta['Key']
                     value = meta['Value']
                     headers["x-ms-meta-" + key] = value
-                #temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
@@ -130,7 +129,6 @@ class Snapshotter(object):
                     key = meta['Key']
                     value = meta['Value']
                     headers["x-ms-meta-" + key] = value
-                #self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
