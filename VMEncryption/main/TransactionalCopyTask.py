@@ -63,12 +63,12 @@ class TransactionalCopyTask(object):
     def resume_copy_internal(self, copy_slice_item_backup_file_size, skip_block, original_total_copy_size):
         block_size_of_slice_item_backup = 512
         #copy the left slice
-        if(copy_slice_item_backup_file_size <= original_total_copy_size):
+        if copy_slice_item_backup_file_size <= original_total_copy_size:
             skip_of_slice_item_backup_file = copy_slice_item_backup_file_size / block_size_of_slice_item_backup
             left_count = ((original_total_copy_size - copy_slice_item_backup_file_size) / block_size_of_slice_item_backup)
             total_count = original_total_copy_size / block_size_of_slice_item_backup
             original_device_skip_count = (self.block_size * skip_block) / block_size_of_slice_item_backup 
-            if(left_count != 0):
+            if left_count != 0:
                 dd_cmd = str(self.copy_command) \
                        + ' if=' + self.source_dev_full_path \
                        + ' of=' + self.encryption_environment.copy_slice_item_backup_file \
@@ -77,9 +77,9 @@ class TransactionalCopyTask(object):
                        + ' seek=' + str(skip_of_slice_item_backup_file) \
                        + ' count=' + str(left_count)
 
-                returnCode = self.command_executer.Execute(dd_cmd)
-                if(returnCode != CommonVariables.process_success):
-                    return returnCode
+                return_code = self.command_executer.Execute(dd_cmd)
+                if return_code != CommonVariables.process_success:
+                    return return_code
 
             dd_cmd = str(self.copy_command) \
                    + ' if=' + self.encryption_environment.copy_slice_item_backup_file \
@@ -88,34 +88,34 @@ class TransactionalCopyTask(object):
                    + ' seek=' + str(original_device_skip_count) \
                    + ' count=' + str(total_count)
 
-            returnCode = self.command_executer.Execute(dd_cmd)
-            if(returnCode != CommonVariables.process_success):
-                return returnCode
+            return_code = self.command_executer.Execute(dd_cmd)
+            if return_code != CommonVariables.process_success:
+                return return_code
             else:
                 self.current_slice_index += 1
                 self.ongoing_item_config.current_slice_index = self.current_slice_index
                 self.ongoing_item_config.commit()
-                if(os.path.exists(self.encryption_environment.copy_slice_item_backup_file)):
+                if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                     os.remove(self.encryption_environment.copy_slice_item_backup_file)
-                return returnCode
+                return return_code
         else:
             self.logger.log(msg="copy_slice_item_backup_file_size is bigger than original_total_copy_size",
                             level=CommonVariables.ErrorLevel)
             return CommonVariables.backup_slice_file_error
 
     def resume_copy(self):
-        if(self.from_end.lower() == 'true'):
+        if self.from_end.lower() == 'true':
             skip_block = (self.total_slice_size - self.current_slice_index - 1)
         else:
             skip_block = self.current_slice_index
 
-        returnCode = CommonVariables.process_success
+        return_code = CommonVariables.process_success
 
-        if(self.current_slice_index == 0):
-            if(self.last_slice_size > 0):
-                if(os.path.exists(self.encryption_environment.copy_slice_item_backup_file)):
+        if self.current_slice_index == 0:
+            if self.last_slice_size > 0:
+                if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                     copy_slice_item_backup_file_size = os.path.getsize(self.encryption_environment.copy_slice_item_backup_file)
-                    returnCode = self.resume_copy_internal(copy_slice_item_backup_file_size=copy_slice_item_backup_file_size,
+                    return_code = self.resume_copy_internal(copy_slice_item_backup_file_size=copy_slice_item_backup_file_size,
                                                            skip_block=skip_block,
                                                            original_total_copy_size=self.last_slice_size)
                 else:
@@ -125,15 +125,15 @@ class TransactionalCopyTask(object):
                 self.logger.log(msg="the last slice",
                                 level=CommonVariables.WarningLevel)
         else:
-            if(os.path.exists(self.encryption_environment.copy_slice_item_backup_file)):
+            if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                 copy_slice_item_backup_file_size = os.path.getsize(self.encryption_environment.copy_slice_item_backup_file)
-                returnCode = self.resume_copy_internal(copy_slice_item_backup_file_size,skip_block=skip_block, original_total_copy_size=self.block_size)
+                return_code = self.resume_copy_internal(copy_slice_item_backup_file_size, skip_block=skip_block, original_total_copy_size=self.block_size)
             else:
                 self.logger.log(msg="2. unfortunately the slice item backup file not exists.",
                                 level=CommonVariables.WarningLevel)
-        return returnCode
+        return return_code
 
-    def copy_last_slice(self,skip_block):
+    def copy_last_slice(self, skip_block):
         block_size_of_last_slice = 512
         skip_of_last_slice = (skip_block * self.block_size) / block_size_of_last_slice
         count_of_last_slice = self.last_slice_size / block_size_of_last_slice
@@ -151,14 +151,14 @@ class TransactionalCopyTask(object):
         check the device_item size first, cut it
         """
         self.resume_copy()
-        if(self.from_end.lower() == 'true'):
-            while(self.current_slice_index < self.total_slice_size):
+        if self.from_end.lower() == 'true':
+            while self.current_slice_index < self.total_slice_size:
                 skip_block = (self.total_slice_size - self.current_slice_index - 1)
 
-                if(self.current_slice_index == 0):
-                    if(self.last_slice_size > 0):
+                if self.current_slice_index == 0:
+                    if self.last_slice_size > 0:
                         copy_result = self.copy_last_slice(skip_block)
-                        if(copy_result != CommonVariables.process_success):
+                        if copy_result != CommonVariables.process_success:
                             return copy_result
                     else:
                         self.logger.log(msg = "the last slice size is zero, so skip the 0 index.")
@@ -169,7 +169,7 @@ class TransactionalCopyTask(object):
                                                      seek=skip_block,
                                                      block_size=self.block_size)
 
-                    if(copy_result != CommonVariables.process_success):
+                    if copy_result != CommonVariables.process_success:
                         return copy_result
 
                 self.current_slice_index += 1
@@ -189,13 +189,13 @@ class TransactionalCopyTask(object):
 
             return CommonVariables.process_success
         else:
-            while(self.current_slice_index < self.total_slice_size):
+            while self.current_slice_index < self.total_slice_size:
                 skip_block = self.current_slice_index
 
-                if(self.current_slice_index == (self.total_slice_size - 1)):
-                    if(self.last_slice_size > 0):
+                if self.current_slice_index == (self.total_slice_size - 1):
+                    if self.last_slice_size > 0:
                         copy_result = self.copy_last_slice(skip_block)
-                        if(copy_result != CommonVariables.process_success):
+                        if copy_result != CommonVariables.process_success:
                             return copy_result
                     else:
                         self.logger.log(msg = "the last slice size is zero, so skip the last slice index.")
@@ -206,7 +206,7 @@ class TransactionalCopyTask(object):
                                                      seek=skip_block,
                                                      block_size=self.block_size)
 
-                    if(copy_result != CommonVariables.process_success):
+                    if copy_result != CommonVariables.process_success:
                         return copy_result
 
                 self.current_slice_index += 1
@@ -244,10 +244,10 @@ class TransactionalCopyTask(object):
                + ' skip=' + str(skip) \
                + ' count=' + str(count)
 
-        returnCode = self.command_executer.Execute(dd_cmd)
-        if(returnCode != CommonVariables.process_success):
-            self.logger.log(msg="{0} is {1}".format(dd_cmd,returnCode), level=CommonVariables.ErrorLevel)
-            return returnCode
+        return_code = self.command_executer.Execute(dd_cmd)
+        if return_code != CommonVariables.process_success:
+            self.logger.log(msg="{0} is {1}".format(dd_cmd, return_code), level=CommonVariables.ErrorLevel)
+            return return_code
         else:
             slice_file_size = os.path.getsize(self.slice_file_path)
             self.logger.log(msg=("slice_file_size is: {0}".format(slice_file_size)))
@@ -267,28 +267,28 @@ class TransactionalCopyTask(object):
             third, copy the data in the middle cache to the target device.
             """
             dd_cmd = str(self.copy_command) + ' if=' + self.slice_file_path + ' of=' + to_device + ' bs=' + str(block_size) + ' seek=' + str(seek) + ' count=' + str(count)
-            returnCode = self.command_executer.Execute(dd_cmd)
-            if(returnCode != CommonVariables.process_success):
-                self.logger.log(msg=("{0} is: {1}".format(dd_cmd, returnCode)), level = CommonVariables.ErrorLevel)
+            return_code = self.command_executer.Execute(dd_cmd)
+            if return_code != CommonVariables.process_success:
+                self.logger.log(msg=("{0} is: {1}".format(dd_cmd, return_code)), level = CommonVariables.ErrorLevel)
             else:
                 #the copy done correctly, so clear the backup slice file item.
                 backup_process.kill()
-                if(os.path.exists(self.encryption_environment.copy_slice_item_backup_file)):
+                if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                     self.logger.log(msg = "clean up the backup file")
                     os.remove(self.encryption_environment.copy_slice_item_backup_file)
-                if(os.path.exists(self.slice_file_path)):
+                if os.path.exists(self.slice_file_path):
                     self.logger.log(msg = "clean up the slice file")
                     os.remove(self.slice_file_path)
-            return returnCode
+            return return_code
 
     def prepare_mem_fs(self):
         self.disk_util.make_sure_path_exists(self.tmpfs_mount_point)
         commandToExecute = self.patching.mount_path + " -t tmpfs -o size=" + str(self.block_size + 1024) + " tmpfs " + self.tmpfs_mount_point
         self.logger.log("prepare mem fs script is: {0}".format(commandToExecute))
-        returnCode = self.command_executer.Execute(commandToExecute)
-        return returnCode
+        return_code = self.command_executer.Execute(commandToExecute)
+        return return_code
 
     def clear_mem_fs(self):
         commandToExecute = self.patching.umount_path + " " + self.tmpfs_mount_point
-        returnCode = self.command_executer.Execute(commandToExecute)
-        return returnCode
+        return_code = self.command_executer.Execute(commandToExecute)
+        return return_code

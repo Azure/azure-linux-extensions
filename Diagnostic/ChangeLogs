@@ -1,3 +1,7 @@
+2016-11-30: LAD-2.3.9017
+    - Fix scx upgrade issue on RPM-based distros when apache or mysql is
+      installed.
+
 2016-11-11: LAD-2.3.9015
     - Correctly fail Enable when mdsd dependency set up fails.
     - Added /etc/fstab watcher feature (logging to /dev/console so that issues

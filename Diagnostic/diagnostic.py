@@ -577,7 +577,7 @@ def get_extension_operation_type(command):
 def main(command):
     #Global Variables definition
 
-    global EnableSyslog, UseSystemdServiceManager
+    global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
     EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
@@ -696,10 +696,16 @@ def start_daemon():
 
 
 def start_mdsd():
-    global EnableSyslog
+    global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
+
+    # Assign correct ext op type for correct ext status/event reporting.
+    # start_mdsd() is called only through "./diagnostic.py -daemon"
+    # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
+    # type, so it needs to be reverted back to a standard one (which is "Enable").
+    ExtensionOperationType = waagent.WALAEventOperation.Enable
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
@@ -982,6 +988,13 @@ def install_omi():
 
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
+
+    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
+    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
+    if ('OMI-1.0.8-4' in RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]) \
+            and ('rpm' in distConfig['installrequiredpackage']):
+        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
+        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
 
     if 'OMI-1.0.8-6' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
