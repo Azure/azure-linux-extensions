@@ -80,16 +80,16 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        epel_cmd = ""
-        if self.distro_info[1].startswith("6."):
-            epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
-        else:
-            epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-
-        if self.command_executor.Execute("rpm -q epel-release"):
-            self.command_executor.Execute(epel_cmd)
-
         if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+            epel_cmd = ""
+            if self.distro_info[1].startswith("6."):
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
+            else:
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+            if self.command_executor.Execute("rpm -q epel-release"):
+                self.command_executor.Execute(epel_cmd)
+
             self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
 
         packages = ['cryptsetup',
