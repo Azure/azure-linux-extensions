@@ -769,6 +769,8 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
+                    if device_to_encrypt_uuid_path == dev_path_in_query:
+                        device_to_encrypt_uuid_path = disk_util.query_dev_uuid_path_by_sdx_path(sdx_path = dev_path_in_query)
                     crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
