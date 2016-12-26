@@ -29,13 +29,16 @@ import time
 import traceback
 import datetime
 import subprocess
+
 from redhatPatching import redhatPatching
 from Common import *
+from CommandExecutor import *
 
 class centosPatching(redhatPatching):
     def __init__(self, logger, distro_info):
         super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
+        self.command_executor = CommandExecutor(logger)
         if distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5":
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -70,8 +73,8 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        return_code = subprocess.call(['yum', 'install','-y', 'epel-release'])
-        self.logger.log("Enabling epel, result: " + str(return_code))
+        cmd = " ".join(['yum', 'install','-y', 'epel-release'])
+        self.command_executor.Execute(cmd)
 
         packages = ['ntfs-3g',
                     'cryptsetup',
@@ -85,6 +88,5 @@ class centosPatching(redhatPatching):
                     'procps-ng',
                     'util-linux']
 
-        return_code = subprocess.call(['yum', 'install', '-y'] + packages)
-        self.logger.log("Installing packages: " + " ".join(packages))
-        self.logger.log("Installation result: " + str(return_code))
+        cmd = " ".join(['yum', 'install', '-y'] + packages)
+        self.command_executor.Execute(cmd)
