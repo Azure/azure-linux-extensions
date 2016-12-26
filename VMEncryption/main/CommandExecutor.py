@@ -48,6 +48,7 @@ class CommandExecutor(object):
                 raise
             else:
                 self.logger.log("Process creation failed: " + str(e))
+                return -1
 
         stdout, stderr = proc.communicate(input=input)
         return_code = proc.returncode
