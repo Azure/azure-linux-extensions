@@ -73,11 +73,24 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        cmd = " ".join(['yum', 'install','-y', 'epel-release'])
-        self.command_executor.Execute(cmd)
+        if self.distro_info[1].startswith("6."):
+            if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
 
-        packages = ['ntfs-3g',
-                    'cryptsetup',
+                if self.command_executor.Execute("rpm -q epel-release"):
+                    self.command_executor.Execute(epel_cmd)
+
+                self.command_executor.Execute("yum install -y ntfs-3g python-pip")
+        else:
+            if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+                if self.command_executor.Execute("rpm -q epel-release"):
+                    self.command_executor.Execute(epel_cmd)
+
+                self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
+
+        packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
                     'cryptsetup-reencrypt',
@@ -86,7 +99,14 @@ class centosPatching(redhatPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux']
+                    'util-linux',
+                    'gcc',
+                    'libffi-devel',
+                    'openssl-devel',
+                    'python-devel']
 
-        cmd = " ".join(['yum', 'install', '-y'] + packages)
-        self.command_executor.Execute(cmd)
+        if self.command_executor.Execute("rpm -q " + " ".join(packages)):
+            self.command_executor.Execute("yum install -y " + " ".join(packages))
+
+        if self.command_executor.Execute("pip show adal"):
+            self.command_executor.Execute("pip install adal")
