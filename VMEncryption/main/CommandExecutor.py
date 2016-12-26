@@ -39,7 +39,16 @@ class CommandExecutor(object):
     def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None):
         self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
-        proc = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE, close_fds=True)
+        proc = None
+
+        try:
+            proc = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE, close_fds=True)
+        except Exception as e:
+            if raise_exception_on_failure:
+                raise
+            else:
+                self.logger.log("Process creation failed: " + str(e))
+
         stdout, stderr = proc.communicate(input=input)
         return_code = proc.returncode
 
