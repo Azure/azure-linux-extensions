@@ -109,6 +109,7 @@
     <Compile Include="main\oscrypto\centos_68\encryptstates\SelinuxState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\StripdownState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\UnmountOldrootState.py" />
+    <Compile Include="main\oscrypto\centos_68\encryptstates\SplitRootPartitionState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\EncryptBlockDeviceState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\PatchBootSystemState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\__init__.py" />
