@@ -51,7 +51,8 @@ class EncryptBlockDeviceState(OSEncryptionState):
 
         current_rootfs_size = self._get_root_fs_size_in_sectors(sector_size=512)
         desired_rootfs_size = current_rootfs_size - 8192
-
+        
+        self.command_executor.Execute('e2fsck -yf {0}'.format(self.rootfs_block_device), True)
         self.command_executor.Execute('resize2fs {0} {1}s'.format(self.rootfs_block_device, desired_rootfs_size), True)
         
         self.command_executor.Execute('mount /boot', False)
