@@ -103,7 +103,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
 
     def _get_root_fs_size_in_sectors(self, sector_size):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="dumpe2fs -h /dev/sda2",
+        self.command_executor.Execute(command_to_execute="dumpe2fs -h /dev/sda1",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
