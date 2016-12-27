@@ -89,6 +89,13 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
             'before': 'on_enter_state'
         },
         {
+            'trigger': 'enter_split_root_partition',
+            'source': 'unmount_oldroot',
+            'dest': 'split_root_partition',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_previous_state'
+        },
+        {
             'trigger': 'enter_encrypt_block_device',
             'source': 'unmount_oldroot',
             'dest': 'encrypt_block_device',
@@ -125,6 +132,7 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
             'selinux': SelinuxState(self.context),
             'stripdown': StripdownState(self.context),
             'unmount_oldroot': UnmountOldrootState(self.context),
+            'split_root_partition': SplitRootPartitionState(self.context),
             'encrypt_block_device': EncryptBlockDeviceState(self.context),
             'patch_boot_system': PatchBootSystemState(self.context),
         }
@@ -188,6 +196,9 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
                 oldroot_unmounted_successfully = True
             finally:
                 attempt += 1
+        
+        self.enter_split_root_partition()
+        self.log_machine_state()
         
         self.enter_encrypt_block_device()
         self.log_machine_state()
