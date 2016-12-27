@@ -132,6 +132,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.Execute("cp /etc/fstab /memroot/etc/fstab", True)
         self.command_executor.Execute("mount /boot", True)
         self.command_executor.ExecuteInBash("mv /boot.backup/* /boot/", True)
+        self.command_executor.ExecuteInBash("mv /boot.backup/.* /boot/", True)
         self.command_executor.Execute("rmdir /boot.backup", True)
         self.command_executor.Execute("mount --make-rprivate /", True)
         self.command_executor.Execute("pivot_root /memroot /memroot/oldroot", True)
