@@ -1,0 +1,50 @@
+diff -Naur 90crypt.orig/cryptroot-ask.sh 90crypt/cryptroot-ask.sh
+--- 90crypt.orig/cryptroot-ask.sh	2016-11-20 18:43:12.697422815 -0800
++++ 90crypt/cryptroot-ask.sh	2016-11-20 18:43:28.033101905 -0800
+@@ -64,6 +64,25 @@
+ # Open LUKS device
+ #
+ 
++MountPoint=/tmp-keydisk-mount
++KeyFileName=LinuxPassPhraseFileName
++echo "Trying to get the key from disks ..." >&2
++mkdir -p $MountPoint >&2
++modprobe vfat >/dev/null >&2
++modprobe fuse >/dev/null >&2
++for SFS in /dev/sd*; do
++	echo "> Trying device:$SFS..." >&2
++	mount ${SFS}1 $MountPoint -t vfat -r >&2
++	ntfs-3g -o ro ${SFS}1 $MountPoint >&2
++	if [ -f $MountPoint/$KeyFileName ]; then
++		echo "> keyfile got..." >&2
++		cp $MountPoint/$KeyFileName /tmp-keyfile
++		luksfile=/tmp-keyfile
++		umount $MountPoint
++		break
++	fi
++done
++
+ info "luksOpen $device $luksname $luksfile"
+ 
+ if [ -n "$luksfile" -a "$luksfile" != "none" -a -e "$luksfile" ]; then
+diff -Naur 90crypt.orig/parse-crypt.sh 90crypt/parse-crypt.sh
+--- 90crypt.orig/parse-crypt.sh	2016-11-20 18:43:12.698422813 -0800
++++ 90crypt/parse-crypt.sh	2016-11-20 18:43:28.033101905 -0800
+@@ -12,13 +12,13 @@
+ 	echo '. /lib/dracut-lib.sh' > /emergency/90-crypt.sh
+ 	for luksid in $LUKS; do 
+             luksid=${luksid##luks-}
+-	    printf 'ENV{ID_FS_TYPE}=="crypto_LUKS", ENV{ID_FS_UUID}=="%s*", RUN+="/sbin/initqueue --unique --onetime --name cryptroot-ask-%%k /sbin/cryptroot-ask $env{DEVNAME} luks-$env{ID_FS_UUID}"\n' $luksid \
++            printf 'KERNEL=="sda2", RUN+="/sbin/initqueue --unique --onetime --name cryptroot-ask-%%k /sbin/cryptroot-ask $env{DEVNAME} osencrypt"\n' $luksid \
+ 	        >> /etc/udev/rules.d/70-luks.rules	
+-	    printf '[ -e /dev/disk/by-uuid/*%s* ] || exit 1 \n'  $luksid >> /initqueue-finished/crypt.sh
+-	    printf '[ -e /dev/disk/by-uuid/*%s* ] || warn "crypto LUKS UUID "%s" not found" \n' $luksid $luksid >> /emergency/90-crypt.sh
++	    printf '[ -e /dev/mapper/osencrypt ] || ( /sbin/cryptroot-ask /dev/sda2 osencrypt && [ -e /dev/mapper/osencrypt ] ) || exit 1 \n'  $luksid >> /initqueue-finished/crypt.sh
++	    printf '[ -e /dev/mapper/osencrypt ] || warn "crypto LUKS UUID "%s" not found" \n' $luksid $luksid >> /emergency/90-crypt.sh
+ 	done
+     else
+-	echo 'ENV{ID_FS_TYPE}=="crypto_LUKS", RUN+="/sbin/initqueue --unique --onetime --name cryptroot-ask-%k /sbin/cryptroot-ask $env{DEVNAME} luks-$env{ID_FS_UUID}"' \
++        echo 'KERNEL="sda2", RUN+="/sbin/initqueue --unique --onetime --name cryptroot-ask-%k /sbin/cryptroot-ask $env{DEVNAME} osencrypt"' \
+ 	    >> /etc/udev/rules.d/70-luks.rules	
+     fi
+     echo 'LABEL="luks_end"' >> /etc/udev/rules.d/70-luks.rules
