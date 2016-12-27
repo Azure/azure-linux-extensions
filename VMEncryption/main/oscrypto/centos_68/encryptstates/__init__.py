@@ -31,5 +31,6 @@ from PrereqState import *
 from SelinuxState import *
 from StripdownState import *
 from UnmountOldrootState import *
+from SplitRootPartitionState import *
 from EncryptBlockDeviceState import *
 from PatchBootSystemState import *
