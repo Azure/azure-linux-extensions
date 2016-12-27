@@ -56,7 +56,7 @@ class SplitRootPartitionState(OSEncryptionState):
         original_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
         self.context.logger.log("Original root filesystem size (sectors): {0}".format(original_root_fs_size))
 
-        desired_boot_partition_size = parted.sizeToSectors(256, 'MiB', device.sectorSize)
+        desired_boot_partition_size = self._size_to_sectors(256, 'MiB', device.sectorSize)
         self.context.logger.log("Desired boot partition size (sectors): {0}".format(desired_boot_partition_size))
         
         root_partition = disk.partitions[0]
@@ -160,6 +160,33 @@ class SplitRootPartitionState(OSEncryptionState):
 
         return super(SplitRootPartitionState, self).should_exit()
 
+    def _size_to_sectors(self, bytes_, unit, sector_size):
+        exponents = {
+            "B":    1,       # byte
+            "kB":   1000**1, # kilobyte
+            "MB":   1000**2, # megabyte
+            "GB":   1000**3, # gigabyte
+            "TB":   1000**4, # terabyte
+            "PB":   1000**5, # petabyte
+            "EB":   1000**6, # exabyte
+            "ZB":   1000**7, # zettabyte
+            "YB":   1000**8, # yottabyte
+
+            "KiB":  1024**1, # kibibyte
+            "MiB":  1024**2, # mebibyte
+            "GiB":  1024**3, # gibibyte
+            "TiB":  1024**4, # tebibyte
+            "PiB":  1024**5, # pebibyte
+            "EiB":  1024**6, # exbibyte
+            "ZiB":  1024**7, # zebibyte
+            "YiB":  1024**8  # yobibyte
+        }
+
+        if unit not in exponents.keys():
+            raise SyntaxError("{:} is not a valid SI or IEC byte unit".format(unit))
+        else:
+            return bytes_ * exponents[unit] // sector_size
+
     def _get_uuid(self, partition_name):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="blkid -s UUID -o value {0}".format(partition_name),
@@ -199,7 +226,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         root_fs_block_count = int(root_fs_block_count[0])
         root_fs_block_size = int(root_fs_block_size[0])
-        root_fs_size = parted.sizeToSectors(root_fs_block_count * root_fs_block_size, 'B', sector_size)
+        root_fs_size = self._size_to_sectors(root_fs_block_count * root_fs_block_size, 'B', sector_size)
 
         return root_fs_size
 
