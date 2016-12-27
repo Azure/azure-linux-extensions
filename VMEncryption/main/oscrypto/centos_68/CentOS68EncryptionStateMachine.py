@@ -45,6 +45,7 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
         State(name='selinux', on_enter='on_enter_state'),
         State(name='stripdown', on_enter='on_enter_state'),
         State(name='unmount_oldroot', on_enter='on_enter_state'),
+        State(name='split_root_partition', on_enter='on_enter_state'),
         State(name='encrypt_block_device', on_enter='on_enter_state'),
         State(name='patch_boot_system', on_enter='on_enter_state'),
         State(name='completed'),
