@@ -101,6 +101,8 @@ class centosPatching(redhatPatching):
                     'procps-ng',
                     'util-linux',
                     'gcc',
+                    'python-six',
+                    'pyparted',
                     'libffi-devel',
                     'openssl-devel',
                     'python-devel']
