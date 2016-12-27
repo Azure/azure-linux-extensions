@@ -1473,7 +1473,7 @@ def daemon_encrypt():
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
         elif distro_name == 'centos' and distro_version == '6.8':
-            from oscrypto.centos_68 import RHEL68EncryptionStateMachine
+            from oscrypto.centos_68 import CentOS68EncryptionStateMachine
             os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
                                                            distro_patcher=DistroPatcher,
                                                            logger=logger,
