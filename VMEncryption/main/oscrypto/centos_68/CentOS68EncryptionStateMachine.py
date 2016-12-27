@@ -98,7 +98,7 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
         },
         {
             'trigger': 'enter_encrypt_block_device',
-            'source': 'unmount_oldroot',
+            'source': 'split_root_partition',
             'dest': 'encrypt_block_device',
             'before': 'on_enter_state',
             'conditions': 'should_exit_previous_state'
