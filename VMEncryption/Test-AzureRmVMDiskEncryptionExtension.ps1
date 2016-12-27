@@ -18,7 +18,8 @@
     [string] $VolumeType="data",
     [string] $GalleryImage="RedHat:RHEL:7.2",
     [string] $VMSize="Standard_D2",
-    [switch] $DryRun=$false
+    [switch] $DryRun=$false,
+    [switch] $Force=$false
 )
 
 $ErrorActionPreference = "Stop"
@@ -307,8 +308,6 @@ reboot
 
 if(!$DryRun)
 {
-    Read-Host "Press Enter to continue..."
-
     $global:EncryptionEnableOutput = Set-AzureRmVMDiskEncryptionExtension `
         -ExtensionName $ExtensionName `
         -ResourceGroupName $ResourceGroupName `
@@ -321,7 +320,8 @@ if(!$DryRun)
         -KeyEncryptionKeyURL $KeyEncryptionKey.Id `
         -KeyEncryptionAlgorithm "RSA-OAEP" `
         -VolumeType $VolumeType `
-        -SequenceVersion "1" 3>&1 | Out-String
+        -SequenceVersion "1" `
+        -Force:$Force 3>&1 | Out-String
 
     Write-Host "Set AzureRmVMDiskEncryptionExtension successfully"
 
