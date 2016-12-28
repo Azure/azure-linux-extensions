@@ -155,7 +155,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
         
         self.command_executor.ExecuteInBash("mount /boot || mountpoint /boot", True)
-        self.command_executor.ExecuteInBash("[ -e /boot/grub ]", True)
+        self.command_executor.ExecuteInBash("[ -e /boot/boot/grub ]", True)
         self.command_executor.Execute("umount /boot", True)
 
         return super(SplitRootPartitionState, self).should_exit()
