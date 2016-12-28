@@ -133,7 +133,7 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf')
 
         self.command_executor.Execute('/sbin/dracut -f -v', True)
-        self.command_executor.ExecuteInBash('mv /boot/initramfs* /boot/boot/', True)
+        self.command_executor.ExecuteInBash('mv -f /boot/initramfs* /boot/boot/', True)
 
         with open("/boot/boot/grub/grub.conf", "r") as f:
             contents = f.read()
