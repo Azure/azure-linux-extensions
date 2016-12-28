@@ -138,3 +138,6 @@ class PatchBootSystemState(OSEncryptionState):
 
         with open("/boot/grub/grub.conf", "w") as f:
             f.write(contents)
+
+        grub_input = "root (hd0,1)\nsetup (hd0)\nquit\n"
+        self.command_executor.Execute('grub', input=grub_input, raise_exception_on_failure=True)
