@@ -130,14 +130,14 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('/sbin/dracut -f -v', True)
         self.command_executor.ExecuteInBash('mv /boot/initramfs* /boot/boot/', True)
 
-        with open("/boot/grub/grub.conf", "r") as f:
+        with open("/boot/boot/grub/grub.conf", "r") as f:
             contents = f.read()
 
         contents = re.sub(r"rd_NO_LUKS ", r"", contents)
         contents = re.sub(r"root=(.*?)\s", r"root=/dev/mapper/osencrypt rd_LUKS_UUID=osencrypt rdinitdebug ", contents)
         contents = re.sub(r"hd0,0", r"hd0,1", contents)
 
-        with open("/boot/grub/grub.conf", "w") as f:
+        with open("/boot/boot/grub/grub.conf", "w") as f:
             f.write(contents)
 
         grub_input = "root (hd0,1)\nsetup (hd0)\nquit\n"
