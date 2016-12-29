@@ -62,8 +62,13 @@ class PatchBootSystemState(OSEncryptionState):
         try:
             self._modify_pivoted_oldroot()
         except Exception as e:
+            self.command_executor.Execute('mount --make-rprivate /')
+            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
+            self.command_executor.Execute('rmdir /oldroot/memroot')
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
+
             raise
-        finally:
+        else:
             self.command_executor.Execute('mount --make-rprivate /')
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
             self.command_executor.Execute('rmdir /oldroot/memroot')
