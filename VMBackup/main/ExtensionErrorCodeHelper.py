@@ -22,10 +22,10 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
-            ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.green,
 
+            ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
 
-            ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.error_http_failure : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red

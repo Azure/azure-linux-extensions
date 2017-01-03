@@ -481,8 +481,8 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
-            self.do_status_report(operation, status,code,message)
             HandlerUtility.add_to_telemetery_data("extErrorCode",self.ExtErrorCode)
+            self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
