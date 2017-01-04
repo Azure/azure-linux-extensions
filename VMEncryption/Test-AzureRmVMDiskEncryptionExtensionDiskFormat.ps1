@@ -179,6 +179,12 @@ exit
     Write-Host "Copied SSH public key for root"
 
     $commands = @"
+(cat <<EOF
+alias adetail='tail -f /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinux*/*/extension.log'
+alias adecat='cat /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinux*/*/extension.log'
+EOF
+) >> /root/.bashrc
+
 apt-get install -yq mdadm
 yum install -y mdadm
 exit
