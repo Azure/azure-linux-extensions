@@ -137,6 +137,9 @@ class OSEncryptionState(object):
             return matches[0]
 
     def _get_block_device_size(self, dev):
+        if not os.path.exists(dev):
+            return 0
+
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute('blockdev --getsize64 {0}'.format(dev),
                                       raise_exception_on_failure=True,
