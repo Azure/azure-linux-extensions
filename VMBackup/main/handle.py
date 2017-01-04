@@ -126,6 +126,14 @@ def exit_with_commit_log(error_msg, para_parser):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
+def exit_if_same_taskId(taskId):  
+    global backup_logger  
+    taskIdentity = TaskIdentity()  
+    last_taskId = taskIdentity.stored_identity()  
+    if(taskId == last_taskId):  
+        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)  
+        sys.exit(0)  
+
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
@@ -403,6 +411,8 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
