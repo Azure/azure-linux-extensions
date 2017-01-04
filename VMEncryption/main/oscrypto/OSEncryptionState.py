@@ -116,11 +116,11 @@ class OSEncryptionState(object):
 
         return result
 
-    def _is_in_memfs_root(self, fs):
+    def _is_in_memfs_root(self):
         mounts = file('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
-    def _parse_rootfs_uuid_from_fstab(self, fs):
+    def _parse_rootfs_uuid_from_fstab(self):
         contents = file('/etc/fstab', 'r').read()
         matches = re.findall(r'UUID=(.*?)\s+/\s+', s)
         if matches:
