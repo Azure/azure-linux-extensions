@@ -69,22 +69,20 @@ class OSEncryptionState(object):
 
         self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
 
-        distro_name = self.context.distro_patcher.distro_info[0]
-        if not self.rootfs_block_device.startswith('/dev'):
-            self.rootfs_block_device = '/dev/sda1' if distro_name == 'Ubuntu' else '/dev/sda2'
+        if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
+            self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+            raise Exception("Could not find rootfs block device")
 
-        self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+        self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
+        self.bootfs_block_device = self.rootfs_disk + "-part2"
 
-        self.rootfs_disk = '/dev/sda'
-        self.bootfs_block_device = '/dev/sda2' if distro_name == 'Ubuntu' else '/dev/sda1'
-
-        if "-part" in self.rootfs_block_device:
-            self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
-            bootfs_part = 'part2' if self.bootfs_block_device == '/dev/sda2' else 'part1'
-            self.bootfs_block_device = self.rootfs_disk + "-" + bootfs_part
+        if self._get_block_device_size(self.bootfs_block_device) > self._get_block_device_size(self.rootfs_block_device):
+            self.context.logger.log("Swapping partition identifiers for rootfs and bootfs")
+            self.rootfs_block_device, self.bootfs_block_device = self.bootfs_block_device, self.rootfs_block_device
 
         self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
-        self.context.logger.log("bootfs_disk: {0}".format(self.bootfs_block_device))
+        self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+        self.context.logger.log("bootfs_block_device: {0}".format(self.bootfs_block_device))
         
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
@@ -137,6 +135,13 @@ class OSEncryptionState(object):
         matches = re.findall(r'UUID=(.*?)\s+/\s+', contents)
         if matches:
             return matches[0]
+
+    def _get_block_device_size(self, dev):
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute('blockdev --getsize64 {0}'.format(dev),
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+        return int(proc_comm.stdout.strip())
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
