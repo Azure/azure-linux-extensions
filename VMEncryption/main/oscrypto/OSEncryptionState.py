@@ -69,8 +69,8 @@ class OSEncryptionState(object):
 
         self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
 
+        distro_name = self.context.distro_patcher.distro_info[0]
         if not self.rootfs_block_device.startswith('/dev'):
-            distro_name = self.context.distro_patcher.distro_info[0]
             self.rootfs_block_device = '/dev/sda1' if distro_name == 'Ubuntu' else '/dev/sda2'
 
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
