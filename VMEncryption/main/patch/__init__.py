@@ -59,5 +59,5 @@ def GetDistroPatcher(logger):
     if not globals().has_key(patching_class_name):
         logger.log('{0} is not a supported distribution.'.format(Distro))
         return None
-    patchingInstance = globals()[patching_class_name](logger,dist_info)
+    patchingInstance = globals()[patching_class_name](logger, dist_info)
     return patchingInstance
