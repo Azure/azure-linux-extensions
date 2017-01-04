@@ -76,11 +76,15 @@ class OSEncryptionState(object):
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
 
         self.rootfs_disk = '/dev/sda'
+        self.bootfs_block_device = '/dev/sda2' if distro_name == 'Ubuntu' else '/dev/sda1'
 
         if "-part" in self.rootfs_block_device:
             self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
+            bootfs_part = 'part2' if self.bootfs_block_device == '/dev/sda2' else 'part1'
+            self.bootfs_block_device = self.rootfs_disk + "-" + bootfs_part
 
         self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
+        self.context.logger.log("bootfs_disk: {0}".format(self.bootfs_block_device))
         
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))

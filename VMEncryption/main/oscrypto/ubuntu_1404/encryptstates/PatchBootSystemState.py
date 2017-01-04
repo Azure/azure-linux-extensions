@@ -137,7 +137,7 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception("initramfs update failed")
 
         self.command_executor.Execute('update-grub', True)
-        self.command_executor.Execute('grub-install --recheck --force /dev/sda', True)
+        self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
 
     def _get_uuid(self, partition_name):
         proc_comm = ProcessCommunicator()
