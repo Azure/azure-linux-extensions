@@ -61,24 +61,33 @@ class OSEncryptionState(object):
 
         if rootfs_sdx_path == "none":
             self.context.logger.log("rootfs_sdx_path is none, parsing UUID from fstab")
-            rootfs_uuid = self._parse_rootfs_uuid_from_fstab()
+            rootfs_uuid = self._parse_uuid_from_fstab('/')
             self.context.logger.log("rootfs_uuid: {0}".format(rootfs_uuid))
             rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_uuid)
 
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
-        self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+        self.rootfs_disk = None
+        self.rootfs_block_device = None
+        self.bootfs_block_device = None
 
-        if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
-            self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
-            raise Exception("Could not find rootfs block device")
+        if rootfs_sdx_path == '/dev/mapper/osencrypt':
+            self.rootfs_block_device = '/dev/mapper/osencrypt'
+            bootfs_uuid = self._parse_uuid_from_fstab('/boot')
+            self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
+            self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
+        else:
+            self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+            if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
+                self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+                raise Exception("Could not find rootfs block device")
 
-        self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
-        self.bootfs_block_device = self.rootfs_disk + "-part2"
+            self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
+            self.bootfs_block_device = self.rootfs_disk + "-part2"
 
-        if self._get_block_device_size(self.bootfs_block_device) > self._get_block_device_size(self.rootfs_block_device):
-            self.context.logger.log("Swapping partition identifiers for rootfs and bootfs")
-            self.rootfs_block_device, self.bootfs_block_device = self.bootfs_block_device, self.rootfs_block_device
+            if self._get_block_device_size(self.bootfs_block_device) > self._get_block_device_size(self.rootfs_block_device):
+                self.context.logger.log("Swapping partition identifiers for rootfs and bootfs")
+                self.rootfs_block_device, self.bootfs_block_device = self.bootfs_block_device, self.rootfs_block_device
 
         self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
@@ -130,9 +139,9 @@ class OSEncryptionState(object):
         mounts = file('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
-    def _parse_rootfs_uuid_from_fstab(self):
+    def _parse_uuid_from_fstab(self, mountpoint):
         contents = file('/etc/fstab', 'r').read()
-        matches = re.findall(r'UUID=(.*?)\s+/\s+', contents)
+        matches = re.findall(r'UUID=(.*?)\s+{0}\s+'.format(mountpoint), contents)
         if matches:
             return matches[0]
 
