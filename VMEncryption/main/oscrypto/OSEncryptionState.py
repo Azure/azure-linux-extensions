@@ -68,11 +68,19 @@ class OSEncryptionState(object):
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
         self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+
         if not self.rootfs_block_device.startswith('/dev'):
             distro_name = self.context.distro_patcher.distro_info[0]
             self.rootfs_block_device = '/dev/sda1' if distro_name == 'Ubuntu' else '/dev/sda2'
 
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+
+        self.rootfs_disk = '/dev/sda'
+
+        if "-part" in self.rootfs_block_device:
+            self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
+
+        self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
         
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
