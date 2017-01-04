@@ -65,7 +65,7 @@ class OSEncryptionState(object):
             self.context.logger.log("rootfs_uuid: {0}".format(rootfs_sdx_path))
 
         if rootfs_sdx_path.startswith("/dev/disk/by-uuid/"):
-            rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_uuid)
+            rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_sdx_path)
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
         self.rootfs_disk = None
