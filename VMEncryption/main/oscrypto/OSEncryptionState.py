@@ -23,6 +23,7 @@ import os.path
 import re
 
 from collections import namedtuple
+from uuid import UUID
 
 from Common import *
 from CommandExecutor import *
@@ -64,7 +65,7 @@ class OSEncryptionState(object):
             rootfs_sdx_path = self._parse_uuid_from_fstab('/')
             self.context.logger.log("rootfs_uuid: {0}".format(rootfs_sdx_path))
 
-        if rootfs_sdx_path.startswith("/dev/disk/by-uuid/"):
+        if rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(rootfs_sdx_path):
             rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_sdx_path)
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
@@ -72,7 +73,7 @@ class OSEncryptionState(object):
         self.rootfs_block_device = None
         self.bootfs_block_device = None
 
-        if rootfs_sdx_path == '/dev/mapper/osencrypt':
+        if rootfs_sdx_path == '/dev/mapper/osencrypt' or rootfs_sdx_path.startswith('/dev/dm-'):
             self.rootfs_block_device = '/dev/mapper/osencrypt'
             bootfs_uuid = self._parse_uuid_from_fstab('/boot')
             self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
@@ -155,6 +156,14 @@ class OSEncryptionState(object):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         return int(proc_comm.stdout.strip())
+
+    def _is_uuid(self, s):
+        try:
+            UUID(s)
+        except:
+            return False
+        else:
+            return True
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
