@@ -180,8 +180,8 @@ exit
 
     $commands = @"
 (cat <<EOF
-alias adetail='tail -f /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinux*/*/extension.log'
-alias adecat='cat /var/log/azure/Microsoft.Azure.Security.AzureDiskEncryptionForLinux*/*/extension.log'
+alias adetail='tail -f /var/log/azure/Microsoft.Azure.Security.A*D*E*ForLinux*/*/extension.log'
+alias adecat='cat /var/log/azure/Microsoft.Azure.Security.A*D*E*ForLinux*/*/extension.log'
 EOF
 ) >> /root/.bashrc
 
