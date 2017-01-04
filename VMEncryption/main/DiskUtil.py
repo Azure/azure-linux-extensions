@@ -609,7 +609,7 @@ class DiskUtil(object):
         for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
             disk_by_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, disk_by_uuid)
 
-            if disk_by_uuid == desired_uuid_path:
+            if disk_by_uuid_path == desired_uuid_path:
                 return os.path.realpath(disk_by_id_path)
 
         return desired_uuid_path
