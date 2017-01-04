@@ -38,6 +38,7 @@ class CommonVariables:
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
     disk_by_id_root = '/dev/disk/by-id'
+    disk_by_uuid_root = '/dev/disk/by-uuid'
 
     """
     parameter key names

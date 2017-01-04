@@ -20,6 +20,7 @@
 #
 
 import os.path
+import re
 
 from collections import namedtuple
 
@@ -53,16 +54,24 @@ class OSEncryptionState(object):
 
         rootfs_mountpoint = '/'
 
-        if self.command_executor.Execute('mountpoint /oldroot') == 0:
+        if self._is_in_memfs_root():
             rootfs_mountpoint = '/oldroot'
 
         rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
+
+        if rootfs_sdx_path == "none":
+            self.context.logger.log("rootfs_sdx_path is none, parsing UUID from fstab")
+            rootfs_uuid = self._parse_rootfs_uuid_from_fstab()
+            self.context.logger.log("rootfs_uuid: {0}".format(rootfs_uuid))
+            rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_uuid)
+
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
         self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
         if not self.rootfs_block_device.startswith('/dev'):
             distro_name = self.context.distro_patcher.distro_info[0]
             self.rootfs_block_device = '/dev/sda1' if distro_name == 'Ubuntu' else '/dev/sda2'
+
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
         
     def should_enter(self):
@@ -106,6 +115,16 @@ class OSEncryptionState(object):
                 result = tuple(line)
 
         return result
+
+    def _is_in_memfs_root(self, fs):
+        mounts = file('/proc/mounts', 'r').read()
+        return bool(re.search(r'/\s+tmpfs', mounts))
+
+    def _parse_rootfs_uuid_from_fstab(self, fs):
+        contents = file('/etc/fstab', 'r').read()
+        matches = re.findall(r'UUID=(.*?)\s+/\s+', s)
+        if matches:
+            return matches[0]
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
