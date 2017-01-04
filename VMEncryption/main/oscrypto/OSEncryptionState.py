@@ -122,7 +122,7 @@ class OSEncryptionState(object):
 
     def _parse_rootfs_uuid_from_fstab(self):
         contents = file('/etc/fstab', 'r').read()
-        matches = re.findall(r'UUID=(.*?)\s+/\s+', s)
+        matches = re.findall(r'UUID=(.*?)\s+/\s+', contents)
         if matches:
             return matches[0]
 
