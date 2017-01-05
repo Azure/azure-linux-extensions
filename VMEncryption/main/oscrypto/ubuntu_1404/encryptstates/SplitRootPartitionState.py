@@ -147,7 +147,7 @@ class SplitRootPartitionState(OSEncryptionState):
             self.context.logger.log("Could not unmount /oldroot, attempting to restart WALA and unmount again")
 
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
-            self.command_executor.Execute('killall -s KILL waagent', True)
+            self.command_executor.Execute('service walinuxagent stop', True)
 
             self.command_executor.Execute("umount /oldroot", True)
         
