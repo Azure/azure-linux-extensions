@@ -70,6 +70,7 @@ import subprocess
 import datetime
 import Status
 from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -81,6 +82,7 @@ class HandlerContext:
 
 class HandlerUtility:
     telemetry_data = []
+    ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -317,10 +319,14 @@ class HandlerUtility:
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info):
+    def SetExtErrorCode(self, extErrorCode):
+        if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
+            self.ExtErrorCode = extErrorCode
+
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
@@ -427,7 +433,8 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info)
+        vm_health_obj = Status.VmHealthInfoObj((ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]).value, status_code)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -440,7 +447,7 @@ class HandlerUtility:
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None)
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
@@ -475,6 +482,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
+            HandlerUtility.add_to_telemetery_data("extErrorCode",self.ExtErrorCode)
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
