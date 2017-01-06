@@ -33,22 +33,37 @@ class CommonActions:
         pass
 
     def log_run_get_output(self, cmd):
+        """
+        Execute a command in a subshell
+        :param str cmd: The command to be executed
+        :return (int, str): A tuple of (subshell exit code, contents of stdout)
+        """
         self.logger("RunCmd " + cmd)
         error, msg = waagent.RunGetOutput(cmd, chk_err=True)
         self.logger("Return " + str(error) + ":" + msg)
-        return error, msg
+        return int(error), str(msg)
 
     def log_run_ignore_output(self, cmd):
+        """
+        Execute a command in a subshell
+        :param str cmd: The command to be executed
+        :return int: The subshell exit code
+        """
         self.logger("RunCmd " + cmd)
         error, msg = waagent.RunGetOutput(cmd, chk_err=True)
         self.logger("Return " + str(error) + ":" + msg)
-        return error
+        return int(error)
 
-    def log_run_with_timeout(self, cmd):
+    def log_run_with_timeout(self, cmd, timeout=360):
+        """
+        Execute a command in a subshell, killing the subshell if it runs too long
+        :param str cmd: The command to be executed
+        :param int timeout: The maximum elapsed time, in seconds, to wait for the subshell to return; default 360
+        :return (int, str): (1, "Process timeout") if timeout, else (subshell exit code, contents of stdout)
+        """
         self.logger("Run with timeout: " + cmd)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
                                    executable='/bin/bash')
-        timeout = 360
         time.sleep(1)
         while process.poll() is None and timeout > 0:
             time.sleep(10)
@@ -59,21 +74,33 @@ class CommonActions:
             return 1, "Process timeout"
         output, error = process.communicate()
         self.logger("Return " + str(error))
-        return process.returncode, output
+        return int(process.returncode), output
 
-    def log_run_multiple_cmds(self, cmds, with_timeout):
+    def log_run_multiple_cmds(self, cmds, with_timeout, timeout=360):
+        """
+        Execute multiple commands in subshells, with optional timeout protection
+        :param Iterable[str] cmds: An iterable of commands to be executed
+        :param bool with_timeout: True if commands should be run with timeout
+        :param int timeout: The timeout, in seconds; default 360. Ignored if with_timeout is False.
+        :return (int, str): A tuple of (sum of status codes, concatenated stdout from commands)
+        """
         errors = 0
-        output = ''
+        output = []
         for cmd in cmds:
             if with_timeout:
-                msg, err = self.log_run_with_timeout(cmd)
+                err, msg = self.log_run_with_timeout(cmd, timeout)
             else:
-                msg, err = self.log_run_get_output(cmd)
+                err, msg = self.log_run_get_output(cmd)
             errors += err
-            output += msg
-        return errors, str(errors)
+            output.append(msg)
+        return errors, ''.join(output)
 
-    def extract_omi_path_and_version(self, results):
+    def extract_om_path_and_version(self, results):
+        """
+        Get information about rsyslogd
+        :param str results: Package information about omprog.so or version
+        :return (str, str): (Path where rsyslogd output modules are installed, major version of rsyslogd)
+        """
         match = re.search(r"(.+)omprog\.so", results)
         if not match:
             return None, ''
@@ -86,30 +113,65 @@ class CommonActions:
         return path, version
 
     def install_omi(self):
+        """
+        Install OMI
+        :return (int, str): (status code, output of install command).
+        """
         return self.log_run_ignore_output(omi_universal_install_cmd)
 
     def install_extra_packages(self, packages, with_timeout=False):
-        return 0
+        """
+        Ensure an arbitrary set of packages is installed
+        :param list[str] packages: Iterable of package names
+        :param bool with_timeout: true if package installations should be aborted if they take too long
+        :return int:
+        """
+        return 0, ''
 
     def install_required_packages(self):
+        """
+        Install packages required by this distro to meet the common bar required of all distros
+        :return (int, str): (status, concatenated stdout from all package installs)
+        """
         return 0, "no additional packages were needed"
 
     def is_package_handler(self, package_manager):
+        """
+        Checks if the distro's package manager matches the specified tool.
+        :param str package_manager: The tool to be checked against the distro's native package manager
+        :return bool: True if the distro's native package manager is package_manager
+        """
         return False
 
     def restart_rsyslog(self):
+        """
+        Restart rsyslogd.
+        :return int: status of operation
+        """
         return self.log_run_ignore_output("service rsyslog restart")
 
     def get_rsyslog_info(self):
+        """
+        Get rsyslogd configuration information
+        :return (str, str): (path to output modules, major version)
+        """
         return None, ''
 
     def prepare_for_mdsd_install(self):
         return 0, ''
 
     def extend_environment(self, env):
+        """
+        Add required environment variables to process environment
+        :param dict[str, str] env: Process environment
+        """
         pass
 
     def use_systemd(self):
+        """
+        Determine if the distro uses systemd as its system management tool.
+        :return bool: True if the distro uses systemd as its system management tool.
+        """
         return False
 
 
@@ -127,7 +189,7 @@ class DebianActions(CommonActions):
     def get_rsyslog_info(self):
         cmd = r'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|omprog\.so"'
         error, results = self.log_run_get_output(cmd)
-        return self.extract_omi_path_and_version(results)
+        return self.extract_om_path_and_version(results)
 
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"})
@@ -172,7 +234,7 @@ class RedhatActions(CommonActions):
     def get_rsyslog_info(self):
         cmd = r'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\|omprog\.so"'
         error, results = self.log_run_get_output(cmd)
-        return self.extract_omi_path_and_version(results)
+        return self.extract_om_path_and_version(results)
 
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"})
