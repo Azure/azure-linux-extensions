@@ -38,10 +38,11 @@ from CommandExecutor import *
 from DiskUtil import *
 from transitions import *
 
-class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
+class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
     states = [
         State(name='uninitialized'),
         State(name='prereq', on_enter='on_enter_state'),
+        State(name='selinux', on_enter='on_enter_state'),
         State(name='stripdown', on_enter='on_enter_state'),
         State(name='unmount_oldroot', on_enter='on_enter_state'),
         State(name='split_root_partition', on_enter='on_enter_state'),
@@ -62,8 +63,15 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
             'dest': 'prereq'
         },
         {
-            'trigger': 'enter_stripdown',
+            'trigger': 'enter_selinux',
             'source': 'prereq',
+            'dest': 'selinux',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_previous_state'
+        },
+        {
+            'trigger': 'enter_stripdown',
+            'source': 'selinux',
             'dest': 'stripdown',
             'before': 'on_enter_state',
             'conditions': 'should_exit_previous_state'
@@ -111,17 +119,18 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
     ]
 
     def on_enter_state(self):
-        super(Ubuntu1404EncryptionStateMachine, self).on_enter_state()
+        super(CentOS68EncryptionStateMachine, self).on_enter_state()
 
     def should_exit_previous_state(self):
         # when this is called, self.state is still the "source" state in the transition
-        return super(Ubuntu1404EncryptionStateMachine, self).should_exit_previous_state()
+        return super(CentOS68EncryptionStateMachine, self).should_exit_previous_state()
 
     def __init__(self, hutil, distro_patcher, logger, encryption_environment):
-        super(Ubuntu1404EncryptionStateMachine, self).__init__(hutil, distro_patcher, logger, encryption_environment)
+        super(CentOS68EncryptionStateMachine, self).__init__(hutil, distro_patcher, logger, encryption_environment)
 
         self.state_objs = {
             'prereq': PrereqState(self.context),
+            'selinux': SelinuxState(self.context),
             'stripdown': StripdownState(self.context),
             'unmount_oldroot': UnmountOldrootState(self.context),
             'split_root_partition': SplitRootPartitionState(self.context),
@@ -130,8 +139,8 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
         }
 
         self.state_machine = Machine(model=self,
-                                     states=Ubuntu1404EncryptionStateMachine.states,
-                                     transitions=Ubuntu1404EncryptionStateMachine.transitions,
+                                     states=CentOS68EncryptionStateMachine.states,
+                                     transitions=CentOS68EncryptionStateMachine.transitions,
                                      initial='uninitialized')
 
     def start_encryption(self):
@@ -150,6 +159,9 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
         self.log_machine_state()
 
         self.enter_prereq()
+        self.log_machine_state()
+
+        self.enter_selinux()
         self.log_machine_state()
 
         self.enter_stripdown()
@@ -181,7 +193,6 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
                                             message=message)
 
                 sleep(10)
-                raise Exception(message)
             else:
                 oldroot_unmounted_successfully = True
             finally:

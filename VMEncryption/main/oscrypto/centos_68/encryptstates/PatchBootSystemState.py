@@ -113,7 +113,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         patchesdir = os.path.join(scriptdir, '../encryptpatches')
-        patchpath = os.path.join(patchesdir, 'rhel_68_dracut.patch')
+        patchpath = os.path.join(patchesdir, 'centos_68_dracut.patch')
 
         if not os.path.exists(patchpath):
             message = "Patch not found at path: {0}".format(patchpath)
@@ -133,12 +133,17 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf')
 
         self.command_executor.Execute('/sbin/dracut -f -v', True)
+        self.command_executor.ExecuteInBash('mv -f /boot/initramfs* /boot/boot/', True)
 
-        with open("/boot/grub/grub.conf", "r") as f:
+        with open("/boot/boot/grub/grub.conf", "r") as f:
             contents = f.read()
 
         contents = re.sub(r"rd_NO_LUKS ", r"", contents)
         contents = re.sub(r"root=(.*?)\s", r"root=/dev/mapper/osencrypt rd_LUKS_UUID=osencrypt rdinitdebug ", contents)
+        contents = re.sub(r"hd0,0", r"hd0,1", contents)
 
-        with open("/boot/grub/grub.conf", "w") as f:
+        with open("/boot/boot/grub/grub.conf", "w") as f:
             f.write(contents)
+
+        grub_input = "root (hd0,1)\nsetup (hd0)\nquit\n"
+        self.command_executor.Execute('grub', input=grub_input, raise_exception_on_failure=True)
