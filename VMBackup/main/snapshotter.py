@@ -208,9 +208,9 @@ class Snapshotter(object):
                 self.logger.log("the blobs are None")
                 return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
         except Exception as e:
-                self.logger.log("Unable to perform parallel snapshot")
-                exceptOccurred = True
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+            self.logger.log("Unable to perform parallel snapshot" + str(e))
+            exceptOccurred = True
+            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
 
 
     def snapshotall_seq(self, paras):
@@ -241,9 +241,9 @@ class Snapshotter(object):
                 self.logger.log("the blobs are None")
                 return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
         except Exception as e:
-                self.logger.log("Unable to perform sequential snapshot")
-                exceptOccurred = True
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+            self.logger.log("Unable to perform sequential snapshot with exception" + str(e))
+            exceptOccurred = True
+            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
 
     def get_value_from_configfile(self, key):
         value = None

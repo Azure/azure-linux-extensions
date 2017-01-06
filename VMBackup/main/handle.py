@@ -150,7 +150,7 @@ def set_do_seq_flag():
             file_pointer.write("doseq: 1")
             file_pointer.close()
     except Exception as e:
-        backup_logger.log('Unable to set doseq flag ' + str(e), True, 'Info')
+        backup_logger.log('Unable to set doseq flag ' + str(e), True, 'Warning')
 
 def snapshot(): 
     try: 
