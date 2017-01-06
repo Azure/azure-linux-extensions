@@ -79,6 +79,8 @@ class centosPatching(redhatPatching):
 
                 if self.command_executor.Execute("rpm -q epel-release"):
                     self.command_executor.Execute(epel_cmd)
+                    self.command_executor.Execute('yum clean all')
+                    self.command_executor.Execute('yum makecache')
 
                 self.command_executor.Execute("yum install -y ntfs-3g python-pip")
         else:
@@ -87,6 +89,8 @@ class centosPatching(redhatPatching):
 
                 if self.command_executor.Execute("rpm -q epel-release"):
                     self.command_executor.Execute(epel_cmd)
+                    self.command_executor.Execute('yum clean all')
+                    self.command_executor.Execute('yum makecache')
 
                 self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
 
