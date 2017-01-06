@@ -1,4 +1,4 @@
-from unittest import TestCase
+import unittest
 import os
 import errno
 import platform
@@ -6,9 +6,10 @@ import time
 import string
 import random
 import DistroSpecific
+from Utils.WAAgentUtil import waagent
 
 
-class TestCommonActions(TestCase):
+class TestCommonActions(unittest.TestCase):
     _pid = os.getpid()
     _sequence = 0
     _messages = []
@@ -32,6 +33,10 @@ class TestCommonActions(TestCase):
 
     def tearDown(self):
         pass
+        if len(self._messages) > 0:
+            print("** Test {0} messages:\n**{1}\n".format(self.id(), "\n**".join(self._messages)))
+        else:
+            print("** Test {0} no messages\n".format(self.id()))
 
     def test_log_run_get_output_silent_success(self):
         (error, results) = self._distro.log_run_get_output('/bin/true')
@@ -49,15 +54,16 @@ class TestCommonActions(TestCase):
         self.assertEqual(error, 0)
 
     def test_log_run_get_output_failure(self):
-        (error, results) = self._distro.log_run_get_output('/bin/ThIsDoEsNoTeXiSt')
-        self.assertIn('No such file or directory', error)
-        self.assertEqual(results, '')
+        bad_file= '/bin/ThIsDoEsNoTeXiSt'
+        (error, results) = self._distro.log_run_get_output(bad_file)
+        self.assertEqual(127, error)
+        self.assertIn(bad_file, results)    # Should be an error message talking about the non-existent file
 
     def test_log_run_ignore_output(self):
         filename = self.make_temp_filename()
         try:
             os.remove(filename)
-        except IOError as e:
+        except OSError as e:
             if e.errno != errno.ENOENT:
                 self.fail("Pre-test os.delete({0}) returned {1}".format(filename, errno.errorcode[e.errno]))
         error = self._distro.log_run_ignore_output("touch {0}".format(filename))
@@ -95,8 +101,13 @@ class TestCommonActions(TestCase):
         self.assertEqual(output, expected)
 
     def test_log_run_multiple_cmds_partial_timeout(self):
-        expected = 'bar\n'
+        expected = 'Process timeout\nbar\n'
         cmds = ('sleep 30; echo foo', 'echo bar')
         error, output = self._distro.log_run_multiple_cmds(cmds, True, 5)
         self.assertEqual(error, 1)
         self.assertEqual(output, expected)
+
+
+if __name__ == '__main__':
+    waagent.LoggerInit('waagent.verbose.log', None, True)
+    unittest.main()

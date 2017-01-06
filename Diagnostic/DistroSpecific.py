@@ -54,24 +54,24 @@ class CommonActions:
         self.logger("Return " + str(error) + ":" + msg)
         return int(error)
 
-    def log_run_with_timeout(self, cmd, timeout=360):
+    def log_run_with_timeout(self, cmd, timeout=3600):
         """
         Execute a command in a subshell, killing the subshell if it runs too long
         :param str cmd: The command to be executed
         :param int timeout: The maximum elapsed time, in seconds, to wait for the subshell to return; default 360
-        :return (int, str): (1, "Process timeout") if timeout, else (subshell exit code, contents of stdout)
+        :return (int, str): (1, "Process timeout\n") if timeout, else (subshell exit code, contents of stdout)
         """
         self.logger("Run with timeout: " + cmd)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
                                    executable='/bin/bash')
         time.sleep(1)
         while process.poll() is None and timeout > 0:
-            time.sleep(10)
+            time.sleep(1)
             timeout -= 1
         if process.poll() is None:
             self.logger("Timeout while running:" + cmd)
             process.kill()
-            return 1, "Process timeout"
+            return 1, "Process timeout\n"
         output, error = process.communicate()
         self.logger("Return " + str(error))
         return int(process.returncode), output
