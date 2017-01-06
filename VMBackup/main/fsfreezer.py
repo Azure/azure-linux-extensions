@@ -132,12 +132,11 @@ class FsFreezer:
                 error_msg="freeze failed for some mount"
                 freeze_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
-            return freeze_result
         except Exception as e:
             error_msg="freeze failed for some mount with exception " + str(e)
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
-            return freeze_result
+        return freeze_result
 
     def thaw_safe(self):
         thaw_result = FreezeResult()

@@ -11,7 +11,7 @@ class TopLevelStatus:
         return dict(version = self.version, timestampUTC = self.timestampUTC, status = self.status)
 
 class StatusObj:
-    def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, storageDetails, uniqueMachineId, taskId, commandStartTimeUTCTicks, snapshotInfo, extErrorCode):
+    def __init__(self, name, operation, status, substatus, code, formattedMessage, telemetrydata, storageDetails, uniqueMachineId, taskId, commandStartTimeUTCTicks, snapshotInfo, vmHealthInfo):
         self.name = name
         self.operation = operation
         self.status = status
@@ -24,7 +24,7 @@ class StatusObj:
         self.taskId = taskId
         self.commandStartTimeUTCTicks = commandStartTimeUTCTicks
         self.snapshotInfo = snapshotInfo
-        self.vmHealthInfo = VmHealthInfoObj(extErrorCode, code)
+        self.vmHealthInfo = vmHealthInfo
         
     def convertToDictionary(self):
         return dict(name = self.name, operation = self.operation, status = self.status, substatus = self.substatus, code = self.code, taskId = self.taskId, formattedMessage = self.formattedMessage, storageDetails = self.storageDetails, commandStartTimeUTCTicks = self.commandStartTimeUTCTicks, telemetryData = self.telemetryData, uniqueMachineId = self.uniqueMachineId, snapshotInfo = self.snapshotInfo, vmHealthInfo = self.vmHealthInfo)

@@ -150,87 +150,100 @@ class Snapshotter(object):
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
         all_failed = True
-        mp_jobs = []
-        global_logger = mp.Queue()
-        global_error_logger = mp.Queue()
-        snapshot_result_error = mp.Queue()
-        snapshot_info_indexer_queue = mp.Queue()
         is_inconsistent = False
-        time_before_snapshot_start = datetime.datetime.now()
-        blobs = paras.blobs
-        if blobs is not None:
-            # initialize snapshot_info_array
+        exceptOccurred = False
+        try:
             mp_jobs = []
-            blob_index = 0
-            for blob in blobs:
-                blobUri = blob.split("?")[0]
-                self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
-                mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
-                blob_index = blob_index + 1
+            global_logger = mp.Queue()
+            global_error_logger = mp.Queue()
+            snapshot_result_error = mp.Queue()
+            snapshot_info_indexer_queue = mp.Queue()
+            time_before_snapshot_start = datetime.datetime.now()
+            blobs = paras.blobs
+            if blobs is not None:
+                # initialize snapshot_info_array
+                mp_jobs = []
+                blob_index = 0
+                for blob in blobs:
+                    blobUri = blob.split("?")[0]
+                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                    blob_index = blob_index + 1
 
-            for job in mp_jobs:
-                job.start()
+                for job in mp_jobs:
+                    job.start()
 
-            time_after_snapshot_start = datetime.datetime.now()
-            timeout = self.get_value_from_configfile('timeout')
-            if timeout == None:
-                timeout = 60
+                time_after_snapshot_start = datetime.datetime.now()
+                timeout = self.get_value_from_configfile('timeout')
+                if timeout == None:
+                    timeout = 60
 
-            if datetime.timedelta.total_seconds(time_after_snapshot_start - time_before_snapshot_start) > int(timeout):
-                is_inconsistent = True
+                if datetime.timedelta.total_seconds(time_after_snapshot_start - time_before_snapshot_start) > int(timeout):
+                    is_inconsistent = True
 
-            for job in mp_jobs:
-                job.join()
-            self.logger.log('end of snapshot process')
-            logging = [global_logger.get() for job in mp_jobs]
-            self.logger.log(str(logging))
-            error_logging = [global_error_logger.get() for job in mp_jobs]
-            self.logger.log(error_logging,False,'Error')
-            if not snapshot_result_error.empty():
-                results = [snapshot_result_error.get() for job in mp_jobs]
-                for result in results:
-                    if(result.errorcode != CommonVariables.success):
-                        snapshot_result.errors.append(result)
-            if not snapshot_info_indexer_queue.empty():
-                snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
-                for snapshot_info_indexer in snapshot_info_indexers:
-                    # update snapshot_info_array element properties from snapshot_info_indexer object
-                    self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[snapshot_info_indexer.index])
-                    if (snapshot_info_array[snapshot_info_indexer.index].isSuccessful == True):
-                        all_failed = False
-                    self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
+                for job in mp_jobs:
+                    job.join()
+                self.logger.log('end of snapshot process')
+                logging = [global_logger.get() for job in mp_jobs]
+                self.logger.log(str(logging))
+                error_logging = [global_error_logger.get() for job in mp_jobs]
+                self.logger.log(error_logging,False,'Error')
+                if not snapshot_result_error.empty():
+                    results = [snapshot_result_error.get() for job in mp_jobs]
+                    for result in results:
+                        if(result.errorcode != CommonVariables.success):
+                            snapshot_result.errors.append(result)
+                if not snapshot_info_indexer_queue.empty():
+                    snapshot_info_indexers = [snapshot_info_indexer_queue.get() for job in mp_jobs]
+                    for snapshot_info_indexer in snapshot_info_indexers:
+                        # update snapshot_info_array element properties from snapshot_info_indexer object
+                        self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[snapshot_info_indexer.index])
+                        if (snapshot_info_array[snapshot_info_indexer.index].isSuccessful == True):
+                            all_failed = False
+                        self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
-        else:
-            self.logger.log("the blobs are None")
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+            else:
+                self.logger.log("the blobs are None")
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+        except Exception as e:
+                self.logger.log("Unable to perform parallel snapshot")
+                exceptOccurred = True
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+
 
     def snapshotall_seq(self, paras):
+        exceptOccurred = False
         self.logger.log("doing snapshotall now in sequence...")
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
         all_failed = True
         is_inconsistent = False
-        blobs = paras.blobs
-        if blobs is not None:
-            blob_index = 0
-            for blob in blobs:
-                blobUri = blob.split("?")[0]
-                self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
-                snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
-                if(snapshotError.errorcode != CommonVariables.success):
-                    snapshot_result.errors.append(snapshotError)
-                # update snapshot_info_array element properties from snapshot_info_indexer object
-                self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[blob_index])
-                if (snapshot_info_array[blob_index].isSuccessful == True):
-                    all_failed = False
-                blob_index = blob_index + 1
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
-        else:
-            self.logger.log("the blobs are None")
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
+        try:
+            blobs = paras.blobs
+            if blobs is not None:
+                blob_index = 0
+                for blob in blobs:
+                    blobUri = blob.split("?")[0]
+                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
+                    if(snapshotError.errorcode != CommonVariables.success):
+                        snapshot_result.errors.append(snapshotError)
+                    # update snapshot_info_array element properties from snapshot_info_indexer object
+                    self.get_snapshot_info(snapshot_info_indexer, snapshot_info_array[blob_index])
+                    if (snapshot_info_array[blob_index].isSuccessful == True):
+                        all_failed = False
+                    blob_index = blob_index + 1
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+            else:
+                self.logger.log("the blobs are None")
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
+        except Exception as e:
+                self.logger.log("Unable to perform sequential snapshot")
+                exceptOccurred = True
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
 
     def get_value_from_configfile(self, key):
         value = None
@@ -242,26 +255,20 @@ class Snapshotter(object):
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
                 else:
-                    self.logger.log("Config File doesn't have the key :" + key
-            return value
+                    self.logger.log("Config File doesn't have the key :" + key)
         except Exception as e:
             self.logger.log("Unable to read config file.key is : " + key + "with exception " + str(e))
-            return value
+        return value
 
 
     def snapshotall(self, paras):
-        try:
-            if self.get_value_from_configfile('doseq') == '1':
-                snapshot_result, snapshot_info_array, all_failed, is_inconsistent =  self.snapshotall_seq(paras)
-            else:
-                snapshot_result, snapshot_info_array, all_failed, is_inconsistent =  self.snapshotall_parallel(paras)
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
-        except Exception as e:
-            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(errorMsg, False, 'Error')
-            self.logger.log("Do sequential snapshoting")
-            snapshot_result, snapshot_info_array, all_failed, is_inconsistent =  self.snapshotall_seq(paras)
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
+        if self.get_value_from_configfile('doseq') == '1':
+            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
+        else:
+            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_parallel(paras)
+            if exceptOccurred:
+                snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
+        return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
         snapshot_error = SnapshotError()

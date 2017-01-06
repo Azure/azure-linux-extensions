@@ -133,28 +133,28 @@ def convert_time(utcTicks):
 def set_do_seq_flag():
     configfile='/etc/azure/vmbackup.conf'
     try:
-        config = ConfigParser.ConfigParser()
-        config.read(configfile)
-        do_seq = config.get('SnapshotThread','doseq')
-    except:
         backup_logger.log('setting doseq flag in config file', True, 'Info')
         if not os.path.exists(os.path.dirname(configfile)):
             os.makedirs(os.path.dirname(configfile))
 
         if os.path.exists(configfile):
-            file_pointer = open(configfile, "a")
-            file_pointer.write("doseq: 1")
-            file_pointer.close()
+            config = ConfigParser.ConfigParser()
+            config.read(configfile)
+            if not config.has_option('SnapshotThread','doseq'):
+                file_pointer = open(configfile, "a")
+                file_pointer.write("doseq: 1")
+                file_pointer.close()
         else :
             file_pointer = open(configfile, "w")
             file_pointer.write("[SnapshotThread]\n")
             file_pointer.write("doseq: 1")
-            backup_logger.log('test 9', True, 'Error')
             file_pointer.close()
+    except Exception as e:
+        backup_logger.log('Unable to set doseq flag ' + str(e), True, 'Info')
 
 def snapshot(): 
     try: 
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array
         freeze_result = freezer.freezeall() 
         all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
@@ -193,7 +193,7 @@ def snapshot():
 
 def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         all_failed= False
         is_inconsistent_freeze = False
