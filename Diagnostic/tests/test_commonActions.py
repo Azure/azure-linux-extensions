@@ -23,7 +23,7 @@ class TestCommonActions(unittest.TestCase):
         self._messages.append(message)
 
     @staticmethod
-    def random_string(size, charset = string.ascii_uppercase + string.digits):
+    def random_string(size, charset=string.ascii_uppercase + string.digits):
         return ''.join(random.SystemRandom().choice(charset) for _ in range(size))
 
     def setUp(self):
@@ -33,10 +33,6 @@ class TestCommonActions(unittest.TestCase):
 
     def tearDown(self):
         pass
-        if len(self._messages) > 0:
-            print("** Test {0} messages:\n**{1}\n".format(self.id(), "\n**".join(self._messages)))
-        else:
-            print("** Test {0} no messages\n".format(self.id()))
 
     def test_log_run_get_output_silent_success(self):
         (error, results) = self._distro.log_run_get_output('/bin/true')
@@ -78,7 +74,7 @@ class TestCommonActions(unittest.TestCase):
 
     def test_log_run_with_timeout_force_timeout(self):
         (status, output) = self._distro.log_run_with_timeout("sleep 10; echo sleep done", timeout=5)
-        self.assertEqual(output, 'Process timeout')
+        self.assertEqual(output, 'Process timeout\n')
         self.assertEqual(status, 1)
 
     def test_log_run_with_timeout_without_timeout(self):
