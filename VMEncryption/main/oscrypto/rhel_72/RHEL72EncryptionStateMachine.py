@@ -184,6 +184,7 @@ class RHEL72EncryptionStateMachine(OSEncryptionStateMachine):
                                             message=message)
 
                 sleep(10)
+                raise Exception(message)
             else:
                 oldroot_unmounted_successfully = True
             finally:

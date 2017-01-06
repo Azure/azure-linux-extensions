@@ -29,14 +29,17 @@ import time
 import traceback
 import datetime
 import subprocess
+
 from AbstractPatching import AbstractPatching
 from Common import *
+from CommandExecutor import *
 
 
 class UbuntuPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
         super(UbuntuPatching, self).__init__(distro_info)
         self.logger = logger
+        self.command_executor = CommandExecutor(logger)
         self.base64_path = '/usr/bin/base64'
         self.bash_path = '/bin/bash'
         self.blkid_path = '/sbin/blkid'
@@ -58,14 +61,13 @@ class UbuntuPatching(AbstractPatching):
         """
         install the sg_dd because the default dd do not support the sparse write
         """
-        return_code = subprocess.call(['apt-get', 'update'])
-        self.logger.log("Apt-get update result: " + str(return_code))
+        cmd = " ".join(['apt-get', 'update'])
+        self.command_executor.Execute(cmd)
 
         packages = ['at', 'cryptsetup-bin', 'lsscsi', 'python-six', 'python-parted', 'procps', 'psmisc', 'gcc', 'libssl-dev', 'libffi-dev', 'python-dev', 'python-pip']
 
-        return_code = subprocess.call(['apt-get', 'install', '-y'] + packages)
-        self.logger.log("Installing packages: " + " ".join(packages))
-        self.logger.log("Installation result: " + str(return_code))
+        cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+        self.command_executor.Execute(cmd)
         
-        return_code = subprocess.call(['pip', 'install', 'adal'])
-        self.logger.log("Pip installation result: " + str(return_code))
+        cmd = " ".join(['pip', 'install', 'adal'])
+        self.command_executor.Execute(cmd)

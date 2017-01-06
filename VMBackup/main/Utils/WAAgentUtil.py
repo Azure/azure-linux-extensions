@@ -1,4 +1,4 @@
-﻿# Wrapper module for waagent
+# Wrapper module for waagent
 #
 # waagent is not written as a module. This wrapper module is created 
 # to use the waagent code as a module.

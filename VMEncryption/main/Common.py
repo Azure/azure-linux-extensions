@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinuxTest'
-    extension_version = '0.1.0.999220'
+    extension_version = '0.1.0.999249'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -163,7 +163,7 @@ class TestHooks:
 
 class DeviceItem(object):
     def __init__(self):
-        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL
+        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN
         self.name = None
         self.type = None
         self.file_system = None
@@ -172,11 +172,23 @@ class DeviceItem(object):
         self.uuid = None
         self.model = None
         self.size = None
+        self.majmin = None
     def __str__(self):
         return ("name:" + str(self.name) + " type:" + str(self.type) +
                 " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
                 " label:" + str(self.label) + " model:" + str(self.model) +
-                " size:" + str(self.size))
+                " size:" + str(self.size)) + " majmin:" + str(self.majmin)
+
+class LvmItem(object):
+    def __init__(self):
+        #lv_name,vg_name,lv_kernel_major,lv_kernel_minor
+        self.lv_name = None
+        self.vg_name = None
+        self.lv_kernel_major = None
+        self.lv_kernel_minor = None
+    def __str__(self):
+        return ("lv_name:" + str(self.lv_name) + " vg_name:" + str(self.vg_name) +
+                " lv_kernel_major:" + str(self.lv_kernel_major) + " lv_kernel_minor:" + str(self.lv_kernel_minor))
 
 class CryptItem(object):
     def __init__(self):

@@ -18,6 +18,7 @@
 
 import array
 import base64
+import filecmp
 import httplib
 import imp
 import json
@@ -110,7 +111,7 @@ def disable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
@@ -173,6 +174,9 @@ def update_encryption_settings():
 
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
     logger.log("The update call is operation #{0}".format(update_call_seq_num))
+    
+    executor = CommandExecutor(logger)
+    executor.Execute("mount /boot")
 
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
@@ -188,58 +192,60 @@ def update_encryption_settings():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
-
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
 
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
         if current_secret_seq_num < update_call_seq_num:
+            if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
+                extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+
             logger.log('Recreating secret to store in the KeyVault')
 
             keyVaultUtil = KeyVaultUtil(logger)
 
-            if not extension_parameter.passphrase:
-                extension_parameter.passphrase = file(existing_passphrase_file).read()
-            else:
-                temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
-                temp_keyfile.write(extension_parameter.passphrase)
-                temp_keyfile.close()
+            temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+            temp_keyfile.write(extension_parameter.passphrase)
+            temp_keyfile.close()
             
-                for crypt_item in disk_util.get_crypt_items():
-                    if not crypt_item:
-                        continue
+            for crypt_item in disk_util.get_crypt_items():
+                if not crypt_item:
+                    continue
 
-                    before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
 
-                    logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+                logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
 
-                    logger.log("Adding new key for {0}".format(crypt_item.dev_path))
+                logger.log("Adding new key for {0}".format(crypt_item.dev_path))
 
-                    luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
-                                                             dev_path=crypt_item.dev_path,
-                                                             mapper_name=crypt_item.mapper_name,
-                                                             header_file=crypt_item.luks_header_path,
-                                                             new_key_path=temp_keyfile.name)
+                luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
+                                                         dev_path=crypt_item.dev_path,
+                                                         mapper_name=crypt_item.mapper_name,
+                                                         header_file=crypt_item.luks_header_path,
+                                                         new_key_path=temp_keyfile.name)
 
-                    logger.log("luks add result is {0}".format(luks_add_result))
+                logger.log("luks add result is {0}".format(luks_add_result))
 
-                    after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
 
-                    logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
+                logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
-                    new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+                new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
 
-                    logger.log("New key was added in keyslot {0}".format(new_keyslot))
+                logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
-                    crypt_item.current_luks_slot = new_keyslot
+                crypt_item.current_luks_slot = new_keyslot
 
-                    disk_util.update_crypt_item(crypt_item)
+                disk_util.update_crypt_item(crypt_item)
 
-                logger.log("New key successfully added to all encrypted devices")
+            logger.log("New key successfully added to all encrypted devices")
 
-                os.unlink(temp_keyfile.name)
+            if DistroPatcher.distro_info[0] == "Ubuntu":
+                executor.Execute("update-initramfs -u -k all", True)
+
+            os.unlink(temp_keyfile.name)
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
@@ -262,6 +268,9 @@ def update_encryption_settings():
                 encryption_config.secret_seq_num = hutil.get_current_seq()
                 encryption_config.commit()
 
+                shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
+                logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
+
                 hutil.do_exit(exit_code=0,
                               operation='UpdateEncryptionSettings',
                               status=CommonVariables.extension_success_status,
@@ -272,39 +281,41 @@ def update_encryption_settings():
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
             hutil.exit_if_same_seq()
 
-            logger.log('Removing old passphrase')
-
             # remount bek volume
             existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
+            if extension_parameter.passphrase and extension_parameter.passphrase != file(existing_passphrase_file).read():
+                logger.log("The new passphrase has not been placed in BEK volume yet")
+                logger.log("Skipping removal of old passphrase")
+                exit_without_status_report()
+
+            logger.log('Removing old passphrase')
 
             for crypt_item in disk_util.get_crypt_items():
                 if not crypt_item:
                     continue
 
+                if filecmp.cmp(existing_passphrase_file, encryption_environment.bek_backup_path):
+                    logger.log('Current BEK and backup are the same, skipping removal')
+                    continue
+
                 logger.log('Removing old passphrase from {0}'.format(crypt_item.dev_path))
 
                 keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots before removal: {0}".format(keyslots))
+                
+                luks_remove_result = disk_util.luks_remove_key(passphrase_file=encryption_environment.bek_backup_path,
+                                                               dev_path=crypt_item.dev_path,
+                                                               header_file=crypt_item.luks_header_path)
+                logger.log("luks remove result is {0}".format(luks_remove_result))
 
-                for index, enabled in enumerate(keyslots):
-                    if enabled:
-                        logger.log('Keyslot {0} is enabled'.format(index))
-
-                        if index != crypt_item.current_luks_slot:
-                            logger.log('Keyslot {0} is redundant, killing the slot'.format(index))
-
-                            luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
-                                                                        dev_path=crypt_item.dev_path,
-                                                                        header_file=crypt_item.luks_header_path,
-                                                                        keyslot=index)
-
-                            logger.log("luks kill result is {0}".format(luks_kill_result))
-                        else:
-                            logger.log('Keyslot {0} is currently active'.format(index))
-                    else:
-                        logger.log('Keyslot {0} is disabled'.format(index))
+                keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots after removal: {0}".format(keyslots))
 
             logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()
+            extension_parameter.commit()
+            os.unlink(encryption_environment.bek_backup_path)
 
         hutil.do_exit(exit_code=0,
                         operation='UpdateEncryptionSettings',
@@ -470,15 +481,9 @@ def enable():
             logger.log("Installing pre-requisites")
             DistroPatcher.install_extras()
 
-            extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+            extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-            if extension_parameter.config_file_exists() and extension_parameter.config_changed():
-                logger.log("Config has changed, updating encryption settings")
-                update_encryption_settings()
-                extension_parameter.commit()
-            else:
-                logger.log("Config did not change or first call, enabling encryption")
-                enable_encryption()
+            enable_encryption()
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
@@ -551,23 +556,7 @@ def enable_encryption():
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-    if not encryption_marker.config_file_exists():
-        machine_identity = MachineIdentity()
-        stored_identity = machine_identity.stored_identity()
-        if stored_identity is None:
-            machine_identity.save_identity()
-        else:
-            current_identity = machine_identity.current_identity()
-            if current_identity != stored_identity:
-                current_seq_no = -1
-                logger.log("machine identity not same {0} {1}, set current_seq_no to {2}".format(stored_identity,
-                                                                                                 current_identity,
-                                                                                                 current_seq_no))
-                hutil.set_last_seq(current_seq_no)
-                machine_identity.save_identity()
-                # we should be careful about proceed for this case, we just
-                # failed this time to wait for customers' retry.
-                exit_without_status_report()
+
     try:
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -582,7 +571,7 @@ def enable_encryption():
         else:
             protected_settings = protected_settings_str
 
-        extension_parameter = ExtensionParameter(hutil, logger, encryption_environment, protected_settings, public_settings)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
         
         kek_secret_id_created = None
 
@@ -954,7 +943,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
                 original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                crypt_item_to_update.dev_path = original_dev_name_path
+                crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
@@ -1477,13 +1466,18 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif ((distro_name == 'redhat' and distro_version == '6.8') or
-              (distro_name == 'centos' and distro_version == '6.8')):
+        elif distro_name == 'redhat' and distro_version == '6.8':
             from oscrypto.rhel_68 import RHEL68EncryptionStateMachine
             os_encryption = RHEL68EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
+        elif distro_name == 'centos' and distro_version == '6.8':
+            from oscrypto.centos_68 import CentOS68EncryptionStateMachine
+            os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
+                                                           distro_patcher=DistroPatcher,
+                                                           logger=logger,
+                                                           encryption_environment=encryption_environment)
         elif distro_name == 'Ubuntu' and distro_version == '16.04':
             from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
             os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
