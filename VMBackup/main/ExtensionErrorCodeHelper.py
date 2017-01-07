@@ -1,7 +1,6 @@
-from enum import Enum
 from Utils import Status
 
-class ExtensionErrorCodeEnum(Enum):
+class ExtensionErrorCodeEnum():
     success = 1
     ExtensionTempTerminalState = 4
     error_parameter = 11
@@ -30,8 +29,22 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red
             }
+
+    ExtensionErrorCodeNameDict = {
+            ExtensionErrorCodeEnum.success : "success",
+            ExtensionErrorCodeEnum.ExtensionTempTerminalState : "ExtensionTempTerminalState",
+            ExtensionErrorCodeEnum.error : "error",
+            ExtensionErrorCodeEnum.error_12 : "error_12",
+
+            ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
+            ExtensionErrorCodeEnum.error_parameter : "error_parameter",
+
+            ExtensionErrorCodeEnum.error_http_failure : "error_http_failure",
+            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",
+            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork"
+            }
     
     @staticmethod
     def StatusCodeStringBuilder(ExtErrorCodeEnum):
-        return " StatusCode." + ExtErrorCodeEnum.name + ","
+        return " StatusCode." + ExtensionErrorCodeNameDict[ExtErrorCodeEnum] + ","
 

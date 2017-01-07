@@ -1,5 +1,4 @@
 import json
-from enum import Enum
 
 class TopLevelStatus:
     def __init__(self, version, timestampUTC, status):
@@ -79,7 +78,7 @@ class ComplexEncoder(json.JSONEncoder):
         else:
             return obj.__dict__
 
-class ExtVmHealthStateEnum(Enum):
+class ExtVmHealthStateEnum():
     green = 0
     yellow = 128
     red = 256
