@@ -146,10 +146,13 @@ class SplitRootPartitionState(OSEncryptionState):
         except:
             self.context.logger.log("Could not unmount /oldroot, attempting to restart WALA and unmount again")
 
+            self.should_exit()
+            
+            self.context.logger.log("Removing marker for UnmountOldrootState")
+            os.unlink(os.path.join(self.context.encryption_environment.os_encryption_markers_path, 'UnmountOldrootState'))
+
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
             self.command_executor.Execute('service walinuxagent stop', True)
-
-            self.command_executor.Execute("umount /oldroot", True)
         
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
