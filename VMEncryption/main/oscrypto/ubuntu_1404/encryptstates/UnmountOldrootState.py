@@ -140,7 +140,10 @@ class UnmountOldrootState(OSEncryptionState):
 
 
         if self.command_executor.Execute('mountpoint /oldroot', False):
-            self.command_executor.Execute('umount /oldroot', True)
+            self.should_exit()
+            return
+        
+        self.command_executor.Execute('umount /oldroot', True)
 
         sleep(3)
         
