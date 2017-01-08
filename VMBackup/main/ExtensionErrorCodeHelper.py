@@ -46,5 +46,5 @@ class ExtensionErrorCodeHelper:
     
     @staticmethod
     def StatusCodeStringBuilder(ExtErrorCodeEnum):
-        return " StatusCode." + ExtensionErrorCodeNameDict[ExtErrorCodeEnum] + ","
+        return " StatusCode." + ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtErrorCodeEnum] + ","
 
