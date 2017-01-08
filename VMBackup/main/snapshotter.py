@@ -181,7 +181,7 @@ class Snapshotter(object):
                 if timeout == None:
                     timeout = 60
 
-                if datetime.timedelta.total_seconds(time_after_snapshot_start - time_before_snapshot_start) > int(timeout):
+                if (time_after_snapshot_start - time_before_snapshot_start) > datetime.timedelta(seconds=int(timeout-1)):
                     is_inconsistent = True
 
                 for job in mp_jobs:
@@ -268,7 +268,7 @@ class Snapshotter(object):
             snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
         else:
             snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_parallel(paras)
-            if exceptOccurred:
+            if exceptOccurred and is_inconsistent == False:
                 snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
 
