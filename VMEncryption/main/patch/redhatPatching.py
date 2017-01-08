@@ -99,6 +99,8 @@ class redhatPatching(AbstractPatching):
 
                     if not self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
                         epel_packages_installed = True
+                else:
+                    epel_packages_installed = True
             else:
                 if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
                     epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
@@ -112,6 +114,8 @@ class redhatPatching(AbstractPatching):
 
                     if not self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
                         epel_packages_installed = True
+                else:
+                    epel_packages_installed = True
 
         packages = ['cryptsetup',
                     'lsscsi',
