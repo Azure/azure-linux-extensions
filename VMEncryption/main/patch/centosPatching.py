@@ -103,7 +103,7 @@ class centosPatching(redhatPatching):
 
                     self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
 
-                    if not self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                    if not self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
                         epel_packages_installed = True
 
         packages = ['cryptsetup',
