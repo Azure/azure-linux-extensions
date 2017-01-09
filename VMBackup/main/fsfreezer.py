@@ -100,41 +100,47 @@ class FsFreezer:
     def freeze_safe(self,timeout):
         self.root_seen = False
         error_msg=''
-        freeze_result = FreezeResult()
-        freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
-        args=[freezebin,str(timeout)]
-        arg=[]
-        for mount in self.mounts.mounts:
-            if(mount.mount_point == '/'):
-                self.root_seen = True
-                self.root_mount = mount
-            elif(mount.mount_point and not self.should_skip(mount)):
-                arg.append(str(mount.mount_point))
-        mount_set=set(arg)
-        mount_list=list(mount_set)
-        mount_list.sort(reverse=True)
-        for mount_itr in mount_list:
-            args.append(mount_itr)
-        if(self.root_seen):
-            args.append('/')
-        self.logger.log(str(args))
-        self.freeze_handler.signal_receiver()
-        self.logger.log("proceeded for accepting signals")
-        sig_handle=self.freeze_handler.startproc(args)
-        if(sig_handle != 1):
-            while True:
-                line=self.freeze_handler.child.stdout.readline()
-                if(line != ''):
-                    self.logger.log(line.rstrip())
-                else:
-                    break
-            error_msg="freeze failed for some mount"
+        try:
+            freeze_result = FreezeResult()
+            freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
+            args=[freezebin,str(timeout)]
+            arg=[]
+            for mount in self.mounts.mounts:
+                if(mount.mount_point == '/'):
+                    self.root_seen = True
+                    self.root_mount = mount
+                elif(mount.mount_point and not self.should_skip(mount)):
+                    arg.append(str(mount.mount_point))
+            mount_set=set(arg)
+            mount_list=list(mount_set)
+            mount_list.sort(reverse=True)
+            for mount_itr in mount_list:
+                args.append(mount_itr)
+            if(self.root_seen):
+                args.append('/')
+            self.logger.log(str(args),True)
+            self.freeze_handler.signal_receiver()
+            self.logger.log("proceeded for accepting signals", True)
+            sig_handle=self.freeze_handler.startproc(args)
+            if(sig_handle != 1):
+                while True:
+                    line=self.freeze_handler.child.stdout.readline()
+                    if(line != ''):
+                        self.logger.log(line.rstrip(), True)
+                    else:
+                        break
+                error_msg="freeze failed for some mount"
+                freeze_result.errors.append(error_msg)
+                self.logger.log(error_msg, True, 'Error')
+        except Exception as e:
+            error_msg="freeze failed for some mount with exception " + str(e)
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         return freeze_result
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
+        is_inconsistent = False
         if(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
@@ -144,11 +150,11 @@ class FsFreezer:
                     time.sleep(1)
                 else:
                     break;
-            self.logger.log("Binary output after process end: ")
+            self.logger.log("Binary output after process end: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
-                    self.logger.log(line.rstrip())
+                    self.logger.log(line.rstrip(), True)
                 else:
                     break
             if(self.freeze_handler.child.returncode!=0):
@@ -156,17 +162,18 @@ class FsFreezer:
                 thaw_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         else:
-            self.logger.log("Binary output after process end when no thaw sent: ")
+            self.logger.log("Binary output after process end when no thaw sent: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
-                    self.logger.log(line.rstrip())
+                    self.logger.log(line.rstrip(), True)
                 else:
                     break
             error_msg = 'snapshot result inconsistent'
+            is_inconsistent = True
             thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
-        return thaw_result
+        return thaw_result, is_inconsistent
 
     def freeze(self, mount):
         """

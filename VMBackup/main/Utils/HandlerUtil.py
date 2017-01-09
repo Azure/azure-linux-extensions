@@ -69,6 +69,8 @@ import platform
 import subprocess
 import datetime
 import Status
+from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -80,11 +82,14 @@ class HandlerContext:
 
 class HandlerUtility:
     telemetry_data = []
+    ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
         self._short_name = short_name
         self.patching = None
+        self.storageDetailsObj = None
+        self.partitioncount = 0
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -244,11 +249,86 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks):
+    def get_machine_id(self):
+        machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
+        machine_id = ""
+        try:
+            if not os.path.exists(os.path.dirname(machine_id_file)):
+                os.makedirs(os.path.dirname(machine_id_file))
+
+            if os.path.exists(machine_id_file):
+                file_pointer = open(machine_id_file, "r")
+                machine_id = file_pointer.readline()
+                file_pointer.close()
+            else:
+                mi = MachineIdentity()
+                machine_id = mi.stored_identity()[1:-1]
+                file_pointer = open(machine_id_file, "w")
+                file_pointer.write(machine_id)
+                file_pointer.close()
+        except:
+            errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg, False, 'Error')
+ 
+        self.log("Unique Machine Id  : {0}".format(machine_id))
+        return machine_id
+
+    def get_total_used_size(self):
+        try:
+            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+            '''
+            Sample output of the df command
+
+            Filesystem     1K-blocks    Used Available Use% Mounted on
+            udev             1756684      12   1756672   1% /dev
+            tmpfs             352312     420    351892   1% /run
+            /dev/sda1       30202916 2598292  26338592   9% /
+            none                   4       0         4   0% /sys/fs/cgroup
+            none                5120       0      5120   0% /run/lock
+            none             1761552       0   1761552   0% /run/shm
+            none              102400       0    102400   0% /run/user
+            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
+            tmpfs                  4       4         0 100% /etc/ruxitagentproc
+            /dev/sdb1        7092664   16120   6693216   1% /mnt
+
+            '''
+            process_wait_time = 30
+            while(process_wait_time >0 and df.poll() is None):
+                time.sleep(1)
+                process_wait_time -= 1
+
+            output = df.stdout.read()
+            output = output.split("\n")
+            total_used = 0
+            for i in range(1,len(output)-1):
+                device, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} used space in KB : {1}".format(device,used))
+                total_used = total_used + int(used) #return in KB
+
+            self.log("Total used space in Bytes : {0}".format(total_used * 1024))
+            return total_used * 1024,False #Converting into Bytes
+        except:
+            self.log("Unable to fetch total used space")
+            return 0,True
+
+    def get_storage_details(self):
+        if(self.storageDetailsObj == None):
+            total_size,failure_flag = self.get_total_used_size()
+            self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+
+        self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
+        return self.storageDetailsObj
+
+    def SetExtErrorCode(self, extErrorCode):
+        if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
+            self.ExtErrorCode = extErrorCode
+
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, taskId, commandStartTimeUTCTicks)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
+
         return top_stat_obj
 
     def get_extension_version(self):
@@ -259,7 +339,7 @@ class HandlerUtility:
             return extension_version
         except Exception as e:
             errMsg = 'Failed to retrieve the Extension version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg)
             extension_version="Unknown"
             return extension_version
 
@@ -278,7 +358,7 @@ class HandlerUtility:
                 return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg)
             waagent_version="Unknown"
             return waagent_version
 
@@ -287,6 +367,10 @@ class HandlerUtility:
             cur_dir = os.getcwd()
             os.chdir("..")
             p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
+            process_wait_time = 30
+            while(process_wait_time > 0 and p.poll() is None):
+                time.sleep(1)
+                process_wait_time -= 1
             out = p.stdout.read()
             out =  out.split(" ")
             waagent = out[0]
@@ -295,7 +379,7 @@ class HandlerUtility:
             return waagent_version
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Warning')
+            self.log(errMsg)
             waagent_version="Unknown"
             return waagent_version
 
@@ -314,7 +398,7 @@ class HandlerUtility:
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, False, 'Error')
+            self.log(errMsg)
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
@@ -338,37 +422,41 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
-        HandlerUtility.add_to_telemetery_data("GuestAgentVersion",self.get_wala_version())
-        HandlerUtility.add_to_telemetery_data("ExtensionVersion",self.get_extension_version())
-        HandlerUtility.add_to_telemetery_data("OSVersion",os_version)
-        HandlerUtility.add_to_telemetery_data("KernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
+        HandlerUtility.add_to_telemetery_data("osVersion",os_version)
+        HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
 
-    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None):
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
+
+        vm_health_obj = Status.VmHealthInfoObj((ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]).value, status_code)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+        time_span = self.timedelta_total_seconds(time_delta) * 1000
+        date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
+        stat_rept.timestampUTC = date_place_holder
+        date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+        stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+        stat_rept = stat_rept.replace(date_place_holder,date_string)
+        
+        # Add Status as sub-status for Status to be written on Status-File
+        sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
-            stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
-            time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
-            time_span = self.timedelta_total_seconds(time_delta) * 1000
-            date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
-            stat_rept.timestampUTC = date_place_holder
-            stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
-            date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-            stat_rept = stat_rept.replace(date_place_holder,date_string)
-            status_code = '1'
             status = CommonVariables.status_success
-            sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks)
-        stat_rept =  "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
+
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
         if self._context._status_file:
             with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept)
+                f.write(stat_rept_file)
 
         return stat_rept
 
@@ -394,6 +482,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
+            HandlerUtility.add_to_telemetery_data("extErrorCode",self.ExtErrorCode)
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
