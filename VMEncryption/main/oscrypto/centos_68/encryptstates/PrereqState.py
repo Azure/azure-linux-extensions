@@ -50,7 +50,7 @@ class PrereqState(OSEncryptionState):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:
-            raise Exception("RHEL68EncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
+            raise Exception("CentOS68EncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
                                                                                             distro_info[1]))
 
         self.context.distro_patcher.install_extras()

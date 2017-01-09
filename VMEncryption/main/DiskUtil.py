@@ -134,14 +134,33 @@ class DiskUtil(object):
                 crypt_item = CryptItem()
                 crypt_item.mapper_name = "osencrypt"
 
+                proc_comm = ProcessCommunicator()
+                grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+
+                if grep_result == 0:
+                    crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+                else:
+                    proc_comm = ProcessCommunicator()
+                    self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
+
+                    for line in proc_comm.stdout.splitlines():
+                        if 'osencrypt' in line:
+                            majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
+                            src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
+                            crypt_item.dev_path = '/dev/' + src_device.name
+                            break
+
                 rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
-                crypt_item.dev_path = rootfs_dev["src"]
                 crypt_item.file_system = rootfs_dev["fs"]
 
                 if not crypt_item.dev_path:
                     raise Exception("Could not locate block device for rootfs")
 
                 crypt_item.luks_header_path = "/boot/luks/osluksheader"
+
+                if not os.path.exists(crypt_item.luks_header_path):
+                    crypt_item.luks_header_path = crypt_item.dev_path
+
                 crypt_item.mount_point = "/"
                 crypt_item.uses_cleartext_key = False
                 crypt_item.current_luks_slot = -1
@@ -273,19 +292,20 @@ class DiskUtil(object):
         self.hutil.log("dev path to cryptsetup luksFormat {0}".format(dev_path))
         #walkaround for sles sp3
         if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
+            proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
-            passphrase_cmd_args = shlex.split(passphrase_cmd)
-            self.logger.log("passphrase_cmd is:{0}".format(passphrase_cmd))
-            passphrase_p = Popen(passphrase_cmd_args, stdout=subprocess.PIPE)
+            self.command_executor.Execute(passphrase_cmd, communicator=proc_comm)
+            passphrase = proc_comm.stdout
 
-            cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path , dev_path)
+            cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path, dev_path)
+            return self.command_executor.Execute(cryptsetup_cmd, input=passphrase)
         else:
             if header_file is not None:
                 cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
             else:
                 cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path , dev_path , passphrase_file)
             
-        return self.command_executor.Execute(cryptsetup_cmd)
+            return self.command_executor.Execute(cryptsetup_cmd)
         
     def luks_add_key(self, passphrase_file, dev_path, mapper_name, header_file, new_key_path):
         """
@@ -301,6 +321,19 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, header_file, new_key_path, passphrase_file)
         else:
             cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, new_key_path, passphrase_file)
+
+        return self.command_executor.Execute(cryptsetup_cmd)
+        
+    def luks_remove_key(self, passphrase_file, dev_path, header_file):
+        """
+        return the return code of the process for error handling.
+        """
+        self.hutil.log("removing keyslot: {0}".format(passphrase_file))
+
+        if header_file:
+            cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, header_file, passphrase_file)
+        else:
+            cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
         
@@ -616,59 +649,59 @@ class DiskUtil(object):
 
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
-            get_property_cmd_args = shlex.split(get_property_cmd)
-            get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output, err = get_property_cmd_p.communicate()
-            return output.strip()
+            proc_comm = ProcessCommunicator()
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm)
+            return proc_comm.stdout.strip()
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
-            get_property_cmd_args = shlex.split(get_property_cmd)
-            get_property_cmd_p = Popen(get_property_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output, err = get_property_cmd_p.communicate()
-            lines = output.splitlines()
-            for i in range(0, len(lines)):
-                item_value_str = lines[i].strip()
-                if item_value_str != "":
-                    disk_info_item_array = item_value_str.split()
+            proc_comm = ProcessCommunicator()
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True)
+            for line in proc_comm.stdout.splitlines():
+                if line.strip():
+                    disk_info_item_array = line.strip().split()
                     if dev_name == disk_info_item_array[0]:
                         if len(disk_info_item_array) > 1:
                             return disk_info_item_array[1]
-        return None
+
+        return
 
     def get_device_items_sles(self, dev_path):
         self.logger.log(msg=("getting the blk info from:{0}".format(dev_path)))
         device_items_to_return = []
         device_items = []
+
         #first get all the device names
         if dev_path is None:
-            get_device_cmd = self.distro_patcher.lsblk_path + " -b -nl -o NAME"
+            lsblk_command = 'lsblk -b -nl -o NAME'
         else:
-            get_device_cmd = "{0} -b -nl -o NAME {1}".format(self.distro_patcher.lsblk_path , dev_path)
-        get_device_cmd_args = shlex.split(get_device_cmd)
-        p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out_lsblk_output, err = p.communicate()
-        lines = out_lsblk_output.splitlines()
-        for i in range(0, len(lines)):
-            item_value_str = lines[i].strip()
-            if item_value_str != "":
-                disk_info_item_array = item_value_str.split()
+            lsblk_command = 'lsblk -b -nl -o NAME ' + dev_path
+
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
+
+        for line in proc_comm.stdout.splitlines():
+            item_value_str = line.strip()
+            if item_value_str:
                 device_item = DeviceItem()
-                device_item.name = disk_info_item_array[0]
+                device_item.name = item_value_str.split()[0]
                 device_items.append(device_item)
 
-        for i in range(0, len(device_items)):
-            device_item = device_items[i]
+        for device_item in device_items:
             device_item.file_system = self.get_device_items_property(dev_name=device_item.name, property_name='FSTYPE')
             device_item.mount_point = self.get_device_items_property(dev_name=device_item.name, property_name='MOUNTPOINT')
             device_item.label = self.get_device_items_property(dev_name=device_item.name, property_name='LABEL')
             device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
+            device_item.majmin = self.get_device_items_property(dev_name=device_item.name, property_name='MAJ:MIN')
+
             # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
+
             if os.path.exists(model_file_path):
-                with open(model_file_path,'r') as f:
+                with open(model_file_path, 'r') as f:
                     device_item.model = f.read().strip()
             else:
                 self.logger.log(msg=("no model file found for device {0}".format(device_item.name)))
+
             if device_item.model == 'Virtual Disk':
                 self.logger.log(msg="model is virtual disk")
                 device_item.type = 'disk'
@@ -677,13 +710,17 @@ class DiskUtil(object):
                 self.logger.log(msg="partition files exists")
                 if partition_files is not None and len(partition_files) > 0:
                     device_item.type = 'part'
+
             size_string = self.get_device_items_property(dev_name=device_item.name, property_name='SIZE')
+
             if size_string is not None and size_string != "":
                 device_item.size = int(size_string)
+
             if device_item.size is not None:
                 device_items_to_return.append(device_item)
             else:
                 self.logger.log(msg=("skip the device {0} because we could not get size of it.".format(device_item.name)))
+
         return device_items_to_return
 
     def get_device_items(self, dev_path):
@@ -691,25 +728,21 @@ class DiskUtil(object):
             return self.get_device_items_sles(dev_path)
         else:
             self.logger.log(msg=("getting the blk info from " + str(dev_path)))
-            device_items = []
+
             if dev_path is None:
-                p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN'
             else:
-                p = Popen([self.distro_patcher.lsblk_path, '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE', dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out_lsblk_output, err = p.communicate()
-            out_lsblk_output = str(out_lsblk_output)
-            error_msg = str(err)
-            if error_msg is not None and error_msg.strip() != "":
-                self.logger.log(msg=str(err), level=CommonVariables.ErrorLevel)
-            lines = out_lsblk_output.splitlines()
-            for i in range(0, len(lines)):
-                item_value_str = lines[i].strip()
-                if item_value_str != "":
-                    disk_info_item_array = item_value_str.split()
+                lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN ' + dev_path
+            
+            proc_comm = ProcessCommunicator()
+            self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
+            
+            device_items = []
+            for line in proc_comm.stdout.splitlines():
+                if line:
                     device_item = DeviceItem()
-                    disk_info_item_array_length = len(disk_info_item_array)
-                    for j in range(0, disk_info_item_array_length):
-                        disk_info_property = disk_info_item_array[j]
+
+                    for disk_info_property in line.split():
                         property_item_pair = disk_info_property.split('=')
                         if property_item_pair[0] == 'SIZE':
                             device_item.size = int(property_item_pair[1].strip('"'))
@@ -735,9 +768,55 @@ class DiskUtil(object):
                         if property_item_pair[0] == 'MODEL':
                             device_item.model = property_item_pair[1].strip('"')
 
+                        if property_item_pair[0] == 'MAJ:MIN':
+                            device_item.majmin = property_item_pair[1].strip('"')
+
+                    if device_item.type.lower() == 'lvm':
+                        for lvm_item in self.get_lvm_items():
+                            majmin = lvm_item.lv_kernel_major + ':' + lvm_item.lv_kernel_minor
+
+                            if majmin == device_item.majmin:
+                                device_item.name = lvm_item.vg_name + '/' + lvm_item.lv_name
+
                     device_items.append(device_item)
+
             return device_items
-    
+
+    def get_lvm_items(self):
+        lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+
+        lvm_items = []
+
+        for line in proc_comm.stdout.splitlines():
+            if not line:
+                continue
+
+            lvm_item = LvmItem()
+
+            for pair in line.strip().split():
+                if len(pair.split('=')) != 2:
+                    continue
+
+                key, value = pair.split('=')
+
+                if key == 'LVM2_LV_NAME':
+                    lvm_item.lv_name = value
+
+                if key == 'LVM2_VG_NAME':
+                    lvm_item.vg_name = value
+
+                if key == 'LVM2_LV_KERNEL_MAJOR':
+                    lvm_item.lv_kernel_major = value
+
+                if key == 'LVM2_LV_KERNEL_MINOR':
+                    lvm_item.lv_kernel_minor = value
+
+            lvm_items.append(lvm_item)
+
+        return lvm_items
+
     def should_skip_for_inplace_encryption(self, device_item):
         """
         TYPE="raid0"
