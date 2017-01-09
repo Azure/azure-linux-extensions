@@ -199,7 +199,8 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri)
                     headers = {}
-                    httpResp = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
+                    result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
+                    self.hutil.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                     blobProperties = self.httpresponse_get_blob_properties(httpResp)
                     self.hutil.log("GetBlobProperties: blobProperties :" + str(blobProperties))
                     retry_times = 0

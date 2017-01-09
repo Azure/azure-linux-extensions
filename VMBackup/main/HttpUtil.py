@@ -71,8 +71,9 @@ class HttpUtil(object):
 
     def Call(self, method, sasuri_obj, data, headers, fallback_to_curl = False):
         try:
-            resp = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
-            if(resp != None):
+            result, resp, errorMsg = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
+            self.logger.log("HttpUtil Call : result: " + str(result) + ", errorMsg: " + str(errorMsg))
+            if(result == CommonVariables.success and resp != None):
                 self.logger.log("resp-header: " + str(resp.getheaders()))
             else:
                 self.logger.log("Http connection response is None")
@@ -95,6 +96,9 @@ class HttpUtil(object):
                 return CommonVariables.error_http_failure
 
     def HttpCallGetResponse(self, method, sasuri_obj, data, headers):
+        result = CommonVariables.error_http_failure
+        resp = None
+        errorMsg = None
         try:
             resp = None
             if(self.proxyHost == None or self.proxyPort == None):
@@ -110,8 +114,8 @@ class HttpUtil(object):
                 connection.request(method=method, url=(path), body=data, headers=headers)
                 resp = connection.getresponse()
                 connection.close()
-            return resp
+            result = CommonVariables.success
         except Exception as e:
-            errorMsg = "Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = str(datetime.datetime.now()) +  " Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
-            return None
+        return result, resp, errorMsg
