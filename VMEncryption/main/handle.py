@@ -59,6 +59,8 @@ from __builtin__ import int
 def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
+    logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
