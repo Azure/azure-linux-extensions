@@ -31,13 +31,17 @@ class Backuplogger(object):
         self.msg = ''
         self.log_message = ''
         self.con_path = '/dev/console'
+        self.enforced_local_flag_value = True
         self.hutil = hutil
+
+    def enforce_local_flag(self, enforced_local):
+        self.enforced_local_flag_value = enforced_local
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
         log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
         self.log_to_con(log_msg)
-        if(local):
+        if(local and self.enforced_local_flag_value):
             self.log_message += log_msg
             self.hutil.log(log_msg)
         else:
