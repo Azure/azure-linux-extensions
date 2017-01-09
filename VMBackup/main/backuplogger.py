@@ -41,7 +41,9 @@ class Backuplogger(object):
     def log(self, msg, local=False, level='Info'):
         log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
         self.log_to_con(log_msg)
-        if(local and self.enforced_local_flag_value):
+        if self.enforced_local_flag_value != None:
+            local = self.enforced_local_flag_value
+        if(local):
             self.log_message += log_msg
             self.hutil.log(log_msg)
         else:
