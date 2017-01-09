@@ -121,6 +121,7 @@ class FsFreezer:
             self.logger.log(str(args),True)
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
+            self.logger.enforce_local_flag(False)
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
                 while True:
@@ -173,6 +174,7 @@ class FsFreezer:
             is_inconsistent = True
             thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
+        self.logger.enforce_local_flag(True)
         return thaw_result, is_inconsistent
 
     def freeze(self, mount):
