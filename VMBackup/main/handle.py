@@ -50,6 +50,7 @@ from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
 
 #Main function is the only entrence to this extension handler
 
@@ -104,7 +105,7 @@ def status_report(status, status_code, message, snapshot_info = None):
                     commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                     snapshot_info=snapshot_info)
     except Exception as e:
-        err_msg='cannot write status to the status file'
+        err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(err_msg, True, 'Warning')
     try:
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -126,12 +127,42 @@ def exit_with_commit_log(error_msg, para_parser):
         backup_logger.commit(para_parser.logsBlobUri)
     sys.exit(0)
 
+def exit_if_same_taskId(taskId):  
+    global backup_logger  
+    taskIdentity = TaskIdentity()  
+    last_taskId = taskIdentity.stored_identity()  
+    if(taskId == last_taskId):  
+        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)  
+        sys.exit(0)  
+
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
+def set_do_seq_flag():
+    configfile='/etc/azure/vmbackup.conf'
+    try:
+        backup_logger.log('setting doseq flag in config file', True, 'Info')
+        if not os.path.exists(os.path.dirname(configfile)):
+            os.makedirs(os.path.dirname(configfile))
+
+        if os.path.exists(configfile):
+            config = ConfigParser.ConfigParser()
+            config.read(configfile)
+            if not config.has_option('SnapshotThread','doseq'):
+                file_pointer = open(configfile, "a")
+                file_pointer.write("doseq: 1")
+                file_pointer.close()
+        else :
+            file_pointer = open(configfile, "w")
+            file_pointer.write("[SnapshotThread]\n")
+            file_pointer.write("doseq: 1")
+            file_pointer.close()
+    except Exception as e:
+        backup_logger.log('Unable to set doseq flag ' + str(e), True, 'Warning')
+
 def snapshot(): 
     try: 
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array 
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array
         freeze_result = freezer.freezeall() 
         all_failed= False
         backup_logger.log('T:S freeze result ' + str(freeze_result)) 
@@ -139,7 +170,8 @@ def snapshot():
             run_result = CommonVariables.error 
             run_status = 'error' 
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
-            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
             backup_logger.log(error_msg, True, 'Warning') 
         else: 
             backup_logger.log('T:S doing snapshot now...') 
@@ -150,9 +182,11 @@ def snapshot():
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 if all_failed:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 else:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error' 
                 backup_logger.log(error_msg, True, 'Error') 
             else: 
@@ -167,32 +201,39 @@ def snapshot():
 
 def freeze_snapshot(timeout):
     try:
-        global backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         all_failed= False
+        is_inconsistent_freeze = False
+        is_inconsistent_snapshot =  False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            error_msg = error_msg + " StatusCode.FailedRetryableFsFreezeFailed,"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
             backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array, all_failed, is_inconsistent_snapshot = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 if all_failed:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedNoNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 else:
-                    error_msg = error_msg + " StatusCode.FailedRetryableSnapshotFailedRestrictedNetwork,"
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
             else:
-                thaw_result=freezer.thaw_safe()
+                thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
+                if is_inconsistent_freeze and is_inconsistent_snapshot:
+                    set_do_seq_flag()
                 backup_logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
                     run_result = CommonVariables.error
@@ -228,8 +269,10 @@ def daemon():
             hutil.partitioncount = len(freezer.mounts.mounts)
         config = ConfigParser.ConfigParser()
         config.read(configfile)
-        thread_timeout= config.get('SnapshotThread','timeout')
-        safe_freeze_on=config.get('SnapshotThread','safefreeze')
+        if config.has_option('SnapshotThread','timeout'):
+            thread_timeout= config.get('SnapshotThread','timeout')
+        if config.has_option('SnapshotThread','safefreeze'):
+            safe_freeze_on=config.get('SnapshotThread','safefreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
@@ -263,6 +306,7 @@ def daemon():
         elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
             if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
                 run_result = CommonVariables.error_parameter
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'
                 error_msg = 'required field empty or not correct'
                 backup_logger.log(error_msg, True, 'Error')
@@ -290,6 +334,7 @@ def daemon():
                     snapshot_thread.join(float(thread_timeout))
                     if not snapshot_done:
                         run_result = CommonVariables.error
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.CommonVariables.error)
                         run_status = 'error'
                         error_msg = 'T:W Snapshot timeout'
                         backup_logger.log(error_msg, True, 'Warning')
@@ -311,6 +356,7 @@ def daemon():
         else:
             run_status = 'error'
             run_result = CommonVariables.error_parameter
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
@@ -325,13 +371,17 @@ def daemon():
         if(global_error_result is not None):
             if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
                 run_result = CommonVariables.error_12
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_12)
             elif(para_parser is None):
                 run_result = CommonVariables.error_parameter
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
             else:
                 run_result = CommonVariables.error
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
             run_status = 'error'
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         status_report(run_status,run_result,error_msg, snapshot_info_array)
     except Exception as e:
         errMsg = 'Failed to log status in extension'
@@ -403,6 +453,8 @@ def enable():
                 exit_with_commit_log(error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):

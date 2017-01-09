@@ -31,20 +31,20 @@
     status = (x);                \
     if (status) goto CLEANUP;    \
 }
-time_t mytime;
-struct tm * timeinfo;
-char buffer [80];
 void logger(const char *logstr,...)
 {
+    time_t mytime;
+    struct tm * timeinfo;
+    char buffer[80];
     time(&mytime);
     timeinfo = localtime(&mytime);
-    strftime (buffer,80,"%F %X",timeinfo);
+    strftime(buffer, 80, "%F %X", timeinfo);
     va_list arg;
     int done;
-    printf("%s : ", buffer);
+    printf("%s ", buffer);
     va_start(arg, logstr);
-    done = vfprintf (stdout,  logstr, arg);
-    va_end (arg);
+    done = vfprintf(stdout,  logstr, arg);
+    va_end(arg);
 }
 
 int gThaw = 0;
@@ -52,7 +52,7 @@ int gThaw = 0;
 
 void globalSignalHandler(int signum)
 {
-    printf("SignalHandler signum: %d\n", signum);
+    logger("SignalHandler signum: %d\n", signum);
     if (signum == SIGUSR1)
     {
         gThaw = 1;
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
-        logger("freezing the mount: %s\n", mountPoint);
+        logger("Freezing: %s\n", mountPoint);
 
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
@@ -160,7 +160,9 @@ int main(int argc, char *argv[])
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
-    time_t starttime,currenttime,endtime; 
+    time_t starttime,currenttime; 
+    currenttime=time(NULL);
+    starttime=time(NULL);
     for (i = 0; i < timeout; i++)
     {
         if (gThaw == 1 )
@@ -168,11 +170,8 @@ int main(int argc, char *argv[])
             break;
         }
         else if (sleep(1) != 0)
-	{
-           currenttime=time(NULL);
-           starttime=time(NULL);
-           endtime=starttime+1;
-	   while(currenttime<endtime)
+        {
+           while(currenttime<starttime+i+1)
            {
                 currenttime=time(NULL);
            }
@@ -194,7 +193,7 @@ CLEANUP:
             if (fileSystemDescriptors[i] >= 0)
             {
                 char *mountPoint = argv[i + 2];
-                logger("unfreezing the mount: %s\n", mountPoint);
+                logger("Thawing: %s\n", mountPoint);
 
                 if (ioctl(fileSystemDescriptors[i], FITHAW, 0) != 0)
                 {

@@ -18,6 +18,7 @@
 
 import array
 import base64
+import filecmp
 import httplib
 import imp
 import json
@@ -241,6 +242,9 @@ def update_encryption_settings():
 
             logger.log("New key successfully added to all encrypted devices")
 
+            if DistroPatcher.distro_info[0] == "Ubuntu":
+                executor.Execute("update-initramfs -u -k all", True)
+
             os.unlink(temp_keyfile.name)
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
@@ -264,9 +268,8 @@ def update_encryption_settings():
                 encryption_config.secret_seq_num = hutil.get_current_seq()
                 encryption_config.commit()
 
-                with open(encryption_environment.update_encryption_marker_path, 'w') as f:
-                    logger.log("Touching update marker at {0}".format(encryption_environment.update_encryption_marker_path))
-                    pass
+                shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
+                logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
 
                 hutil.do_exit(exit_code=0,
                               operation='UpdateEncryptionSettings',
@@ -292,32 +295,27 @@ def update_encryption_settings():
                 if not crypt_item:
                     continue
 
+                if filecmp.cmp(existing_passphrase_file, encryption_environment.bek_backup_path):
+                    logger.log('Current BEK and backup are the same, skipping removal')
+                    continue
+
                 logger.log('Removing old passphrase from {0}'.format(crypt_item.dev_path))
 
                 keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots before removal: {0}".format(keyslots))
+                
+                luks_remove_result = disk_util.luks_remove_key(passphrase_file=encryption_environment.bek_backup_path,
+                                                               dev_path=crypt_item.dev_path,
+                                                               header_file=crypt_item.luks_header_path)
+                logger.log("luks remove result is {0}".format(luks_remove_result))
 
-                for index, enabled in enumerate(keyslots):
-                    if enabled:
-                        logger.log('Keyslot {0} is enabled'.format(index))
-
-                        if index != crypt_item.current_luks_slot:
-                            logger.log('Keyslot {0} is redundant, killing the slot'.format(index))
-
-                            luks_kill_result = disk_util.luks_kill_slot(passphrase_file=existing_passphrase_file,
-                                                                        dev_path=crypt_item.dev_path,
-                                                                        header_file=crypt_item.luks_header_path,
-                                                                        keyslot=index)
-
-                            logger.log("luks kill result is {0}".format(luks_kill_result))
-                        else:
-                            logger.log('Keyslot {0} is currently active'.format(index))
-                    else:
-                        logger.log('Keyslot {0} is disabled'.format(index))
+                keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+                logger.log("Keyslots after removal: {0}".format(keyslots))
 
             logger.log("Old key successfully removed from all encrypted devices") 
             hutil.save_seq()
             extension_parameter.commit()
-            os.unlink(encryption_environment.update_encryption_marker_path)
+            os.unlink(encryption_environment.bek_backup_path)
 
         hutil.do_exit(exit_code=0,
                         operation='UpdateEncryptionSettings',
@@ -945,7 +943,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
                 original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                crypt_item_to_update.dev_path = original_dev_name_path
+                crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
@@ -1468,13 +1466,18 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif ((distro_name == 'redhat' and distro_version == '6.8') or
-              (distro_name == 'centos' and distro_version == '6.8')):
+        elif distro_name == 'redhat' and distro_version == '6.8':
             from oscrypto.rhel_68 import RHEL68EncryptionStateMachine
             os_encryption = RHEL68EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
+        elif distro_name == 'centos' and distro_version == '6.8':
+            from oscrypto.centos_68 import CentOS68EncryptionStateMachine
+            os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
+                                                           distro_patcher=DistroPatcher,
+                                                           logger=logger,
+                                                           encryption_environment=encryption_environment)
         elif distro_name == 'Ubuntu' and distro_version == '16.04':
             from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
             os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
