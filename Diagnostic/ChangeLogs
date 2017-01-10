@@ -1,3 +1,8 @@
+2017-01-08: LAD-2.3.9019
+    - Fix rsyslogd core dump issue when re-enabling the extension
+    - Take latest mdsd binary that fixes other issues like missing perf
+      counter logs when there's a race condition between mdsd and omiserver.
+
 2016-11-30: LAD-2.3.9017
     - Fix scx upgrade issue on RPM-based distros when apache or mysql is
       installed.
