@@ -80,6 +80,7 @@ omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
+                "stoprsyslog" : "service rsyslog stop",
                 "restartrsyslog":"service rsyslog restart",
                 'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
                 'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
@@ -88,6 +89,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
                  "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
+                 "stoprsyslog" : "service rsyslog stop",
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -1102,7 +1104,11 @@ def install_rsyslogom():
     if rsyslog_om_folder and rsyslog_om_path:
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
-        # Copy necesssary files
+        # Copy necesssary files. First, stop rsyslog to avoid SEGV on overwriting omazuremds.so.
+        if distConfig.has_key("stoprsyslog"):
+            RunGetOutput(distConfig["stoprsyslog"])
+        else:
+            RunGetOutput("service rsyslog stop")
         RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
