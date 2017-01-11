@@ -17,7 +17,7 @@ class FStabUnitTests(unittest.TestCase):
         try:
             os.mkdir(self._datapath)
         except OSError as e:
-            if (e.errno != errno.EEXIST):
+            if e.errno != errno.EEXIST:
                 raise
             pass
 
@@ -36,11 +36,11 @@ class FStabUnitTests(unittest.TestCase):
             pass
 
     def test_fstab_basic(self):
-        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignore_time=True), 0)
        
     def test_fstab_touch(self):
         subprocess.call(['sudo', 'touch', '/etc/fstab'])
-        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignore_time=True), 0)
 
     def addFstabEntry(self, fstabentry):
         with open(self._datapath + '/fstab', 'w') as f:
@@ -51,21 +51,21 @@ class FStabUnitTests(unittest.TestCase):
     def test_fstab_baduuid(self):
         self.addFstabEntry('UUID=1111111-1111-1111-1111-111111111111 /test ext4 defaults 0 0')
         pdb.set_trace()
-        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignore_time=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_baddevicename(self):
         self.addFstabEntry('/dev/foobar /test ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignore_time=True), 0)
 
     @unittest.skip('Skipping because mount -f fails to detect error')
     def test_fstab_malformedentry(self):
         self.addFstabEntry('/test /dev/foobar ext4 defaults 0 0')
-        self.assertNotEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertNotEqual(self._watcher.handle_fstab(ignore_time=True), 0)
 
     def test_fstab_goodentry(self):
         self.addFstabEntry('/dev/sdb1 /test ext4 defaults 0 0')
-        self.assertEqual(self._watcher.handle_fstab(ignoretime=True), 0)
+        self.assertEqual(self._watcher.handle_fstab(ignore_time=True), 0)
 
 
 
