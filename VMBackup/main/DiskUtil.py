@@ -153,7 +153,8 @@ class DiskUtil(object):
                         if(property_item_pair[0] == 'MODEL'):
                             device_item.model = property_item_pair[1].strip('"')
                     self.logger.log("lsblk command mount :" + str(device_item.mount_point) + ":", True)
-                    device_items.append(device_item)
+                    if(device_item.mount_point is not None and device_item.mount_point != "" and device_item.mount_point != " "):
+                        device_items.append(device_item)
             return device_items
 
     def get_mount_points(self, dev_path):
@@ -198,13 +199,14 @@ class DiskUtil(object):
                     mountpointStart = prefixIndex + len(mountPrefixStr) - 1
                     fstypePrefixStr = " type "
                     mountpointEnd = line.find(fstypePrefixStr, mountpointStart)
-                    fstypeStart = line.find(fstypePrefixStr) + len(fstypePrefixStr) - 1
-                    if(line.find(fstypePrefixStr) >= 0):
-                        fstypeEnd = line.find(" ", fstypeStart+1)
-                        print(fstypeEnd)
-                    if(mountpointEnd >= 0 and fstypeEnd >=0):
+                    if(mountpointEnd >= 0):
                         mount_point = line[mountpointStart:mountpointEnd]
-                        fs_type = line[fstypeStart+1:fstypeEnd]
+                        fs_type = ""
+                        fstypeStart = line.find(fstypePrefixStr) + len(fstypePrefixStr) - 1
+                        if(line.find(fstypePrefixStr) >= 0):
+                            fstypeEnd = line.find(" ", fstypeStart+1)
+                            if(fstypeEnd >=0):
+                                fs_type = line[fstypeStart+1:fstypeEnd]
                         # If there is a duplicate, keep only the first instance
                         if(mount_point not in mount_points):
                             self.logger.log("mount command mount :" + str(mount_point) + ": and fstype :"+ str(fs_type) + ":", True)
