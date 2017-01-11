@@ -854,8 +854,7 @@ def start_mdsd():
                     memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
                                       "Recycling mdsd to self-mitigate.".format(int((mdsd_memory_usage_in_KB+1023)/1024))
                     hutil.log(memory_leak_msg)
-                    # Add a telemetry as well. This might ding our enable success KPI,
-                    # but there doesn't seem to be any other way.
+                    # Add a telemetry for a possible statistical analysis
                     waagent.AddExtensionEvent(name=hutil.get_name(),
                                               op=waagent.WALAEventOperation.HeartBeat,
                                               isSuccess=True,
