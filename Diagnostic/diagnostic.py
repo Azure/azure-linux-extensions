@@ -695,6 +695,26 @@ def start_daemon():
         hutil.error("wait daemon start time out")
 
 
+def check_suspected_memory_leak(pid):
+    memory_leak_threshold_in_KB = 2000000  # Roughly 2GB
+    memory_rss_usage_in_KB = 0
+    memory_leak_suspected = False
+
+    try:
+        # Check /proc/[pid]/status file for "VmRSS" to find out the process's RSS memory usage
+        with open("/proc/{0}/status".format(pid)) as proc_file:
+            for line in proc_file:
+                if line.startswith("VmRSS:"):
+                    memory_rss_usage_in_KB = int(line.split()[1])
+                    memory_leak_suspected = memory_rss_usage_in_KB > memory_leak_threshold_in_KB
+                    break
+    except Exception as e:
+        # Not to throw in case any statement above fails (e.g., invalid pid). Just log.
+        hutil.error("Failed to check memory usage of pid={0}.\nError: {1}\nTrace:\n{2}".format(pid, e, traceback.format_exc()))
+
+    return memory_leak_suspected, memory_rss_usage_in_KB/1024  # return mem usage in MB
+
+
 def start_mdsd():
     global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
@@ -827,6 +847,21 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
+
+                # Mitigate if memory leak is suspected.
+                mdsd_memory_leak_suspected, mdsd_memory_usage_in_MB = check_suspected_memory_leak(mdsd.pid)
+                if mdsd_memory_leak_suspected:
+                    memory_leak_msg = "Suspected mdsd memory leak (memory usage: {0}MB). Recycling mdsd to self-mitigate.".format(mdsd_memory_usage_in_MB)
+                    hutil.log(memory_leak_msg)
+                    # Add a telemetry as well. This might ding our enable success KPI,
+                    # but there doesn't seem to be any other way.
+                    waagent.AddExtensionEvent(name=hutil.get_name(),
+                                              op=ExtensionOperationType,
+                                              isSuccess=False,
+                                              version=hutil.get_extension_version(),
+                                              message=memory_leak_msg)
+                    mdsd.kill()
+                    break
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
