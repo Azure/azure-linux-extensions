@@ -16,12 +16,30 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+# A provider is responsible for taking a particular syntax of configuration instructions, as found in the JSON config
+# blob, and using it to enable collection of data as specified in those instructions.
+
+# The "Builtin" configuration instructions are agnostic to the collection mechanism used to implement them; it's simply
+# a list of metrics to be collected on a particular schedule. The metric names are collected into classes for ease
+# of understanding by the user. The predefined classes and metric names are available without regard to how the
+# underlying mechanism might name them.
+#
+# This specific implementation of the Builtin provider converts the configuration instructions into a set of OMI
+# queries to be executed by the mdsd agent. The agent executes the queries are written by this provider and uploads
+# the results to the appropriate table in the customer's storage account.
+#
+# A different implementation might use fluentd to collect the data and to upload the results to table storage.
+
+# A different provider (e.g. an OMI provider) would expect configuration instructions bound directly to OMI; that is,
+# the PublicConfig JSON delivered to LAD would itself contain actual OMI queries. The implementation of such a provider
+# might construct an mdsd configuration file cause mdsd to run the specified queries and store the data in tables.
+
 import Utils.ProviderUtil as ProvUtil
 from collections import defaultdict
 
 # These are the built-in metrics this code provides, grouped by class.
 _builtIns = {
-    'processor' : [ 'percentidletime', 'percentprocessortime', 'percentiowaittime', 'percentinterrupttime',
+    'processor':  [ 'percentidletime', 'percentprocessortime', 'percentiowaittime', 'percentinterrupttime',
                     'percentusertime', 'percentnicetime', 'percentprivilegedtime' ],
     'memory':     [ 'availablememory', 'percentavailablememory', 'usedmemory', 'percentusedmemory', 'pagespersec',
                     'pagesreadpersec', 'pageswrittenpersec', 'availableswap', 'percentavailableswap', 'usedswap',
@@ -43,7 +61,8 @@ _omiClassName = { 'processor': 'SCX_ProcessorStatisticalInformation',
                   'disk': 'SCX_DiskDriveStatisticalInformation'
                 }
 
-_instancedClasses = [ 'network', 'filesystem', 'disk', 'processor' ]
+# There can be multiple NICs, multiple drives and filesystems, multiple cores... only one pile of memory.
+_instancedClasses = ['network', 'filesystem', 'disk', 'processor']
 
 # The Azure Metrics infrastructure, along with App Insights, requires that quantities be measured
 # in one of these units: Percent, Count, Seconds, Milliseconds, Bytes, BytesPerSecond, CountPerSecond
@@ -54,9 +73,9 @@ _instancedClasses = [ 'network', 'filesystem', 'disk', 'processor' ]
 _scaling = defaultdict(lambda:defaultdict(str),
             { 'memory' : defaultdict(str,
                 { 'availablememory': 'scaleUp="1048576"',
-                  'usedmemory' : 'scaleUp="1048576"',
-                  'availableswap' : 'scaleUp="1048576"',
-                  'usedswap' : 'scaleUp="1048576"'
+                  'usedmemory': 'scaleUp="1048576"',
+                  'availableswap': 'scaleUp="1048576"',
+                  'usedswap': 'scaleUp="1048576"'
                 } )
             } )
 
@@ -66,6 +85,7 @@ _eventNames = {}
 _defaultSampleRate = 15
 
 def SetDefaultSampleRate(rate):
+    global _defaultSampleRate
     _defaultSampleRate = rate
 
 class BuiltinMetric:
@@ -76,7 +96,7 @@ class BuiltinMetric:
         else:
             self._Type = t.lower()
             if t != 'builtin':
-                raise ProvUtil.UnexpectedCounterType('Expected type "builtin" but saw type "{0}"'.format(self.Type))
+                raise ProvUtil.UnexpectedCounterType('Expected type "builtin" but saw type "{0}"'.format(self._Type))
 
         self._CounterClass = ProvUtil.GetCounterSetting(counterSpec, 'class').lower()
         if self._CounterClass not in _builtIns:
@@ -90,7 +110,7 @@ class BuiltinMetric:
         self._SampleRate = ProvUtil.GetCounterSetting(counterSpec, 'sampleRate')
 
     def IsType(self, t):
-        return self.Type == t.lower()
+        return self._Type == t.lower()
 
     def Class(self):
         return self._CounterClass
@@ -124,7 +144,7 @@ def AddMetric(counterSpec):
     # table where we store the collected metrics.
 
     key = (metric.Class(), metric.InstanceId(), metric.SampleRate() )
-    if (key not in _eventNames):
+    if key not in _eventNames:
         _eventNames[key] = ProvUtil.MakeUniqueEventName('builtin')
     _metrics[key].append(metric)
 

@@ -41,7 +41,7 @@ def IntervalToSeconds(specifiedInterval):
         elif unit == 'H':
             seconds += qty * 3600
 
-    if (0 == seconds):
+    if 0 == seconds:
         raise ValueError('Could not parse interval specification "{0}"'.format(specifiedInterval))
     return seconds
 
