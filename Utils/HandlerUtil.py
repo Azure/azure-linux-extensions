@@ -168,7 +168,7 @@ class HandlerUtility:
                 cert=waagent.LibDir+'/'+thumb+'.crt'
                 pkey=waagent.LibDir+'/'+thumb+'.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = "openssl smime -inform DER -decrypt -recip {} -inkey {}"
+                openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
                 cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
                 if cleartxt == None:
                     self.error("OpenSSh decode error using  thumbprint " + thumb )
