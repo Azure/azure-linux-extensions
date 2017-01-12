@@ -62,7 +62,21 @@ class SplitRootPartitionState(OSEncryptionState):
         desired_root_fs_size = original_root_fs_size - desired_boot_partition_size
         self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
 
-        self.command_executor.Execute("resize2fs {0} {1}s".format(self.rootfs_block_device, desired_root_fs_size), True)
+        attempt = 1
+        while attempt < 10:
+            resize_result = self.command_executor.Execute("resize2fs {0} {1}s".format(self.rootfs_block_device, desired_root_fs_size))
+
+            if resize_result == 0:
+                break
+            else:
+                self.context.logger.log("Restarting systemd-udevd")
+                self.command_executor.Execute('systemctl restart systemd-udevd')
+                self.context.logger.log("Restarting systemd-timesyncd")
+                self.command_executor.Execute('systemctl restart systemd-timesyncd')
+
+                sleep(10)
+
+                attempt += 1
 
         resized_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
 
