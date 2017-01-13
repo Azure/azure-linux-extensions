@@ -40,7 +40,23 @@ class SplitRootPartitionState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for split_root_partition state")
 
-        self.command_executor.Execute("e2fsck -yf {0}".format(self.rootfs_block_device), True)
+
+        attempt = 1
+        while attempt < 10:
+            fsck_result = self.command_executor.Execute("e2fsck -yf {0}".format(self.rootfs_block_device))
+
+            if fsck_result == 0:
+                break
+
+            self.context.logger.log("Restarting systemd-udevd")
+            self.command_executor.Execute('systemctl restart systemd-udevd')
+            self.context.logger.log("Restarting systemd-timesyncd")
+            self.command_executor.Execute('systemctl restart systemd-timesyncd')
+
+            sleep(10)
+
+        if not attempt < 10:
+            return False
                 
         return True
 
@@ -203,9 +219,26 @@ class SplitRootPartitionState(OSEncryptionState):
 
     def _get_root_fs_size_in(self, sector_size):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="dumpe2fs -h {0}".format(self.rootfs_block_device),
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
+
+        attempt = 1
+        while attempt < 10:
+            dump_result = self.command_executor.Execute(command_to_execute="dumpe2fs -h {0}".format(self.rootfs_block_device),
+                                                        raise_exception_on_failure=False,
+                                                        communicator=proc_comm)
+
+            if dump_result == 0:
+                break
+
+            self.context.logger.log("Restarting systemd-udevd")
+            self.command_executor.Execute('systemctl restart systemd-udevd')
+            self.context.logger.log("Restarting systemd-timesyncd")
+            self.command_executor.Execute('systemctl restart systemd-timesyncd')
+
+            sleep(10)
+
+        if not attempt < 10:
+            return Exception("Could not dumpe2fs, stderr: \n{0}".format(proc_comm.stderr))
+        
 
         root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
         root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)
