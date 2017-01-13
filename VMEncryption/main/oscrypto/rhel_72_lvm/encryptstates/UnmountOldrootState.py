@@ -51,6 +51,8 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.context.logger.log("Entering unmount_oldroot state")
 
+        raise Exception("Dummy exception")
+
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
         self.command_executor.ExecuteInBash('systemctl restart sshd.service')
         self.command_executor.ExecuteInBash('dhclient')
