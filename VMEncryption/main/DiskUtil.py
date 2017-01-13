@@ -557,7 +557,9 @@ class DiskUtil(object):
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
-            if mount_item["dest"] == "/" and \
+            if self.is_os_disk_lvm():
+                self.logger.log("OS disk is using LVM")
+            elif mount_item["dest"] == "/" and \
                 "/dev/mapper" in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
@@ -829,6 +831,20 @@ class DiskUtil(object):
             lvm_items.append(lvm_item)
 
         return lvm_items
+
+    def is_os_disk_lvm(self):
+        lvm_items = self.get_lvm_items()
+
+        current_lv_names = set([item.lv_name for item in lvm_items])
+        current_vg_names = set([item.vg_name for item in lvm_items])
+
+        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
+        expected_vg_names = set(['rootvg'])
+
+        if expected_lv_names == current_lv_names and expected_vg_names == current_vg_names:
+            return True
+
+        return False
 
     def should_skip_for_inplace_encryption(self, device_item):
         """
