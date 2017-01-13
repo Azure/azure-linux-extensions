@@ -75,7 +75,7 @@ class OSEncryptionState(object):
 
         if self.disk_util.is_os_disk_lvm():
             self.rootfs_disk = '/dev/sda'
-            self.rootfs_block_device = '/dev/rootvg/rootlv'
+            self.rootfs_block_device = '/dev/sda2'
             self.bootfs_block_device = '/dev/sda1'
         elif rootfs_sdx_path == '/dev/mapper/osencrypt' or rootfs_sdx_path.startswith('/dev/dm-'):
             self.rootfs_block_device = '/dev/mapper/osencrypt'

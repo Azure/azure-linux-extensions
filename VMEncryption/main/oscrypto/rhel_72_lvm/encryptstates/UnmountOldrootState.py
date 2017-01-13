@@ -108,15 +108,20 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('systemctl restart NetworkManager', True)
         self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
         self.command_executor.Execute('umount /var')
+
         sleep(3)
 
-        self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
+        self.command_executor.Execute('vgcfgbackup -f /volumes.lvm', True)
+        self.command_executor.Execute('sed -i.bak \'s/sda2/mapper\/osencrypt/g\' /volumes.lvm', True)
+        self.command_executor.Execute('lvremove -f rootvg', True)
+        self.command_executor.Execute('vgremove rootvg', True)
 
     def unmount(self, mountpoint):
         self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
         self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
-        self.command_executor.Execute('umount /var')
         self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
+        self.command_executor.ExecuteInBash('systemctl restart systemd-journald', True)
+        self.command_executor.Execute('umount /var')
 
         proc_comm = ProcessCommunicator()
 
