@@ -558,7 +558,8 @@ class DiskUtil(object):
                     data_drives_encrypted = False
 
             if self.is_os_disk_lvm():
-                self.logger.log("OS disk is using LVM")
+                # self.logger.log("OS disk is using LVM")
+                pass
             elif mount_item["dest"] == "/" and \
                 "/dev/mapper" in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
@@ -681,7 +682,8 @@ class DiskUtil(object):
         return
 
     def get_device_items_sles(self, dev_path):
-        self.logger.log(msg=("getting the blk info from:{0}".format(dev_path)))
+        if dev_path:
+            self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
         device_items_to_return = []
         device_items = []
 
@@ -742,7 +744,8 @@ class DiskUtil(object):
         if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
             return self.get_device_items_sles(dev_path)
         else:
-            self.logger.log(msg=("getting the blk info from " + str(dev_path)))
+            if dev_path:
+                self.logger.log(msg=("getting blk info for: " + str(dev_path)))
 
             if dev_path is None:
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN'
