@@ -51,11 +51,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.context.logger.log("Entering unmount_oldroot state")
 
-        self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
-        self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
-        self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
-        self.command_executor.ExecuteInBash('systemctl restart systemd-journald', True)
-        self.command_executor.Execute('umount /var')
+        self.unmount_var()
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
         self.command_executor.ExecuteInBash('systemctl restart sshd.service')
@@ -105,9 +101,7 @@ class UnmountOldrootState(OSEncryptionState):
 
             attempt += 1
 
-        self.command_executor.Execute('systemctl restart NetworkManager', True)
-        self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
-        self.command_executor.Execute('umount /var')
+        self.unmount_var()
 
         sleep(3)
 
@@ -116,12 +110,24 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('lvremove -f rootvg', True)
         self.command_executor.Execute('vgremove rootvg', True)
 
+    def unmount_var(self):
+        unmounted = False
+
+        while not unmounted:
+            self.command_executor.Execute('systemctl stop NetworkManager')
+            self.command_executor.Execute('systemctl stop rsyslog')
+            self.command_executor.Execute('systemctl stop systemd-udevd')
+            self.command_executor.Execute('systemctl stop systemd-journald')
+            self.command_executor.Execute('systemctl stop systemd-hostnamed')
+            self.command_executor.Execute('umount /var')
+
+            sleep(3)
+
+            if self.command_executor.Execute('mountpoint /var'):
+                unmounted = True
+
     def unmount(self, mountpoint):
-        self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
-        self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
-        self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
-        self.command_executor.ExecuteInBash('systemctl restart systemd-journald', True)
-        self.command_executor.Execute('umount /var')
+        self.unmount_var()
 
         proc_comm = ProcessCommunicator()
 
