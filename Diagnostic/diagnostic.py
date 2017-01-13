@@ -701,10 +701,11 @@ def check_suspected_memory_leak(pid):
     memory_leak_suspected = False
 
     try:
-        # Check /proc/[pid]/status file for "VmSize" to find out the process's virtual memory usage
+        # Check /proc/[pid]/status file for "VmRSS" to find out the process's virtual memory usage
+        # Note: "VmSize" for some reason starts out very high (>2000000) at this moment, so can't use that.
         with open("/proc/{0}/status".format(pid)) as proc_file:
             for line in proc_file:
-                if line.startswith("VmSize:"):  # Example line: "VmSize:   33904 kB"
+                if line.startswith("VmRSS:"):  # Example line: "VmRSS:   33904 kB"
                     memory_usage_in_KB = int(line.split()[1])
                     memory_leak_suspected = memory_usage_in_KB > memory_leak_threshold_in_KB
                     break
