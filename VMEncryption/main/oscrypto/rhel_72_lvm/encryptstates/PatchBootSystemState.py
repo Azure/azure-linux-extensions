@@ -38,8 +38,8 @@ class PatchBootSystemState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for patch_boot_system state")
 
-        self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
-        self.command_executor.Execute('umount /oldroot', True)
+        if not os.path.exists('/dev/mapper/osencrypt'):
+            return False
                 
         return True
 
@@ -48,6 +48,24 @@ class PatchBootSystemState(OSEncryptionState):
             return
 
         self.context.logger.log("Entering patch_boot_system state")
+
+        self.command_executor.Execute('systemctl restart lvm2-lvmetad', True)
+        self.command_executor.Execute('pvscan', True)
+        self.command_executor.Execute('vgcreate /dev/mapper/osencrypt', True)
+        self.command_executor.Execute('vgcfgrestore -f /volumes.lvm rootvg', True)
+        self.command_executor.Execute('cryptsetup luksClose osencrypt', True)
+
+        self._find_bek_and_execute_action('_luks_open')
+
+        self.command_executor.Execute('swapoff -a', True)
+        self.command_executor.Execute('umount -a', True)
+        
+        self.command_executor.Execute('mount /dev/rootvg/rootlv /oldroot', True)
+        self.command_executor.Execute('mount /dev/rootvg/varlv /oldroot/var', True)
+        self.command_executor.Execute('mount /dev/rootvg/usrlv /oldroot/usr', True)
+        self.command_executor.Execute('mount /dev/rootvg/tmplv /oldroot/tmp', True)
+        self.command_executor.Execute('mount /dev/rootvg/homelv /oldroot/home', True)
+        self.command_executor.Execute('mount /dev/rootvg/optlv /oldroot/opt', True)
 
         self.command_executor.Execute('mount /boot', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
@@ -107,6 +125,8 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
+        self.command_executor.Execute('mv /usr/lib/dracut/modules.d/90lvm /usr/lib/dracut/modules.d/91lvm', True)
+
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
                                       '/etc/default/grub')
 
@@ -120,3 +140,16 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
         self.command_executor.Execute('grub2-install --recheck --force {0}'.format(self.rootfs_disk), True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
+
+    def _luks_open(self, bek_path):
+        self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
+                                                                                                                         bek_path),
+                                      raise_exception_on_failure=True)
+
+    def _find_bek_and_execute_action(self, callback_method_name):
+        callback_method = getattr(self, callback_method_name)
+        if not ismethod(callback_method):
+            raise Exception("{0} is not a method".format(callback_method_name))
+
+        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        callback_method(bek_path)    
