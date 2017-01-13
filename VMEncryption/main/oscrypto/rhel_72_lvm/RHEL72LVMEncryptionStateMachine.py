@@ -135,7 +135,6 @@ class RHEL72LVMEncryptionStateMachine(OSEncryptionStateMachine):
                                      initial='uninitialized')
 
     def start_encryption(self):
-        import pudb; pu.db
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="mount",
                                       raise_exception_on_failure=True,
