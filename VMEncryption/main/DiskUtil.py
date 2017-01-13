@@ -750,7 +750,7 @@ class DiskUtil(object):
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN ' + dev_path
             
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
+            self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
             
             device_items = []
             for line in proc_comm.stdout.splitlines():
@@ -800,7 +800,7 @@ class DiskUtil(object):
     def get_lvm_items(self):
         lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+        self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
 
         lvm_items = []
 

@@ -36,8 +36,9 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None):
-        self.logger.log("Executing: {0}".format(command_to_execute))
+    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
+        if not suppress_logging:
+            self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
         proc = None
 
@@ -47,7 +48,8 @@ class CommandExecutor(object):
             if raise_exception_on_failure:
                 raise
             else:
-                self.logger.log("Process creation failed: " + str(e))
+                if not suppress_logging:
+                    self.logger.log("Process creation failed: " + str(e))
                 return -1
 
         stdout, stderr = proc.communicate(input=input)
@@ -61,7 +63,8 @@ class CommandExecutor(object):
             msg += "\nstdout:\n" + stdout
             msg += "\nstderr:\n" + stderr
 
-            self.logger.log(msg)
+            if not suppress_logging:
+                self.logger.log(msg)
 
             if raise_exception_on_failure:
                 raise Exception(msg)
