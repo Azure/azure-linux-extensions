@@ -23,6 +23,7 @@ import inspect
 import os
 import sys
 
+from inspect import ismethod
 from time import sleep
 from OSEncryptionState import *
 
@@ -51,14 +52,19 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.Execute('systemctl restart lvm2-lvmetad', True)
         self.command_executor.Execute('pvscan', True)
-        self.command_executor.Execute('vgcreate /dev/mapper/osencrypt', True)
         self.command_executor.Execute('vgcfgrestore -f /volumes.lvm rootvg', True)
         self.command_executor.Execute('cryptsetup luksClose osencrypt', True)
 
         self._find_bek_and_execute_action('_luks_open')
 
         self.command_executor.Execute('swapoff -a', True)
-        self.command_executor.Execute('umount -a', True)
+        self.command_executor.Execute('umount -a')
+
+        for mountpoint in ['/var', '/opt', '/tmp', '/home', '/usr']:
+            if self.command_executor.Execute('mountpoint ' + mountpoint) == 0:
+                self.unmount(mountpoint)
+
+        self.unmount_var()
         
         self.command_executor.Execute('mount /dev/rootvg/rootlv /oldroot', True)
         self.command_executor.Execute('mount /dev/rootvg/varlv /oldroot/var', True)
@@ -68,7 +74,6 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('mount /dev/rootvg/optlv /oldroot/opt', True)
 
         self.command_executor.Execute('mount /boot', False)
-        self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('mkdir /oldroot/memroot', True)
         self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
@@ -107,6 +112,66 @@ class PatchBootSystemState(OSEncryptionState):
 
         return super(PatchBootSystemState, self).should_exit()
 
+    def unmount_var(self):
+        unmounted = False
+
+        while not unmounted:
+            self.command_executor.Execute('systemctl stop NetworkManager')
+            self.command_executor.Execute('systemctl stop rsyslog')
+            self.command_executor.Execute('systemctl stop systemd-udevd')
+            self.command_executor.Execute('systemctl stop systemd-journald')
+            self.command_executor.Execute('systemctl stop systemd-hostnamed')
+            self.command_executor.Execute('umount /var')
+
+            sleep(3)
+
+            if self.command_executor.Execute('mountpoint /var'):
+                unmounted = True
+
+    def unmount(self, mountpoint):
+        self.unmount_var()
+
+        proc_comm = ProcessCommunicator()
+
+        self.command_executor.Execute(command_to_execute="fuser -vm " + mountpoint,
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+
+        self.context.logger.log("Processes using {0}:\n{1}".format(mountpoint, proc_comm.stdout))
+
+        procs_to_kill = filter(lambda p: p.isdigit(), proc_comm.stdout.split())
+        procs_to_kill = reversed(sorted(procs_to_kill))
+
+        for victim in procs_to_kill:
+            if int(victim) == os.getpid():
+                self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
+                
+                # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
+                # needs to be restarted and the drive mounted/unmounted.
+                # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
+
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+
+                self.bek_util.get_bek_passphrase_file(self.encryption_config)
+                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
+                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+
+                self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
+
+            if int(victim) == 1:
+                self.context.logger.log("Skipping init")
+                continue
+
+            self.command_executor.Execute('kill -9 {0}'.format(victim))
+
+        self.command_executor.Execute('telinit u', True)
+
+        sleep(3)
+
+        self.command_executor.Execute('umount ' + mountpoint, True)
+
     def _append_contents_to_file(self, contents, path):
         with open(path, 'a') as f:
             f.write(contents)
@@ -142,6 +207,7 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
 
     def _luks_open(self, bek_path):
+        self.command_executor.Execute('mount /boot')
         self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
                                                                                                                          bek_path),
                                       raise_exception_on_failure=True)
