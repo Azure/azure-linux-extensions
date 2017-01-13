@@ -1475,6 +1475,13 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
+        elif ((distro_name == 'centos' and distro_version == '7.3.1611') and
+              (disk_util.is_os_disk_lvm())):
+            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+            os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
         elif distro_name == 'redhat' and distro_version == '6.8':
             from oscrypto.rhel_68 import RHEL68EncryptionStateMachine
             os_encryption = RHEL68EncryptionStateMachine(hutil=hutil,
