@@ -53,8 +53,9 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
         self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
-        self.command_executor.Execute('umount /var')
         self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
+        self.command_executor.ExecuteInBash('systemctl restart systemd-journald', True)
+        self.command_executor.Execute('umount /var')
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
         self.command_executor.ExecuteInBash('systemctl restart sshd.service')
@@ -69,7 +70,7 @@ class UnmountOldrootState(OSEncryptionState):
             if not "running" in line:
                 continue
 
-            if "waagent.service" in line or "sshd.service" in line:
+            if "waagent.service" in line or "sshd.service" in line or "journald.service" in line:
                 continue
 
             match = re.search(r'\s(\S*?\.service)', line)
@@ -106,6 +107,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.Execute('systemctl restart NetworkManager', True)
         self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
+        self.command_executor.Execute('umount /var')
         sleep(3)
 
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
