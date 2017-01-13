@@ -53,6 +53,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
         self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
+        self.command_executor.Execute('umount /var')
         self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
 
         self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
@@ -110,6 +111,11 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
 
     def unmount(self, mountpoint):
+        self.command_executor.ExecuteInBash('systemctl stop NetworkManager', True)
+        self.command_executor.ExecuteInBash('systemctl stop rsyslog', True)
+        self.command_executor.Execute('umount /var')
+        self.command_executor.ExecuteInBash('systemctl restart systemd-udevd', True)
+
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm " + mountpoint,
