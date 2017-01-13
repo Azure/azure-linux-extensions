@@ -1,4 +1,4 @@
-2017-01-08: LAD-2.3.9019
+2017-01-13: LAD-2.3.9021
     - Fix rsyslogd core dump issue when re-enabling the extension
     - Take latest mdsd binary that fixes other issues like missing perf
       counter logs when there's a race condition between mdsd and omiserver.
