@@ -833,7 +833,7 @@ class DiskUtil(object):
         return lvm_items
 
     def is_os_disk_lvm(self):
-        device_items = self.get_device_items()
+        device_items = self.get_device_items(None)
 
         if not any([item.type.lower() == 'lvm' for item in device_items]):
             return False
