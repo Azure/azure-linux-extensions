@@ -65,15 +65,16 @@ class OSEncryptionState(object):
             rootfs_sdx_path = self._parse_uuid_from_fstab('/')
             self.context.logger.log("rootfs_uuid: {0}".format(rootfs_sdx_path))
 
-        if rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(rootfs_sdx_path):
+        if rootfs_sdx_path and (rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(rootfs_sdx_path)):
             rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_sdx_path)
+
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
         self.rootfs_disk = None
         self.rootfs_block_device = None
         self.bootfs_block_device = None
 
-        if self.disk_util.is_os_disk_lvm():
+        if (not rootfs_sdx_path) or self.disk_util.is_os_disk_lvm():
             self.rootfs_disk = '/dev/sda'
             self.rootfs_block_device = '/dev/sda2'
             self.bootfs_block_device = '/dev/sda1'
