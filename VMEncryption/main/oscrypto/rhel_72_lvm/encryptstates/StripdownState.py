@@ -36,7 +36,7 @@ class StripdownState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for stripdown state")
 
-        self.command_executor.Execute('rm -rf /tmp/tmproot', True)
+        self.command_executor.Execute('rm -rf /usr/tmproot', True)
         self.command_executor.ExecuteInBash('! [ -e "/oldroot" ]', True)
 
         return True
@@ -46,20 +46,21 @@ class StripdownState(OSEncryptionState):
             return
 
         self.context.logger.log("Entering stripdown state")
-
+        
+        self.command_executor.Execute('swapoff -a')
         self.command_executor.Execute('umount -a')
-        self.command_executor.Execute('mkdir /tmp/tmproot', True)
-        self.command_executor.Execute('mount -t tmpfs none /tmp/tmproot', True)
-        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot boot; do mkdir /tmp/tmproot/$i; done', True)
-        self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /tmp/tmproot/; done', True)
-        self.command_executor.ExecuteInBash('for i in bin sbin libexec lib lib64 share; do cp -ax /usr/$i /tmp/tmproot/usr/; done', True)
-        self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
-        self.command_executor.ExecuteInBash('mkdir /tmp/tmproot/var/log', True)
-        self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
+        self.command_executor.Execute('mkdir /usr/tmproot', True)
+        self.command_executor.Execute('mount -t tmpfs none /usr/tmproot', True)
+        self.command_executor.ExecuteInBash('for i in proc sys dev run usr var tmp root oldroot boot; do mkdir /usr/tmproot/$i; done', True)
+        self.command_executor.ExecuteInBash('for i in bin etc mnt sbin lib lib64 root; do cp -ax /$i /usr/tmproot/; done', True)
+        self.command_executor.ExecuteInBash('for i in bin sbin libexec lib lib64 share; do cp -ax /usr/$i /usr/tmproot/usr/; done', True)
+        self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /usr/tmproot/var/; done', True)
+        self.command_executor.ExecuteInBash('mkdir /usr/tmproot/var/log', True)
+        self.command_executor.ExecuteInBash('cp -ax /var/log/azure /usr/tmproot/var/log/', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
-        self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
+        self.command_executor.ExecuteInBash('[ -e "/usr/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
         self.command_executor.Execute('systemctl stop waagent', True)
-        self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
+        self.command_executor.Execute('pivot_root /usr/tmproot /usr/tmproot/oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
 
     def should_exit(self):

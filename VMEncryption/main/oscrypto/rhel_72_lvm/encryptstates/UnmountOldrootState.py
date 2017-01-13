@@ -77,13 +77,38 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 
+        sleep(3)
+
+        attempt = 1
+
+        while True:
+            if attempt > 10:
+                raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
+
+            self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
+            self.command_executor.Execute('systemctl restart systemd-udevd')
+
+            sleep(10)
+
+            if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
+                break
+
+            attempt += 1
+
+        self.command_executor.Execute('systemctl restart NetworkManager', True)
+        self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
+        sleep(3)
+
+        self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
+
+    def unmount(self, mountpoint):
         proc_comm = ProcessCommunicator()
 
-        self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
+        self.command_executor.Execute(command_to_execute="fuser -vm " + mountpoint,
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout))
+        self.context.logger.log("Processes using {0}:\n{1}".format(mountpoint, proc_comm.stdout))
 
         procs_to_kill = filter(lambda p: p.isdigit(), proc_comm.stdout.split())
         procs_to_kill = reversed(sorted(procs_to_kill))
@@ -116,31 +141,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
-        self.command_executor.Execute('umount /oldroot', True)
-
-        sleep(3)
-
-        attempt = 1
-
-        while True:
-            if attempt > 10:
-                raise Exception("Block device {0} did not appear in 10 restart attempts".format(self.rootfs_block_device))
-
-            self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
-            self.command_executor.Execute('systemctl restart systemd-udevd')
-
-            sleep(10)
-
-            if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
-                break
-
-            attempt += 1
-
-        self.command_executor.Execute('systemctl restart NetworkManager', True)
-        self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
-        sleep(3)
-
-        self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
+        self.command_executor.Execute('umount ' + mountpoint, True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")
