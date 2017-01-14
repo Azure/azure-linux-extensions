@@ -733,6 +733,9 @@ class DiskUtil(object):
             if size_string is not None and size_string != "":
                 device_item.size = int(size_string)
 
+            if device_item.type is None:
+                device_item.type = ''
+
             if device_item.size is not None:
                 device_items_to_return.append(device_item)
             else:
@@ -788,6 +791,9 @@ class DiskUtil(object):
 
                         if property_item_pair[0] == 'MAJ:MIN':
                             device_item.majmin = property_item_pair[1].strip('"')
+
+                    if device_item.type is None:
+                        device_item.type = ''
 
                     if device_item.type.lower() == 'lvm':
                         for lvm_item in self.get_lvm_items():
