@@ -666,12 +666,12 @@ class DiskUtil(object):
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(get_property_cmd, communicator=proc_comm)
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
             return proc_comm.stdout.strip()
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True)
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
             for line in proc_comm.stdout.splitlines():
                 if line.strip():
                     disk_info_item_array = line.strip().split()
