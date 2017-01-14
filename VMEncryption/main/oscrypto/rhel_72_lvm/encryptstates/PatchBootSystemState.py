@@ -57,14 +57,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         self._find_bek_and_execute_action('_luks_open')
 
-        self.command_executor.Execute('swapoff -a', True)
-        self.command_executor.Execute('umount -a')
-
-        for mountpoint in ['/var', '/opt', '/tmp', '/home', '/usr']:
-            if self.command_executor.Execute('mountpoint ' + mountpoint) == 0:
-                self.unmount(mountpoint)
-
-        self.unmount_var()
+        self.unmount_lvm_volumes()
         
         self.command_executor.Execute('mount /dev/rootvg/rootlv /oldroot', True)
         self.command_executor.Execute('mount /dev/rootvg/varlv /oldroot/var', True)
@@ -107,10 +100,24 @@ class PatchBootSystemState(OSEncryptionState):
 
             self.context.logger.log("Pivoted back into memroot successfully")
 
+            self.unmount_lvm_volumes()
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
 
         return super(PatchBootSystemState, self).should_exit()
+
+    def unmount_lvm_volumes(self):
+        self.command_executor.Execute('swapoff -a', True)
+        self.command_executor.Execute('umount -a')
+
+        for mountpoint in ['/var', '/opt', '/tmp', '/home', '/usr']:
+            if self.command_executor.Execute('mountpoint /oldroot' + mountpoint) == 0:
+                self.unmount('/oldroot' + mountpoint)
+            if self.command_executor.Execute('mountpoint ' + mountpoint) == 0:
+                self.unmount(mountpoint)
+
+        self.unmount_var()
 
     def unmount_var(self):
         unmounted = False
