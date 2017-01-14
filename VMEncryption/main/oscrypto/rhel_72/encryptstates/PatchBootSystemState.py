@@ -21,6 +21,7 @@
 
 import inspect
 import os
+import re
 import sys
 
 from time import sleep
@@ -106,6 +107,17 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception(message)
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
+
+        proc_comm = ProcessCommunicator()
+        udevadm_cmd = "udevadm info --query=all --name={0}".format(self.rootfs_block_device)
+        self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
+
+        matches = re.findall(r"ID_WWN_WITH_EXTENSION=(.*)", proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ID_WWN_WITH_EXTENSION from udevadm info")
+
+        wwn = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_WWN/{0}/ "{1}"'.format(wwn, patchpath)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
                                       '/etc/default/grub')
