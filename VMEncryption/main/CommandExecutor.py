@@ -71,8 +71,8 @@ class CommandExecutor(object):
 
         return return_code
     
-    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
+    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
         command_to_execute = 'bash -c "{0}{1}"'.format('set -e; ' if raise_exception_on_failure else '',
                                                       command_to_execute)
         
-        return self.Execute(command_to_execute, raise_exception_on_failure, communicator)
+        return self.Execute(command_to_execute, raise_exception_on_failure, communicator, input, suppress_logging)
