@@ -557,9 +557,10 @@ class DiskUtil(object):
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
-            if self.is_os_disk_lvm():
-                # self.logger.log("OS disk is using LVM")
-                pass
+            if (self.is_os_disk_lvm() and
+                self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True) == 0):
+                self.logger.log("OS PV is encrypted")
+                os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
                 "/dev/mapper" in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:

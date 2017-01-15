@@ -136,7 +136,7 @@ class RHEL72LVMEncryptionStateMachine(OSEncryptionStateMachine):
 
     def start_encryption(self):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="mount",
+        self.command_executor.Execute(command_to_execute="pvdisplay",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         if '/dev/mapper/osencrypt' in proc_comm.stdout:
