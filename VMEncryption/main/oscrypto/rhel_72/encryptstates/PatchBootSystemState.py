@@ -118,6 +118,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         wwn = matches[0]
         sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_WWN/{0}/ "{1}"'.format(wwn, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
                                       '/etc/default/grub')
