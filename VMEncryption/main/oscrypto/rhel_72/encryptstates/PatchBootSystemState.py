@@ -109,7 +109,7 @@ class PatchBootSystemState(OSEncryptionState):
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
         proc_comm = ProcessCommunicator()
-        udevadm_cmd = "udevadm info --query=all --name={0}".format(self.rootfs_block_device)
+        udevadm_cmd = "udevadm info --atribute-walk --name={0}".format(self.rootfs_block_device)
         self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
 
         matches = re.findall(r'ATTR{size}=="(.*)"', proc_comm.stdout)
