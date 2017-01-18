@@ -760,6 +760,7 @@ class DiskUtil(object):
             self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
             
             device_items = []
+            lvm_items = self.get_lvm_items()
             for line in proc_comm.stdout.splitlines():
                 if line:
                     device_item = DeviceItem()
@@ -797,7 +798,7 @@ class DiskUtil(object):
                         device_item.type = ''
 
                     if device_item.type.lower() == 'lvm':
-                        for lvm_item in self.get_lvm_items():
+                        for lvm_item in lvm_items:
                             majmin = lvm_item.lv_kernel_major + ':' + lvm_item.lv_kernel_minor
 
                             if majmin == device_item.majmin:
