@@ -37,6 +37,8 @@ from CommandExecutor import *
 from Common import *
 
 class DiskUtil(object):
+    os_disk_lvm = None
+
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
         self.hutil = hutil
@@ -844,6 +846,9 @@ class DiskUtil(object):
         return lvm_items
 
     def is_os_disk_lvm(self):
+        if DiskUtil.os_disk_lvm is not None:
+            return DiskUtil.os_disk_lvm
+
         device_items = self.get_device_items(None)
 
         if not any([item.type.lower() == 'lvm' for item in device_items]):
@@ -858,9 +863,11 @@ class DiskUtil(object):
         expected_vg_names = set(['rootvg'])
 
         if expected_lv_names == current_lv_names and expected_vg_names == current_vg_names:
-            return True
+            DiskUtil.os_disk_lvm = True
+        else:
+            DiskUtil.os_disk_lvm = False
 
-        return False
+        return DiskUtil.os_disk_lvm
 
     def should_skip_for_inplace_encryption(self, device_item):
         """
