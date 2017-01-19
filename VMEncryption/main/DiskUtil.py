@@ -854,6 +854,7 @@ class DiskUtil(object):
         device_items = self.get_device_items(None)
 
         if not any([item.type.lower() == 'lvm' for item in device_items]):
+            DiskUtil.os_disk_lvm = False
             return False
 
         lvm_items = self.get_lvm_items()
