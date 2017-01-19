@@ -48,12 +48,13 @@ class SplitRootPartitionState(OSEncryptionState):
             if fsck_result == 0:
                 break
 
-            self.context.logger.log("Restarting systemd-udevd")
             self.command_executor.Execute('systemctl restart systemd-udevd')
-            self.context.logger.log("Restarting systemd-timesyncd")
             self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.command_executor.Execute('udevadm trigger')
 
             sleep(10)
+
+            attempt += 1
 
         if not attempt < 10:
             return False
@@ -85,10 +86,9 @@ class SplitRootPartitionState(OSEncryptionState):
             if resize_result == 0:
                 break
             else:
-                self.context.logger.log("Restarting systemd-udevd")
                 self.command_executor.Execute('systemctl restart systemd-udevd')
-                self.context.logger.log("Restarting systemd-timesyncd")
                 self.command_executor.Execute('systemctl restart systemd-timesyncd')
+                self.command_executor.Execute('udevadm trigger')
 
                 sleep(10)
 
@@ -229,12 +229,13 @@ class SplitRootPartitionState(OSEncryptionState):
             if dump_result == 0:
                 break
 
-            self.context.logger.log("Restarting systemd-udevd")
             self.command_executor.Execute('systemctl restart systemd-udevd')
-            self.context.logger.log("Restarting systemd-timesyncd")
             self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.command_executor.Execute('udevadm trigger')
 
             sleep(10)
+
+            attempt += 1
 
         if not attempt < 10:
             return Exception("Could not dumpe2fs, stderr: \n{0}".format(proc_comm.stderr))
