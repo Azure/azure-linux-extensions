@@ -813,7 +813,9 @@ class DiskUtil(object):
     def get_lvm_items(self):
         lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+
+        if self.command_executor.Execute(lvs_command, communicator=proc_comm):
+            return []
 
         lvm_items = []
 
