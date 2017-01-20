@@ -48,17 +48,17 @@ class EncryptionMarkConfig(object):
     
     def commit(self):
         key_value_pairs = []
-        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey,self.command)
+        command = ConfigKeyValuePair(CommonVariables.EncryptionEncryptionOperationKey, self.command)
         key_value_pairs.append(command)
-        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey,self.volume_type)
+        volume_type = ConfigKeyValuePair(CommonVariables.EncryptionVolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
-        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey,self.diskFormatQuery)
+        disk_format_query = ConfigKeyValuePair(CommonVariables.EncryptionDiskFormatQueryKey, self.diskFormatQuery)
         key_value_pairs.append(disk_format_query)
         self.encryption_mark_config.save_configs(key_value_pairs)
 
     def clear_config(self):
         try:
-            if(os.path.exists(self.encryption_environment.azure_crypt_request_queue_path)):
+            if os.path.exists(self.encryption_environment.azure_crypt_request_queue_path):
                 os.remove(self.encryption_environment.azure_crypt_request_queue_path)
             return True
         except OSError as e:

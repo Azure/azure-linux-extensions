@@ -39,7 +39,7 @@ diff -Naur 90crypt.orig/parse-crypt.sh 90crypt/parse-crypt.sh
  	        >> /etc/udev/rules.d/70-luks.rules	
 -	    printf '[ -e /dev/disk/by-uuid/*%s* ] || exit 1 \n'  $luksid >> /initqueue-finished/crypt.sh
 -	    printf '[ -e /dev/disk/by-uuid/*%s* ] || warn "crypto LUKS UUID "%s" not found" \n' $luksid $luksid >> /emergency/90-crypt.sh
-+	    printf '[ -e /dev/mapper/osencrypt ] || exit 1 \n'  $luksid >> /initqueue-finished/crypt.sh
++	    printf '[ -e /dev/mapper/osencrypt ] || ( /sbin/cryptroot-ask /dev/sda2 osencrypt && [ -e /dev/mapper/osencrypt ] ) || exit 1 \n'  $luksid >> /initqueue-finished/crypt.sh
 +	    printf '[ -e /dev/mapper/osencrypt ] || warn "crypto LUKS UUID "%s" not found" \n' $luksid $luksid >> /emergency/90-crypt.sh
  	done
      else

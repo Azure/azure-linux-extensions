@@ -27,8 +27,6 @@ import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
 import threading
-import logging
-
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
@@ -82,6 +80,7 @@ omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                 "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                 "packages":(),
+                "stoprsyslog" : "service rsyslog stop",
                 "restartrsyslog":"service rsyslog restart",
                 'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
                 'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
@@ -90,6 +89,7 @@ DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
 RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                  "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
                  "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
+                 "stoprsyslog" : "service rsyslog stop",
                  "restartrsyslog":"service rsyslog restart",
                  'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
                  'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
@@ -577,7 +577,7 @@ def get_extension_operation_type(command):
 def main(command):
     #Global Variables definition
 
-    global EnableSyslog, UseSystemdServiceManager
+    global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
     EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
@@ -695,11 +695,38 @@ def start_daemon():
         hutil.error("wait daemon start time out")
 
 
+def check_suspected_memory_leak(pid):
+    memory_leak_threshold_in_KB = 2000000  # Roughly 2GB. TODO: Make it configurable or automatically calculated
+    memory_usage_in_KB = 0
+    memory_leak_suspected = False
+
+    try:
+        # Check /proc/[pid]/status file for "VmRSS" to find out the process's virtual memory usage
+        # Note: "VmSize" for some reason starts out very high (>2000000) at this moment, so can't use that.
+        with open("/proc/{0}/status".format(pid)) as proc_file:
+            for line in proc_file:
+                if line.startswith("VmRSS:"):  # Example line: "VmRSS:   33904 kB"
+                    memory_usage_in_KB = int(line.split()[1])
+                    memory_leak_suspected = memory_usage_in_KB > memory_leak_threshold_in_KB
+                    break
+    except Exception as e:
+        # Not to throw in case any statement above fails (e.g., invalid pid). Just log.
+        hutil.error("Failed to check memory usage of pid={0}.\nError: {1}\nTrace:\n{2}".format(pid, e, traceback.format_exc()))
+
+    return memory_leak_suspected, memory_usage_in_KB
+
+
 def start_mdsd():
-    global EnableSyslog
+    global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
          pidfile.write(str(os.getpid())+'\n')
          pidfile.close()
+
+    # Assign correct ext op type for correct ext status/event reporting.
+    # start_mdsd() is called only through "./diagnostic.py -daemon"
+    # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
+    # type, so it needs to be reverted back to a standard one (which is "Enable").
+    ExtensionOperationType = waagent.WALAEventOperation.Enable
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
@@ -821,6 +848,21 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
+
+                # Mitigate if memory leak is suspected.
+                mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid)
+                if mdsd_memory_leak_suspected:
+                    memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
+                                      "Recycling mdsd to self-mitigate.".format(int((mdsd_memory_usage_in_KB+1023)/1024))
+                    hutil.log(memory_leak_msg)
+                    # Add a telemetry for a possible statistical analysis
+                    waagent.AddExtensionEvent(name=hutil.get_name(),
+                                              op=waagent.WALAEventOperation.HeartBeat,
+                                              isSuccess=True,
+                                              version=hutil.get_extension_version(),
+                                              message=memory_leak_msg)
+                    mdsd.kill()
+                    break
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed   # Remember the OMI install status from the last iteration
@@ -983,6 +1025,13 @@ def install_omi():
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
     isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
 
+    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
+    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
+    if ('OMI-1.0.8-4' in RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]) \
+            and ('rpm' in distConfig['installrequiredpackage']):
+        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
+        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
+
     if 'OMI-1.0.8-6' not in RunGetOutput('/opt/omi/bin/omiserver -v')[1]:
         need_install_omi=1
     if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
@@ -1091,7 +1140,11 @@ def install_rsyslogom():
     if rsyslog_om_folder and rsyslog_om_path:
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
-        # Copy necesssary files
+        # Copy necesssary files. First, stop rsyslog to avoid SEGV on overwriting omazuremds.so.
+        if distConfig.has_key("stoprsyslog"):
+            RunGetOutput(distConfig["stoprsyslog"])
+        else:
+            RunGetOutput("service rsyslog stop")
         RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
         RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
         RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file

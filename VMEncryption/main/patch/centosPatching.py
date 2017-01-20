@@ -29,14 +29,17 @@ import time
 import traceback
 import datetime
 import subprocess
+
 from redhatPatching import redhatPatching
 from Common import *
+from CommandExecutor import *
 
 class centosPatching(redhatPatching):
-    def __init__(self,logger,distro_info):
-        super(centosPatching,self).__init__(logger,distro_info)
+    def __init__(self, logger, distro_info):
+        super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
-        if(distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5"):
+        self.command_executor = CommandExecutor(logger)
+        if distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5":
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
@@ -70,11 +73,24 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        return_code = subprocess.call(['yum', 'install','-y', 'epel-release'])
-        self.logger.log("Enabling epel, result: " + str(return_code))
+        if self.distro_info[1].startswith("6."):
+            if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
 
-        packages = ['ntfs-3g',
-                    'cryptsetup',
+                if self.command_executor.Execute("rpm -q epel-release"):
+                    self.command_executor.Execute(epel_cmd)
+
+                self.command_executor.Execute("yum install -y ntfs-3g python-pip")
+        else:
+            if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+                if self.command_executor.Execute("rpm -q epel-release"):
+                    self.command_executor.Execute(epel_cmd)
+
+                self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
+
+        packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
                     'cryptsetup-reencrypt',
@@ -83,8 +99,16 @@ class centosPatching(redhatPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux']
+                    'util-linux',
+                    'gcc',
+                    'python-six',
+                    'pyparted',
+                    'libffi-devel',
+                    'openssl-devel',
+                    'python-devel']
 
-        return_code = subprocess.call(['yum', 'install', '-y'] + packages)
-        self.logger.log("Installing packages: " + " ".join(packages))
-        self.logger.log("Installation result: " + str(return_code))
+        if self.command_executor.Execute("rpm -q " + " ".join(packages)):
+            self.command_executor.Execute("yum install -y " + " ".join(packages))
+
+        if self.command_executor.Execute("pip show adal"):
+            self.command_executor.Execute("pip install adal")

@@ -332,7 +332,6 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 - Oracle Linux 6.4.0.0.0 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
-- FreeBSD
 
 ## Debug
 

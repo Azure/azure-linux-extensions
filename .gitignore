@@ -66,6 +66,7 @@ VMBackup/MANIFEST
 #VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
+VMBackup/main/safefreeze/bin/*
 
 # CustomScript ignors
 CustomScript/test/download/0/stdout
