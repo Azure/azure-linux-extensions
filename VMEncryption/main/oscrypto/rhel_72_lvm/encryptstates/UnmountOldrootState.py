@@ -81,6 +81,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
         
+        self.unmount('/oldroot/opt')
         self.unmount('/oldroot/var')
         self.unmount('/oldroot/usr')
         self.unmount('/oldroot')
