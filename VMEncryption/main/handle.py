@@ -1433,10 +1433,12 @@ def daemon_encrypt():
                       code=CommonVariables.passphrase_file_not_found,
                       message='Passphrase file not found.')
 
+    executor = CommandExecutor(logger)
+    is_not_in_stripped_os = bool(executor.Execute("mountpoint /oldroot"))
     volume_type = encryption_config.get_volume_type().lower()
 
-    if volume_type == CommonVariables.VolumeTypeData.lower() or \
-       volume_type == CommonVariables.VolumeTypeAll.lower():
+    if (volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower()) and \
+        is_not_in_stripped_os:
         try:
             while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
                                                   encryption_config=encryption_config,
