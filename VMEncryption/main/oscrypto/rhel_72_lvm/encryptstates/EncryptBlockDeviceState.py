@@ -19,7 +19,6 @@
 # Requires Python 2.7+
 #
 
-import re
 import os
 import sys
 
@@ -46,24 +45,18 @@ class EncryptBlockDeviceState(OSEncryptionState):
             return
 
         self.context.logger.log("Entering encrypt_block_device state")
-
-        self.context.logger.log("Resizing " + self.rootfs_block_device)
-
-        current_rootfs_size = self._get_root_fs_size_in_sectors(sector_size=512)
-        desired_rootfs_size = current_rootfs_size - 8192
-        
-        self.command_executor.Execute('e2fsck -yf {0}'.format(self.rootfs_block_device), True)
-        self.command_executor.Execute('resize2fs {0} {1}s'.format(self.rootfs_block_device, desired_rootfs_size), True)
         
         self.command_executor.Execute('mount /boot', False)
         # self._find_bek_and_execute_action('_dump_passphrase')
+        self._find_bek_and_execute_action('_luks_format')
+        self._find_bek_and_execute_action('_luks_open')
 
         self.context.hutil.do_status_report(operation='EnableEncryptionDataVolumes',
                                             status=CommonVariables.extension_success_status,
                                             status_code=str(CommonVariables.success),
                                             message='OS disk encryption started')
 
-        self._find_bek_and_execute_action('_luks_reencrypt')
+        self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt bs=52428800'.format(self.rootfs_block_device), True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
@@ -71,19 +64,19 @@ class EncryptBlockDeviceState(OSEncryptionState):
         if not os.path.exists('/dev/mapper/osencrypt'):
             self._find_bek_and_execute_action('_luks_open')
 
-        self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
-        self.command_executor.Execute('umount /oldroot', True)
-
         return super(EncryptBlockDeviceState, self).should_exit()
 
-    def _luks_open(self, bek_path):
-        self.command_executor.Execute('cryptsetup luksOpen {0} osencrypt -d {1}'.format(self.rootfs_block_device, bek_path),
+    def _luks_format(self, bek_path):
+        self.command_executor.Execute('mkdir /boot/luks', True)
+        self.command_executor.Execute('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
+        self.command_executor.Execute('cryptsetup luksFormat --header /boot/luks/osluksheader -d {0} {1} -q'.format(bek_path,
+                                                                                                                    self.rootfs_block_device),
                                       raise_exception_on_failure=True)
 
-    def _luks_reencrypt(self, bek_path):
-        self.command_executor.ExecuteInBash('cat {0} | cryptsetup-reencrypt -N --reduce-device-size 8192s {1} -v'.format(bek_path,
-                                                                                                                         self.rootfs_block_device),
-                                            raise_exception_on_failure=True)
+    def _luks_open(self, bek_path):
+        self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
+                                                                                                                         bek_path),
+                                      raise_exception_on_failure=True)
 
     def _dump_passphrase(self, bek_path):
         proc_comm = ProcessCommunicator()
@@ -100,22 +93,4 @@ class EncryptBlockDeviceState(OSEncryptionState):
             raise Exception("{0} is not a method".format(callback_method_name))
 
         bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
-        callback_method(bek_path)    
-
-    def _get_root_fs_size_in_sectors(self, sector_size):
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="dumpe2fs -h {0}".format(self.rootfs_block_device),
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
-
-        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
-        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)
-
-        if not root_fs_block_count or not root_fs_block_size:
-            raise Exception("Error parsing dumpe2fs output, count={0}, size={1}".format(root_fs_block_count,
-                                                                                        root_fs_block_size))
-
-        root_fs_block_count = int(root_fs_block_count[0])
-        root_fs_block_size = int(root_fs_block_size[0])
-
-        return (root_fs_block_count * root_fs_block_size) / sector_size
+        callback_method(bek_path)        

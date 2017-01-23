@@ -20,8 +20,10 @@
 #
 
 import os.path
+import re
 
 from collections import namedtuple
+from uuid import UUID
 
 from Common import *
 from CommandExecutor import *
@@ -53,17 +55,50 @@ class OSEncryptionState(object):
 
         rootfs_mountpoint = '/'
 
-        if self.command_executor.Execute('mountpoint /oldroot') == 0:
+        if self._is_in_memfs_root():
             rootfs_mountpoint = '/oldroot'
 
         rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
+
+        if rootfs_sdx_path == "none":
+            self.context.logger.log("rootfs_sdx_path is none, parsing UUID from fstab")
+            rootfs_sdx_path = self._parse_uuid_from_fstab('/')
+            self.context.logger.log("rootfs_uuid: {0}".format(rootfs_sdx_path))
+
+        if rootfs_sdx_path and (rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(rootfs_sdx_path)):
+            rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_sdx_path)
+
         self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
 
-        self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
-        if not self.rootfs_block_device.startswith('/dev'):
-            distro_name = self.context.distro_patcher.distro_info[0]
-            self.rootfs_block_device = '/dev/sda1' if distro_name == 'Ubuntu' else '/dev/sda2'
+        self.rootfs_disk = None
+        self.rootfs_block_device = None
+        self.bootfs_block_device = None
+
+        if (not rootfs_sdx_path) or self.disk_util.is_os_disk_lvm():
+            self.rootfs_disk = '/dev/sda'
+            self.rootfs_block_device = '/dev/sda2'
+            self.bootfs_block_device = '/dev/sda1'
+        elif rootfs_sdx_path == '/dev/mapper/osencrypt' or rootfs_sdx_path.startswith('/dev/dm-'):
+            self.rootfs_block_device = '/dev/mapper/osencrypt'
+            bootfs_uuid = self._parse_uuid_from_fstab('/boot')
+            self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
+            self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
+        else:
+            self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+            if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
+                self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+                raise Exception("Could not find rootfs block device")
+
+            self.rootfs_disk = self.rootfs_block_device[:self.rootfs_block_device.index("-part")]
+            self.bootfs_block_device = self.rootfs_disk + "-part2"
+
+            if self._get_block_device_size(self.bootfs_block_device) > self._get_block_device_size(self.rootfs_block_device):
+                self.context.logger.log("Swapping partition identifiers for rootfs and bootfs")
+                self.rootfs_block_device, self.bootfs_block_device = self.bootfs_block_device, self.rootfs_block_device
+
+        self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
+        self.context.logger.log("bootfs_block_device: {0}".format(self.bootfs_block_device))
         
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
@@ -106,6 +141,34 @@ class OSEncryptionState(object):
                 result = tuple(line)
 
         return result
+
+    def _is_in_memfs_root(self):
+        mounts = file('/proc/mounts', 'r').read()
+        return bool(re.search(r'/\s+tmpfs', mounts))
+
+    def _parse_uuid_from_fstab(self, mountpoint):
+        contents = file('/etc/fstab', 'r').read()
+        matches = re.findall(r'UUID=(.*?)\s+{0}\s+'.format(mountpoint), contents)
+        if matches:
+            return matches[0]
+
+    def _get_block_device_size(self, dev):
+        if not os.path.exists(dev):
+            return 0
+
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute('blockdev --getsize64 {0}'.format(dev),
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+        return int(proc_comm.stdout.strip())
+
+    def _is_uuid(self, s):
+        try:
+            UUID(s)
+        except:
+            return False
+        else:
+            return True
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
