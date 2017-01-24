@@ -130,6 +130,9 @@ class UnmountOldrootState(OSEncryptionState):
     def unmount(self, mountpoint):
         self.unmount_var()
 
+        if self.command_executor.Execute("mountpoint " + mountpoint):
+            return
+
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm " + mountpoint,
