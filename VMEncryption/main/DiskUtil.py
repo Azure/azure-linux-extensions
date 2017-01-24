@@ -560,7 +560,8 @@ class DiskUtil(object):
                     data_drives_encrypted = False
 
             if (self.is_os_disk_lvm() and
-                self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True) == 0):
+                self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True) == 0 and
+                not os.path.exists('/volumes.lvm')):
                 self.logger.log("OS PV is encrypted")
                 os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
