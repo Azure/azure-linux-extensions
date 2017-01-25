@@ -21,29 +21,29 @@ from collections import defaultdict
 
 # These are the built-in metrics this code provides, grouped by class.
 _builtIns = {
-    'processor' : [ 'percentidletime', 'percentprocessortime', 'percentiowaittime', 'percentinterrupttime',
-                    'percentusertime', 'percentnicetime', 'percentprivilegedtime' ],
-    'memory':     [ 'availablememory', 'percentavailablememory', 'usedmemory', 'percentusedmemory', 'pagespersec',
+    'processor' : ['percentidletime', 'percentprocessortime', 'percentiowaittime', 'percentinterrupttime',
+                    'percentusertime', 'percentnicetime', 'percentprivilegedtime'],
+    'memory':     ['availablememory', 'percentavailablememory', 'usedmemory', 'percentusedmemory', 'pagespersec',
                     'pagesreadpersec', 'pageswrittenpersec', 'availableswap', 'percentavailableswap', 'usedswap',
-                    'percentusedswap' ],
-    'network':    [ 'bytestransmitted', 'bytesreceived', 'bytestotal', 'packetstransmitted', 'packetsreceived',
-                    'totalrxerrors', 'totaltxerrors', 'totalcollisions' ],
-    'filesystem': [ 'freemegabytes', 'usedmegabytes', 'percentfreespace', 'percentusedspace', 'percentfreeinodes',
+                    'percentusedswap'],
+    'network':    ['bytestransmitted', 'bytesreceived', 'bytestotal', 'packetstransmitted', 'packetsreceived',
+                    'totalrxerrors', 'totaltxerrors', 'totalcollisions'],
+    'filesystem': ['freemegabytes', 'usedmegabytes', 'percentfreespace', 'percentusedspace', 'percentfreeinodes',
                     'percentusedinodes', 'bytesreadpersecond', 'byteswrittenpersecond', 'bytespersecond',
-                    'readspersecond', 'writespersecond', 'transferspersecond' ],
-    'disk':       [ 'readspersecond', 'writespersecond', 'transferspersecond', 'averagereadtime', 'averagewritetime',
+                    'readspersecond', 'writespersecond', 'transferspersecond'],
+    'disk':       ['readspersecond', 'writespersecond', 'transferspersecond', 'averagereadtime', 'averagewritetime',
                     'averagetransfertime', 'averagediskqueuelength', 'readbytespersecond', 'writebytespersecond',
-                    'bytespersecond' ]
+                    'bytespersecond']
     }
 
-_omiClassName = { 'processor': 'SCX_ProcessorStatisticalInformation',
-                  'memory': 'SCX_MemoryStatisticalInformation',
-                  'network': 'SCX_EthernetPortStatistics',
-                  'filesystem': 'SCX_FileSystemStatisticalInformation',
-                  'disk': 'SCX_DiskDriveStatisticalInformation'
+_omiClassName = {'processor': 'SCX_ProcessorStatisticalInformation',
+                 'memory': 'SCX_MemoryStatisticalInformation',
+                 'network': 'SCX_EthernetPortStatistics',
+                 'filesystem': 'SCX_FileSystemStatisticalInformation',
+                 'disk': 'SCX_DiskDriveStatisticalInformation'
                 }
 
-_instancedClasses = [ 'network', 'filesystem', 'disk', 'processor' ]
+_instancedClasses = ['network', 'filesystem', 'disk', 'processor']
 
 # The Azure Metrics infrastructure, along with App Insights, requires that quantities be measured
 # in one of these units: Percent, Count, Seconds, Milliseconds, Bytes, BytesPerSecond, CountPerSecond
@@ -70,13 +70,27 @@ def SetDefaultSampleRate(rate):
 
 class BuiltinMetric:
     def __init__(self, counterSpec):
+        """
+        Construct an instance of the BuiltinMetric class. Values are case-insensitive unless otherwise noted.
+
+        "type": the provider type. If present, must have value "builtin". If absent, assumed to be "builtin".
+        "class": the name of the class within which this metric is scoped. Must be a key in the _builtIns dict.
+        "counter": the name of the metric, within the class. Must appear in the list of metric names for this class
+                found in the _builtIns dict.
+        "instanceId": the identifier for the specific instance of the metric, if any. Must be "None" for uninstanced
+                metrics.
+        "counterSpecifier": the name under which this retrieved metric will be stored
+        "sampleRate": a string containing an ISO8601-compliant duration.
+
+        :param counterSpec: A dict containing the key/value settings that define the metric to be collected.
+        """
         t = ProvUtil.GetCounterSetting(counterSpec, 'type')
         if t is None:
             self._Type = 'builtin'
         else:
             self._Type = t.lower()
             if t != 'builtin':
-                raise ProvUtil.UnexpectedCounterType('Expected type "builtin" but saw type "{0}"'.format(self.Type))
+                raise ProvUtil.UnexpectedCounterType('Expected type "builtin" but saw type "{0}"'.format(self._Type))
 
         self._CounterClass = ProvUtil.GetCounterSetting(counterSpec, 'class').lower()
         if self._CounterClass not in _builtIns:
@@ -90,7 +104,12 @@ class BuiltinMetric:
         self._SampleRate = ProvUtil.GetCounterSetting(counterSpec, 'sampleRate')
 
     def IsType(self, t):
-        return self.Type == t.lower()
+        """
+        Returns True if the metric is of the specified type.
+        :param t: The name of the metric type to be checked
+        :return bool:
+        """
+        return self._Type == t.lower()
 
     def Class(self):
         return self._CounterClass
@@ -105,15 +124,25 @@ class BuiltinMetric:
         return self._Label
 
     def SampleRate(self):
+        """
+        Determine how often this metric should be retrieved. If the metric didn't define a sample period, return the
+        default.
+        :return int: Number of seconds between collecting samples of this metric.
+        """
         if self._SampleRate is None:
             return _defaultSampleRate
         else:
             return ProvUtil.IntervalToSeconds(self._SampleRate)
 
 
-def AddMetric(counterSpec):
+def AddMetric(counter_spec):
+    """
+    Add a metric to the list of metrics to be collected.
+    :param counter_spec: The specification of a builtin metric.
+    """
+    global _metrics, _eventNames
     try:
-        metric = BuiltinMetric(counterSpec)
+        metric = BuiltinMetric(counter_spec)
     except ProvUtil.ParseException as ex:
         print "Couldn't create metric: ", ex
         return
@@ -124,37 +153,43 @@ def AddMetric(counterSpec):
     # table where we store the collected metrics.
 
     key = (metric.Class(), metric.InstanceId(), metric.SampleRate() )
-    if (key not in _eventNames):
+    if key not in _eventNames:
         _eventNames[key] = ProvUtil.MakeUniqueEventName('builtin')
     _metrics[key].append(metric)
 
+
 def GenerateOMIQuery():
+    """
+    Build the minimal set of OMI queries which will retrieve the metrics requested via AddMetric().
+    :return: A string containing an XML mdsd configuration of OMI queries to collect the raw metrics on schedule.
+    """
+    global _metrics, _eventNames, _omiClassName
     queries = []
     for group in _metrics:
-        (className, instanceId, sampleRate) = group
-        if className in _instancedClasses and not instanceId:
-            instanceId = '_Total'
+        (class_name, instance_id, sample_rate) = group
+        if class_name in _instancedClasses and not instance_id:
+            instance_id = '_Total'
         columns = []
         mappings = []
         for metric in _metrics[group]:
             columns.append(metric.Counter())
             mappings.append('<MapName name="{0}">{1}</MapName>'.format(metric.Counter(), metric.Label()))
-        columnString = ','.join(columns)
-        if instanceId:
-            whereClause = " WHERE name='{0}'".format(instanceId)
+        column_string = ','.join(columns)
+        if instance_id:
+            where_clause = " WHERE name='{0}'".format(instance_id)
         else:
-            whereClause = ""
+            where_clause = ""
         queries.append('''
 <OMIQuery cqlQuery="SELECT {0} FROM {1}{2}" eventName="{3}" omiNamespace="root/scx" sampleRateInSeconds="{4}" storeType="local">
   <Unpivot columnName="CounterName" columnValue="Value" columns="{0}">
     {5}
   </Unpivot>
 </OMIQuery>'''.format(
-            columnString,
-            _omiClassName[className],
-            whereClause,
+            column_string,
+            _omiClassName[class_name],
+            where_clause,
             _eventNames[group],
-            sampleRate,
+            sample_rate,
             '\n    '.join(mappings)
         ))
     return ''.join(queries)

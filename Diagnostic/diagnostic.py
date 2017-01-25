@@ -72,16 +72,6 @@ if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
         waagent.WALAEventOperation.Uninstall = 'Uninstall'
 
 
-def log_run_get_output(cmd, should_log=True):
-    if should_log:
-        hutil.log("RunCmd " + cmd)
-    error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
-    if should_log:
-        hutil.log("Return " + str(error) + ":" + msg)
-    return error, msg
-
-
-RunGetOutput = log_run_get_output
 MdsdFolder = os.path.join(WorkDir, 'bin')
 StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
 
@@ -95,7 +85,10 @@ try:
     distConfig = get_distro_actions(dist[0], dist[1], hutil.log)
 except exceptions.LookupError as ex:
     hutil.error("os version:" + distroNameAndVersion + " not supported")
+    # TODO Exit immediately if distro is unknown
     distConfig = None
+
+RunGetOutput = distConfig.log_run_get_output
 
 
 def escape(data):
@@ -157,17 +150,29 @@ def setup_dependencies_and_mdsd():
 
 
 def hasPublicConfig(key):
-    return public_settings.has_key(key)
+    """
+    Determine if a particular setting is present in the public config
+    :param str key: The setting to look for
+    :return: True if the setting is present (regardless of its value)
+    :rtype: bool
+    """
+    return key in public_settings
 
 
 def readPublicConfig(key):
-    if public_settings.has_key(key):
+    """
+    Return the value of a particular public config setting
+    :param str key: The setting to retrieve
+    :return: The value of the setting if present; an empty string (*not* None) if the setting is not present
+    :rtype: str
+    """
+    if key in public_settings:
         return public_settings[key]
     return ''
 
 
 def readPrivateConfig(key):
-    if private_settings.has_key(key):
+    if key in private_settings:
         return private_settings[key]
     return ''
 
@@ -181,10 +186,10 @@ def createPortalSettings(tree, resourceId):
 
 
 eventSourceSchema = """
- <MdsdEventSource source="ladfile">
-     <RouteEvent dontUsePerNDayTable="true" eventName="" priority="High"/>
+<MdsdEventSource source="ladfile">
+    <RouteEvent dontUsePerNDayTable="true" eventName="" priority="High"/>
 </MdsdEventSource>
-                    """
+"""
 sourceSchema = """
 <Source name="ladfile1" schema="ladfile" />
 """
@@ -249,11 +254,18 @@ def createPerfSettngs(tree, perfs, forAI=False):
         XmlUtil.addElement(xml=tree, path='Events/OMI', el=perfElement, addOnlyOnce=True)
 
 
-# Updates the MDSD configuration Account elements.
-# Updates existing default Account element with Azure table storage properties.
-# If an aikey is provided to the function, then it adds a new Account element for
-# Application Insights with the application insights key.
 def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
+    """
+    Update the MDSD configuration Account element with Azure table storage properties.
+    Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for Application
+    Insights with the application insights key.
+    :param tree: The XML doc to be updated.
+    :param account: Storage account to which LAD should write data
+    :param key: Shared key secret for the storage account, if present
+    :param token: SAS token to access the storage account, if present
+    :param endpoint: Identifies the Azure instance (public or specific sovereign cloud) where the storage account is
+    :param aikey: Key for accessing AI, if present
+    """
     assert key or token, "Either key or token must be given."
 
     def get_handler_cert_pkey_paths():
@@ -333,9 +345,7 @@ def generatePerformanceCounterConfiguration(mdsdCfg, includeAI=False):
             "Failed to parse performance configuration with exception:{0} {1}".format(e, traceback.format_exc()))
 
     try:
-        createPerfSettngs(mdsdCfg, perfCfgList)
-        if includeAI:
-            createPerfSettngs(mdsdCfg, perfCfgList, True)
+        createPerfSettngs(mdsdCfg, perfCfgList, includeAI)
     except Exception as e:
         hutil.error("Failed to create perf config  error:{0} {1}".format(e, traceback.format_exc()))
 
@@ -351,16 +361,19 @@ def getResourceId():
             xmlCfg = base64.b64decode(encodedXmlCfg)
             resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg), 'diagnosticMonitorConfiguration/metrics',
                                              'resourceId')
-            # Azure portal uses xmlCfg which contains WadCfg which is pascal case, Currently we will support both casing and deprecate one later
+            # Azure portal uses xmlCfg which contains WadCfg which is pascal case, Currently we will support both
+            # casing and deprecate one later
             if not resourceId:
                 resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),
                                                  'DiagnosticMonitorConfiguration/Metrics', 'resourceId')
     return resourceId
 
 
-# Try to get syslogCfg from LadCfg, if not present
-# fetch it from public settings
 def getSyslogCfg():
+    """
+    Try to get syslogCfg from LadCfg, if not present fetch it from public settings
+    :return: Configuration string for syslog, or empty string
+    """
     syslogCfg = ""
     ladCfg = readPublicConfig('ladCfg')
     encodedSyslogCfg = LadUtil.getDiagnosticsMonitorConfigurationElement(ladCfg, 'syslogCfg')
@@ -371,9 +384,11 @@ def getSyslogCfg():
     return syslogCfg
 
 
-# Try to get fileCfg from LadCfg, if not present
-# fetch it from public settings
 def getFileCfg():
+    """
+    Try to get fileCfg from LadCfg, if not present fetch it from public settings
+    :return: fileCfg, or None if not set anywhere in the public config
+    """
     ladCfg = readPublicConfig('ladCfg')
     fileCfg = LadUtil.getFileCfgFromLadCfg(ladCfg)
     if not fileCfg:
@@ -381,10 +396,14 @@ def getFileCfg():
     return fileCfg
 
 
-# Set event volume in mdsd config.
-# Check if desired event volume is specified, first in ladCfg then in public config.
-# If in neither then default to Medium.
 def setEventVolume(mdsdCfg, ladCfg):
+    """
+    Set event volume in mdsd config. Check if desired event volume is specified, first in ladCfg then in public config.
+    :param mdsdCfg: The XML document holding the mdsd config
+    :param ladCfg: The ladCfg part of the public config
+    :return: The event volume. If not set anywhere in public config, return "Medium"
+    :rtype: str
+    """
     eventVolume = LadUtil.getEventVolumeFromLadCfg(ladCfg)
     if eventVolume:
         hutil.log("Event volume found in ladCfg: " + eventVolume)
@@ -400,6 +419,13 @@ def setEventVolume(mdsdCfg, ladCfg):
 
 
 def getStorageAccountEndPoint(account):
+    """
+    Construct the storage endpoint specifier based on private config. If not set, assume public cloud. If set, it may
+    or may not contain the protocol specifier (http vs https); if that's not specified, assume https.
+    :param str account: Storage account (extracted previously)
+    :return: the full URL specifying the storage account endpoint
+    :rtype: str
+    """
     endpoint = readPrivateConfig('storageAccountEndPoint')
     if endpoint:
         parts = endpoint.split('//', 1)
@@ -413,6 +439,9 @@ def getStorageAccountEndPoint(account):
 
 
 def logPrivateSettingsKeys():
+    """
+    Log the redacted contents of the private settings
+    """
     try:
         msg = "Keys in privateSettings (and some non-secret values): "
         first = True
@@ -430,11 +459,11 @@ def logPrivateSettingsKeys():
 
 
 def configSettings():
-    '''
+    """
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
     Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
     Returns (False, '...') if config was invalid and the error message.
-    '''
+    """
     mdsdCfgstr = readPublicConfig('mdsdCfg')
     if not mdsdCfgstr:
         with open(os.path.join(WorkDir, './mdsdConfig.xml.template'), "r") as defaulCfg:
@@ -471,8 +500,8 @@ def configSettings():
         else:
             hutil.log("Application Insights key not found.")
     except Exception as e:
-        hutil.error("Failed check for Application Insights key in LAD configuration with exception:{0} {1}".format(e,
-                                                                                                                   traceback.format_exc()))
+        msg = "Failed check for Application Insights key in LAD configuration with exception:{0} {1}"
+        hutil.error(msg.format(e, traceback.format_exc()))
 
     generatePerformanceCounterConfiguration(mdsdCfg, aikey is not None)
 
@@ -644,6 +673,7 @@ def update_selinux_settings_for_rsyslogomazuremds():
     # for even Unix domain sockets.
     # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
     # We instead compile from the bundled SELinux module def for lad_mdsd
+    # TODO Either check the output of these commands or run without capturing output
     if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
         RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
         RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
@@ -733,9 +763,10 @@ def start_mdsd():
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: " \
-                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
-        hutil.log(message)
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
+            "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
+            "Config validation message: {0}."
+        hutil.log(message.format(config_validate_cmd_msg))
         # No need to do success status report (it's already done). Just silently return.
         return
 
