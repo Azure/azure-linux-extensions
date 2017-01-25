@@ -22,135 +22,163 @@ import string
 import subprocess
 import sys
 import syslog
+import threading
 import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-import threading
-import Utils.HandlerUtil as Util
+
+# local imports
+import watcherutil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.ApplicationInsightsUtil as AIUtil
-from Utils.WAAgentUtil import waagent
-import watcherutil
+try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
+    import Utils.HandlerUtil as Util
+    from Utils.WAAgentUtil import waagent
+except Exception as e:
+    print('waagent import failed.\nException thrown: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
+    print('Are you running without waagent for some reason? Just passing here for now...')
+    # We may add some waagent mock later to support this scenario.
 
-WorkDir = os.getcwd()
-MDSDFileResourcesDir = "/var/run/mdsd"
-MDSDRoleName = 'lad_mdsd'
-MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
-MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
-OutputSize = 1024
-EnableSyslog = True
-waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-waagent.Log("LinuxAzureDiagnostic started to handle.")
-hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-hutil.try_parse_context()
-hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
-public_settings = hutil.get_public_settings()
-private_settings = hutil.get_protected_settings()
-if not public_settings:
-    public_settings = {}
-if not private_settings:
-    private_settings = {}
-ExtensionOperationType = None
-# Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
-if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
-    if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
-        waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
-    else:  # This shouldn't happen, but just in case...
-        waagent.WALAEventOperation.Uninstall = 'Uninstall'
 
-def LogRunGetOutPut(cmd, should_log=True):
-    if should_log:
-        hutil.log("RunCmd "+cmd)
-    error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
-    if should_log:
-        hutil.log("Return "+str(error)+":"+msg)
-    return error, msg
+def init_public_and_private_settings():
+    """Initialize extension's public & private settings. hutil must be already initialized prior to calling this."""
+    global public_settings, private_settings
 
-rsyslog_ommodule_for_check = 'omprog.so'
-RunGetOutput = LogRunGetOutPut
-MdsdFolder = os.path.join(WorkDir, 'bin')
-StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
+    hutil.try_parse_context()
+    hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
+    public_settings = hutil.get_public_settings()
+    private_settings = hutil.get_protected_settings()
+    if not public_settings:
+        public_settings = {}
+    if not private_settings:
+        private_settings = {}
 
-omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
-                "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
-                "packages":(),
-                "stoprsyslog" : "service rsyslog stop",
-                "restartrsyslog":"service rsyslog restart",
-                'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
-                'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
-                }
+def init_globals():
+    """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
+    global WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix
+    global MDSDPidFile, MDSDPidPortFile, EnableSyslog, hutil
+    global public_settings, private_settings, ExtensionOperationType
+    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, StartDaemonFilePath, omi_universal_pkg_name
+    global omfileconfig, DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
+    global SuseConfig11, SuseConfig12, CentosConfig, MDSD_LISTEN_PORT, All_Dist, distConfig, dist
+    global distroNameAndVersion, UseSystemdServiceManager
 
-RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
-                 "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
-                 "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
-                 "stoprsyslog" : "service rsyslog stop",
-                 "restartrsyslog":"service rsyslog restart",
-                 'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
-                 'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
-                 }
+    WorkDir = os.getcwd()
+    MDSDFileResourcesDir = "/var/run/mdsd"
+    MDSDRoleName = 'lad_mdsd'
+    MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
+    MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
+    MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
+    EnableSyslog = True
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    waagent.Log("LinuxAzureDiagnostic started to handle.")
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
+    init_public_and_private_settings()
+    ExtensionOperationType = None
+    fix_potential_uninstall_wala_event_op_value()
 
-UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
-                    {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
-                        '|| apt-get install -y PACKAGES',
-                     'packages':()
-                    }.items())
+    def LogRunGetOutPut(cmd, should_log=True):
+        if should_log:
+            hutil.log("RunCmd "+cmd)
+        error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
+        if should_log:
+            hutil.log("Return "+str(error)+":"+msg)
+        return error, msg
 
-# For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
-SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
+    rsyslog_ommodule_for_check = 'omprog.so'
+    RunGetOutput = LogRunGetOutPut
+    MdsdFolder = os.path.join(WorkDir, 'bin')
+    StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
+    omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
 
-SuseConfig11 = dict(RedhatConfig.items()+
-                  {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ',
-                   "packages":('rsyslog',),
-                   'restartrsyslog':"""\
-if [ ! -f /etc/sysconfig/syslog.org_lad ]; then cp /etc/sysconfig/syslog /etc/sysconfig/syslog.org_lad; fi;
-sed -i 's/SYSLOG_DAEMON="syslog-ng"/SYSLOG_DAEMON="rsyslogd"/g' /etc/sysconfig/syslog;
-service syslog restart""",
-                   'mdsd_prep_cmds' :
-                        (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
-                         r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
-                         r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
-                         r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
-                        ),
-                   'mdsd_env_vars': {"SSL_CERT_FILE": SUSE11_MDSD_SSL_CERTS_FILE}
-                  }.items())
+    omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-SuseConfig12 = dict(RedhatConfig.items()+
-                  {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
-                   "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
-                   'mdsd_env_vars': {"SSL_CERT_DIR": "/var/lib/ca-certificates/openssl", "SSL_CERT_FILE": "/etc/ssl/cert.pem"}
-                  }.items())
+    DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
+                    "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
+                    "packages":(),
+                    "stoprsyslog" : "service rsyslog stop",
+                    "restartrsyslog":"service rsyslog restart",
+                    'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
+                    'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
+                    }
 
-CentosConfig = dict(RedhatConfig.items()+
-                    {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install -y PACKAGE; fi',
-                     "packages":('policycoreutils-python',)  # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
-                    }.items())
+    RedhatConfig =  {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
+                     "installrequiredpackage":'rpm -q PACKAGE ;  if [ ! $? == 0 ]; then yum install -y PACKAGE; fi',
+                     "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
+                     "stoprsyslog" : "service rsyslog stop",
+                     "restartrsyslog":"service rsyslog restart",
+                     'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
+                     'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
+                     }
 
-MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
-All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig, 
-           'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
-           'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
-           'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
-           'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12, 'SuSE':SuseConfig12}
-distConfig = None
-dist = platform.dist()
-distroNameAndVersion = dist[0] + ":" + dist[1]
-if distroNameAndVersion in All_Dist:  # if All_Dist.has_key(distroNameAndVersion):
-    distConfig = All_Dist[distroNameAndVersion]
-elif All_Dist.has_key(dist[0]):
-    distConfig = All_Dist[dist[0]]
+    UbuntuConfig1510OrHigher = dict(DebianConfig.items()+
+                        {'installrequiredpackages':'[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] '
+                            '|| apt-get install -y PACKAGES',
+                         'packages':()
+                        }.items())
 
-if distConfig is None:
-    hutil.error("os version:" + distroNameAndVersion + " not supported")
+    # For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
+    SUSE11_MDSD_SSL_CERTS_FILE = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
-UseSystemdServiceManager = False
-if dist[0] == 'Ubuntu' and dist[1] >= '15.10':  # Use systemd for Ubuntu 15.10 or later
-    UseSystemdServiceManager = True
+    SuseConfig11 = dict(RedhatConfig.items()+
+                      {'installrequiredpackage':'rpm -qi PACKAGE;  if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ',
+                       "packages":('rsyslog',),
+                       'restartrsyslog':"""\
+    if [ ! -f /etc/sysconfig/syslog.org_lad ]; then cp /etc/sysconfig/syslog /etc/sysconfig/syslog.org_lad; fi;
+    sed -i 's/SYSLOG_DAEMON="syslog-ng"/SYSLOG_DAEMON="rsyslogd"/g' /etc/sysconfig/syslog;
+    service syslog restart""",
+                       'mdsd_prep_cmds' :
+                            (r'\cp /dev/null {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                             r'chown 0:0 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                             r'chmod 0644 {0}'.format(SUSE11_MDSD_SSL_CERTS_FILE),
+                             r"cat /etc/ssl/certs/????????.[0-9a-f] | sed '/^#/d' >> {0}".format(SUSE11_MDSD_SSL_CERTS_FILE)
+                            ),
+                       'mdsd_env_vars': {"SSL_CERT_FILE": SUSE11_MDSD_SSL_CERTS_FILE}
+                      }.items())
+
+    SuseConfig12 = dict(RedhatConfig.items()+
+                      {'installrequiredpackage':' rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi; ','restartrsyslog':'service syslog restart',
+                       "packages":('libgthread-2_0-0','ca-certificates-mozilla','rsyslog'),
+                       'mdsd_env_vars': {"SSL_CERT_DIR": "/var/lib/ca-certificates/openssl", "SSL_CERT_FILE": "/etc/ssl/cert.pem"}
+                      }.items())
+
+    CentosConfig = dict(RedhatConfig.items()+
+                        {'installrequiredpackage':'rpm -qi PACKAGE; if [ ! $? == 0 ]; then  yum install -y PACKAGE; fi',
+                         "packages":('policycoreutils-python',)  # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
+                        }.items())
+
+    MDSD_LISTEN_PORT= '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
+    All_Dist= {'debian':DebianConfig, 'Kali':DebianConfig,
+               'Ubuntu':DebianConfig, 'Ubuntu:15.10':UbuntuConfig1510OrHigher,
+               'Ubuntu:16.04' : UbuntuConfig1510OrHigher, 'Ubuntu:16.10' : UbuntuConfig1510OrHigher,
+               'redhat':RedhatConfig, 'centos':CentosConfig, 'oracle':RedhatConfig,
+               'SuSE:11':SuseConfig11, 'SuSE:12':SuseConfig12, 'SuSE':SuseConfig12}
+    distConfig = None
+    dist = platform.dist()
+    distroNameAndVersion = dist[0] + ":" + dist[1]
+    if distroNameAndVersion in All_Dist:  # if All_Dist.has_key(distroNameAndVersion):
+        distConfig = All_Dist[distroNameAndVersion]
+    elif All_Dist.has_key(dist[0]):
+        distConfig = All_Dist[dist[0]]
+
+    if distConfig is None:
+        hutil.error("os version:" + distroNameAndVersion + " not supported")
+
+    UseSystemdServiceManager = False
+    if dist[0] == 'Ubuntu' and dist[1] >= '15.10':  # Use systemd for Ubuntu 15.10 or later
+        UseSystemdServiceManager = True
+
+
+def fix_potential_uninstall_wala_event_op_value():
+    # Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
+    if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
+        if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
+            waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
+        else:  # This shouldn't happen, but just in case...
+            waagent.WALAEventOperation.Uninstall = 'Uninstall'
 
 
 def escape(datas):
@@ -574,9 +602,14 @@ def get_extension_operation_type(command):
         return waagent.WALAEventOperation.Update
 
 
-def main(command):
-    #Global Variables definition
+def wala_event_type_for_telemetry(ext_op_type):
+    return "HeartBeat" if ext_op_type == "Daemon" else ext_op_type
 
+
+def main(command):
+    init_globals()
+
+    # Declare global scope for globals that are assigned in this function
     global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
@@ -1210,7 +1243,7 @@ def install_required_package():
     return 0,"not pacakge need install"
 
 
-def tail(log_file, output_size = OutputSize):
+def tail(log_file, output_size=1024):
     if not os.path.exists(log_file):
         return ""
     pos = min(output_size, os.path.getsize(log_file))
@@ -1244,8 +1277,19 @@ def get_deployment_id():
     return identity
 
 
-
 if __name__ == '__main__' :
-    if len(sys.argv) > 1:
-        main(sys.argv[1])
+    if len(sys.argv) <= 1:
+        print('No command line argument was specified.\nYou must be executing this program manually for testing.\n'
+              'In that case, one of "install", "enable", "disable", "uninstall", or "update" should be given.')
+    else:
+        try:
+            main(sys.argv[1])
+        except Exception as e:
+            ext_version = ET.parse('manifest.xml').find('{http://schemas.microsoft.com/windowsazure}Version').text
+            waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
+                                      op=wala_event_type_for_telemetry(get_extension_operation_type(sys.argv[1])),
+                                      isSuccess=False,
+                                      version=ext_version,
+                                      message="Unknown exception thrown from diagnostic.py.\n"
+                                              "Error: {0}\nStackTrace: {1}".format(e, traceback.format_exc()))
 
