@@ -94,6 +94,11 @@ class PatchBootSystemState(OSEncryptionState):
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
                                           True)
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                                ' /var/lib/azure_disk_encryption_config/os_encryption_markers/*' +
+                                                ' /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/',
+                                                True)
+            self.command_executor.Execute('touch /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/PatchBootSystemState')
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('systemctl restart waagent')
