@@ -98,7 +98,7 @@ class PatchBootSystemState(OSEncryptionState):
                                                 ' /var/lib/azure_disk_encryption_config/os_encryption_markers/*' +
                                                 ' /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/',
                                                 True)
-            self.command_executor.Execute('touch /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/PatchBootSystemState')
+            self.command_executor.Execute('touch /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/PatchBootSystemState', True)
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('systemctl restart waagent')
