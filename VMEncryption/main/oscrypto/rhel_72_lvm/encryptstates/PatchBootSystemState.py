@@ -205,6 +205,31 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
+        proc_comm = ProcessCommunicator()
+        udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
+        self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
+
+        matches = re.findall(r'ATTR{size}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{size} from udevadm info")
+        size = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_SIZE/{0}/ "{1}"'.format(size, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{partition} from udevadm info")
+        partition = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+
+        matches = re.findall(r'ATTR{start}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{start} from udevadm info")
+        start = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_START/{0}/ "{1}"'.format(start, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+
         self.command_executor.Execute('mv /usr/lib/dracut/modules.d/90lvm /usr/lib/dracut/modules.d/91lvm', True)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
