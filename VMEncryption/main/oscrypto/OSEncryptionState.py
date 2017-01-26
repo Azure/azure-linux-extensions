@@ -73,8 +73,15 @@ class OSEncryptionState(object):
         self.rootfs_disk = None
         self.rootfs_block_device = None
         self.bootfs_block_device = None
+        
+        if self.disk_util.is_os_disk_lvm():
+            proc_comm = ProcessCommunicator()
+            self.command_executor.ExecuteInBash('pvdisplay | grep "PV Name"', True, communicator=proc_comm)
 
-        if (not rootfs_sdx_path) or self.disk_util.is_os_disk_lvm():
+            self.rootfs_block_device = proc_comm.stdout.replace("PV Name", "").strip()
+            self.rootfs_disk = self.rootfs_block_device[:-1]
+            self.bootfs_block_device = self.rootfs_disk + '2'
+        elif not rootfs_sdx_path:
             self.rootfs_disk = '/dev/sda'
             self.rootfs_block_device = '/dev/sda2'
             self.bootfs_block_device = '/dev/sda1'
