@@ -91,7 +91,7 @@ diff -Naur 90crypt.orig/parse-crypt.sh 90crypt/parse-crypt.sh
                  {
 -                    printf -- 'ENV{ID_FS_TYPE}=="crypto_LUKS", '
 -                    printf -- 'ENV{ID_FS_UUID}=="*%s*", ' $luksid
-+                    printf -- 'ATTRS{ID_VENDOR}=="Msft", ATTRS{device_id}=="?00000000-0000-*", ATTRS{ID_MODEL}=="Virtual_Disk", ATTR{partition}=="ENCRYPTED_DISK_PARTITION",'
++                    printf -- 'ATTRS{device_id}=="?00000000-0000-*", ATTR{partition}=="ENCRYPTED_DISK_PARTITION",'
                      printf -- 'RUN+="%s --settled --unique --onetime ' $(command -v initqueue)
                      printf -- '--name cryptroot-ask-%%k %s ' $(command -v cryptroot-ask)
 -                    printf -- '$env{DEVNAME} luks-$env{ID_FS_UUID} %s"\n' $tout
@@ -118,7 +118,7 @@ diff -Naur 90crypt.orig/parse-crypt.sh 90crypt/parse-crypt.sh
 +        if [ 1 ]; then
              {
 -                printf -- 'ENV{ID_FS_TYPE}=="crypto_LUKS", RUN+="%s ' $(command -v initqueue)
-+                printf -- 'ATTRS{ID_VENDOR}=="Msft", ATTRS{device_id}=="?00000000-0000-*", ATTRS{ID_MODEL}=="Virtual_Disk", ATTR{partition}=="ENCRYPTED_DISK_PARTITION", RUN+="%s ' $(command -v initqueue)
++                printf -- 'ATTRS{device_id}=="?00000000-0000-*", ATTR{partition}=="ENCRYPTED_DISK_PARTITION", RUN+="%s ' $(command -v initqueue)
                  printf -- '--unique --settled --onetime --name cryptroot-ask-%%k '
 -                printf -- '%s $env{DEVNAME} luks-$env{ID_FS_UUID} %s"\n' $(command -v cryptroot-ask) $tout
 +                printf -- '%s $env{DEVNAME} osencrypt %s"\n' $(command -v cryptroot-ask) $tout
@@ -126,7 +126,7 @@ diff -Naur 90crypt.orig/parse-crypt.sh 90crypt/parse-crypt.sh
          else
              {
 -                printf -- 'ENV{ID_FS_TYPE}=="crypto_LUKS", RUN+="%s ' $(command -v initqueue)
-+                printf -- 'ATTRS{ID_VENDOR}=="Msft", ATTRS{device_id}=="?00000000-0000-*", ATTRS{ID_MODEL}=="Virtual_Disk", ATTR{partition}=="ENCRYPTED_DISK_PARTITION", RUN+="%s ' $(command -v initqueue)
++                printf -- 'ATTRS{device_id}=="?00000000-0000-*", ATTR{partition}=="ENCRYPTED_DISK_PARTITION", RUN+="%s ' $(command -v initqueue)
                  printf -- '--unique --settled --onetime --name crypt-run-generator-%%k '
 -                printf -- '%s $env{DEVNAME} luks-$env{ID_FS_UUID}"\n' $(command -v crypt-run-generator)
 +                printf -- '%s $env{DEVNAME} osencrypt"\n' $(command -v crypt-run-generator)
