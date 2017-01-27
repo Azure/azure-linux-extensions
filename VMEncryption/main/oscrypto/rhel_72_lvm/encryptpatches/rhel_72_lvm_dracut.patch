@@ -1,7 +1,7 @@
 diff -Naur 90crypt.orig/cryptroot-ask.sh 90crypt/cryptroot-ask.sh
 --- 90crypt.orig/cryptroot-ask.sh	2016-07-04 00:05:52.294690900 +0000
 +++ 90crypt/cryptroot-ask.sh	2016-07-04 00:12:17.646964796 +0000
-@@ -65,6 +65,29 @@
+@@ -65,6 +65,43 @@
  
  #
  # Open LUKS device
@@ -24,9 +24,23 @@ diff -Naur 90crypt.orig/cryptroot-ask.sh 90crypt/cryptroot-ask.sh
 +fi
 +done
 +
-+mkdir /boot
-+mount /dev/sda1 /boot
-+cryptsetupopts="$cryptsetupopts --header /boot/luks/osluksheader"
++MountPoint=/tmp-boot-mount
++LuksHeaderPath=luks/osluksheader
++echo "Trying to get the LUKS header from disks ..." >&2
++mkdir -p $MountPoint >&2
++for SFS in /dev/sd*; do
++echo "> Trying device:$SFS..." >&2
++mount ${SFS}1 $MountPoint -r >&2
++if [ -f $MountPoint/$LuksHeaderPath ]; then
++echo "> got luks header..." >&2
++cp $MountPoint/$LuksHeaderPath /tmp-luksheader
++luksheaderfile=/tmp-luksheader
++umount $MountPoint
++break
++fi
++done
++
++cryptsetupopts="$cryptsetupopts --header $luksheaderfile"
 +
  #
  
