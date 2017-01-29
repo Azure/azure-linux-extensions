@@ -559,10 +559,11 @@ class DiskUtil(object):
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
-            if (self.is_os_disk_lvm() and
-                self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True) == 0):
-                self.logger.log("OS PV is encrypted")
-                os_drive_encrypted = True
+            if self.is_os_disk_lvm():
+                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
+                if grep_result == 0 and not os.path.exists('/volumes.lvm'):
+                    self.logger.log("OS PV is encrypted")
+                    os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
                 "/dev/mapper" in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
@@ -857,15 +858,12 @@ class DiskUtil(object):
             DiskUtil.os_disk_lvm = False
             return False
 
-        lvm_items = self.get_lvm_items()
+        lvm_items = filter(lambda item: item.vg_name == "rootvg", self.get_lvm_items())
 
         current_lv_names = set([item.lv_name for item in lvm_items])
-        current_vg_names = set([item.vg_name for item in lvm_items])
-
         expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
-        expected_vg_names = set(['rootvg'])
 
-        if expected_lv_names == current_lv_names and expected_vg_names == current_vg_names:
+        if expected_lv_names == current_lv_names:
             DiskUtil.os_disk_lvm = True
         else:
             DiskUtil.os_disk_lvm = False

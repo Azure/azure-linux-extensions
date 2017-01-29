@@ -127,4 +127,5 @@ class centosPatching(redhatPatching):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
         if self.command_executor.Execute("pip show adal"):
+            self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")

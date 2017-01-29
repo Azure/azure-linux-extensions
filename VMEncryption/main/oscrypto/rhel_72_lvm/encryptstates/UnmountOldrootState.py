@@ -81,6 +81,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
         
+        self.unmount('/oldroot/opt')
         self.unmount('/oldroot/var')
         self.unmount('/oldroot/usr')
         self.unmount('/oldroot')
@@ -105,7 +106,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
-        self.command_executor.Execute('vgcfgbackup -f /volumes.lvm', True)
+        self.command_executor.Execute('vgcfgbackup -f /volumes.lvm rootvg', True)
         self.command_executor.Execute('sed -i.bak \'s/sda2/mapper\/osencrypt/g\' /volumes.lvm', True)
         self.command_executor.Execute('lvremove -f rootvg', True)
         self.command_executor.Execute('vgremove rootvg', True)
@@ -128,6 +129,9 @@ class UnmountOldrootState(OSEncryptionState):
 
     def unmount(self, mountpoint):
         self.unmount_var()
+
+        if self.command_executor.Execute("mountpoint " + mountpoint):
+            return
 
         proc_comm = ProcessCommunicator()
 

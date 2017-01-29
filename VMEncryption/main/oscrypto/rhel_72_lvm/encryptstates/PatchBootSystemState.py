@@ -94,6 +94,11 @@ class PatchBootSystemState(OSEncryptionState):
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
                                           True)
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                                ' /var/lib/azure_disk_encryption_config/os_encryption_markers/*' +
+                                                ' /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/',
+                                                True)
+            self.command_executor.Execute('touch /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/PatchBootSystemState', True)
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('systemctl restart waagent')
@@ -137,6 +142,9 @@ class PatchBootSystemState(OSEncryptionState):
 
     def unmount(self, mountpoint):
         self.unmount_var()
+
+        if self.command_executor.Execute("mountpoint " + mountpoint):
+            return
 
         proc_comm = ProcessCommunicator()
 
@@ -196,6 +204,17 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception(message)
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
+
+        proc_comm = ProcessCommunicator()
+        udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
+        self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
+
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{partition} from udevadm info")
+        partition = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
         self.command_executor.Execute('mv /usr/lib/dracut/modules.d/90lvm /usr/lib/dracut/modules.d/91lvm', True)
 
