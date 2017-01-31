@@ -102,6 +102,7 @@ class FsFreezer:
     def freeze_safe(self,timeout):
         self.root_seen = False
         error_msg=''
+        freeze_start_time = None
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
@@ -120,6 +121,7 @@ class FsFreezer:
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
             self.logger.enforce_local_flag(False)
+            freeze_start_time = datetime.datetime.utcnow()
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
                 while True:
@@ -135,7 +137,7 @@ class FsFreezer:
             error_msg="freeze failed for some mount with exception " + str(e)
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
-        return freeze_result
+        return freeze_result, freeze_start_time
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
@@ -157,7 +159,8 @@ class FsFreezer:
                 else:
                     break
             if(self.freeze_handler.child.returncode!=0):
-                error_msg = 'snapshot result inconsistent'
+                is_inconsistent = True
+                error_msg = 'snapshot result inconsistent as child returns with failure'
                 thaw_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         else:
