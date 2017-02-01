@@ -157,7 +157,7 @@ class FsFreezer:
                 else:
                     break
             if(self.freeze_handler.child.returncode!=0):
-                error_msg = 'snapshot result inconsistent'
+                error_msg = 'snapshot result inconsistent as child returns with failure'
                 thaw_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         else:
