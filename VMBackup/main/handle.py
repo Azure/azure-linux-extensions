@@ -202,7 +202,7 @@ def snapshot():
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
-        freeze_result, freeze_start_time = freezer.freeze_safe(timeout)
+        freeze_result = freezer.freeze_safe(timeout)
         all_failed= False
         is_inconsistent_freeze = False
         is_inconsistent_snapshot =  False
@@ -217,7 +217,7 @@ def freeze_snapshot(timeout):
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent_snapshot, snapshot_end_time = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array, all_failed, is_inconsistent_snapshot = snap_shotter.snapshotall(para_parser)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
@@ -231,15 +231,6 @@ def freeze_snapshot(timeout):
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
                 thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
-                if is_inconsistent_freeze:
-                    backup_logger.log('freeze start time is ' + str(freeze_start_time) + " and snapshot end time is " + str(snapshot_end_time), True)
-                    if snapshot_end_time is not None and freeze_start_time is not None:
-                        timediff = snapshot_end_time - freeze_start_time
-                        timediff_secs= timedelta_total_seconds(timediff)
-                        if(abs(timediff_secs)<timeout):
-                            backup_logger.log("reverting this backup to consistent backup", True)
-                            is_inconsistent_freeze = False
-                            thaw_result = None
                 if is_inconsistent_freeze and is_inconsistent_snapshot:
                     set_do_seq_flag()
                 backup_logger.log('T:S thaw result ' + str(thaw_result))

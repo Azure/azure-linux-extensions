@@ -166,7 +166,6 @@ class Snapshotter(object):
         all_failed = True
         is_inconsistent = False
         exceptOccurred = False
-        snapshot_end_time = None
         try:
             mp_jobs = []
             global_logger = mp.Queue()
@@ -199,8 +198,7 @@ class Snapshotter(object):
 
                 for job in mp_jobs:
                     job.join()
-                snapshot_end_time = datetime.datetime.utcnow()
-                self.logger.log('end of snapshot process at time' + str(snapshot_end_time))
+                self.logger.log('end of snapshot process at time')
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
                 error_logging = [global_error_logger.get() for job in mp_jobs]
@@ -219,14 +217,14 @@ class Snapshotter(object):
                             all_failed = False
                         self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
         except Exception as e:
             self.logger.log("Unable to perform parallel snapshot" + str(e))
             exceptOccurred = True
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
 
 
     def snapshotall_seq(self, paras):
@@ -236,7 +234,6 @@ class Snapshotter(object):
         snapshot_info_array = []
         all_failed = True
         is_inconsistent = False
-        snapshot_end_time = None
         try:
             blobs = paras.blobs
             if blobs is not None:
@@ -253,15 +250,14 @@ class Snapshotter(object):
                     if (snapshot_info_array[blob_index].isSuccessful == True):
                         all_failed = False
                     blob_index = blob_index + 1
-                snapshot_end_time = datetime.datetime.utcnow()
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+                return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
         except Exception as e:
             self.logger.log("Unable to perform sequential snapshot with exception" + str(e))
             exceptOccurred = True
-            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time
+            return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred
 
     def get_value_from_configfile(self, key):
         value = None
@@ -281,12 +277,12 @@ class Snapshotter(object):
 
     def snapshotall(self, paras):
         if self.get_value_from_configfile('doseq') == '1':
-            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time =  self.snapshotall_seq(paras)
+            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
         else:
-            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time =  self.snapshotall_parallel(paras)
+            snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_parallel(paras)
             if exceptOccurred and is_inconsistent == False:
-                snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred, snapshot_end_time =  self.snapshotall_seq(paras)
-        return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, snapshot_end_time
+                snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
+        return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
         snapshot_error = SnapshotError()
