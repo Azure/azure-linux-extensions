@@ -2,6 +2,7 @@ from Utils import Status
 
 class ExtensionErrorCodeEnum():
     success = 1
+    success_appconsistent = 0
     ExtensionTempTerminalState = 4
     error_parameter = 11
     error_12 = 12
@@ -15,8 +16,25 @@ class ExtensionErrorCodeEnum():
 
     FailedRetryableFsFreezeFailed = 201
 
+    FailedPrepostPreScriptFailed = 1100
+    FailedPrepostPostScriptFailed = 1101
+    FailedPrepostPreScriptNotFound = 1102
+    FailedPrepostPostScriptNotFound = 1103
+    FailedPrepostPluginhostConfigParsing = 1104
+    FailedPrepostPluginConfigParsing = 1105
+    FailedPrepostPreScriptPermissionError = 1106
+    FailedPrepostPostScriptPermissionError = 1107
+    FailedPrepostPreScriptTimeout = 1108
+    FailedPrepostPostScriptTimeout = 1109
+    FailedPrepostPluginhostPreTimeout = 1110
+    FailedPrepostPluginhostPostTimeout = 1111
+    FailedPrepostCheckSumMismatch = 1112
+    FailedPrepostPreScriptOwnershipError = 1113
+    FailedPrepostPostScriptOwnershipError = 1114
+
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
+            ExtensionErrorCodeEnum.success_appconsistent : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.success : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error : Status.ExtVmHealthStateEnum.green,
@@ -25,6 +43,23 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
 
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptNotFound : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptNotFound : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigParsing : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPluginConfigParsing : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptPermissionError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptPermissionError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostPreTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostPostTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostCheckSumMismatch : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptOwnershipError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptOwnershipError : Status.ExtVmHealthStateEnum.yellow,
+
+
             ExtensionErrorCodeEnum.error_http_failure : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red
@@ -32,12 +67,29 @@ class ExtensionErrorCodeHelper:
 
     ExtensionErrorCodeNameDict = {
             ExtensionErrorCodeEnum.success : "success",
+            ExtensionErrorCodeEnum.success_appconsistent : "success_appconsistent",
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : "ExtensionTempTerminalState",
             ExtensionErrorCodeEnum.error : "error",
             ExtensionErrorCodeEnum.error_12 : "error_12",
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
+
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptNotFound : "FailedPrepostPreScriptNotFound",
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptNotFound : "FailedPrepostPostScriptNotFound",
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigParsing : "FailedPrepostPluginhostConfigParsing",
+            ExtensionErrorCodeEnum.FailedPrepostPluginConfigParsing : "FailedPrepostPluginConfigParsing",
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptPermissionError : "FailedPrepostPreScriptPermissionError",
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptPermissionError : "FailedPrepostPostScriptPermissionError",
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptTimeout : "FailedPrepostPreScriptTimeout",
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptTimeout : "FailedPrepostPostScriptTimeout",
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostPreTimeout : "FailedPrepostPluginhostPreTimeout",
+            ExtensionErrorCodeEnum.FailedPrepostPluginhostPostTimeout : "FailedPrepostPluginhostPostTimeout",
+            ExtensionErrorCodeEnum.FailedPrepostCheckSumMismatch : "FailedPrepostCheckSumMismatch",
+            ExtensionErrorCodeEnum.FailedPrepostPreScriptOwnershipError : "FailedPrepostPreScriptOwnershipError",
+            ExtensionErrorCodeEnum.FailedPrepostPostScriptOwnershipError : "FailedPrepostPostScriptOwnershipError",
 
             ExtensionErrorCodeEnum.error_http_failure : "error_http_failure",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",

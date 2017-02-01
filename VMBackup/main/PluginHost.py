@@ -1,12 +1,13 @@
 import time
 import sys
+import os
 import threading
 import ConfigParser
 from common import CommonVariables
 
 
     # [pre_post]
-    # "timeout" : (in minutes),
+    # "timeout" : (in seconds),
     #
     # .... other params ...
     #
@@ -56,7 +57,7 @@ class PluginHost(object):
         self.logger = logger
         self.modulesLoaded = False
         self.configLocation = '/etc/azure/PluginHost.conf'
-        self.timeout = 10
+        self.timeoutInSeconds = 600
         self.plugins = []
         self.pluginName = []
         self.noOfPlugins = 0
@@ -75,34 +76,34 @@ class PluginHost(object):
             self.logger.log('config file: '+str(self.configLocation),True,'Info')
             config = ConfigParser.ConfigParser()
             config.read(self.configLocation)
-            if (config.has_option('pre_post', 'timeout')):
-                self.timeout = int(config.get('pre_post','timeout'))
+            if (config.has_option('pre_post', 'timeoutInSeconds')):
+                self.timeoutInSeconds = int(config.get('pre_post','timeoutInSeconds'))
             if (config.has_option('pre_post', 'numberOfPlugins')):
                 len = int(config.get('pre_post','numberOfPlugins'))
+        
+            self.logger.log('timeoutInSeconds: '+str(self.timeoutInSeconds),True,'Info')
+            self.logger.log('numberOfPlugins: '+str(len),True,'Info')
+        
+            while self.noOfPlugins < len:
+                pname = config.get('pre_post','pluginName'+str(self.noOfPlugins))
+                ppath = config.get('pre_post','pluginPath'+str(self.noOfPlugins))
+                pcpath = config.get('pre_post','pluginConfigPath'+str(self.noOfPlugins))
+                sys.path.append(ppath)
+                plugin = __import__(pname)
+
+                self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath))
+                self.noOfPlugins = self.noOfPlugins + 1
+                self.pluginName.append(pname)
+                self.preScriptCompleted.append(False)
+                self.preScriptResult.append(None)
+                self.postScriptCompleted.append(False)
+                self.postScriptResult.append(None)
+
+            if self.noOfPlugins != 0:
+                self.modulesLoaded = True
+        
         except Exception as err:
             self.logger.log('Error in reading PluginHost config file. '+str(err),True,'Error')
-            return
-        
-        self.logger.log('timeout: '+str(self.timeout),True,'Info')
-        self.logger.log('numberOfPlugins: '+str(len),True,'Info')
-        
-        while self.noOfPlugins < len:
-            pname = config.get('pre_post','pluginName'+str(self.noOfPlugins))
-            ppath = config.get('pre_post','pluginPath'+str(self.noOfPlugins))
-            pcpath = config.get('pre_post','pluginConfigPath'+str(self.noOfPlugins))
-            sys.path.append(ppath)
-            plugin = __import__(pname)
-
-            self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath))
-            self.noOfPlugins = self.noOfPlugins + 1
-            self.pluginName.append(pname)
-            self.preScriptCompleted.append(False)
-            self.preScriptResult.append(None)
-            self.postScriptCompleted.append(False)
-            self.postScriptResult.append(None)
-
-        if self.noOfPlugins != 0:
-            self.modulesLoaded = True
 
     def pre_script(self):
 
@@ -114,7 +115,9 @@ class PluginHost(object):
         result = PluginHostResult()
         if not self.modulesLoaded:
             self.logger.log('PluginHost config file error.', True, 'Info')
-            result.errorCode = 10
+            result.errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
+            if os.path.isfile(self.configLocation):
+                result.continueBackup = False
             return result
 
         self.logger.log('Modules loaded successfully...',True,'Info')
@@ -126,7 +129,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,12*(self.timeout)):
+        for i in range(0,(self.timeoutInSeconds)/5):
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -137,13 +140,13 @@ class PluginHost(object):
 
         continueBackup = True
         for j in range(0,self.noOfPlugins):
-            ecode = CommonVariables.PrePost_PluginStatus_Timeout
+            ecode = CommonVariables.FailedPrepostPluginhostPreTimeout
             continueBackup = continueBackup & self.preScriptResult[j].continueBackup
             if self.preScriptCompleted[j]:
                 ecode = self.preScriptResult[j].errorCode
             if ecode != CommonVariables.PrePost_PluginStatus_Success:
                 result.anyScriptFailed = True
-            presult = PluginHostError(errorCode=ecode, pluginName=self.pluginName[j])
+            presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished prescript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')
@@ -157,7 +160,9 @@ class PluginHost(object):
         result = PluginHostResult()
         if not self.modulesLoaded:
             self.logger.log('PluginHost config file error.', True, 'Info')
-            result.errorCode = 10
+            result.errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
+            if os.path.isfile(self.configLocation):
+                result.continueBackup = False
             return result
 
         self.logger.log('Starting postscript for all modules.',True,'Info')
@@ -168,7 +173,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,12*(self.timeout)):
+        for i in range(0,(self.timeoutInSeconds)/5):
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -178,13 +183,13 @@ class PluginHost(object):
 
         continueBackup = True
         for j in range(0,self.noOfPlugins):
-            ecode = CommonVariables.PrePost_PluginStatus_Timeout
+            ecode = CommonVariables.FailedPrepostPluginhostPostTimeout
             continueBackup = continueBackup & self.postScriptResult[j].continueBackup
             if self.postScriptCompleted[j]:
                 ecode = self.postScriptResult[j].errorCode
             if ecode != CommonVariables.PrePost_PluginStatus_Success:
                 result.anyScriptFailed = True
-            presult = PluginHostError(errorCode=ecode, pluginName=self.pluginName[j])
+            presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished postscript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')

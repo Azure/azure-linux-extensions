@@ -202,7 +202,6 @@ def snapshot():
                 run_status = 'success' 
                 error_msg = 'Enable Succeeded' 
                 backup_logger.log("T:S " + error_msg, True) 
-                backup_logger.log(error_msg, False, 'Error') 
 
         if (run_result == CommonVariables.success):
             error_msg = 'Enable Succeeded'
@@ -213,6 +212,7 @@ def snapshot():
         run_result = CommonVariables.error
         run_status = 'error'
         error_msg = 'Enable failed with exception in freeze or snapshot ' 
+        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
     snapshot_done = True 
 
 def freeze_snapshot(timeout):
@@ -267,6 +267,7 @@ def freeze_snapshot(timeout):
                         run_result = CommonVariables.error
                         run_status = 'error'
                         error_msg = 'T:S Enable failed with error: ' + str(thaw_result)
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
                         backup_logger.log(error_msg, True, 'Warning')
                     else:   
                         run_result = CommonVariables.success
@@ -279,6 +280,7 @@ def freeze_snapshot(timeout):
         run_result = CommonVariables.error
         run_status = 'error'
         error_msg = 'Enable failed with exception in safe freeze or snapshot ' 
+        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
     #snapshot_done = True
 
 def daemon():
@@ -362,7 +364,9 @@ def daemon():
                 PluginHostObj = PluginHost(logger=backup_logger)
                 preResult = PluginHostObj.pre_script()
                 dobackup = preResult.continueBackup
-                if preResult.continueBackup:
+                if(g_fsfreeze_on == False and preResult.anyScriptFailed):
+                    dobackup = False
+                if dobackup:
                     if(safe_freeze_on==True):
                         freeze_snapshot(thread_timeout)
                     else:
@@ -394,15 +398,50 @@ def daemon():
                 postResult = PluginHostObj.post_script()
                 if not postResult.continueBackup:
                     dobackup = False
+                
+                if(g_fsfreeze_on == False and postResult.anyScriptFailed):
+                    dobackup = False
 
                 if not dobackup:
-                    run_status = 'error'
-                    run_result = CommonVariables.error
-                    error_msg = 'Scripts failed and backup also failed'
-                    backup_logger.log(error_msg,False,'Error')
-                elif preResult.anyScriptFailed or postResult.anyScriptFailed:
-                    error_msg = 'Scripts failed but continue backup'
-                    backup_logger.log(error_msg,False,'Error')
+                    if preResult.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                        run_status = 'error'
+                        run_result = preResult.errorCode
+                        hutil.SetExtErrorCode(preResult.errorCode)
+                        error_msg = 'Plugin Host Failed.'
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)
+
+                    if run_result == CommonVariables.success:
+                        pre_plugin_errors = preResult.errors
+                        for error in pre_plugin_errors:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                                run_status = 'error'
+                                run_result = error.errorCode
+                                hutil.SetExtErrorCode(error.errorCode)
+                                error_msg = 'PreScript failed for the plugin ' +  error.pluginName
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                backup_logger.log(error_msg, True)
+                                break
+
+                    if run_result == CommonVariables.success:
+                        post_plugin_errors = postResult.errors
+                        for error in post_plugin_errors:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                                run_status = 'error'
+                                run_result = error.errorCode
+                                hutil.SetExtErrorCode(error.errorCode)
+                                error_msg = 'PostScript failed for the plugin ' +  error.pluginName
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                backup_logger.log(error_msg, True)
+                                break
+
+                if run_result == CommonVariables.success and not( preResult.anyScriptFailed or postResult.anyScriptFailed ):
+                    run_status = 'success'
+                    run_result = CommonVariables.success_appconsistent
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                    error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                    backup_logger.log(error_msg, True)
+
         else:
             run_status = 'error'
             run_result = CommonVariables.error_parameter
