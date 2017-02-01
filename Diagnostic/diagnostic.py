@@ -18,7 +18,6 @@ import os.path
 import platform
 import re
 import signal
-import string
 import subprocess
 import sys
 import syslog
@@ -28,11 +27,14 @@ import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
 
-# local imports
-import watcherutil
+import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-import Utils.ApplicationInsightsUtil as AIUtil
+import watcherutil
+from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
+    get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
+
+
 try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
     import Utils.HandlerUtil as Util
     from Utils.WAAgentUtil import waagent
@@ -78,7 +80,6 @@ def init_globals():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     init_public_and_private_settings()
     ExtensionOperationType = None
-    fix_potential_uninstall_wala_event_op_value()
 
     def LogRunGetOutPut(cmd, should_log=True):
         if should_log:
@@ -170,38 +171,6 @@ def init_globals():
     UseSystemdServiceManager = False
     if dist[0] == 'Ubuntu' and dist[1] >= '15.10':  # Use systemd for Ubuntu 15.10 or later
         UseSystemdServiceManager = True
-
-
-def fix_potential_uninstall_wala_event_op_value():
-    # Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
-    if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
-        if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
-            waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
-        else:  # This shouldn't happen, but just in case...
-            waagent.WALAEventOperation.Uninstall = 'Uninstall'
-
-
-def escape(datas):
-    s_build=''
-    for c in datas:
-        if c.isalnum():
-            s_build+=c
-        else:
-            s_build+=":{0:04X}".format(ord(c))
-    return s_build
-
-def getChildNode(p,tag):
-   for node in p.childNodes:
-       if not hasattr(node, 'tagName'):
-           continue
-       print(str(node.tagName)+":"+tag)
-       if node.tagName == tag:
-           return node
-
-def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    hutil.try_parse_context()
-    return
 
 
 def setup_dependencies_and_mdsd():
@@ -387,9 +356,6 @@ def config(xmltree,key,value,xmlpath,selector=[]):
         v = value
     XmlUtil.setXmlValue(xmltree,xmlpath,key,v,selector)
 
-def readUUID():
-     code,str_ret = waagent.RunGetOutput("dmidecode |grep UUID |awk '{print $2}'",chk_err=False)
-     return str_ret.strip()
 
 def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
     perfCfgList = []
@@ -466,35 +432,6 @@ def setEventVolume(mdsdCfg,ladCfg):
             hutil.log("Event volume not found in config. Using default value: " + eventVolume)
             
     XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
-        
-def getStorageAccountEndPoint(account):
-    endpoint = readPrivateConfig('storageAccountEndPoint')
-    if endpoint:
-        parts = endpoint.split('//', 1)
-        if len(parts) > 1:
-            endpoint = parts[0]+'//'+account+".table."+parts[1]
-        else:
-            endpoint = 'https://'+account+".table."+parts[0]
-    else:
-        endpoint = 'https://'+account+'.table.core.windows.net'
-    return endpoint
-
-
-def logPrivateSettingsKeys():
-    try:
-        msg = "Keys in privateSettings (and some non-secret values): "
-        first = True
-        for key in private_settings:
-            if first:
-                first = False
-            else:
-                msg += ", "
-            msg += key
-            if key == 'storageAccountEndPoint':
-                msg += ":" + private_settings[key]
-        hutil.log(msg)
-    except Exception as e:
-        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
 
 
 def configSettings():
@@ -520,10 +457,11 @@ def configSettings():
     try:
         resourceId = getResourceId()
         if resourceId:
-            createPortalSettings(mdsdCfg,escape(resourceId))
+            escaped_resource_id_str = ''.join([ch if ch.isalnum() else ":{0:04X}".format(ord(ch)) for ch in resourceId])
+            createPortalSettings(mdsdCfg, escaped_resource_id_str)
             instanceID=""
             if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >=0:
-                instanceID = readUUID()
+                instanceID = read_uuid(waagent.RunGetOutput)
             config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
 
     except Exception as e:
@@ -554,7 +492,7 @@ def configSettings():
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
 
-    logPrivateSettingsKeys()
+    log_private_settings_keys(private_settings, hutil.log, hutil.error)
 
     account = readPrivateConfig('storageAccountName')
     if not account:
@@ -565,7 +503,7 @@ def configSettings():
         return False, "Neither storageAccountKey nor storageAccountSasToken is given"
     if key and token:
         return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
-    endpoint = getStorageAccountEndPoint(account)
+    endpoint = get_storage_endpoint_with_account(account, readPrivateConfig('storageAccountEndPoint'))
 
     createAccountSettings(mdsdCfg, account, key, token, endpoint, aikey)
 
@@ -585,25 +523,6 @@ def install_service():
     RunGetOutput('sed s#{WORKDIR}#' + WorkDir + '# ' +
                  WorkDir + '/services/mdsd-lde.service > /lib/systemd/system/mdsd-lde.service')
     RunGetOutput('systemctl daemon-reload')
-
-
-def get_extension_operation_type(command):
-    if re.match("^([-/]*)(enable)", command):
-        return waagent.WALAEventOperation.Enable
-    if re.match("^([-/]*)(daemon)", command):   # LAD-specific extension operation (invoked from "./diagnostic.py -enable")
-        return "Daemon"
-    if re.match("^([-/]*)(install)", command):
-        return waagent.WALAEventOperation.Install
-    if re.match("^([-/]*)(disable)", command):
-        return waagent.WALAEventOperation.Disable
-    if re.match("^([-/]*)(uninstall)", command):
-        return waagent.WALAEventOperation.Uninstall
-    if re.match("^([-/]*)(update)", command):
-        return waagent.WALAEventOperation.Update
-
-
-def wala_event_type_for_telemetry(ext_op_type):
-    return "HeartBeat" if ext_op_type == "Daemon" else ext_op_type
 
 
 def main(command):
@@ -726,27 +645,6 @@ def start_daemon():
         wait_n=wait_n-1
     if wait_n <=0:
         hutil.error("wait daemon start time out")
-
-
-def check_suspected_memory_leak(pid):
-    memory_leak_threshold_in_KB = 2000000  # Roughly 2GB. TODO: Make it configurable or automatically calculated
-    memory_usage_in_KB = 0
-    memory_leak_suspected = False
-
-    try:
-        # Check /proc/[pid]/status file for "VmRSS" to find out the process's virtual memory usage
-        # Note: "VmSize" for some reason starts out very high (>2000000) at this moment, so can't use that.
-        with open("/proc/{0}/status".format(pid)) as proc_file:
-            for line in proc_file:
-                if line.startswith("VmRSS:"):  # Example line: "VmRSS:   33904 kB"
-                    memory_usage_in_KB = int(line.split()[1])
-                    memory_leak_suspected = memory_usage_in_KB > memory_leak_threshold_in_KB
-                    break
-    except Exception as e:
-        # Not to throw in case any statement above fails (e.g., invalid pid). Just log.
-        hutil.error("Failed to check memory usage of pid={0}.\nError: {1}\nTrace:\n{2}".format(pid, e, traceback.format_exc()))
-
-    return memory_leak_suspected, memory_usage_in_KB
 
 
 def start_mdsd():
@@ -883,7 +781,7 @@ def start_mdsd():
                 # mdsd is now up for at least 30 seconds.
 
                 # Mitigate if memory leak is suspected.
-                mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid)
+                mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid, hutil.error)
                 if mdsd_memory_leak_suspected:
                     memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
                                       "Recycling mdsd to self-mitigate.".format(int((mdsd_memory_usage_in_KB+1023)/1024))
@@ -953,7 +851,7 @@ def start_mdsd():
             # we just continue by restarting mdsd.
             mdsd_up_time = datetime.datetime.now() - last_mdsd_start_time
             if mdsd_up_time > datetime.timedelta(minutes=30):
-                mdsd_terminated_msg = "MDSD terminated after "+str(mdsd_up_time)+". "+tail(mdsd_log_path)+tail(monitor_file_path)
+                mdsd_terminated_msg = "MDSD terminated after "+str(mdsd_up_time)+". " + tail(mdsd_log_path) + tail(monitor_file_path)
                 hutil.log(mdsd_terminated_msg)
                 num_quick_consecutive_crashes = 0
                 continue
@@ -961,7 +859,7 @@ def start_mdsd():
             # It's a quick crash. Log error and add an extension event.
             num_quick_consecutive_crashes += 1
 
-            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):"+tail(mdsd_log_path)+tail(monitor_file_path)
+            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_log_path) + tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
 
             # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
@@ -981,7 +879,7 @@ def start_mdsd():
 
     except Exception as e:
         if mdsd_log:
-            hutil.error("Error :"+tail(mdsd_log_path))
+            hutil.error("Error :" + tail(mdsd_log_path))
         hutil.error(("Failed to launch mdsd with error:{0},"
                      "stacktrace:{1}").format(e, traceback.format_exc()))
         hutil.do_status_report(ExtensionOperationType, 'error', '1', 'Launch script failed:{0}'.format(e))
@@ -1039,16 +937,6 @@ def get_mdsd_process():
             else:
                 hutil.log("return not alive "+is_still_alive.strip())
     return mdsd_pids
-
-
-def get_dist_config():
-    dist = platform.dist()
-    if All_Dist.has_key(dist[0]+":"+dist[1]):
-        return All_Dist[dist[0]+":"+dist[1]]
-    elif All_Dist.has_key(dist[0]):
-        return All_Dist[dist[0]]
-    else:
-        return None
 
 
 def install_omi():
@@ -1241,17 +1129,6 @@ def install_required_package():
                 errorcode+=process.returncode
             return errorcode,str(output_all)
     return 0,"not pacakge need install"
-
-
-def tail(log_file, output_size=1024):
-    if not os.path.exists(log_file):
-        return ""
-    pos = min(output_size, os.path.getsize(log_file))
-    with open(log_file, "r") as log:
-        log.seek(-pos, 2)
-        buf = log.read(output_size)
-        buf = filter(lambda x: x in string.printable, buf)
-        return buf.decode("ascii", "ignore")
 
 
 def get_deployment_id():
