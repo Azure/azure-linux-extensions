@@ -198,7 +198,7 @@ class Snapshotter(object):
 
                 for job in mp_jobs:
                     job.join()
-                self.logger.log('end of snapshot process at time')
+                self.logger.log('end of snapshot process')
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
                 error_logging = [global_error_logger.get() for job in mp_jobs]
