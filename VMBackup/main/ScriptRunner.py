@@ -111,11 +111,7 @@ class ScriptRunner(object):
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
             self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
-            if int(permissions[0]) < 7 : #validating owner permission to rwx
-                valid_permissions = False
-            elif int(permissions[1]) < 7 : #validating group permission to rwx
-                valid_permissions = False
-            elif int(permissions[2]) > 0 : #validating other permission
+            if int(permissions[2]) > 0 : #validating permissions for others
                 valid_permissions = False
         except Exception as err:
             self.logger.log('Error in fetching permissions of the file : ' + filename + 'with error ' + str(err),True,'Error')
