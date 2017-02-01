@@ -23,6 +23,7 @@ import traceback
 import datetime
 import ConfigParser
 import multiprocessing as mp
+import datetime
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status
@@ -98,6 +99,8 @@ class Snapshotter(object):
                     # HttpCall failed
                     error_logger = error_logger + str(datetime.datetime.now()) + " snapshot HttpCallGetResponse failed "
                     error_logger = error_logger + str(datetime.datetime.now()) + str(errMsg)
+                    snapshot_error.errorcode = CommonVariables.error
+                    snapshot_error.sasuri = sasuri
                 end_time = datetime.datetime.utcnow()
                 time_taken=end_time-start_time
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' time taken for snapshot ' + str(time_taken)
