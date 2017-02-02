@@ -30,6 +30,7 @@ import xml.etree.ElementTree as ET
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
+from Utils.imds_util import ImdsLogger
 import watcherutil
 from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
     get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
@@ -647,6 +648,19 @@ def start_daemon():
         hutil.error("wait daemon start time out")
 
 
+def start_watcher_thread():
+    # Create monitor object that encapsulates monitoring activities
+    watcher = watcherutil.Watcher(hutil.error, hutil.log, log_to_console=True)
+    # Create an IMDS data logger and set it to the monitor object
+    imds_logger = ImdsLogger(hutil.get_name(), hutil.get_extension_version(),
+                             waagent.WALAEventOperation.HeartBeat, waagent.AddExtensionEvent)
+    watcher.set_imds_logger(imds_logger)
+    # Start a thread to perform periodic monitoring activity (e.g., /etc/fstab watcher, IMDS data logging)
+    threadObj = threading.Thread(target=watcher.watch)
+    threadObj.daemon = True
+    threadObj.start()
+
+
 def start_mdsd():
     global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
@@ -736,12 +750,7 @@ def start_mdsd():
         info_file_path).split(" ")
 
     try:
-        # Create monitor object that encapsulates monitoring activities
-        watcher = watcherutil.Watcher(hutil.error, hutil.log, log_to_console=True)
-        # Start a thread to monitor /etc/fstab
-        threadObj = threading.Thread(target=watcher.watch)
-        threadObj.daemon = True
-        threadObj.start()
+        start_watcher_thread()
 
         num_quick_consecutive_crashes = 0
 
