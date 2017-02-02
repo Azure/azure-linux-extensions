@@ -30,6 +30,7 @@ import xml.etree.ElementTree as ET
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
+from Utils.imds_util import ImdsLogger
 import watcherutil
 from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
     get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
@@ -743,6 +744,10 @@ def start_mdsd():
         threadObj.daemon = True
         threadObj.start()
 
+        # IMDS data logger
+        imds_logger = ImdsLogger(hutil.get_name(), hutil.get_extension_version(),
+                                 waagent.WALAEventOperation.HeartBeat, waagent.AddExtensionEvent)
+
         num_quick_consecutive_crashes = 0
 
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
@@ -779,6 +784,12 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
+
+                # IMDS probe (only sporadically, inside the function)
+                try:
+                    imds_logger.log_imds_data_if_right_time()
+                except Exception as ex:
+                    hutil.error('ImdsLogger exception: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc()))
 
                 # Mitigate if memory leak is suspected.
                 mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid, hutil.error)
