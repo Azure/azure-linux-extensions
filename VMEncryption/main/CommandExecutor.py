@@ -36,11 +36,23 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
-        self.logger.log("Executing: {0}".format(command_to_execute))
+    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
+        if not suppress_logging:
+            self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
-        proc = Popen(args, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = proc.communicate()
+        proc = None
+
+        try:
+            proc = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE, close_fds=True)
+        except Exception as e:
+            if raise_exception_on_failure:
+                raise
+            else:
+                if not suppress_logging:
+                    self.logger.log("Process creation failed: " + str(e))
+                return -1
+
+        stdout, stderr = proc.communicate(input=input)
         return_code = proc.returncode
 
         if isinstance(communicator, ProcessCommunicator):
@@ -51,15 +63,16 @@ class CommandExecutor(object):
             msg += "\nstdout:\n" + stdout
             msg += "\nstderr:\n" + stderr
 
-            self.logger.log(msg)
+            if not suppress_logging:
+                self.logger.log(msg)
 
             if raise_exception_on_failure:
                 raise Exception(msg)
 
         return return_code
     
-    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False, communicator=None):
+    def ExecuteInBash(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
         command_to_execute = 'bash -c "{0}{1}"'.format('set -e; ' if raise_exception_on_failure else '',
                                                       command_to_execute)
         
-        return self.Execute(command_to_execute, raise_exception_on_failure, communicator)
+        return self.Execute(command_to_execute, raise_exception_on_failure, communicator, input, suppress_logging)

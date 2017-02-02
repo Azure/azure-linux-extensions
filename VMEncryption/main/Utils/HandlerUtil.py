@@ -76,7 +76,7 @@ import logging.handlers
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 class HandlerContext:
-    def __init__(self,name):
+    def __init__(self, name):
         self._name = name
         self._version = '0.0'
         return
@@ -101,14 +101,14 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
-                    if(file.endswith('.settings')):
+                    if file.endswith('.settings'):
                         cur_seq_no = int(os.path.basename(file).split('.')[0])
-                        if(freshest_time == None):
-                            freshest_time = os.path.getmtime(join(config_folder,file))
+                        if freshest_time == None:
+                            freshest_time = os.path.getmtime(join(config_folder, file))
                             seq_no = cur_seq_no
                         else:
-                            current_file_m_time = os.path.getmtime(join(config_folder,file))
-                            if(current_file_m_time > freshest_time):
+                            current_file_m_time = os.path.getmtime(join(config_folder, file))
+                            if current_file_m_time > freshest_time:
                                 freshest_time = current_file_m_time
                                 seq_no = cur_seq_no
                 except ValueError:
@@ -116,9 +116,9 @@ class HandlerUtility:
         return seq_no
 
     def get_last_seq(self):
-        if(os.path.isfile('mrseq')):
+        if os.path.isfile('mrseq'):
             seq = waagent.GetFileContents('mrseq')
-            if(seq):
+            if seq:
                 return int(seq)
         return -1
 
@@ -138,7 +138,7 @@ class HandlerUtility:
     def exit_if_same_seq(self, exit_status=None):
         current_seq = int(self._context._seq_no)
         last_seq = self.get_last_seq()
-        if(current_seq == last_seq):
+        if current_seq == last_seq:
             self.log("the sequence numbers are same, so skipping daemon"+
                      ", current=" +
                      str(current_seq) +
@@ -180,7 +180,7 @@ class HandlerUtility:
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
                 f = tempfile.NamedTemporaryFile(delete=False)
                 f.close()
-                waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
+                waagent.SetFileContents(f.name, config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 if cleartxt == None:
@@ -271,7 +271,7 @@ class HandlerUtility:
 
                 return None
             else:
-                if(self.operation is not None and self.operation.lower() == "enable"):
+                if self.operation is not None and self.operation.lower() == "enable":
                     # we should keep the current status file
                     # self.backup_settings_status_file(self._context._seq_no)
                     pass
@@ -279,7 +279,7 @@ class HandlerUtility:
             self._context._config = self._parse_config(ctxt)
 
             public_settings_str = self._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-            if(isinstance(public_settings_str, basestring)):
+            if isinstance(public_settings_str, basestring):
                 public_settings = json.loads(public_settings_str)
             else:
                 public_settings = public_settings_str
@@ -308,7 +308,7 @@ class HandlerUtility:
         self.set_last_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
 
-    def set_last_seq(self,seq):
+    def set_last_seq(self, seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def redo_last_status(self):
@@ -320,6 +320,15 @@ class HandlerUtility:
 
         shutil.copy2(previous_status_file, self._context._status_file)
         self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
+
+    def redo_current_status(self):
+        stat_rept = waagent.GetFileContents(self._context._status_file)
+        stat = json.loads(stat_rept)
+
+        self.do_status_report(stat[0]["status"]["operation"],
+                              stat[0]["status"]["status"],
+                              stat[0]["status"]["code"],
+                              stat[0]["status"]["formattedMessage"]["message"])
 
     def do_status_report(self, operation, status, status_code, message):
         latest_seq = str(self.get_latest_seq())
@@ -384,9 +393,9 @@ class HandlerUtility:
         for subdir, dirs, files in os.walk(self._context._config_dir):
             for file in files:
                 try:
-                    if(file.endswith('.settings') and file != (_seq_no + ".settings")):
+                    if file.endswith('.settings') and file != (_seq_no + ".settings"):
                         new_file_name = file.replace(".","_")
-                        os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
+                        os.rename(join(self._context._config_dir, file), join(self._context._config_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the settings file.")
 

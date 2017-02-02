@@ -433,7 +433,7 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj((ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]).value, status_code)
+        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], status_code)
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
@@ -482,7 +482,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
-            HandlerUtility.add_to_telemetery_data("extErrorCode",self.ExtErrorCode)
+            HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]))
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))

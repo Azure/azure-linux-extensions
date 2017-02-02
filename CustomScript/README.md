@@ -36,6 +36,7 @@ Schema for the public configuration file looks like this:
 
 * `fileUris`: (optional, string array) the uri list of the scripts
 * `commandToExecute`: (required, string) the entrypoint script to execute
+* `enableInternalDNSCheck`: (optional, bool) default is True, set to False to disable DNS check.
  
 ```json
 {
@@ -307,6 +308,7 @@ If you need to run scripts repeatly, you can add a timestamp.
 
 ## Supported Linux Distributions
 - CentOS 6.5 and higher
+- Debian 8 and higher
 - FreeBSD
 - OpenSUSE 13.1 and higher
 - Oracle Linux 6.4 and higher

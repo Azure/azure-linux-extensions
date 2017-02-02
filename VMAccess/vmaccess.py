@@ -77,6 +77,14 @@ def enable():
             reset_ssh = protect_settings.get('reset_ssh')
             remove_user = protect_settings.get('remove_user')
 
+        if remove_user and _is_sshd_config_modified(protect_settings):
+            hutil.error("Cannot reset sshd_config and remove a user in one operation.")
+            waagent.AddExtensionEvent(name=hutil.get_name(),
+                                      op=waagent.WALAEventOperation.Enable,
+                                      isSuccess=False,
+                                      message="(03002)Argument error, conflicting operations")
+            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+
         # check port each time the VM boots up
         if reset_ssh:
             _open_ssh_port()
@@ -145,6 +153,7 @@ def update():
 
 
 def _remove_user_account(user_name, hutil):
+    hutil.log("Removing user account")
     try:
         sudoers = _get_other_sudoers(user_name)
         waagent.MyDistro.DeleteAccount(user_name)
@@ -155,6 +164,11 @@ def _remove_user_account(user_name, hutil):
                                   isSuccess=False,
                                   message="(02102)Failed to remove user.")
         raise Exception("Failed to remove user {0}".format(e))
+
+    waagent.AddExtensionEvent(name=hutil.get_name(),
+                              op=waagent.WALAEventOperation.Enable,
+                              isSuccess=True,
+                              message="Successfully removed user")
 
 
 def _set_user_account_pub_key(protect_settings, hutil):

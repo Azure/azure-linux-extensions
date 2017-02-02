@@ -61,8 +61,13 @@ class PatchBootSystemState(OSEncryptionState):
         try:
             self._modify_pivoted_oldroot()
         except Exception as e:
+            self.command_executor.Execute('mount --make-rprivate /')
+            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
+            self.command_executor.Execute('rmdir /oldroot/memroot')
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
+
             raise
-        finally:
+        else:
             self.command_executor.Execute('mount --make-rprivate /')
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
             self.command_executor.Execute('rmdir /oldroot/memroot')
@@ -123,7 +128,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
         self.command_executor.Execute('update-grub', True)
-        self.command_executor.Execute('grub-install --recheck --force /dev/sda', True)
+        self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
 
     def _get_uuid(self, partition_name):
         proc_comm = ProcessCommunicator()

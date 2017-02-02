@@ -29,14 +29,20 @@ import time
 import traceback
 import datetime
 import subprocess
+
 from AbstractPatching import AbstractPatching
 from Common import *
+from CommandExecutor import *
 
 
 class SuSEPatching(AbstractPatching):
-    def __init__(self,logger,distro_info):
-        super(SuSEPatching,self).__init__(distro_info)
-        if(distro_info[1] == "11"):
+    def __init__(self, logger, distro_info):
+        super(SuSEPatching, self).__init__(distro_info)
+
+        self.distro_info = distro_info
+        self.command_executor = CommandExecutor(logger)
+
+        if distro_info[1] == "11":
             self.logger = logger
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -73,12 +79,17 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        common_extras = ['cryptsetup','lsscsi']
-        for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
-
-        #if(paras.filesystem == "btrfs"):
-        #    extras = ['btrfs-tools']
-        #    for extra in extras:
-        #        print("installation for " + extra + 'result is ' + str(subprocess.call(['zypper', 'install','-l', extra])))
-        #pass
+        packages = ['cryptsetup', 'lsscsi']
+        cmd = " ".join((['zypper', 'install', '-l', '-y'] + packages))
+        self.command_executor.Execute(cmd)
+        
+        if not self.distro_info[1] == "11":
+            packages = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
+            cmd = " ".join(['zypper', 'install', '-l', '-y'] + packages)
+            self.command_executor.Execute(cmd)
+        
+            cmd = " ".join(['pip', 'install', 'jwt'])
+            self.command_executor.Execute(cmd)
+        
+            cmd = " ".join(['pip', 'install', 'adal'])
+            self.command_executor.Execute(cmd)

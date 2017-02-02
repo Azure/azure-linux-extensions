@@ -40,7 +40,24 @@ class SplitRootPartitionState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for split_root_partition state")
 
-        self.command_executor.Execute("e2fsck -yf /dev/sda1", True)
+
+        attempt = 1
+        while attempt < 10:
+            fsck_result = self.command_executor.Execute("e2fsck -yf {0}".format(self.rootfs_block_device))
+
+            if fsck_result == 0:
+                break
+
+            self.command_executor.Execute('systemctl restart systemd-udevd')
+            self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.command_executor.Execute('udevadm trigger')
+
+            sleep(10)
+
+            attempt += 1
+
+        if not attempt < 10:
+            return False
                 
         return True
 
@@ -50,7 +67,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         self.context.logger.log("Entering split_root_partition state")
 
-        device = parted.getDevice('/dev/sda')
+        device = parted.getDevice(self.rootfs_disk)
         disk = parted.newDisk(device)
 
         original_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
@@ -62,7 +79,20 @@ class SplitRootPartitionState(OSEncryptionState):
         desired_root_fs_size = original_root_fs_size - desired_boot_partition_size
         self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
 
-        self.command_executor.Execute("resize2fs /dev/sda1 {0}s".format(desired_root_fs_size), True)
+        attempt = 1
+        while attempt < 10:
+            resize_result = self.command_executor.Execute("resize2fs {0} {1}s".format(self.rootfs_block_device, desired_root_fs_size))
+
+            if resize_result == 0:
+                break
+            else:
+                self.command_executor.Execute('systemctl restart systemd-udevd')
+                self.command_executor.Execute('systemctl restart systemd-timesyncd')
+                self.command_executor.Execute('udevadm trigger')
+
+                sleep(10)
+
+                attempt += 1
 
         resized_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
 
@@ -127,12 +157,12 @@ class SplitRootPartitionState(OSEncryptionState):
         disk.commit()
         
         self.command_executor.Execute("partprobe", True)
-        self.command_executor.Execute("mkfs.ext2 /dev/sda2", True)
+        self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
         
-        boot_partition_uuid = self._get_uuid("/dev/sda2")
+        boot_partition_uuid = self._get_uuid(self.bootfs_block_device)
 
         # Move stuff from /oldroot/boot to new partition, make new partition mountable at the same spot
-        self.command_executor.Execute("mount /dev/sda1 /oldroot", True)
+        self.command_executor.Execute("mount {0} /oldroot".format(self.rootfs_block_device), True)
         self.command_executor.Execute("mkdir /oldroot/memroot", True)
         self.command_executor.Execute("mount --make-rprivate /", True)
         self.command_executor.Execute("pivot_root /oldroot /oldroot/memroot", True)
@@ -189,9 +219,27 @@ class SplitRootPartitionState(OSEncryptionState):
 
     def _get_root_fs_size_in(self, sector_size):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="dumpe2fs -h /dev/sda1",
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
+
+        attempt = 1
+        while attempt < 10:
+            dump_result = self.command_executor.Execute(command_to_execute="dumpe2fs -h {0}".format(self.rootfs_block_device),
+                                                        raise_exception_on_failure=False,
+                                                        communicator=proc_comm)
+
+            if dump_result == 0:
+                break
+
+            self.command_executor.Execute('systemctl restart systemd-udevd')
+            self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.command_executor.Execute('udevadm trigger')
+
+            sleep(10)
+
+            attempt += 1
+
+        if not attempt < 10:
+            return Exception("Could not dumpe2fs, stderr: \n{0}".format(proc_comm.stderr))
+        
 
         root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
         root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)

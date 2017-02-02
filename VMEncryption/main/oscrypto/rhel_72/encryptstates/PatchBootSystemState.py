@@ -21,6 +21,7 @@
 
 import inspect
 import os
+import re
 import sys
 
 from time import sleep
@@ -61,8 +62,13 @@ class PatchBootSystemState(OSEncryptionState):
         try:
             self._modify_pivoted_oldroot()
         except Exception as e:
+            self.command_executor.Execute('mount --make-rprivate /')
+            self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
+            self.command_executor.Execute('rmdir /oldroot/memroot')
+            self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
+
             raise
-        finally:
+        else:
             self.command_executor.Execute('mount --make-rprivate /')
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
             self.command_executor.Execute('rmdir /oldroot/memroot')
@@ -102,6 +108,17 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
+        proc_comm = ProcessCommunicator()
+        udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
+        self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
+
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{partition} from udevadm info")
+        partition = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, patchpath)
+        self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
                                       '/etc/default/grub')
 
@@ -113,5 +130,5 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf')
 
         self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
-        self.command_executor.Execute('grub2-install --recheck --force /dev/sda', True)
+        self.command_executor.Execute('grub2-install --recheck --force {0}'.format(self.rootfs_disk), True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
