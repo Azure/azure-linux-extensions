@@ -17,32 +17,34 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import logging
 import subprocess
 import os
 import datetime
 import time
+import string
 
 
 class Watcher:
 
-    def __init__(self, error_stream, output_stream, log_to_console=False):
-        self.lastModTime = os.path.getmtime('/etc/fstab')
+    def __init__(self, hutil_error, hutil_log, log_to_console=False):
+        self._last_mod_time = os.path.getmtime('/etc/fstab')
 
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
+        self._hutil_error = hutil_error
+        self._hutil_log = hutil_log
+        self._log_to_console = log_to_console
 
-        ch = logging.StreamHandler(error_stream)
-        ch.setLevel(logging.WARNING)
-        self.logger.addHandler(ch)
-        ch = logging.StreamHandler(output_stream)
-        ch.setLevel(logging.INFO)
-        self.logger.addHandler(ch)
-
-        if log_to_console:
-            ch = logging.FileHandler('/dev/console')
-            ch.setLevel(logging.WARNING)
-            self.logger.addHandler(ch)
+    def _do_log_to_console_if_enabled(self, message):
+        """
+        Write 'message' to console. Stolen from waagent LogToCon().
+        """
+        if self._log_to_console:
+            self._hutil_log('Logging to console: ' + message)
+            try:
+                with open('/dev/console', 'w') as console:
+                    message = filter(lambda x: x in string.printable, message)
+                    console.write(message.encode('ascii', 'ignore') + '\n')
+            except IOError as e:
+                self._hutil_error('Error writing to console. Exception={0}'.format(e))
 
     def handle_fstab(self, ignore_time=False):
         try_mount = False
@@ -54,21 +56,23 @@ class Watcher:
 
             # Only try to mount if it's been at least 1 minute since the 
             # change to fstab was done, to prevent spewing out erroneous spew
-            if (current_mod_time != self.lastModTime and
+            if (current_mod_time != self._last_mod_time and
                 datetime.datetime.now() > current_mod_date_time +
                     datetime.timedelta(minutes=1)):
                 try_mount = True
-                self.lastModTime = current_mod_time
+                self._last_mod_time = current_mod_time
 
         ret = 0
         if try_mount:
             ret = subprocess.call(['sudo', 'mount', '-a', '-vf'])
             if ret != 0:
                 # There was an error running mount, so log
-                self.logger.error('fstab modification failed mount validation.  Please correct before reboot.')
+                error_msg = 'fstab modification failed mount validation.  Please correct before reboot.'
+                self._hutil_error(error_msg)
+                self._do_log_to_console_if_enabled(error_msg)
             else:
                 # No errors
-                self.logger.info('fstab modification passed mount validation')
+                self._hutil_log('fstab modification passed mount validation')
         return ret
 
     def watch(self):
