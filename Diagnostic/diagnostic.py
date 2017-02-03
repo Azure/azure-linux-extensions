@@ -27,47 +27,50 @@ import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
 
-import Utils.ApplicationInsightsUtil as AIUtil
-import Utils.LadDiagnosticUtil as LadUtil
-import Utils.XmlUtil as XmlUtil
-from Utils.imds_util import ImdsLogger
-import watcherutil
-from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
-    get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
-
-
-try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
-    import Utils.HandlerUtil as Util
+# Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
+# Also for any potential local imports that may throw, let's do try-except here on them.
+try:
+    # waagent, ext handler
     from Utils.WAAgentUtil import waagent
+    import Utils.HandlerUtil as Util
+
+    # Old LAD utils
+    import Utils.ApplicationInsightsUtil as AIUtil
+    import Utils.LadDiagnosticUtil as LadUtil
+    import Utils.XmlUtil as XmlUtil
+
+    # New LAD  utils
+    import watcherutil
+    from misc_helpers import *
+    from config_mdsd_rsyslog import *
+    from Utils.imds_util import ImdsLogger
 except Exception as e:
-    print('waagent import failed.\nException thrown: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
-    print('Are you running without waagent for some reason? Just passing here for now...')
+    print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
+          'Stacktrace: {1}'.format(e, traceback.format_exc())
+    print 'Are you running without waagent for some reason? Just passing here for now...'
     # We may add some waagent mock later to support this scenario.
 
 
-def init_public_and_private_settings():
+def init_extension_settings():
     """Initialize extension's public & private settings. hutil must be already initialized prior to calling this."""
-    global public_settings, private_settings
+    global g_ext_settings
 
+    # Need to read/parse the Json extension settings (context) first.
     hutil.try_parse_context()
     hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
-    public_settings = hutil.get_public_settings()
-    private_settings = hutil.get_protected_settings()
-    if not public_settings:
-        public_settings = {}
-    if not private_settings:
-        private_settings = {}
+
+    g_ext_settings = LadExtSettings(hutil.get_handler_settings())
 
 
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix
-    global MDSDPidFile, MDSDPidPortFile, EnableSyslog, hutil
-    global public_settings, private_settings, ExtensionOperationType
-    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, StartDaemonFilePath, omi_universal_pkg_name
-    global omfileconfig, DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
+    global MDSDPidFile, MDSDPidPortFile, EnableSyslog, hutil, ExtensionOperationType
+    global rsyslog_module_for_check, RunGetOutput, MdsdFolder, StartDaemonFilePath, omi_universal_pkg_name
+    global imfile_config_filename, DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
     global SuseConfig11, SuseConfig12, CentosConfig, MDSD_LISTEN_PORT, All_Dist, distConfig, dist
     global distroNameAndVersion, UseSystemdServiceManager
+    global g_ext_settings
 
     WorkDir = os.getcwd()
     MDSDFileResourcesDir = "/var/run/mdsd"
@@ -79,7 +82,7 @@ def init_globals():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("LinuxAzureDiagnostic started to handle.")
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    init_public_and_private_settings()
+    init_extension_settings()
     ExtensionOperationType = None
 
     def LogRunGetOutPut(cmd, should_log=True):
@@ -90,20 +93,20 @@ def init_globals():
             hutil.log("Return "+str(error)+":"+msg)
         return error, msg
 
-    rsyslog_ommodule_for_check = 'omprog.so'
+    rsyslog_module_for_check = 'omprog.so'
     RunGetOutput = LogRunGetOutPut
     MdsdFolder = os.path.join(WorkDir, 'bin')
     StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
     omi_universal_pkg_name = 'scx-1.6.2-337.universal.x64.sh'
 
-    omfileconfig = os.path.join(WorkDir, 'omfileconfig')
+    imfile_config_filename = os.path.join(WorkDir, 'imfileconfig')
 
     DebianConfig = {"installomi":"bash "+omi_universal_pkg_name+" --upgrade;",
                     "installrequiredpackage":'dpkg-query -l PACKAGE |grep ^ii ;  if [ ! $? == 0 ]; then apt-get update ; apt-get install -y PACKAGE; fi',
                     "packages":(),
                     "stoprsyslog" : "service rsyslog stop",
                     "restartrsyslog":"service rsyslog restart",
-                    'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|'+rsyslog_ommodule_for_check+'"',
+                    'checkrsyslog':'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|' + rsyslog_module_for_check + '"',
                     'mdsd_env_vars': {"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"}
                     }
 
@@ -112,7 +115,7 @@ def init_globals():
                      "packages":('policycoreutils-python', 'tar'),  # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy). tar is really missing on Oracle Linux 7!
                      "stoprsyslog" : "service rsyslog stop",
                      "restartrsyslog":"service rsyslog restart",
-                     'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|'+rsyslog_ommodule_for_check+'"',
+                     'checkrsyslog':'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\\|' + rsyslog_module_for_check + '"',
                      'mdsd_env_vars': {"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"}
                      }
 
@@ -215,311 +218,6 @@ def setup_dependencies_and_mdsd():
     return 0, 'success'
 
 
-def hasPublicConfig(key):
-    return public_settings.has_key(key)
-
-def readPublicConfig(key):
-    if public_settings.has_key(key):
-        return public_settings[key]
-    return ''
-
-def readPrivateConfig(key):
-    if private_settings.has_key(key):
-        return private_settings[key]
-    return ''
-
-def createPortalSettings(tree,resourceId):
-    portal_config = ET.ElementTree()
-    portal_config.parse(os.path.join(WorkDir, "portal.xml.template"))
-    XmlUtil.setXmlValue(portal_config,"./DerivedEvents/DerivedEvent/LADQuery","partitionKey",resourceId)
-    XmlUtil.addElement(tree,'Events',portal_config._root.getchildren()[0])
-    XmlUtil.addElement(tree,'Events',portal_config._root.getchildren()[1])
-
-
-eventSourceSchema = """
- <MdsdEventSource source="ladfile">
-     <RouteEvent dontUsePerNDayTable="true" eventName="" priority="High"/>
-</MdsdEventSource>
-                    """
-sourceSchema = """
-<Source name="ladfile1" schema="ladfile" />
-"""
-
-syslogEventSourceConfig ="""
-
-$InputFileName #FILE#
-$InputFileTag #FILETAG#
-$InputFileFacility local6
-$InputFileStateFile syslog-stat#STATFILE#
-$InputFileSeverity debug
-$InputRunFileMonitor
-
-"""
-
-
-
-def createEventFileSettings(tree,files):
-    fileid = 0
-    sysconfig = """
-$ModLoad imfile
-
-                """
-    if not files:
-        return
-    for file in files:
-        fileid=fileid+1
-        eventSourceElement = XmlUtil.createElement(eventSourceSchema)
-        XmlUtil.setXmlValue(eventSourceElement,'RouteEvent','eventName',file["table"])
-        eventSourceElement.set('source','ladfile'+str(fileid))
-        XmlUtil.addElement(tree,'Events/MdsdEvents',eventSourceElement)
-
-        sourceElement = XmlUtil.createElement(sourceSchema)
-        sourceElement.set('name','ladfile'+str(fileid))
-        XmlUtil.addElement(tree,'Sources',sourceElement)
-
-        syslog_config = syslogEventSourceConfig.replace('#FILE#',file['file'])
-        syslog_config = syslog_config.replace('#STATFILE#',file['file'].replace("/","-"))
-        syslog_config = syslog_config.replace('#FILETAG#','ladfile'+str(fileid))
-        sysconfig+=syslog_config
-    return sysconfig
-
-
-perfSchema = """
-    <OMIQuery cqlQuery=""
-      dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" />
-    """
-
-def createPerfSettngs(tree,perfs,forAI=False):
-    if not perfs:
-        return
-    for perf in perfs:
-        perfElement = XmlUtil.createElement(perfSchema)
-        perfElement.set('cqlQuery',perf['query'])
-        perfElement.set('eventName',perf['table'])
-        namespace="root/scx"
-        if perf.has_key('namespace'):
-           namespace=perf['namespace']
-        perfElement.set('omiNamespace',namespace)
-        if forAI:
-            AIUtil.updateOMIQueryElement(perfElement)
-        XmlUtil.addElement(xml=tree,path='Events/OMI',el=perfElement,addOnlyOnce=True)
-
-
-# Updates the MDSD configuration Account elements.
-# Updates existing default Account element with Azure table storage properties.
-# If an aikey is provided to the function, then it adds a new Account element for
-# Application Insights with the application insights key.
-def createAccountSettings(tree, account, key, token, endpoint, aikey=None):
-    assert key or token, "Either key or token must be given."
-
-    def get_handler_cert_pkey_paths():
-        handler_settings = hutil.get_handler_settings()
-        thumbprint = handler_settings['protectedSettingsCertThumbprint']
-        cert_path = waagent.LibDir + '/' + thumbprint + '.crt'
-        pkey_path = waagent.LibDir + '/' + thumbprint + '.prv'
-        return cert_path, pkey_path
-
-    def encrypt_secret_with_cert(cert_path, secret):
-        encrypted_secret_tmp_file_path = os.path.join(WorkDir, "mdsd_secret.bin")
-        cmd_to_run = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}".format(secret, encrypted_secret_tmp_file_path, cert_path)
-        ret_status, ret_msg = RunGetOutput(cmd_to_run, should_log=False)
-        if ret_status is not 0:
-            hutil.error("Encrypting storage secret failed with the following message: " + ret_msg)
-            return None
-        with open(encrypted_secret_tmp_file_path, 'rb') as f:
-            encrypted_secret = f.read()
-        os.remove(encrypted_secret_tmp_file_path)
-        return binascii.b2a_hex(encrypted_secret).upper()
-
-    handler_cert_path, handler_pkey_path = get_handler_cert_pkey_paths()
-    if key:
-        key = encrypt_secret_with_cert(handler_cert_path, key)
-        XmlUtil.setXmlValue(tree,'Accounts/Account',"account",account,['isDefault','true'])
-        XmlUtil.setXmlValue(tree,'Accounts/Account',"key",key,['isDefault','true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/Account', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree,'Accounts/Account',"tableEndpoint",endpoint,['isDefault','true'])
-        XmlUtil.removeElement(tree, 'Accounts', 'SharedAccessSignature')
-    else:  # token
-        token = encrypt_secret_with_cert(handler_cert_path, token)
-        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
-        XmlUtil.removeElement(tree, 'Accounts', 'Account')
-
-    if aikey:
-        AIUtil.createAccountElement(tree,aikey)
-
-
-def config(xmltree,key,value,xmlpath,selector=[]):
-    v = readPublicConfig(key)
-    if not v:
-        v = value
-    XmlUtil.setXmlValue(xmltree,xmlpath,key,v,selector)
-
-
-def generatePerformanceCounterConfiguration(mdsdCfg,includeAI=False):
-    perfCfgList = []
-    try:
-        ladCfg = readPublicConfig('ladCfg')
-        perfCfgList = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(ladCfg)
-        if not perfCfgList:
-            perfCfgList = readPublicConfig('perfCfg')
-        if not perfCfgList and not hasPublicConfig('perfCfg'):
-            perfCfgList = [
-                    {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
-                    {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
-                    {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
-                  ]
-    except Exception as e:
-        hutil.error("Failed to parse performance configuration with exception:{0} {1}".format(e,traceback.format_exc()))
-
-    try:
-        createPerfSettngs(mdsdCfg,perfCfgList)
-        if includeAI:
-            createPerfSettngs(mdsdCfg,perfCfgList,True)
-    except Exception as e:
-        hutil.error("Failed to create perf config  error:{0} {1}".format(e,traceback.format_exc()))
-
-# Try to get resourceId from LadCfg, if not present
-# try to fetch from xmlCfg
-def getResourceId():
-    ladCfg = readPublicConfig('ladCfg')
-    resourceId = LadUtil.getResourceIdFromLadCfg(ladCfg)
-    if not resourceId:
-        encodedXmlCfg = readPublicConfig('xmlCfg').strip()
-        if encodedXmlCfg:
-            xmlCfg = base64.b64decode(encodedXmlCfg)
-            resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),'diagnosticMonitorConfiguration/metrics','resourceId')
-# Azure portal uses xmlCfg which contains WadCfg which is pascal case, Currently we will support both casing and deprecate one later
-            if not resourceId:
-                resourceId = XmlUtil.getXmlValue(XmlUtil.createElement(xmlCfg),'DiagnosticMonitorConfiguration/Metrics','resourceId')
-    return resourceId
-
-# Try to get syslogCfg from LadCfg, if not present
-# fetch it from public settings
-def getSyslogCfg():
-    syslogCfg = ""
-    ladCfg = readPublicConfig('ladCfg')
-    encodedSyslogCfg = LadUtil.getDiagnosticsMonitorConfigurationElement(ladCfg, 'syslogCfg')
-    if not encodedSyslogCfg:
-        encodedSyslogCfg = readPublicConfig('syslogCfg')
-    if encodedSyslogCfg:
-        syslogCfg = base64.b64decode(encodedSyslogCfg)
-    return syslogCfg
-
-# Try to get fileCfg from LadCfg, if not present
-# fetch it from public settings
-def getFileCfg():
-    ladCfg = readPublicConfig('ladCfg')
-    fileCfg = LadUtil.getFileCfgFromLadCfg(ladCfg)
-    if not fileCfg:
-        fileCfg = readPublicConfig('fileCfg')
-    return fileCfg
-
-# Set event volume in mdsd config.
-# Check if desired event volume is specified, first in ladCfg then in public config.
-# If in neither then default to Medium.
-def setEventVolume(mdsdCfg,ladCfg):
-    eventVolume = LadUtil.getEventVolumeFromLadCfg(ladCfg)
-    if eventVolume:
-        hutil.log("Event volume found in ladCfg: " + eventVolume)
-    else:
-        eventVolume = readPublicConfig("eventVolume")
-        if eventVolume:
-            hutil.log("Event volume found in public config: " + eventVolume)
-        else:
-            eventVolume = "Medium"
-            hutil.log("Event volume not found in config. Using default value: " + eventVolume)
-            
-    XmlUtil.setXmlValue(mdsdCfg,"Management","eventVolume",eventVolume)
-
-
-def configSettings():
-    '''
-    Generates XML cfg file for mdsd, from JSON config settings (public & private).
-    Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
-    Returns (False, '...') if config was invalid and the error message.
-    '''
-    mdsdCfgstr = readPublicConfig('mdsdCfg')
-    if not mdsdCfgstr:
-        with open(os.path.join(WorkDir, './mdsdConfig.xml.template'),"r") as defaulCfg:
-            mdsdCfgstr = defaulCfg.read()
-    else:
-        mdsdCfgstr = base64.b64decode(mdsdCfgstr)
-    mdsdCfg = ET.ElementTree()
-    mdsdCfg._setroot(XmlUtil.createElement(mdsdCfgstr))
-
-    # Add DeploymentId (if available) to identity columns
-    deployment_id = get_deployment_id()
-    if deployment_id:
-        XmlUtil.setXmlValue(mdsdCfg, "Management/Identity/IdentityComponent", "", deployment_id, ["name", "DeploymentId"])
-
-    try:
-        resourceId = getResourceId()
-        if resourceId:
-            escaped_resource_id_str = ''.join([ch if ch.isalnum() else ":{0:04X}".format(ord(ch)) for ch in resourceId])
-            createPortalSettings(mdsdCfg, escaped_resource_id_str)
-            instanceID=""
-            if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >=0:
-                instanceID = read_uuid(waagent.RunGetOutput)
-            config(mdsdCfg,"instanceID",instanceID,"Events/DerivedEvents/DerivedEvent/LADQuery")
-
-    except Exception as e:
-        hutil.error("Failed to create portal config  error:{0} {1}".format(e,traceback.format_exc()))
-    
-    # Check if Application Insights key is present in ladCfg
-    ladCfg = readPublicConfig('ladCfg')
-    try:
-        aikey = AIUtil.tryGetAiKey(ladCfg)
-        if aikey:
-            hutil.log("Application Insights key found.")
-        else:
-            hutil.log("Application Insights key not found.")
-    except Exception as e:
-        hutil.error("Failed check for Application Insights key in LAD configuration with exception:{0} {1}".format(e,traceback.format_exc()))
-
-    generatePerformanceCounterConfiguration(mdsdCfg,aikey != None)
-
-    syslogCfg = getSyslogCfg()
-    fileCfg = getFileCfg() 
-    #fileCfg = [{"file":"/var/log/waagent.log","table":"waagent"},{"file":"/var/log/waagent2.log","table":"waagent3"}]
-    try:
-        if fileCfg:
-           syslogCfg = createEventFileSettings(mdsdCfg,fileCfg)+syslogCfg
-
-        with open(omfileconfig,'w') as hfile:
-                hfile.write(syslogCfg)
-    except Exception as e:
-        hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e,traceback.format_exc()))
-
-    log_private_settings_keys(private_settings, hutil.log, hutil.error)
-
-    account = readPrivateConfig('storageAccountName')
-    if not account:
-        return False, "Empty storageAccountName"
-    key = readPrivateConfig('storageAccountKey')
-    token = readPrivateConfig('storageAccountSasToken')
-    if not key and not token:
-        return False, "Neither storageAccountKey nor storageAccountSasToken is given"
-    if key and token:
-        return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
-    endpoint = get_storage_endpoint_with_account(account, readPrivateConfig('storageAccountEndPoint'))
-
-    createAccountSettings(mdsdCfg, account, key, token, endpoint, aikey)
-
-    # Check and add new syslog RouteEvent for Application Insights.
-    if aikey:
-        AIUtil.createSyslogRouteEventElement(mdsdCfg)
-
-    setEventVolume(mdsdCfg,ladCfg)
-
-    config(mdsdCfg,"sampleRateInSeconds","60","Events/OMI/OMIQuery")
-
-    mdsdCfg.write(os.path.join(WorkDir, './xmlCfg.xml'))
-
-    return True, ""
-
 def install_service():
     RunGetOutput('sed s#{WORKDIR}#' + WorkDir + '# ' +
                  WorkDir + '/services/mdsd-lde.service > /lib/systemd/system/mdsd-lde.service')
@@ -533,11 +231,14 @@ def main(command):
     global EnableSyslog, UseSystemdServiceManager, ExtensionOperationType
 
     # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
-    EnableSyslog = readPublicConfig('enableSyslog').lower() != 'false' and readPublicConfig('EnableSyslog').lower() != 'false'
+    EnableSyslog = g_ext_settings.read_public_config('enableSyslog').lower() != 'false' \
+                   and g_ext_settings.read_public_config('EnableSyslog').lower() != 'false'
 
     ExtensionOperationType = get_extension_operation_type(command)
 
-    config_valid, config_invalid_reason = configSettings()
+    config_valid, config_invalid_reason = generate_mdsd_rsyslog_configs(g_ext_settings, WorkDir, waagent.LibDir,
+                                                                        imfile_config_filename, RunGetOutput,
+                                                                        hutil.log, hutil.error)
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason +\
                              ". Install will proceed, but enable can't proceed, " \
@@ -624,17 +325,6 @@ def main(command):
                       'Extension operation {0} failed:{1}'.format(ExtensionOperationType, e))
 
 
-def update_selinux_settings_for_rsyslogomazuremds():
-    # This is still needed for Redhat-based distros, which still require SELinux to be allowed
-    # for even Unix domain sockets.
-    # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
-    # We instead compile from the bundled SELinux module def for lad_mdsd
-    if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
-        RunGetOutput('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(WorkDir, WorkDir))
-        RunGetOutput('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(WorkDir, WorkDir))
-        RunGetOutput('semodule -u {0}/lad_mdsd.pp'.format(WorkDir))
-
-
 def start_daemon():
     args = ['python', StartDaemonFilePath, "-daemon"]
     log = open(os.path.join(os.getcwd(),'daemon.log'), 'w')
@@ -700,7 +390,7 @@ def start_mdsd():
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
-    update_selinux_settings_for_rsyslogomazuremds()
+    update_selinux_settings_for_rsyslogomazuremds(RunGetOutput, WorkDir)
 
     mdsd_log_path = os.path.join(WorkDir,"mdsd.log")
     mdsd_log = None
@@ -712,19 +402,9 @@ def start_mdsd():
             copy_env[var_name] = var_value
 
     # mdsd http proxy setting
-    proxy_config_name = 'mdsdHttpProxy'
-    proxy_config = waagent.HttpProxyConfigString    # /etc/waagent.conf has highest priority
-    if not proxy_config:
-        proxy_config = readPrivateConfig(proxy_config_name)  # Private (protected) setting has next priority
-    if not proxy_config:
-        proxy_config = readPublicConfig(proxy_config_name)
-    if not isinstance(proxy_config, basestring):
-        hutil.log("Error: mdsdHttpProxy config is not a string. Ignored.")
-    else:
-        proxy_config = proxy_config.strip()
-        if proxy_config:
-            hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
-            copy_env['MDSD_http_proxy'] = proxy_config
+    proxy_config = get_mdsd_proxy_config(waagent.HttpProxyConfigString, g_ext_settings, hutil.log)
+    if proxy_config:
+        copy_env['MDSD_http_proxy'] = proxy_config
 
     xml_file = os.path.join(WorkDir, './xmlCfg.xml')
 
@@ -1002,9 +682,9 @@ def install_omi():
     isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
 
     if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
-        mysqladdress=readPrivateConfig("mysqladdress")
-        mysqlusername=readPrivateConfig("mysqlusername")
-        mysqlpassword=readPrivateConfig("mysqlpassword")
+        mysqladdress = g_ext_settings.read_protected_config("mysqladdress")
+        mysqlusername = g_ext_settings.read_protected_config("mysqlusername")
+        mysqlpassword = g_ext_settings.read_protected_config("mysqlpassword")
         RunGetOutput("/opt/microsoft/mysql-cimprov/bin/mycimprovauth default "+mysqladdress+" "+mysqlusername+" '"+mysqlpassword+"'", should_log=False)
         shouldRestartOmi = True
 
@@ -1026,22 +706,22 @@ def uninstall_omi():
     return 0, "do nothing"
 
 
-rsyslog_om_mdsd_syslog_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds.conf"
-rsyslog_om_mdsd_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-fileom.conf"
+rsyslog_om_mdsd_syslog_conf_prefix = "/etc/rsyslog.d/10-omazurelinuxmds"
+rsyslog_om_mdsd_syslog_conf_path = rsyslog_om_mdsd_syslog_conf_prefix + ".conf"
+rsyslog_om_mdsd_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-imfile.conf"
 
 def uninstall_rsyslogom():
     #return RunGetOutput(distConfig['uninstallmdsd'])
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
-    rsyslog_om_path = None
-    match = re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
+    rsyslog_module_path = None
+    match = re.search("(.*)"+rsyslog_module_for_check,rsyslog_info)
     if match:
-       rsyslog_om_path = match.group(1)
-    if rsyslog_om_path == None:
+       rsyslog_module_path = match.group(1)
+    if rsyslog_module_path == None:
         return 1,"rsyslog not installed"
     if os.path.exists(rsyslog_om_mdsd_syslog_conf_path):
-        RunGetOutput("rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path,
-                                                              rsyslog_om_mdsd_syslog_conf_path,
-                                                              rsyslog_om_mdsd_file_conf_path))
+        RunGetOutput("rm -f {0}/omazuremds.so {1}*".format(rsyslog_module_path,
+                                                           rsyslog_om_mdsd_syslog_conf_prefix))
 
     if distConfig.has_key("restartrsyslog"):
         RunGetOutput(distConfig["restartrsyslog"])
@@ -1053,21 +733,21 @@ def uninstall_rsyslogom():
 
 def install_rsyslogom():
     error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
-    rsyslog_om_path = None
-    match = re.search("(.*)"+rsyslog_ommodule_for_check, rsyslog_info)
+    rsyslog_module_path = None
+    match = re.search("(.*)"+rsyslog_module_for_check, rsyslog_info)
     if match:
-       rsyslog_om_path = match.group(1)
-    if rsyslog_om_path == None:
+       rsyslog_module_path = match.group(1)
+    if rsyslog_module_path == None:
         return 1,"rsyslog not installed"
 
     #error,output = RunGetOutput(distConfig['installmdsd'])
 
-    rsyslog_om_folder = None
+    lad_rsyslog_om_folder = None
     for v in {'8':'rsyslog8','7':'rsyslog7','5':'rsyslog5'}.items():
         if re.search('Version\s*:\s*'+v[0],rsyslog_info):
-            rsyslog_om_folder = v[1]
+            lad_rsyslog_om_folder = v[1]
 
-    if rsyslog_om_folder and rsyslog_om_path:
+    if lad_rsyslog_om_folder and rsyslog_module_path:
         # Remove old-path conf files to avoid confusion
         RunGetOutput("rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf")
         # Copy necesssary files. First, stop rsyslog to avoid SEGV on overwriting omazuremds.so.
@@ -1075,9 +755,9 @@ def install_rsyslogom():
             RunGetOutput(distConfig["stoprsyslog"])
         else:
             RunGetOutput("service rsyslog stop")
-        RunGetOutput("cp -f {0}/omazuremds.so {1}".format(rsyslog_om_folder, rsyslog_om_path))  # Copy the *.so mdsd rsyslog output module
-        RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
-        RunGetOutput("cp -f {0} {1}".format(omfileconfig, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
+        RunGetOutput("cp -f {0}/omazuremds.so {1}".format(lad_rsyslog_om_folder, rsyslog_module_path))  # Copy the *.so mdsd rsyslog output module
+        RunGetOutput("cp -f {0}/omazurelinuxmds.conf {1}".format(lad_rsyslog_om_folder, rsyslog_om_mdsd_syslog_conf_path))  # Copy mdsd rsyslog syslog conf file
+        RunGetOutput("cp -f {0} {1}".format(imfile_config_filename, rsyslog_om_mdsd_file_conf_path))  # Copy mdsd rsyslog filecfg conf file
         # Update __MDSD_SOCKET_FILE_PATH__ with the valid path for the latest rsyslog module (5/7/8)
         mdsd_json_socket_file_path = MDSDFileResourcesPrefix + "_json.socket"
         cmd_to_run = "sed -i 's#__MDSD_SOCKET_FILE_PATH__#{0}#g' {1}"
@@ -1138,29 +818,6 @@ def install_required_package():
                 errorcode+=process.returncode
             return errorcode,str(output_all)
     return 0,"not pacakge need install"
-
-
-def get_deployment_id():
-    identity = "unknown"
-    env_cfg_path = os.path.join(WorkDir, os.pardir, "HostingEnvironmentConfig.xml")
-    if not os.path.exists(env_cfg_path):
-        hutil.log("No Deployment ID (not running in a hosted environment")
-        return None
-
-    try:
-        with open(env_cfg_path, 'r') as env_cfg_file:
-            xml_text = env_cfg_file.read()
-        dom = xml.dom.minidom.parseString(xml_text)
-        deployment = dom.getElementsByTagName("Deployment")
-        name = deployment[0].getAttribute("name")
-        if name:
-            identity = name
-            hutil.log("Deployment ID found: {0}.".format(identity))
-    except Exception as e:
-        # use fallback identity
-        hutil.error("Failed to retrieve deployment ID. Error:{0} {1}".format(e, traceback.format_exc()))
-
-    return identity
 
 
 if __name__ == '__main__' :

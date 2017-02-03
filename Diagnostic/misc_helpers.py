@@ -76,23 +76,6 @@ def read_uuid(run_command):
     return str_ret.strip()
 
 
-def log_private_settings_keys(private_settings, logger_log, logger_err):
-    try:
-        msg = "Keys in privateSettings (and some non-secret values): "
-        first = True
-        for key in private_settings:
-            if first:
-                first = False
-            else:
-                msg += ", "
-            msg += key
-            if key == 'storageAccountEndPoint':
-                msg += ":" + private_settings[key]
-        logger_log(msg)
-    except Exception as e:
-        logger_err("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
-
-
 def tail(log_file, output_size=1024):
     if not os.path.exists(log_file):
         return ""
@@ -102,3 +85,34 @@ def tail(log_file, output_size=1024):
         buf = log.read(output_size)
         buf = filter(lambda x: x in string.printable, buf)
         return buf.decode("ascii", "ignore")
+
+
+def update_selinux_settings_for_rsyslogomazuremds(run_command, ext_dir):
+    # This is still needed for Redhat-based distros, which still require SELinux to be allowed
+    # for even Unix domain sockets.
+    # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
+    # We instead compile from the bundled SELinux module def for lad_mdsd
+    if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
+        run_command('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(ext_dir, ext_dir))
+        run_command('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(ext_dir, ext_dir))
+        run_command('semodule -u {0}/lad_mdsd.pp'.format(ext_dir))
+
+
+def get_mdsd_proxy_config(waagent_setting, ext_settings, logger):
+    # mdsd http proxy setting
+    proxy_setting_name = 'mdsdHttpProxy'
+    proxy_config = waagent_setting  # waagent.HttpProxyConfigString from /etc/waagent.conf has highest priority
+    if not proxy_config:
+        proxy_config = ext_settings.read_protected_config(proxy_setting_name)  # Protected setting has next priority
+    if not proxy_config:
+        proxy_config = ext_settings.read_public_config(proxy_setting_name)
+    if not isinstance(proxy_config, basestring):
+        logger('Error: mdsdHttpProxy config is not a string. Ignored.')
+    else:
+        proxy_config = proxy_config.strip()
+        if proxy_config:
+            logger("mdsdHttpProxy setting was given and will be passed to mdsd, "
+                   "but not logged here in case there's a password in it")
+            return proxy_config
+    return ''
+
