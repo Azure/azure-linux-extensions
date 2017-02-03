@@ -648,6 +648,19 @@ def start_daemon():
         hutil.error("wait daemon start time out")
 
 
+def start_watcher_thread():
+    # Create monitor object that encapsulates monitoring activities
+    watcher = watcherutil.Watcher(hutil.error, hutil.log, log_to_console=True)
+    # Create an IMDS data logger and set it to the monitor object
+    imds_logger = ImdsLogger(hutil.get_name(), hutil.get_extension_version(),
+                             waagent.WALAEventOperation.HeartBeat, waagent.AddExtensionEvent)
+    watcher.set_imds_logger(imds_logger)
+    # Start a thread to perform periodic monitoring activity (e.g., /etc/fstab watcher, IMDS data logging)
+    threadObj = threading.Thread(target=watcher.watch)
+    threadObj.daemon = True
+    threadObj.start()
+
+
 def start_mdsd():
     global EnableSyslog, ExtensionOperationType
     with open(MDSDPidFile, "w") as pidfile:
@@ -737,16 +750,7 @@ def start_mdsd():
         info_file_path).split(" ")
 
     try:
-        # Create monitor object that encapsulates monitoring activities
-        watcher = watcherutil.Watcher(hutil.error, hutil.log, log_to_console=True)
-        # Start a thread to monitor /etc/fstab
-        threadObj = threading.Thread(target=watcher.watch)
-        threadObj.daemon = True
-        threadObj.start()
-
-        # IMDS data logger
-        imds_logger = ImdsLogger(hutil.get_name(), hutil.get_extension_version(),
-                                 waagent.WALAEventOperation.HeartBeat, waagent.AddExtensionEvent)
+        start_watcher_thread()
 
         num_quick_consecutive_crashes = 0
 
@@ -784,12 +788,6 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
-
-                # IMDS probe (only sporadically, inside the function)
-                try:
-                    imds_logger.log_imds_data_if_right_time()
-                except Exception as ex:
-                    hutil.error('ImdsLogger exception: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc()))
 
                 # Mitigate if memory leak is suspected.
                 mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid, hutil.error)

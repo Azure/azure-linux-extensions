@@ -22,6 +22,7 @@ import os
 import datetime
 import time
 import string
+import traceback
 
 
 class Watcher:
@@ -32,6 +33,8 @@ class Watcher:
         self._hutil_error = hutil_error
         self._hutil_log = hutil_log
         self._log_to_console = log_to_console
+
+        self._imds_logger = None
 
     def _do_log_to_console_if_enabled(self, message):
         """
@@ -75,8 +78,21 @@ class Watcher:
                 self._hutil_log('fstab modification passed mount validation')
         return ret
 
+    def set_imds_logger(self, imds_logger):
+        self._imds_logger = imds_logger
+
     def watch(self):
         while True:
+            # /etc/fstab watcher
             self.handle_fstab()
-            time.sleep(60 * 5)  # Sleep 5 minutes
+
+            # IMDS probe (only sporadically, inside the function)
+            if self._imds_logger:
+                try:
+                    self._imds_logger.log_imds_data_if_right_time()
+                except Exception as e:
+                    self._hutil_error('ImdsLogger exception: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
+
+            # Sleep 5 minutes
+            time.sleep(60 * 5)
         pass
