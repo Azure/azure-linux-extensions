@@ -195,12 +195,6 @@ def setup_dependencies_and_mdsd():
         hutil.error(install_package_error)
         return 2, install_package_error
 
-    if EnableSyslog:
-        error, msg = install_rsyslogom()
-        if error != 0:
-            hutil.error(msg)
-            return 3, msg
-
     # Run mdsd prep commands
     if 'mdsd_prep_cmds' in distConfig:
         for cmd in distConfig['mdsd_prep_cmds']:
@@ -209,7 +203,13 @@ def setup_dependencies_and_mdsd():
     # Install/start OMI
     omi_err, omi_msg = install_omi()
     if omi_err is not 0:
-        return 4, omi_msg
+        return 3, omi_msg
+
+    if EnableSyslog:
+        error, msg = install_rsyslogom()
+        if error != 0:
+            hutil.error(msg)
+            return 4, msg
 
     return 0, 'success'
 
