@@ -120,6 +120,8 @@ class UnmountOldrootState(OSEncryptionState):
             self.command_executor.Execute('systemctl stop systemd-udevd')
             self.command_executor.Execute('systemctl stop systemd-journald')
             self.command_executor.Execute('systemctl stop systemd-hostnamed')
+            self.command_executor.Execute('systemctl stop atd')
+            self.command_executor.Execute('systemctl stop postfix')
             self.command_executor.Execute('umount /var')
 
             sleep(3)
