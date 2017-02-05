@@ -75,8 +75,7 @@ class StripdownState(OSEncryptionState):
 
             self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/*.mount', True)
             self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/local-fs.target.requires/*.mount', True)
-
-            self.command_executor.Execute("sed -i.bak '/rootlv/d' /etc/fstab", True)
+            self.command_executor.Execute("sed -i.bak '/rootvg/d' /etc/fstab", True)
 
             self.command_executor.Execute('telinit u', True)
 
