@@ -73,6 +73,7 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             self.command_executor.Execute('telinit u', True)
+            sleep(10)
             self.command_executor.Execute('umount /var', True)
             # the restarted process shall see the marker and advance the state machine
             self.command_executor.Execute('systemctl restart atd', True)
