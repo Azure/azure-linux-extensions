@@ -73,8 +73,8 @@ class StripdownState(OSEncryptionState):
             # create the marker, but do not advance the state machine
             super(StripdownState, self).should_exit()
 
-            self.command_executor.ExecuteInBash('/run/systemd/generator/*.mount', True)
-            self.command_executor.ExecuteInBash('/run/systemd/generator/local-fs.target.requires/*.mount', True)
+            self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/*.mount', True)
+            self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/local-fs.target.requires/*.mount', True)
 
             self.command_executor.Execute("sed -i.bak '/rootlv/d' /etc/fstab", True)
 
