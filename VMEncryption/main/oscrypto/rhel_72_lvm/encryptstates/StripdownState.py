@@ -23,6 +23,7 @@ import os
 import sys
 
 from OSEncryptionState import *
+from time import sleep
 
 class StripdownState(OSEncryptionState):
     def __init__(self, context):
