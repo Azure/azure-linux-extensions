@@ -173,6 +173,11 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.Execute('telinit u', True)
 
+        sleep(10)
+
+        if self.command_executor.Execute('mountpoint /var') == 0:
+            self.command_executor.Execute('umount /var', True)
+
         sleep(3)
 
         self.command_executor.Execute('umount ' + mountpoint, True)
