@@ -162,21 +162,21 @@ class PatchBootSystemState(OSEncryptionState):
 
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
-                self.context.logger.log("Restarting WALA in 30 seconds before committing suicide")
-                
-                # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
-                # needs to be restarted and the drive mounted/unmounted.
-                # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
+                self.context.logger.log("Restarting WALA before committing suicide")
+                self.context.logger.log("Current executable path: " + sys.executable)
+                self.context.logger.log("Current executable arguments: " + " ".join(sys.argv))
 
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                # Kill any other daemons that are blocked and would be executed after this process commits
+                # suicide
+                self.command_executor.Execute('systemctl restart atd')
 
-                self.bek_util.get_bek_passphrase_file(self.encryption_config)
-                self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-                self.command_executor.Execute('systemctl restart systemd-udevd', True)
+                os.chdir('/')
+                with open("/delete-lock.sh", "w") as f:
+                    f.write("rm -f /var/lib/azure_disk_encryption_config/daemon_lock_file.lck\n")
 
-                self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
+                self.command_executor.Execute('at -f /delete-lock.sh now + 1 minutes', True)
+                self.command_executor.Execute('at -f /restart-wala.sh now + 2 minutes', True)
+                self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
