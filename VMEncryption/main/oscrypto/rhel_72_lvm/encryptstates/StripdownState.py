@@ -72,6 +72,7 @@ class StripdownState(OSEncryptionState):
             # create the marker, but do not advance the state machine
             super(StripdownState, self).should_exit()
 
+            self.command_executor.Execute('telinit u', True)
             # the restarted process shall see the marker and advance the state machine
             self.command_executor.Execute('systemctl restart atd', True)
 
