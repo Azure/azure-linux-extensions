@@ -98,8 +98,6 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('umount /oldroot/net')
 
         self.command_executor.Execute('telinit u', True)
-        sleep(10)
-        self.command_executor.Execute('umount /var', True)
         self.command_executor.Execute('kill 1', True)
 
         proc_comm = ProcessCommunicator()
