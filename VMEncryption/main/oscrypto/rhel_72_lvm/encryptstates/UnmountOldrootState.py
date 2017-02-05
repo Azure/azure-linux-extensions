@@ -122,15 +122,16 @@ class UnmountOldrootState(OSEncryptionState):
             self.command_executor.Execute('systemctl stop systemd-hostnamed')
             self.command_executor.Execute('systemctl stop atd')
             self.command_executor.Execute('systemctl stop postfix')
-            self.command_executor.Execute('umount /var')
+            self.unmount('/var')
 
             sleep(3)
 
             if self.command_executor.Execute('mountpoint /var'):
                 unmounted = True
 
-    def unmount(self, mountpoint):
-        self.unmount_var()
+    def unmount(self, mountpoint, call_unmount_var=True):
+        if mountpoint != '/var':
+            self.unmount_var()
 
         if self.command_executor.Execute("mountpoint " + mountpoint):
             return

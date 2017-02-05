@@ -135,7 +135,7 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.Execute('systemctl stop systemd-hostnamed')
             self.command_executor.Execute('systemctl stop atd')
             self.command_executor.Execute('systemctl stop postfix')
-            self.command_executor.Execute('umount /var')
+            self.unmount('/var')
 
             sleep(3)
 
@@ -143,7 +143,8 @@ class PatchBootSystemState(OSEncryptionState):
                 unmounted = True
 
     def unmount(self, mountpoint):
-        self.unmount_var()
+        if mountpoint != '/var':
+            self.unmount_var()
 
         if self.command_executor.Execute("mountpoint " + mountpoint):
             return
