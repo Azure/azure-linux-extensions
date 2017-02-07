@@ -105,7 +105,7 @@ def status_report(status, status_code, message, snapshot_info = None):
                     commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                     snapshot_info=snapshot_info)
     except Exception as e:
-        err_msg='cannot write status to the status file'
+        err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(err_msg, True, 'Warning')
     try:
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -230,6 +230,10 @@ def freeze_snapshot(timeout):
                     error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
+                thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
+                if is_inconsistent_freeze and is_inconsistent_snapshot:
+                    set_do_seq_flag()
+                backup_logger.log('T:S thaw result ' + str(thaw_result))
             else:
                 thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
                 if is_inconsistent_freeze and is_inconsistent_snapshot:
@@ -381,7 +385,7 @@ def daemon():
             run_status = 'error'
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode",hutil.ExtErrorCode.name)
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         status_report(run_status,run_result,error_msg, snapshot_info_array)
     except Exception as e:
         errMsg = 'Failed to log status in extension'

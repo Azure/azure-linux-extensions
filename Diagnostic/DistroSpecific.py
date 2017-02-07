@@ -30,7 +30,6 @@ omi_universal_install_cmd = 'bash scx-1.6.2-337.universal.x64.sh --upgrade'
 class CommonActions:
     def __init__(self, logger):
         self.logger = logger
-        pass
 
     def log_run_get_output(self, cmd, should_log=True):
         """
@@ -46,15 +45,14 @@ class CommonActions:
             self.logger("Return " + str(error) + ":" + msg)
         return int(error), str(msg)
 
-    def log_run_ignore_output(self, cmd):
+    def log_run_ignore_output(self, cmd, should_log=True):
         """
         Execute a command in a subshell
         :param str cmd: The command to be executed
+        :param bool should_log: True if command execution should be logged. (False preserves privacy of parameters.)
         :return int: The subshell exit code
         """
-        self.logger("RunCmd " + cmd)
-        error, msg = waagent.RunGetOutput(cmd, chk_err=True)
-        self.logger("Return " + str(error) + ":" + msg)
+        error, msg = self.log_run_get_output(cmd, should_log)
         return int(error)
 
     def log_run_with_timeout(self, cmd, timeout=3600):
@@ -145,6 +143,13 @@ class CommonActions:
         :return bool: True if the distro's native package manager is package_manager
         """
         return False
+
+    def stop_rsyslog(self):
+        """
+        Stop (shutdown) rsyslogd.
+        :return int: status of operation
+        """
+        return self.log_run_ignore_output("service rsyslog stop")
 
     def restart_rsyslog(self):
         """

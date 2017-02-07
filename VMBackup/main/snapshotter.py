@@ -23,6 +23,7 @@ import traceback
 import datetime
 import ConfigParser
 import multiprocessing as mp
+import datetime
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status
@@ -65,13 +66,13 @@ class Snapshotter(object):
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         if(sasuri is None):
-            error_logger = error_logger + " Failed to do the snapshot because sasuri is none "
+            error_logger = error_logger + str(datetime.datetime.now()) + " Failed to do the snapshot because sasuri is none "
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         try:
             sasuri_obj = urlparse.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
-                error_logger = error_logger + " Failed to parse the sasuri "
+                error_logger = error_logger + str(datetime.datetime.now()) + " Failed to parse the sasuri "
                 snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
@@ -87,22 +88,28 @@ class Snapshotter(object):
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
-                temp_logger = temp_logger + 'start calling the snapshot rest api. '
+                temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
-                temp_logger = temp_logger + ' handle_snapshot_http_response message: ' + str(message)
-                
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                if(result == CommonVariables.success and httpResp != None):
+                    # retrieve snapshot information from http response
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    temp_logger = temp_logger + str(datetime.datetime.now()) + ' httpresponse_get_snapshot_info message: ' + str(message)
+                else:
+                    # HttpCall failed
+                    error_logger = error_logger + str(datetime.datetime.now()) + " snapshot HttpCallGetResponse failed "
+                    error_logger = error_logger + str(datetime.datetime.now()) + str(errMsg)
+                    snapshot_error.errorcode = CommonVariables.error
+                    snapshot_error.sasuri = sasuri
                 end_time = datetime.datetime.utcnow()
                 time_taken=end_time-start_time
-                temp_logger = temp_logger + ' time taken for snapshot ' + str(time_taken)
+                temp_logger = temp_logger + str(datetime.datetime.now()) + ' time taken for snapshot ' + str(time_taken)
         except Exception as e:
             errorMsg = " Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            error_logger = error_logger + errorMsg
+            error_logger = error_logger + str(datetime.datetime.now()) + errorMsg
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
-        temp_logger=temp_logger + ' snapshot ends..'
+        temp_logger=temp_logger + str(datetime.datetime.now()) + ' snapshot ends..'
         global_logger.put(temp_logger)
         global_error_logger.put(error_logger)
         snapshot_result_error.put(snapshot_error)
@@ -136,10 +143,15 @@ class Snapshotter(object):
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
-                self.logger.log("get_snapshot_info: " + str(message))
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                if(result == CommonVariables.success and httpResp != None):
+                    # retrieve snapshot information from http response
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    self.logger.log(' httpresponse_get_snapshot_info message: ' + str(message))
+                else:
+                    # HttpCall failed
+                    self.logger.log(" snapshot HttpCallGetResponse failed ")
+                    self.logger.log(str(errMsg))
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
@@ -181,7 +193,7 @@ class Snapshotter(object):
                 if timeout == None:
                     timeout = 60
 
-                if datetime.timedelta.total_seconds(time_after_snapshot_start - time_before_snapshot_start) > int(timeout):
+                if (time_after_snapshot_start - time_before_snapshot_start) > datetime.timedelta(seconds=int(timeout-1)):
                     is_inconsistent = True
 
                 for job in mp_jobs:
@@ -268,7 +280,7 @@ class Snapshotter(object):
             snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
         else:
             snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_parallel(paras)
-            if exceptOccurred:
+            if exceptOccurred and is_inconsistent == False:
                 snapshot_result, snapshot_info_array, all_failed, is_inconsistent, exceptOccurred =  self.snapshotall_seq(paras)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent
 
@@ -278,12 +290,9 @@ class Snapshotter(object):
         result = CommonVariables.error_http_failure
         message = ""
         if(resp != None):
+            message = message + str(datetime.datetime.now()) + " snapshot resp status: " + str(resp.status) + " "
             resp_headers = resp.getheaders()
-            message = message + "snapshot resp-header: " + str(resp_headers)
-            message = message + "snapshot resp status: " + str(resp.status)
-            responseBody = resp.read()
-            if(responseBody is not None):
-                message = message + "snapshot responseBody: " + (responseBody).decode('utf-8-sig')
+            message = message + str(datetime.datetime.now()) + " snapshot resp-header: " + str(resp_headers) + " "
 
             if(resp.status == 200 or resp.status == 201):
                 result = CommonVariables.success
@@ -293,9 +302,9 @@ class Snapshotter(object):
                 result = resp.status
                 snapshot_info_indexer.errorMessage = resp.status
         else:
-            message = message + "snapshot Http connection response is None"
+            message = message + str(datetime.datetime.now()) + " snapshot Http connection response is None" + " "
 
-        message = message + ' snapshot api returned: {0} '.format(result)
+        message = message + str(datetime.datetime.now()) + ' snapshot api returned: {0} '.format(result) + " "
         if(result != CommonVariables.success):
             snapshot_error.errorcode = result
             snapshot_error.sasuri = sasuri

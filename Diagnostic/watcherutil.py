@@ -26,20 +26,20 @@ import time
 
 class Watcher:
 
-    def __init__(self, errorStream, outputStream, logtoconsole=False):
+    def __init__(self, error_stream, output_stream, log_to_console=False):
         self.lastModTime = os.path.getmtime('/etc/fstab')
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-        ch = logging.StreamHandler(errorStream)
+        ch = logging.StreamHandler(error_stream)
         ch.setLevel(logging.WARNING)
         self.logger.addHandler(ch)
-        ch = logging.StreamHandler(outputStream)
+        ch = logging.StreamHandler(output_stream)
         ch.setLevel(logging.INFO)
         self.logger.addHandler(ch)
 
-        if logtoconsole:
+        if log_to_console:
             ch = logging.FileHandler('/dev/console')
             ch.setLevel(logging.WARNING)
             self.logger.addHandler(ch)

@@ -64,6 +64,13 @@ if not hasattr(waagent, "WALAEventOperation"):
         Update = "Update"           
     waagent.WALAEventOperation = _WALAEventOperation
 
+# Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
+if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
+    if hasattr(waagent.WALAEventOperation, 'UnIsntall'):
+        waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
+    else:  # This shouldn't happen, but just in case...
+        waagent.WALAEventOperation.Uninstall = 'Uninstall'
+
 
 def GetWaagentHttpProxyConfigString():
     """

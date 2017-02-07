@@ -167,13 +167,12 @@ class HandlerUtility:
                 thumb=handlerSettings['protectedSettingsCertThumbprint']
                 cert=waagent.LibDir+'/'+thumb+'.crt'
                 pkey=waagent.LibDir+'/'+thumb+'.prv'
-                waagent.SetFileContents('/tmp/kk', protectedSettings)
-                cleartxt=None
-                cleartxt=waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " +  cert + "  -inkey " + pkey )[1]
-                os.remove("/tmp/kk")
+                unencodedSettings = base64.standard_b64decode(protectedSettings)
+                openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
+                cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
                 if cleartxt == None:
                     self.error("OpenSSh decode error using  thumbprint " + thumb )
-                    do_exit(1,operation,'error','1', operation + ' Failed')
+                    self.do_exit(1,"Enable",'error','1', 'Failed decrypting protectedSettings')
                 jctxt=''
                 try:
                     jctxt=json.loads(cleartxt)

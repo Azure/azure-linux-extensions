@@ -24,17 +24,15 @@ import os.path
 import platform
 import re
 import signal
-import string
 import subprocess
 import sys
 import exceptions
 import syslog
+import threading
 import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-import threading
-import logging
 
 import Utils.HandlerUtil as Util
 import Utils.LadDiagnosticUtil as LadUtil
@@ -43,33 +41,55 @@ import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 import watcherutil
 from DistroSpecific import get_distro_actions
+from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
+    get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
 
-WorkDir = os.getcwd()
-MDSDFileResourcesDir = "/var/run/mdsd"
-MDSDRoleName = 'lad_mdsd'
-MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
-MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
-MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
-OutputSize = 1024
-EnableSyslog = True
-waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-waagent.Log("LinuxAzureDiagnostic started to handle.")
-hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-hutil.try_parse_context()
-hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. Although default, this logs the choice.
-public_settings = hutil.get_public_settings()
-private_settings = hutil.get_protected_settings()
-if not public_settings:
-    public_settings = {}
-if not private_settings:
-    private_settings = {}
-ExtensionOperationType = None
-# Better deal with the silly waagent typo, in anticipation of a proper fix of the typo later on waagent
-if not hasattr(waagent.WALAEventOperation, 'Uninstall'):
-    if hasattr(waagent.WALAEventOperation, 'UnIsntall'):  # Handle known typo
-        waagent.WALAEventOperation.Uninstall = waagent.WALAEventOperation.UnIsntall
-    else:  # This shouldn't happen, but just in case...
-        waagent.WALAEventOperation.Uninstall = 'Uninstall'
+
+try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
+    import Utils.HandlerUtil as Util
+    from Utils.WAAgentUtil import waagent
+except Exception as e:
+    print('waagent import failed.\nException thrown: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
+    print('Are you running without waagent for some reason? Just passing here for now...')
+    # We may add some waagent mock later to support this scenario.
+
+
+def init_public_and_private_settings():
+    """Initialize extension's public & private settings. hutil must be already initialized prior to calling this."""
+    global public_settings, private_settings
+
+    hutil.try_parse_context()
+    hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
+    public_settings = hutil.get_public_settings()
+    private_settings = hutil.get_protected_settings()
+    if not public_settings:
+        public_settings = {}
+    if not private_settings:
+        private_settings = {}
+
+
+def init_globals():
+    """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
+    global WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix
+    global MDSDPidFile, MDSDPidPortFile, EnableSyslog, hutil
+    global public_settings, private_settings, ExtensionOperationType
+    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, StartDaemonFilePath, omi_universal_pkg_name
+    global omfileconfig, DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
+    global SuseConfig11, SuseConfig12, CentosConfig, MDSD_LISTEN_PORT, All_Dist, distConfig, dist
+    global distroNameAndVersion, UseSystemdServiceManager
+
+    WorkDir = os.getcwd()
+    MDSDFileResourcesDir = "/var/run/mdsd"
+    MDSDRoleName = 'lad_mdsd'
+    MDSDFileResourcesPrefix = os.path.join(MDSDFileResourcesDir, MDSDRoleName)
+    MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
+    MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
+    EnableSyslog = True
+    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    waagent.Log("LinuxAzureDiagnostic started to handle.")
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
+    init_public_and_private_settings()
+    ExtensionOperationType = None
 
 
 MdsdFolder = os.path.join(WorkDir, 'bin')
@@ -91,6 +111,7 @@ except exceptions.LookupError as ex:
 RunGetOutput = distConfig.log_run_get_output
 
 
+# TODO Don't know if I need this
 def escape(data):
     s_build = ''
     for c in data:
@@ -101,6 +122,7 @@ def escape(data):
     return s_build
 
 
+# TODO Don't know if I need this
 def getChildNode(p, tag):
     for node in p.childNodes:
         if not hasattr(node, 'tagName'):
@@ -316,6 +338,7 @@ def config(xmltree, key, value, xmlpath, selector=[]):
     XmlUtil.setXmlValue(xmltree, xmlpath, key, v, selector)
 
 
+# TODO Don't know if I need this
 def readUUID():
     code, str_ret = waagent.RunGetOutput("dmidecode |grep UUID |awk '{print $2}'", chk_err=False)
     return str_ret.strip()
@@ -418,6 +441,7 @@ def setEventVolume(mdsdCfg, ladCfg):
     XmlUtil.setXmlValue(mdsdCfg, "Management", "eventVolume", eventVolume)
 
 
+# TODO Don't know if I need this
 def getStorageAccountEndPoint(account):
     """
     Construct the storage endpoint specifier based on private config. If not set, assume public cloud. If set, it may
@@ -438,6 +462,7 @@ def getStorageAccountEndPoint(account):
     return endpoint
 
 
+# TODO Don't know if I need this
 def logPrivateSettingsKeys():
     """
     Log the redacted contents of the private settings
@@ -517,7 +542,7 @@ def configSettings():
     except Exception as e:
         hutil.error("Failed to create syslog_file config  error:{0} {1}".format(e, traceback.format_exc()))
 
-    logPrivateSettingsKeys()
+    log_private_settings_keys(private_settings, hutil.log, hutil.error)
 
     account = readPrivateConfig('storageAccountName')
     if not account:
@@ -528,7 +553,7 @@ def configSettings():
         return False, "Neither storageAccountKey nor storageAccountSasToken is given"
     if key and token:
         return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
-    endpoint = getStorageAccountEndPoint(account)
+    endpoint = get_storage_endpoint_with_account(account, readPrivateConfig('storageAccountEndPoint'))
 
     createAccountSettings(mdsdCfg, account, key, token, endpoint, aikey)
 
@@ -551,6 +576,7 @@ def install_service():
     RunGetOutput('systemctl daemon-reload')
 
 
+# TODO Don't know if I need this
 def get_extension_operation_type(command):
     if re.match("^([-/]*)(enable)", command):
         return waagent.WALAEventOperation.Enable
@@ -568,7 +594,7 @@ def get_extension_operation_type(command):
 
 
 def main(command):
-    # Global Variables definition
+    init_globals()
 
     global EnableSyslog, ExtensionOperationType
 
@@ -824,6 +850,21 @@ def start_mdsd():
                     break
 
                 # mdsd is now up for at least 30 seconds.
+
+                # Mitigate if memory leak is suspected.
+                mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid, hutil.error)
+                if mdsd_memory_leak_suspected:
+                    memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
+                                      "Recycling mdsd to self-mitigate.".format(int((mdsd_memory_usage_in_KB+1023)/1024))
+                    hutil.log(memory_leak_msg)
+                    # Add a telemetry for a possible statistical analysis
+                    waagent.AddExtensionEvent(name=hutil.get_name(),
+                                              op=waagent.WALAEventOperation.HeartBeat,
+                                              isSuccess=True,
+                                              version=hutil.get_extension_version(),
+                                              message=memory_leak_msg)
+                    mdsd.kill()
+                    break
 
                 # Issue #128 LAD should restart OMI if it crashes
                 omi_was_installed = omi_installed  # Remember the OMI install status from the last iteration
@@ -1104,6 +1145,7 @@ def install_required_package():
     return distConfig.install_required_packages()
 
 
+# TODO Don't know if I need this
 def tail(log_file, output_size=OutputSize):
     if not os.path.exists(log_file):
         return ""
@@ -1138,6 +1180,18 @@ def get_deployment_id():
     return identity
 
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        main(sys.argv[1])
+if __name__ == '__main__' :
+    if len(sys.argv) <= 1:
+        print('No command line argument was specified.\nYou must be executing this program manually for testing.\n'
+              'In that case, one of "install", "enable", "disable", "uninstall", or "update" should be given.')
+    else:
+        try:
+            main(sys.argv[1])
+        except Exception as e:
+            ext_version = ET.parse('manifest.xml').find('{http://schemas.microsoft.com/windowsazure}Version').text
+            waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
+                                      op=wala_event_type_for_telemetry(get_extension_operation_type(sys.argv[1])),
+                                      isSuccess=False,
+                                      version=ext_version,
+                                      message="Unknown exception thrown from diagnostic.py.\n"
+                                              "Error: {0}\nStackTrace: {1}".format(e, traceback.format_exc()))
