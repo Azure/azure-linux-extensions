@@ -32,15 +32,18 @@ class CommonActions:
         self.logger = logger
         pass
 
-    def log_run_get_output(self, cmd):
+    def log_run_get_output(self, cmd, should_log=True):
         """
         Execute a command in a subshell
         :param str cmd: The command to be executed
+        :param bool should_log: If true, log command execution
         :return (int, str): A tuple of (subshell exit code, contents of stdout)
         """
-        self.logger("RunCmd " + cmd)
-        error, msg = waagent.RunGetOutput(cmd, chk_err=True)
-        self.logger("Return " + str(error) + ":" + msg)
+        if should_log:
+            self.logger("RunCmd " + cmd)
+        error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
+        if should_log:
+            self.logger("Return " + str(error) + ":" + msg)
         return int(error), str(msg)
 
     def log_run_ignore_output(self, cmd):
