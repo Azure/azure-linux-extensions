@@ -949,7 +949,6 @@ def get_mdsd_process():
 
 
 def install_omi():
-    need_install_omi = 0
     need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
     isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
@@ -962,12 +961,9 @@ def install_omi():
         RunGetOutput('rpm --erase apache-cimprov', should_log=False)
         RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
 
-    if 'OMI-1.0.8-6' not in omi_version:
-        need_install_omi = 1
-    if isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov"):
-        need_install_omi = 1
-    if isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"):
-        need_install_omi = 1
+    need_install_omi = ('OMI-1.0.8-6' not in omi_version) \
+        or (isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov")) \
+        or (isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"))
 
     if need_install_omi:
         hutil.log("Begin omi installation.")
