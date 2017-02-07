@@ -35,7 +35,7 @@ class CommonActions:
         """
         Execute a command in a subshell
         :param str cmd: The command to be executed
-        :param bool should_log: True if command execution should be logged. (False preserves privacy of parameters.)
+        :param bool should_log: If true, log command execution
         :return (int, str): A tuple of (subshell exit code, contents of stdout)
         """
         if should_log:
