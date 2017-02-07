@@ -19,31 +19,30 @@
 import base64
 import binascii
 import datetime
+import exceptions
 import os
 import os.path
 import platform
-import re
 import signal
 import subprocess
 import sys
-import exceptions
-import syslog
 import threading
 import time
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
 
-import Utils.HandlerUtil as Util
+import syslog
+
+import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-import Utils.ApplicationInsightsUtil as AIUtil
 from Utils.WAAgentUtil import waagent
 import watcherutil
-from DistroSpecific import get_distro_actions
+import DistroSpecific
 from misc_helpers import get_extension_operation_type, wala_event_type_for_telemetry,\
-    get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail
-
+    get_storage_endpoint_with_account, check_suspected_memory_leak, read_uuid, log_private_settings_keys, tail,\
+    escape_nonalphanumerics
 
 try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
     import Utils.HandlerUtil as Util
@@ -54,12 +53,31 @@ except Exception as e:
     # We may add some waagent mock later to support this scenario.
 
 
+def init_distro_specific_actions():
+    """
+    Identify the specific Linux distribution in use. Set the global distConfig to point to the corresponding
+    implementation class. If the distribution isn't supported, set the extension status appropriately and exit.
+    Expects the global hutil to already be initialized.
+    """
+    # TODO Exit immediately if distro is unknown
+    global distConfig, RunGetOutput
+    dist = platform.dist()
+    distroNameAndVersion = dist[0] + ":" + dist[1]
+    try:
+        distConfig = DistroSpecific.get_distro_actions(dist[0], dist[1], hutil.log)
+        RunGetOutput = distConfig.log_run_get_output
+    except exceptions.LookupError as ex:
+        hutil.error("os version:" + distroNameAndVersion + " not supported")
+        # TODO Exit immediately if distro is unknown
+        distConfig = None
+
+
 def init_public_and_private_settings():
     """Initialize extension's public & private settings. hutil must be already initialized prior to calling this."""
     global public_settings, private_settings
 
     hutil.try_parse_context()
-    hutil.set_verbose_log(False)  # Explicitly set verbose flag to False. This is default anyway, but it will be made explicit and logged.
+    hutil.set_verbose_log(False)  # This is default, but this choice will be made explicit and logged.
     public_settings = hutil.get_public_settings()
     private_settings = hutil.get_protected_settings()
     if not public_settings:
@@ -70,13 +88,16 @@ def init_public_and_private_settings():
 
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
-    global WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix
-    global MDSDPidFile, MDSDPidPortFile, EnableSyslog, hutil
-    global public_settings, private_settings, ExtensionOperationType
-    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, StartDaemonFilePath, omi_universal_pkg_name
-    global omfileconfig, DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
-    global SuseConfig11, SuseConfig12, CentosConfig, MDSD_LISTEN_PORT, All_Dist, distConfig, dist
-    global distroNameAndVersion, UseSystemdServiceManager
+    global hutil, WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix, MDSDPidFile, MDSDPidPortFile
+    global EnableSyslog, ExtensionOperationType, MdsdFolder, StartDaemonFilePath, MDSD_LISTEN_PORT, omfileconfig
+#    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, omi_universal_pkg_name
+#    global DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
+#    global SuseConfig11, SuseConfig12, CentosConfig, All_Dist
+
+    waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
+    waagent.Log("LinuxAzureDiagnostic started to handle.")
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
+    init_distro_specific_actions()
 
     WorkDir = os.getcwd()
     MDSDFileResourcesDir = "/var/run/mdsd"
@@ -85,51 +106,13 @@ def init_globals():
     MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
     MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
     EnableSyslog = True
-    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    waagent.Log("LinuxAzureDiagnostic started to handle.")
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    init_public_and_private_settings()
     ExtensionOperationType = None
+    MdsdFolder = os.path.join(WorkDir, 'bin')
+    StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
+    MDSD_LISTEN_PORT = 29131
+    omfileconfig = os.path.join(WorkDir, 'omfileconfig')
 
-
-MdsdFolder = os.path.join(WorkDir, 'bin')
-StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
-
-omfileconfig = os.path.join(WorkDir, 'omfileconfig')
-
-MDSD_LISTEN_PORT = '29131'  # No longer used, but we still need this to avoid port conflict with ASM mdsd
-
-dist = platform.dist()
-distroNameAndVersion = dist[0] + ":" + dist[1]
-try:
-    distConfig = get_distro_actions(dist[0], dist[1], hutil.log)
-except exceptions.LookupError as ex:
-    hutil.error("os version:" + distroNameAndVersion + " not supported")
-    # TODO Exit immediately if distro is unknown
-    distConfig = None
-
-RunGetOutput = distConfig.log_run_get_output
-
-
-# TODO Don't know if I need this
-def escape(data):
-    s_build = ''
-    for c in data:
-        if c.isalnum():
-            s_build += c
-        else:
-            s_build += ":{0:04X}".format(ord(c))
-    return s_build
-
-
-# TODO Don't know if I need this
-def getChildNode(p, tag):
-    for node in p.childNodes:
-        if not hasattr(node, 'tagName'):
-            continue
-        print(str(node.tagName) + ":" + tag)
-        if node.tagName == tag:
-            return node
+    init_public_and_private_settings()
 
 
 def setup_dependencies_and_mdsd():
@@ -338,12 +321,6 @@ def config(xmltree, key, value, xmlpath, selector=[]):
     XmlUtil.setXmlValue(xmltree, xmlpath, key, v, selector)
 
 
-# TODO Don't know if I need this
-def readUUID():
-    code, str_ret = waagent.RunGetOutput("dmidecode |grep UUID |awk '{print $2}'", chk_err=False)
-    return str_ret.strip()
-
-
 def generatePerformanceCounterConfiguration(mdsdCfg, includeAI=False):
     perfCfgList = []
     try:
@@ -441,48 +418,6 @@ def setEventVolume(mdsdCfg, ladCfg):
     XmlUtil.setXmlValue(mdsdCfg, "Management", "eventVolume", eventVolume)
 
 
-# TODO Don't know if I need this
-def getStorageAccountEndPoint(account):
-    """
-    Construct the storage endpoint specifier based on private config. If not set, assume public cloud. If set, it may
-    or may not contain the protocol specifier (http vs https); if that's not specified, assume https.
-    :param str account: Storage account (extracted previously)
-    :return: the full URL specifying the storage account endpoint
-    :rtype: str
-    """
-    endpoint = readPrivateConfig('storageAccountEndPoint')
-    if endpoint:
-        parts = endpoint.split('//', 1)
-        if len(parts) > 1:
-            endpoint = parts[0] + '//' + account + ".table." + parts[1]
-        else:
-            endpoint = 'https://' + account + ".table." + parts[0]
-    else:
-        endpoint = 'https://' + account + '.table.core.windows.net'
-    return endpoint
-
-
-# TODO Don't know if I need this
-def logPrivateSettingsKeys():
-    """
-    Log the redacted contents of the private settings
-    """
-    try:
-        msg = "Keys in privateSettings (and some non-secret values): "
-        first = True
-        for key in private_settings:
-            if first:
-                first = False
-            else:
-                msg += ", "
-            msg += key
-            if key == 'storageAccountEndPoint':
-                msg += ":" + private_settings[key]
-        hutil.log(msg)
-    except Exception as e:
-        hutil.error("Failed to log keys in privateSettings. error:{0} {1}".format(e, traceback.format_exc()))
-
-
 def configSettings():
     """
     Generates XML cfg file for mdsd, from JSON config settings (public & private).
@@ -507,10 +442,10 @@ def configSettings():
     try:
         resourceId = getResourceId()
         if resourceId:
-            createPortalSettings(mdsdCfg, escape(resourceId))
+            createPortalSettings(mdsdCfg, escape_nonalphanumerics(resourceId))
             instanceID = ""
             if resourceId.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                instanceID = readUUID()
+                instanceID = read_uuid(waagent.RunGetOutput)
             config(mdsdCfg, "instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
 
     except Exception as e:
@@ -518,17 +453,20 @@ def configSettings():
 
     # Check if Application Insights key is present in ladCfg
     ladCfg = readPublicConfig('ladCfg')
+    do_ai = False
+    aikey = None
     try:
         aikey = AIUtil.tryGetAiKey(ladCfg)
         if aikey:
             hutil.log("Application Insights key found.")
+            do_ai = True
         else:
             hutil.log("Application Insights key not found.")
     except Exception as e:
         msg = "Failed check for Application Insights key in LAD configuration with exception:{0} {1}"
         hutil.error(msg.format(e, traceback.format_exc()))
 
-    generatePerformanceCounterConfiguration(mdsdCfg, aikey is not None)
+    generatePerformanceCounterConfiguration(mdsdCfg, do_ai)
 
     syslogCfg = getSyslogCfg()
     fileCfg = getFileCfg()
@@ -574,23 +512,6 @@ def install_service():
     RunGetOutput('sed s#{WORKDIR}#' + WorkDir + '# ' +
                  WorkDir + '/services/mdsd-lde.service > /lib/systemd/system/mdsd-lde.service')
     RunGetOutput('systemctl daemon-reload')
-
-
-# TODO Don't know if I need this
-def get_extension_operation_type(command):
-    if re.match("^([-/]*)(enable)", command):
-        return waagent.WALAEventOperation.Enable
-    if re.match("^([-/]*)(daemon)",
-                command):  # LAD-specific extension operation (invoked from "./diagnostic.py -enable")
-        return "Daemon"
-    if re.match("^([-/]*)(install)", command):
-        return waagent.WALAEventOperation.Install
-    if re.match("^([-/]*)(disable)", command):
-        return waagent.WALAEventOperation.Disable
-    if re.match("^([-/]*)(uninstall)", command):
-        return waagent.WALAEventOperation.Uninstall
-    if re.match("^([-/]*)(update)", command):
-        return waagent.WALAEventOperation.Update
 
 
 def main(command):
@@ -808,7 +729,7 @@ def start_mdsd():
 
     try:
         # Create monitor object that encapsulates monitoring activities
-        watcher = watcherutil.Watcher(hutil._error, hutil._log, logtoconsole=True)
+        watcher = watcherutil.Watcher(hutil._error, hutil._log, log_to_console=True)
         # Start a thread to monitor /etc/fstab
         threadObj = threading.Thread(target=watcher.watch)
         threadObj.daemon = True
@@ -1143,18 +1064,6 @@ sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
 
 def install_required_package():
     return distConfig.install_required_packages()
-
-
-# TODO Don't know if I need this
-def tail(log_file, output_size=OutputSize):
-    if not os.path.exists(log_file):
-        return ""
-    pos = min(output_size, os.path.getsize(log_file))
-    with open(log_file, "r") as log:
-        log.seek(-pos, 2)
-        buf = log.read(output_size)
-        buf = filter(lambda x: x in string.printable, buf)
-        return buf.decode("ascii", "ignore")
 
 
 def get_deployment_id():

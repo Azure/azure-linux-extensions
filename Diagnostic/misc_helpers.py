@@ -102,3 +102,13 @@ def tail(log_file, output_size=1024):
         buf = log.read(output_size)
         buf = filter(lambda x: x in string.printable, buf)
         return buf.decode("ascii", "ignore")
+
+
+def escape_nonalphanumerics(data):
+    s_build = ''
+    for c in data:
+        if c.isalnum():
+            s_build += c
+        else:
+            s_build += ":{0:04X}".format(ord(c))
+    return s_build
