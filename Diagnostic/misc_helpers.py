@@ -116,3 +116,12 @@ def get_mdsd_proxy_config(waagent_setting, ext_settings, logger):
             return proxy_config
     return ''
 
+
+def escape_nonalphanumerics(data):
+    s_build = ''
+    for c in data:
+        if c.isalnum():
+            s_build += c
+        else:
+            s_build += ":{0:04X}".format(ord(c))
+    return s_build
