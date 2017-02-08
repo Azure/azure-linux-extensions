@@ -170,9 +170,9 @@ def main(command):
 
     ExtensionOperationType = get_extension_operation_type(command)
 
-    config_valid, config_invalid_reason = generate_mdsd_rsyslog_configs(g_ext_settings, WorkDir, waagent.LibDir,
-                                                                        imfile_config_filename, RunGetOutput,
-                                                                        hutil.log, hutil.error)
+    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, WorkDir, waagent.LibDir,
+                                                  imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
+    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_rsyslog_configs()
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
                              ". Install will proceed, but enable can't proceed, " \
