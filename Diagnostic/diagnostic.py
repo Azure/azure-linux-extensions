@@ -16,8 +16,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import base64
-import binascii
 import datetime
 import exceptions
 import os
@@ -30,7 +28,6 @@ import syslog
 import threading
 import time
 import traceback
-import xml.dom.minidom
 import xml.etree.ElementTree as ET
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
@@ -77,7 +74,7 @@ def init_distro_specific_actions():
         distConfig = None
 
 
-def init_extensions_settings():
+def init_extension_settings():
     """Initialize extension's public & private settings. hutil must be already initialized prior to calling this."""
     global g_ext_settings
 
@@ -91,7 +88,7 @@ def init_extensions_settings():
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global hutil, WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix, MDSDPidFile, MDSDPidPortFile
-    global EnableSyslog, ExtensionOperationType, MdsdFolder, StartDaemonFilePath, MDSD_LISTEN_PORT, omfileconfig
+    global EnableSyslog, ExtensionOperationType, MdsdFolder, StartDaemonFilePath, MDSD_LISTEN_PORT, imfile_config_filename
 #    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, omi_universal_pkg_name
 #    global DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
 #    global SuseConfig11, SuseConfig12, CentosConfig, All_Dist
@@ -108,13 +105,13 @@ def init_globals():
     MDSDPidFile = os.path.join(WorkDir, 'mdsd.pid')
     MDSDPidPortFile = MDSDFileResourcesPrefix + '.pidport'
     EnableSyslog = True
-    init_extension_settings()
     ExtensionOperationType = None
     MdsdFolder = os.path.join(WorkDir, 'bin')
     StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
     MDSD_LISTEN_PORT = 29131
     imfile_config_filename = os.path.join(WorkDir, 'imfileconfig')
 
+    init_extension_settings()
 
 
 def setup_dependencies_and_mdsd():
@@ -154,9 +151,6 @@ def setup_dependencies_and_mdsd():
         return 4, omi_msg
 
     return 0, 'success'
-
-
-
 
 
 def install_service():
@@ -289,9 +283,9 @@ def start_watcher_thread():
                              waagent.WALAEventOperation.HeartBeat, waagent.AddExtensionEvent)
     watcher.set_imds_logger(imds_logger)
     # Start a thread to perform periodic monitoring activity (e.g., /etc/fstab watcher, IMDS data logging)
-    threadObj = threading.Thread(target=watcher.watch)
-    threadObj.daemon = True
-    threadObj.start()
+    thread_obj = threading.Thread(target=watcher.watch)
+    thread_obj.daemon = True
+    thread_obj.start()
 
 
 def start_mdsd():
@@ -690,7 +684,7 @@ rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.
 cp -f {3} {4};\
 sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
     cmd = script.format(rsyslog_om_folder, rsyslog_om_path, rsyslog_om_mdsd_syslog_conf_path,
-                        omfileconfig, rsyslog_om_mdsd_file_conf_path, mdsd_socket_path)
+                        imfile_config_filename, rsyslog_om_mdsd_file_conf_path, mdsd_socket_path)
     RunGetOutput(cmd)
 
     distConfig.restart_rsyslog()
@@ -699,7 +693,6 @@ sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
 
 def install_required_package():
     return distConfig.install_required_packages()
-
 
 
 if __name__ == '__main__' :

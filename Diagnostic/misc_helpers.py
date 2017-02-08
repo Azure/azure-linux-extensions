@@ -92,6 +92,7 @@ def update_selinux_settings_for_rsyslogomazuremds(run_command, ext_dir):
     # for even Unix domain sockets.
     # Anyway, we no longer use 'semanage' (so no need to install policycoreutils-python).
     # We instead compile from the bundled SELinux module def for lad_mdsd
+    # TODO Either check the output of these commands or run without capturing output
     if os.path.exists("/usr/sbin/semodule") or os.path.exists("/sbin/semodule"):
         run_command('checkmodule -M -m -o {0}/lad_mdsd.mod {1}/lad_mdsd.te'.format(ext_dir, ext_dir))
         run_command('semodule_package -o {0}/lad_mdsd.pp -m {1}/lad_mdsd.mod'.format(ext_dir, ext_dir))
@@ -118,10 +119,4 @@ def get_mdsd_proxy_config(waagent_setting, ext_settings, logger):
 
 
 def escape_nonalphanumerics(data):
-    s_build = ''
-    for c in data:
-        if c.isalnum():
-            s_build += c
-        else:
-            s_build += ":{0:04X}".format(ord(c))
-    return s_build
+    return ''.join([ch if ch.isalnum() else ":{0:04X}".format(ord(ch)) for ch in data])

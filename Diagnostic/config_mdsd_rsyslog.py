@@ -12,7 +12,7 @@
 
 import base64
 import binascii
-from misc_helpers import read_uuid, get_storage_endpoint_with_account
+from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
 import traceback
 import xml.dom.minidom
@@ -37,9 +37,21 @@ class LadExtSettings:
         return self._handler_settings
 
     def has_public_config(self, key):
+        """
+        Determine if a particular setting is present in the public config
+        :param str key: The setting to look for
+        :return: True if the setting is present (regardless of its value)
+        :rtype: bool
+        """
         return key in self._public_settings
 
     def read_public_config(self, key):
+        """
+        Return the value of a particular public config setting
+        :param str key: The setting to retrieve
+        :return: The value of the setting if present; an empty string (*not* None) if the setting is not present
+        :rtype: str
+        """
         if key in self._public_settings:
             return self._public_settings[key]
         return ''
@@ -177,10 +189,10 @@ $InputFileSeverity debug
 $InputRunFileMonitor
 """
 
-    for file in files:
+    for item in files:
         file_id += 1
         mdsd_event_source_element = XmlUtil.createElement(mdsd_event_source_schema)
-        XmlUtil.setXmlValue(mdsd_event_source_element, 'RouteEvent', 'eventName', file["table"])
+        XmlUtil.setXmlValue(mdsd_event_source_element, 'RouteEvent', 'eventName', item["table"])
         mdsd_event_source_element.set('source', 'ladfile'+str(file_id))
         XmlUtil.addElement(mdsd_config_xml_tree, 'Events/MdsdEvents', mdsd_event_source_element)
 
@@ -188,8 +200,8 @@ $InputRunFileMonitor
         mdsd_source_element.set('name', 'ladfile'+str(file_id))
         XmlUtil.addElement(mdsd_config_xml_tree, 'Sources', mdsd_source_element)
 
-        imfile_per_file_config = imfile_per_file_config_template.replace('#FILE#', file['file'])
-        imfile_per_file_config = imfile_per_file_config.replace('#STATFILE#', file['file'].replace("/","-"))
+        imfile_per_file_config = imfile_per_file_config_template.replace('#FILE#', item['file'])
+        imfile_per_file_config = imfile_per_file_config.replace('#STATFILE#', item['file'].replace("/","-"))
         imfile_per_file_config = imfile_per_file_config.replace('#FILETAG#', 'ladfile'+str(file_id))
         imfile_config += imfile_per_file_config
     return imfile_config
@@ -296,7 +308,8 @@ def encrypt_secret_with_cert(ext_dir, run_command, logger_error, cert_path, secr
     :return: Encrypted secret string. None if openssl command exec fails.
     """
     encrypted_secret_tmp_file_path = os.path.join(ext_dir, "mdsd_secret.bin")
-    cmd_to_run = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}".format(secret, encrypted_secret_tmp_file_path, cert_path)
+    cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
+    cmd_to_run = cmd.format(secret, encrypted_secret_tmp_file_path, cert_path)
     ret_status, ret_msg = run_command(cmd_to_run, should_log=False)
     if ret_status is not 0:
         logger_error("Encrypting storage secret failed with the following message: " + ret_msg)
@@ -310,18 +323,15 @@ def encrypt_secret_with_cert(ext_dir, run_command, logger_error, cert_path, secr
 def update_account_settings(ext_settings, run_command, ext_dir, waagent_dir, logger_error,
                             mdsd_config_xml_tree, account, key, token, endpoint, aikey=None):
     """
-    Updates the MDSD configuration Account elements.
-    Updates existing default Account element with Azure table storage properties.
-    If an aikey is provided to the function, then it adds a new Account element for
-    Application Insights with the application insights key.
-
-    :param mdsd_config_xml_tree: MDSD config XML object where account settings will be updated
-    :param account: Storage account name
-    :param key: Storage account shared key
-    :param token: Storage account SAS. Either key or token must be specified. If both are given, key will be used.
-    :param endpoint: Storage endpoint
-    :param aikey: Indicates whether AppInsights key should be updated as well
-    :return:
+    Update the MDSD configuration Account element with Azure table storage properties.
+    Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for Application
+    Insights with the application insights key.
+    :param mdsd_config_xml_tree: The XML doc to be updated.
+    :param account: Storage account to which LAD should write data
+    :param key: Shared key secret for the storage account, if present
+    :param token: SAS token to access the storage account, if present
+    :param endpoint: Identifies the Azure instance (public or specific sovereign cloud) where the storage account is
+    :param aikey: Key for accessing AI, if present
     """
     assert key or token, "Either key or token must be given."
 
@@ -337,7 +347,8 @@ def update_account_settings(ext_settings, run_command, ext_dir, waagent_dir, log
         token = encrypt_secret_with_cert(ext_dir, run_command, logger_error, handler_cert_path, token)
         XmlUtil.setXmlValue(mdsd_config_xml_tree, 'Accounts/SharedAccessSignature', "account", account, ['isDefault', 'true'])
         XmlUtil.setXmlValue(mdsd_config_xml_tree, 'Accounts/SharedAccessSignature', "key", token, ['isDefault', 'true'])
-        XmlUtil.setXmlValue(mdsd_config_xml_tree, 'Accounts/SharedAccessSignature', "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(mdsd_config_xml_tree, 'Accounts/SharedAccessSignature', "decryptKeyPath", handler_pkey_path,
+                            ['isDefault', 'true'])
         XmlUtil.setXmlValue(mdsd_config_xml_tree, 'Accounts/SharedAccessSignature', "tableEndpoint", endpoint, ['isDefault', 'true'])
         XmlUtil.removeElement(mdsd_config_xml_tree, 'Accounts', 'Account')
 
@@ -345,6 +356,8 @@ def update_account_settings(ext_settings, run_command, ext_dir, waagent_dir, log
         AIUtil.createAccountElement(mdsd_config_xml_tree, aikey)
 
 
+# Formerly:
+# def config(xmltree, key, value, xmlpath, selector=[]):
 def set_xml_attr(ext_settings, mdsd_config_xml_tree, key, value, xml_path, selector=[]):
     """
     Set XML attribute on the element specified with xml_path.
@@ -409,7 +422,8 @@ def set_event_volume(ext_settings, logger_log, mdsd_config_xml_tree, lad_cfg):
     :param logger_log: Logger function (hutil.log)
     :param mdsd_config_xml_tree: MDSD config XML tree root where eventVolume will be set
     :param lad_cfg: 'ladCfg' Json object to look up for the event volume setting.
-    :return:
+    :return: The event volume. If not set anywhere in public config, return "Medium"
+    :rtype: str
     """
     event_volume = LadUtil.getEventVolumeFromLadCfg(lad_cfg)
     if event_volume:
@@ -450,7 +464,7 @@ def generate_mdsd_rsyslog_configs(ext_settings, ext_dir, waagent_dir, imfile_con
     try:
         resource_id = get_resource_id(ext_settings)
         if resource_id:
-            escaped_resource_id_str = ''.join([ch if ch.isalnum() else ":{0:04X}".format(ord(ch)) for ch in resource_id])
+            escaped_resource_id_str = escape_nonalphanumerics(resource_id)
             add_portal_settings(mdsd_cfg_xml_tree, ext_dir, escaped_resource_id_str)
             instanceID = ""
             if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
@@ -463,17 +477,20 @@ def generate_mdsd_rsyslog_configs(ext_settings, ext_dir, waagent_dir, imfile_con
 
     # Check if Application Insights key is present in ladCfg
     lad_cfg = ext_settings.read_public_config('ladCfg')
+    do_ai = False
+    aikey = None
     try:
         aikey = AIUtil.tryGetAiKey(lad_cfg)
         if aikey:
             logger_log("Application Insights key found.")
+            do_ai = True
         else:
             logger_log("Application Insights key not found.")
     except Exception as e:
         logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
                     "Stacktrace: {1}".format(e, traceback.format_exc()))
 
-    apply_perf_cfgs(mdsd_cfg_xml_tree, ext_settings, logger_error, aikey != None)
+    apply_perf_cfgs(mdsd_cfg_xml_tree, ext_settings, logger_error, do_ai)
 
     syslog_cfg = get_syslog_config(ext_settings)
     file_cfg = get_file_monitoring_config(ext_settings)
