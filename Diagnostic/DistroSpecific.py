@@ -43,7 +43,7 @@ class CommonActions:
         error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
         if should_log:
             self.logger("Return " + str(error) + ":" + msg)
-        return int(error), str(msg)
+        return error, msg
 
     def log_run_ignore_output(self, cmd, should_log=True):
         """

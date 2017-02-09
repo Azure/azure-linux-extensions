@@ -14,6 +14,7 @@ import os
 import re
 import string
 import traceback
+import xml.dom.minidom
 
 from Utils.WAAgentUtil import waagent
 
@@ -120,3 +121,37 @@ def get_mdsd_proxy_config(waagent_setting, ext_settings, logger):
 
 def escape_nonalphanumerics(data):
     return ''.join([ch if ch.isalnum() else ":{0:04X}".format(ord(ch)) for ch in data])
+
+
+# TODO Should this be placed in WAAgentUtil.py?
+def get_deployment_id_from_hosting_env_cfg(waagent_dir, logger_log, logger_error):
+    """
+    Get deployment ID from waagent dir's HostingEnvironmentConfig.xml.
+
+    :param waagent_dir: Waagent dir path (/var/lib/waagent)
+    :param logger_log: Normal logging function (hutil.log)
+    :param logger_error: Error logging function (hutil.error)
+    :return: Obtained deployment ID string if the hosting env cfg xml exists & deployment ID is found.
+             "unknown" if the xml exists, but deployment ID can't be found.
+             None if the xml does not exist.
+    """
+    identity = "unknown"
+    env_cfg_path = os.path.join(waagent_dir, "HostingEnvironmentConfig.xml")
+    if not os.path.exists(env_cfg_path):
+        logger_log("No Deployment ID (not running in a hosted environment")
+        return None
+
+    try:
+        with open(env_cfg_path, 'r') as env_cfg_file:
+            xml_text = env_cfg_file.read()
+        dom = xml.dom.minidom.parseString(xml_text)
+        deployment = dom.getElementsByTagName("Deployment")
+        name = deployment[0].getAttribute("name")
+        if name:
+            identity = name
+            logger_log("Deployment ID found: {0}.".format(identity))
+    except Exception as e:
+        # use fallback identity
+        logger_error("Failed to retrieve deployment ID. Error:{0}\nStacktrace: {1}".format(e, traceback.format_exc()))
+
+    return identity

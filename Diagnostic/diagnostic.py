@@ -45,6 +45,7 @@ try:
     # New LAD  utils
     import DistroSpecific
     import watcherutil
+    from Utils.lad_ext_settings import LadExtSettings
     from misc_helpers import *
     from config_mdsd_rsyslog import *
     from Utils.imds_util import ImdsLogger
@@ -170,7 +171,8 @@ def main(command):
 
     ExtensionOperationType = get_extension_operation_type(command)
 
-    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, WorkDir, waagent.LibDir,
+    deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
+    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, WorkDir, waagent.LibDir, deployment_id,
                                                   imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
     config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_rsyslog_configs()
     if not config_valid:

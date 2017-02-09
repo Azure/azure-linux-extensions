@@ -15,68 +15,10 @@ import binascii
 from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
 import traceback
-import xml.dom.minidom
 import xml.etree.ElementTree as ET
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-
-
-class LadExtSettings:
-    """
-    Wrapper class around LAD's extension settings Json objects.
-    """
-    def __init__(self, handler_settings):
-        self._handler_settings = handler_settings if handler_settings else {}
-        public_settings = self._handler_settings.get('publicSettings')
-        self._public_settings = public_settings if public_settings else {}
-        protected_settings = self._handler_settings.get('protectedSettings')
-        self._protected_settings = protected_settings if protected_settings else {}
-
-    def get_handler_settings(self):
-        return self._handler_settings
-
-    def has_public_config(self, key):
-        """
-        Determine if a particular setting is present in the public config
-        :param str key: The setting to look for
-        :return: True if the setting is present (regardless of its value)
-        :rtype: bool
-        """
-        return key in self._public_settings
-
-    def read_public_config(self, key):
-        """
-        Return the value of a particular public config setting
-        :param str key: The setting to retrieve
-        :return: The value of the setting if present; an empty string (*not* None) if the setting is not present
-        :rtype: str
-        """
-        if key in self._public_settings:
-            return self._public_settings[key]
-        return ''
-
-    def read_protected_config(self, key):
-        if key in self._protected_settings:
-            return self._protected_settings[key]
-        return ''
-
-    def log_protected_settings_keys(self, logger_log, logger_err):
-        try:
-            msg = "Keys in privateSettings (and some non-secret values): "
-            first = True
-            for key in self._protected_settings:
-                if first:
-                    first = False
-                else:
-                    msg += ", "
-                msg += key
-                if key == 'storageAccountEndPoint':
-                    msg += ":" + self._protected_settings[key]
-            logger_log(msg)
-        except Exception as e:
-            logger_err("Failed to log keys in privateSettings. Error:{0}\n"
-                       "Stacktrace: {1}".format(e, traceback.format_exc()))
 
 
 class ConfigMdsdRsyslog:
@@ -86,13 +28,15 @@ class ConfigMdsdRsyslog:
     The rsyslog imfile config file generated will be /var/lib/waagent/Microsoft. ...-x.y.zzzz/imfileconfig
        (the filename part is configurable as a constructor param).
     """
-    def __init__(self, ext_settings, ext_dir, waagent_dir, imfile_config_filename, run_command,
-                 logger_log, logger_error):
+    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
+                 imfile_config_filename, run_command, logger_log, logger_error):
         """
         Constructor.
-        :param ext_settings: A LadExtSettings object wrapping the Json extension settings.
+        :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) object wrapping the Json extension settings.
         :param ext_dir: Extension directory (e.g., /var/lib/waagent/Microsoft.OSTCExtensions.LinuxDiagnostic-2.3.xxxx)
         :param waagent_dir: WAAgent directory (e.g., /var/lib/waagent)
+        :param deployment_id: Deployment ID string (or None) that should be obtained & passed by the caller
+                              from waagent's HostingEnvironmentCfg.xml.
         :param imfile_config_filename: Rsyslog imfile module configuration file name (that will be copied
                                        to the rsyslog config directory). This could be hard-coded and later removed.
                                        Currently '/var/lib/waagent/Microsoft...-2.3.xxxx/imfileconfig' is passed.
@@ -103,6 +47,7 @@ class ConfigMdsdRsyslog:
         self._ext_settings = ext_settings
         self._ext_dir = ext_dir
         self._waagent_dir = waagent_dir
+        self._deployment_id = deployment_id
         self._imfile_config_filename = imfile_config_filename
         self._run_command = run_command
         self._logger_log = logger_log
@@ -111,33 +56,6 @@ class ConfigMdsdRsyslog:
         # This should be assigned in the main API function from an mdsd XML cfg template file.
         # TODO Consider doing that right away from here. For now, just keeping the existing behavior/logic.
         self._mdsd_config_xml_tree = None
-
-    def _get_deployment_id(self):
-        """
-        Get deployment ID from waagent dir (ext_dir's parent)'s HostingEnvironmentConfig.xml.
-        """
-        identity = "unknown"
-        # TODO RHS of the following line could be simply os.path.join(self._waagent_dir, "HostingEnvironmentConfig.xml")
-        # Just retaining as is for now as legacy.
-        env_cfg_path = os.path.join(self._ext_dir, os.pardir, "HostingEnvironmentConfig.xml")
-        if not os.path.exists(env_cfg_path):
-            self._logger_log("No Deployment ID (not running in a hosted environment")
-            return None
-
-        try:
-            with open(env_cfg_path, 'r') as env_cfg_file:
-                xml_text = env_cfg_file.read()
-            dom = xml.dom.minidom.parseString(xml_text)
-            deployment = dom.getElementsByTagName("Deployment")
-            name = deployment[0].getAttribute("name")
-            if name:
-                identity = name
-                self._logger_log("Deployment ID found: {0}.".format(identity))
-        except Exception as e:
-            # use fallback identity
-            self._logger_error("Failed to retrieve deployment ID. Error:{0}\nStacktrace: {1}".format(e, traceback.format_exc()))
-
-        return identity
 
     def _get_resource_id(self):
         """
@@ -478,10 +396,9 @@ $InputRunFileMonitor
         self._mdsd_config_xml_tree._setroot(XmlUtil.createElement(mdsd_cfg_str))
 
         # 2. Add DeploymentId (if available) to identity columns
-        deployment_id = self._get_deployment_id()
-        if deployment_id:
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "", deployment_id,
-                                ["name", "DeploymentId"])
+        if self._deployment_id:
+            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
+                                self._deployment_id, ["name", "DeploymentId"])
         try:
             resource_id = self._get_resource_id()
             if resource_id:
