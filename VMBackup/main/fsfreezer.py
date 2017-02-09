@@ -139,7 +139,6 @@ class FsFreezer:
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
-        is_inconsistent = False
         if(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
@@ -169,11 +168,10 @@ class FsFreezer:
                 else:
                     break
             error_msg = 'snapshot result inconsistent'
-            is_inconsistent = True
             thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
-        return thaw_result, is_inconsistent
+        return thaw_result
 
     def freeze(self, mount):
         """

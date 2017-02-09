@@ -204,8 +204,6 @@ def freeze_snapshot(timeout):
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         all_failed= False
-        is_inconsistent_freeze = False
-        is_inconsistent_snapshot =  False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
@@ -217,7 +215,7 @@ def freeze_snapshot(timeout):
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent_snapshot = snap_shotter.snapshotall(para_parser)
+            snapshot_result,snapshot_info_array, all_failed  = snap_shotter.snapshotall(para_parser, freezer)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 error_msg = 'T:S snapshot result: ' + str(snapshot_result)
@@ -230,25 +228,11 @@ def freeze_snapshot(timeout):
                     error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                 run_status = 'error'
                 backup_logger.log(error_msg, True, 'Error')
-                thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
-                if is_inconsistent_freeze and is_inconsistent_snapshot:
-                    set_do_seq_flag()
-                backup_logger.log('T:S thaw result ' + str(thaw_result))
             else:
-                thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
-                if is_inconsistent_freeze and is_inconsistent_snapshot:
-                    set_do_seq_flag()
-                backup_logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:S Enable failed with error: ' + str(thaw_result)
-                    backup_logger.log(error_msg, True, 'Warning')
-                else:   
-                    run_result = CommonVariables.success
-                    run_status = 'success'
-                    error_msg = 'Enable Succeeded'
-                    backup_logger.log("T:S " + error_msg, True)
+                run_result = CommonVariables.success
+                run_status = 'success'
+                error_msg = 'Enable Succeeded'
+                backup_logger.log("T:S " + error_msg, True)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
