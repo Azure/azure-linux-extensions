@@ -695,7 +695,7 @@ def install_required_package():
     return distConfig.install_required_packages()
 
 
-if __name__ == '__main__' :
+if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print('No command line argument was specified.\nYou must be executing this program manually for testing.\n'
               'In that case, one of "install", "enable", "disable", "uninstall", or "update" should be given.')
@@ -704,9 +704,22 @@ if __name__ == '__main__' :
             main(sys.argv[1])
         except Exception as e:
             ext_version = ET.parse('manifest.xml').find('{http://schemas.microsoft.com/windowsazure}Version').text
-            waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
-                                      op=wala_event_type_for_telemetry(get_extension_operation_type(sys.argv[1])),
-                                      isSuccess=False,
-                                      version=ext_version,
-                                      message="Unknown exception thrown from diagnostic.py.\n"
-                                              "Error: {0}\nStackTrace: {1}".format(e, traceback.format_exc()))
+            msg = "Unknown exception thrown from diagnostic.py.\n" \
+                  "Error: {0}\nStackTrace: {1}".format(e, traceback.format_exc())
+            wala_event_type = wala_event_type_for_telemetry(get_extension_operation_type(sys.argv[1]))
+            if len(sys.argv) == 2:
+                # Add a telemetry only if this is executed through waagent (in which
+                # we are guaranteed to have just one cmdline arg './diagnostic -xxx').
+                waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
+                                          op=wala_event_type,
+                                          isSuccess=False,
+                                          version=ext_version,
+                                          message=msg)
+            else:
+                # Trick to print backtrace in case we execute './diagnostic.py -xxx yyy' from a terminal for testing.
+                # By just adding one more cmdline arg with any content, the above if condition becomes false,\
+                # thus allowing us to run code here, printing the exception message with the stack trace.
+                print msg
+            # Need to exit with an error code, so that this situation can be detected by waagent and also
+            # reported to customer through agent/extension status blob.
+            hutil.do_exit(42, wala_event_type, 'Error', '42', msg)  # What's 42? Ask Abhi.

@@ -65,14 +65,14 @@ class LadExtSettings:
         try:
             msg = "Keys in privateSettings (and some non-secret values): "
             first = True
-            for key in self._private_settings:
+            for key in self._protected_settings:
                 if first:
                     first = False
                 else:
                     msg += ", "
                 msg += key
                 if key == 'storageAccountEndPoint':
-                    msg += ":" + self._private_settings[key]
+                    msg += ":" + self._protected_settings[key]
             logger_log(msg)
         except Exception as e:
             logger_err("Failed to log keys in privateSettings. Error:{0}\n"
@@ -474,13 +474,13 @@ $InputRunFileMonitor
         else:
             with open(os.path.join(self._ext_dir, './mdsdConfig.xml.template'), "r") as defaul_mdsd_config_file:
                 mdsd_cfg_str = defaul_mdsd_config_file.read()
-        self._mdsd_cfg_xml_tree = ET.ElementTree()
-        self._mdsd_cfg_xml_tree._setroot(XmlUtil.createElement(mdsd_cfg_str))
+        self._mdsd_config_xml_tree = ET.ElementTree()
+        self._mdsd_config_xml_tree._setroot(XmlUtil.createElement(mdsd_cfg_str))
 
         # 2. Add DeploymentId (if available) to identity columns
         deployment_id = self._get_deployment_id()
         if deployment_id:
-            XmlUtil.setXmlValue(self._mdsd_cfg_xml_tree, "Management/Identity/IdentityComponent", "", deployment_id,
+            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "", deployment_id,
                                 ["name", "DeploymentId"])
         try:
             resource_id = self._get_resource_id()
@@ -530,7 +530,7 @@ $InputRunFileMonitor
         # 5. Before starting to update the storage account settings, log extension's protected settings'
         #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that
         #    the extension's Json settings include a correctly entered 'storageEndpoint'.
-        self._ext_settings.log_protected_settings_keys()
+        self._ext_settings.log_protected_settings_keys(self._logger_log, self._logger_error)
 
         # 6. Actually update the storage account settings on mdsd config XML tree (based on extension's
         #    protectedSettings).
@@ -549,7 +549,7 @@ $InputRunFileMonitor
 
         # 7. Check and add new syslog RouteEvent for Application Insights.
         if aikey:
-            AIUtil.createSyslogRouteEventElement(self._mdsd_cfg_xml_tree)
+            AIUtil.createSyslogRouteEventElement(self._mdsd_config_xml_tree)
 
         # 8. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
         self._set_event_volume(lad_cfg)
@@ -558,7 +558,7 @@ $InputRunFileMonitor
         self._set_xml_attr("sampleRateInSeconds", "60", "Events/OMI/OMIQuery")
 
         # 10. Finally generate mdsd config XML file out of the constructed XML tree object.
-        self._mdsd_cfg_xml_tree.write(os.path.join(self._ext_dir, './xmlCfg.xml'))
+        self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, './xmlCfg.xml'))
 
         return True, ""
 
