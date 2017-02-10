@@ -176,12 +176,21 @@ int main(int argc, char *argv[])
                 currenttime=time(NULL);
            }
         }
+        else
+        {
+            break;
+        }
     }
-
-    if (gThaw != 1)
+    currenttime=time(NULL);
+    if (gThaw != 1 && currenttime > starttime+timeout-1)
     {
         logger("Failed to receive timely Thaw from parent process\n");
         JUMPWITHSTATUS(EXIT_FAILURE);
+    }
+    else if (gThaw != 1)
+    {
+        logger("Inconsistent snapshot because of SLEEP failure \n");
+        JUMPWITHSTATUS(2);
     }
     
 CLEANUP:

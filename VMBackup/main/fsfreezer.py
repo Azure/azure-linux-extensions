@@ -161,14 +161,18 @@ class FsFreezer:
                 self.logger.log(error_msg, True, 'Error')
         else:
             self.logger.log("Binary output after process end when no thaw sent: ", True)
+            if(self.freeze_handler.child.returncode==2):
+                error_msg = 'Unable to execute sleep'
+                thaw_result.errors.append(error_msg)
+            else:
+                error_msg = 'snapshot result inconsistent'
+                thaw_result.errors.append(error_msg)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:
                     break
-            error_msg = 'snapshot result inconsistent'
-            thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
         return thaw_result
