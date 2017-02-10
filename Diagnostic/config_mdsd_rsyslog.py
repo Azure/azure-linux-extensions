@@ -214,7 +214,7 @@ $InputRunFileMonitor
                 perf_cfgs = default_perf_cfgs
         except Exception as e:
             self._logger_error("Failed to parse performance configuration with exception:{0}\n"
-                         "Stacktrace: {1}".format(e, traceback.format_exc()))
+                               "Stacktrace: {1}".format(e, traceback.format_exc()))
 
         try:
             self._update_perf_counters_settings(perf_cfgs)
