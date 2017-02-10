@@ -4,6 +4,8 @@ import os
 import threading
 import ConfigParser
 from common import CommonVariables
+from pwd import getpwuid
+from stat import *
 
 
     # [pre_post]
@@ -56,7 +58,7 @@ class PluginHost(object):
     def __init__(self, logger):
         self.logger = logger
         self.modulesLoaded = False
-        self.configLocation = '/etc/azure/PluginHost.conf'
+        self.configLocation = './main/PluginHost.conf'
         self.timeoutInSeconds = 600
         self.plugins = []
         self.pluginName = []
@@ -77,17 +79,34 @@ class PluginHost(object):
             config = ConfigParser.ConfigParser()
             config.read(self.configLocation)
             if (config.has_option('pre_post', 'timeoutInSeconds')):
-                self.timeoutInSeconds = int(config.get('pre_post','timeoutInSeconds'))
+                self.timeoutInSeconds = min(int(config.get('pre_post','timeoutInSeconds')),self.timeoutInSeconds)
             if (config.has_option('pre_post', 'numberOfPlugins')):
                 len = int(config.get('pre_post','numberOfPlugins'))
         
             self.logger.log('timeoutInSeconds: '+str(self.timeoutInSeconds),True,'Info')
             self.logger.log('numberOfPlugins: '+str(len),True,'Info')
+
+            result = PluginHostResult()
         
             while self.noOfPlugins < len:
                 pname = config.get('pre_post','pluginName'+str(self.noOfPlugins))
                 ppath = config.get('pre_post','pluginPath'+str(self.noOfPlugins))
                 pcpath = config.get('pre_post','pluginConfigPath'+str(self.noOfPlugins))
+
+                if os.path.isfile(pcpath):
+                    if not self.validate_permissions(pcpath):
+                        self.logger.log('Plugin Config file does not have desired permissions', True, 'Error')
+                        result.errorCode = CommonVariables.FailedPrepostPluginConfigPermissionError
+                        return result
+                    if not self.find_owner(pcpath) == 'root':
+                        self.logger.log('The owner of the Plugin Config file ' + pcpath + ' is ' + self.find_owner(pcpath) + ' but not root', True, 'Error')
+                        result.errorCode = CommonVariables.FailedPrepostPluginConfigOwnershipError
+                        return result
+                else:
+                    self.logger.log('Plugin host file does not exist in the location ' + pcpath, True, 'Error')
+                    result.errorCode = CommonVariables.FailedPrepostPluginConfigNotFound
+                    return result
+
                 sys.path.append(ppath)
                 plugin = __import__(pname)
 
@@ -105,16 +124,58 @@ class PluginHost(object):
         except Exception as err:
             self.logger.log('Error in reading PluginHost config file. '+str(err),True,'Error')
 
+    def find_owner(self, filename):
+        file_owner = ''
+        try:
+            file_owner = getpwuid(os.stat(filename).st_uid).pw_name
+        except Exception as err:
+            self.logger.log('Error in fetching owner of the file : ' + filename + 'with error ' + str(err),True,'Error')
+
+        return file_owner
+
+
+    def validate_permissions(self, filename):
+        valid_permissions = True
+        try:
+            permissions = oct(os.stat(filename)[ST_MODE])[-3:]
+            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            if int(permissions[2]) > 0 : #validating permissions for others
+                valid_permissions = False
+        except Exception as err:
+            self.logger.log('Error in fetching permissions of the file : ' + filename + 'with error ' + str(err),True,'Error')
+            valid_permissions = False
+
+        return valid_permissions
+
+
     def pre_script(self):
 
             # Runs pre_script() for all plugins and maintains a timer
 
 
-        self.logger.log('Loading script modules now...',True,'Info')
-        self.load_modules()
         result = PluginHostResult()
+        self.logger.log('Loading script modules now...',True,'Info')
+        if os.path.isfile(self.configLocation):
+            if not self.validate_permissions(self.configLocation):
+                self.logger.log('Plugin host Config file does not have desired permissions', True, 'Error')
+                result.errorCode = CommonVariables.FailedPrepostPluginhostConfigPermissionError
+                return result
+            if not self.find_owner(self.configLocation) == 'root':
+                self.logger.log('The owner of the Plugin host Config file ' + self.configLocation + ' is ' + self.find_owner(self.configLocation) + ' but not root', True, 'Error')
+                result.errorCode = CommonVariables.FailedPrepostPluginhostConfigOwnershipError
+                return result
+        else:
+            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPluginhostConfigNotFound
+            return result
+
+        load_modules_result = self.load_modules()
+
+        if load_modules_result is not None:
+            return load_modules_result
+
         if not self.modulesLoaded:
-            self.logger.log('PluginHost config file error.', True, 'Info')
+            self.logger.log('PluginHost config file error.', True, 'Error')
             result.errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
             if os.path.isfile(self.configLocation):
                 result.continueBackup = False
@@ -159,10 +220,6 @@ class PluginHost(object):
 
         result = PluginHostResult()
         if not self.modulesLoaded:
-            self.logger.log('PluginHost config file error.', True, 'Info')
-            result.errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
-            if os.path.isfile(self.configLocation):
-                result.continueBackup = False
             return result
 
         self.logger.log('Starting postscript for all modules.',True,'Info')

@@ -68,6 +68,7 @@ class ScriptRunner(object):
         self.preScriptNoOfRetries = 0
         self.postScriptNoOfRetries = 0
         self.configLoaded = False
+        self.PreScriptCompletedSuccessfully = False
         self.get_config()
         self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount), True, 'Info')
 
@@ -79,7 +80,7 @@ class ScriptRunner(object):
         try:
             with open(self.configLocation, 'r') as configFile:
                 configData = json.load(configFile)
-            self.timeoutInSeconds = configData['timeoutInSeconds']
+            self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.timeoutInSeconds)
             self.pluginName = configData['pluginName']
             self.preScriptLocation = configData['preScriptLocation']
             self.postScriptLocation = configData['postScriptLocation']
@@ -199,6 +200,7 @@ class ScriptRunner(object):
                 result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
                 self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
             else:
+                self.PreScriptCompletedSuccessfully = True
                 self.logger.log('Prescript for '+self.pluginName+' successfully executed.',True,'Info')
         else:
             result.errorCode =  CommonVariables.FailedPrepostPreScriptTimeout
@@ -213,8 +215,12 @@ class ScriptRunner(object):
             # -- postScriptCompleted is a bool array, upon completion of script, true will be assigned at pluginIndex
             # -- postScriptResult is an array and it stores the result at pluginIndex
 
+        if not self.PreScriptCompletedSuccessfully:
+            self.logger.log('PreScript failed for ' + self.pluginName + ' .So, Postr Script is not triggered', True, 'Info')
+            return
 
         result = ScriptRunnerResult()
+
         result.requiredNoOfRetries = self.postScriptNoOfRetries
         if not self.configLoaded:
             result.errorCode =  CommonVariables.FailedPrepostPluginConfigParsing

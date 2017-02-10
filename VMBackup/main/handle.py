@@ -363,6 +363,10 @@ def daemon():
 
                 PluginHostObj = PluginHost(logger=backup_logger)
                 preResult = PluginHostObj.pre_script()
+
+                if preResult.errorCode == CommonVariables.PrePost_PluginStatus_Success:
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+
                 dobackup = preResult.continueBackup
                 if(g_fsfreeze_on == False and preResult.anyScriptFailed):
                     dobackup = False
@@ -435,7 +439,7 @@ def daemon():
                                 backup_logger.log(error_msg, True)
                                 break
 
-                if run_result == CommonVariables.success and not( preResult.anyScriptFailed or postResult.anyScriptFailed ):
+                if run_result == CommonVariables.success and preResult.errorCode == 0 and not( preResult.anyScriptFailed or postResult.anyScriptFailed ):
                     run_status = 'success'
                     run_result = CommonVariables.success_appconsistent
                     hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
