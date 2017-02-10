@@ -10,7 +10,6 @@
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import base64
 import binascii
 from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
@@ -56,25 +55,6 @@ class ConfigMdsdRsyslog:
         # This should be assigned in the main API function from an mdsd XML cfg template file.
         # TODO Consider doing that right away from here. For now, just keeping the existing behavior/logic.
         self._mdsd_config_xml_tree = None
-
-    def _get_resource_id(self):
-        """
-        Try to get resourceId from LadCfg. If not present, try to fetch from xmlCfg.
-        """
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
-        resource_id = LadUtil.getResourceIdFromLadCfg(lad_cfg)
-        if not resource_id:
-            encoded_xml_cfg = self._ext_settings.read_public_config('xmlCfg').strip()
-            if encoded_xml_cfg:
-                xml_cfg = base64.b64decode(encoded_xml_cfg)
-                resource_id = XmlUtil.getXmlValue(XmlUtil.createElement(xml_cfg),
-                                                  'diagnosticMonitorConfiguration/metrics', 'resourceId')
-                # Azure portal uses xmlCfg which contains WadCfg which is pascal case
-                # Currently we will support both casing and deprecate one later
-                if not resource_id:
-                    resource_id = XmlUtil.getXmlValue(XmlUtil.createElement(xml_cfg),
-                                                      'DiagnosticMonitorConfiguration/Metrics', 'resourceId')
-        return resource_id
 
     def _add_portal_settings(self, resource_id):
         """
@@ -313,41 +293,6 @@ $InputRunFileMonitor
             v = value
         XmlUtil.setXmlValue(self._mdsd_config_xml_tree, xml_path, key, v, selector)
 
-    def _get_syslog_config(self):
-        """
-        Get syslog config from extension settings.
-        First look up 'ladCfg' section's 'syslogCfg' and use it. If none, then use 'syslogCfg' at the top level
-        of public settings. Base64-encoded rsyslogd conf content is currently supported for 'syslogCfg' in either
-        section.
-        :return: rsyslogd configuration content string (base64-decoded 'syslogCfg' setting)
-        """
-        syslog_cfg = ''
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
-        encoded_syslog_cfg = LadUtil.getDiagnosticsMonitorConfigurationElement(lad_cfg, 'syslogCfg')
-        if not encoded_syslog_cfg:
-            encoded_syslog_cfg = self._ext_settings.read_public_config('syslogCfg')
-        if encoded_syslog_cfg:
-            syslog_cfg = base64.b64decode(encoded_syslog_cfg)
-        return syslog_cfg
-
-    def _get_file_monitoring_config(self):
-        """
-        Get rsyslog file monitoring (imfile module) config from extension settings.
-        First look up 'ladCfg' and use it if one is there. If not, then get 'fileCfg' at the top level
-        of public settings.
-        :return: List of dictionaries specifying files to monitor and Azure table names for the destinations
-        of the monitored files. E.g.:
-        [
-          {"file":"/var/log/a.log", "table":"aLog"},
-          {"file":"/var/log/b.log", "table":"bLog"}
-        ]
-        """
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
-        file_cfg = LadUtil.getFileCfgFromLadCfg(lad_cfg)
-        if not file_cfg:
-            file_cfg = self._ext_settings.read_public_config('fileCfg')
-        return file_cfg
-
     def _set_event_volume(self, lad_cfg):
         """
         Set event volumne in mdsd config. Check if desired event volume is specified,
@@ -383,13 +328,11 @@ $InputRunFileMonitor
         """
 
         # 1. Get the mdsd config XML tree base.
-        #    - 1st priority is from the extension setting's 'mdsdCfg' value (base64-encoded).
+        #    - 1st priority is from the extension setting's 'mdsdCfg' value.
         #      Note that we have never used this option.
         #    - 2nd priority is to use the provided XML template stored in <ext_dir>/mdsdConfig.xml.template.
-        mdsd_cfg_str = self._ext_settings.read_public_config('mdsdCfg')
-        if mdsd_cfg_str:
-            mdsd_cfg_str = base64.b64decode(mdsd_cfg_str)
-        else:
+        mdsd_cfg_str = self._ext_settings.get_mdsd_cfg()
+        if not mdsd_cfg_str:
             with open(os.path.join(self._ext_dir, './mdsdConfig.xml.template'), "r") as defaul_mdsd_config_file:
                 mdsd_cfg_str = defaul_mdsd_config_file.read()
         self._mdsd_config_xml_tree = ET.ElementTree()
@@ -400,7 +343,7 @@ $InputRunFileMonitor
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
         try:
-            resource_id = self._get_resource_id()
+            resource_id = self._ext_settings.get_resource_id()
             if resource_id:
                 escaped_resource_id_str = escape_nonalphanumerics(resource_id)
                 self._add_portal_settings(escaped_resource_id_str)
@@ -432,8 +375,8 @@ $InputRunFileMonitor
         # 4. Generate rsyslog imfile config. It's unclear why non-imfile config stuff (self._get_syslog_config())
         #    is appended to imfileconfig as well. That part has never been used, as far as I remember, and will
         #    definitely need to change later.
-        syslog_cfg = self._get_syslog_config()
-        file_cfg = self._get_file_monitoring_config()
+        syslog_cfg = self._ext_settings.get_syslog_config()
+        file_cfg = self._ext_settings.get_file_monitoring_config()
         # fileCfg = [{"file":"/var/log/waagent.log","table":"waagent"},{"file":"/var/log/waagent2.log","table":"waagent3"}]
         try:
             if file_cfg:

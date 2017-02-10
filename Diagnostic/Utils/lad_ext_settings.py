@@ -10,14 +10,22 @@
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import base64
 import traceback
+import Utils.LadDiagnosticUtil as LadUtil
+import Utils.XmlUtil as XmlUtil
 
 
-class LadExtSettings:
+class ExtSettings(object):
     """
-    Wrapper class around LAD's extension settings Json objects.
+    Wrapper class around any generic Azure extension settings Json objects.
+    TODO This class may better go to some place else (e.g., HandlerUtil.py).
     """
     def __init__(self, handler_settings):
+        """
+        Constructor
+        :param handler_settings: Json object (dictionary) decoded from the extension settings Json string.
+        """
         self._handler_settings = handler_settings if handler_settings else {}
         public_settings = self._handler_settings.get('publicSettings')
         self._public_settings = public_settings if public_settings else {}
@@ -25,6 +33,10 @@ class LadExtSettings:
         self._protected_settings = protected_settings if protected_settings else {}
 
     def get_handler_settings(self):
+        """
+        Hanlder settings (Json dictionary) getter
+        :return: Handler settings Json object
+        """
         return self._handler_settings
 
     def has_public_config(self, key):
@@ -48,11 +60,33 @@ class LadExtSettings:
         return ''
 
     def read_protected_config(self, key):
+        """
+        Return the value of a particular protected config setting
+        :param str key: The setting to retrive
+        :return: The value of the setting if present; an empty string (*not* None) if the setting is not present
+        :rtype: str
+        """
         if key in self._protected_settings:
             return self._protected_settings[key]
         return ''
 
+
+class LadExtSettings(ExtSettings):
+    """
+    LAD-specific extension settings object that supports LAD-specific member functions
+    """
+    def __init__(self, handler_settings):
+        super(LadExtSettings, self).__init__(handler_settings)
+
     def log_protected_settings_keys(self, logger_log, logger_err):
+        """
+        Log some protected settings information. Keys only for credentials and both key/value for known public
+        values (e.g., storageAccountEndPoint). This was introduced to help ourselves find any misconfiguration
+        issues related to the storageAccountEndPoint easier.
+        :param logger_log: Normal logging function (e.g., hutil.log)
+        :param logger_err: Error logging function (e.g., hutil.error)
+        :return: None
+        """
         try:
             msg = "Keys in privateSettings (and some non-secret values): "
             first = True
@@ -69,3 +103,66 @@ class LadExtSettings:
             logger_err("Failed to log keys in privateSettings. Error:{0}\n"
                        "Stacktrace: {1}".format(e, traceback.format_exc()))
 
+    def get_resource_id(self):
+        """
+        Try to get resourceId from LadCfg. If not present, try to fetch from xmlCfg.
+        """
+        lad_cfg = self.read_public_config('ladCfg')
+        resource_id = LadUtil.getResourceIdFromLadCfg(lad_cfg)
+        if not resource_id:
+            encoded_xml_cfg = self.read_public_config('xmlCfg').strip()
+            if encoded_xml_cfg:
+                xml_cfg = base64.b64decode(encoded_xml_cfg)
+                resource_id = XmlUtil.getXmlValue(XmlUtil.createElement(xml_cfg),
+                                                  'diagnosticMonitorConfiguration/metrics', 'resourceId')
+                # Azure portal uses xmlCfg which contains WadCfg which is pascal case
+                # Currently we will support both casing and deprecate one later
+                if not resource_id:
+                    resource_id = XmlUtil.getXmlValue(XmlUtil.createElement(xml_cfg),
+                                                      'DiagnosticMonitorConfiguration/Metrics', 'resourceId')
+        return resource_id
+
+    def get_syslog_config(self):
+        """
+        Get syslog config from LAD extension settings.
+        First look up 'ladCfg' section's 'syslogCfg' and use it. If none, then use 'syslogCfg' at the top level
+        of public settings. Base64-encoded rsyslogd conf content is currently supported for 'syslogCfg' in either
+        section.
+        :return: rsyslogd configuration content string (base64-decoded 'syslogCfg' setting)
+        """
+        syslog_cfg = ''
+        lad_cfg = self.read_public_config('ladCfg')
+        encoded_syslog_cfg = LadUtil.getDiagnosticsMonitorConfigurationElement(lad_cfg, 'syslogCfg')
+        if not encoded_syslog_cfg:
+            encoded_syslog_cfg = self.read_public_config('syslogCfg')
+        if encoded_syslog_cfg:
+            syslog_cfg = base64.b64decode(encoded_syslog_cfg)
+        return syslog_cfg
+
+    def get_file_monitoring_config(self):
+        """
+        Get rsyslog file monitoring (imfile module) config from LAD extension settings.
+        First look up 'ladCfg' and use it if one is there. If not, then get 'fileCfg' at the top level
+        of public settings.
+        :return: List of dictionaries specifying files to monitor and Azure table names for the destinations
+        of the monitored files. E.g.:
+        [
+          {"file":"/var/log/a.log", "table":"aLog"},
+          {"file":"/var/log/b.log", "table":"bLog"}
+        ]
+        """
+        lad_cfg = self.read_public_config('ladCfg')
+        file_cfg = LadUtil.getFileCfgFromLadCfg(lad_cfg)
+        if not file_cfg:
+            file_cfg = self.read_public_config('fileCfg')
+        return file_cfg
+
+    def get_mdsd_cfg(self):
+        """
+        Get 'mdsdCfg' setting from the LAD public settings. Since it's base64-encoded, decode it for returning.
+        :return: Base64-decoded 'mdsdCfg' LAD public setting. '' if not present.
+        """
+        mdsd_cfg_str = self.read_public_config('mdsdCfg')
+        if mdsd_cfg_str:
+            mdsd_cfg_str = base64.b64decode(mdsd_cfg_str)
+        return mdsd_cfg_str
