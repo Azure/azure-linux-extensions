@@ -90,6 +90,7 @@ def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global hutil, WorkDir, MDSDFileResourcesDir, MDSDRoleName, MDSDFileResourcesPrefix, MDSDPidFile, MDSDPidPortFile
     global EnableSyslog, ExtensionOperationType, MdsdFolder, StartDaemonFilePath, MDSD_LISTEN_PORT, imfile_config_filename
+    global g_lad_log_helper
 #    global rsyslog_ommodule_for_check, RunGetOutput, MdsdFolder, omi_universal_pkg_name
 #    global DebianConfig, RedhatConfig, UbuntuConfig1510OrHigher, SUSE11_MDSD_SSL_CERTS_FILE
 #    global SuseConfig11, SuseConfig12, CentosConfig, All_Dist
@@ -111,6 +112,8 @@ def init_globals():
     StartDaemonFilePath = os.path.join(os.getcwd(), __file__)
     MDSD_LISTEN_PORT = 29131
     imfile_config_filename = os.path.join(WorkDir, 'imfileconfig')
+    g_lad_log_helper = LadLogHelper(hutil.log, hutil.error, waagent.AddExtensionEvent,
+                                    hutil.get_name(), hutil.get_extension_version())
 
     init_extension_settings()
 
@@ -325,14 +328,14 @@ def start_mdsd():
         uninstall_rsyslogom()
 
     log_dir = hutil.get_log_dir()
-    monitor_file_path = os.path.join(log_dir, 'mdsd.err')
+    err_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
 
     update_selinux_settings_for_rsyslogomazuremds(RunGetOutput, WorkDir)
 
-    mdsd_log_path = os.path.join(WorkDir, "mdsd.log")
-    mdsd_log = None
+    mdsd_stdout_redirect_path = os.path.join(WorkDir, "mdsd.log")
+    mdsd_stdout_stream = None
     copy_env = os.environ
     copy_env['LD_LIBRARY_PATH'] = MdsdFolder
     distConfig.extend_environment(copy_env)
@@ -362,7 +365,7 @@ def start_mdsd():
         xml_file,
         MDSD_LISTEN_PORT,
         MDSDRoleName,
-        monitor_file_path,
+        err_file_path,
         warn_file_path,
         info_file_path).split(" ")
 
@@ -374,12 +377,12 @@ def start_mdsd():
         while num_quick_consecutive_crashes < 3:  # We consider only quick & consecutive crashes for retries
 
             RunGetOutput("rm -f " + MDSDPidPortFile)  # Must delete any existing port num file
-            mdsd_log = open(mdsd_log_path, "w")
+            mdsd_stdout_stream = open(mdsd_stdout_redirect_path, "w")
             hutil.log("Start mdsd " + str(command))
             mdsd = subprocess.Popen(command,
                                     cwd=WorkDir,
-                                    stdout=mdsd_log,
-                                    stderr=mdsd_log,
+                                    stdout=mdsd_stdout_stream,
+                                    stderr=mdsd_stdout_stream,
                                     env=copy_env)
 
             with open(MDSDPidFile, "w") as pidfile:
@@ -389,9 +392,7 @@ def start_mdsd():
 
             last_mdsd_start_time = datetime.datetime.now()
             last_error_time = last_mdsd_start_time
-            omi_installed = True
-            omicli_path = "/opt/omi/bin/omicli"
-            omicli_noop_query_cmd = omicli_path + " noop"
+            omi_installed = True  # Remembers if OMI is installed at each iteration
             # Continuously monitors mdsd process
             while True:
                 time.sleep(30)
@@ -401,90 +402,33 @@ def start_mdsd():
                     return
                 if mdsd.poll() is not None:  # if mdsd has terminated
                     time.sleep(60)
-                    mdsd_log.flush()
+                    mdsd_stdout_stream.flush()
                     break
 
-                # mdsd is now up for at least 30 seconds.
-
-                # Mitigate if memory leak is suspected.
+                # mdsd is now up for at least 30 seconds. Do some monitoring activities.
+                # 1. Mitigate if memory leak is suspected.
                 mdsd_memory_leak_suspected, mdsd_memory_usage_in_KB = check_suspected_memory_leak(mdsd.pid, hutil.error)
                 if mdsd_memory_leak_suspected:
-                    memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
-                                      "Recycling mdsd to self-mitigate.".format(int((mdsd_memory_usage_in_KB+1023)/1024))
-                    hutil.log(memory_leak_msg)
-                    # Add a telemetry for a possible statistical analysis
-                    waagent.AddExtensionEvent(name=hutil.get_name(),
-                                              op=waagent.WALAEventOperation.HeartBeat,
-                                              isSuccess=True,
-                                              version=hutil.get_extension_version(),
-                                              message=memory_leak_msg)
-                    mdsd.kill()
+                    g_lad_log_helper.log_suspected_memory_leak_and_kill_mdsd(mdsd_memory_usage_in_KB, mdsd,
+                                                                             waagent.AddExtensionEvent)
                     break
+                # 2. Restart OMI if it crashed (Issue #128)
+                omi_installed = restart_omi_if_crashed(omi_installed, mdsd)
+                # 3. Check if there's any new logs in mdsd.err and report
+                last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
 
-                # Issue #128 LAD should restart OMI if it crashes
-                omi_was_installed = omi_installed  # Remember the OMI install status from the last iteration
-                omi_installed = os.path.isfile(omicli_path)
-
-                if omi_was_installed and not omi_installed:
-                    hutil.log(
-                        "OMI is uninstalled. This must have been intentional and externally done. Will no longer check if OMI is up and running.")
-
-                omi_reinstalled = not omi_was_installed and omi_installed
-                if omi_reinstalled:
-                    hutil.log("OMI is reinstalled. Will resume checking if OMI is up and running.")
-
-                should_restart_omi = False
-                if omi_installed:
-                    cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
-                    should_restart_omi = cmd_exit_status is not 0
-                    if should_restart_omi:
-                        hutil.error(
-                            "OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
-                        omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
-                        hutil.log("OMI restart result: " + omi_restart_msg)
-                        time.sleep(5)
-
-                should_signal_mdsd = should_restart_omi or omi_reinstalled
-                if should_signal_mdsd:
-                    omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
-                    if omi_up_and_running:
-                        mdsd.send_signal(signal.SIGHUP)
-                        hutil.log("SIGHUP sent to mdsd")
-                    else:  # OMI restarted but not staying up...
-                        log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
-                        hutil.error(log_msg)
-                        # Also log this issue on syslog as well
-                        syslog.openlog('diagnostic.py', syslog.LOG_PID,
-                                       syslog.LOG_DAEMON)  # syslog.openlog(ident, logoption, facility) -- not taking kw args in Python 2.6
-                        syslog.syslog(syslog.LOG_ALERT,
-                                      log_msg)  # syslog.syslog(priority, message) -- not taking kw args
-                        syslog.closelog()
-
-                if not os.path.exists(monitor_file_path):
-                    continue
-                monitor_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(monitor_file_path))),
-                                                                "%a %b %d %H:%M:%S %Y")
-                if last_error_time >= monitor_file_ctime:
-                    continue
-                last_error_time = monitor_file_ctime
-                last_error = tail(monitor_file_path)
-                if len(last_error) > 0 and (datetime.datetime.now() - last_error_time) < datetime.timedelta(minutes=30):
-                    hutil.log("Error in MDSD:" + last_error)
-                    hutil.do_status_report(ExtensionOperationType, "success", '1',
-                                           "message in /var/log/mdsd.err:" + str(last_error_time) + ":" + last_error)
-
-            # mdsd terminated.
-            if mdsd_log:
-                mdsd_log.close()
-                mdsd_log = None
+            # Out of the inner while loop: mdsd terminated.
+            if mdsd_stdout_stream:
+                mdsd_stdout_stream.close()
+                mdsd_stdout_stream = None
 
             # Check if this is NOT a quick crash -- we consider a crash quick
             # if it's within 30 minutes from the start time. If it's not quick,
             # we just continue by restarting mdsd.
             mdsd_up_time = datetime.datetime.now() - last_mdsd_start_time
             if mdsd_up_time > datetime.timedelta(minutes=30):
-                mdsd_terminated_msg = "MDSD terminated after " + str(mdsd_up_time) + ". " + tail(mdsd_log_path) + tail(
-                    monitor_file_path)
+                mdsd_terminated_msg = "MDSD terminated after " + str(mdsd_up_time) + ". "\
+                                      + tail(mdsd_stdout_redirect_path) + tail(err_file_path)
                 hutil.log(mdsd_terminated_msg)
                 num_quick_consecutive_crashes = 0
                 continue
@@ -492,7 +436,7 @@ def start_mdsd():
             # It's a quick crash. Log error and add an extension event.
             num_quick_consecutive_crashes += 1
 
-            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_log_path) + tail(monitor_file_path)
+            error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_stdout_redirect_path) + tail(err_file_path)
             hutil.error("MDSD crashed:" + error)
 
             # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
@@ -511,8 +455,8 @@ def start_mdsd():
             pass
 
     except Exception as e:
-        if mdsd_log:
-            hutil.error("Error :" + tail(mdsd_log_path))
+        if mdsd_stdout_stream:
+            hutil.error("Error :" + tail(mdsd_stdout_redirect_path))
         hutil.error(("Failed to launch mdsd with error:{0},"
                      "stacktrace:{1}").format(e, traceback.format_exc()))
         hutil.do_status_report(ExtensionOperationType, 'error', '1', 'Launch script failed:{0}'.format(e))
@@ -522,8 +466,32 @@ def start_mdsd():
                                   version=hutil.get_extension_version(),
                                   message="Launch script failed:" + str(e))
     finally:
-        if mdsd_log:
-            mdsd_log.close()
+        if mdsd_stdout_stream:
+            mdsd_stdout_stream.close()
+
+
+def report_new_mdsd_errors(err_file_path, last_error_time):
+    """
+    Monitors if there's any new stuff in mdsd.err and report it if any through the agent/ext status report mechanism.
+    :param err_file_path: Path of the mdsd.err file
+    :param last_error_time: Time when last error was reported.
+    :return: Time when the last error was reported. Same as the argument if there's no error reported in this call.
+             A new time (error file ctime) if a new error is reported.
+    """
+    if not os.path.exists(err_file_path):
+        return last_error_time
+    err_file_ctime = datetime.datetime.strptime(time.ctime(int(os.path.getctime(err_file_path))), "%a %b %d %H:%M:%S %Y")
+    if last_error_time >= err_file_ctime:
+        return last_error_time
+    # No new error above. A new error below.
+    last_error_time = err_file_ctime
+    last_error = tail(err_file_path)
+    if len(last_error) > 0 and (datetime.datetime.now() - last_error_time) < datetime.timedelta(minutes=30):
+        # Only recent error logs (within 30 minutes) are reported.
+        hutil.log("Error in MDSD:" + last_error)
+        hutil.do_status_report(ExtensionOperationType, "success", '1',
+                               "message in mdsd.err:" + str(last_error_time) + ":" + last_error)
+    return last_error_time
 
 
 def stop_mdsd():
@@ -649,6 +617,61 @@ def uninstall_omi():
         RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
     hutil.log("omi will not be uninstalled")
     return 0, "do nothing"
+
+
+# Issue #128 LAD should restart OMI if it crashes
+def restart_omi_if_crashed(omi_installed, mdsd):
+    """
+    Restart OMI if it crashed. Called from the main monitoring loop.
+    :param omi_installed: bool indicating whether OMI was installed at the previous iteration.
+    :param mdsd: Python Process object for the mdsd process, because it might need to be signaled.
+    :return: bool indicating whether OMI was installed at this iteration (from this call)
+    """
+    omicli_path = "/opt/omi/bin/omicli"
+    omicli_noop_query_cmd = omicli_path + " noop"
+    omi_was_installed = omi_installed  # Remember the OMI install status from the last iteration
+    omi_installed = os.path.isfile(omicli_path)
+
+    if omi_was_installed and not omi_installed:
+        hutil.log("OMI is uninstalled. This must have been intentional and externally done. "
+                  "Will no longer check if OMI is up and running.")
+
+    omi_reinstalled = not omi_was_installed and omi_installed
+    if omi_reinstalled:
+        hutil.log("OMI is reinstalled. Will resume checking if OMI is up and running.")
+
+    should_restart_omi = False
+    if omi_installed:
+        cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+        should_restart_omi = cmd_exit_status is not 0
+        if should_restart_omi:
+            hutil.error("OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. "
+                        "Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
+            omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
+            hutil.log("OMI restart result: " + omi_restart_msg)
+            time.sleep(5)
+
+    # mdsd needs to be signaled if OMI was restarted or reinstalled because mdsd used to give up connecting to OMI
+    # if it fails first time, and never retried until signaled. mdsd was fixed to retry now, but it's still
+    # limited (stops retrying beyond 30 minutes or so) and backoff-ed exponentially
+    # so it's still better to signal anyway.
+    should_signal_mdsd = should_restart_omi or omi_reinstalled
+    if should_signal_mdsd:
+        omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
+        if omi_up_and_running:
+            mdsd.send_signal(signal.SIGHUP)
+            hutil.log("SIGHUP sent to mdsd")
+        else:  # OMI restarted but not staying up...
+            log_msg = "OMI restarted but not staying up. Will be restarted in the next iteration."
+            hutil.error(log_msg)
+            # Also log this issue on syslog as well
+            syslog.openlog('diagnostic.py', syslog.LOG_PID,
+                           syslog.LOG_DAEMON)  # syslog.openlog(ident, logoption, facility) -- not taking kw args in Python 2.6
+            syslog.syslog(syslog.LOG_ALERT,
+                          log_msg)  # syslog.syslog(priority, message) -- not taking kw args
+            syslog.closelog()
+
+    return omi_installed
 
 
 rsyslog_om_mdsd_syslog_conf_prefix = "/etc/rsyslog.d/10-omazurelinuxmds"

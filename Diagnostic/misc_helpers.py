@@ -52,6 +52,12 @@ def get_storage_endpoint_with_account(account, endpoint_without_account):
 
 
 def check_suspected_memory_leak(pid, logger_err):
+    """
+    Check suspected memory leak of a process, by inspecting /proc/<pid>/status's VmRSS value.
+    :param pid: ID of the process we are checking.
+    :param logger_err: Error logging function (e.g., hutil.error)
+    :return (bool, int): Bool indicating whether memory leak is suspected. Int for memory usage in KB in true case.
+    """
     memory_leak_threshold_in_KB = 2000000  # Roughly 2GB. TODO: Make it configurable or automatically calculated
     memory_usage_in_KB = 0
     memory_leak_suspected = False
@@ -70,6 +76,46 @@ def check_suspected_memory_leak(pid, logger_err):
         logger_err("Failed to check memory usage of pid={0}.\nError: {1}\nTrace:\n{2}".format(pid, e, traceback.format_exc()))
 
     return memory_leak_suspected, memory_usage_in_KB
+
+
+class LadLogHelper(object):
+    """
+    Various LAD log helper functions encapsulated here, so that we don't have to tag along all the parameters.
+    """
+
+    def __init__(self, logger_log, logger_error, waagent_event_adder, ext_name, ext_ver):
+        """
+        Constructor
+        :param logger_log: Normal logging function (e.g., hutil.log)
+        :param logger_error: Error logging function (e.g., hutil.error)
+        :param waagent_event_adder: waagent event add function (waagent.AddExtensionEvent)
+        :param ext_name: Extension name (hutil.get_name())
+        :param ext_ver: Extension version (hutil.get_extension_version())
+        """
+        self._logger_log = logger_log
+        self._logger_error = logger_error
+        self._waagent_event_adder = waagent_event_adder
+        self._ext_name = ext_name
+        self._ext_ver = ext_ver
+
+    def log_suspected_memory_leak_and_kill_mdsd(self, memory_usage_in_KB, mdsd_process, ext_op):
+        """
+        Log suspected-memory-leak message both in ext logs and as a waagent event.
+        :param memory_usage_in_KB: Memory usage in KB (to be included in the log)
+        :param mdsd_process: Python Process object for the mdsd process to kill
+        :param ext_op: Extension operation type to use for waagent event (waagent.waagent.WALAEventOperation.HeartBeat)
+        :return: None
+        """
+        memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
+                          "Recycling mdsd to self-mitigate.".format(int((memory_usage_in_KB + 1023) / 1024))
+        self._logger_log(memory_leak_msg)
+        # Add a telemetry for a possible statistical analysis
+        self._waagent_event_add(name=self._ext_name,
+                                op=ext_op,
+                                isSuccess=True,
+                                version=self._ext_ver,
+                                message=memory_leak_msg)
+        mdsd_process.kill()
 
 
 def read_uuid(run_command):
