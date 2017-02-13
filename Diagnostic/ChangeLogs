@@ -1,3 +1,7 @@
+2017-02-13: LAD-2.3.9023
+    - Fix /etc/fstab watcher util issues
+    - Add IMDS probing support (per request)
+
 2017-01-13: LAD-2.3.9021
     - Fix rsyslogd core dump issue when re-enabling the extension
     - Self-mitigate suspected mdsd memory leaks
