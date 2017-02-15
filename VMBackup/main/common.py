@@ -81,14 +81,12 @@ class CommonVariables:
     FailedPrepostPluginhostPreTimeout = 1110
     FailedPrepostPluginhostPostTimeout = 1111
     FailedPrepostCheckSumMismatch = 1112
-    FailedPrepostPreScriptOwnershipError = 1113
-    FailedPrepostPostScriptOwnershipError = 1114
-    FailedPrepostPluginhostConfigNotFound = 1115
-    FailedPrepostPluginhostConfigPermissionError = 1116
-    FailedPrepostPluginhostConfigOwnershipError = 1117
-    FailedPrepostPluginConfigNotFound = 1118
-    FailedPrepostPluginConfigPermissionError = 1119
-    FailedPrepostPluginConfigOwnershipError = 1120
+    FailedPrepostPluginhostConfigNotFound = 1113
+    FailedPrepostPluginhostConfigPermissionError = 1114
+    FailedPrepostPluginhostConfigOwnershipError = 1115
+    FailedPrepostPluginConfigNotFound = 1116
+    FailedPrepostPluginConfigPermissionError = 1117
+    FailedPrepostPluginConfigOwnershipError = 1118
 
     @staticmethod
     def isTerminalStatus(status):

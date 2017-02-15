@@ -53,7 +53,7 @@ class ScriptRunnerResult(object):
 
 class ScriptRunner(object):
     """ description of class """
-    def __init__(self, logger, name, configPath):
+    def __init__(self, logger, name, configPath, maxTimeOut):
         self.logger = logger
         self.timeoutInSeconds = 10
         self.pollSleepTime = 3
@@ -69,10 +69,10 @@ class ScriptRunner(object):
         self.postScriptNoOfRetries = 0
         self.configLoaded = False
         self.PreScriptCompletedSuccessfully = False
-        self.get_config()
+        self.get_config(maxTimeOut)
         self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount), True, 'Info')
 
-    def get_config(self):
+    def get_config(self, maxTimeOut):
         """
             Get configuration information from config.json
 
@@ -80,10 +80,10 @@ class ScriptRunner(object):
         try:
             with open(self.configLocation, 'r') as configFile:
                 configData = json.load(configFile)
-            self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.timeoutInSeconds)
+            self.timeoutInSeconds = min(configData['timeoutInSeconds'],maxTimeOut)
             self.pluginName = configData['pluginName']
-            self.preScriptLocation = configData['preScriptLocation']
-            self.postScriptLocation = configData['postScriptLocation']
+            self.preScriptLocation = '/etc/azure/' + configData['preScriptLocation']
+            self.postScriptLocation = '/etc/azure/' + configData['postScriptLocation']
             self.preScriptParams = configData['preScriptParams']
             self.postScriptParams = configData['postScriptParams']
             self.continueBackupOnFailure = configData['continueBackupOnFailure']
@@ -120,6 +120,64 @@ class ScriptRunner(object):
 
         return valid_permissions
 
+    def validate_scripts(self, pluginIndex, preScriptCompleted, preScriptResult):
+        scripts_in_desired_state = False
+        result = ScriptRunnerResult()
+
+        if not os.path.isfile(self.preScriptLocation):
+            self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPreScriptNotFound
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+        if not self.validate_permissions(self.preScriptLocation):
+            self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+
+        if not self.find_owner(self.preScriptLocation) == 'root':
+            self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+        if not os.path.isfile(self.postScriptLocation):
+            self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPostScriptNotFound
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+        if not self.validate_permissions(self.postScriptLocation):
+            self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+        if not self.find_owner(self.postScriptLocation) == 'root':
+            self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+            return scripts_in_desired_state
+
+        scripts_validated = True
+        return scripts_validated
+
+
+
     def pre_script(self, pluginIndex, preScriptCompleted, preScriptResult):
 
             # Generates a system call to run the prescript
@@ -139,29 +197,7 @@ class ScriptRunner(object):
             self.logger.log('Cant run prescript for '+self.pluginName+' . Config File error.', True, 'Error')
             return
 
-        if not os.path.isfile(self.preScriptLocation):
-            self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptNotFound
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return
-
-        if not self.validate_permissions(self.preScriptLocation):
-            self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return
-
-
-        if not self.find_owner(self.preScriptLocation) == 'root':
-            self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptOwnershipError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
+        if not self.validate_scripts(pluginIndex, preScriptCompleted, preScriptResult):
             return
 
         paramsStr = ['sh',str(self.preScriptLocation)]
@@ -215,45 +251,16 @@ class ScriptRunner(object):
             # -- postScriptCompleted is a bool array, upon completion of script, true will be assigned at pluginIndex
             # -- postScriptResult is an array and it stores the result at pluginIndex
 
-        if not self.PreScriptCompletedSuccessfully:
-            self.logger.log('PreScript failed for ' + self.pluginName + ' .So, Postr Script is not triggered', True, 'Info')
-            return
-
         result = ScriptRunnerResult()
 
+        if not self.PreScriptCompletedSuccessfully:
+            self.logger.log('PreScript execution did not complete for ' + self.pluginName + ' .So, Post Script is not triggered', True, 'Info')
+            postScriptCompleted[pluginIndex] = True
+            result.continueBackup = self.continueBackupOnFailure
+            postScriptResult[pluginIndex] = result
+            return
+
         result.requiredNoOfRetries = self.postScriptNoOfRetries
-        if not self.configLoaded:
-            result.errorCode =  CommonVariables.FailedPrepostPluginConfigParsing
-            if os.path.isfile(self.configLocation):
-                result.continueBackup = False
-            postScriptCompleted[pluginIndex] = True
-            postScriptResult[pluginIndex] = result
-            self.logger.log('Cant run postscript for '+self.pluginName+' . Config File error.',True,'Error')
-            return
-
-        if not os.path.isfile(self.postScriptLocation):
-            self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptNotFound
-            result.continueBackup = self.continueBackupOnFailure
-            postScriptCompleted[pluginIndex] = True
-            postScriptResult[pluginIndex] = result
-            return
-
-        if not self.validate_permissions(self.postScriptLocation):
-            self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            postScriptCompleted[pluginIndex] = True
-            postScriptResult[pluginIndex] = result
-            return
-
-        if not self.find_owner(self.postScriptLocation) == 'root':
-            self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptOwnershipError
-            result.continueBackup = self.continueBackupOnFailure
-            postScriptCompleted[pluginIndex] = True
-            postScriptResult[pluginIndex] = result
-            return
 
         paramsStr = ['sh',str(self.postScriptLocation)]
         for param in self.postScriptParams:

@@ -29,14 +29,12 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginhostPreTimeout = 1110
     FailedPrepostPluginhostPostTimeout = 1111
     FailedPrepostCheckSumMismatch = 1112
-    FailedPrepostPreScriptOwnershipError = 1113
-    FailedPrepostPostScriptOwnershipError = 1114
-    FailedPrepostPluginhostConfigNotFound = 1115
-    FailedPrepostPluginhostConfigPermissionError = 1116
-    FailedPrepostPluginhostConfigOwnershipError = 1117
-    FailedPrepostPluginConfigNotFound = 1118
-    FailedPrepostPluginConfigPermissionError = 1119
-    FailedPrepostPluginConfigOwnershipError = 1120
+    FailedPrepostPluginhostConfigNotFound = 1113
+    FailedPrepostPluginhostConfigPermissionError = 1114
+    FailedPrepostPluginhostConfigOwnershipError = 1115
+    FailedPrepostPluginConfigNotFound = 1116
+    FailedPrepostPluginConfigPermissionError = 1117
+    FailedPrepostPluginConfigOwnershipError = 1118
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -62,8 +60,6 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedPrepostPluginhostPreTimeout : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPluginhostPostTimeout : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostCheckSumMismatch : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedPrepostPreScriptOwnershipError : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedPrepostPostScriptOwnershipError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigNotFound : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigPermissionError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigOwnershipError : Status.ExtVmHealthStateEnum.yellow,
@@ -100,8 +96,6 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedPrepostPluginhostPreTimeout : "FailedPrepostPluginhostPreTimeout",
             ExtensionErrorCodeEnum.FailedPrepostPluginhostPostTimeout : "FailedPrepostPluginhostPostTimeout",
             ExtensionErrorCodeEnum.FailedPrepostCheckSumMismatch : "FailedPrepostCheckSumMismatch",
-            ExtensionErrorCodeEnum.FailedPrepostPreScriptOwnershipError : "FailedPrepostPreScriptOwnershipError",
-            ExtensionErrorCodeEnum.FailedPrepostPostScriptOwnershipError : "FailedPrepostPostScriptOwnershipError",
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigNotFound : "FailedPrepostPluginhostConfigNotFound",
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigPermissionError : "FailedPrepostPluginhostConfigPermissionError",
             ExtensionErrorCodeEnum.FailedPrepostPluginhostConfigOwnershipError : "FailedPrepostPluginhostConfigOwnershipError",

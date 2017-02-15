@@ -59,7 +59,7 @@ class PluginHost(object):
         self.logger = logger
         self.modulesLoaded = False
         self.configLocation = './main/PluginHost.conf'
-        self.timeoutInSeconds = 600
+        self.timeoutInSeconds = 1800
         self.plugins = []
         self.pluginName = []
         self.noOfPlugins = 0
@@ -110,7 +110,7 @@ class PluginHost(object):
                 sys.path.append(ppath)
                 plugin = __import__(pname)
 
-                self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath))
+                self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
                 self.noOfPlugins = self.noOfPlugins + 1
                 self.pluginName.append(pname)
                 self.preScriptCompleted.append(False)
