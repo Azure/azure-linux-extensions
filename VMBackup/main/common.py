@@ -68,25 +68,25 @@ class CommonVariables:
     PrePost_ScriptStatus_Error = 1
     PrePost_ScriptStatus_Warning = 2
 
-    FailedPrepostPreScriptFailed = 1100
-    FailedPrepostPostScriptFailed = 1101
-    FailedPrepostPreScriptNotFound = 1102
-    FailedPrepostPostScriptNotFound = 1103
-    FailedPrepostPluginhostConfigParsing = 1104
-    FailedPrepostPluginConfigParsing = 1105
-    FailedPrepostPreScriptPermissionError = 1106
-    FailedPrepostPostScriptPermissionError = 1107
-    FailedPrepostPreScriptTimeout = 1108
-    FailedPrepostPostScriptTimeout = 1109
-    FailedPrepostPluginhostPreTimeout = 1110
-    FailedPrepostPluginhostPostTimeout = 1111
-    FailedPrepostCheckSumMismatch = 1112
-    FailedPrepostPluginhostConfigNotFound = 1113
-    FailedPrepostPluginhostConfigPermissionError = 1114
-    FailedPrepostPluginhostConfigOwnershipError = 1115
-    FailedPrepostPluginConfigNotFound = 1116
-    FailedPrepostPluginConfigPermissionError = 1117
-    FailedPrepostPluginConfigOwnershipError = 1118
+    FailedPrepostPreScriptFailed = 300
+    FailedPrepostPostScriptFailed = 301
+    FailedPrepostPreScriptNotFound = 302
+    FailedPrepostPostScriptNotFound = 303
+    FailedPrepostPluginhostConfigParsing = 304
+    FailedPrepostPluginConfigParsing = 305
+    FailedPrepostPreScriptPermissionError = 306
+    FailedPrepostPostScriptPermissionError = 307
+    FailedPrepostPreScriptTimeout = 308
+    FailedPrepostPostScriptTimeout = 309
+    FailedPrepostPluginhostPreTimeout = 310
+    FailedPrepostPluginhostPostTimeout = 311
+    FailedPrepostCheckSumMismatch = 312
+    FailedPrepostPluginhostConfigNotFound = 313
+    FailedPrepostPluginhostConfigPermissionError = 314
+    FailedPrepostPluginhostConfigOwnershipError = 315
+    FailedPrepostPluginConfigNotFound = 316
+    FailedPrepostPluginConfigPermissionError = 317
+    FailedPrepostPluginConfigOwnershipError = 318
 
     @staticmethod
     def isTerminalStatus(status):
