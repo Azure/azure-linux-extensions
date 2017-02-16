@@ -324,4 +324,4 @@ def get_distro_actions(name, version, logger):
         return DistroMap[name_and_version](logger)
     elif name in DistroMap:
         return DistroMap[name](logger)
-    raise exceptions.LookupError('{} is not a supported distro'.format(name_and_version))
+    raise exceptions.LookupError('{0} is not a supported distro'.format(name_and_version))

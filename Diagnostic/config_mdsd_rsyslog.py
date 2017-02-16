@@ -333,8 +333,8 @@ $InputRunFileMonitor
         #    - 2nd priority is to use the provided XML template stored in <ext_dir>/mdsdConfig.xml.template.
         mdsd_cfg_str = self._ext_settings.get_mdsd_cfg()
         if not mdsd_cfg_str:
-            with open(os.path.join(self._ext_dir, './mdsdConfig.xml.template'), "r") as defaul_mdsd_config_file:
-                mdsd_cfg_str = defaul_mdsd_config_file.read()
+            with open(os.path.join(self._ext_dir, './mdsdConfig.xml.template'), "r") as f:
+                mdsd_cfg_str = f.read()
         self._mdsd_config_xml_tree = ET.ElementTree()
         self._mdsd_config_xml_tree._setroot(XmlUtil.createElement(mdsd_cfg_str))
 
@@ -342,6 +342,7 @@ $InputRunFileMonitor
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
+        # 2.1. Apply resourceId attribute to LADQuery elements
         try:
             resource_id = self._ext_settings.get_resource_id()
             if resource_id:

@@ -83,18 +83,20 @@ class LadLogHelper(object):
     Various LAD log helper functions encapsulated here, so that we don't have to tag along all the parameters.
     """
 
-    def __init__(self, logger_log, logger_error, waagent_event_adder, ext_name, ext_ver):
+    def __init__(self, logger_log, logger_error, waagent_event_adder, status_reporter, ext_name, ext_ver):
         """
         Constructor
         :param logger_log: Normal logging function (e.g., hutil.log)
         :param logger_error: Error logging function (e.g., hutil.error)
         :param waagent_event_adder: waagent event add function (waagent.AddExtensionEvent)
+        :param status_reporter: waagent/extension status report function (hutil.do_status_report)
         :param ext_name: Extension name (hutil.get_name())
         :param ext_ver: Extension version (hutil.get_extension_version())
         """
         self._logger_log = logger_log
         self._logger_error = logger_error
         self._waagent_event_adder = waagent_event_adder
+        self._status_reporter = status_reporter
         self._ext_name = ext_name
         self._ext_ver = ext_ver
 
@@ -103,7 +105,7 @@ class LadLogHelper(object):
         Log suspected-memory-leak message both in ext logs and as a waagent event.
         :param memory_usage_in_KB: Memory usage in KB (to be included in the log)
         :param mdsd_process: Python Process object for the mdsd process to kill
-        :param ext_op: Extension operation type to use for waagent event (waagent.waagent.WALAEventOperation.HeartBeat)
+        :param ext_op: Extension operation type to use for waagent event (waagent.WALAEventOperation.HeartBeat)
         :return: None
         """
         memory_leak_msg = "Suspected mdsd memory leak (Virtual memory usage: {0}MB). " \
@@ -116,6 +118,22 @@ class LadLogHelper(object):
                                 version=self._ext_ver,
                                 message=memory_leak_msg)
         mdsd_process.kill()
+
+    def report_mdsd_dependency_setup_failure(self, ext_event_type, failure_msg):
+        """
+        Report mdsd dependency setup failure to 3 destinations (ext log, status report, agent event)
+        :param ext_event_type: Type of extension event being performed (e.g., 'HeartBeat')
+        :param failure_msg: Dependency setup failure message to be added to the logs
+        :return: None
+        """
+        dependencies_err_log_msg = "Failed to set up mdsd dependencies: {0}".format(failure_msg)
+        self._logger_error(dependencies_err_log_msg)
+        self._status_reporter(ext_event_type, 'error', '1', dependencies_err_log_msg)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_event_type,
+                                  isSuccess=False,
+                                  version=self._ext_ver,
+                                  message=dependencies_err_log_msg)
 
 
 def read_uuid(run_command):
@@ -201,3 +219,17 @@ def get_deployment_id_from_hosting_env_cfg(waagent_dir, logger_log, logger_error
         logger_error("Failed to retrieve deployment ID. Error:{0}\nStacktrace: {1}".format(e, traceback.format_exc()))
 
     return identity
+
+
+def write_lad_pids_to_file(pid_file_path, py_pid, mdsd_pid=None):
+    """
+    Write LAD process IDs to file
+    :param int py_pid: PID of diagnostic.py
+    :param int mdsd_pid: PID of mdsd or None (when called before mdsd is started)
+    :param str pid_file_path: Path of the file to be written
+    :return: None
+    """
+    with open(pid_file_path, 'w') as f:
+        f.write(str(py_pid) + '\n')
+        if mdsd_pid is not None:
+            f.write(str(mdsd_pid) + '\n')
