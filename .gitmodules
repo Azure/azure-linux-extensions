@@ -6,4 +6,4 @@
 	url = https://github.com/giampaolo/psutil.git
 [submodule "VMEncryption/transitions"]
 	path = VMEncryption/transitions
-	url = git@github.com:tyarkoni/transitions.git
+	url = https://github.com/tyarkoni/transitions.git
