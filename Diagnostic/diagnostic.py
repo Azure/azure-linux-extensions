@@ -114,6 +114,7 @@ def init_globals():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("LinuxAzureDiagnostic started to handle.")
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
+    init_extension_settings()
     init_distro_specific_actions()
 
     g_ext_dir = os.getcwd()
@@ -124,7 +125,6 @@ def init_globals():
     g_imfile_config_filename = os.path.join(g_ext_dir, 'imfileconfig')
     g_lad_log_helper = LadLogHelper(hutil.log, hutil.error, waagent.AddExtensionEvent, hutil.do_status_report,
                                     hutil.get_name(), hutil.get_extension_version())
-    init_extension_settings()
 
 
 def setup_dependencies_and_mdsd():
