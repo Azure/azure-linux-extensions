@@ -362,14 +362,27 @@ def daemon():
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
 
                 PluginHostObj = PluginHost(logger=backup_logger)
-                preResult = PluginHostObj.pre_script()
+                PluginHostErrorCode,dobackup = PluginHostObj.pre_check()
+                doFsConsistentbackup = False
+                if(PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound or
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigPermissionError):
+                    backup_logger.log('Triggering File System Consistent Backup', True)
+                    doFsConsistentbackup = True
 
-                if preResult.errorCode == CommonVariables.PrePost_PluginStatus_Success:
+                if not doFsConsistentbackup:
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
 
-                dobackup = preResult.continueBackup
-                if(g_fsfreeze_on == False and preResult.anyScriptFailed):
-                    dobackup = False
+                if not doFsConsistentbackup:
+                    preResult = PluginHostObj.pre_script()
+                    dobackup = preResult.continueBackup
+
+                    if(g_fsfreeze_on == False and preResult.anyScriptFailed):
+                        dobackup = False
+
                 if dobackup:
                     if(safe_freeze_on==True):
                         freeze_snapshot(thread_timeout)
@@ -399,22 +412,15 @@ def daemon():
                                     break;
                         backup_logger.log('unfreeze ends...')
 
-                postResult = PluginHostObj.post_script()
-                if not postResult.continueBackup:
-                    dobackup = False
+                if not doFsConsistentbackup:
+                    postResult = PluginHostObj.post_script()
+                    if not postResult.continueBackup:
+                        dobackup = False
                 
-                if(g_fsfreeze_on == False and postResult.anyScriptFailed):
-                    dobackup = False
+                    if(g_fsfreeze_on == False and postResult.anyScriptFailed):
+                        dobackup = False
 
-                if not dobackup:
-                    if preResult.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                        run_status = 'error'
-                        run_result = preResult.errorCode
-                        hutil.SetExtErrorCode(preResult.errorCode)
-                        error_msg = 'Plugin Host Failed.'
-                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                        backup_logger.log(error_msg, True)
-
+                if not doFsConsistentbackup:
                     if run_result == CommonVariables.success:
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
@@ -439,7 +445,7 @@ def daemon():
                                 backup_logger.log(error_msg, True)
                                 break
 
-                if run_result == CommonVariables.success and preResult.errorCode == 0 and not( preResult.anyScriptFailed or postResult.anyScriptFailed ):
+                if run_result == CommonVariables.success and not doFsConsistentbackup:
                     run_status = 'success'
                     run_result = CommonVariables.success_appconsistent
                     hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)

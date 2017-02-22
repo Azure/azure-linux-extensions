@@ -5,6 +5,7 @@ import os
 from pwd import getpwuid
 from stat import *
 from common import CommonVariables
+import traceback
 
 
     # config.json --------structure---------
@@ -69,10 +70,10 @@ class ScriptRunner(object):
         self.postScriptNoOfRetries = 0
         self.configLoaded = False
         self.PreScriptCompletedSuccessfully = False
-        self.get_config(maxTimeOut)
+        self.maxTimeOut = maxTimeOut
         self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount), True, 'Info')
 
-    def get_config(self, maxTimeOut):
+    def get_config(self):
         """
             Get configuration information from config.json
 
@@ -80,7 +81,7 @@ class ScriptRunner(object):
         try:
             with open(self.configLocation, 'r') as configFile:
                 configData = json.load(configFile)
-            self.timeoutInSeconds = min(configData['timeoutInSeconds'],maxTimeOut)
+            self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.maxTimeOut)
             self.pluginName = configData['pluginName']
             self.preScriptLocation = '/etc/azure/' + configData['preScriptLocation']
             self.postScriptLocation = '/etc/azure/' + configData['postScriptLocation']
@@ -92,18 +93,22 @@ class ScriptRunner(object):
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:
-            self.logger.log('Error in opening '+self.pluginName+' config file.',True,'Error')
+            errMsg = 'Error in opening ' + self.pluginName + ' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
         except ValueError as err:
-            self.logger.log('Error in decoding '+self.pluginName+' config file. '+str(err),True,'Error')
+            errMsg = 'Error in decoding ' + self.pluginName + ' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
         except KeyError as err:
-            self.logger.log('Error in fetching value for the key '+str(err) + ' in ' +self.pluginName+' config file.',True,'Error')
+            errMsg = 'Error in fetching value for the key '+str(err) + ' in ' +self.pluginName+' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
 
     def find_owner(self, filename):
         file_owner = ''
         try:
             file_owner = getpwuid(os.stat(filename).st_uid).pw_name
         except Exception as err:
-            self.logger.log('Error in fetching owner of the file : ' + filename + 'with error ' + str(err),True,'Error')
+            errMsg = 'Error in fetching owner of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
 
         return file_owner
 
@@ -112,71 +117,63 @@ class ScriptRunner(object):
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
             self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            if int(permissions[1]) > 0 : #validating permissions for group
+                valid_permissions = False
             if int(permissions[2]) > 0 : #validating permissions for others
                 valid_permissions = False
         except Exception as err:
-            self.logger.log('Error in fetching permissions of the file : ' + filename + 'with error ' + str(err),True,'Error')
+            errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
             valid_permissions = False
 
         return valid_permissions
 
-    def validate_scripts(self, pluginIndex, preScriptCompleted, preScriptResult):
-        scripts_in_desired_state = False
-        result = ScriptRunnerResult()
+    def validate_scripts(self):
+
+        errorCode = CommonVariables.PrePost_PluginStatus_Success
+        dobackup = True
+
+        self.get_config()
+
+        if not self.configLoaded:
+            errorCode = CommonVariables.FailedPrepostPluginConfigParsing
+            self.logger.log('Cant run prescript for '+self.pluginName+' . Config File error.', True, 'Error')
+            return errorCode,dobackup
+
+        dobackup = self.continueBackupOnFailure
 
         if not os.path.isfile(self.preScriptLocation):
             self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptNotFound
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPreScriptNotFound
+            return errorCode,dobackup
 
         if not self.validate_permissions(self.preScriptLocation):
             self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
+            return errorCode,dobackup
 
 
         if not self.find_owner(self.preScriptLocation) == 'root':
             self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
+            return errorCode,dobackup
 
         if not os.path.isfile(self.postScriptLocation):
             self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptNotFound
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPostScriptNotFound
+            return errorCode,dobackup
 
         if not self.validate_permissions(self.postScriptLocation):
             self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
+            return errorCode,dobackup
 
         if not self.find_owner(self.postScriptLocation) == 'root':
             self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
-            result.errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            result.continueBackup = self.continueBackupOnFailure
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            return scripts_in_desired_state
+            errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
+            return errorCode,dobackup
 
-        scripts_validated = True
-        return scripts_validated
-
-
+        return errorCode,dobackup
 
     def pre_script(self, pluginIndex, preScriptCompleted, preScriptResult):
 
@@ -188,17 +185,6 @@ class ScriptRunner(object):
 
         result = ScriptRunnerResult()
         result.requiredNoOfRetries = self.preScriptNoOfRetries
-        if not self.configLoaded:
-            result.errorCode = CommonVariables.FailedPrepostPluginConfigParsing
-            if os.path.isfile(self.configLocation):
-                result.continueBackup = False
-            preScriptCompleted[pluginIndex] = True
-            preScriptResult[pluginIndex] = result
-            self.logger.log('Cant run prescript for '+self.pluginName+' . Config File error.', True, 'Error')
-            return
-
-        if not self.validate_scripts(pluginIndex, preScriptCompleted, preScriptResult):
-            return
 
         paramsStr = ['sh',str(self.preScriptLocation)]
         for param in self.preScriptParams:
