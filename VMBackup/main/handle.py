@@ -364,17 +364,19 @@ def daemon():
                 PluginHostObj = PluginHost(logger=backup_logger)
                 PluginHostErrorCode,dobackup = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
-                if(PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
+
+                if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigPermissionError):
-                    backup_logger.log('Triggering File System Consistent Backup', True)
-                    doFsConsistentbackup = True
-
-                if not doFsConsistentbackup:
+                    backup_logger.log('App Consistent Consistent Backup Enabled', True)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+
+                if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                    backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
+                    doFsConsistentbackup = True
 
                 if not doFsConsistentbackup:
                     preResult = PluginHostObj.pre_script()
@@ -420,7 +422,15 @@ def daemon():
                     if(g_fsfreeze_on == False and postResult.anyScriptFailed):
                         dobackup = False
 
-                if not doFsConsistentbackup:
+                if not dobackup:
+                    if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
+                        run_status = 'error'
+                        run_result = PluginHostErrorCode
+                        hutil.SetExtErrorCode(PluginHostErrorCode)
+                        error_msg = 'Plugin Host Precheck Failed'
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)
+
                     if run_result == CommonVariables.success:
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
@@ -445,7 +455,7 @@ def daemon():
                                 backup_logger.log(error_msg, True)
                                 break
 
-                if run_result == CommonVariables.success and not doFsConsistentbackup:
+                if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
                     run_status = 'success'
                     run_result = CommonVariables.success_appconsistent
                     hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)

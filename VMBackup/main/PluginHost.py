@@ -77,7 +77,7 @@ class PluginHost(object):
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
             self.configLocation = './main/PluginHost.conf'
-
+        
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
             errorCode =CommonVariables.FailedPrepostPluginhostConfigNotFound
@@ -108,12 +108,11 @@ class PluginHost(object):
                 self.timeoutInSeconds = min(int(config.get('pre_post','timeoutInSeconds')),self.timeoutInSeconds)
             if (config.has_option('pre_post', 'numberOfPlugins')):
                 len = int(config.get('pre_post','numberOfPlugins'))
-        
+ 
             self.logger.log('timeoutInSeconds: '+str(self.timeoutInSeconds),True,'Info')
             self.logger.log('numberOfPlugins: '+str(len),True,'Info')
 
-        
-            while self.noOfPlugins < len:
+            while len > 0:
                 pname = config.get('pre_post','pluginName'+str(self.noOfPlugins))
                 ppath = config.get('pre_post','pluginPath'+str(self.noOfPlugins))
                 pcpath = config.get('pre_post','pluginConfigPath'+str(self.noOfPlugins))
@@ -145,6 +144,7 @@ class PluginHost(object):
                     self.postScriptCompleted.append(False)
                     self.postScriptResult.append(None)
 
+                len = len - 1
             if self.noOfPlugins != 0:
                 self.modulesLoaded = True
 
