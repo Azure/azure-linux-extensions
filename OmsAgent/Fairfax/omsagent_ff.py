@@ -21,6 +21,7 @@ import os.path
 import re
 import sys
 import traceback
+import tempfile
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -30,12 +31,13 @@ import Utils.ScriptUtil as ScriptUtil
 ExtensionShortName = "OmsAgentForLinux"
 
 PackagesDirectory = "packages"
-BundleFileName = 'omsagent-1.2.0-75.universal.x64.sh'
+BundleFileName = 'omsagent-1.3.1-15.universal.x64.sh'
 
 # always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
 InstallCommandTemplate = './{0} --upgrade --force'
 UninstallCommandTemplate = './{0} --remove'
 OmsAdminWorkingDirectory = '/opt/microsoft/omsagent/bin'
+WorkspaceCheckCommand = './omsadmin.sh -l'
 OnboardCommandWithOptionalParamsTemplate = './omsadmin.sh -d opinsights.azure.us -w {0} -s {1} {2}'
 ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
 DisableOmsAgentServiceCommand = './service_control disable'
@@ -67,11 +69,15 @@ def main():
             elif re.match("^([-/]*)(update)", a):
                 dummy_command("Update", "success", "Update succeeded")
     except Exception as e:
-        err_msg = ("Failed to enable the extension with error: {0}, "
-                   "{1}").format(e, traceback.format_exc())
+        exit_code = 1
+        err_msg = ("Failed with error: {0}, {1}").format(e, traceback.format_exc())
+        if "LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS" in str(e):
+            exit_code = 10
+            err_msg = ("Failed with error: {0}").format(e)
+
         waagent.Error(err_msg)
         hutil.error(err_msg)
-        hutil.do_exit(1, 'Enable','failed','0',
+        hutil.do_exit(exit_code, 'Enable','failed','0',
                       'Enable failed: {0}'.format(e))
 
 
@@ -116,10 +122,36 @@ def enable(hutil):
     workspaceKey = protected_settings.get("workspaceKey")
     proxy = protected_settings.get("proxy")
     vmResourceId = protected_settings.get("vmResourceId")
+    stopOnMultipleConnections = public_settings.get("stopOnMultipleConnections")
     if workspaceId is None:
         raise ValueError("Workspace ID cannot be None.")
     if workspaceKey is None:
         raise ValueError("Workspace key cannot be None.")
+
+    if stopOnMultipleConnections is not None and stopOnMultipleConnections is True:
+        output_file = tempfile.NamedTemporaryFile('w')
+        output_file.close()
+
+        list_exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(WorkspaceCheckCommand), OmsAdminWorkingDirectory, 'Check If Already Onboarded', ExtensionShortName, hutil.get_extension_version(), False, interval = 30, std_out_file_name = output_file.name)
+
+        # If the printout includes "No Workspace" then there are no workspaces onboarded to the machine
+        # Otherwise the workspaces that have been onboarded are listed in the output
+        output_file_handle = open(output_file.name, 'r')
+        connectionExists = False
+        if "No Workspace" not in output_file_handle.read():
+            connectionExists = True
+        output_file_handle.close()
+
+        if connectionExists:
+            err_msg = ("This machine is already connected to some other Log "
+                       "Analytics workspace, please set stopOnMultipleConnections "
+                       "to false in public settings or remove this property, "
+                       "so this machine can connect to new workspaces, also it "
+                       "means this machine will get billed multiple times for "
+                       "each workspace it report to. "
+                       "(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)")
+            # This exception will get caught by the main clause
+            raise Exception(err_msg)
 
     proxyParam = ""
     if proxy is not None:

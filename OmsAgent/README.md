@@ -19,10 +19,12 @@ OmsAgent Extension can:
 Schema for the public configuration file looks like this:
 
 * `workspaceId`: (required, string) the OMS workspace id to onboard to
+* `stopOnMultipleConnections`: (optional, true/false) warn and stop onboarding if the machine already has a workspace connection; defaults to false
  
 ```json
 {
-  "workspaceId": "<workspace-id (guid)>"
+  "workspaceId": "<workspace-id (guid)>",
+  "stopOnMultipleConnections": true/false
 }
 ```
 
@@ -113,12 +115,13 @@ $Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
 $Version = '<version>'
 
 $PublicConf = '{
-    "workspaceId": "<workspace id>"
+    "workspaceId": "<workspace id>",
+    "stopOnMultipleConnections": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
     "proxy": "<proxy string>",
-    "vmResourceId": "< vm resource id>"
+    "vmResourceId": "<vm resource id>"
 }'
 
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
@@ -149,7 +152,8 @@ $Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
 $Version = '<version>'
 
 $PublicConf = '{
-    "workspaceId": "<workspace id>"
+    "workspaceId": "<workspace id>",
+    "stopOnMultipleConnections": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
@@ -178,7 +182,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
     "type": "OmsAgentForLinux",
     "typeHandlerVersion": "1.0",
     "settings": {
-      "workspaceId": "<workspace id>"
+      "workspaceId": "<workspace id>",
+      "stopOnMultipleConnections": true/false
     },
     "protectedSettings": {
       "workspaceKey": "<workspace key>",
@@ -194,7 +199,8 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 ### 3.1 Onboard to OMS workspace
 ```json
 {
-  "workspaceId": "MyWorkspaceId"
+  "workspaceId": "MyWorkspaceId",
+  "stopOnMultipleConnections": true
 }
 ```
 ```json
