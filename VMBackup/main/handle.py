@@ -176,10 +176,15 @@ def freeze_snapshot(timeout):
         else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent  = snap_shotter.snapshotall(para_parser, freezer)
+            snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
             backup_logger.log('T:S snapshotall ends...')
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                if is_inconsistent :
+                if unable_to_sleep:
+                    run_result = CommonVariables.SleepFailed
+                    run_status = 'error'
+                    error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
+                    backup_logger.log(error_msg, True, 'Warning')
+                else if is_inconsistent :
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)

@@ -169,16 +169,10 @@ int main(int argc, char *argv[])
         {
             break;
         }
-        else if (sleep(1) != 0)
-        {
-           while(currenttime<starttime+i+1)
-           {
-                currenttime=time(NULL);
-           }
-        }
         else
         {
-            break;
+            sleep(1);
+            logger("sleep for 1 second \n");
         }
     }
     currenttime=time(NULL);
