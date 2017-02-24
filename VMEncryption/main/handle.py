@@ -155,14 +155,13 @@ def disable_encryption():
                       message='Decryption started')
 
     except Exception as e:
-        logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()),
-                   level=CommonVariables.ErrorLevel)
+        message = logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()), level=CommonVariables.ErrorLevel)
 
         hutil.do_exit(exit_code=0,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
-                      message='Decryption failed.')
+                      message=message)
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
