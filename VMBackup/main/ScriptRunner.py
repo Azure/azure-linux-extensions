@@ -68,10 +68,10 @@ class ScriptRunner(object):
         self.postScriptLocation = None
         self.preScriptNoOfRetries = 0
         self.postScriptNoOfRetries = 0
+        self.fsFreeze_on = True
         self.configLoaded = False
         self.PreScriptCompletedSuccessfully = False
         self.maxTimeOut = maxTimeOut
-        self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount), True, 'Info')
 
     def get_config(self):
         """
@@ -90,6 +90,7 @@ class ScriptRunner(object):
             self.continueBackupOnFailure = configData['continueBackupOnFailure']
             self.preScriptNoOfRetries = configData['preScriptNoOfRetries']
             self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
+            self.fsFreeze_on = configData['fsFreeze']
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:
@@ -134,6 +135,7 @@ class ScriptRunner(object):
         dobackup = True
 
         self.get_config()
+        self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount) +' preScriptParams:'+str(self.preScriptParams)+' postScriptParams:' + str(self.postScriptParams)+ ' continueBackupOnFailure:' + str(self.continueBackupOnFailure) + ' preScriptNoOfRetries:' + str(self.preScriptNoOfRetries) + ' postScriptNoOfRetries:' + str(self.postScriptNoOfRetries) + ' Global FS Freeze on :' + str(self.fsFreeze_on), True, 'Info')
 
         if not self.configLoaded:
             errorCode = CommonVariables.FailedPrepostPluginConfigParsing
@@ -173,7 +175,7 @@ class ScriptRunner(object):
             errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
             return errorCode,dobackup
 
-        return errorCode,dobackup
+        return errorCode,dobackup,self.fsFreeze_on
 
     def pre_script(self, pluginIndex, preScriptCompleted, preScriptResult):
 

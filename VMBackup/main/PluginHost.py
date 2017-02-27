@@ -73,6 +73,7 @@ class PluginHost(object):
         self.logger.log('Loading script modules now...',True,'Info')
         errorCode = CommonVariables.PrePost_PluginStatus_Success
         dobackup = True
+        fsFreeze_on = True
 
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
@@ -88,9 +89,9 @@ class PluginHost(object):
             self.logger.log('The owner of the Plugin host Config file ' + self.configLocation + ' is ' + self.find_owner(self.configLocation) + ' but not root', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPluginhostConfigPermissionError
         else :
-            errorCode,dobackup = self.load_modules()
+            errorCode,dobackup,fsFreeze_on = self.load_modules()
 
-        return errorCode,dobackup
+        return errorCode,dobackup,fsFreeze_on
 
     def load_modules(self):
 
@@ -99,6 +100,7 @@ class PluginHost(object):
         len = 0
         errorCode = CommonVariables.PrePost_PluginStatus_Success
         dobackup = True
+        fsFreeze_on = True
 
         try:
             self.logger.log('config file: '+str(self.configLocation),True,'Info')
@@ -108,7 +110,7 @@ class PluginHost(object):
                 self.timeoutInSeconds = min(int(config.get('pre_post','timeoutInSeconds')),self.timeoutInSeconds)
             if (config.has_option('pre_post', 'numberOfPlugins')):
                 len = int(config.get('pre_post','numberOfPlugins'))
- 
+
             self.logger.log('timeoutInSeconds: '+str(self.timeoutInSeconds),True,'Info')
             self.logger.log('numberOfPlugins: '+str(len),True,'Info')
 
@@ -116,6 +118,7 @@ class PluginHost(object):
                 pname = config.get('pre_post','pluginName'+str(self.noOfPlugins))
                 ppath = config.get('pre_post','pluginPath'+str(self.noOfPlugins))
                 pcpath = config.get('pre_post','pluginConfigPath'+str(self.noOfPlugins))
+                self.logger.log('Name of the Plugin is ' + pname, True)
                 self.logger.log('Plugin config path is ' + pcpath, True)
                 errorCode = CommonVariables.PrePost_PluginStatus_Success
                 dobackup = True
@@ -136,7 +139,7 @@ class PluginHost(object):
                     plugin = __import__(pname)
 
                     self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
-                    errorCode,dobackup = self.plugins[self.noOfPlugins].validate_scripts()
+                    errorCode,dobackup,fsFreeze_on = self.plugins[self.noOfPlugins].validate_scripts()
                     self.noOfPlugins = self.noOfPlugins + 1
                     self.pluginName.append(pname)
                     self.preScriptCompleted.append(False)
@@ -152,8 +155,8 @@ class PluginHost(object):
             errMsg = 'Error in reading PluginHost config file : %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
-            
-        return errorCode,dobackup
+
+        return errorCode,dobackup,fsFreeze_on
 
     def find_owner(self, filename):
         file_owner = ''

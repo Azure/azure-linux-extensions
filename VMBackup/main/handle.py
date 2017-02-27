@@ -302,8 +302,6 @@ def daemon():
         config.read(configfile)
         if (config.has_option('SnapshotThread','timeout')):
             thread_timeout = config.get('SnapshotThread','timeout')
-        if (config.has_option('SnapshotThread','fsfreeze')):
-            g_fsfreeze_on = config.getboolean('SnapshotThread','fsfreeze')
         if (config.has_option('SnapshotThread','safefreeze')):
             safe_freeze_on = config.getboolean('SnapshotThread','safefreeze')
     except Exception as ex:
@@ -362,7 +360,7 @@ def daemon():
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
 
                 PluginHostObj = PluginHost(logger=backup_logger)
-                PluginHostErrorCode,dobackup = PluginHostObj.pre_check()
+                PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
 
                 if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
