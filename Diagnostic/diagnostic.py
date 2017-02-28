@@ -196,11 +196,10 @@ def setup_dependencies_and_mdsd():
         hutil.error(install_package_error)
         return 2, install_package_error
 
-    if EnableSyslog:
-        error, msg = install_rsyslogom()
-        if error != 0:
-            hutil.error(msg)
-            return 3, msg
+    error, msg = install_rsyslogom()
+    if error != 0:
+        hutil.error(msg)
+        return 3, msg
 
     # Run mdsd prep commands
     if 'mdsd_prep_cmds' in distConfig:
@@ -586,8 +585,7 @@ def main(command):
             else:
                 stop_mdsd()
             uninstall_omi()
-            if EnableSyslog:
-                uninstall_rsyslogom()
+            uninstall_rsyslogom(condition=EnableSyslog)
             hutil.do_status_report(ExtensionOperationType, "success", '0', "Uninstall succeeded")
 
         elif ExtensionOperationType is waagent.WALAEventOperation.Install:
@@ -662,16 +660,28 @@ def start_watcher_thread():
 
 
 def start_mdsd():
-    global EnableSyslog, ExtensionOperationType
-    with open(MDSDPidFile, "w") as pidfile:
-         pidfile.write(str(os.getpid())+'\n')
-         pidfile.close()
-
     # Assign correct ext op type for correct ext status/event reporting.
     # start_mdsd() is called only through "./diagnostic.py -daemon"
     # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
     # type, so it needs to be reverted back to a standard one (which is "Enable").
     ExtensionOperationType = waagent.WALAEventOperation.Enable
+
+    # We first validate the mdsd config and proceed only when it succeeds.
+    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
+    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(MdsdFolder, "mdsd"), xml_file)
+    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
+    if config_validate_cmd_status is not 0:
+        # Invalid config. Log error and report success.
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
+                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
+        hutil.log(message)
+        hutil.do_status_report(ExtensionOperationType, 'success', '0', message)
+        return
+
+    global EnableSyslog, ExtensionOperationType
+    with open(MDSDPidFile, "w") as pidfile:
+         pidfile.write(str(os.getpid())+'\n')
+         pidfile.close()
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
@@ -692,8 +702,7 @@ def start_mdsd():
     if not omi_running:
         RunGetOutput("/opt/omi/bin/service_control restart")
 
-    if not EnableSyslog:
-        uninstall_rsyslogom()
+    uninstall_rsyslogom(condition=not EnableSyslog)
 
     log_dir = hutil.get_log_dir()
     monitor_file_path = os.path.join(log_dir, 'mdsd.err')
@@ -726,20 +735,7 @@ def start_mdsd():
             hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
             copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
-
-    # We now validate the config and proceed only when it succeeds.
-    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(MdsdFolder, "mdsd"), xml_file)
-    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
-    if config_validate_cmd_status is not 0:
-        # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
-                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
-        hutil.log(message)
-        # No need to do success status report (it's already done). Just silently return.
-        return
-
-    # Config validated. Prepare actual mdsd cmdline.
+    # Prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
@@ -871,12 +867,13 @@ def start_mdsd():
             error = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_log_path) + tail(monitor_file_path)
             hutil.error("MDSD crashed:"+error)
 
-            # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
+            # Need to reset rsyslog omazurelinuxmds config before retrying mdsd if syslog is enabled
             install_rsyslogom()
 
         # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report(ExtensionOperationType, "error", '1', "mdsd stopped:"+error)
-
+        # Also need to uninstall rsyslog-mdsd OM before returning if it was installed earlier
+        uninstall_rsyslogom(condition=EnableSyslog)
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=ExtensionOperationType,
@@ -1029,8 +1026,10 @@ def uninstall_omi():
 rsyslog_om_mdsd_syslog_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds.conf"
 rsyslog_om_mdsd_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-fileom.conf"
 
-def uninstall_rsyslogom():
-    #return RunGetOutput(distConfig['uninstallmdsd'])
+def uninstall_rsyslogom(condition):
+    if not condition:
+        return 0, 'rsyslog OM uninstall condition is not met. Not uninstalling.'
+
     error,rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
     match = re.search("(.*)"+rsyslog_ommodule_for_check,rsyslog_info)
@@ -1052,6 +1051,9 @@ def uninstall_rsyslogom():
 
 
 def install_rsyslogom():
+    if not EnableSyslog:
+        return 0, 'syslog is not enabled'
+
     error, rsyslog_info = RunGetOutput(distConfig['checkrsyslog'])
     rsyslog_om_path = None
     match = re.search("(.*)"+rsyslog_ommodule_for_check, rsyslog_info)
