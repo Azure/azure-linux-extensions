@@ -56,31 +56,34 @@ import ExtensionErrorCodeHelper
 
 def main():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array
-    run_result = CommonVariables.success
-    run_status = 'success'
-    error_msg = ''
-    freeze_result = None
-    snapshot_info_array = None
-    HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-    backup_logger = Backuplogger(hutil)
-    MyPatching = GetMyPatching(logger = backup_logger)
-    hutil.patching = MyPatching
+    try:
+        run_result = CommonVariables.success
+        run_status = 'success'
+        error_msg = ''
+        freeze_result = None
+        snapshot_info_array = None
+        HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+        HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+        hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
+        backup_logger = Backuplogger(hutil)
+        MyPatching = GetMyPatching(logger = backup_logger)
+        hutil.patching = MyPatching
     
-    for a in sys.argv[1:]:
-        if re.match("^([-/]*)(disable)", a):
-            disable()
-        elif re.match("^([-/]*)(uninstall)", a):
-            uninstall()
-        elif re.match("^([-/]*)(install)", a):
-            install()
-        elif re.match("^([-/]*)(enable)", a):
-            enable()
-        elif re.match("^([-/]*)(update)", a):
-            update()
-        elif re.match("^([-/]*)(daemon)", a):
-            daemon()
+        for a in sys.argv[1:]:
+            if re.match("^([-/]*)(disable)", a):
+                disable()
+            elif re.match("^([-/]*)(uninstall)", a):
+                uninstall()
+            elif re.match("^([-/]*)(install)", a):
+                install()
+            elif re.match("^([-/]*)(enable)", a):
+                enable()
+            elif re.match("^([-/]*)(update)", a):
+                update()
+            elif re.match("^([-/]*)(daemon)", a):
+                daemon()
+    except Exception as e:
+        sys.exit(0)
 
 def install():
     global hutil
@@ -165,6 +168,7 @@ def freeze_snapshot(timeout):
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array
         freeze_result = freezer.freeze_safe(timeout)
         all_failed= False
+        is_inconsistent =  False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.error
@@ -185,6 +189,7 @@ def freeze_snapshot(timeout):
                     error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
                     backup_logger.log(error_msg, True, 'Warning')
                 else if is_inconsistent :
+                    set_do_seq_flag()
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
@@ -387,6 +392,8 @@ def enable():
             exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
+        if(hutil.is_prev_in_transition()):
+            backup_logger.set_prev_log()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
             backup_logger.commit(para_parser.logsBlobUri)
         temp_status= 'transitioning'
@@ -394,6 +401,7 @@ def enable():
         temp_msg='Transitioning state in enable'
         status_report(temp_status, temp_result, temp_msg, None)
         start_daemon();
+        sys.exit(0)
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
