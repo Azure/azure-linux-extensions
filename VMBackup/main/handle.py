@@ -188,7 +188,7 @@ def freeze_snapshot(timeout):
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
                     backup_logger.log(error_msg, True, 'Warning')
-                else if is_inconsistent :
+                elif is_inconsistent == True :
                     set_do_seq_flag()
                     run_result = CommonVariables.error
                     run_status = 'error'
@@ -361,7 +361,6 @@ def enable():
                 mi.save_identity()
 
         hutil.exit_if_same_seq()
-        hutil.save_seq()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -394,6 +393,7 @@ def enable():
             taskIdentity.save_identity(para_parser.taskId)
         if(hutil.is_prev_in_transition()):
             backup_logger.set_prev_log()
+        hutil.save_seq()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
             backup_logger.commit(para_parser.logsBlobUri)
         temp_status= 'transitioning'

@@ -500,7 +500,7 @@ class HandlerUtility:
     def is_prev_in_transition(self):
         last_seq = self.get_last_seq()
         self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
-        status_file_prev = os.path.join(self._context._status_dir, last_seq + '.status')
+        status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
         searchfile = open(status_file_prev, "r")
         for line in searchfile:
             if "transition" in line: 
@@ -514,5 +514,5 @@ class HandlerUtility:
         if(len(lines) > 100):
             lines = lines[-100:]
             return ''.join(str(x) for x in lines)
-        else
+        else:
             return ''.join(str(x) for x in lines)
