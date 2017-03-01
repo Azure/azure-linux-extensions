@@ -23,6 +23,7 @@ import os
 import sys
 
 from OSEncryptionState import *
+from time import sleep
 
 class StripdownState(OSEncryptionState):
     def __init__(self, context):
@@ -72,8 +73,24 @@ class StripdownState(OSEncryptionState):
             # create the marker, but do not advance the state machine
             super(StripdownState, self).should_exit()
 
+            self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/*.mount', True)
+            self.command_executor.ExecuteInBash('rm -f /run/systemd/generator/local-fs.target.requires/*.mount', True)
+            self.command_executor.Execute("sed -i.bak '/rootvg/d' /etc/fstab", True)
+
+            self.command_executor.Execute('telinit u', True)
+
+            sleep(10)
+
+            if self.command_executor.Execute('mountpoint /var') == 0:
+                self.command_executor.Execute('umount /var', True)
+
             # the restarted process shall see the marker and advance the state machine
-            self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
+            self.command_executor.Execute('systemctl restart atd', True)
+
+            os.chdir('/')
+            with open("/restart-wala.sh", "w") as f:
+                f.write("systemctl restart waagent\n")
+            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
             self.context.hutil.do_exit(exit_code=0,
                                        operation='EnableEncryptionOSVolume',

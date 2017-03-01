@@ -47,6 +47,7 @@ class CommonVariables:
     """
     error code definitions
     """
+    success_appconsistent = 0
     success = 1
     ExtensionTempTerminalState = 4
     error_parameter = 11
@@ -57,8 +58,36 @@ class CommonVariables:
     error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
-    SleepFailed = 97
-    
+
+    """
+    Pre-Post Plugin error code definitions
+    """
+
+    PrePost_PluginStatus_Success = 0
+    PrePost_ScriptStatus_Success = 0
+    PrePost_ScriptStatus_Error = 1
+    PrePost_ScriptStatus_Warning = 2
+
+    FailedPrepostPreScriptFailed = 300
+    FailedPrepostPostScriptFailed = 301
+    FailedPrepostPreScriptNotFound = 302
+    FailedPrepostPostScriptNotFound = 303
+    FailedPrepostPluginhostConfigParsing = 304
+    FailedPrepostPluginConfigParsing = 305
+    FailedPrepostPreScriptPermissionError = 306
+    FailedPrepostPostScriptPermissionError = 307
+    FailedPrepostPreScriptTimeout = 308
+    FailedPrepostPostScriptTimeout = 309
+    FailedPrepostPluginhostPreTimeout = 310
+    FailedPrepostPluginhostPostTimeout = 311
+    FailedPrepostCheckSumMismatch = 312
+    FailedPrepostPluginhostConfigNotFound = 313
+    FailedPrepostPluginhostConfigPermissionError = 314
+    FailedPrepostPluginhostConfigOwnershipError = 315
+    FailedPrepostPluginConfigNotFound = 316
+    FailedPrepostPluginConfigPermissionError = 317
+    FailedPrepostPluginConfigOwnershipError = 318
+
     @staticmethod
     def isTerminalStatus(status):
         return (status==CommonVariables.status_success or status==CommonVariables.status_error)

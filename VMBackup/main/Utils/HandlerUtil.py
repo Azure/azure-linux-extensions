@@ -433,7 +433,7 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], status_code)
+        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
