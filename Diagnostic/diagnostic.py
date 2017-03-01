@@ -153,11 +153,10 @@ def setup_dependencies_and_mdsd():
         hutil.error(install_package_error)
         return 2, install_package_error
 
-    if g_enable_syslog:
-        error, msg = setup_rsyslog_for_mdsd()
-        if error != 0:
-            hutil.error(msg)
-            return 3, msg
+    error, msg = setup_rsyslog_for_mdsd()
+    if error != 0:
+        hutil.error(msg)
+        return 3, msg
 
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
@@ -245,8 +244,7 @@ def main(command):
             else:
                 stop_mdsd()
             tear_down_omi()
-            if g_enable_syslog:
-                tear_down_mdsd_rsyslog_setup()
+            tear_down_mdsd_rsyslog_setup(condition=g_enable_syslog)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
@@ -323,10 +321,24 @@ def start_mdsd():
     Start mdsd and monitor its activities. Report if it crashes or emits error logs.
     :return: None
     """
-    write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
 
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
+
+    # We first validate the mdsd config and proceed only when it succeeds.
+    xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
+    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
+    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
+    if config_validate_cmd_status is not 0:
+        # Invalid config. Log error and report success.
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
+            "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
+            "Config validation message: {0}.".format(config_validate_cmd_msg)
+        hutil.log(message)
+        hutil.do_status_report(waagent_ext_event_type, "success", '0', message)
+        return
+
+    write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
@@ -340,8 +352,7 @@ def start_mdsd():
     if not omi_running:
         RunGetOutput("/opt/omi/bin/service_control restart")
 
-    if not g_enable_syslog:
-        tear_down_mdsd_rsyslog_setup()
+    tear_down_mdsd_rsyslog_setup(condition=not g_enable_syslog)
 
     log_dir = hutil.get_log_dir()
     err_file_path = os.path.join(log_dir, 'mdsd.err')
@@ -361,21 +372,7 @@ def start_mdsd():
     if proxy_config:
         copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
-
-    # We now validate the config and proceed only when it succeeds.
-    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
-    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
-    if config_validate_cmd_status is not 0:
-        # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
-            "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
-            "Config validation message: {0}."
-        hutil.log(message.format(config_validate_cmd_msg))
-        # No need to do success status report (it's already done). Just silently return.
-        return
-
-    # Config validated. Prepare actual mdsd cmdline.
+    # Now prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}'.format(
         os.path.join(g_mdsd_bin_dir, "mdsd"),
         xml_file,
@@ -452,12 +449,13 @@ def start_mdsd():
             mdsd_crash_msg = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_stdout_redirect_path) + tail(err_file_path)
             hutil.error("MDSD crashed:" + mdsd_crash_msg)
 
-            # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
+            # Need to reset rsyslog omazurelinuxmds config before retrying mdsd if it was set up earlier
             setup_rsyslog_for_mdsd()
 
         # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped:" + mdsd_crash_msg)
-
+        # Also need to tear down rsyslog-mdsd OM before returning/exiting if it was set up earlier
+        tear_down_mdsd_rsyslog_setup(condition=g_enable_syslog)
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent_ext_event_type,
@@ -719,6 +717,11 @@ def setup_rsyslog_for_mdsd():
     4) Restart rsyslog
     :return: Status code (0 for success, non-zero for failure), message
     """
+
+    # Don't bother to set up rsyslog for mdsd if syslog is not enabled.
+    if not g_enable_syslog:
+        return 0, 'syslog is not enabled'
+
     rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
     if rsyslog_om_path is None:
         return 1, "rsyslog not installed"
@@ -744,17 +747,22 @@ sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
     return 0, "Setting up rsyslog for mdsd completed"
 
 
-def tear_down_mdsd_rsyslog_setup():
+def tear_down_mdsd_rsyslog_setup(condition):
     """
     Tear down mdsd-related rsyslog setup by doing the following:
     1) Remove mdsd rsyslog output module binary, config, and imfile config for mdsd destination
     2) Restart rsyslog
     :return: Status code and message
     """
+    # Don't bother to proceed if the passed condition is not met
+    if not condition:
+        return 0, 'rsyslog OM uninstall condition is not met. Not proceeding.'
+
     rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
     if os.path.exists(g_rsyslog_om_mdsd_conf_path):
-        cmd = "rm -f {0}/omazuremds.so {1} {2}"
-        RunGetOutput(cmd.format(rsyslog_om_path, g_rsyslog_om_mdsd_conf_path, g_rsyslog_im_file_conf_path))
+        cmd = "rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path, g_rsyslog_om_mdsd_conf_path,
+                                                       g_rsyslog_im_file_conf_path)
+        RunGetOutput(cmd)
     g_dist_config.restart_rsyslog()
     return 0, "rm omazurelinuxmds done"
 
