@@ -81,16 +81,25 @@ class ScriptRunner(object):
         try:
             with open(self.configLocation, 'r') as configFile:
                 configData = json.load(configFile)
-            self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.maxTimeOut)
-            self.pluginName = configData['pluginName']
+            configDataKeys = configData.keys()
+            if 'timeoutInSeconds' in configDataKeys:
+                self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.maxTimeOut)
+            if 'pluginName' in configDataKeys:
+                self.pluginName = configData['pluginName']
             self.preScriptLocation = configData['preScriptLocation']
             self.postScriptLocation = configData['postScriptLocation']
-            self.preScriptParams = configData['preScriptParams']
-            self.postScriptParams = configData['postScriptParams']
-            self.continueBackupOnFailure = configData['continueBackupOnFailure']
-            self.preScriptNoOfRetries = configData['preScriptNoOfRetries']
-            self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
-            self.fsFreeze_on = not configData['disableFsFreeze']
+            if 'preScriptParams' in configDataKeys:
+                self.preScriptParams = configData['preScriptParams']
+            if 'postScriptParams' in configDataKeys:
+                self.postScriptParams = configData['postScriptParams']
+            if 'continueBackupOnFailure' in configDataKeys:
+                self.continueBackupOnFailure = configData['continueBackupOnFailure']
+            if 'preScriptNoOfRetries' in configDataKeys:
+                self.preScriptNoOfRetries = configData['preScriptNoOfRetries']
+            if 'postScriptNoOfRetries' in configDataKeys:
+                self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
+            if 'disableFsFreeze' in configDataKeys:
+                self.fsFreeze_on = not configData['disableFsFreeze']
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:
