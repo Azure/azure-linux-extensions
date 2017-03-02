@@ -6,6 +6,7 @@
 	"postScriptLocation" : "",
 	"preScriptNoOfRetries" : 0,
 	"postScriptNoOfRetries" : 0,
+	"disableFsFreeze" : false,
 	"preScriptParams" : ["", ""],
 	"postScriptParams" : ["", ""]
 }

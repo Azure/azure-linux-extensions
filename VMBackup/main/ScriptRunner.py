@@ -83,14 +83,14 @@ class ScriptRunner(object):
                 configData = json.load(configFile)
             self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.maxTimeOut)
             self.pluginName = configData['pluginName']
-            self.preScriptLocation = '/etc/azure/' + configData['preScriptLocation']
-            self.postScriptLocation = '/etc/azure/' + configData['postScriptLocation']
+            self.preScriptLocation = configData['preScriptLocation']
+            self.postScriptLocation = configData['postScriptLocation']
             self.preScriptParams = configData['preScriptParams']
             self.postScriptParams = configData['postScriptParams']
             self.continueBackupOnFailure = configData['continueBackupOnFailure']
             self.preScriptNoOfRetries = configData['preScriptNoOfRetries']
             self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
-            self.fsFreeze_on = configData['fsFreeze']
+            self.fsFreeze_on = not configData['disableFsFreeze']
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:
