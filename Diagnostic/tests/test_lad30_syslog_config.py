@@ -1,7 +1,9 @@
 import unittest
 import json
+from xml.etree import ElementTree as ET
 
-from Utils.lad30_syslog_config import RsyslogMdsdConfig
+from Utils.lad30_syslog_config import *
+
 
 # "syslogEvents" LAD config example
 syslog_basic_json_ext_settings = """
@@ -319,6 +321,25 @@ class Lad30RsyslogConfigTest(unittest.TestCase):
         cfg = RsyslogMdsdConfig(None, None, fileLogs)
         self.assertEqual(filelogs_imfile_expected_output, cfg.get_imfile_config())
         self.assertEqual(filelogs_mdsd_expected_output, cfg.get_mdsd_filelog_config())
+
+    def test_copy_schema_source_mdsdevent_elems(self):
+        """
+        Tests whether copy_schema_source_mdsdevent_elems() works fine.
+        Uses syslog_mdsd_extended_expected_output and filelogs_mdsd_expected_output XML strings
+        to test the operation.
+        :return:  None
+        """
+        xml_string_srcs = [syslog_mdsd_extended_expected_output, filelogs_mdsd_expected_output]
+        dst_xml_tree = ET.parse('../mdsdConfig.xml.template')
+        map(lambda x: copy_schema_source_mdsdevent_elems(dst_xml_tree, x), xml_string_srcs)
+        # Just print the output for now (no easy XML comparison)
+        print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
+        print ET.tostring(dst_xml_tree.getroot())
+        print '==================================================================='
+        # And verify some elementary properties
+        self.assertEqual(2, len(dst_xml_tree.find('Schemas')))  # 2 Schema elements under Schemas
+        self.assertEqual(4, len(dst_xml_tree.find('Sources')))  # 4 Source elements under Sources
+        self.assertEqual(4, len(dst_xml_tree.find('Events/MdsdEvents')))  # 4 MdsdEventSource elements under Events/MdsdEvents
 
 
 if __name__ == '__main__':

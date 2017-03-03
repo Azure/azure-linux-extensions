@@ -1,8 +1,9 @@
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
- <Accounts>
- <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
- <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
- </Accounts>
+  <Accounts>
+    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+  </Accounts>
+
   <Management defaultRetentionInDays="90" eventVolume="">
     <Identity>
       <IdentityComponent name="DeploymentId" />
@@ -11,39 +12,18 @@
     <AgentResourceUsage diskQuotaInMB="50000" />
   </Management>
 
-    <Schemas>
-    <Schema name="syslog">
-      <Column mdstype="mt:wstr" name="Ignore" type="str" />
-      <Column mdstype="mt:wstr" name="Facility" type="str" />
-      <Column mdstype="mt:int32" name="Severity" type="str" />
-      <Column mdstype="mt:utc" name="EventTime" type="str-rfc3339" />
-      <Column mdstype="mt:wstr" name="SendingHost" type="str" />
-      <Column mdstype="mt:wstr" name="Msg" type="str" />
-    </Schema>
-
-    <Schema name="ladfile">
-      <Column mdstype="mt:wstr" name="FileTag" type="str" />
-      <Column mdstype="mt:wstr" name="Msg" type="str" />
-    </Schema>
-
+  <Schemas>
   </Schemas>
 
-
   <Sources>
-    <Source name="syslog_basic" schema="syslog" />
   </Sources>
 
- <Events>
+  <Events>
     <MdsdEvents>
-      <MdsdEventSource source="syslog_basic">
-        <RouteEvent dontUsePerNDayTable="true" eventName="LinuxSyslog" priority="High" />
-      </MdsdEventSource>
     </MdsdEvents>
 
-<OMI>
-</OMI>
+    <OMI>
+    </OMI>
+  </Events>
 
-
-</Events>
 </MonitoringManagement>
-

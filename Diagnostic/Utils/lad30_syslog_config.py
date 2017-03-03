@@ -16,6 +16,8 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from xml.etree import ElementTree as ET
+
 
 class RsyslogMdsdConfig:
     """
@@ -493,3 +495,40 @@ class LadSyslogConfigException(Exception):
     Custom exception class for LAD syslog config errors
     """
     pass
+
+
+def copy_sub_elems(dst_xml, src_xml, path):
+    """
+    Copy sub-elements of src_elem (XML) to dst_elem.
+    :param dst_xml: Python xml tree object to which sub-elements will be copied.
+    :param dst_xml: Python xml tree object from which sub-elements will be copied.
+    :param path: The path of the element whose sub-elements will be copied.
+    :return: None. dst_xml will be updated with copied sub-elements
+    """
+    dst_elem = dst_xml.find(path)
+    src_elem = src_xml.find(path)
+    for sub_elem in src_elem:
+        dst_elem.append(sub_elem)
+
+
+def copy_schema_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
+    """
+    Copy MonitoringManagement/Schemas/Schema, MonitoringManagement/Sources/Source,
+    MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
+    Used to actually add generated rsyslog mdsd config XML elements to the mdsd config XML tree.
+
+    :param mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
+    :param mdsd_rsyslog_xml_string: XML string containing the generated rsyslog mdsd config XML elements.
+                                See syslog_mdsd_*_expected_output variables in test_lad30_syslog_config.py for examples.
+    :return: None. mdsd_xml_tree object will contain the added elements.
+    """
+    rsyslog_xml_tree = ET.ElementTree(ET.fromstring(mdsd_rsyslog_xml_string))
+
+    # Copy Schema elements (sub-elements of Schemas element)
+    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Schemas')
+
+    # Copy Source elements (sub-elements of Sources element)
+    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Sources')
+
+    # Copy MdsdEventSource elements (sub-elements of Events/MdsdEvents element)
+    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Events/MdsdEvents')
