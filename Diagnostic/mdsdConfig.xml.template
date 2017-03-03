@@ -30,13 +30,13 @@
 
 
   <Sources>
-    <Source name="syslog" schema="syslog" />
+    <Source name="syslog_basic" schema="syslog" />
   </Sources>
 
  <Events>
     <MdsdEvents>
-      <MdsdEventSource source="syslog">
-        <RouteEvent dontUsePerNDayTable="true" eventName="Linuxsyslog" priority="High" />
+      <MdsdEventSource source="syslog_basic">
+        <RouteEvent dontUsePerNDayTable="true" eventName="LinuxSyslog" priority="High" />
       </MdsdEventSource>
     </MdsdEvents>
 
