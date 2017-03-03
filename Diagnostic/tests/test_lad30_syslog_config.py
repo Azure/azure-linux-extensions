@@ -7,8 +7,8 @@ from Utils.lad30_syslog_config import RsyslogMdsdConfig
 syslog_basic_json_ext_settings = """
 {
     "syslogEventConfiguration": {
-        "LOG_USER": "LOG_ERR",
-        "LOG_LOCAL0": "LOG_CRIT"
+        "LOG_LOCAL0": "LOG_CRIT",
+        "LOG_USER": "LOG_ERR"
     }
 }
 """

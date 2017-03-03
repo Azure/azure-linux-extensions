@@ -160,7 +160,7 @@ class RsyslogMdsdConfig:
             return ''
 
         fac_sev_list = ''
-        for facility in fac_sev_map:
+        for facility in sorted(fac_sev_map):
             if fac_sev_list:
                 fac_sev_list += ';'
             fac_sev_list += '{0}.{1}'.format(syslog_name_to_rsyslog_name(facility),
