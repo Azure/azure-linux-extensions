@@ -16,6 +16,7 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+
 class RsyslogMdsdConfig:
     """
     Utility class for obtaining rsyslog configurations for omazuremds output module and imfile input module
@@ -97,11 +98,25 @@ class RsyslogMdsdConfig:
         self._syslogCfg = syslogCfg
         self._fileLogs = fileLogs
 
-        self._omazuremds_legacy_config = self._create_omazuremds_config(legacy=True)
-        self._omazuremds_config = self._create_omazuremds_config(legacy=False)
-        self._mdsd_syslog_config = self._create_mdsd_syslog_config()
-        self._imfile_config = self._create_imfile_config()
-        self._mdsd_filelog_config = self._create_mdsd_filelog_config()
+        try:
+            if self._syslogCfg:
+                # Convert the 'syslogCfg' JSON object array into a Python dictionary of 'facility;minSeverity' - 'table'
+                # E.g., { 'user.err': 'SyslogUserErrorEvents', 'local0.crit': 'SyslogLocal0CritEvent' }
+                self._facsev_table_map = dict([('{0}.{1}'.format(syslog_name_to_rsyslog_name(entry['facility']),
+                                                                 syslog_name_to_rsyslog_name(entry['minSeverity'])),
+                                                entry['table'])
+                                               for entry in self._syslogCfg])
+            if self._fileLogs:
+                # Convert the 'fileLogs' JSON object array into a Python dictionary of 'file' - 'table'
+                # E.g., { '/var/log/mydaemonlog1': 'MyDaemon1Events', '/var/log/mydaemonlog2': 'MyDaemon2Events' }
+                self._file_table_map = dict([(entry['file'], entry['table']) for entry in self._fileLogs])
+            self._omazuremds_legacy_config = self._create_omazuremds_config(legacy=True)
+            self._omazuremds_config = self._create_omazuremds_config(legacy=False)
+            self._mdsd_syslog_config = self._create_mdsd_syslog_config()
+            self._imfile_config = self._create_imfile_config()
+            self._mdsd_filelog_config = self._create_mdsd_filelog_config()
+        except KeyError as e:
+            raise LadSyslogConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
     def get_omazuremds_config(self, legacy):
         """
@@ -206,12 +221,65 @@ $template fmt_basic,"\"syslog_basic\",\"%syslogfacility-text:::json%\",\"%syslog
             else omazuremds_basic_config_template
         return omazuremds_basic_config_string.replace('<<<FACILITY_SEVERITY_LIST>>>', fac_sev_list)
 
+    def _create_omazuremds_config_from_extended(self, legacy):
+        """
+        Create omazuremds config string for LAD 3.0 "syslogCfg" (extended) settings.
+        :param legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
+        :return: rsyslog omazuremds config string
+        """
+
+        if not self._syslogCfg:
+            return ''
+
+        # Start creating omazuremds config
+        omazuremds_extended_config = """
+$ModLoad omazuremds.so
+$legacymdsdconnections 1
+$legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
+""" if legacy else """
+$ModLoad omazuremds
+"""
+        omazuremds_per_table_template = """
+$template fmt_ext_<<<INDEX>>>, "\"syslog_ext_<<<INDEX>>>\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
+$ActionQueueType LinkedList
+$ActionQueueDequeueBatchSize 100
+$ActionQueueSize 10000
+$ActionResumeRetryCount -1
+$ActionQueueSaveOnShutdown on
+$ActionQueueFileName lad_mdsd_queue_syslog_ext_<<<INDEX>>>
+$ActionQueueDiscardSeverity 8
+<<<FACILITY_SEVERITY>>> :omazuremds:;fmt_ext_<<<INDEX>>>
+""" if legacy else """
+$template fmt_ext_<<<INDEX>>>,"\"syslog_ext_<<<INDEX>>>\",\"%syslogfacility-text:::json%\",\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",\"%rawmsg:::json%\""
+<<<FACILITY_SEVERITY>>> action( type="omazuremds"
+    template="fmt_ext_<<<INDEX>>>"
+    mdsdsocketfile="__MDSD_SOCKET_FILE_PATH__"
+    queue.workerthreads="1"
+    queue.dequeuebatchsize="16"
+    queue.type="fixedarray"
+    queue.filename="lad_mdsd_queue_syslog_ext_<<<INDEX>>>"
+    queue.highwatermark="400"
+    queue.lowwatermark="100"
+    queue.discardseverity="8"
+    queue.maxdiskspace="5g"
+    queue.size="500"
+    queue.saveonshutdown="on"
+    action.resumeretrycount="-1"
+    action.resumeinterval = "3"
+)
+"""
+        index = 0
+        for entry in sorted(self._facsev_table_map):
+            index += 1
+            omazuremds_extended_config += omazuremds_per_table_template.replace("<<<INDEX>>>", str(index))\
+                                                                       .replace("<<<FACILITY_SEVERITY>>>", entry)
+        return omazuremds_extended_config
+
     def _create_mdsd_syslog_config(self):
         """
         Create mdsd XML config string for LAD 3.0 syslog settings.
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
-
         return self._create_mdsd_syslog_basic_config() if self._syslogEvents else self._create_mdsd_syslog_extended_config()
 
     def _create_mdsd_syslog_basic_config(self):
@@ -244,20 +312,135 @@ $template fmt_basic,"\"syslog_basic\",\"%syslogfacility-text:::json%\",\"%syslog
   </Events>
 </MonitoringManagement>
 """
+    def _create_mdsd_syslog_extended_config(self):
+        """
+        Create mdsd XML config string for extended syslog config ("syslogCfg")
+        :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
+        """
+        if not self._syslogCfg:
+            return ''
+
+        syslog_mdsd_config = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
+  <Schemas>
+    <Schema name="syslog">
+      <Column mdstype="mt:wstr" name="Ignore" type="str" />
+      <Column mdstype="mt:wstr" name="Facility" type="str" />
+      <Column mdstype="mt:int32" name="Severity" type="str" />
+      <Column mdstype="mt:utc" name="EventTime" type="str-rfc3339" />
+      <Column mdstype="mt:wstr" name="SendingHost" type="str" />
+      <Column mdstype="mt:wstr" name="Msg" type="str" />
+    </Schema>
+  </Schemas>
+  <Sources>
+{0}  </Sources>
+
+  <Events>
+    <MdsdEvents>
+{1}    </MdsdEvents>
+  </Events>
+</MonitoringManagement>
+"""
+        per_table_source_template = """    <Source name="syslog_ext_{0}" schema="syslog" />
+"""
+        per_table_mdsd_event_source_template = """      <MdsdEventSource source="syslog_ext_{0}">
+        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
+      </MdsdEventSource>
+"""
+        syslog_sources = ''
+        syslog_mdsd_event_sources = ''
+        index = 0
+        for facsev_key in sorted(self._facsev_table_map):
+            index += 1
+            syslog_sources += per_table_source_template.format(index)
+            syslog_mdsd_event_sources += per_table_mdsd_event_source_template.format(index, self._facsev_table_map[facsev_key])
+
+        return syslog_mdsd_config.format(syslog_sources, syslog_mdsd_event_sources)
 
     def _create_imfile_config(self):
         """
         Create imfile rsyslog input module config for the get method.
         :return: rsyslog imfile config string
         """
-        pass
+        if not self._fileLogs:
+            return ''
+        imfile_config_template = """
+$ModLoad imfile
+{0}
+$ModLoad omazuremds.so
+$legacymdsdconnections 1
+$legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
+
+$ActionQueueType LinkedList
+$ActionQueueDequeueBatchSize 100
+$ActionQueueSize 10000
+$ActionResumeRetryCount -1
+$ActionQueueSaveOnShutdown on
+$ActionQueueFileName lad_mdsd_queue_filelog
+$ActionQueueDiscardSeverity 8
+
+$template fmt_file,"\"%syslogtag%\",#TOJSON#%rawmsg%"
+local6.* :omazuremds:;fmt_file
+
+& ~
+"""
+        per_file_template = """
+$InputFileName {0}
+$InputFileTag ladfile_{1}
+$InputFileFacility local6
+$InputFileStateFile syslog-stat{2}
+$InputFileSeverity debug
+$InputRunFileMonitor
+"""
+        all_files_config = ''
+        index = 0
+        for file_key in self._file_table_map:
+            index += 1
+            all_files_config += per_file_template.format(file_key, index, file_key.replace('/', '-'))
+
+        return imfile_config_template.format(all_files_config)
 
     def _create_mdsd_filelog_config(self):
         """
         Create mdsd XML config string for LAD 3.0 filelog settings.
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
-        pass
+        if not self._fileLogs:
+            return ''
+
+        filelogs_mdsd_config = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
+  <Schemas>
+    <Schema name="ladfile">
+      <Column mdstype="mt:wstr" name="FileTag" type="str" />
+      <Column mdstype="mt:wstr" name="Msg" type="str" />
+    </Schema>
+  </Schemas>
+  <Sources>
+{0}  </Sources>
+
+  <Events>
+    <MdsdEvents>
+{1}    </MdsdEvents>
+  </Events>
+</MonitoringManagement>
+"""
+        per_file_source_template = """    <Source name="ladfile_{0}" schema="ladfile" />
+"""
+        per_file_mdsd_event_source_template = """      <MdsdEventSource source="ladfile_{0}">
+        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
+      </MdsdEventSource>
+"""
+        filelogs_sources = ''
+        filelogs_mdsd_event_sources = ''
+        index = 0
+        for file_key in sorted(self._file_table_map):
+            index += 1
+            filelogs_sources += per_file_source_template.format(index)
+            filelogs_mdsd_event_sources += per_file_mdsd_event_source_template.format(index,
+                                                                                      self._file_table_map[file_key])
+
+        return filelogs_mdsd_config.format(filelogs_sources, filelogs_mdsd_event_sources)
 
 
 syslog_name_to_rsyslog_name_map = {

@@ -116,7 +116,7 @@ $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_ext_1
 $ActionQueueDiscardSeverity 8
-user.err :omazuremds:;fmt_ext_1
+local0.crit :omazuremds:;fmt_ext_1
 
 $template fmt_ext_2, "\"syslog_ext_2\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
@@ -126,7 +126,7 @@ $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_ext_2
 $ActionQueueDiscardSeverity 8
-local0.crit :omazuremds:;fmt_ext_2
+user.err :omazuremds:;fmt_ext_2
 """
 
 # Expected omazuremds rsyslog output module config string corresponding to syslog_extended_json_ext_settings
@@ -135,7 +135,7 @@ syslog_omazuremds_extended_expected_output = """
 $ModLoad omazuremds
 
 $template fmt_ext_1,"\"syslog_ext_1\",\"%syslogfacility-text:::json%\",\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",\"%rawmsg:::json%\""
-user.error action( type="omazuremds"
+local0.crit action( type="omazuremds"
     template="fmt_ext_1"
     mdsdsocketfile="__MDSD_SOCKET_FILE_PATH__"
     queue.workerthreads="1"
@@ -153,7 +153,7 @@ user.error action( type="omazuremds"
 )
 
 $template fmt_ext_2,"\"syslog_ext_2\",\"%syslogfacility-text:::json%\",\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",\"%rawmsg:::json%\""
-local0.crit action( type="omazuremds"
+user.err action( type="omazuremds"
     template="fmt_ext_2"
     mdsdsocketfile="__MDSD_SOCKET_FILE_PATH__"
     queue.workerthreads="1"
@@ -193,10 +193,10 @@ syslog_mdsd_extended_expected_output = """
   <Events>
     <MdsdEvents>
       <MdsdEventSource source="syslog_ext_1">
-        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogUserErrorEvents" priority="High" />
+        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogLocal0CritEvents" priority="High" />
       </MdsdEventSource>
       <MdsdEventSource source="syslog_ext_2">
-        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogLocal0CritEvents" priority="High" />
+        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogUserErrorEvents" priority="High" />
       </MdsdEventSource>
     </MdsdEvents>
   </Events>
@@ -211,7 +211,7 @@ filelogs_json_ext_settings = """
         "table": "MyDaemon1Events"
     },
     {
-        "file": "/var/log/mydaemonelog2",
+        "file": "/var/log/mydaemonlog2",
         "table": "MyDaemon2Events"
     }
 ]
@@ -228,7 +228,7 @@ $InputFileStateFile syslog-stat-var-log-mydaemonlog1
 $InputFileSeverity debug
 $InputRunFileMonitor
 
-$InputFileName /var/log/mydaemonelog2
+$InputFileName /var/log/mydaemonlog2
 $InputFileTag ladfile_2
 $InputFileFacility local6
 $InputFileStateFile syslog-stat-var-log-mydaemonlog2
@@ -285,24 +285,40 @@ filelogs_mdsd_expected_output = """
 class Lad30RsyslogConfigTest(unittest.TestCase):
 
     def test_omazuremds_basic(self):
+        """
+        Tests whether omazuremds and mdsd configs are correctly generated for 'syslogEvents' setting
+        (writing to the single 'LinuxSyslog' table). Tests both legacy (rsyslog 5/7) and non-legacy (rsyslog 8).
+        :return: None
+        """
         syslogEvents = json.loads(syslog_basic_json_ext_settings)
         cfg = RsyslogMdsdConfig(syslogEvents, None, None)
-        self.assertEqual(cfg.get_omazuremds_config(legacy=True), syslog_omazuremds_basic_expected_output_legacy)
-        self.assertEqual(cfg.get_omazuremds_config(legacy=False), syslog_omazuremds_basic_expected_output)
-        self.assertEqual(cfg.get_mdsd_syslog_config(), syslog_mdsd_basic_expected_output)
+        self.assertEqual(syslog_omazuremds_basic_expected_output_legacy, cfg.get_omazuremds_config(legacy=True))
+        self.assertEqual(syslog_omazuremds_basic_expected_output, cfg.get_omazuremds_config(legacy=False))
+        self.assertEqual(syslog_mdsd_basic_expected_output, cfg.get_mdsd_syslog_config())
 
     def test_omazuremds_extended(self):
+        """
+        Tests whether omazuremds and mdsd configs are correctly generated for 'syslogCfg' setting
+        (writing to the specified table for each facility.minSeverity).
+        Tests both legacy (rsyslog 5/7) and non-legacy (rsyslog 8).
+        :return: None
+        """
         syslogCfg = json.loads(syslog_extended_json_ext_settings)
         cfg = RsyslogMdsdConfig(None, syslogCfg, None)
-        self.assertEqual(cfg.get_omazuremds_config(legacy=True), syslog_omazuremds_extended_expected_output_legacy)
-        self.assertEqual(cfg.get_omazuremds_config(legacy=False), syslog_omazuremds_extended_expected_output)
-        self.assertEqual(cfg.get_mdsd_syslog_config(), syslog_mdsd_extended_expected_output)
+        self.assertEqual(syslog_omazuremds_extended_expected_output_legacy, cfg.get_omazuremds_config(legacy=True))
+        self.assertEqual(syslog_omazuremds_extended_expected_output, cfg.get_omazuremds_config(legacy=False))
+        self.assertEqual(syslog_mdsd_extended_expected_output, cfg.get_mdsd_syslog_config())
 
     def test_imfile(self):
+        """
+        Tests whether imfile and mdsd configs are correctly generated for 'fileLogs' setting
+        (writing to the specified table for each monitored).
+        :return: None
+        """
         fileLogs = json.loads(filelogs_json_ext_settings)
         cfg = RsyslogMdsdConfig(None, None, fileLogs)
-        self.assertEqual(cfg.get_imfile_config(), filelogs_imfile_expected_output)
-        self.assertEqual(cfg.get_mdsd_filelog_config(), filelogs_mdsd_expected_output)
+        self.assertEqual(filelogs_imfile_expected_output, cfg.get_imfile_config())
+        self.assertEqual(filelogs_mdsd_expected_output, cfg.get_mdsd_filelog_config())
 
 
 if __name__ == '__main__':
