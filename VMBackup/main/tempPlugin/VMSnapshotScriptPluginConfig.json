@@ -1,6 +1,6 @@
 {
 	"pluginName" : "ScriptRunner",
-	"timeoutInSeconds" : 10,
+	"timeoutInSeconds" : 30,
 	"continueBackupOnFailure" : true,
 	"preScriptLocation" : "",
 	"postScriptLocation" : "",

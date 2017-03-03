@@ -59,7 +59,7 @@ class PluginHost(object):
     def __init__(self, logger):
         self.logger = logger
         self.modulesLoaded = False
-        self.configLocation = '/etc/azure/PluginHost.conf'
+        self.configLocation = '/etc/azure/VMSnapshotPluginHost.conf'
         self.timeoutInSeconds = 1800
         self.plugins = []
         self.pluginName = []
@@ -77,13 +77,13 @@ class PluginHost(object):
 
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
-            self.configLocation = './main/PluginHost.conf'
+            self.configLocation = './main/VMSnapshotPluginHost.conf'
         
         permissions = self.get_permissions(self.configLocation)
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
             errorCode =CommonVariables.FailedPrepostPluginhostConfigNotFound
-        elif not (int(permissions[1]) == 0 or int(permissions[1]) == 4) or not (int(permissions[2]) == 0 or int(permissions[2]) == 4):
+        elif (int(permissions[0]) == 7) or not (int(permissions[1]) == 0 or int(permissions[1]) == 4) or not (int(permissions[2]) == 0 or int(permissions[2]) == 4):
             self.logger.log('Plugin host Config file does not have desired permissions', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPluginhostConfigPermissionError
         elif not self.find_owner(self.configLocation) == 'root':
@@ -126,7 +126,7 @@ class PluginHost(object):
 
                 if os.path.isfile(pcpath):
                     permissions = self.get_permissions(pcpath)
-                    if int(permissions[1]) > 0 or int(permissions[2]) > 0:
+                    if int(permissions[0]) == 7 or int(permissions[1]) > 0 or int(permissions[2]) > 0:
                         self.logger.log('Plugin Config file does not have desired permissions', True, 'Error')
                         errorCode = CommonVariables.FailedPrepostPluginConfigPermissionError
                     if not self.find_owner(pcpath) == 'root':
