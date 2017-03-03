@@ -17,4 +17,4 @@ clean:
 package: $(LADSOURCES) 
 	mkdir -p output
 	cp -t output -r $(LADSOURCES)
-
+	zip -r DSC.zip output/* > /dev/null
