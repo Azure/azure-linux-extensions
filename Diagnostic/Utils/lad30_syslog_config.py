@@ -30,7 +30,7 @@ class RsyslogMdsdConfig:
         """
         Constructor to receive/store necessary LAD settings for the desired configuration generation.
 
-        :param syslogEvents: LAD 3.0 "ladCfg" - "syslogEvents" JSON object, or a False object if it's not given
+        :param dict syslogEvents: LAD 3.0 "ladCfg" - "syslogEvents" JSON object, or a False object if it's not given
                              in the extension settings. An example is as follows:
 
                              "ladCfg": {
@@ -49,7 +49,7 @@ class RsyslogMdsdConfig:
                                  "NONE" means no logs from the facility will be captured (thus it's equivalent to
                                   not specifying the facility at all).
 
-        :param syslogCfg: LAD 3.0 "syslogCfg" JSON object, or a False object if it's not given in the ext settings.
+        :param dict syslogCfg: LAD 3.0 "syslogCfg" JSON object, or a False object if it's not given in the ext settings.
                           This parameter must be a False object if syslogEvents is given as a non-False object.
                           An example is as follows:
 
@@ -71,7 +71,7 @@ class RsyslogMdsdConfig:
                           "facility" and "minSeverity" are self-explanatory. "table" is for the Azure storage table
                           into which the matching syslog events will be placed.
 
-        :param fileLogs: LAD 3.0 "fileLogs" JSON object, or a False object if it's not given in the ext settings.
+        :param dict fileLogs: LAD 3.0 "fileLogs" JSON object, or a False object if it's not given in the ext settings.
                          An example is as follows:
 
                          "fileLogs": {
@@ -125,7 +125,8 @@ class RsyslogMdsdConfig:
         Get omazuremds rsyslog output module config that corresponds to the syslogEvents or the syslogCfg JSON
         object given in the construction parameters.
 
-        :param legacy: A boolean indicating whether to get omazuremds config for rsyslog 5/7 (legacy rsyslog config)
+        :param bool legacy: A boolean indicating whether to get omazuremds config for rsyslog 5/7 (legacy rsyslog config)
+        :rtype: str
         :return: omazuremds rsyslog output module config string that should be saved to a file and placed in
                  /etc/rsyslog.d/ directory
         """
@@ -134,6 +135,7 @@ class RsyslogMdsdConfig:
     def get_mdsd_syslog_config(self):
         """
         Get mdsd XML config string for the LAD 3.0 syslog config.
+        :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for the LAD 3.0 syslog config.
         """
         return self._mdsd_syslog_config
@@ -142,6 +144,7 @@ class RsyslogMdsdConfig:
         """
         Get imfile rsyslog input module config that corresponds to the fileLogs JSON object given in the construction
         parameters.
+        :rtype: str
         :return: imfile rsyslog input module config string that should be saved to a file and placed in
                  /etc/rsyslog.d/ directory
         """
@@ -150,6 +153,7 @@ class RsyslogMdsdConfig:
     def get_mdsd_filelog_config(self):
         """
         Get mdsd XML config string for the LAD 3.0 filelog config.
+        :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for the LAD 3.0 filelog config.
         """
         return self._mdsd_filelog_config
@@ -157,7 +161,8 @@ class RsyslogMdsdConfig:
     def _create_omazuremds_config(self, legacy):
         """
         Create omazure rsyslog output module config for the get method.
-        :param legacy: Indicates whether we are creating omazuremds config for rsyslog legacy versions (5/7) or not (8).
+        :param bool legacy: Indicates whether we are creating omazuremds config for rsyslog legacy versions (5/7) or not (8).
+        :rtype: str
         :return: rsyslog omazuremds config string
         """
         return self._create_omazuremds_config_from_basic(legacy) if self._syslogEvents else \
@@ -166,7 +171,8 @@ class RsyslogMdsdConfig:
     def _create_omazuremds_config_from_basic(self, legacy):
         """
         Create omazure rsyslog output module config from "syslogEvents" setting
-        :param legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
+        :param bool legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
+        :rtype: str
         :return: rsyslog omazuremds config string
         """
         if 'syslogEventConfiguration' not in self._syslogEvents:
@@ -191,7 +197,7 @@ $legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
 $template fmt_basic, "\"syslog_basic\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_basic
@@ -226,7 +232,8 @@ $template fmt_basic,"\"syslog_basic\",\"%syslogfacility-text:::json%\",\"%syslog
     def _create_omazuremds_config_from_extended(self, legacy):
         """
         Create omazuremds config string for LAD 3.0 "syslogCfg" (extended) settings.
-        :param legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
+        :param bool legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
+        :rtype: str
         :return: rsyslog omazuremds config string
         """
 
@@ -245,7 +252,7 @@ $ModLoad omazuremds
 $template fmt_ext_<<<INDEX>>>, "\"syslog_ext_<<<INDEX>>>\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_ext_<<<INDEX>>>
@@ -280,6 +287,7 @@ $template fmt_ext_<<<INDEX>>>,"\"syslog_ext_<<<INDEX>>>\",\"%syslogfacility-text
     def _create_mdsd_syslog_config(self):
         """
         Create mdsd XML config string for LAD 3.0 syslog settings.
+        :rtype: str
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
         return self._create_mdsd_syslog_basic_config() if self._syslogEvents else self._create_mdsd_syslog_extended_config()
@@ -287,6 +295,7 @@ $template fmt_ext_<<<INDEX>>>,"\"syslog_ext_<<<INDEX>>>\",\"%syslogfacility-text
     def _create_mdsd_syslog_basic_config(self):
         """
         Create mdsd XML config string for basic syslog config ("syslogEvents")
+        :rtype: str
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
         return """
@@ -317,6 +326,7 @@ $template fmt_ext_<<<INDEX>>>,"\"syslog_ext_<<<INDEX>>>\",\"%syslogfacility-text
     def _create_mdsd_syslog_extended_config(self):
         """
         Create mdsd XML config string for extended syslog config ("syslogCfg")
+        :rtype: str
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
         if not self._syslogCfg:
@@ -375,7 +385,7 @@ $legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
 
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_filelog
@@ -405,6 +415,7 @@ $InputRunFileMonitor
     def _create_mdsd_filelog_config(self):
         """
         Create mdsd XML config string for LAD 3.0 filelog settings.
+        :rtype: str
         :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
         """
         if not self._fileLogs:
@@ -482,7 +493,8 @@ syslog_name_to_rsyslog_name_map = {
 def syslog_name_to_rsyslog_name(syslog_name):
     """
     Convert a syslog name (e.g., "LOG_USER") to the corresponding rsyslog name (e.g., "user")
-    :param syslog_name: A syslog name for a facility (e.g., "LOG_USER") or a severity (e.g., "LOG_ERR")
+    :param str syslog_name: A syslog name for a facility (e.g., "LOG_USER") or a severity (e.g., "LOG_ERR")
+    :rtype: str
     :return: Corresponding rsyslog name (e.g., "user" or "error")
     """
     if syslog_name not in syslog_name_to_rsyslog_name_map:
@@ -500,9 +512,9 @@ class LadSyslogConfigException(Exception):
 def copy_sub_elems(dst_xml, src_xml, path):
     """
     Copy sub-elements of src_elem (XML) to dst_elem.
-    :param dst_xml: Python xml tree object to which sub-elements will be copied.
-    :param dst_xml: Python xml tree object from which sub-elements will be copied.
-    :param path: The path of the element whose sub-elements will be copied.
+    :param xml.etree.ElementTree.ElementTree dst_xml: Python xml tree object to which sub-elements will be copied.
+    :param xml.etree.ElementTree.ElementTree dst_xml: Python xml tree object from which sub-elements will be copied.
+    :param str path: The path of the element whose sub-elements will be copied.
     :return: None. dst_xml will be updated with copied sub-elements
     """
     dst_elem = dst_xml.find(path)
@@ -517,8 +529,8 @@ def copy_schema_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
     MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
     Used to actually add generated rsyslog mdsd config XML elements to the mdsd config XML tree.
 
-    :param mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
-    :param mdsd_rsyslog_xml_string: XML string containing the generated rsyslog mdsd config XML elements.
+    :param xml.etree.ElementTree.ElementTree mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
+    :param str mdsd_rsyslog_xml_string: XML string containing the generated rsyslog mdsd config XML elements.
                                 See syslog_mdsd_*_expected_output variables in test_lad30_syslog_config.py for examples.
     :return: None. mdsd_xml_tree object will contain the added elements.
     """

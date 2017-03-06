@@ -28,7 +28,7 @@ $legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
 $template fmt_basic, "\"syslog_basic\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_basic
@@ -116,7 +116,7 @@ $legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
 $template fmt_ext_1, "\"syslog_ext_1\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_ext_1
@@ -126,7 +126,7 @@ local0.crit :omazuremds:;fmt_ext_1
 $template fmt_ext_2, "\"syslog_ext_2\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_syslog_ext_2
@@ -246,7 +246,7 @@ $legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
 
 $ActionQueueType LinkedList
 $ActionQueueDequeueBatchSize 100
-$ActionQueueSize 10000
+$ActionQueueSize 500
 $ActionResumeRetryCount -1
 $ActionQueueSaveOnShutdown on
 $ActionQueueFileName lad_mdsd_queue_filelog
