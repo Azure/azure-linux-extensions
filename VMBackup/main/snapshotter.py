@@ -200,8 +200,8 @@ class Snapshotter(object):
                     job.join()
                 thaw_result = None
                 if thaw_done_local == False:
-                    thaw_done_local = True
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    thaw_done_local = True
                 self.logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
                     is_inconsistent = True
@@ -263,9 +263,9 @@ class Snapshotter(object):
                     blob_index = blob_index + 1
                 thaw_result= None
                 if thaw_done_local== False:
-                    thaw_done_local = True
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
-                backup_logger.log('T:S thaw result ' + str(thaw_result))
+                    thaw_done_local = True
+                self.logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
                     snapshot_result.errors.append(thaw_result.errors)
                     is_inconsistent= True
@@ -343,4 +343,5 @@ class Snapshotter(object):
         else:
             snapshot_info.isSuccessful = False
             snapshot_info.snapshotUri = None
+
 

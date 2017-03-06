@@ -52,7 +52,6 @@ int gThaw = 0;
 
 void globalSignalHandler(int signum)
 {
-    logger("SignalHandler signum: %d\n", signum);
     if (signum == SIGUSR1)
     {
         gThaw = 1;
