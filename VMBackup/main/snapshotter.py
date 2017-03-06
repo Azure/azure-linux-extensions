@@ -231,7 +231,8 @@ class Snapshotter(object):
                 self.logger.log("the blobs are None")
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
         except Exception as e:
-            self.logger.log("Unable to perform parallel snapshot" + str(e))
+            errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
             exceptOccurred = True
             return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
 
@@ -274,7 +275,8 @@ class Snapshotter(object):
                 self.logger.log("the blobs are None")
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
         except Exception as e:
-            self.logger.log("Unable to perform sequential snapshot with exception" + str(e))
+            errorMsg = " Unable to perform sequential snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
             exceptOccurred = True
             return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
 
@@ -290,7 +292,8 @@ class Snapshotter(object):
                 else:
                     self.logger.log("Config File doesn't have the key :" + key)
         except Exception as e:
-            self.logger.log("Unable to read config file.key is : " + key + "with exception " + str(e))
+            errorMsg = " Unable to ed config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
         return value
 
 
