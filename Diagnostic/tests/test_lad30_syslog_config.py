@@ -1,6 +1,9 @@
 import unittest
 import json
 from xml.etree import ElementTree as ET
+# This test suite uses xmlunittest package. Install it by running 'pip install xmlunittest'.
+# Documentation at http://python-xmlunittest.readthedocs.io/en/latest/
+from xmlunittest import XmlTestMixin
 
 from Utils.lad30_syslog_config import *
 
@@ -283,8 +286,41 @@ filelogs_mdsd_expected_output = """
 </MonitoringManagement>
 """
 
+# XPaths representations of expected XML outputs, for use with xmlunittests package
+syslog_schema_expected_xpaths = ('./Schemas/Schema[@name="syslog"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:wstr" and @name="Ignore" and @type="str"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:wstr" and @name="Facility" and @type="str"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:int32" and @name="Severity" and @type="str"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:utc" and @name="EventTime" and @type="str-rfc3339"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:wstr" and @name="SendingHost" and @type="str"]',
+                                 './Schemas/Schema[@name="syslog"]/Column[@mdstype="mt:wstr" and @name="Msg" and @type="str"]',
+                                 )
 
-class Lad30RsyslogConfigTest(unittest.TestCase):
+syslog_mdsd_basic_expected_xpaths = ('./Sources/Source[@name="syslog_basic" and @schema="syslog"]',
+                                     './Events/MdsdEvents/MdsdEventSource[@source="syslog_basic"]',
+                                     './Events/MdsdEvents/MdsdEventSource[@source="syslog_basic"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
+                                     )
+
+syslog_mdsd_extended_expected_xpaths = ('./Sources/Source[@name="syslog_ext_1" and @schema="syslog"]',
+                                        './Sources/Source[@name="syslog_ext_2" and @schema="syslog"]',
+                                        './Events/MdsdEvents/MdsdEventSource[@source="syslog_ext_1"]',
+                                        './Events/MdsdEvents/MdsdEventSource[@source="syslog_ext_1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogLocal0CritEvents" and @priority="High"]',
+                                        './Events/MdsdEvents/MdsdEventSource[@source="syslog_ext_2"]',
+                                        './Events/MdsdEvents/MdsdEventSource[@source="syslog_ext_2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogUserErrorEvents" and @priority="High"]',
+                                        )
+
+filelogs_schema_expected_xpaths = ('./Schemas/Schema[@name="ladfile"]',
+                                   './Schemas/Schema[@name="ladfile"]/Column[@mdstype="mt:wstr" and @name="FileTag" and @type="str"]',
+                                   './Schemas/Schema[@name="ladfile"]/Column[@mdstype="mt:wstr" and @name="Msg" and @type="str"]',
+                                   )
+
+filelogs_mdsd_expected_xpaths = ('./Events/MdsdEvents/MdsdEventSource[@source="ladfile_1"]',
+                                 './Events/MdsdEvents/MdsdEventSource[@source="ladfile_1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
+                                 './Events/MdsdEvents/MdsdEventSource[@source="ladfile_2"]',
+                                 './Events/MdsdEvents/MdsdEventSource[@source="ladfile_2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
+                                 )
+
+class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 
     def test_omazuremds_basic(self):
         """
@@ -296,7 +332,17 @@ class Lad30RsyslogConfigTest(unittest.TestCase):
         cfg = RsyslogMdsdConfig(syslogEvents, None, None)
         self.assertEqual(syslog_omazuremds_basic_expected_output_legacy, cfg.get_omazuremds_config(legacy=True))
         self.assertEqual(syslog_omazuremds_basic_expected_output, cfg.get_omazuremds_config(legacy=False))
-        self.assertEqual(syslog_mdsd_basic_expected_output, cfg.get_mdsd_syslog_config())
+        # Don't do blind string comparison of two XML strings any more. Just print and use xmlunittest
+        #self.assertEqual(syslog_mdsd_basic_expected_output, cfg.get_mdsd_syslog_config())
+        print '=== Expected syslog mdsd basic output ==='
+        print syslog_mdsd_basic_expected_output
+        print '=== Actual syslog mdsd basic output ==='
+        xml = cfg.get_mdsd_syslog_config()
+        print xml
+        print '======================================='
+        root = self.assertXmlDocument(xml)
+        self.assertXpathsOnlyOne(root, syslog_schema_expected_xpaths)
+        self.assertXpathsOnlyOne(root, syslog_mdsd_basic_expected_xpaths)
 
     def test_omazuremds_extended(self):
         """
@@ -309,7 +355,18 @@ class Lad30RsyslogConfigTest(unittest.TestCase):
         cfg = RsyslogMdsdConfig(None, syslogCfg, None)
         self.assertEqual(syslog_omazuremds_extended_expected_output_legacy, cfg.get_omazuremds_config(legacy=True))
         self.assertEqual(syslog_omazuremds_extended_expected_output, cfg.get_omazuremds_config(legacy=False))
-        self.assertEqual(syslog_mdsd_extended_expected_output, cfg.get_mdsd_syslog_config())
+        # Don't do blind string comparison of two XML strings any more. Just print and use xmlunittest
+        #self.assertEqual(syslog_mdsd_extended_expected_output, cfg.get_mdsd_syslog_config())
+        print '=== Expected syslog mdsd extended output ==='
+        print syslog_mdsd_extended_expected_output
+        print '=== Actual syslog mdsd extended output ==='
+        xml = cfg.get_mdsd_syslog_config()
+        print xml
+        print '======================================='
+        root = self.assertXmlDocument(xml)
+        self.assertXpathsOnlyOne(root, syslog_schema_expected_xpaths)
+        self.assertXpathsOnlyOne(root, syslog_mdsd_extended_expected_xpaths)
+
 
     def test_imfile(self):
         """
@@ -320,7 +377,17 @@ class Lad30RsyslogConfigTest(unittest.TestCase):
         fileLogs = json.loads(filelogs_json_ext_settings)
         cfg = RsyslogMdsdConfig(None, None, fileLogs)
         self.assertEqual(filelogs_imfile_expected_output, cfg.get_imfile_config())
-        self.assertEqual(filelogs_mdsd_expected_output, cfg.get_mdsd_filelog_config())
+        # Don't do blind string comparison of two XML strings any more. Just print and use xmlunittest
+        #self.assertEqual(filelogs_mdsd_expected_output, cfg.get_mdsd_filelog_config())
+        print '=== Expected filelogs mdsd output ==='
+        print filelogs_mdsd_expected_output
+        print '=== Actual filelogs mdsd output ==='
+        xml = cfg.get_mdsd_filelog_config()
+        print xml
+        print '======================================='
+        root = self.assertXmlDocument(xml)
+        self.assertXpathsOnlyOne(root, filelogs_schema_expected_xpaths)
+        self.assertXpathsOnlyOne(root, filelogs_mdsd_expected_xpaths)
 
     def test_copy_schema_source_mdsdevent_elems(self):
         """
@@ -332,14 +399,16 @@ class Lad30RsyslogConfigTest(unittest.TestCase):
         xml_string_srcs = [syslog_mdsd_extended_expected_output, filelogs_mdsd_expected_output]
         dst_xml_tree = ET.parse('../mdsdConfig.xml.template')
         map(lambda x: copy_schema_source_mdsdevent_elems(dst_xml_tree, x), xml_string_srcs)
-        # Just print the output for now (no easy XML comparison)
         print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
-        print ET.tostring(dst_xml_tree.getroot())
+        xml = ET.tostring(dst_xml_tree.getroot())
+        print xml
         print '==================================================================='
-        # And verify some elementary properties
-        self.assertEqual(2, len(dst_xml_tree.find('Schemas')))  # 2 Schema elements under Schemas
-        self.assertEqual(4, len(dst_xml_tree.find('Sources')))  # 4 Source elements under Sources
-        self.assertEqual(4, len(dst_xml_tree.find('Events/MdsdEvents')))  # 4 MdsdEventSource elements under Events/MdsdEvents
+        # Verify using xmlunittests
+        root = self.assertXmlDocument(xml)
+        self.assertXpathsOnlyOne(root, syslog_schema_expected_xpaths)
+        self.assertXpathsOnlyOne(root, syslog_mdsd_extended_expected_xpaths)
+        self.assertXpathsOnlyOne(root, filelogs_schema_expected_xpaths)
+        self.assertXpathsOnlyOne(root, filelogs_mdsd_expected_xpaths)
 
 
 if __name__ == '__main__':
