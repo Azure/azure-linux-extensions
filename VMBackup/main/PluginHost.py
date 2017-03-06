@@ -126,7 +126,7 @@ class PluginHost(object):
 
                 if os.path.isfile(pcpath):
                     permissions = self.get_permissions(pcpath)
-                    if int(permissions[0]) == 7 or int(permissions[1]) > 0 or int(permissions[2]) > 0:
+                    if int(permissions[1]) > 0 or int(permissions[2]) > 0:
                         self.logger.log('Plugin Config file does not have desired permissions', True, 'Error')
                         errorCode = CommonVariables.FailedPrepostPluginConfigPermissionError
                     if not self.find_owner(pcpath) == 'root':
