@@ -184,7 +184,7 @@ def freeze_snapshot(timeout):
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
             snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
-            backup_logger.log('T:S snapshotall ends...')
+            backup_logger.log('T:S snapshotall ends...', True)
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 if unable_to_sleep:
                     run_result = CommonVariables.error
@@ -228,11 +228,12 @@ def freeze_snapshot(timeout):
     #snapshot_done = True
 
 def check_snapshot_array_fail():
+    global snapshot_info_array, backup_logger
     snapshot_array_fail = False
     if snapshot_info_array is not None and snapshot_info_array !=[]:
         for snapshot_index in range(len(snapshot_info_array)):
             if(snapshot_info_array[snapshot_index].isSuccessful == False):
-                backup_logger.log('T:S  snapshot failed at index ' + str(snapshot_index))
+                backup_logger.log('T:S  snapshot failed at index ' + str(snapshot_index), True)
                 snapshot_array_fail = True
                 break
     return snapshot_array_fail
