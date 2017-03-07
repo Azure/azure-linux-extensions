@@ -73,22 +73,38 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        if self.distro_info[1].startswith("6."):
-            if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
-                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
+        epel_packages_installed = False
+        attempt = 0
 
-                if self.command_executor.Execute("rpm -q epel-release"):
-                    self.command_executor.Execute(epel_cmd)
+        while not epel_packages_installed:
+            attempt += 1
+            self.logger.log("Attempt #{0} to locate EPEL packages".format(attempt))
+            if self.distro_info[1].startswith("6."):
+                if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
 
-                self.command_executor.Execute("yum install -y ntfs-3g python-pip")
-        else:
-            if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
-                epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+                    if self.command_executor.Execute("rpm -q epel-release"):
+                        self.command_executor.Execute(epel_cmd)
 
-                if self.command_executor.Execute("rpm -q epel-release"):
-                    self.command_executor.Execute(epel_cmd)
+                    self.command_executor.Execute("yum install -y ntfs-3g python-pip")
 
-                self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
+                    if not self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                        epel_packages_installed = True
+                else:
+                    epel_packages_installed = True
+            else:
+                if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+                    if self.command_executor.Execute("rpm -q epel-release"):
+                        self.command_executor.Execute(epel_cmd)
+
+                    self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
+
+                    if not self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                        epel_packages_installed = True
+                else:
+                    epel_packages_installed = True
 
         packages = ['cryptsetup',
                     'lsscsi',
@@ -111,4 +127,5 @@ class centosPatching(redhatPatching):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
         if self.command_executor.Execute("pip show adal"):
+            self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")

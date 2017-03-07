@@ -37,6 +37,8 @@ from CommandExecutor import *
 from Common import *
 
 class DiskUtil(object):
+    os_disk_lvm = None
+
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
         self.hutil = hutil
@@ -557,7 +559,12 @@ class DiskUtil(object):
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
-            if mount_item["dest"] == "/" and \
+            if self.is_os_disk_lvm():
+                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
+                if grep_result == 0 and not os.path.exists('/volumes.lvm'):
+                    self.logger.log("OS PV is encrypted")
+                    os_drive_encrypted = True
+            elif mount_item["dest"] == "/" and \
                 "/dev/mapper" in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
@@ -600,6 +607,19 @@ class DiskUtil(object):
             return None
         sdx_path = vals[len(vals) - 1]
         return sdx_path
+
+    def query_dev_sdx_path_by_uuid(self, uuid):
+        """
+        return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
+        """
+        desired_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, uuid)
+        for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
+            disk_by_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, disk_by_uuid)
+
+            if disk_by_uuid_path == desired_uuid_path:
+                return os.path.realpath(disk_by_uuid_path)
+
+        return desired_uuid_path
 
     def query_dev_id_path_by_sdx_path(self, sdx_path):
         """
@@ -650,12 +670,12 @@ class DiskUtil(object):
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(get_property_cmd, communicator=proc_comm)
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
             return proc_comm.stdout.strip()
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True)
+            self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
             for line in proc_comm.stdout.splitlines():
                 if line.strip():
                     disk_info_item_array = line.strip().split()
@@ -666,7 +686,8 @@ class DiskUtil(object):
         return
 
     def get_device_items_sles(self, dev_path):
-        self.logger.log(msg=("getting the blk info from:{0}".format(dev_path)))
+        if dev_path:
+            self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
         device_items_to_return = []
         device_items = []
 
@@ -716,6 +737,9 @@ class DiskUtil(object):
             if size_string is not None and size_string != "":
                 device_item.size = int(size_string)
 
+            if device_item.type is None:
+                device_item.type = ''
+
             if device_item.size is not None:
                 device_items_to_return.append(device_item)
             else:
@@ -727,7 +751,8 @@ class DiskUtil(object):
         if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
             return self.get_device_items_sles(dev_path)
         else:
-            self.logger.log(msg=("getting the blk info from " + str(dev_path)))
+            if dev_path:
+                self.logger.log(msg=("getting blk info for: " + str(dev_path)))
 
             if dev_path is None:
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN'
@@ -735,9 +760,10 @@ class DiskUtil(object):
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN ' + dev_path
             
             proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
+            self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
             
             device_items = []
+            lvm_items = self.get_lvm_items()
             for line in proc_comm.stdout.splitlines():
                 if line:
                     device_item = DeviceItem()
@@ -771,8 +797,11 @@ class DiskUtil(object):
                         if property_item_pair[0] == 'MAJ:MIN':
                             device_item.majmin = property_item_pair[1].strip('"')
 
+                    if device_item.type is None:
+                        device_item.type = ''
+
                     if device_item.type.lower() == 'lvm':
-                        for lvm_item in self.get_lvm_items():
+                        for lvm_item in lvm_items:
                             majmin = lvm_item.lv_kernel_major + ':' + lvm_item.lv_kernel_minor
 
                             if majmin == device_item.majmin:
@@ -785,7 +814,9 @@ class DiskUtil(object):
     def get_lvm_items(self):
         lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+
+        if self.command_executor.Execute(lvs_command, communicator=proc_comm):
+            return []
 
         lvm_items = []
 
@@ -816,6 +847,28 @@ class DiskUtil(object):
             lvm_items.append(lvm_item)
 
         return lvm_items
+
+    def is_os_disk_lvm(self):
+        if DiskUtil.os_disk_lvm is not None:
+            return DiskUtil.os_disk_lvm
+
+        device_items = self.get_device_items(None)
+
+        if not any([item.type.lower() == 'lvm' for item in device_items]):
+            DiskUtil.os_disk_lvm = False
+            return False
+
+        lvm_items = filter(lambda item: item.vg_name == "rootvg", self.get_lvm_items())
+
+        current_lv_names = set([item.lv_name for item in lvm_items])
+        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
+
+        if expected_lv_names == current_lv_names:
+            DiskUtil.os_disk_lvm = True
+        else:
+            DiskUtil.os_disk_lvm = False
+
+        return DiskUtil.os_disk_lvm
 
     def should_skip_for_inplace_encryption(self, device_item):
         """

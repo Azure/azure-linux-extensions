@@ -35,7 +35,7 @@ class CommonActions:
         """
         Execute a command in a subshell
         :param str cmd: The command to be executed
-        :param bool should_log: True if command execution should be logged. (False preserves privacy of parameters.)
+        :param bool should_log: If true, log command execution
         :return (int, str): A tuple of (subshell exit code, contents of stdout)
         """
         if should_log:
@@ -43,7 +43,7 @@ class CommonActions:
         error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
         if should_log:
             self.logger("Return " + str(error) + ":" + msg)
-        return int(error), str(msg)
+        return int(error), msg
 
     def log_run_ignore_output(self, cmd, should_log=True):
         """
@@ -324,4 +324,4 @@ def get_distro_actions(name, version, logger):
         return DistroMap[name_and_version](logger)
     elif name in DistroMap:
         return DistroMap[name](logger)
-    raise exceptions.LookupError('{} is not a supported distro'.format(name_and_version))
+    raise exceptions.LookupError('{0} is not a supported distro'.format(name_and_version))

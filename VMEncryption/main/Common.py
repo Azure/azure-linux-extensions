@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinuxTest'
-    extension_version = '0.1.0.999249'
+    extension_version = '0.1.0.999286'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -38,6 +38,7 @@ class CommonVariables:
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
     disk_by_id_root = '/dev/disk/by-id'
+    disk_by_uuid_root = '/dev/disk/by-uuid'
 
     """
     parameter key names

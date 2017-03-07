@@ -56,33 +56,35 @@ from PluginHost import PluginHost
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,g_fsfreeze_on
-    run_result = CommonVariables.success
-    run_status = 'success'
-    error_msg = ''
-    freeze_result = None
-    snapshot_info_array = None
-    g_fsfreeze_on = True
-    HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
-    HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
-    hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-    backup_logger = Backuplogger(hutil)
-    MyPatching = GetMyPatching(logger = backup_logger)
-    hutil.patching = MyPatching
-
-    for a in sys.argv[1:]:
-        if re.match("^([-/]*)(disable)", a):
-            disable()
-        elif re.match("^([-/]*)(uninstall)", a):
-            uninstall()
-        elif re.match("^([-/]*)(install)", a):
-            install()
-        elif re.match("^([-/]*)(enable)", a):
-            enable()
-        elif re.match("^([-/]*)(update)", a):
-            update()
-        elif re.match("^([-/]*)(daemon)", a):
-            daemon()
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array
+    try:
+        run_result = CommonVariables.success
+        run_status = 'success'
+        error_msg = ''
+        freeze_result = None
+        snapshot_info_array = None
+        HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+        HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+        hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
+        backup_logger = Backuplogger(hutil)
+        MyPatching = GetMyPatching(logger = backup_logger)
+        hutil.patching = MyPatching
+    
+        for a in sys.argv[1:]:
+            if re.match("^([-/]*)(disable)", a):
+                disable()
+            elif re.match("^([-/]*)(uninstall)", a):
+                uninstall()
+            elif re.match("^([-/]*)(install)", a):
+                install()
+            elif re.match("^([-/]*)(enable)", a):
+                enable()
+            elif re.match("^([-/]*)(update)", a):
+                update()
+            elif re.match("^([-/]*)(daemon)", a):
+                daemon()
+    except Exception as e:
+        sys.exit(0)
 
 def install():
     global hutil
@@ -162,118 +164,60 @@ def set_do_seq_flag():
     except Exception as e:
         backup_logger.log('Unable to set doseq flag ' + str(e), True, 'Warning')
 
-def snapshot():
-    try: 
-        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,snapshot_result,snapshot_done,para_parser,snapshot_info_array,g_fsfreeze_on
-        
-        run_result = CommonVariables.success
-        run_status = 'success'
-        all_failed= False
-
-        if (g_fsfreeze_on == True):
-            freeze_result = freezer.freezeall() 
-            backup_logger.log('T:S freeze result ' + str(freeze_result)) 
-            if(freeze_result is not None and len(freeze_result.errors) > 0): 
-                run_result = CommonVariables.error 
-                run_status = 'error' 
-                error_msg = 'T:S Enable failed with error: ' + str(freeze_result) 
-                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
-                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                backup_logger.log(error_msg, False, 'Warning') 
-
-        if (run_result == CommonVariables.success): 
-            backup_logger.log('T:S doing snapshot now...') 
-            snap_shotter = Snapshotter(backup_logger) 
-            snapshot_result,snapshot_info_array, all_failed = snap_shotter.snapshotall(para_parser) 
-            backup_logger.log('T:S snapshotall ends...') 
-            if(snapshot_result is not None and len(snapshot_result.errors) > 0): 
-                error_msg = 'T:S snapshot result: ' + str(snapshot_result) 
-                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                if all_failed:
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                else:
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                run_status = 'error' 
-                backup_logger.log(error_msg, True, 'Error') 
-            else: 
-                run_result = CommonVariables.success 
-                run_status = 'success' 
-                error_msg = 'Enable Succeeded' 
-                backup_logger.log("T:S " + error_msg, True) 
-
-        if (run_result == CommonVariables.success):
-            error_msg = 'Enable Succeeded'
-            backup_logger.log("T:S " + error_msg)
-    except Exception as e: 
-        errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc()) 
-        backup_logger.log(errMsg, True, 'Error')
-        run_result = CommonVariables.error
-        run_status = 'error'
-        error_msg = 'Enable failed with exception in freeze or snapshot ' 
-        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
-    snapshot_done = True 
-
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        
+        freeze_result = freezer.freeze_safe(timeout) 
         run_result = CommonVariables.success
         run_status = 'success'
         all_failed= False
-        is_inconsistent_freeze = False
-        is_inconsistent_snapshot =  False
-
-        if (g_fsfreeze_on == True):
-            freeze_result = freezer.freeze_safe(timeout)
-            backup_logger.log('T:S freeze result ' + str(freeze_result))
-            if(freeze_result is not None and len(freeze_result.errors) > 0):
-                run_result = CommonVariables.error
-                run_status = 'error'
-                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
-                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                backup_logger.log(error_msg, True, 'Warning')
-
-        if (run_result == CommonVariables.success):
+        is_inconsistent =  False
+        backup_logger.log('T:S freeze result ' + str(freeze_result))
+        if(freeze_result is not None and len(freeze_result.errors) > 0):
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+            backup_logger.log(error_msg, True, 'Warning')
+        else:
             backup_logger.log('T:S doing snapshot now...')
             snap_shotter = Snapshotter(backup_logger)
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent_snapshot = snap_shotter.snapshotall(para_parser)
-            backup_logger.log('T:S snapshotall ends...')
+            snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
+            backup_logger.log('T:S snapshotall ends...', True)
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                if all_failed:
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                if unable_to_sleep:
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
+                    backup_logger.log(error_msg, True, 'Warning')
+                elif is_inconsistent == True :
+                    set_do_seq_flag()
+                    run_result = CommonVariables.error
+                    run_status = 'error'
+                    error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
+                    backup_logger.log(error_msg, True, 'Warning')
                 else:
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                    error_msg = 'T:S snapshot result: ' + str(snapshot_result)
+                    run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                    if all_failed:
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                    else:
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                    run_status = 'error'
+                    backup_logger.log(error_msg, True, 'Error')
+            elif check_snapshot_array_fail() == True:
+                run_result = CommonVariables.error
                 run_status = 'error'
+                error_msg = 'T:S Enable failed with error in snapshot_array index'
                 backup_logger.log(error_msg, True, 'Error')
-                if (g_fsfreeze_on == True):
-                    thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
-                    if is_inconsistent_freeze and is_inconsistent_snapshot:
-                        set_do_seq_flag()
-                    backup_logger.log('T:S thaw result ' + str(thaw_result))
             else:
-                if (g_fsfreeze_on == True):
-                    thaw_result, is_inconsistent_freeze = freezer.thaw_safe()
-                    if is_inconsistent_freeze and is_inconsistent_snapshot:
-                        set_do_seq_flag()
-                    backup_logger.log('T:S thaw result ' + str(thaw_result))
-                    if(thaw_result is not None and len(thaw_result.errors) > 0):
-                        run_result = CommonVariables.error
-                        run_status = 'error'
-                        error_msg = 'T:S Enable failed with error: ' + str(thaw_result)
-                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
-                        backup_logger.log(error_msg, True, 'Warning')
-                    else:   
-                        run_result = CommonVariables.success
-                        run_status = 'success'
-                        error_msg = 'Enable Succeeded'
-                        backup_logger.log("T:S " + error_msg, True)
+                run_result = CommonVariables.success
+                run_status = 'success'
+                error_msg = 'Enable Succeeded'
+                backup_logger.log("T:S " + error_msg, True)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -282,6 +226,17 @@ def freeze_snapshot(timeout):
         error_msg = 'Enable failed with exception in safe freeze or snapshot ' 
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
     #snapshot_done = True
+
+def check_snapshot_array_fail():
+    global snapshot_info_array, backup_logger
+    snapshot_array_fail = False
+    if snapshot_info_array is not None and snapshot_info_array !=[]:
+        for snapshot_index in range(len(snapshot_info_array)):
+            if(snapshot_info_array[snapshot_index].isSuccessful == False):
+                backup_logger.log('T:S  snapshot failed at index ' + str(snapshot_index), True)
+                snapshot_array_fail = True
+                break
+    return snapshot_array_fail
 
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on
@@ -293,23 +248,18 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    safe_freeze_on = True
     try:
         if(freezer.mounts is not None):
             hutil.partitioncount = len(freezer.mounts.mounts)
         backup_logger.log(" configfile " + str(configfile), True)
         config = ConfigParser.ConfigParser()
         config.read(configfile)
-        if (config.has_option('SnapshotThread','timeout')):
-            thread_timeout = config.get('SnapshotThread','timeout')
-        if (config.has_option('SnapshotThread','safefreeze')):
-            safe_freeze_on = config.getboolean('SnapshotThread','safefreeze')
-    except Exception as ex:
-        errMsg='cannot read config file or file not present, ex: '+str(ex)
+        if config.has_option('SnapshotThread','timeout'):
+            thread_timeout= config.get('SnapshotThread','timeout')
+    except Exception as e:
+        errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
-    backup_logger.log(" fsfreeze flag " + str(g_fsfreeze_on), True)
-    backup_logger.log(" safe freeze flag " + str(safe_freeze_on), True)
     
     snapshot_info_array = None
 
@@ -384,33 +334,8 @@ def daemon():
                         dobackup = False
 
                 if dobackup:
-                    if(safe_freeze_on==True):
-                        freeze_snapshot(thread_timeout)
-                    else:
-                        snapshot_thread = Thread(target = snapshot)
-                        start_time=datetime.datetime.utcnow()
-                        snapshot_thread.start()
-                        snapshot_thread.join(float(thread_timeout))
-                        if not snapshot_done:
-                            run_result = CommonVariables.error
-                            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.CommonVariables.error)
-                            run_status = 'error'
-                            error_msg = 'T:W Snapshot timeout'
-                            backup_logger.log(error_msg, True, 'Warning')
-                        end_time=datetime.datetime.utcnow()
-                        time_taken=end_time-start_time
-                        backup_logger.log('total time taken..' + str(time_taken), True)
-                        for i in range(0,3):
-                            unfreeze_result = freezer.unfreezeall()
-                            backup_logger.log('unfreeze result ' + str(unfreeze_result))
-                            if(unfreeze_result is not None):
-                                if len(unfreeze_result.errors) > 0:
-                                    error_msg += ('unfreeze with error: ' + str(unfreeze_result.errors))
-                                    backup_logger.log(error_msg, True, 'Warning')
-                                else:
-                                    backup_logger.log('unfreeze result is None')
-                                    break;
-                        backup_logger.log('unfreeze ends...')
+                    freeze_snapshot(thread_timeout)
+                    backup_logger.log('unfreeze ends...')
 
                 if not doFsConsistentbackup:
                     postResult = PluginHostObj.post_script()
@@ -533,7 +458,6 @@ def enable():
                 mi.save_identity()
 
         hutil.exit_if_same_seq()
-        hutil.save_seq()
 
         """
         protectedSettings is the privateConfig passed from Powershell.
@@ -564,6 +488,9 @@ def enable():
             exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
+        if(hutil.is_prev_in_transition()):
+            backup_logger.set_prev_log()
+        hutil.save_seq()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
             backup_logger.commit(para_parser.logsBlobUri)
         temp_status= 'transitioning'
@@ -571,6 +498,7 @@ def enable():
         temp_msg='Transitioning state in enable'
         status_report(temp_status, temp_result, temp_msg, None)
         start_daemon();
+        sys.exit(0)
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
