@@ -98,8 +98,8 @@ class ScriptRunner(object):
                 self.preScriptNoOfRetries = configData['preScriptNoOfRetries']
             if 'postScriptNoOfRetries' in configDataKeys:
                 self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
-            if 'disableFsFreeze' in configDataKeys:
-                self.fsFreeze_on = not configData['disableFsFreeze']
+            if 'fsFreezeEnabled' in configDataKeys:
+                self.fsFreeze_on = configData['fsFreezeEnabled']
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:

@@ -1,12 +1,12 @@
 {
 	"pluginName" : "ScriptRunner",
-	"timeoutInSeconds" : 30,
-	"continueBackupOnFailure" : true,
-	"preScriptLocation" : "",
+    "preScriptLocation" : "",
 	"postScriptLocation" : "",
+	"preScriptParams" : ["", ""],
+	"postScriptParams" : ["", ""],
 	"preScriptNoOfRetries" : 0,
 	"postScriptNoOfRetries" : 0,
-	"disableFsFreeze" : false,
-	"preScriptParams" : ["", ""],
-	"postScriptParams" : ["", ""]
+	"timeoutInSeconds" : 30,
+	"continueBackupOnFailure" : true,
+	"fsFreezeEnabled" : true
 }
