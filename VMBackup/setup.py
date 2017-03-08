@@ -47,7 +47,8 @@ binary_entry = main_folder + '/safefreeze'
 packages_array.append(main_folder)
 
 plugin_folder = main_folder + '/tempPlugin'
-plugin_conf =  main_folder + '/PluginHost.conf'
+plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
+
 
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
