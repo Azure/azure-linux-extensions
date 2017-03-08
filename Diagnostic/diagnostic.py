@@ -52,8 +52,8 @@ try:
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
           'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print 'Are you running without waagent for some reason? Just passing here for now...'
-    # We may add some waagent mock later to support this scenario.
+    print "Can't proceed. Exiting with a special exit code 999."
+    sys.exit(999)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
 # Globals declaration/initialization (with const values only) for IDE
