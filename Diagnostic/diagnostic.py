@@ -41,8 +41,8 @@ try:  # Just wanted to be able to run 'python diagnostic.py ...' from a local de
     from Utils.WAAgentUtil import waagent
 except Exception as e:
     print('waagent import failed.\nException thrown: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
-    print('Are you running without waagent for some reason? Just passing here for now...')
-    # We may add some waagent mock later to support this scenario.
+    print "Can't proceed. Exiting with a special exit code 999."
+    sys.exit(999)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
 def init_public_and_private_settings():
