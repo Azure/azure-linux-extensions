@@ -11,13 +11,14 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import binascii
-from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics
+from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics, write_string_to_file
 import os.path
 import traceback
 import xml.etree.ElementTree as ET
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
+from Utils.lad30_syslog_config import RsyslogMdsdConfig, copy_schema_source_mdsdevent_elems
 
 
 class ConfigMdsdRsyslog:
@@ -373,20 +374,26 @@ $InputRunFileMonitor
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
         self._apply_perf_cfgs(do_ai)
 
-        # 4. Generate rsyslog imfile config. It's unclear why non-imfile config stuff (self._get_syslog_config())
-        #    is appended to imfileconfig as well. That part has never been used, as far as I remember, and will
-        #    definitely need to change later.
-        syslog_cfg = self._ext_settings.get_syslog_config()
-        file_cfg = self._ext_settings.get_file_monitoring_config()
-        # fileCfg = [{"file":"/var/log/waagent.log","table":"waagent"},{"file":"/var/log/waagent2.log","table":"waagent3"}]
+        # 4. Generate rsyslog omazuremds, imfile configs, and update corresponding mdsd config XML
         try:
-            if file_cfg:
-                syslog_cfg = self._update_and_get_file_monitoring_settings(file_cfg) + syslog_cfg
-            with open(self._imfile_config_filename, 'w') as imfile_config_file:
-                imfile_config_file.write(syslog_cfg)
+            lad30_syslogCfg = self._ext_settings.get_lad30_syslogCfg_setting()
+            lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
+            lad30_fileLogs = self._ext_settings.get_lad30_fileLogs_setting()
+            rsyslog_mdsd_config_helper = RsyslogMdsdConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs)
+            omazuremds_legacy_config = rsyslog_mdsd_config_helper.get_omazuremds_config(legacy=True)
+            omazuremds_config = rsyslog_mdsd_config_helper.get_omazuremds_config(legacy=False)
+            imfile_config = rsyslog_mdsd_config_helper.get_imfile_config()
+            mdsd_syslog_config = rsyslog_mdsd_config_helper.get_mdsd_syslog_config()
+            mdsd_filelog_config = rsyslog_mdsd_config_helper.get_mdsd_filelog_config()
+            write_string_to_file('rsyslog5/omazurelinuxmds.conf', omazuremds_legacy_config)
+            write_string_to_file('rsyslog7/omazurelinuxmds.conf', omazuremds_legacy_config)
+            write_string_to_file('rsyslog8/omazurelinuxmds.conf', omazuremds_config)
+            write_string_to_file(self._imfile_config_filename, imfile_config)
+            copy_schema_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
+            copy_schema_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
         except Exception as e:
-            self._logger_error("Failed to create rsyslog imfile config. Error:{0}\n"
-                         "Stacktrace: {1}".format(e, traceback.format_exc()))
+            self._logger_error("Failed to create omazuremds/imfile configs or to update corresponding "
+                               "mdsd config XML. Error: {0}\nStacktrace: {1}".format(e, traceback.format_exc()))
 
         # 5. Before starting to update the storage account settings, log extension's protected settings'
         #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that
