@@ -215,7 +215,7 @@ class BlobWriter(object):
         sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
         headers = {}
         headers["x-ms-page-write"] = 'clear'
-        headers["x-ms-range"] = 'bytes={}-{}'.format(pageBlobIndex, pageBlobIndex + clearLength - 1)
+        headers["x-ms-range"] = 'bytes={0}-{1}'.format(pageBlobIndex, pageBlobIndex + clearLength - 1)
         headers["Content-Length"] = 0
         result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = None, headers = headers, fallback_to_curl = True)
         return result
@@ -225,7 +225,7 @@ class BlobWriter(object):
         sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
         headers = {}
         headers["x-ms-page-write"] = 'update'
-        headers["x-ms-range"] = 'bytes={}-{}'.format(pageBlobIndex, pageBlobIndex + len(pageContent) - 1)
+        headers["x-ms-range"] = 'bytes={0}-{1}'.format(pageBlobIndex, pageBlobIndex + len(pageContent) - 1)
         headers["Content-Length"] = len(str(pageContent))
         result = http_util.Call(method = 'PUT', sasuri_obj = sasuri_obj, data = pageContent, headers = headers, fallback_to_curl = True)
         return result

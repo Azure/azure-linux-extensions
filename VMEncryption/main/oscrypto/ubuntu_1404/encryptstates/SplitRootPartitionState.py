@@ -40,7 +40,7 @@ class SplitRootPartitionState(OSEncryptionState):
         
         self.context.logger.log("Performing enter checks for split_root_partition state")
 
-        self.command_executor.Execute("e2fsck -yf /dev/sda1", True)
+        self.command_executor.Execute("e2fsck -yf {0}".format(self.rootfs_block_device), True)
                 
         return True
 
@@ -50,7 +50,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         self.context.logger.log("Entering split_root_partition state")
 
-        device = parted.getDevice('/dev/sda')
+        device = parted.getDevice(self.rootfs_disk)
         disk = parted.Disk(device)
 
         original_root_fs_size = self._get_root_fs_size_in(device.sectorSize)
@@ -116,12 +116,12 @@ class SplitRootPartitionState(OSEncryptionState):
         disk.commit()
         
         self.command_executor.Execute("partprobe", False)
-        self.command_executor.Execute("mkfs.ext2 /dev/sda2", True)
+        self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
         
-        boot_partition_uuid = self._get_uuid("/dev/sda2")
+        boot_partition_uuid = self._get_uuid(self.bootfs_block_device)
 
         # Move stuff from /oldroot/boot to new partition, make new partition mountable at the same spot
-        self.command_executor.Execute("mount /dev/sda1 /oldroot", True)
+        self.command_executor.Execute("mount {0} /oldroot".format(self.rootfs_block_device), True)
         self.command_executor.Execute("mkdir /oldroot/memroot", True)
         self.command_executor.Execute("mount --make-rprivate /", True)
         self.command_executor.Execute("pivot_root /oldroot /oldroot/memroot", True)
@@ -146,10 +146,13 @@ class SplitRootPartitionState(OSEncryptionState):
         except:
             self.context.logger.log("Could not unmount /oldroot, attempting to restart WALA and unmount again")
 
-            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
-            self.command_executor.Execute('killall -s KILL waagent', True)
+            self.should_exit()
+            
+            self.context.logger.log("Removing marker for UnmountOldrootState")
+            os.unlink(os.path.join(self.context.encryption_environment.os_encryption_markers_path, 'UnmountOldrootState'))
 
-            self.command_executor.Execute("umount /oldroot", True)
+            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
+            self.command_executor.Execute('service walinuxagent stop', True)
         
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
@@ -186,7 +189,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
     def _get_root_fs_size_in(self, sector_size):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="dumpe2fs -h /dev/sda1",
+        self.command_executor.Execute(command_to_execute="dumpe2fs -h {0}".format(self.rootfs_block_device),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
@@ -206,7 +209,7 @@ class SplitRootPartitionState(OSEncryptionState):
     def _resize_root_fs_to_sectors(self, desired_root_fs_size, sectorSize):
         self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
 
-        self.command_executor.Execute("resize2fs /dev/sda1 {0}s".format(desired_root_fs_size), True)
+        self.command_executor.Execute("resize2fs {0} {1}s".format(self.rootfs_block_device, desired_root_fs_size), True)
 
         resized_root_fs_size = self._get_root_fs_size_in(sectorSize)
 

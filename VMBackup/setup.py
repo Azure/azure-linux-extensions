@@ -49,6 +49,7 @@ packages_array.append(main_folder)
 plugin_folder = main_folder + '/tempPlugin'
 plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 
+
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
@@ -166,10 +167,15 @@ def zip(src, dst):
 def copybinary(src, dst):
     shutil.copytree(src, dst)
 
+def copy(src, dst):
+    shutil.copy2(src, dst)
+
 final_folder_path = target_zip_file_location + target_folder_name
 final_binary_path= final_folder_path + '/main/safefreeze'
 final_plugin_path = final_folder_path + '/main/tempPlugin'
+final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
+copy(plugin_conf, final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
 

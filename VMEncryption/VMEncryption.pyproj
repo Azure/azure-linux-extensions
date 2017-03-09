@@ -5,7 +5,6 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>334deedb-1c9a-40c8-89f2-a4ae042c18aa</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>test\test.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -30,6 +29,7 @@
     <Content Include="MANIFEST.in" />
     <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
+    <Content Include="main\oscrypto\rhel_72_lvm\encryptpatches\rhel_72_lvm_dracut.patch" />
     <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
@@ -85,6 +85,15 @@
     <Compile Include="main\oscrypto\__init__.py" />
     <Compile Include="main\oscrypto\OSEncryptionState.py" />
     <Compile Include="main\oscrypto\OSEncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\RHEL72LVMEncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\__init__.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\PrereqState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\SelinuxState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\StripdownState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\UnmountOldrootState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\EncryptBlockDeviceState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\PatchBootSystemState.py" />
+    <Compile Include="main\oscrypto\rhel_72_lvm\encryptstates\__init__.py" />
     <Compile Include="main\oscrypto\rhel_72\RHEL72EncryptionStateMachine.py" />
     <Compile Include="main\oscrypto\rhel_72\__init__.py" />
     <Compile Include="main\oscrypto\rhel_72\encryptstates\PrereqState.py" />
@@ -146,6 +155,9 @@
   <ItemGroup>
     <Folder Include="main\" />
     <Folder Include="main\oscrypto\" />
+    <Folder Include="main\oscrypto\rhel_72_lvm\" />
+    <Folder Include="main\oscrypto\rhel_72_lvm\encryptstates\" />
+    <Folder Include="main\oscrypto\rhel_72_lvm\encryptpatches\" />
     <Folder Include="main\oscrypto\rhel_72\" />
     <Folder Include="main\oscrypto\rhel_72\encryptstates\" />
     <Folder Include="main\oscrypto\rhel_72\encryptpatches\" />
