@@ -149,40 +149,40 @@ class ScriptRunner(object):
         if not self.configLoaded:
             errorCode = CommonVariables.FailedPrepostPluginConfigParsing
             self.logger.log('Cant run prescript for '+self.pluginName+' . Config File error.', True, 'Error')
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         dobackup = self.continueBackupOnFailure
 
         if not os.path.isfile(self.preScriptLocation):
             self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptNotFound
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         if not self.validate_permissions(self.preScriptLocation):
             self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
 
         if not self.find_owner(self.preScriptLocation) == 'root':
             self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         if not os.path.isfile(self.postScriptLocation):
             self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptNotFound
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         if not self.validate_permissions(self.postScriptLocation):
             self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         if not self.find_owner(self.postScriptLocation) == 'root':
             self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup
+            return errorCode,dobackup,self.fsFreeze_on
 
         return errorCode,dobackup,self.fsFreeze_on
 
