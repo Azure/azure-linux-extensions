@@ -433,7 +433,7 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], status_code)
+        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
@@ -496,3 +496,24 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
+
+    def is_prev_in_transition(self):
+        last_seq = self.get_last_seq()
+        self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
+        status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+        if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
+            searchfile = open(status_file_prev, "r")
+            for line in searchfile:
+                if "transition" in line: 
+                    return True
+            searchfile.close()
+        return False
+
+    def get_prev_log(self):
+        with open(self._context._log_file, "r") as f:
+            lines = f.readlines()
+        if(len(lines) > 100):
+            lines = lines[-100:]
+            return ''.join(str(x) for x in lines)
+        else:
+            return ''.join(str(x) for x in lines)
