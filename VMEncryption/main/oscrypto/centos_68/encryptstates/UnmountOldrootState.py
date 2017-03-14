@@ -74,6 +74,8 @@ class UnmountOldrootState(OSEncryptionState):
                 self.command_executor.Execute('service {0} restart'.format(service))
 
         self.command_executor.Execute('umount -a')
+        self.command_executor.Execute('mount -t proc proc /proc')
+        self.command_executor.Execute('mount -t sysfs sysfs /sys')
         self.command_executor.Execute('swapoff -a', True)
 
         self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
