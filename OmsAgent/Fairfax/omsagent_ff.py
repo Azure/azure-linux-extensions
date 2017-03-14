@@ -77,7 +77,7 @@ def main():
 
         waagent.Error(err_msg)
         hutil.error(err_msg)
-        hutil.do_exit(exit_code, 'Enable','failed','0',
+        hutil.do_exit(exit_code, 'Enable','failed', str(exit_code),
                       'Enable failed: {0}'.format(e))
 
 
