@@ -7,6 +7,7 @@ SOURCES = \
 	manifest.xml \
 	azure \
 	packages \
+	../Utils \
 
 clean:
 	rm -rf output

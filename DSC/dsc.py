@@ -113,7 +113,7 @@ def install():
     hutil.do_parse_context('Install')
     try:
         hutil.log('DSC installation is in progress ')
-                waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="install in is inprogress")
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="install in is inprogress")
         remove_old_dsc_packages()
         install_dsc_packages()
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
