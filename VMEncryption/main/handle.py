@@ -59,6 +59,8 @@ from __builtin__ import int
 def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
+    logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -483,7 +485,13 @@ def enable():
 
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
-            enable_encryption()
+            if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
+                logger.log("Config has changed, updating encryption settings")
+                update_encryption_settings()
+                extension_parameter.commit()
+            else:
+                logger.log("Config did not change or first call, enabling encryption")
+                enable_encryption()
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
@@ -1425,10 +1433,12 @@ def daemon_encrypt():
                       code=CommonVariables.passphrase_file_not_found,
                       message='Passphrase file not found.')
 
+    executor = CommandExecutor(logger)
+    is_not_in_stripped_os = bool(executor.Execute("mountpoint /oldroot"))
     volume_type = encryption_config.get_volume_type().lower()
 
-    if volume_type == CommonVariables.VolumeTypeData.lower() or \
-       volume_type == CommonVariables.VolumeTypeAll.lower():
+    if (volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower()) and \
+        is_not_in_stripped_os:
         try:
             while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
                                                   encryption_config=encryption_config,
@@ -1459,7 +1469,22 @@ def daemon_encrypt():
 
         os_encryption = None
 
-        if ((distro_name == 'redhat' and distro_version == '7.2') or
+        if ((distro_name == 'redhat' and distro_version == '7.2') and
+              (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
+            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+            os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
+        elif ((distro_name == 'centos' and distro_version == '7.3.1611') and
+              (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
+            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+            os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
+        elif ((distro_name == 'redhat' and distro_version == '7.2') or
+            (distro_name == 'redhat' and distro_version == '7.3') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
             os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
