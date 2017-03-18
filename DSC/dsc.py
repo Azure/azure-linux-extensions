@@ -33,7 +33,7 @@ import Utils.HandlerUtil as Util
 
 # Define global variables
 
-ExtensionShortName = 'DSC'
+ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
 omi_package_prefix = 'packages/omi-1.0.8.ssl_'
@@ -101,7 +101,7 @@ def main():
 def get_distro_category():
     distro_info = platform.dist()
     distro_name = distro_info[0].lower()
-    if distro_name == 'ubuntu' or distro_name == 'debian':
+    if distro_name == 'ubuntu' or distro_name == 'debian' or distro_name == 'oracle':
         return DistroCategory.debian
     elif distro_name == 'centos' or distro_name == 'redhat':
         return DistroCategory.redhat
@@ -112,10 +112,10 @@ def get_distro_category():
 def install():
     hutil.do_parse_context('Install')
     try:
-        hutil.log('DSC installation is in progress ')
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="install in is inprogress")
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Installing DSCForLinux extension")
         remove_old_dsc_packages()
         install_dsc_packages()
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="successfully installed DSCForLinux extension")
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
         hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
@@ -215,6 +215,7 @@ def get_config(key):
     return ''
 
 def remove_old_dsc_packages():
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Deleting DSC and omi packages")
     if distro_category == DistroCategory.debian:
         deb_remove_old_package('dsc', dsc_version_deb)
         # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
