@@ -672,8 +672,8 @@ class DiskUtil(object):
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
-        device_id = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())[0]
-        return device_id
+        match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
+        return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
         self.logger.log("getting property of device {0}".format(dev_name))
