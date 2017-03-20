@@ -101,9 +101,9 @@ def main():
 def get_distro_category():
     distro_info = platform.dist()
     distro_name = distro_info[0].lower()
-    if distro_name == 'ubuntu' or distro_name == 'debian' or distro_name == 'oracle':
+    if distro_name == 'ubuntu' or distro_name == 'debian':
         return DistroCategory.debian
-    elif distro_name == 'centos' or distro_name == 'redhat':
+    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
         return DistroCategory.redhat
     elif distro_name == 'suse':
         return DistroCategory.suse 
