@@ -888,7 +888,7 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
-    def should_skip_for_inplace_encryption(self, device_item):
+    def should_skip_for_inplace_encryption(self, device_item, encrypt_volume_type):
         """
         TYPE="raid0"
         TYPE="part"
@@ -898,6 +898,16 @@ class DiskUtil(object):
         if the type is disk, then to check whether it have child-items, say the part, lvm or crypt luks.
         if the answer is yes, then skip it.
         """
+
+        if encrypt_volume_type.lower() == 'data':
+            self.logger.log(msg="enabling encryption for data volumes", level=CommonVariables.WarningLevel)
+            if device_item.device_id.startswith('00000000-0000'):
+                self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
+                return True
+            if device_item.device_id.startswith('00000000-0001'):
+                self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
+                return True
+
         if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
             return True
