@@ -678,7 +678,7 @@ class DiskUtil(object):
     def get_device_items_property(self, dev_name, property_name):
         self.logger.log("getting property of device {0}".format(dev_name))
 
-        device_path = get_device_path(dev_name)
+        device_path = self.get_device_path(dev_name)
 
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
