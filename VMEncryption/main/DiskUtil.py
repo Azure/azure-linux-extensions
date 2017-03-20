@@ -658,20 +658,35 @@ class DiskUtil(object):
         sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
         return self.query_dev_uuid_path_by_sdx_path(sdx_path)
 
-    def get_device_items_property(self, dev_name, property_name):
-        self.logger.log("getting property of device {0}".format(dev_name))
-
+    def get_device_path(self, dev_name):
         device_path = None
+
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
         elif os.path.exists("/dev/mapper/" + dev_name):
             device_path = "/dev/mapper/" + dev_name
+
+        return device_path
+
+    def get_device_id(self, dev_path):
+        udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
+        proc_comm = ProcessCommunicator()
+        self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
+        device_id = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
+        return device_id
+
+    def get_device_items_property(self, dev_name, property_name):
+        self.logger.log("getting property of device {0}".format(dev_name))
+
+        device_path = get_device_path(dev_name)
 
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
             return proc_comm.stdout.strip()
+        elif property_name == "DEVICE_ID":
+            return self.get_device_id(device_path)
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
@@ -713,6 +728,7 @@ class DiskUtil(object):
             device_item.label = self.get_device_items_property(dev_name=device_item.name, property_name='LABEL')
             device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
             device_item.majmin = self.get_device_items_property(dev_name=device_item.name, property_name='MAJ:MIN')
+            device_item.device_id = self.get_device_items_property(dev_name=device_item.name, property_name='DEVICE_ID')
 
             # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
@@ -796,6 +812,8 @@ class DiskUtil(object):
 
                         if property_item_pair[0] == 'MAJ:MIN':
                             device_item.majmin = property_item_pair[1].strip('"')
+
+                    device_item.device_id = self.get_device_id(self.get_device_path(device_item.name))
 
                     if device_item.type is None:
                         device_item.type = ''
