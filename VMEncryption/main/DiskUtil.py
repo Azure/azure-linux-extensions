@@ -38,6 +38,7 @@ from Common import *
 
 class DiskUtil(object):
     os_disk_lvm = None
+    sles_cache = {}
 
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
@@ -676,17 +677,21 @@ class DiskUtil(object):
         return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
+        if (dev_name, property_name) in DiskUtil.sles_cache:
+            return DiskUtil.sles_cache[(dev_name, property_name)]
+
         self.logger.log("getting property of device {0}".format(dev_name))
 
         device_path = self.get_device_path(dev_name)
+        property_value = ""
 
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
-            return proc_comm.stdout.strip()
+            property_value = proc_comm.stdout.strip()
         elif property_name == "DEVICE_ID":
-            return self.get_device_id(device_path)
+            property_value = self.get_device_id(device_path)
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
@@ -696,9 +701,10 @@ class DiskUtil(object):
                     disk_info_item_array = line.strip().split()
                     if dev_name == disk_info_item_array[0]:
                         if len(disk_info_item_array) > 1:
-                            return disk_info_item_array[1]
+                            property_value = disk_info_item_array[1]
 
-        return
+        DiskUtil.sles_cache[(dev_name, property_name)] = property_value
+        return property_value
 
     def get_device_items_sles(self, dev_path):
         if dev_path:
