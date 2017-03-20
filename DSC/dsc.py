@@ -103,11 +103,12 @@ def get_distro_category():
     distro_name = distro_info[0].lower()
     if distro_name == 'ubuntu' or distro_name == 'debian':
         return DistroCategory.debian
-    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
+    elif distro_name == 'centos' or distro_name == 'redhat':
         return DistroCategory.redhat
     elif distro_name == 'suse':
         return DistroCategory.suse 
-    raise Exception('Unsupported distro: {0}'.format(distro_info[0]))
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Unsupported distro" + distro_info)
+    hutil.do_exit(51, 'Install', 'error', '51', distro_info + 'is not supported.')
 
 def install():
     hutil.do_parse_context('Install')
@@ -118,6 +119,7 @@ def install():
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="successfully installed DSCForLinux extension")
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="failed to install an extension with error" + str(e))
         hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '1', 'Install Failed.')
 
@@ -127,6 +129,7 @@ def enable():
     try:
         start_omiservice()
         mode = get_config('Mode')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInprogress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
         if mode == '':
             mode = Mode.push
         else:
@@ -134,9 +137,9 @@ def enable():
             if not hasattr(Mode, mode):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
-                                          isSuccess=False,
+                                          isSuccess=True,
                                           message="(03001)Argument error, invalid mode")
-                hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed, unknown mode: ' + mode)
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
@@ -176,6 +179,7 @@ def enable():
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInprogress', isSuccess=True, message="Enable failed with the error " + str(e))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -255,6 +259,7 @@ def install_dsc_packages():
     openssl_version = get_openssl_version()
     omi_package_path = omi_package_prefix + openssl_version
     dsc_package_path = dsc_package_prefix + openssl_version
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Installing omipackage version: " + omi_package_path + "; dsc package version: " +  dsc_package_path)
     if distro_category == DistroCategory.debian:
         deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
@@ -273,6 +278,7 @@ def rpm_install_pkg(package_path, package_name):
         if code == 0:
             hutil.log(package_name + ' is installed successfully')
         else:
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Failed to install RPM package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
 def deb_install_pkg(package_path, package_name, package_version):
@@ -286,6 +292,7 @@ def deb_install_pkg(package_path, package_name, package_version):
         if code == 0:
             hutil.log(package_name + ' version ' + package_version + ' is installed successfully')
         else:
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Failed to install debian package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
 def install_package(package):
@@ -302,6 +309,7 @@ def zypper_package_install(package):
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Failed to install zypper package :" + package)
         raise Exception('Failed to install package {0}: {1}'.format(package, output))
 
 def yum_package_install(package):
@@ -310,6 +318,7 @@ def yum_package_install(package):
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Failed to install yum package :" + package)
         raise Exception('Failed to install package {0}: {1}'.format(package, output))
 
 def apt_package_install(package):
@@ -318,6 +327,7 @@ def apt_package_install(package):
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="Failed to install apt package :" + package)
         raise Exception('Failed to install package {0}: {1}'.format(package, output))    
 
 def get_openssl_version():
@@ -330,7 +340,8 @@ def get_openssl_version():
     else:
         error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*'
         hutil.error(error_msg)
-        raise Exception(error_msg)                
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + package)
+        hutil.do_exit(51, 'Install', 'error', '51', openssl_version + 'is not supported.')
         
 def start_omiservice():
     run_cmd('/opt/omi/bin/service_control start')
@@ -353,7 +364,7 @@ def download_file():
                                   op=Operation.Download,
                                   isSuccess=False,
                                   message="(03000)Argument error, invalid file location")
-        raise Exception(error_msg)
+        hutil.do_exit(51, 'Enable', 'error', '51', '(03000)Argument error, invalid file location')
 
     if storage_account_name and storage_account_key:
         hutil.log('Downloading file from azure storage...')
@@ -521,6 +532,7 @@ def remove_module():
                               message="(03103)Succeeded to remove DSC Module")
 
 def uninstall_package(package_name):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="uninstalling the package" + package_name)
     if distro_category == DistroCategory.debian:
         deb_uninstall_package(package_name)
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
@@ -532,6 +544,7 @@ def deb_uninstall_package(package_name):
     if code == 0:
         hutil.log('Package ' + package_name + ' is removed successfully')
     else:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
 
 def rpm_uninstall_package(package_name):
@@ -540,6 +553,7 @@ def rpm_uninstall_package(package_name):
     if code == 0:
         hutil.log('Package ' + package_name + ' is removed successfully')
     else:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInprogress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
 
 def register_automation():
