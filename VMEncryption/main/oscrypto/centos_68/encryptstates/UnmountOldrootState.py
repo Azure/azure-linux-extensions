@@ -140,7 +140,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
-        self.command_executor.ExecuteInBash('for mp in `grep /oldroot /proc/mounts | cut -f2 -d" " | sort -r`; do umount $mp; done', True)
+        self.command_executor.ExecuteInBash('for mp in `grep /oldroot /proc/mounts | cut -f2 -d\' \' | sort -r`; do umount $mp; done', True)
 
         sleep(3)
 
