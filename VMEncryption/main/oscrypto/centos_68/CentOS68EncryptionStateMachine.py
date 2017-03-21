@@ -191,8 +191,9 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
                                             status=CommonVariables.extension_error_status,
                                             status_code=str(CommonVariables.unmount_oldroot_error),
                                             message=message)
-
+                
                 sleep(10)
+                raise Exception(message)
             else:
                 oldroot_unmounted_successfully = True
             finally:
