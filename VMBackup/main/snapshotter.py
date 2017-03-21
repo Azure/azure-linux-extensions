@@ -304,7 +304,7 @@ class Snapshotter(object):
         else:
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
             if exceptOccurred and thaw_done == False:
-                snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, unable_to_sleep =  self.snapshotall_seq(paras, freezer)
+                snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
