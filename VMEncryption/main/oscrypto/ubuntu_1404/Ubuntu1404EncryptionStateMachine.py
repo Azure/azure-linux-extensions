@@ -181,7 +181,8 @@ class Ubuntu1404EncryptionStateMachine(OSEncryptionStateMachine):
                                             message=message)
 
                 sleep(10)
-                raise Exception(message)
+                if attempt > 10:
+                    raise Exception(message)
             else:
                 oldroot_unmounted_successfully = True
             finally:
