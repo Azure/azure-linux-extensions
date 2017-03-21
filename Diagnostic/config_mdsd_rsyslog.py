@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-from Utils.lad30_syslog_config import RsyslogMdsdConfig, copy_schema_source_mdsdevent_elems
+from Utils.lad30_syslog_config import SyslogMdsdConfig, copy_source_mdsdevent_elems
 
 
 class ConfigMdsdRsyslog:
@@ -379,7 +379,7 @@ $InputRunFileMonitor
             lad30_syslogCfg = self._ext_settings.get_lad30_syslogCfg_setting()
             lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
             lad30_fileLogs = self._ext_settings.get_lad30_fileLogs_setting()
-            rsyslog_mdsd_config_helper = RsyslogMdsdConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs)
+            rsyslog_mdsd_config_helper = SyslogMdsdConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs)
             omazuremds_legacy_config = rsyslog_mdsd_config_helper.get_omazuremds_config(legacy=True)
             omazuremds_config = rsyslog_mdsd_config_helper.get_omazuremds_config(legacy=False)
             imfile_config = rsyslog_mdsd_config_helper.get_imfile_config()
@@ -389,8 +389,8 @@ $InputRunFileMonitor
             write_string_to_file('rsyslog7/omazurelinuxmds.conf', omazuremds_legacy_config)
             write_string_to_file('rsyslog8/omazurelinuxmds.conf', omazuremds_config)
             write_string_to_file(self._imfile_config_filename, imfile_config)
-            copy_schema_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
-            copy_schema_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
+            copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
+            copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
         except Exception as e:
             self._logger_error("Failed to create omazuremds/imfile configs or to update corresponding "
                                "mdsd config XML. Error: {0}\nStacktrace: {1}".format(e, traceback.format_exc()))
