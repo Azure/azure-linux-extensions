@@ -327,6 +327,7 @@ class SyslogMdsdConfig:
     type mdsd
     log_level warn
     djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    mdsd_tag_prefix mdsd.syslog  # fluentd tag prefix that will be used as mdsd source name
     acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
     num_threads 1
     buffer_chunk_limit 1000k
