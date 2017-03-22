@@ -129,7 +129,7 @@ def enable():
     try:
         start_omiservice()
         mode = get_config('Mode')
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInprogress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
         if mode == '':
             mode = Mode.push
         else:
@@ -138,8 +138,8 @@ def enable():
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=True,
-                                          message="(03001)Argument error, invalid mode")
-                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown mode: ' + mode)
+                                          message="(03001)Argument error, invalid mode. DSC supports only Push and Pull mode.")
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown mode: ' + mode + " DSC supports only Push and Pull mode.")
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
@@ -179,7 +179,7 @@ def enable():
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInprogress', isSuccess=True, message="Enable failed with the error " + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error " + str(e))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -542,7 +542,7 @@ def deb_uninstall_package(package_name):
     cmd = 'dpkg -P ' + package_name
     code,output = run_cmd(cmd)
     if code == 0:
-        hutil.log('Package ' + package_name + ' is removed successfully')
+        hutil.log('Package ' + package_name + ' was removed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
@@ -551,7 +551,7 @@ def rpm_uninstall_package(package_name):
     cmd = 'rpm -e ' + package_name
     code,output = run_cmd(cmd)
     if code == 0:
-        hutil.log('Package ' + package_name + ' is removed successfully')
+        hutil.log('Package ' + package_name + ' was removed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
