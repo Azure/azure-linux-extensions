@@ -119,10 +119,10 @@ class SyslogMdsdConfig:
                 # E.g., { '/var/log/mydaemonlog1': 'MyDaemon1Events', '/var/log/mydaemonlog2': 'MyDaemon2Events' }
                 self._file_table_map = dict([(entry['file'], entry['table']) for entry in self._fileLogs])
 
-            self._oms_rsyslog_config = self._create_oms_rsyslog_config()
-            self._oms_syslog_ng_config = self._create_oms_syslog_ng_config()
-            self._oms_mdsd_syslog_config = self._create_oms_mdsd_syslog_config()
-            self._oms_mdsd_filelog_config = self._create_oms_filelog_config()
+            self._oms_rsyslog_config = None
+            self._oms_syslog_ng_config = None
+            self._oms_mdsd_syslog_config = None
+            self._oms_mdsd_filelog_config = None
         except KeyError as e:
             raise LadSyslogConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
@@ -135,6 +135,13 @@ class SyslogMdsdConfig:
         :return: rsyslog config string that should be appended to /etc/rsyslog.d/95-omsagent.conf (new rsyslog)
                  or to /etc/rsyslog.conf (old rsyslog)
         """
+        if not self._oms_rsyslog_config:
+            # Generate/save/return rsyslog config string for the facility-severity pairs.
+            # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
+            self._oms_rsyslog_config = '' if not self._fac_sev_map else \
+                '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
+                                                                     syslog_name_to_rsyslog_name(sev))
+                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._oms_rsyslog_config
 
     def get_oms_syslog_ng_config(self):
@@ -145,6 +152,14 @@ class SyslogMdsdConfig:
         :rtype: str
         :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
         """
+        if not self._oms_syslog_ng_config:
+            # Generate/save/return syslog-ng config string for the facility-severity pairs.
+            # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
+            self._oms_syslog_ng_config = '' if not self._fac_sev_map else \
+                '\n'.join('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
+                          'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
+                                                               syslog_name_to_rsyslog_name(sev))
+                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._oms_syslog_ng_config
 
     def get_oms_mdsd_syslog_config(self):
@@ -153,55 +168,13 @@ class SyslogMdsdConfig:
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for syslog use with omsagent in LAD 3.0.
         """
+        if not self._oms_mdsd_syslog_config:
+            self._oms_mdsd_syslog_config = self.__generate_oms_mdsd_syslog_config()
         return self._oms_mdsd_syslog_config
 
-    def get_oms_mdsd_filelog_config(self):
+    def __generate_oms_mdsd_syslog_config(self):
         """
-        Get mdsd XML config string for filelog (tail) use with omsagent in LAD 3.0.
-        :rtype: str
-        :return: XML string that should be added to the mdsd config XML tree for filelog use with omsagent in LAD 3.0.
-        """
-        return self._oms_mdsd_filelog_config
-
-    def _create_oms_rsyslog_config(self):
-        """
-        Construct rsyslog config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
-        JSON object given in the construction parameters.
-        :rtype: str
-        :return: rsyslog config string that should be appended to /etc/rsyslog.d/95-omsagent.conf (new rsyslog)
-                 or to /etc/rsyslog.conf (old rsyslog)
-        """
-        if not self._fac_sev_map:
-            return ''
-
-        # Get/return rsyslog config string for the facility-severity pairs.
-        # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
-        return '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
-                                                                   syslog_name_to_rsyslog_name(sev))
-                         for fac, sev in self._fac_sev_map.iteritems()) + '\n'
-
-    def _create_oms_syslog_ng_config(self):
-        """
-        Construct syslog-ng config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
-        JSON object given in the construction parameters.
-        :rtype: str
-        :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
-        """
-        if not self._fac_sev_map:
-            return ''
-
-        # Get/return syslog-ng config string for the facility-severity pairs.
-        # E.g.: "log { source(src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
-        return '\n'.join('log {{ source(src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
-                         'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
-                                                              syslog_name_to_rsyslog_name(sev))
-                         for fac, sev in self._fac_sev_map.iteritems()) + '\n'
-
-    def _create_oms_mdsd_syslog_config(self):
-        """
-        Construct mdsd XML config string for syslog use with omsagent in LAD 3.0.
-        :rtype: str
-        :return: XML string that should be added to the mdsd config XML tree for syslog use with omsagent in LAD 3.0.
+        Helper method to generate oms_mdsd_syslog_config
         """
         if not self._fac_sev_map:
             return ''
@@ -242,11 +215,19 @@ class SyslogMdsdConfig:
                 per_table_mdsd_event_source_template.format(source_name, self._facsev_table_map[facsev_key])
         return oms_mdsd_syslog_config.format(syslog_sources, syslog_mdsd_event_sources)
 
-    def _create_oms_filelog_config(self):
+    def get_oms_mdsd_filelog_config(self):
         """
-        Construct mdsd XML config string for filelog (tail) use with omsagent in LAD 3.0.
+        Get mdsd XML config string for filelog (tail) use with omsagent in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for filelog use with omsagent in LAD 3.0.
+        """
+        if not self._oms_mdsd_filelog_config:
+            self._oms_mdsd_filelog_config = self.__generate_oms_mdsd_filelog_config()
+        return self._oms_mdsd_filelog_config
+
+    def __generate_oms_mdsd_filelog_config(self):
+        """
+        Helper method to generate oms_mdsd_filelog_config
         """
         if not self._fileLogs:
             return ''
@@ -278,6 +259,86 @@ class SyslogMdsdConfig:
             filelogs_mdsd_event_sources += \
                 per_file_mdsd_event_source_template.format(source_name, self._file_table_map[file_key])
         return oms_filelogs_mdsd_config.format(filelogs_sources, filelogs_mdsd_event_sources)
+
+    def get_oms_fluentd_syslog_src_config(self):
+        """
+        Get Fluentd's syslog source config that should be used for this LAD's syslog configs.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
+                 (after replacing '%SYSLOG_PORT%' with the assigned/picked port number)
+        """
+        fluentd_syslog_src_config = """
+<source>
+  type syslog
+  port %SYSLOG_PORT%
+  bind 127.0.0.1
+  protocol_type udp
+  tag mdsd.syslog
+</source>
+
+# Generate fields expected for existing mdsd syslog collection schema.
+# This method needs record_modifier plugin.
+# Run '/opt/microsoft/omsagent/ruby/bin/fluent-gem install fluent-plugin-record-modifier'
+# to install the plugin.
+<filter mdsd.syslog.**>
+  type record_modifier
+  # Fields expected by mdsd for syslog messages
+  <record>
+    Ignore "syslog"
+    Facility ${tag_parts[2]}
+    Severity ${tag_parts[3]}
+    EventTime ${Time.at(time).strftime('%Y-%m-%dT%H:%M:%S%z')}
+    SendingHost ${record["source_host"]}
+    Msg ${record["message"]}
+  </record>
+  remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
+</filter>
+"""
+        fluentd_syslog_tag_converter_for_extended_config = """
+# Unify mdsd.syslog.<facility>.<level> to mdsd.ext_syslog.<facility> for extended LAD syslog config scenario
+# (per facility/min-level table dest).
+<match mdsd.syslog.**>
+  type record_modifier
+  tag mdsd.ext_syslog.${tag_parts[2]}
+</match>
+"""
+        # Basic config case (single table destination for all facilities/levels)
+        if self._syslogEvents:
+            return fluentd_syslog_src_config
+        # Extended config case (per facility/min-level table destination)
+        if self._syslogCfg:
+            return fluentd_syslog_src_config + fluentd_syslog_tag_converter_for_extended_config
+        # No syslog config
+        return ''
+
+    def get_oms_fluentd_out_mdsd_config(self):
+        """
+        Get Fluentd's out_mdsd output config that should be used for LAD.
+        TODO This is not really syslog-specific, so should be moved outside from here.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/out_mdsd.conf
+        """
+        fluentd_out_mdsd_config = """
+# Output to mdsd. The out_mdsd fluentd plugin must be installed in advance.
+# Run '/opt/microsoft/omsagent/ruby/bin/fluent-gem install .../fluent-plugin-mdsd-*.gem' to install the plugin.
+<match mdsd.**>
+    type mdsd
+    log_level warn
+    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
+    num_threads 1
+    buffer_chunk_limit 1000k
+    buffer_type file
+    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_queue_limit 128
+    flush_interval 10s
+    retry_limit 3
+    retry_wait 10s
+</match>
+"""
+        return fluentd_out_mdsd_config
 
 
 syslog_name_to_rsyslog_name_map = {
