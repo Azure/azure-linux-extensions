@@ -150,6 +150,7 @@ class SplitRootPartitionState(OSEncryptionState):
             self.command_executor.Execute('service waagent stop', True)
 
             os.unlink('/var/lib/azure_disk_encryption_config/os_encryption_markers/UnmountOldrootState')
+            self.should_exit()
 
             raise
         
