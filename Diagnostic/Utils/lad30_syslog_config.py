@@ -274,41 +274,31 @@ class SyslogMdsdConfig:
   port %SYSLOG_PORT%
   bind 127.0.0.1
   protocol_type udp
-  tag mdsd.syslog
+  tag mdsd.%SYSLOG_TAG_PART%
 </source>
 
 # Generate fields expected for existing mdsd syslog collection schema.
-# This method needs record_modifier plugin.
-# Run '/opt/microsoft/omsagent/ruby/bin/fluent-gem install fluent-plugin-record-modifier'
-# to install the plugin.
-<filter mdsd.syslog.**>
-  type record_modifier
-  # Fields expected by mdsd for syslog messages
+<filter mdsd.%SYSLOG_TAG_PART%.**>
+  type record_transformer
+  enable_ruby
   <record>
+    # Fields expected by mdsd for syslog messages
     Ignore "syslog"
     Facility ${tag_parts[2]}
     Severity ${tag_parts[3]}
-    EventTime ${Time.at(time).strftime('%Y-%m-%dT%H:%M:%S%z')}
+    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
     SendingHost ${record["source_host"]}
     Msg ${record["message"]}
   </record>
   remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
-        fluentd_syslog_tag_converter_for_extended_config = """
-# Unify mdsd.syslog.<facility>.<level> to mdsd.ext_syslog.<facility> for extended LAD syslog config scenario
-# (per facility/min-level table dest).
-<match mdsd.syslog.**>
-  type record_modifier
-  tag mdsd.ext_syslog.${tag_parts[2]}
-</match>
-"""
         # Basic config case (single table destination for all facilities/levels)
         if self._syslogEvents:
-            return fluentd_syslog_src_config
+            return fluentd_syslog_src_config.replace('%SYSLOG_TAG_PART%', 'syslog')
         # Extended config case (per facility/min-level table destination)
         if self._syslogCfg:
-            return fluentd_syslog_src_config + fluentd_syslog_tag_converter_for_extended_config
+            return fluentd_syslog_src_config.replace('%SYSLOG_TAG_PART%', 'ext_syslog')
         # No syslog config
         return ''
 
@@ -318,18 +308,16 @@ class SyslogMdsdConfig:
         TODO This is not really syslog-specific, so should be moved outside from here.
         :rtype: str
         :return: Fluentd config string that should be overwritten to
-                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/out_mdsd.conf
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/z_out_mdsd.conf
         """
-        fluentd_out_mdsd_config = """
-# Output to mdsd. The out_mdsd fluentd plugin must be installed in advance.
-# Run '/opt/microsoft/omsagent/ruby/bin/fluent-gem install .../fluent-plugin-mdsd-*.gem' to install the plugin.
+        fluentd_out_mdsd_config_template = """
+# Output to mdsd
 <match mdsd.**>
     type mdsd
     log_level warn
     djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
-    mdsd_tag_prefix mdsd.syslog  # fluentd tag prefix that will be used as mdsd source name
     acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
-    num_threads 1
+{0}    num_threads 1
     buffer_chunk_limit 1000k
     buffer_type file
     buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
@@ -339,7 +327,18 @@ class SyslogMdsdConfig:
     retry_wait 10s
 </match>
 """
-        return fluentd_out_mdsd_config
+        tag_regex_patterns_template = """    mdsd_tag_regex_patterns [{0}] # fluentd tag patterns whose match will be used as mdsd source name
+"""
+        # Basic config case (single table destination for all facilities/levels)
+        if self._syslogEvents:
+            tag_regex_patterns = tag_regex_patterns_template.format(r' "^mdsd\\.syslog" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_patterns)
+        # Extended config case (per facility/min-level table destination)
+        if self._syslogCfg:
+            tag_regex_patterns = tag_regex_patterns_template.format(r' "^mdsd\\.ext_syslog\\.\\w+" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_patterns)
+        # No syslog config
+        return fluentd_out_mdsd_config_template.format('')
 
 
 syslog_name_to_rsyslog_name_map = {

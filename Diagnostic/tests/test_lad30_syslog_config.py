@@ -8,144 +8,100 @@ from xmlunittest import XmlTestMixin
 from Utils.lad30_syslog_config import *
 
 
-# "syslogEvents" LAD config example
-syslog_basic_json_ext_settings = """
-{
-    "syslogEventConfiguration": {
-        "LOG_LOCAL0": "LOG_CRIT",
-        "LOG_USER": "LOG_ERR"
-    }
-}
-"""
-
-# "syslogCfg" LAD config example
-syslog_extended_json_ext_settings = """
-[
-    {
-        "facility": "LOG_USER",
-        "minSeverity": "LOG_ERR",
-        "table": "SyslogUserErrorEvents"
-    },
-    {
-        "facility": "LOG_LOCAL0",
-        "minSeverity": "LOG_CRIT",
-        "table": "SyslogLocal0CritEvents"
-    }
-]
-"""
-
-# <!-- Expected mdsd XML config for syslog_extended_json_ext_settings -->
-# This resulting XML will need to be merged to the main mdsd config XML that's created from mdsdConfig.xml.template.
-oms_syslog_mdsd_ext_expected_xml = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Sources>
-    <Source name="mdsd.ext_syslog.local0" dynamic_schema="true" />
-    <Source name="mdsd.ext_syslog.user" dynamic_schema="true" />
-  </Sources>
-
-  <Events>
-    <MdsdEvents>
-      <MdsdEventSource source="mdsd.ext_syslog.local0">
-        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogLocal0CritEvents" priority="High" />
-      </MdsdEventSource>
-      <MdsdEventSource source="mdsd.ext_syslog.user">
-        <RouteEvent dontUsePerNDayTable="true" eventName="SyslogUserErrorEvents" priority="High" />
-      </MdsdEventSource>
-    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-
-# "fileLogs" LAD config example
-filelogs_json_ext_settings = """
-[
-    {
-        "file": "/var/log/mydaemonlog1",
-        "table": "MyDaemon1Events"
-    },
-    {
-        "file": "/var/log/mydaemonlog2",
-        "table": "MyDaemon2Events"
-    }
-]
-"""
-
-# <!-- Expected mdsd XML config for filelogs_json_ext_settings -->
-# This resulting XML will need to be merged to the main mdsd config XML that's created from mdsdConfig.xml.template.
-oms_filelogs_mdsd_expected_xml = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Sources>
-    <Source name="mdsd.filelog.var.log.mydaemonlog1" dynamic_schema="true" />
-    <Source name="mdsd.filelog.var.log.mydaemonlog2" dynamic_schema="true" />
-  </Sources>
-
-  <Events>
-    <MdsdEvents>
-      <MdsdEventSource source="mdsd.filelog.var.log.mydaemonlog1">
-        <RouteEvent dontUsePerNDayTable="true" eventName="MyDaemon1Events" priority="High" />
-      </MdsdEventSource>
-      <MdsdEventSource source="mdsd.filelog.var.log.mydaemonlog2">
-        <RouteEvent dontUsePerNDayTable="true" eventName="MyDaemon2Events" priority="High" />
-      </MdsdEventSource>
-    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-
-# XPaths representations of expected XML outputs, for use with xmlunittests package
-oms_syslog_basic_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
-                                    './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
-                                    './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
-                                   )
-
-oms_syslog_ext_expected_xpaths = ('./Sources/Source[@name="mdsd.ext_syslog.local0" and @dynamic_schema="true"]',
-                                  './Sources/Source[@name="mdsd.ext_syslog.user" and @dynamic_schema="true"]',
-                                  './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.local0"]',
-                                  './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.local0"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogLocal0CritEvents" and @priority="High"]',
-                                  './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.user"]',
-                                  './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.user"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogUserErrorEvents" and @priority="High"]',
-                                  )
-
-oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
-                               './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
-                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
-                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
-                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
-                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
-                              )
-
-
 class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
+
+    def setUp(self):
+        """
+        Create SyslogMdsdConfig objects for use by test cases
+        """
+        # "syslogEvents" LAD config example
+        syslog_basic_json_ext_settings = """
+            {
+                "syslogEventConfiguration": {
+                    "LOG_LOCAL0": "LOG_CRIT",
+                    "LOG_USER": "LOG_ERR"
+                }
+            }
+            """
+        # "syslogCfg" LAD config example
+        syslog_extended_json_ext_settings = """
+            [
+                {
+                    "facility": "LOG_USER",
+                    "minSeverity": "LOG_ERR",
+                    "table": "SyslogUserErrorEvents"
+                },
+                {
+                    "facility": "LOG_LOCAL0",
+                    "minSeverity": "LOG_CRIT",
+                    "table": "SyslogLocal0CritEvents"
+                }
+            ]
+            """
+        # "fileLogs" LAD config example
+        filelogs_json_ext_settings = """
+            [
+                {
+                    "file": "/var/log/mydaemonlog1",
+                    "table": "MyDaemon1Events"
+                },
+                {
+                    "file": "/var/log/mydaemonlog2",
+                    "table": "MyDaemon2Events"
+                }
+            ]
+            """
+
+        syslogEvents = json.loads(syslog_basic_json_ext_settings)
+        syslogCfg = json.loads(syslog_extended_json_ext_settings)
+        self.cfg_syslog_basic = SyslogMdsdConfig(syslogEvents, None, None)
+        self.cfg_syslog_ext = SyslogMdsdConfig(None, syslogCfg, None)
+        fileLogs = json.loads(filelogs_json_ext_settings)
+        self.cfg_filelog = SyslogMdsdConfig(None, None, fileLogs)
+
+        # XPaths representations of expected XML outputs, for use with xmlunittests package
+        self.oms_syslog_basic_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
+                                                 './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
+                                                 './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
+                                                 )
+        self.oms_syslog_ext_expected_xpaths = ('./Sources/Source[@name="mdsd.ext_syslog.local0" and @dynamic_schema="true"]',
+                                               './Sources/Source[@name="mdsd.ext_syslog.user" and @dynamic_schema="true"]',
+                                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.local0"]',
+                                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.local0"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogLocal0CritEvents" and @priority="High"]',
+                                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.user"]',
+                                               './Events/MdsdEvents/MdsdEventSource[@source="mdsd.ext_syslog.user"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogUserErrorEvents" and @priority="High"]',
+                                              )
+        self.oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
+                                            './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
+                                           )
 
     def test_oms_syslog_config(self):
         """
         Test whether syslog/syslog-ng config (for use with omsagent) is correctly generated for both 'syslogEvents'
         and 'syslogCfg' settings. Also test whether the coresponding mdsd XML config is correctly generated.
-        :return: None
         """
         # Basic config (single dest table)
-        syslogEvents = json.loads(syslog_basic_json_ext_settings)
-        cfg = SyslogMdsdConfig(syslogEvents, None, None)
-        self.helper_test_oms_syslog_config(cfg, oms_syslog_basic_expected_xpaths)
+        self.__helper_test_oms_syslog_config(self.cfg_syslog_basic, self.oms_syslog_basic_expected_xpaths)
 
         # Extended config (per-facility dest table)
-        syslogCfg = json.loads(syslog_extended_json_ext_settings)
-        cfg = SyslogMdsdConfig(None, syslogCfg, None)
-        self.helper_test_oms_syslog_config(cfg, oms_syslog_ext_expected_xpaths)
+        self.__helper_test_oms_syslog_config(self.cfg_syslog_ext, self.oms_syslog_ext_expected_xpaths)
 
-    def helper_test_oms_syslog_config(self, cfg, expected_xpaths):
+    def __helper_test_oms_syslog_config(self, cfg, expected_xpaths):
         """
         Helper for test_oms_rsyslog().
         :param cfg: SyslogMdsdConfig object containing syslog config
-        :return: None
         """
         print '=== Actual oms rsyslog config output ==='
         oms_rsyslog_config = cfg.get_oms_rsyslog_config()
         print oms_rsyslog_config
-        print '============================================='
+        print '========================================'
         lines = oms_rsyslog_config.strip().split('\n')
         # Item (line) count should match
-        self.assertEqual(len(lines), len(cfg._fac_sev_map))
+        self.assertEqual(len(cfg._fac_sev_map), len(lines))
         # Each line should be correctly formatted
         for l in lines:
             self.assertRegexpMatches(l, r"\w+\.\w+\s+@127\.0\.0\.1:%SYSLOG_PORT%")
@@ -165,10 +121,10 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         self.assertGreaterEqual(len(lines), len(cfg._fac_sev_map))
         # Each line should be correctly formatted
         for l in lines:
-            self.assertRegexpMatches(l, r"log \{ source\(src\); filter\(f_LAD_oms_f_\w+\); filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}")
+            self.assertRegexpMatches(l, r"log \{ source\(s_src\); filter\(f_LAD_oms_f_\w+\); filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}")
         # For each facility-severity, there should be corresponding line.
         for fac, sev in cfg._fac_sev_map.iteritems():
-            index = oms_syslog_ng_config.find('log {{ source(src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
+            index = oms_syslog_ng_config.find('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
                                               'destination(d_LAD_oms); }}'.format(syslog_name_to_rsyslog_name(fac),
                                                                                   syslog_name_to_rsyslog_name(sev)))
             self.assertGreaterEqual(index, 0)
@@ -185,17 +141,150 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
     def test_oms_filelog_config(self):
         """
         Test whether mdsd XML config for LAD fileLog settings is correctly generated.
-        :return: None
         """
-        fileLogs = json.loads(filelogs_json_ext_settings)
-        cfg = SyslogMdsdConfig(None, None, fileLogs)
         print '=== Actual oms filelog mdsd XML config output ==='
-        xml = cfg.get_oms_mdsd_filelog_config()
+        xml = self.cfg_filelog.get_oms_mdsd_filelog_config()
         print xml
         print '================================================='
         root = self.assertXmlDocument(xml)
-        self.assertXpathsOnlyOne(root, oms_filelog_expected_xpaths)
+
+        self.assertXpathsOnlyOne(root, self.oms_filelog_expected_xpaths)
         print "*** Actual output verified ***\n"
+
+    def __helper_test_oms_fluentd_config(self, header_text, expected, actual):
+        header = "=== Actual output of {0} ===".format(header_text)
+        print header
+        print actual
+        print '=' * len(header)
+        # TODO BADBAD exact string matching...
+        self.assertEqual(expected, actual)
+        pass
+
+    def test_oms_fluentd_configs(self):
+        """
+        Test whether fluentd syslog source config & out_mdsd config are correctly generated.
+        """
+        actual = self.cfg_syslog_basic.get_oms_fluentd_syslog_src_config()
+        expected = """
+<source>
+  type syslog
+  port %SYSLOG_PORT%
+  bind 127.0.0.1
+  protocol_type udp
+  tag mdsd.syslog
+</source>
+
+# Generate fields expected for existing mdsd syslog collection schema.
+<filter mdsd.syslog.**>
+  type record_transformer
+  enable_ruby
+  <record>
+    # Fields expected by mdsd for syslog messages
+    Ignore "syslog"
+    Facility ${tag_parts[2]}
+    Severity ${tag_parts[3]}
+    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
+    SendingHost ${record["source_host"]}
+    Msg ${record["message"]}
+  </record>
+  remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
+</filter>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd basic syslog src config', expected, actual)
+
+        actual = self.cfg_syslog_ext.get_oms_fluentd_syslog_src_config()
+        expected = """
+<source>
+  type syslog
+  port %SYSLOG_PORT%
+  bind 127.0.0.1
+  protocol_type udp
+  tag mdsd.ext_syslog
+</source>
+
+# Generate fields expected for existing mdsd syslog collection schema.
+<filter mdsd.ext_syslog.**>
+  type record_transformer
+  enable_ruby
+  <record>
+    # Fields expected by mdsd for syslog messages
+    Ignore "syslog"
+    Facility ${tag_parts[2]}
+    Severity ${tag_parts[3]}
+    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
+    SendingHost ${record["source_host"]}
+    Msg ${record["message"]}
+  </record>
+  remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
+</filter>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd extended syslog src config', expected, actual)
+
+        actual = self.cfg_filelog.get_oms_fluentd_syslog_src_config()
+        expected = ''
+        self.__helper_test_oms_fluentd_config('fluentd syslog src config for no syslog', expected, actual)
+
+        actual = self.cfg_syslog_basic.get_oms_fluentd_out_mdsd_config()
+        expected = r"""
+# Output to mdsd
+<match mdsd.**>
+    type mdsd
+    log_level warn
+    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
+    mdsd_tag_regex_patterns [ "^mdsd\\.syslog" ] # fluentd tag patterns whose match will be used as mdsd source name
+    num_threads 1
+    buffer_chunk_limit 1000k
+    buffer_type file
+    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_queue_limit 128
+    flush_interval 10s
+    retry_limit 3
+    retry_wait 10s
+</match>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for basic syslog cfg', expected, actual)
+
+        actual = self.cfg_syslog_ext.get_oms_fluentd_out_mdsd_config()
+        expected = r"""
+# Output to mdsd
+<match mdsd.**>
+    type mdsd
+    log_level warn
+    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
+    mdsd_tag_regex_patterns [ "^mdsd\\.ext_syslog\\.\\w+" ] # fluentd tag patterns whose match will be used as mdsd source name
+    num_threads 1
+    buffer_chunk_limit 1000k
+    buffer_type file
+    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_queue_limit 128
+    flush_interval 10s
+    retry_limit 3
+    retry_wait 10s
+</match>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for extended syslog cfg', expected, actual)
+
+        actual = self.cfg_filelog.get_oms_fluentd_out_mdsd_config()
+        expected = """
+# Output to mdsd
+<match mdsd.**>
+    type mdsd
+    log_level warn
+    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
+    num_threads 1
+    buffer_chunk_limit 1000k
+    buffer_type file
+    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_queue_limit 128
+    flush_interval 10s
+    retry_limit 3
+    retry_wait 10s
+</match>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for no syslog cfg', expected, actual)
 
     def test_copy_schema_source_mdsdevent_elems(self):
         """
@@ -204,7 +293,9 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         to test the operation.
         :return:  None
         """
-        xml_string_srcs = [oms_syslog_mdsd_ext_expected_xml, oms_filelogs_mdsd_expected_xml]
+        xml_string_srcs = [ self.cfg_syslog_ext.get_oms_mdsd_syslog_config(),
+                            self.cfg_filelog.get_oms_mdsd_filelog_config()
+                          ]
         dst_xml_tree = ET.parse('../mdsdConfig.xml.template')
         map(lambda x: copy_source_mdsdevent_elems(dst_xml_tree, x), xml_string_srcs)
         print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
@@ -213,8 +304,8 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         print '==================================================================='
         # Verify using xmlunittests
         root = self.assertXmlDocument(xml)
-        self.assertXpathsOnlyOne(root, oms_syslog_ext_expected_xpaths)
-        self.assertXpathsOnlyOne(root, oms_filelog_expected_xpaths)
+        self.assertXpathsOnlyOne(root, self.oms_syslog_ext_expected_xpaths)
+        self.assertXpathsOnlyOne(root, self.oms_filelog_expected_xpaths)
         print "*** Actual output verified ***\n"
 
 
