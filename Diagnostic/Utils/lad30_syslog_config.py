@@ -19,10 +19,32 @@
 from xml.etree import ElementTree as ET
 
 
+# Mdsd XML config templates defined globally because they are shared by multiple methods
+_mdsd_sources_events_config_template = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
+  <Sources>
+{sources}  </Sources>
+
+  <Events>
+    <MdsdEvents>
+{events}    </MdsdEvents>
+  </Events>
+</MonitoringManagement>
+"""
+
+_mdsd_per_source_config_template = """    <Source name="{name}" dynamic_schema="true" />
+"""
+
+_mdsd_per_event_source_config_template = """      <MdsdEventSource source="{source}">
+        <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" />
+      </MdsdEventSource>
+"""
+
+
 class SyslogMdsdConfig:
     """
-    Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with omsagent (fluentd),
-    fluentd config, and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
+    Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with fluentd
+    (currently omsagent), and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
     """
 
     def __init__(self, syslogEvents, syslogCfg, fileLogs):
@@ -179,30 +201,12 @@ class SyslogMdsdConfig:
         if not self._fac_sev_map:
             return ''
 
-        oms_mdsd_syslog_config = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Sources>
-{0}  </Sources>
-
-  <Events>
-    <MdsdEvents>
-{1}    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-        per_table_source_template = """    <Source name="{0}" dynamic_schema="true" />
-"""
-        per_table_mdsd_event_source_template = """      <MdsdEventSource source="{0}">
-        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
-      </MdsdEventSource>
-"""
         # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
         # dest table (eventName) is 'LinuxSyslog'
         if self._syslogEvents:
-            return oms_mdsd_syslog_config.format(
-                        per_table_source_template.format('mdsd.syslog'),
-                        per_table_mdsd_event_source_template.format('mdsd.syslog', 'LinuxSyslog')
-                   )
+            return _mdsd_sources_events_config_template.format(
+                sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
+                events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
 
         # For extended syslog conf (per-fac/sev dest table): Source name is 'mdsd.ext_syslog.<facility> and
         # dest table (eventName) is in self._fac_sev_table_map
@@ -210,10 +214,10 @@ class SyslogMdsdConfig:
         syslog_mdsd_event_sources = ''
         for facsev_key in self._facsev_table_map:
             source_name = 'mdsd.ext_syslog.{0}'.format(facsev_key.split('.')[0])
-            syslog_sources += per_table_source_template.format(source_name)
-            syslog_mdsd_event_sources += \
-                per_table_mdsd_event_source_template.format(source_name, self._facsev_table_map[facsev_key])
-        return oms_mdsd_syslog_config.format(syslog_sources, syslog_mdsd_event_sources)
+            syslog_sources += _mdsd_per_source_config_template.format(name=source_name)
+            syslog_mdsd_event_sources += _mdsd_per_event_source_config_template.format(source=source_name,
+                                                                                       event_name=self._facsev_table_map[facsev_key])
+        return _mdsd_sources_events_config_template.format(sources=syslog_sources, events=syslog_mdsd_event_sources)
 
     def get_oms_mdsd_filelog_config(self):
         """
@@ -232,33 +236,16 @@ class SyslogMdsdConfig:
         if not self._fileLogs:
             return ''
 
-        oms_filelogs_mdsd_config = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Sources>
-{0}  </Sources>
-
-  <Events>
-    <MdsdEvents>
-{1}    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-        per_file_source_template = """    <Source name="{0}" dynamic_schema="true" />
-"""
-        per_file_mdsd_event_source_template = """      <MdsdEventSource source="{0}">
-        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
-      </MdsdEventSource>
-"""
         # Per-file source name is 'mdsd.filelog<.path.to.file>' where '<.path.to.file>' is a full path
         # with all '/' replaced by '.'.
         filelogs_sources = ''
         filelogs_mdsd_event_sources = ''
         for file_key in sorted(self._file_table_map):
             source_name = 'mdsd.filelog{0}'.format(file_key.replace('/', '.'))
-            filelogs_sources += per_file_source_template.format(source_name)
+            filelogs_sources += _mdsd_per_source_config_template.format(name=source_name)
             filelogs_mdsd_event_sources += \
-                per_file_mdsd_event_source_template.format(source_name, self._file_table_map[file_key])
-        return oms_filelogs_mdsd_config.format(filelogs_sources, filelogs_mdsd_event_sources)
+                _mdsd_per_event_source_config_template.format(source=source_name, event_name=self._file_table_map[file_key])
+        return _mdsd_sources_events_config_template.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources)
 
     def get_oms_fluentd_syslog_src_config(self):
         """
@@ -268,37 +255,37 @@ class SyslogMdsdConfig:
                  /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
                  (after replacing '%SYSLOG_PORT%' with the assigned/picked port number)
         """
-        fluentd_syslog_src_config = """
+        fluentd_syslog_src_config_template = """
 <source>
   type syslog
   port %SYSLOG_PORT%
   bind 127.0.0.1
   protocol_type udp
-  tag mdsd.%SYSLOG_TAG_PART%
+  tag mdsd.{syslog_tag_part}
 </source>
 
 # Generate fields expected for existing mdsd syslog collection schema.
-<filter mdsd.%SYSLOG_TAG_PART%.**>
+<filter mdsd.{syslog_tag_part}.**>
   type record_transformer
   enable_ruby
   <record>
     # Fields expected by mdsd for syslog messages
     Ignore "syslog"
-    Facility ${tag_parts[2]}
-    Severity ${tag_parts[3]}
-    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
-    SendingHost ${record["source_host"]}
-    Msg ${record["message"]}
+    Facility ${{tag_parts[2]}}
+    Severity ${{tag_parts[3]}}
+    EventTime ${{time.strftime('%Y-%m-%dT%H:%M:%S%z')}}
+    SendingHost ${{record["source_host"]}}
+    Msg ${{record["message"]}}
   </record>
   remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
         # Basic config case (single table destination for all facilities/levels)
         if self._syslogEvents:
-            return fluentd_syslog_src_config.replace('%SYSLOG_TAG_PART%', 'syslog')
+            return fluentd_syslog_src_config_template.format(syslog_tag_part='syslog')
         # Extended config case (per facility/min-level table destination)
         if self._syslogCfg:
-            return fluentd_syslog_src_config.replace('%SYSLOG_TAG_PART%', 'ext_syslog')
+            return fluentd_syslog_src_config_template.format(syslog_tag_part='ext_syslog')
         # No syslog config
         return ''
 
@@ -317,7 +304,7 @@ class SyslogMdsdConfig:
     log_level warn
     djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
     acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
-{0}    num_threads 1
+{tag_regex_cfg_line}    num_threads 1
     buffer_chunk_limit 1000k
     buffer_type file
     buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
@@ -327,18 +314,18 @@ class SyslogMdsdConfig:
     retry_wait 10s
 </match>
 """
-        tag_regex_patterns_template = """    mdsd_tag_regex_patterns [{0}] # fluentd tag patterns whose match will be used as mdsd source name
+        tag_regex_cfg_line_template = """    mdsd_tag_regex_patterns [{tag_patterns}] # fluentd tag patterns whose match will be used as mdsd source name
 """
         # Basic config case (single table destination for all facilities/levels)
         if self._syslogEvents:
-            tag_regex_patterns = tag_regex_patterns_template.format(r' "^mdsd\\.syslog" ')
-            return fluentd_out_mdsd_config_template.format(tag_regex_patterns)
+            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.syslog" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
         # Extended config case (per facility/min-level table destination)
         if self._syslogCfg:
-            tag_regex_patterns = tag_regex_patterns_template.format(r' "^mdsd\\.ext_syslog\\.\\w+" ')
-            return fluentd_out_mdsd_config_template.format(tag_regex_patterns)
+            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.ext_syslog\\.\\w+" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
         # No syslog config
-        return fluentd_out_mdsd_config_template.format('')
+        return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line='')
 
 
 syslog_name_to_rsyslog_name_map = {
