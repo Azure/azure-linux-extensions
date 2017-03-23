@@ -174,13 +174,29 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('telinit u', True)
 
         sleep(10)
+        
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(command_to_execute="systemctl list-units",
+                                      raise_exception_on_failure=True,
+                                      communicator=proc_comm)
+
+        for line in proc_comm.stdout.split('\n'):
+
+            match = re.search(r'\s(\S*?\.mount)', line)
+            if match:
+                mount = match.groups()[0]
+                self.command_executor.Execute('systemctl stop {0}'.format(mount))
+                continue
+
+        sleep(10)
 
         if self.command_executor.Execute('mountpoint /var') == 0:
             self.command_executor.Execute('umount /var', True)
 
         sleep(3)
 
-        self.command_executor.Execute('umount ' + mountpoint, True)
+        if self.command_executor.Execute('mountpoint ' + mountpoint) == 0:
+            self.command_executor.Execute('umount ' + mountpoint, True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")

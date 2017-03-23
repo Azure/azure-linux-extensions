@@ -334,6 +334,9 @@ class HandlerUtility:
         latest_seq = str(self.get_latest_seq())
         self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
 
+        if message is None:
+            message = ""
+
         message = filter(lambda c: c in string.printable, message)
         message = message.encode('ascii', 'ignore')
 

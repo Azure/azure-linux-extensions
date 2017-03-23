@@ -149,7 +149,10 @@ class SplitRootPartitionState(OSEncryptionState):
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
             self.command_executor.Execute('service waagent stop', True)
 
-            self.command_executor.Execute("umount /oldroot", True)
+            os.unlink('/var/lib/azure_disk_encryption_config/os_encryption_markers/UnmountOldrootState')
+            self.should_exit()
+
+            raise
         
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
