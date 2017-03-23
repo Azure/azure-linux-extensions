@@ -84,12 +84,11 @@ def init_distro_specific_actions():
     # TODO Exit immediately if distro is unknown
     global g_dist_config, RunGetOutput
     dist = platform.dist()
-    distroNameAndVersion = dist[0] + ":" + dist[1]
     try:
         g_dist_config = DistroSpecific.get_distro_actions(dist[0], dist[1], hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
     except exceptions.LookupError as ex:
-        hutil.error("os version:" + distroNameAndVersion + " not supported")
+        hutil.error("os version: {0}:{1} not supported".format(dist[0], dist[1]))
         # TODO Exit immediately if distro is unknown. This is currently done in main().
         g_dist_config = None
 
