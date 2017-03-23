@@ -59,6 +59,7 @@ from __builtin__ import int
 def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
+    hutil.do_status_report(operation='Install', status=CommonVariables.extension_success_status, status_code=str(CommonVariables.success), message='Installing pre-requisites')
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
@@ -116,6 +117,12 @@ def disable_encryption():
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+
+        encryption_status = json.loads(disk_util.get_encryption_status())
+
+        if encryption_status["os"] != "NotEncrypted":
+            raise Exception("Disabling encryption is not supported when OS volume is encrypted")
+
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -155,14 +162,14 @@ def disable_encryption():
                       message='Decryption started')
 
     except Exception as e:
-        logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()),
-                   level=CommonVariables.ErrorLevel)
+        message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
 
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
         hutil.do_exit(exit_code=0,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
-                      message='Decryption failed.')
+                      message=message)
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
@@ -1271,7 +1278,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
-        should_skip = disk_util.should_skip_for_inplace_encryption(device_item)
+        should_skip = disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type())
         if not should_skip:
             if device_item.name == bek_util.passphrase_device:
                 logger.log("skip for the passphrase disk ".format(device_item))
@@ -1469,7 +1476,7 @@ def daemon_encrypt():
 
         os_encryption = None
 
-        if ((distro_name == 'redhat' and distro_version == '7.2') and
+        if ((distro_name == 'redhat' and distro_version == '7.3') and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1485,6 +1492,7 @@ def daemon_encrypt():
                                                          encryption_environment=encryption_environment)
         elif ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'redhat' and distro_version == '7.3') or
+            (distro_name == 'centos' and distro_version == '7.3.1611') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
             os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
