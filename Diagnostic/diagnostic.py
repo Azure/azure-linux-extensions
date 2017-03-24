@@ -188,9 +188,7 @@ def create_core_components_configs():
     """
     global g_enable_syslog
 
-    # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
-    g_enable_syslog = g_ext_settings.read_public_config('enableSyslog').lower() != 'false' \
-                      and g_ext_settings.read_public_config('EnableSyslog').lower() != 'false'
+    g_enable_syslog = g_ext_settings.is_syslog_enabled()
 
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
     mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,

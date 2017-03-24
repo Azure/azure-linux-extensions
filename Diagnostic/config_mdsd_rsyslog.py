@@ -62,7 +62,7 @@ class ConfigMdsdRsyslog:
         Update mdsd_config_xml_tree for Azure Portal metric collection setting.
         It's basically applying the resource_id as the partitionKey attribute of LADQuery elements.
 
-        :param resource_id: ARM rerousce ID to provide as partitionKey in LADQuery elements
+        :param resource_id: ARM resource ID to provide as partitionKey in LADQuery elements
         :return: None
         """
         assert self._mdsd_config_xml_tree is not None
@@ -72,64 +72,6 @@ class ConfigMdsdRsyslog:
         XmlUtil.setXmlValue(portal_config, './DerivedEvents/DerivedEvent/LADQuery', 'partitionKey', resource_id)
         XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', portal_config._root.getchildren()[0])
         XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', portal_config._root.getchildren()[1])
-
-    def _update_and_get_file_monitoring_settings(self, files):
-        """
-        Update mdsd config's file monitoring config. Also creates/returns rsyslog imfile config.
-        All the operations are based on the input param files, which is a Json-deserialized dictionary
-        corresponding the following Json array example:
-        [
-            {"file":"/var/log/a.log", "table":"aLog"},
-            {"file":"/var/log/b.log", "table":"bLog"}
-        ]
-        :param files: Array of dictionaries deserialized from the 'fileCfg' Json config (example as above)
-        :return: rsyslog omfile module config file content
-        """
-        assert self._mdsd_config_xml_tree is not None
-
-        if not files:
-            return ''
-
-        file_id = 0
-        imfile_config = """
-$ModLoad imfile
-
-"""
-
-        mdsd_event_source_schema = """
-<MdsdEventSource source="ladfile">
-    <RouteEvent dontUsePerNDayTable="true" eventName="" priority="High"/>
-</MdsdEventSource>
-"""
-
-        mdsd_source_schema = """
-<Source name="ladfile1" schema="ladfile" />
-"""
-        imfile_per_file_config_template = """
-$InputFileName #FILE#
-$InputFileTag #FILETAG#
-$InputFileFacility local6
-$InputFileStateFile syslog-stat#STATFILE#
-$InputFileSeverity debug
-$InputRunFileMonitor
-"""
-
-        for item in files:
-            file_id += 1
-            mdsd_event_source_element = XmlUtil.createElement(mdsd_event_source_schema)
-            XmlUtil.setXmlValue(mdsd_event_source_element, 'RouteEvent', 'eventName', item["table"])
-            mdsd_event_source_element.set('source', 'ladfile'+str(file_id))
-            XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/MdsdEvents', mdsd_event_source_element)
-
-            mdsd_source_element = XmlUtil.createElement(mdsd_source_schema)
-            mdsd_source_element.set('name', 'ladfile'+str(file_id))
-            XmlUtil.addElement(self._mdsd_config_xml_tree, 'Sources', mdsd_source_element)
-
-            imfile_per_file_config = imfile_per_file_config_template.replace('#FILE#', item['file'])
-            imfile_per_file_config = imfile_per_file_config.replace('#STATFILE#', item['file'].replace("/","-"))
-            imfile_per_file_config = imfile_per_file_config.replace('#FILETAG#', 'ladfile'+str(file_id))
-            imfile_config += imfile_per_file_config
-        return imfile_config
 
     def _update_perf_counters_settings(self, omi_queries, for_app_insights=False):
         """
