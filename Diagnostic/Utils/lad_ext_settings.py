@@ -196,7 +196,7 @@ class LadExtSettings(ExtSettings):
 
     def is_syslog_enabled(self):
         """
-        Check if syslog is enabled in the LAD settings.
+        Check if syslog is enabled in the LAD settings ('enableSyslog' setting)
         :rtype: bool
         :return: True if so. False otherwise.
         """

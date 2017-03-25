@@ -54,10 +54,12 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 
         syslogEvents = json.loads(syslog_basic_json_ext_settings)
         syslogCfg = json.loads(syslog_extended_json_ext_settings)
-        self.cfg_syslog_basic = SyslogMdsdConfig(syslogEvents, None, None)
-        self.cfg_syslog_ext = SyslogMdsdConfig(None, syslogCfg, None)
+        self.cfg_syslog_basic = SyslogMdsdConfig(syslogEvents, None, None, True)
+        self.cfg_syslog_ext = SyslogMdsdConfig(None, syslogCfg, None, True)
+        self.cfg_syslog_all = SyslogMdsdConfig(None, None, None, True)
         fileLogs = json.loads(filelogs_json_ext_settings)
-        self.cfg_filelog = SyslogMdsdConfig(None, None, fileLogs)
+        self.cfg_filelog = SyslogMdsdConfig(None, None, fileLogs, False)
+        self.cfg_none = SyslogMdsdConfig(None, None, None, False)
 
         # XPaths representations of expected XML outputs, for use with xmlunittests package
         self.oms_syslog_basic_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
@@ -86,9 +88,15 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         """
         # Basic config (single dest table)
         self.__helper_test_oms_syslog_config(self.cfg_syslog_basic, self.oms_syslog_basic_expected_xpaths)
+        self.__helper_test_oms_syslog_config(self.cfg_syslog_all, self.oms_syslog_basic_expected_xpaths)
 
         # Extended config (per-facility dest table)
         self.__helper_test_oms_syslog_config(self.cfg_syslog_ext, self.oms_syslog_ext_expected_xpaths)
+
+        # No syslog config case
+        self.assertFalse(self.cfg_none.get_oms_rsyslog_config())
+        self.assertFalse(self.cfg_none.get_oms_syslog_ng_config())
+        self.assertFalse(self.cfg_none.get_oms_mdsd_syslog_config())
 
     def __helper_test_oms_syslog_config(self, cfg, expected_xpaths):
         """
@@ -100,16 +108,21 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         print oms_rsyslog_config
         print '========================================'
         lines = oms_rsyslog_config.strip().split('\n')
-        # Item (line) count should match
-        self.assertEqual(len(cfg._fac_sev_map), len(lines))
-        # Each line should be correctly formatted
-        for l in lines:
-            self.assertRegexpMatches(l, r"\w+\.\w+\s+@127\.0\.0\.1:%SYSLOG_PORT%")
-        # For each facility-severity, there should be corresponding line.
-        for fac, sev in cfg._fac_sev_map.iteritems():
-            index = oms_rsyslog_config.find('{0}.{1}'.format(syslog_name_to_rsyslog_name(fac),
-                                                             syslog_name_to_rsyslog_name(sev)))
-            self.assertGreaterEqual(index, 0)
+        if cfg._all_syslog_facility_severity_enabled:
+            # Only 1 line should be out: "*.*  @127.0.0.1:%SYSLOG_PORT%"
+            self.assertEqual(1, len(lines))
+            self.assertRegexpMatches(lines[0], r"\*\.\*\s+@127\.0\.0\.1:%SYSLOG_PORT%")
+        else:
+            # Item (line) count should match
+            self.assertEqual(len(cfg._fac_sev_map), len(lines))
+            # Each line should be correctly formatted
+            for l in lines:
+                self.assertRegexpMatches(l, r"\w+\.\w+\s+@127\.0\.0\.1:%SYSLOG_PORT%")
+            # For each facility-severity, there should be corresponding line.
+            for fac, sev in cfg._fac_sev_map.iteritems():
+                index = oms_rsyslog_config.find('{0}.{1}'.format(syslog_name_to_rsyslog_name(fac),
+                                                                 syslog_name_to_rsyslog_name(sev)))
+                self.assertGreaterEqual(index, 0)
         print "*** Actual output verified ***\n"
 
         print '=== Actual oms syslog-ng config output ==='
@@ -117,17 +130,22 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         print oms_syslog_ng_config
         print '=========================================='
         lines = oms_syslog_ng_config.strip().split('\n')
-        # Item (line) count should match
-        self.assertGreaterEqual(len(lines), len(cfg._fac_sev_map))
-        # Each line should be correctly formatted
-        for l in lines:
-            self.assertRegexpMatches(l, r"log \{ source\(s_src\); filter\(f_LAD_oms_f_\w+\); filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}")
-        # For each facility-severity, there should be corresponding line.
-        for fac, sev in cfg._fac_sev_map.iteritems():
-            index = oms_syslog_ng_config.find('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
-                                              'destination(d_LAD_oms); }}'.format(syslog_name_to_rsyslog_name(fac),
-                                                                                  syslog_name_to_rsyslog_name(sev)))
-            self.assertGreaterEqual(index, 0)
+        if cfg._all_syslog_facility_severity_enabled:
+            # Only 1 line should be out: "*.*  @127.0.0.1:%SYSLOG_PORT%"
+            self.assertEqual(1, len(lines))
+            self.assertRegexpMatches(lines[0], r"log \{ source\(s_src\); destination\(d_LAD_oms\); \}")
+        else:
+            # Item (line) count should match
+            self.assertGreaterEqual(len(lines), len(cfg._fac_sev_map))
+            # Each line should be correctly formatted
+            for l in lines:
+                self.assertRegexpMatches(l, r"log \{ source\(s_src\); filter\(f_LAD_oms_f_\w+\); filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}")
+            # For each facility-severity, there should be corresponding line.
+            for fac, sev in cfg._fac_sev_map.iteritems():
+                index = oms_syslog_ng_config.find('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
+                                                  'destination(d_LAD_oms); }}'.format(syslog_name_to_rsyslog_name(fac),
+                                                                                      syslog_name_to_rsyslog_name(sev)))
+                self.assertGreaterEqual(index, 0)
         print "*** Actual output verified ***\n"
 
         print '=== Actual oms syslog mdsd XML output ==='
@@ -138,7 +156,7 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         self.assertXpathsOnlyOne(root, expected_xpaths)
         print "*** Actual output verified ***\n"
 
-    def test_oms_filelog_config(self):
+    def test_oms_filelog_mdsd_config(self):
         """
         Test whether mdsd XML config for LAD fileLog settings is correctly generated.
         """
@@ -150,6 +168,12 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 
         self.assertXpathsOnlyOne(root, self.oms_filelog_expected_xpaths)
         print "*** Actual output verified ***\n"
+
+        # Other configs should be all ''
+        self.assertFalse(self.cfg_syslog_all.get_oms_mdsd_filelog_config())
+        self.assertFalse(self.cfg_syslog_basic.get_oms_mdsd_filelog_config())
+        self.assertFalse(self.cfg_syslog_ext.get_oms_mdsd_filelog_config())
+        self.assertFalse(self.cfg_none.get_oms_mdsd_filelog_config())
 
     def __helper_test_oms_fluentd_config(self, header_text, expected, actual):
         header = "=== Actual output of {0} ===".format(header_text)
@@ -191,6 +215,9 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 </filter>
 """
         self.__helper_test_oms_fluentd_config('fluentd basic syslog src config', expected, actual)
+
+        actual = self.cfg_syslog_all.get_oms_fluentd_syslog_src_config()
+        self.__helper_test_oms_fluentd_config('fluentd all syslog src config', expected, actual)
 
         actual = self.cfg_syslog_ext.get_oms_fluentd_syslog_src_config()
         expected = """
@@ -245,6 +272,9 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 """
         self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for basic syslog cfg', expected, actual)
 
+        actual = self.cfg_syslog_all.get_oms_fluentd_out_mdsd_config()
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for all syslog cfg', expected, actual)
+
         actual = self.cfg_syslog_ext.get_oms_fluentd_out_mdsd_config()
         expected = r"""
 # Output to mdsd
@@ -284,14 +314,16 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
     retry_wait 10s
 </match>
 """
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for no syslog cfg', expected, actual)
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for filelog only (no syslog) cfg', expected, actual)
+
+        actual = self.cfg_none.get_oms_fluentd_out_mdsd_config()
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for blank cfg (syslog disabled)', expected, actual)
 
     def test_copy_schema_source_mdsdevent_elems(self):
         """
         Tests whether copy_schema_source_mdsdevent_elems() works fine.
         Uses syslog_mdsd_extended_expected_output and filelogs_mdsd_expected_output XML strings
         to test the operation.
-        :return:  None
         """
         xml_string_srcs = [ self.cfg_syslog_ext.get_oms_mdsd_syslog_config(),
                             self.cfg_filelog.get_oms_mdsd_filelog_config()
