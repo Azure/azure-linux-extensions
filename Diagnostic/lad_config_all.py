@@ -334,7 +334,8 @@ class LadConfigAll:
             lad30_syslogCfg = self._ext_settings.get_lad30_syslogCfg_setting()
             lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
             lad30_fileLogs = self._ext_settings.get_lad30_fileLogs_setting()
-            lad_logging_config_helper = LadLoggingConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs)
+            lad_logging_config_helper = LadLoggingConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs,
+                                                         self._ext_settings.is_syslog_enabled())
             mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
             mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
             copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
@@ -440,7 +441,7 @@ class LadConfigAll:
         :return: rsyslog config string
         """
         self.__throw_if_output_is_none(self._rsyslog_config)
-        return self._fluentd_out_mdsd_config
+        return self._rsyslog_config
 
     def get_syslog_ng_config(self):
         """

@@ -442,7 +442,7 @@ def copy_sub_elems(dst_xml, src_xml, path):
     """
     dst_elem = dst_xml.find(path)
     src_elem = src_xml.find(path)
-    if not src_elem:
+    if src_elem is None:
         return
     for sub_elem in src_elem:
         dst_elem.append(sub_elem)
@@ -459,6 +459,9 @@ def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_logging_xml_string):
             See oms_syslog_mdsd_*_expected_xpaths member variables in test_lad_logging_config.py for examples in XPATHS format.
     :return: None. mdsd_xml_tree object will contain the added elements.
     """
+    if not mdsd_logging_xml_string:
+        return
+
     mdsd_logging_xml_tree = ET.ElementTree(ET.fromstring(mdsd_logging_xml_string))
 
     # Copy Source elements (sub-elements of Sources element)
