@@ -9,11 +9,11 @@ from xmlunittest import XmlTestMixin
 from Utils.lad_logging_config import *
 
 
-class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
+class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
 
     def setUp(self):
         """
-        Create SyslogMdsdConfig objects for use by test cases
+        Create LadLoggingConfig objects for use by test cases
         """
         # "syslogEvents" LAD config example
         syslog_basic_json_ext_settings = """

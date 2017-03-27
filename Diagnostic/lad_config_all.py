@@ -31,11 +31,11 @@ class LadConfigAll:
     - /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/tail.copnf : fluentd's tail source config (fileLogs)
     - /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/z_out_mdsd.conf : fluentd's out_mdsd out plugin config
     - /etc/rsyslog.conf or /etc/rsyslog.d/95-omsagent.conf: rsyslog config for LAD's syslog settings
-       For /etc/rsyslog.conf, the content should be appended, not overwritten.
+       The content should be appended to the corresponding file, not overwritten. After that, the file should be
+       processed so that the '%SYSLOG_PORT%' pattern is replaced with the assigned TCP port number.
     - /etc/syslog-ng.conf: syslog-ng config for LAD's syslog settings. The content should be appended, not overwritten.
     """
-    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
-                 imfile_config_filename, run_command, logger_log, logger_error):
+    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id, run_command, logger_log, logger_error):
         """
         Constructor.
         :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) object wrapping the Json extension settings.
@@ -43,9 +43,6 @@ class LadConfigAll:
         :param waagent_dir: WAAgent directory (e.g., /var/lib/waagent)
         :param deployment_id: Deployment ID string (or None) that should be obtained & passed by the caller
                               from waagent's HostingEnvironmentCfg.xml.
-        :param imfile_config_filename: Rsyslog imfile module configuration file name (that will be copied
-                                       to the rsyslog config directory). This could be hard-coded and later removed.
-                                       Currently '/var/lib/waagent/Microsoft...-2.3.xxxx/imfileconfig' is passed.
         :param run_command: External command execution function (e.g., RunGetOutput)
         :param logger_log: Normal logging function (e.g., hutil.log) that takes only one param for the logged msg.
         :param logger_error: Error logging function (e.g., hutil.error) that takes only one param for the logged msg.
@@ -54,7 +51,6 @@ class LadConfigAll:
         self._ext_dir = ext_dir
         self._waagent_dir = waagent_dir
         self._deployment_id = deployment_id
-        self._imfile_config_filename = imfile_config_filename
         self._run_command = run_command
         self._logger_log = logger_log
         self._logger_error = logger_error
@@ -333,7 +329,7 @@ class LadConfigAll:
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
         self._apply_perf_cfgs(do_ai)
 
-        # 4. Generate rsyslog omazuremds, imfile configs, and update corresponding mdsd config XML
+        # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
             lad30_syslogCfg = self._ext_settings.get_lad30_syslogCfg_setting()
             lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
@@ -349,8 +345,9 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_oms_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_oms_syslog_ng_config()
         except Exception as e:
-            self._logger_error("Failed to create omazuremds/imfile configs or to update corresponding "
-                               "mdsd config XML. Error: {0}\nStacktrace: {1}".format(e, traceback.format_exc()))
+            self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
+                               "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
+                               .format(e, traceback.format_exc()))
 
         # 5. Before starting to update the storage account settings, log extension's protected settings'
         #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that
@@ -438,7 +435,7 @@ class LadConfigAll:
         The return value should be appended to /etc/rsyslog.d/95-omsagent.conf if rsyslog ver is new (that is,
         if /etc/rsyslog.d/ exists). It should be appended to /etc/rsyslog.conf if rsyslog ver is old (no /etc/rsyslog.d/).
         The appended file (either /etc/rsyslog.d/95-omsagent.conf or /etc/rsyslog.conf) should be processed so that
-        the '%SYSLOG_PORT% pattern in the file is replaced with the assigned TCP port number.
+        the '%SYSLOG_PORT%' pattern in the file is replaced with the assigned TCP port number.
         :rtype: str
         :return: rsyslog config string
         """
@@ -451,7 +448,7 @@ class LadConfigAll:
         after self.generate_mdsd_omsagent_syslog_config() is called.
         The return value should be appended to /etc/syslog-ng.conf.
         The appended file (/etc/syslog-ng.conf) should be processed so that
-        the '%SYSLOG_PORT% pattern in the file is replaced with the assigned TCP port number.
+        the '%SYSLOG_PORT%' pattern in the file is replaced with the assigned TCP port number.
         :rtype: str
         :return: syslog-ng config string
         """

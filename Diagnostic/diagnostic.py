@@ -192,7 +192,7 @@ def create_core_components_configs():
 
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
     mdsd_rsyslog_configurator = LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
-                                             g_imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
+                                             RunGetOutput, hutil.log, hutil.error)
     config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_omsagent_syslog_configs()
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
