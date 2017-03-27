@@ -24,6 +24,9 @@
 
     <OMI>
     </OMI>
+
+    <DerivedEvents>
+    </DerivedEvents>
   </Events>
 
 </MonitoringManagement>

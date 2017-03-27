@@ -158,3 +158,56 @@ def getResourceIdFromLadCfg(ladCfg):
 # Get event volume from LadCfg
 def getEventVolumeFromLadCfg(ladCfg):
     return getDiagnosticsMonitorConfigurationElement(ladCfg, 'eventVolume')
+
+
+def getPerformanceCounterCfgFromLadCfg(ladCfg):
+    """
+    Return the array of metric definitions
+    :param ladCfg:
+    :return: array of metric definitions
+    """
+    performanceCounters = getDiagnosticsMonitorConfigurationElement(ladCfg, 'performanceCounters')
+    if performanceCounters and 'performanceCounterConfiguration' in performanceCounters:
+        return performanceCounters['performanceCounterConfiguration']
+    return None
+
+
+def getAggregationPeriodsFromLadCfg(ladCfg):
+    """
+    Return an array of aggregation periods as specified. If nothing appears in the config, default PT1H
+    :param ladCfg:
+    :return: array of strings of ISO 8601 intervals
+    """
+    metrics = getDiagnosticsMonitorConfigurationElement(ladCfg, 'metrics')
+    if metrics and 'metricAggregation' in metrics:
+        return [item['scheduledTransferPeriod'] for item in metrics['metricAggregation']]
+    return ['PT1H']
+
+
+def getTopLevelSinksFromLadCfg(ladCfg):
+    """
+    Return an array of sinks specified at the top of the config.
+    :param ladCfg:
+    :return: array of strings of sink names
+    """
+    sinks = getDiagnosticsMonitorConfigurationElement(ladCfg, 'sinks')
+    if sinks:
+        return [sink.strip() for sink in sinks.split(",")]
+    return []
+
+
+def getSinkDefinitionFromLadCfg(ladCfg, sink_name):
+    """
+    Return the JSON object defining a particular sink.
+    :param ladCfg: JSON config
+    :param sink_name: string name of sink
+    :return: JSON object or None
+    """
+    if 'sinksConfig' not in ladCfg:
+        return None
+    sink_config = ladCfg['sinksConfig']
+    if 'Sink' in sink_config:
+        for sink in sink_config['Sink']:
+            if sink['name'] is sink_name:
+                return sink
+    return None

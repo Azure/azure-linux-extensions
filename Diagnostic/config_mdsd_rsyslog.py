@@ -6,9 +6,16 @@
 # Copyright (c) Microsoft Corporation
 # All rights reserved.
 # MIT License
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+#  documentation files (the ""Software""), to deal in the Software without restriction, including without limitation
+#  the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#  permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+#  Software.
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+#  WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
+#  OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+#  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import binascii
 from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics, write_string_to_file
@@ -19,6 +26,7 @@ import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 from Utils.lad30_syslog_config import RsyslogMdsdConfig, copy_schema_source_mdsdevent_elems
+import Providers.Builtin as BuiltIn
 
 
 class ConfigMdsdRsyslog:
@@ -28,11 +36,12 @@ class ConfigMdsdRsyslog:
     The rsyslog imfile config file generated will be /var/lib/waagent/Microsoft. ...-x.y.zzzz/imfileconfig
        (the filename part is configurable as a constructor param).
     """
+
     def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
                  imfile_config_filename, run_command, logger_log, logger_error):
         """
         Constructor.
-        :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) object wrapping the Json extension settings.
+        :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) obj wrapping the Json extension settings.
         :param ext_dir: Extension directory (e.g., /var/lib/waagent/Microsoft.OSTCExtensions.LinuxDiagnostic-2.3.xxxx)
         :param waagent_dir: WAAgent directory (e.g., /var/lib/waagent)
         :param deployment_id: Deployment ID string (or None) that should be obtained & passed by the caller
@@ -62,16 +71,61 @@ class ConfigMdsdRsyslog:
         Update mdsd_config_xml_tree for Azure Portal metric collection setting.
         It's basically applying the resource_id as the partitionKey attribute of LADQuery elements.
 
-        :param resource_id: ARM rerousce ID to provide as partitionKey in LADQuery elements
+        :param resource_id: ARM resource ID to provide as partitionKey in LADQuery elements
         :return: None
         """
         assert self._mdsd_config_xml_tree is not None
 
-        portal_config = ET.ElementTree()
-        portal_config.parse(os.path.join(self._ext_dir, 'portal.xml.template'))
+        portal_config = ET.parse(os.path.join(self._ext_dir, 'portal.xml.template'))
         XmlUtil.setXmlValue(portal_config, './DerivedEvents/DerivedEvent/LADQuery', 'partitionKey', resource_id)
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', portal_config._root.getchildren()[0])
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', portal_config._root.getchildren()[1])
+        root = portal_config.getroot()
+        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[0])
+        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[1])
+
+    def _update_metric_collection_settings(self, ladCfg):
+        """
+        Update mdsd_config_xml_tree for Azure Portal metric collection. The mdsdCfg performanceCounters element contains
+        an array of metric definitions; this method passes each definition to its provider's AddMetric method, which is
+        responsible for configuring the provider to deliver the metric to mdsd and for updating the mdsd config as
+        required to expect the metric to arrive. This method also builds the necessary aggregation queries (from the
+        metrics.metricAggregation array) that grind the ingested data and push it to the WADmetric table.
+        :param ladCfg: ladCfg object from extension config
+        :return: None
+        """
+        assert self._mdsd_config_xml_tree is not None
+        metrics = LadUtil.getPerformanceCounterCfgFromLadCfg(ladCfg)
+        counter_to_table = {}
+        local_tables = set()
+
+        # Add each metric
+        for metric in metrics:
+            if metric['class'] is 'builtin':
+                local_table_name = BuiltIn.AddMetric(metric)
+                if local_table_name:
+                    local_tables.add(local_table_name)
+                    counter_to_table[metric['counterSpecifier']] = local_table_name
+
+        # Finalize; update the mdsd config to be prepared to receive the metrics
+        BuiltIn.UpdateXML(self._mdsd_config_xml_tree)
+
+        # Pump the received data from the local tables to the desired sinks. The "WADmetrics" shoebox table sink is
+        # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
+        # later.
+        ladquery = '''
+<DerivedEvent  duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
+<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
+</DerivedEvent>
+        '''
+        intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
+        for table_name in local_tables:
+            for aggregation_interval in intervals:
+                query = ladquery.format(interval=aggregation_interval, localTable=table_name)
+                XmlUtil.addElement(self._mdsd_config_xml_tree, 'DerivedEvents', ET.fromstring(query))
+        # Other sinks are handled here
+            sinks = LadUtil.getTopLevelSinksFromLadCfg(ladCfg)
+            if "eventhub" in sinks:
+                eh_sink = LadUtil.getSinkDefinitionFromLadCfg(ladCfg, "eventhub")
+                # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
 
     def _update_and_get_file_monitoring_settings(self, files):
         """
@@ -126,7 +180,7 @@ $InputRunFileMonitor
             XmlUtil.addElement(self._mdsd_config_xml_tree, 'Sources', mdsd_source_element)
 
             imfile_per_file_config = imfile_per_file_config_template.replace('#FILE#', item['file'])
-            imfile_per_file_config = imfile_per_file_config.replace('#STATFILE#', item['file'].replace("/","-"))
+            imfile_per_file_config = imfile_per_file_config.replace('#STATFILE#', item['file'].replace("/", "-"))
             imfile_per_file_config = imfile_per_file_config.replace('#FILETAG#', 'ladfile'+str(file_id))
             imfile_config += imfile_per_file_config
         return imfile_config
@@ -203,7 +257,7 @@ $InputRunFileMonitor
                 self._update_perf_counters_settings(perf_cfgs, True)
         except Exception as e:
             self._logger_error("Failed to create perf config. Error:{0}\n"
-                         "Stacktrace: {1}".format(e, traceback.format_exc()))
+                               "Stacktrace: {1}".format(e, traceback.format_exc()))
 
     def _get_handler_cert_pkey_paths(self, handler_settings):
         """
@@ -333,17 +387,26 @@ $InputRunFileMonitor
         #      Note that we have never used this option.
         #    - 2nd priority is to use the provided XML template stored in <ext_dir>/mdsdConfig.xml.template.
         mdsd_cfg_str = self._ext_settings.get_mdsd_cfg()
-        if not mdsd_cfg_str:
-            with open(os.path.join(self._ext_dir, './mdsdConfig.xml.template'), "r") as f:
-                mdsd_cfg_str = f.read()
-        self._mdsd_config_xml_tree = ET.ElementTree()
-        self._mdsd_config_xml_tree._setroot(XmlUtil.createElement(mdsd_cfg_str))
+        if mdsd_cfg_str:
+            try:
+                self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mdsd_cfg_str))
+            except Exception as e:
+                msg = "Error parsing supplied mdsdCfg string: {0}".format(e)
+                self._logger_error(msg)
+                return False, msg
+        else:
+            self._mdsd_config_xml_tree = ET.parse(os.path.join(self._ext_dir, './mdsdConfig.xml.template'))
 
         # 2. Add DeploymentId (if available) to identity columns
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
-        # 2.1. Apply resourceId attribute to LADQuery elements
+        # 2.1. Use ladCfg to generate OMIQuery and LADQuery elements
+        lad_cfg = self._ext_settings.read_public_config('ladCfg')
+        if lad_cfg:
+            self._update_metric_collection_settings(lad_cfg)
+
+        # 2.9. Apply resourceId attribute to LADQuery elements
         try:
             resource_id = self._ext_settings.get_resource_id()
             if resource_id:
@@ -359,7 +422,6 @@ $InputRunFileMonitor
         # 3. Update perf counter config. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present in ladCfg first, and pass it to the actual helper
         #    function (self._apply_perf_cfgs()).
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
         do_ai = False
         aikey = None
         try:

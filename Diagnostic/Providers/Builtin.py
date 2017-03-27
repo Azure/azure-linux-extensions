@@ -10,7 +10,8 @@
 # documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the
 # rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
 # persons to whom the Software is furnished to do so, subject to the following conditions:
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+#  the Software.
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 # WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
@@ -36,6 +37,9 @@
 
 import Utils.ProviderUtil as ProvUtil
 from collections import defaultdict
+import xml.etree.ElementTree as ET
+import Utils.XmlUtil as XmlUtil
+
 
 # These are the built-in metrics this code provides, grouped by class.
 _builtIns = {
@@ -154,37 +158,40 @@ class BuiltinMetric:
         else:
             return ProvUtil.IntervalToSeconds(self._SampleRate)
 
-
 def AddMetric(counter_spec):
     """
     Add a metric to the list of metrics to be collected.
     :param counter_spec: The specification of a builtin metric.
+    :return: the generated local-table name in mdsd into which this metric will be fetched, or None
     """
     global _metrics, _eventNames
     try:
         metric = BuiltinMetric(counter_spec)
     except ProvUtil.ParseException as ex:
         print "Couldn't create metric: ", ex
-        return
+        return None
 
     # (class, instanceId, sampleRate) -> [ metric ]
     # Given a class, instance within that class, and sample rate, we have a list of the requested metrics
     # matching those constraints. For that set of constraints, we also have a common eventName, the local
     # table where we store the collected metrics.
 
-    key = (metric.Class(), metric.InstanceId(), metric.SampleRate() )
+    key = (metric.Class(), metric.InstanceId(), metric.SampleRate())
     if key not in _eventNames:
         _eventNames[key] = ProvUtil.MakeUniqueEventName('builtin')
     _metrics[key].append(metric)
+    return _eventNames[key]
 
 
-def GenerateOMIQuery():
+def UpdateXML(doc):
     """
-    Build the minimal set of OMI queries which will retrieve the metrics requested via AddMetric().
-    :return: A string containing an XML mdsd configuration of OMI queries to collect the raw metrics on schedule.
+    Add to the mdsd XML the minimal set of OMI queries which will retrieve the metrics requested via AddMetric(). This
+    provider doesn't need any configuration external to mdsd; if it did, that would be generated here as well.
+
+    :param doc: XML document object to be updated
+    :return: None
     """
     global _metrics, _eventNames, _omiClassName
-    queries = []
     for group in _metrics:
         (class_name, instance_id, sample_rate) = group
         if class_name in _instancedClasses and not instance_id:
@@ -199,7 +206,7 @@ def GenerateOMIQuery():
             where_clause = " WHERE name='{0}'".format(instance_id)
         else:
             where_clause = ""
-        queries.append('''
+        query = '''
 <OMIQuery cqlQuery="SELECT {0} FROM {1}{2}" eventName="{3}" omiNamespace="root/scx" sampleRateInSeconds="{4}" storeType="local">
   <Unpivot columnName="CounterName" columnValue="Value" columns="{0}">
     {5}
@@ -211,28 +218,6 @@ def GenerateOMIQuery():
             _eventNames[group],
             sample_rate,
             '\n    '.join(mappings)
-        ))
-    return ''.join(queries)
-
-
-#import base64
-#import datetime
-#import os
-#import os.path
-#import platform
-#import re
-#import signal
-#import string
-#import subprocess
-#import sys
-#import syslog
-#import time
-#import traceback
-#import xml.dom.minidom
-#import xml.etree.ElementTree as ET
-#
-#import Utils.HandlerUtil as Util
-#import Utils.LadDiagnosticUtil as LadUtil
-#import Utils.XmlUtil as XmlUtil
-#import Utils.ApplicationInsightsUtil as AIUtil
-#from Utils.WAAgentUtil import waagent
+        )
+        XmlUtil.addElement(doc, 'Events', ET.fromstring(query))
+    return
