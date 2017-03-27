@@ -77,6 +77,7 @@ class LadExtSettings(ExtSettings):
     """
     def __init__(self, handler_settings):
         super(LadExtSettings, self).__init__(handler_settings)
+        self._syslog_enabled = None
 
     def log_protected_settings_keys(self, logger_log, logger_err):
         """
@@ -192,3 +193,25 @@ class LadExtSettings(ExtSettings):
         destinations of the monitored file. Refer to README.md for more details
         """
         return self.read_public_config('fileLogs')
+
+    def is_syslog_enabled(self):
+        """
+        Check if syslog is enabled in the LAD settings ('enableSyslog' setting)
+        :rtype: bool
+        :return: True if so. False otherwise.
+        """
+        if self._syslog_enabled is None:
+            # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time,
+            # so accommodate it.
+            enable_syslog_setting = self.read_public_config('enableSyslog') if self.has_public_config('enableSyslog') \
+                                    else self.read_public_config('EnableSyslog')
+            if not enable_syslog_setting:
+                self._syslog_enabled = True  # Default is enabled when the setting is not specified
+            elif isinstance(enable_syslog_setting, bool):
+                self._syslog_enabled = enable_syslog_setting
+            elif not isinstance(enable_syslog_setting, basestring):
+                self._syslog_enabled = True  # Ignore non-bool, non-string setting and default it to true
+            else:  # string case.
+                self._syslog_enabled = self.read_public_config('enableSyslog').lower() != 'false' \
+                                       and self.read_public_config('EnableSyslog').lower() != 'false'
+        return self._syslog_enabled

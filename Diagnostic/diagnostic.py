@@ -47,7 +47,7 @@ try:
     import watcherutil
     from Utils.lad_ext_settings import LadExtSettings
     from misc_helpers import *
-    from config_mdsd_rsyslog import *
+    from lad_config_all import *
     from Utils.imds_util import ImdsLogger
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
@@ -178,42 +178,47 @@ def install_lad_as_systemd_service():
     RunGetOutput('systemctl daemon-reload')
 
 
-def main(command):
-    init_globals()
+def create_core_components_configs():
+    """
+    Entry point to creating all configs of LAD's core components (mdsd, omsagent, rsyslog/syslog-ng, ...).
+    This function shouldn't be called on Install/Enable. Only Daemon op needs to call this.
+    :rtype: bool
+    :return: True if and only if all configs are created correctly.
+    """
+    global g_enable_syslog
 
-    global g_enable_syslog, g_ext_op_type
-
-    # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
-    g_enable_syslog = g_ext_settings.read_public_config('enableSyslog').lower() != 'false' \
-                      and g_ext_settings.read_public_config('EnableSyslog').lower() != 'false'
-
-    g_ext_op_type = get_extension_operation_type(command)
+    g_enable_syslog = g_ext_settings.is_syslog_enabled()
 
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
-    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
-                                                  g_imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
-    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_rsyslog_configs()
+    mdsd_rsyslog_configurator = LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
+                                             RunGetOutput, hutil.log, hutil.error)
+    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_omsagent_syslog_configs()
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
-                             ". Install will proceed, but enable can't proceed, " \
-                             "in which case it's still considered a success as it's an external error."
+                             ". Can't proceed, but this will be still considered a success as it's an external error."
         hutil.log(config_invalid_log)
-        if g_ext_op_type is waagent.WALAEventOperation.Enable:
-            hutil.do_status_report(g_ext_op_type, "success", '0', config_invalid_log)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
-                                      op=g_ext_op_type,
-                                      isSuccess=True,
-                                      version=hutil.get_extension_version(),
-                                      message=config_invalid_log)
-            return
+        hutil.do_status_report(g_ext_op_type, "success", '0', config_invalid_log)
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=g_ext_op_type,
+                                  isSuccess=True,
+                                  version=hutil.get_extension_version(),
+                                  message=config_invalid_log)
+    return config_valid
 
+
+def check_for_supported_waagent_and_distro_version():
+    """
+    Checks & returns if the installed waagent and the Linux distro/version are supported by this LAD.
+    :rtype: bool
+    :return: True iff so.
+    """
     for notsupport in ('WALinuxAgent-2.0.5', 'WALinuxAgent-2.0.4', 'WALinuxAgent-1'):
         code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent",
                                              chk_err=False)
         if code == 0 and str_ret.find(notsupport) > -1:
             hutil.log("cannot run this extension on  " + notsupport)
             hutil.do_status_report(g_ext_op_type, "error", '1', "cannot run this extension on  " + notsupport)
-            return
+            return False
 
     if g_dist_config is None:
         msg = ("LAD does not support distro/version ({0}); not installed. This extension install/enable operation is "
@@ -225,7 +230,21 @@ def main(command):
                                   isSuccess=True,
                                   version=hutil.get_extension_version(),
                                   message="Can't be installed on this OS " + str(platform.dist()))
+        return False
+
+    return True
+
+
+def main(command):
+    init_globals()
+
+    global g_ext_op_type
+
+    g_ext_op_type = get_extension_operation_type(command)
+
+    if not check_for_supported_waagent_and_distro_version():
         return
+
     try:
         hutil.log("Dispatching command:" + command)
 
@@ -269,7 +288,8 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Enable succeeded")
 
         elif g_ext_op_type is "Daemon":
-            start_mdsd()
+            if create_core_components_configs():
+                start_mdsd()
 
         elif g_ext_op_type is waagent.WALAEventOperation.Update:
             hutil.do_status_report(g_ext_op_type, "success", '0', "Update succeeded")

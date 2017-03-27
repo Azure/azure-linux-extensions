@@ -41,13 +41,15 @@ _mdsd_per_event_source_config_template = """      <MdsdEventSource source="{sour
 """
 
 
-class SyslogMdsdConfig:
+class LadLoggingConfig:
     """
     Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with fluentd
-    (currently omsagent), and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
+    (currently omsagent), and corresponding omsagent & mdsd configurations, based on the LAD 3.0
+    syslog config schema. This class also generates omsagent (fluentd) config for LAD 3.0's fileLogs settings
+    (using the fluentd tail plugin).
     """
 
-    def __init__(self, syslogEvents, syslogCfg, fileLogs):
+    def __init__(self, syslogEvents, syslogCfg, fileLogs, syslog_enabled):
         """
         Constructor to receive/store necessary LAD settings for the desired configuration generation.
 
@@ -112,20 +114,28 @@ class SyslogMdsdConfig:
 
                          "file" is the full path of the log file to be watched and captured. "table" is for the
                          Azure storage table into which the lines of the watched file will be placed (one row per line).
+        :param bool syslog_enabled: Indicates syslog is enabled in LAD 3.0 settings. False takes the precedence,
+                        and if this is true but the other two syslog settings are none, then entire syslog
+                        facility/levels are collected.
         """
 
         if syslogEvents and syslogCfg:
-            raise LadSyslogConfigException("Can't specify both syslogEvents and syslogCfg")
+            raise LadLoggingConfigException("Can't specify both syslogEvents and syslogCfg")
 
         self._syslogEvents = syslogEvents
         self._syslogCfg = syslogCfg
         self._fileLogs = fileLogs
+        self._syslog_enabled = syslog_enabled
+        # Remembers whether all syslog facility/levels are enabled ('enableSyslog' but neither 'syslogCfg' nor 'syslogEvents')
+        self._all_syslog_facility_severity_enabled = syslog_enabled and not syslogCfg and not syslogEvents
+        # Remembers if this is the basic syslog config case (single destination able)
+        self._syslog_basic_config_case = self._all_syslog_facility_severity_enabled or self._syslogEvents
         self._facsev_table_map = None
         self._fac_sev_map = None
 
         try:
             if self._syslogCfg:
-                # Convert the 'syslogCfg' JSON object array into a Python dictionary of 'facility;minSeverity' - 'table'
+                # Convert the 'syslogCfg' JSON object array into a Python dictionary of 'facility.minSeverity' - 'table'
                 # E.g., { 'user.err': 'SyslogUserErrorEvents', 'local0.crit': 'SyslogLocal0CritEvent' }
                 self._facsev_table_map = dict([('{0}.{1}'.format(syslog_name_to_rsyslog_name(entry['facility']),
                                                                  syslog_name_to_rsyslog_name(entry['minSeverity'])),
@@ -146,7 +156,7 @@ class SyslogMdsdConfig:
             self._oms_mdsd_syslog_config = None
             self._oms_mdsd_filelog_config = None
         except KeyError as e:
-            raise LadSyslogConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
+            raise LadLoggingConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
     def get_oms_rsyslog_config(self):
         """
@@ -158,12 +168,17 @@ class SyslogMdsdConfig:
                  or to /etc/rsyslog.conf (old rsyslog)
         """
         if not self._oms_rsyslog_config:
-            # Generate/save/return rsyslog config string for the facility-severity pairs.
-            # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
-            self._oms_rsyslog_config = '' if not self._fac_sev_map else \
-                '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
-                                                                     syslog_name_to_rsyslog_name(sev))
-                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+            if not self._syslog_enabled:
+                self._oms_rsyslog_config = ''   # Syslog disabled
+            elif self._all_syslog_facility_severity_enabled:
+                self._oms_rsyslog_config = '*.*  @127.0.0.1:%SYSLOG_PORT%\n'
+            else:
+                # Generate/save/return rsyslog config string for the facility-severity pairs.
+                # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
+                self._oms_rsyslog_config = \
+                    '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
+                                                                         syslog_name_to_rsyslog_name(sev))
+                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._oms_rsyslog_config
 
     def get_oms_syslog_ng_config(self):
@@ -175,13 +190,18 @@ class SyslogMdsdConfig:
         :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
         """
         if not self._oms_syslog_ng_config:
-            # Generate/save/return syslog-ng config string for the facility-severity pairs.
-            # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
-            self._oms_syslog_ng_config = '' if not self._fac_sev_map else \
-                '\n'.join('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
-                          'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
-                                                               syslog_name_to_rsyslog_name(sev))
-                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+            if not self._syslog_enabled:
+                self._oms_syslog_ng_config = ''  # Syslog disabled
+            elif self._all_syslog_facility_severity_enabled:
+                self._oms_syslog_ng_config = 'log { source(s_src); destination(d_LAD_oms); }\n'
+            else:
+                # Generate/save/return syslog-ng config string for the facility-severity pairs.
+                # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
+                self._oms_syslog_ng_config = \
+                    '\n'.join('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
+                              'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
+                                                                   syslog_name_to_rsyslog_name(sev))
+                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._oms_syslog_ng_config
 
     def get_oms_mdsd_syslog_config(self):
@@ -198,12 +218,12 @@ class SyslogMdsdConfig:
         """
         Helper method to generate oms_mdsd_syslog_config
         """
-        if not self._fac_sev_map:
+        if not self._syslog_enabled and not self._fac_sev_map:
             return ''
 
         # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
         # dest table (eventName) is 'LinuxSyslog'
-        if self._syslogEvents:
+        if self._syslog_basic_config_case:
             return _mdsd_sources_events_config_template.format(
                 sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
                 events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
@@ -281,13 +301,44 @@ class SyslogMdsdConfig:
 </filter>
 """
         # Basic config case (single table destination for all facilities/levels)
-        if self._syslogEvents:
+        if self._syslog_basic_config_case:
             return fluentd_syslog_src_config_template.format(syslog_tag_part='syslog')
         # Extended config case (per facility/min-level table destination)
         if self._syslogCfg:
             return fluentd_syslog_src_config_template.format(syslog_tag_part='ext_syslog')
         # No syslog config
         return ''
+
+    def get_oms_fluentd_filelog_src_config(self):
+        """
+        Get Fluentd's filelog (tail) source config that should be used for this LAD's fileLogs settings.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/file.conf
+        """
+        if not self._fileLogs:
+            return ''
+
+        fluentd_tail_src_config_template = """
+# For all monitored files
+<source>
+  @type tail
+  path {file_paths}
+  pos_file /var/opt/microsoft/omsagent/LAD/tmp/filelogs.pos
+  tag mdsd.filelog.*
+  format none
+  message_key Msg  # LAD uses "Msg" as the field name
+</source>
+
+# Add FileTag field (existing LAD behavior)
+<filter mdsd.filelog.**>
+  @type record_transformer
+  <record>
+    FileTag ${{tag_suffix[2]}}
+  </record>
+</filter>
+"""
+        return fluentd_tail_src_config_template.format(file_paths=','.join(self._file_table_map.keys()))
 
     def get_oms_fluentd_out_mdsd_config(self):
         """
@@ -317,7 +368,7 @@ class SyslogMdsdConfig:
         tag_regex_cfg_line_template = """    mdsd_tag_regex_patterns [{tag_patterns}] # fluentd tag patterns whose match will be used as mdsd source name
 """
         # Basic config case (single table destination for all facilities/levels)
-        if self._syslogEvents:
+        if self._syslog_basic_config_case:
             tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.syslog" ')
             return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
         # Extended config case (per facility/min-level table destination)
@@ -370,13 +421,13 @@ def syslog_name_to_rsyslog_name(syslog_name):
     :return: Corresponding rsyslog name (e.g., "user" or "error")
     """
     if syslog_name not in syslog_name_to_rsyslog_name_map:
-        raise LadSyslogConfigException('Invalid syslog name given: {0}'.format(syslog_name))
+        raise LadLoggingConfigException('Invalid syslog name given: {0}'.format(syslog_name))
     return syslog_name_to_rsyslog_name_map[syslog_name]
 
 
-class LadSyslogConfigException(Exception):
+class LadLoggingConfigException(Exception):
     """
-    Custom exception class for LAD syslog config errors
+    Custom exception class for LAD logging config errors
     """
     pass
 
@@ -391,27 +442,30 @@ def copy_sub_elems(dst_xml, src_xml, path):
     """
     dst_elem = dst_xml.find(path)
     src_elem = src_xml.find(path)
-    if not src_elem:
+    if src_elem is None:
         return
     for sub_elem in src_elem:
         dst_elem.append(sub_elem)
 
 
-def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
+def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_logging_xml_string):
     """
     Copy MonitoringManagement/Schemas/Schema, MonitoringManagement/Sources/Source,
     MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
     Used to actually add generated rsyslog mdsd config XML elements to the mdsd config XML tree.
 
     :param xml.etree.ElementTree.ElementTree mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
-    :param str mdsd_rsyslog_xml_string: XML string containing the generated rsyslog mdsd config XML elements.
-                                See syslog_mdsd_*_expected_output variables in test_lad30_syslog_config.py for examples.
+    :param str mdsd_logging_xml_string: XML string containing the generated logging (syslog/filelog) mdsd config XML elements.
+            See oms_syslog_mdsd_*_expected_xpaths member variables in test_lad_logging_config.py for examples in XPATHS format.
     :return: None. mdsd_xml_tree object will contain the added elements.
     """
-    rsyslog_xml_tree = ET.ElementTree(ET.fromstring(mdsd_rsyslog_xml_string))
+    if not mdsd_logging_xml_string:
+        return
+
+    mdsd_logging_xml_tree = ET.ElementTree(ET.fromstring(mdsd_logging_xml_string))
 
     # Copy Source elements (sub-elements of Sources element)
-    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Sources')
+    copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'Sources')
 
     # Copy MdsdEventSource elements (sub-elements of Events/MdsdEvents element)
-    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Events/MdsdEvents')
+    copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'Events/MdsdEvents')
