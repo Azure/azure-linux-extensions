@@ -19,11 +19,32 @@
 from xml.etree import ElementTree as ET
 
 
-class RsyslogMdsdConfig:
+# Mdsd XML config templates defined globally because they are shared by multiple methods
+_mdsd_sources_events_config_template = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
+  <Sources>
+{sources}  </Sources>
+
+  <Events>
+    <MdsdEvents>
+{events}    </MdsdEvents>
+  </Events>
+</MonitoringManagement>
+"""
+
+_mdsd_per_source_config_template = """    <Source name="{name}" dynamic_schema="true" />
+"""
+
+_mdsd_per_event_source_config_template = """      <MdsdEventSource source="{source}">
+        <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" />
+      </MdsdEventSource>
+"""
+
+
+class SyslogMdsdConfig:
     """
-    Utility class for obtaining rsyslog configurations for omazuremds output module and imfile input module
-    and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
-    Diagnostic/README.md will include documentation for the LAD 3.0 syslog config schema.
+    Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with fluentd
+    (currently omsagent), and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
     """
 
     def __init__(self, syslogEvents, syslogCfg, fileLogs):
@@ -99,6 +120,8 @@ class RsyslogMdsdConfig:
         self._syslogEvents = syslogEvents
         self._syslogCfg = syslogCfg
         self._fileLogs = fileLogs
+        self._facsev_table_map = None
+        self._fac_sev_map = None
 
         try:
             if self._syslogCfg:
@@ -108,352 +131,201 @@ class RsyslogMdsdConfig:
                                                                  syslog_name_to_rsyslog_name(entry['minSeverity'])),
                                                 entry['table'])
                                                for entry in self._syslogCfg])
+            # Create facility-severity map. E.g.: { "LOG_USER" : "LOG_ERR", "LOG_LOCAL0", "LOG_CRIT" }
+            if self._syslogEvents or self._syslogCfg:
+                self._fac_sev_map = self._syslogEvents['syslogEventConfiguration'] if self._syslogEvents else \
+                    dict([(entry['facility'], entry['minSeverity']) for entry in self._syslogCfg])
+
             if self._fileLogs:
                 # Convert the 'fileLogs' JSON object array into a Python dictionary of 'file' - 'table'
                 # E.g., { '/var/log/mydaemonlog1': 'MyDaemon1Events', '/var/log/mydaemonlog2': 'MyDaemon2Events' }
                 self._file_table_map = dict([(entry['file'], entry['table']) for entry in self._fileLogs])
-            self._omazuremds_legacy_config = self._create_omazuremds_config(legacy=True)
-            self._omazuremds_config = self._create_omazuremds_config(legacy=False)
-            self._mdsd_syslog_config = self._create_mdsd_syslog_config()
-            self._imfile_config = self._create_imfile_config()
-            self._mdsd_filelog_config = self._create_mdsd_filelog_config()
+
+            self._oms_rsyslog_config = None
+            self._oms_syslog_ng_config = None
+            self._oms_mdsd_syslog_config = None
+            self._oms_mdsd_filelog_config = None
         except KeyError as e:
             raise LadSyslogConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
-    def get_omazuremds_config(self, legacy):
+    def get_oms_rsyslog_config(self):
         """
-        Get omazuremds rsyslog output module config that corresponds to the syslogEvents or the syslogCfg JSON
-        object given in the construction parameters.
+        Returns rsyslog config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
+        JSON object given in the construction parameters.
 
-        :param bool legacy: A boolean indicating whether to get omazuremds config for rsyslog 5/7 (legacy rsyslog config)
         :rtype: str
-        :return: omazuremds rsyslog output module config string that should be saved to a file and placed in
-                 /etc/rsyslog.d/ directory
+        :return: rsyslog config string that should be appended to /etc/rsyslog.d/95-omsagent.conf (new rsyslog)
+                 or to /etc/rsyslog.conf (old rsyslog)
         """
-        return self._omazuremds_legacy_config if legacy else self._omazuremds_config
+        if not self._oms_rsyslog_config:
+            # Generate/save/return rsyslog config string for the facility-severity pairs.
+            # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
+            self._oms_rsyslog_config = '' if not self._fac_sev_map else \
+                '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
+                                                                     syslog_name_to_rsyslog_name(sev))
+                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+        return self._oms_rsyslog_config
 
-    def get_mdsd_syslog_config(self):
+    def get_oms_syslog_ng_config(self):
         """
-        Get mdsd XML config string for the LAD 3.0 syslog config.
+        Returns syslog-ng config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
+        JSON object given in the construction parameters.
+
         :rtype: str
-        :return: XML string that should be added to the mdsd config XML tree for the LAD 3.0 syslog config.
+        :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
         """
-        return self._mdsd_syslog_config
+        if not self._oms_syslog_ng_config:
+            # Generate/save/return syslog-ng config string for the facility-severity pairs.
+            # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
+            self._oms_syslog_ng_config = '' if not self._fac_sev_map else \
+                '\n'.join('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
+                          'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
+                                                               syslog_name_to_rsyslog_name(sev))
+                          for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+        return self._oms_syslog_ng_config
 
-    def get_imfile_config(self):
+    def get_oms_mdsd_syslog_config(self):
         """
-        Get imfile rsyslog input module config that corresponds to the fileLogs JSON object given in the construction
-        parameters.
+        Get mdsd XML config string for syslog use with omsagent in LAD 3.0.
         :rtype: str
-        :return: imfile rsyslog input module config string that should be saved to a file and placed in
-                 /etc/rsyslog.d/ directory
+        :return: XML string that should be added to the mdsd config XML tree for syslog use with omsagent in LAD 3.0.
         """
-        return self._imfile_config
+        if not self._oms_mdsd_syslog_config:
+            self._oms_mdsd_syslog_config = self.__generate_oms_mdsd_syslog_config()
+        return self._oms_mdsd_syslog_config
 
-    def get_mdsd_filelog_config(self):
+    def __generate_oms_mdsd_syslog_config(self):
         """
-        Get mdsd XML config string for the LAD 3.0 filelog config.
-        :rtype: str
-        :return: XML string that should be added to the mdsd config XML tree for the LAD 3.0 filelog config.
+        Helper method to generate oms_mdsd_syslog_config
         """
-        return self._mdsd_filelog_config
-
-    def _create_omazuremds_config(self, legacy):
-        """
-        Create omazure rsyslog output module config for the get method.
-        :param bool legacy: Indicates whether we are creating omazuremds config for rsyslog legacy versions (5/7) or not (8).
-        :rtype: str
-        :return: rsyslog omazuremds config string
-        """
-        return self._create_omazuremds_config_from_basic(legacy) if self._syslogEvents else \
-               self._create_omazuremds_config_from_extended(legacy)
-
-    def _create_omazuremds_config_from_basic(self, legacy):
-        """
-        Create omazure rsyslog output module config from "syslogEvents" setting
-        :param bool legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
-        :rtype: str
-        :return: rsyslog omazuremds config string
-        """
-        if 'syslogEventConfiguration' not in self._syslogEvents:
-            raise LadSyslogConfigException('Invalid schema for "syslogEvents": No "syslogEventConfiguration"')
-
-        fac_sev_map = self._syslogEvents['syslogEventConfiguration']
-        if len(fac_sev_map) == 0:
+        if not self._fac_sev_map:
             return ''
 
-        fac_sev_list = ''
-        for facility in sorted(fac_sev_map):
-            if fac_sev_list:
-                fac_sev_list += ';'
-            fac_sev_list += '{0}.{1}'.format(syslog_name_to_rsyslog_name(facility),
-                                             syslog_name_to_rsyslog_name(fac_sev_map[facility]))
+        # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
+        # dest table (eventName) is 'LinuxSyslog'
+        if self._syslogEvents:
+            return _mdsd_sources_events_config_template.format(
+                sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
+                events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
 
-        omazuremds_basic_config_legacy_template = """
-$ModLoad omazuremds.so
-$legacymdsdconnections 1
-$legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
-
-$template fmt_basic, "\"syslog_basic\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
-$ActionQueueType LinkedList
-$ActionQueueDequeueBatchSize 100
-$ActionQueueSize 500
-$ActionResumeRetryCount -1
-$ActionQueueSaveOnShutdown on
-$ActionQueueFileName lad_mdsd_queue_syslog_basic
-$ActionQueueDiscardSeverity 8
-<<<FACILITY_SEVERITY_LIST>>> :omazuremds:;fmt_basic
-"""
-        omazuremds_basic_config_template = """
-$ModLoad omazuremds
-
-$template fmt_basic,"\"syslog_basic\",\"%syslogfacility-text:::json%\",\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",\"%rawmsg:::json%\""
-<<<FACILITY_SEVERITY_LIST>>> action( type="omazuremds"
-    template="fmt_basic"
-    mdsdsocketfile="__MDSD_SOCKET_FILE_PATH__"
-    queue.workerthreads="1"
-    queue.dequeuebatchsize="16"
-    queue.type="fixedarray"
-    queue.filename="lad_mdsd_queue_syslog_basic"
-    queue.highwatermark="400"
-    queue.lowwatermark="100"
-    queue.discardseverity="8"
-    queue.maxdiskspace="5g"
-    queue.size="500"
-    queue.saveonshutdown="on"
-    action.resumeretrycount="-1"
-    action.resumeinterval = "3"
-)
-"""
-        omazuremds_basic_config_string = omazuremds_basic_config_legacy_template if legacy \
-            else omazuremds_basic_config_template
-        return omazuremds_basic_config_string.replace('<<<FACILITY_SEVERITY_LIST>>>', fac_sev_list)
-
-    def _create_omazuremds_config_from_extended(self, legacy):
-        """
-        Create omazuremds config string for LAD 3.0 "syslogCfg" (extended) settings.
-        :param bool legacy: Indicates whether to create for syslog legacy versions (5/7) or not (8).
-        :rtype: str
-        :return: rsyslog omazuremds config string
-        """
-
-        if not self._syslogCfg:
-            return ''
-
-        # Start creating omazuremds config
-        omazuremds_extended_config = """
-$ModLoad omazuremds.so
-$legacymdsdconnections 1
-$legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
-""" if legacy else """
-$ModLoad omazuremds
-"""
-        omazuremds_per_table_template = """
-$template fmt_ext_<<<INDEX>>>, "\"syslog_ext_<<<INDEX>>>\",%syslogfacility-text:::csv%,\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",#TOJSON#%rawmsg%"
-$ActionQueueType LinkedList
-$ActionQueueDequeueBatchSize 100
-$ActionQueueSize 500
-$ActionResumeRetryCount -1
-$ActionQueueSaveOnShutdown on
-$ActionQueueFileName lad_mdsd_queue_syslog_ext_<<<INDEX>>>
-$ActionQueueDiscardSeverity 8
-<<<FACILITY_SEVERITY>>> :omazuremds:;fmt_ext_<<<INDEX>>>
-""" if legacy else """
-$template fmt_ext_<<<INDEX>>>,"\"syslog_ext_<<<INDEX>>>\",\"%syslogfacility-text:::json%\",\"%syslogseverity%\",\"%timereported:::date-rfc3339%\",\"%fromhost-ip%\",\"%rawmsg:::json%\""
-<<<FACILITY_SEVERITY>>> action( type="omazuremds"
-    template="fmt_ext_<<<INDEX>>>"
-    mdsdsocketfile="__MDSD_SOCKET_FILE_PATH__"
-    queue.workerthreads="1"
-    queue.dequeuebatchsize="16"
-    queue.type="fixedarray"
-    queue.filename="lad_mdsd_queue_syslog_ext_<<<INDEX>>>"
-    queue.highwatermark="400"
-    queue.lowwatermark="100"
-    queue.discardseverity="8"
-    queue.maxdiskspace="5g"
-    queue.size="500"
-    queue.saveonshutdown="on"
-    action.resumeretrycount="-1"
-    action.resumeinterval = "3"
-)
-"""
-        index = 0
-        for entry in sorted(self._facsev_table_map):
-            index += 1
-            omazuremds_extended_config += omazuremds_per_table_template.replace("<<<INDEX>>>", str(index))\
-                                                                       .replace("<<<FACILITY_SEVERITY>>>", entry)
-        return omazuremds_extended_config
-
-    def _create_mdsd_syslog_config(self):
-        """
-        Create mdsd XML config string for LAD 3.0 syslog settings.
-        :rtype: str
-        :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
-        """
-        return self._create_mdsd_syslog_basic_config() if self._syslogEvents else self._create_mdsd_syslog_extended_config()
-
-    def _create_mdsd_syslog_basic_config(self):
-        """
-        Create mdsd XML config string for basic syslog config ("syslogEvents")
-        :rtype: str
-        :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
-        """
-        return """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Schemas>
-    <Schema name="syslog">
-      <Column mdstype="mt:wstr" name="Ignore" type="str" />
-      <Column mdstype="mt:wstr" name="Facility" type="str" />
-      <Column mdstype="mt:int32" name="Severity" type="str" />
-      <Column mdstype="mt:utc" name="EventTime" type="str-rfc3339" />
-      <Column mdstype="mt:wstr" name="SendingHost" type="str" />
-      <Column mdstype="mt:wstr" name="Msg" type="str" />
-    </Schema>
-  </Schemas>
-  <Sources>
-    <Source name="syslog_basic" schema="syslog" />
-  </Sources>
-
-  <Events>
-    <MdsdEvents>
-      <MdsdEventSource source="syslog_basic">
-        <RouteEvent dontUsePerNDayTable="true" eventName="LinuxSyslog" priority="High" />
-      </MdsdEventSource>
-    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-    def _create_mdsd_syslog_extended_config(self):
-        """
-        Create mdsd XML config string for extended syslog config ("syslogCfg")
-        :rtype: str
-        :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
-        """
-        if not self._syslogCfg:
-            return ''
-
-        syslog_mdsd_config = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Schemas>
-    <Schema name="syslog">
-      <Column mdstype="mt:wstr" name="Ignore" type="str" />
-      <Column mdstype="mt:wstr" name="Facility" type="str" />
-      <Column mdstype="mt:int32" name="Severity" type="str" />
-      <Column mdstype="mt:utc" name="EventTime" type="str-rfc3339" />
-      <Column mdstype="mt:wstr" name="SendingHost" type="str" />
-      <Column mdstype="mt:wstr" name="Msg" type="str" />
-    </Schema>
-  </Schemas>
-  <Sources>
-{0}  </Sources>
-
-  <Events>
-    <MdsdEvents>
-{1}    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-        per_table_source_template = """    <Source name="syslog_ext_{0}" schema="syslog" />
-"""
-        per_table_mdsd_event_source_template = """      <MdsdEventSource source="syslog_ext_{0}">
-        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
-      </MdsdEventSource>
-"""
+        # For extended syslog conf (per-fac/sev dest table): Source name is 'mdsd.ext_syslog.<facility> and
+        # dest table (eventName) is in self._fac_sev_table_map
         syslog_sources = ''
         syslog_mdsd_event_sources = ''
-        index = 0
-        for facsev_key in sorted(self._facsev_table_map):
-            index += 1
-            syslog_sources += per_table_source_template.format(index)
-            syslog_mdsd_event_sources += per_table_mdsd_event_source_template.format(index, self._facsev_table_map[facsev_key])
+        for facsev_key in self._facsev_table_map:
+            source_name = 'mdsd.ext_syslog.{0}'.format(facsev_key.split('.')[0])
+            syslog_sources += _mdsd_per_source_config_template.format(name=source_name)
+            syslog_mdsd_event_sources += _mdsd_per_event_source_config_template.format(source=source_name,
+                                                                                       event_name=self._facsev_table_map[facsev_key])
+        return _mdsd_sources_events_config_template.format(sources=syslog_sources, events=syslog_mdsd_event_sources)
 
-        return syslog_mdsd_config.format(syslog_sources, syslog_mdsd_event_sources)
-
-    def _create_imfile_config(self):
+    def get_oms_mdsd_filelog_config(self):
         """
-        Create imfile rsyslog input module config for the get method.
-        :return: rsyslog imfile config string
-        """
-        if not self._fileLogs:
-            return ''
-        imfile_config_template = """
-$ModLoad imfile
-{0}
-$ModLoad omazuremds.so
-$legacymdsdconnections 1
-$legacymdsdsocketfile __MDSD_SOCKET_FILE_PATH__
-
-$ActionQueueType LinkedList
-$ActionQueueDequeueBatchSize 100
-$ActionQueueSize 500
-$ActionResumeRetryCount -1
-$ActionQueueSaveOnShutdown on
-$ActionQueueFileName lad_mdsd_queue_filelog
-$ActionQueueDiscardSeverity 8
-
-$template fmt_file,"\"%syslogtag%\",#TOJSON#%rawmsg%"
-local6.* :omazuremds:;fmt_file
-
-& ~
-"""
-        per_file_template = """
-$InputFileName {0}
-$InputFileTag ladfile_{1}
-$InputFileFacility local6
-$InputFileStateFile syslog-stat{2}
-$InputFileSeverity debug
-$InputRunFileMonitor
-"""
-        all_files_config = ''
-        index = 0
-        for file_key in self._file_table_map:
-            index += 1
-            all_files_config += per_file_template.format(file_key, index, file_key.replace('/', '-'))
-
-        return imfile_config_template.format(all_files_config)
-
-    def _create_mdsd_filelog_config(self):
-        """
-        Create mdsd XML config string for LAD 3.0 filelog settings.
+        Get mdsd XML config string for filelog (tail) use with omsagent in LAD 3.0.
         :rtype: str
-        :return: mdsd XML config string (may need to be merged to the main mdsd config XML tree)
+        :return: XML string that should be added to the mdsd config XML tree for filelog use with omsagent in LAD 3.0.
+        """
+        if not self._oms_mdsd_filelog_config:
+            self._oms_mdsd_filelog_config = self.__generate_oms_mdsd_filelog_config()
+        return self._oms_mdsd_filelog_config
+
+    def __generate_oms_mdsd_filelog_config(self):
+        """
+        Helper method to generate oms_mdsd_filelog_config
         """
         if not self._fileLogs:
             return ''
 
-        filelogs_mdsd_config = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
-  <Schemas>
-    <Schema name="ladfile">
-      <Column mdstype="mt:wstr" name="FileTag" type="str" />
-      <Column mdstype="mt:wstr" name="Msg" type="str" />
-    </Schema>
-  </Schemas>
-  <Sources>
-{0}  </Sources>
-
-  <Events>
-    <MdsdEvents>
-{1}    </MdsdEvents>
-  </Events>
-</MonitoringManagement>
-"""
-        per_file_source_template = """    <Source name="ladfile_{0}" schema="ladfile" />
-"""
-        per_file_mdsd_event_source_template = """      <MdsdEventSource source="ladfile_{0}">
-        <RouteEvent dontUsePerNDayTable="true" eventName="{1}" priority="High" />
-      </MdsdEventSource>
-"""
+        # Per-file source name is 'mdsd.filelog<.path.to.file>' where '<.path.to.file>' is a full path
+        # with all '/' replaced by '.'.
         filelogs_sources = ''
         filelogs_mdsd_event_sources = ''
-        index = 0
         for file_key in sorted(self._file_table_map):
-            index += 1
-            filelogs_sources += per_file_source_template.format(index)
-            filelogs_mdsd_event_sources += per_file_mdsd_event_source_template.format(index,
-                                                                                      self._file_table_map[file_key])
+            source_name = 'mdsd.filelog{0}'.format(file_key.replace('/', '.'))
+            filelogs_sources += _mdsd_per_source_config_template.format(name=source_name)
+            filelogs_mdsd_event_sources += \
+                _mdsd_per_event_source_config_template.format(source=source_name, event_name=self._file_table_map[file_key])
+        return _mdsd_sources_events_config_template.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources)
 
-        return filelogs_mdsd_config.format(filelogs_sources, filelogs_mdsd_event_sources)
+    def get_oms_fluentd_syslog_src_config(self):
+        """
+        Get Fluentd's syslog source config that should be used for this LAD's syslog configs.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
+                 (after replacing '%SYSLOG_PORT%' with the assigned/picked port number)
+        """
+        fluentd_syslog_src_config_template = """
+<source>
+  type syslog
+  port %SYSLOG_PORT%
+  bind 127.0.0.1
+  protocol_type udp
+  tag mdsd.{syslog_tag_part}
+</source>
+
+# Generate fields expected for existing mdsd syslog collection schema.
+<filter mdsd.{syslog_tag_part}.**>
+  type record_transformer
+  enable_ruby
+  <record>
+    # Fields expected by mdsd for syslog messages
+    Ignore "syslog"
+    Facility ${{tag_parts[2]}}
+    Severity ${{tag_parts[3]}}
+    EventTime ${{time.strftime('%Y-%m-%dT%H:%M:%S%z')}}
+    SendingHost ${{record["source_host"]}}
+    Msg ${{record["message"]}}
+  </record>
+  remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
+</filter>
+"""
+        # Basic config case (single table destination for all facilities/levels)
+        if self._syslogEvents:
+            return fluentd_syslog_src_config_template.format(syslog_tag_part='syslog')
+        # Extended config case (per facility/min-level table destination)
+        if self._syslogCfg:
+            return fluentd_syslog_src_config_template.format(syslog_tag_part='ext_syslog')
+        # No syslog config
+        return ''
+
+    def get_oms_fluentd_out_mdsd_config(self):
+        """
+        Get Fluentd's out_mdsd output config that should be used for LAD.
+        TODO This is not really syslog-specific, so should be moved outside from here.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/z_out_mdsd.conf
+        """
+        fluentd_out_mdsd_config_template = """
+# Output to mdsd
+<match mdsd.**>
+    type mdsd
+    log_level warn
+    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
+{tag_regex_cfg_line}    num_threads 1
+    buffer_chunk_limit 1000k
+    buffer_type file
+    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_queue_limit 128
+    flush_interval 10s
+    retry_limit 3
+    retry_wait 10s
+</match>
+"""
+        tag_regex_cfg_line_template = """    mdsd_tag_regex_patterns [{tag_patterns}] # fluentd tag patterns whose match will be used as mdsd source name
+"""
+        # Basic config case (single table destination for all facilities/levels)
+        if self._syslogEvents:
+            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.syslog" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
+        # Extended config case (per facility/min-level table destination)
+        if self._syslogCfg:
+            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.ext_syslog\\.\\w+" ')
+            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
+        # No syslog config
+        return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line='')
 
 
 syslog_name_to_rsyslog_name_map = {
@@ -519,11 +391,13 @@ def copy_sub_elems(dst_xml, src_xml, path):
     """
     dst_elem = dst_xml.find(path)
     src_elem = src_xml.find(path)
+    if not src_elem:
+        return
     for sub_elem in src_elem:
         dst_elem.append(sub_elem)
 
 
-def copy_schema_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
+def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
     """
     Copy MonitoringManagement/Schemas/Schema, MonitoringManagement/Sources/Source,
     MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
@@ -535,9 +409,6 @@ def copy_schema_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
     :return: None. mdsd_xml_tree object will contain the added elements.
     """
     rsyslog_xml_tree = ET.ElementTree(ET.fromstring(mdsd_rsyslog_xml_string))
-
-    # Copy Schema elements (sub-elements of Schemas element)
-    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Schemas')
 
     # Copy Source elements (sub-elements of Sources element)
     copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Sources')
