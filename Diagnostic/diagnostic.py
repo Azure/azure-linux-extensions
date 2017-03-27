@@ -47,7 +47,7 @@ try:
     import watcherutil
     from Utils.lad_ext_settings import LadExtSettings
     from misc_helpers import *
-    from config_mdsd_rsyslog import *
+    from lad_config_all import *
     from Utils.imds_util import ImdsLogger
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
@@ -191,9 +191,9 @@ def create_core_components_configs():
     g_enable_syslog = g_ext_settings.is_syslog_enabled()
 
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
-    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
-                                                  g_imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
-    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_rsyslog_configs()
+    mdsd_rsyslog_configurator = LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
+                                             g_imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
+    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_omsagent_syslog_configs()
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
                              ". Can't proceed, but this will be still considered a success as it's an external error."

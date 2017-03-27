@@ -1,11 +1,12 @@
 import unittest
 import json
+import os
 from xml.etree import ElementTree as ET
 # This test suite uses xmlunittest package. Install it by running 'pip install xmlunittest'.
 # Documentation at http://python-xmlunittest.readthedocs.io/en/latest/
 from xmlunittest import XmlTestMixin
 
-from Utils.lad30_syslog_config import *
+from Utils.lad_logging_config import *
 
 
 class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
@@ -54,12 +55,12 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 
         syslogEvents = json.loads(syslog_basic_json_ext_settings)
         syslogCfg = json.loads(syslog_extended_json_ext_settings)
-        self.cfg_syslog_basic = SyslogMdsdConfig(syslogEvents, None, None, True)
-        self.cfg_syslog_ext = SyslogMdsdConfig(None, syslogCfg, None, True)
-        self.cfg_syslog_all = SyslogMdsdConfig(None, None, None, True)
+        self.cfg_syslog_basic = LadLoggingConfig(syslogEvents, None, None, True)
+        self.cfg_syslog_ext = LadLoggingConfig(None, syslogCfg, None, True)
+        self.cfg_syslog_all = LadLoggingConfig(None, None, None, True)
         fileLogs = json.loads(filelogs_json_ext_settings)
-        self.cfg_filelog = SyslogMdsdConfig(None, None, fileLogs, False)
-        self.cfg_none = SyslogMdsdConfig(None, None, None, False)
+        self.cfg_filelog = LadLoggingConfig(None, None, fileLogs, False)
+        self.cfg_none = LadLoggingConfig(None, None, None, False)
 
         # XPaths representations of expected XML outputs, for use with xmlunittests package
         self.oms_syslog_basic_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
@@ -186,7 +187,7 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 
     def test_oms_fluentd_configs(self):
         """
-        Test whether fluentd syslog source config & out_mdsd config are correctly generated.
+        Test whether fluentd syslog/tail source configs & out_mdsd config are correctly generated.
         """
         actual = self.cfg_syslog_basic.get_oms_fluentd_syslog_src_config()
         expected = """
@@ -296,6 +297,28 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
 """
         self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for extended syslog cfg', expected, actual)
 
+        actual = self.cfg_filelog.get_oms_fluentd_filelog_src_config()
+        expected = """
+# For all monitored files
+<source>
+  @type tail
+  path /var/log/mydaemonlog1,/var/log/mydaemonlog2
+  pos_file /var/opt/microsoft/omsagent/LAD/tmp/filelogs.pos
+  tag mdsd.filelog.*
+  format none
+  message_key Msg  # LAD uses "Msg" as the field name
+</source>
+
+# Add FileTag field (existing LAD behavior)
+<filter mdsd.filelog.**>
+  @type record_transformer
+  <record>
+    FileTag ${tag_suffix[2]}
+  </record>
+</filter>
+"""
+        self.__helper_test_oms_fluentd_config('fluentd tail src config for fileLogs', expected, actual)
+
         actual = self.cfg_filelog.get_oms_fluentd_out_mdsd_config()
         expected = """
 # Output to mdsd
@@ -328,7 +351,7 @@ class Lad30RsyslogConfigTest(unittest.TestCase, XmlTestMixin):
         xml_string_srcs = [ self.cfg_syslog_ext.get_oms_mdsd_syslog_config(),
                             self.cfg_filelog.get_oms_mdsd_filelog_config()
                           ]
-        dst_xml_tree = ET.parse('../mdsdConfig.xml.template')
+        dst_xml_tree = ET.parse(os.path.join(os.path.dirname(__file__), os.pardir, 'mdsdConfig.xml.template'))
         map(lambda x: copy_source_mdsdevent_elems(dst_xml_tree, x), xml_string_srcs)
         print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
         xml = ET.tostring(dst_xml_tree.getroot())

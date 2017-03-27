@@ -41,10 +41,12 @@ _mdsd_per_event_source_config_template = """      <MdsdEventSource source="{sour
 """
 
 
-class SyslogMdsdConfig:
+class LadLoggingConfig:
     """
     Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with fluentd
-    (currently omsagent), and corresponding mdsd configurations, based on the LAD 3.0 syslog config schema.
+    (currently omsagent), and corresponding omsagent & mdsd configurations, based on the LAD 3.0
+    syslog config schema. This class also generates omsagent (fluentd) config for LAD 3.0's fileLogs settings
+    (using the fluentd tail plugin).
     """
 
     def __init__(self, syslogEvents, syslogCfg, fileLogs, syslog_enabled):
@@ -118,7 +120,7 @@ class SyslogMdsdConfig:
         """
 
         if syslogEvents and syslogCfg:
-            raise LadSyslogConfigException("Can't specify both syslogEvents and syslogCfg")
+            raise LadLoggingConfigException("Can't specify both syslogEvents and syslogCfg")
 
         self._syslogEvents = syslogEvents
         self._syslogCfg = syslogCfg
@@ -154,7 +156,7 @@ class SyslogMdsdConfig:
             self._oms_mdsd_syslog_config = None
             self._oms_mdsd_filelog_config = None
         except KeyError as e:
-            raise LadSyslogConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
+            raise LadLoggingConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
     def get_oms_rsyslog_config(self):
         """
@@ -307,6 +309,37 @@ class SyslogMdsdConfig:
         # No syslog config
         return ''
 
+    def get_oms_fluentd_filelog_src_config(self):
+        """
+        Get Fluentd's filelog (tail) source config that should be used for this LAD's fileLogs settings.
+        :rtype: str
+        :return: Fluentd config string that should be overwritten to
+                 /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/file.conf
+        """
+        if not self._fileLogs:
+            return ''
+
+        fluentd_tail_src_config_template = """
+# For all monitored files
+<source>
+  @type tail
+  path {file_paths}
+  pos_file /var/opt/microsoft/omsagent/LAD/tmp/filelogs.pos
+  tag mdsd.filelog.*
+  format none
+  message_key Msg  # LAD uses "Msg" as the field name
+</source>
+
+# Add FileTag field (existing LAD behavior)
+<filter mdsd.filelog.**>
+  @type record_transformer
+  <record>
+    FileTag ${{tag_suffix[2]}}
+  </record>
+</filter>
+"""
+        return fluentd_tail_src_config_template.format(file_paths=','.join(self._file_table_map.keys()))
+
     def get_oms_fluentd_out_mdsd_config(self):
         """
         Get Fluentd's out_mdsd output config that should be used for LAD.
@@ -388,13 +421,13 @@ def syslog_name_to_rsyslog_name(syslog_name):
     :return: Corresponding rsyslog name (e.g., "user" or "error")
     """
     if syslog_name not in syslog_name_to_rsyslog_name_map:
-        raise LadSyslogConfigException('Invalid syslog name given: {0}'.format(syslog_name))
+        raise LadLoggingConfigException('Invalid syslog name given: {0}'.format(syslog_name))
     return syslog_name_to_rsyslog_name_map[syslog_name]
 
 
-class LadSyslogConfigException(Exception):
+class LadLoggingConfigException(Exception):
     """
-    Custom exception class for LAD syslog config errors
+    Custom exception class for LAD logging config errors
     """
     pass
 
@@ -415,21 +448,21 @@ def copy_sub_elems(dst_xml, src_xml, path):
         dst_elem.append(sub_elem)
 
 
-def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_rsyslog_xml_string):
+def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_logging_xml_string):
     """
     Copy MonitoringManagement/Schemas/Schema, MonitoringManagement/Sources/Source,
     MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
     Used to actually add generated rsyslog mdsd config XML elements to the mdsd config XML tree.
 
     :param xml.etree.ElementTree.ElementTree mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
-    :param str mdsd_rsyslog_xml_string: XML string containing the generated rsyslog mdsd config XML elements.
-                                See syslog_mdsd_*_expected_output variables in test_lad30_syslog_config.py for examples.
+    :param str mdsd_logging_xml_string: XML string containing the generated logging (syslog/filelog) mdsd config XML elements.
+            See oms_syslog_mdsd_*_expected_xpaths member variables in test_lad_logging_config.py for examples in XPATHS format.
     :return: None. mdsd_xml_tree object will contain the added elements.
     """
-    rsyslog_xml_tree = ET.ElementTree(ET.fromstring(mdsd_rsyslog_xml_string))
+    mdsd_logging_xml_tree = ET.ElementTree(ET.fromstring(mdsd_logging_xml_string))
 
     # Copy Source elements (sub-elements of Sources element)
-    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Sources')
+    copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'Sources')
 
     # Copy MdsdEventSource elements (sub-elements of Events/MdsdEvents element)
-    copy_sub_elems(mdsd_xml_tree, rsyslog_xml_tree, 'Events/MdsdEvents')
+    copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'Events/MdsdEvents')
