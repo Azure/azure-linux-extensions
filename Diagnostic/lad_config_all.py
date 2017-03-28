@@ -103,6 +103,9 @@ class LadConfigAll:
         """
         assert self._mdsd_config_xml_tree is not None
         metrics = LadUtil.getPerformanceCounterCfgFromLadCfg(ladCfg)
+        if not metrics:
+            return
+
         counter_to_table = {}
         local_tables = set()
 
@@ -394,11 +397,9 @@ class LadConfigAll:
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
-            lad30_syslogCfg = self._ext_settings.get_lad30_syslogCfg_setting()
             lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
             lad30_fileLogs = self._ext_settings.get_lad30_fileLogs_setting()
-            lad_logging_config_helper = LadLoggingConfig(lad30_syslogEvents, lad30_syslogCfg, lad30_fileLogs,
-                                                         self._ext_settings.is_syslog_enabled())
+            lad_logging_config_helper = LadLoggingConfig(lad30_syslogEvents, lad30_fileLogs)
             mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
             mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
             copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)

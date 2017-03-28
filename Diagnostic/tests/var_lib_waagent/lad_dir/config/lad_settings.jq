@@ -4,18 +4,14 @@
       "handlerSettings": {
         "publicSettings": {
           "StorageAccount": "ladunittestdiag487",
-          "syslogCfg" : [
-            {
-              "facility": "LOG_USER",
-              "minSeverity": "LOG_ERR",
-              "table": "SyslogUserErrorEvents"
-            },
-            {
-              "facility": "LOG_LOCAL0",
-              "minSeverity": "LOG_CRIT",
-              "table": "SyslogLocal0CritEvents"
+          "ladCfg": {
+            "syslogEvents" : {
+              "syslogEventConfiguration": {
+                "LOG_USER": "LOG_ERR",
+                "LOG_LOCAL0": "LOG_CRIT"
+              }
             }
-          ],
+          },
           "fileLogs" : [
             {
               "file": "/var/log/mydaemonlog1",

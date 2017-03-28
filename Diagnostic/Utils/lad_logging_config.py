@@ -49,7 +49,7 @@ class LadLoggingConfig:
     (using the fluentd tail plugin).
     """
 
-    def __init__(self, syslogEvents, syslogCfg, fileLogs, syslog_enabled):
+    def __init__(self, syslogEvents, fileLogs):
         """
         Constructor to receive/store necessary LAD settings for the desired configuration generation.
 
@@ -72,28 +72,6 @@ class LadLoggingConfig:
                                  "NONE" means no logs from the facility will be captured (thus it's equivalent to
                                   not specifying the facility at all).
 
-        :param dict syslogCfg: LAD 3.0 "syslogCfg" JSON object, or a False object if it's not given in the ext settings.
-                          This parameter must be a False object if syslogEvents is given as a non-False object.
-                          An example is as follows:
-
-                          "syslogCfg": [
-                              {
-                                  "facility": "LOG_USER",
-                                  "minSeverity": "LOG_ERR",
-                                  "table": "SyslogUserErrorEvents"
-                              },
-                              {
-                                  "facility": "LOG_LOCAL0",
-                                  "minSeverity": "LOG_CRIT",
-                                  "table": "SyslogLocal0CritEvents"
-                              }
-                          ]
-
-                          Only the JSON array corresponding to "syslogCfg" key should be passed.
-
-                          "facility" and "minSeverity" are self-explanatory. "table" is for the Azure storage table
-                          into which the matching syslog events will be placed.
-
         :param dict fileLogs: LAD 3.0 "fileLogs" JSON object, or a False object if it's not given in the ext settings.
                          An example is as follows:
 
@@ -114,37 +92,16 @@ class LadLoggingConfig:
 
                          "file" is the full path of the log file to be watched and captured. "table" is for the
                          Azure storage table into which the lines of the watched file will be placed (one row per line).
-        :param bool syslog_enabled: Indicates syslog is enabled in LAD 3.0 settings. False takes the precedence,
-                        and if this is true but the other two syslog settings are none, then entire syslog
-                        facility/levels are collected.
         """
-
-        if syslogEvents and syslogCfg:
-            raise LadLoggingConfigException("Can't specify both syslogEvents and syslogCfg")
-
         self._syslogEvents = syslogEvents
-        self._syslogCfg = syslogCfg
         self._fileLogs = fileLogs
-        self._syslog_enabled = syslog_enabled
-        # Remembers whether all syslog facility/levels are enabled ('enableSyslog' but neither 'syslogCfg' nor 'syslogEvents')
-        self._all_syslog_facility_severity_enabled = syslog_enabled and not syslogCfg and not syslogEvents
-        # Remembers if this is the basic syslog config case (single destination able)
-        self._syslog_basic_config_case = self._all_syslog_facility_severity_enabled or self._syslogEvents
-        self._facsev_table_map = None
         self._fac_sev_map = None
 
         try:
-            if self._syslogCfg:
-                # Convert the 'syslogCfg' JSON object array into a Python dictionary of 'facility.minSeverity' - 'table'
-                # E.g., { 'user.err': 'SyslogUserErrorEvents', 'local0.crit': 'SyslogLocal0CritEvent' }
-                self._facsev_table_map = dict([('{0}.{1}'.format(syslog_name_to_rsyslog_name(entry['facility']),
-                                                                 syslog_name_to_rsyslog_name(entry['minSeverity'])),
-                                                entry['table'])
-                                               for entry in self._syslogCfg])
             # Create facility-severity map. E.g.: { "LOG_USER" : "LOG_ERR", "LOG_LOCAL0", "LOG_CRIT" }
-            if self._syslogEvents or self._syslogCfg:
-                self._fac_sev_map = self._syslogEvents['syslogEventConfiguration'] if self._syslogEvents else \
-                    dict([(entry['facility'], entry['minSeverity']) for entry in self._syslogCfg])
+            if self._syslogEvents:
+                self._fac_sev_map = self._syslogEvents['syslogEventConfiguration']
+            self._syslog_disabled = not self._fac_sev_map  # A convenience predicate
 
             if self._fileLogs:
                 # Convert the 'fileLogs' JSON object array into a Python dictionary of 'file' - 'table'
@@ -168,10 +125,8 @@ class LadLoggingConfig:
                  or to /etc/rsyslog.conf (old rsyslog)
         """
         if not self._oms_rsyslog_config:
-            if not self._syslog_enabled:
-                self._oms_rsyslog_config = ''   # Syslog disabled
-            elif self._all_syslog_facility_severity_enabled:
-                self._oms_rsyslog_config = '*.*  @127.0.0.1:%SYSLOG_PORT%\n'
+            if self._syslog_disabled:
+                self._oms_rsyslog_config = ''
             else:
                 # Generate/save/return rsyslog config string for the facility-severity pairs.
                 # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
@@ -190,10 +145,8 @@ class LadLoggingConfig:
         :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
         """
         if not self._oms_syslog_ng_config:
-            if not self._syslog_enabled:
-                self._oms_syslog_ng_config = ''  # Syslog disabled
-            elif self._all_syslog_facility_severity_enabled:
-                self._oms_syslog_ng_config = 'log { source(s_src); destination(d_LAD_oms); }\n'
+            if self._syslog_disabled:
+                self._oms_syslog_ng_config = ''
             else:
                 # Generate/save/return syslog-ng config string for the facility-severity pairs.
                 # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
@@ -218,26 +171,14 @@ class LadLoggingConfig:
         """
         Helper method to generate oms_mdsd_syslog_config
         """
-        if not self._syslog_enabled and not self._fac_sev_map:
+        if self._syslog_disabled:
             return ''
 
         # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
-        # dest table (eventName) is 'LinuxSyslog'
-        if self._syslog_basic_config_case:
-            return _mdsd_sources_events_config_template.format(
-                sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
-                events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
-
-        # For extended syslog conf (per-fac/sev dest table): Source name is 'mdsd.ext_syslog.<facility> and
-        # dest table (eventName) is in self._fac_sev_table_map
-        syslog_sources = ''
-        syslog_mdsd_event_sources = ''
-        for facsev_key in self._facsev_table_map:
-            source_name = 'mdsd.ext_syslog.{0}'.format(facsev_key.split('.')[0])
-            syslog_sources += _mdsd_per_source_config_template.format(name=source_name)
-            syslog_mdsd_event_sources += _mdsd_per_event_source_config_template.format(source=source_name,
-                                                                                       event_name=self._facsev_table_map[facsev_key])
-        return _mdsd_sources_events_config_template.format(sources=syslog_sources, events=syslog_mdsd_event_sources)
+        # dest table (eventName) is 'LinuxSyslog'. This is currently the only supported syslog conf scheme.
+        return _mdsd_sources_events_config_template.format(
+            sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
+            events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
 
     def get_oms_mdsd_filelog_config(self):
         """
@@ -275,39 +216,32 @@ class LadLoggingConfig:
                  /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
                  (after replacing '%SYSLOG_PORT%' with the assigned/picked port number)
         """
-        fluentd_syslog_src_config_template = """
+        fluentd_syslog_src_config = """
 <source>
   type syslog
   port %SYSLOG_PORT%
   bind 127.0.0.1
   protocol_type udp
-  tag mdsd.{syslog_tag_part}
+  tag mdsd.syslog
 </source>
 
 # Generate fields expected for existing mdsd syslog collection schema.
-<filter mdsd.{syslog_tag_part}.**>
+<filter mdsd.syslog.**>
   type record_transformer
   enable_ruby
   <record>
     # Fields expected by mdsd for syslog messages
     Ignore "syslog"
-    Facility ${{tag_parts[2]}}
-    Severity ${{tag_parts[3]}}
-    EventTime ${{time.strftime('%Y-%m-%dT%H:%M:%S%z')}}
-    SendingHost ${{record["source_host"]}}
-    Msg ${{record["message"]}}
+    Facility ${tag_parts[2]}
+    Severity ${tag_parts[3]}
+    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
+    SendingHost ${record["source_host"]}
+    Msg ${record["message"]}
   </record>
   remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
-        # Basic config case (single table destination for all facilities/levels)
-        if self._syslog_basic_config_case:
-            return fluentd_syslog_src_config_template.format(syslog_tag_part='syslog')
-        # Extended config case (per facility/min-level table destination)
-        if self._syslogCfg:
-            return fluentd_syslog_src_config_template.format(syslog_tag_part='ext_syslog')
-        # No syslog config
-        return ''
+        return '' if self._syslog_disabled else fluentd_syslog_src_config
 
     def get_oms_fluentd_filelog_src_config(self):
         """
@@ -365,18 +299,10 @@ class LadLoggingConfig:
     retry_wait 10s
 </match>
 """
-        tag_regex_cfg_line_template = """    mdsd_tag_regex_patterns [{tag_patterns}] # fluentd tag patterns whose match will be used as mdsd source name
+        tag_regex_cfg_line = '' if self._syslog_disabled \
+            else r"""    mdsd_tag_regex_patterns [ "^mdsd\\.syslog" ] # fluentd tag patterns whose match will be used as mdsd source name
 """
-        # Basic config case (single table destination for all facilities/levels)
-        if self._syslog_basic_config_case:
-            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.syslog" ')
-            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
-        # Extended config case (per facility/min-level table destination)
-        if self._syslogCfg:
-            tag_regex_patterns = tag_regex_cfg_line_template.format(tag_patterns=r' "^mdsd\\.ext_syslog\\.\\w+" ')
-            return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_patterns)
-        # No syslog config
-        return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line='')
+        return fluentd_out_mdsd_config_template.format(tag_regex_cfg_line=tag_regex_cfg_line)
 
 
 syslog_name_to_rsyslog_name_map = {
