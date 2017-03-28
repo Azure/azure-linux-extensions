@@ -253,15 +253,14 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.__helper_test_oms_fluentd_config('fluentd syslog src config for no syslog', expected, actual)
 
         actual = self.cfg_syslog_basic.get_oms_fluentd_out_mdsd_config()
-        expected = r"""
+        expected_out_mdsd_cfg_template = r"""
 # Output to mdsd
 <match mdsd.**>
     type mdsd
     log_level warn
-    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    djsonsocket /var/run/mdsd/lad_mdsd_djson.socket  # Full path to mdsd dynamic json socket file
     acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
-    mdsd_tag_regex_patterns [ "^mdsd\\.syslog" ] # fluentd tag patterns whose match will be used as mdsd source name
-    num_threads 1
+{optional_lines}    num_threads 1
     buffer_chunk_limit 1000k
     buffer_type file
     buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
@@ -271,31 +270,23 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
     retry_wait 10s
 </match>
 """
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for basic syslog cfg', expected, actual)
+        out_mdsd_optional_config_lines = r"""    mdsd_tag_regex_patterns [ "^mdsd\\.syslog" ] # fluentd tag patterns whose match will be used as mdsd source name
+"""
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for basic syslog cfg',
+                                              expected_out_mdsd_cfg_template.format(
+                                                  optional_lines=out_mdsd_optional_config_lines), actual)
 
         actual = self.cfg_syslog_all.get_oms_fluentd_out_mdsd_config()
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for all syslog cfg', expected, actual)
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for all syslog cfg',
+                                              expected_out_mdsd_cfg_template.format(
+                                                  optional_lines=out_mdsd_optional_config_lines), actual)
 
         actual = self.cfg_syslog_ext.get_oms_fluentd_out_mdsd_config()
-        expected = r"""
-# Output to mdsd
-<match mdsd.**>
-    type mdsd
-    log_level warn
-    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
-    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
-    mdsd_tag_regex_patterns [ "^mdsd\\.ext_syslog\\.\\w+" ] # fluentd tag patterns whose match will be used as mdsd source name
-    num_threads 1
-    buffer_chunk_limit 1000k
-    buffer_type file
-    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
-    buffer_queue_limit 128
-    flush_interval 10s
-    retry_limit 3
-    retry_wait 10s
-</match>
+        out_mdsd_optional_config_lines = r"""    mdsd_tag_regex_patterns [ "^mdsd\\.ext_syslog\\.\\w+" ] # fluentd tag patterns whose match will be used as mdsd source name
 """
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for extended syslog cfg', expected, actual)
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for extended syslog cfg',
+                                              expected_out_mdsd_cfg_template.format(
+                                                  optional_lines=out_mdsd_optional_config_lines), actual)
 
         actual = self.cfg_filelog.get_oms_fluentd_filelog_src_config()
         expected = """
@@ -320,27 +311,12 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.__helper_test_oms_fluentd_config('fluentd tail src config for fileLogs', expected, actual)
 
         actual = self.cfg_filelog.get_oms_fluentd_out_mdsd_config()
-        expected = """
-# Output to mdsd
-<match mdsd.**>
-    type mdsd
-    log_level warn
-    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
-    acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
-    num_threads 1
-    buffer_chunk_limit 1000k
-    buffer_type file
-    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
-    buffer_queue_limit 128
-    flush_interval 10s
-    retry_limit 3
-    retry_wait 10s
-</match>
-"""
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for filelog only (no syslog) cfg', expected, actual)
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for filelog only (no syslog) cfg',
+                                              expected_out_mdsd_cfg_template.format(optional_lines=''), actual)
 
         actual = self.cfg_none.get_oms_fluentd_out_mdsd_config()
-        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for blank cfg (syslog disabled)', expected, actual)
+        self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for blank cfg (syslog disabled)',
+                                              expected_out_mdsd_cfg_template.format(optional_lines=''), actual)
 
     def test_copy_schema_source_mdsdevent_elems(self):
         """

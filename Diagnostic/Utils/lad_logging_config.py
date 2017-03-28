@@ -353,7 +353,7 @@ class LadLoggingConfig:
 <match mdsd.**>
     type mdsd
     log_level warn
-    djsonsocket /var/run/mdsd/default_djson.socket  # Full path to mdsd dynamic json socket file
+    djsonsocket /var/run/mdsd/lad_mdsd_djson.socket  # Full path to mdsd dynamic json socket file
     acktimeoutms 5000  # max time in milli-seconds to wait for mdsd acknowledge response. If 0, no wait.
 {tag_regex_cfg_line}    num_threads 1
     buffer_chunk_limit 1000k
