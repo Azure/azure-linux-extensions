@@ -50,7 +50,7 @@ _builtIns = {
                     'percentusedswap' ],
     'network':    [ 'bytestransmitted', 'bytesreceived', 'bytestotal', 'packetstransmitted', 'packetsreceived',
                     'totalrxerrors', 'totaltxerrors', 'totalcollisions' ],
-    'filesystem': [ 'freemegabytes', 'usedmegabytes', 'percentfreespace', 'percentusedspace', 'percentfreeinodes',
+    'filesystem': [ 'freespace', 'usedspace', 'percentfreespace', 'percentusedspace', 'percentfreeinodes',
                     'percentusedinodes', 'bytesreadpersecond', 'byteswrittenpersecond', 'bytespersecond',
                     'readspersecond', 'writespersecond', 'transferspersecond' ],
     'disk':       [ 'readspersecond', 'writespersecond', 'transferspersecond', 'averagereadtime', 'averagewritetime',
@@ -80,9 +80,23 @@ _scaling = defaultdict(lambda:defaultdict(str),
                   'usedmemory': 'scaleUp="1048576"',
                   'availableswap': 'scaleUp="1048576"',
                   'usedswap': 'scaleUp="1048576"'
-                } )
-            } )
+                } ),
+              'filesystem' : defaultdict(str,
+                 {'freespace': 'scaleUp="1048576"',
+                  'usedspace': 'scaleUp="1048576"',
+                  }),
+              } )
 
+# By and large, the names of the builtin metrics are identical to the names of the OMI values fetched by this
+# implementation of the builtin provider. However, there are some exceptions. The builtin_to_omi map translates
+# from the builtin name to the OMI name, by class. If a class or name isn't found in this map, the name should be used
+# without translation
+_builtin_to_omi = {
+    'filesystem': {
+        'freespace': 'freemegabytes',
+        'usedspace': 'usedmegabytes'
+    }
+}
 _metrics = defaultdict(list)
 _eventNames = {}
 
@@ -139,6 +153,11 @@ class BuiltinMetric:
         return self._CounterClass
 
     def Counter(self):
+        return self._Counter
+
+    def omi_counter(self):
+        if self._CounterClass in _builtin_to_omi and self._Counter in _builtin_to_omi[self._CounterClass]:
+            return _builtin_to_omi[self._CounterClass][self._Counter]
         return self._Counter
 
     def InstanceId(self):
@@ -199,8 +218,10 @@ def UpdateXML(doc):
         columns = []
         mappings = []
         for metric in _metrics[group]:
-            columns.append(metric.Counter())
-            mappings.append('<MapName name="{0}">{1}</MapName>'.format(metric.Counter(), metric.Label()))
+            omi_name = metric.omi_counter()
+            scale = _scaling[class_name][metric.Counter()]
+            columns.append(omi_name)
+            mappings.append('<MapName name="{0}" {1}>{2}</MapName>'.format(omi_name, scale, metric.Label()))
         column_string = ','.join(columns)
         if instance_id:
             where_clause = " WHERE name='{0}'".format(instance_id)
