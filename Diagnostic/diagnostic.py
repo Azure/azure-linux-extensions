@@ -31,7 +31,9 @@ import traceback
 import xml.etree.ElementTree as ET
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
-# Also for any potential local imports that may throw, let's do try-except here on them.
+# Actually waagent import can succeed even on a Linux machine without waagent installed,
+# by setting PYTHONPATH env var to the azure-linux-extensions/Common/WALinuxAgent-2.0.16,
+# but let's just keep this try-except here on them for any potential local imports that may throw.
 try:
     # waagent, ext handler
     from Utils.WAAgentUtil import waagent
@@ -47,7 +49,7 @@ try:
     import watcherutil
     from Utils.lad_ext_settings import LadExtSettings
     from misc_helpers import *
-    from lad_config_all import *
+    import lad_config_all as lad_cfg
     from Utils.imds_util import ImdsLogger
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
@@ -190,9 +192,9 @@ def create_core_components_configs():
     g_enable_syslog = g_ext_settings.is_syslog_enabled()
 
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
-    mdsd_rsyslog_configurator = LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
+    configurator = lad_cfg.LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
                                              RunGetOutput, hutil.log, hutil.error)
-    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_omsagent_syslog_configs()
+    config_valid, config_invalid_reason = configurator.generate_all_configs()
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
                              ". Can't proceed, but this will be still considered a success as it's an external error."

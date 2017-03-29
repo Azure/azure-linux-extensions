@@ -95,7 +95,7 @@ class LadConfigAllTest(unittest.TestCase):
         Initially this will be mostly just exercising the API functions, not asserting much.
         """
         lad_cfg = self._lad_config_all_helper  # handy reference
-        result, msg = lad_cfg.generate_mdsd_omsagent_syslog_configs()
+        result, msg = lad_cfg.generate_all_configs()
         self.assertTrue(result, 'Config generation failed: ' + msg)
 
         with open(os.path.join(test_lad_dir, 'xmlCfg.xml')) as f:
