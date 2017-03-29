@@ -5,10 +5,12 @@
         "publicSettings": {
           "StorageAccount": "ladunittestdiag487",
           "ladCfg": {
-            "syslogEvents" : {
-              "syslogEventConfiguration": {
-                "LOG_USER": "LOG_ERR",
-                "LOG_LOCAL0": "LOG_CRIT"
+            "diagnosticMonitorConfiguration": {
+              "syslogEvents": {
+                "syslogEventConfiguration": {
+                  "LOG_USER": "LOG_ERR",
+                  "LOG_LOCAL0": "LOG_CRIT"
+                }
               }
             }
           },

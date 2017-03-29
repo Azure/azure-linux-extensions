@@ -168,23 +168,19 @@ class LadExtSettings(ExtSettings):
             mdsd_cfg_str = base64.b64decode(mdsd_cfg_str)
         return mdsd_cfg_str
 
-    def get_lad30_syslogCfg_setting(self):
-        """
-        Get 'syslogCfg' setting from LAD 3.0 public settings.
-        :return: List of dictionaries specifying syslog facility/minSeverity to monitor and Azure table name for
-        destinations of the monitored facility/minSeverity syslogs. Refer to README.md for more details
-        """
-        return self.read_public_config('syslogCfg')
-
     def get_lad30_syslogEvents_setting(self):
         """
         Get 'ladCfg/syslogEvents' setting from LAD 3.0 public settings.
         :return: A dictionary of syslog facility and minSeverity to monitor/ Refer to README.md for more details.
         """
+        diag_mon_cfg_name = 'diagnosticMonitorConfiguration'
         lad_cfg = self.read_public_config('ladCfg')
-        if not lad_cfg or 'syslogEvents' not in lad_cfg:
+        if not lad_cfg or diag_mon_cfg_name not in lad_cfg:
             return ''
-        return lad_cfg['syslogEvents']
+        diag_mon_cfg = lad_cfg[diag_mon_cfg_name]
+        if not diag_mon_cfg or 'syslogEvents' not in diag_mon_cfg:
+            return ''
+        return diag_mon_cfg['syslogEvents']
 
     def get_lad30_fileLogs_setting(self):
         """
