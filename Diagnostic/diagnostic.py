@@ -51,6 +51,7 @@ try:
     from misc_helpers import *
     import lad_config_all as lad_cfg
     from Utils.imds_util import ImdsLogger
+    import Utils.omsagent_util as oms
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
           'Stacktrace: {1}'.format(e, traceback.format_exc())
@@ -162,10 +163,10 @@ def setup_dependencies_and_mdsd():
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
 
-    # Install/start OMI
-    omi_err, omi_msg = setup_omi()
-    if omi_err is not 0:
-        return 4, omi_msg
+    # Install/start omsagent
+    omsagent_installer_exit_code, omsagent_install_output = setup_omsagent()
+    if omsagent_installer_exit_code is not 0:
+        return 4, omsagent_install_output
 
     return 0, 'success'
 
@@ -581,45 +582,31 @@ def get_lad_pids():
     return lad_pids
 
 
-def setup_omi():
+def setup_omsagent():
     """
-    Set up OMI. Install necessary components, configure them as needed, and start OMI
+    Set up omsagent. Install necessary components, configure them as needed, and start the agent.
     :return: Pair of status code and message. 0 status code for success. Non-zero status code
             for a failure and the associated failure message.
     """
+    # Remember whether OMI (not omsagent) needs to be freshly installed.
+    # This is needed later to determine whether to reconfigure the omiserver.conf or not for security purpose.
     need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
-    isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
-    isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
-
-    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
-    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
-    omi_version = RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]
-    if 'OMI-1.0.8-4' in omi_version and g_dist_config.is_package_handler('rpm'):
-        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
-        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
-
-    need_install_omi = ('OMI-1.0.8-6' not in omi_version) \
-        or (isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov")) \
-        or (isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"))
-
-    if need_install_omi:
-        hutil.log("Begin omi installation.")
-        is_omi_installed_correctly = False
-        maxTries = 5  # Try up to 5 times to install OMI
-        for trialNum in range(1, maxTries + 1):
-            is_omi_installed_correctly = g_dist_config.install_omi() is 0
-            if is_omi_installed_correctly:
-                break
-            hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
-            if trialNum < maxTries:
-                hutil.error("Retrying in 30 seconds...")
-                time.sleep(30)
-        if not is_omi_installed_correctly:
-            hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
-            return 1, "OMI install failed " + str(maxTries) + " times"
-
-    shouldRestartOmi = False
+    # We now try to install all the time. If it's already installed. Any additional install is a no-op.
+    hutil.log("Begin omsagent installation.")
+    is_omsagent_installed_correctly = False
+    maxTries = 5  # Try up to 5 times to install omsagent
+    for trialNum in range(1, maxTries + 1):
+        is_omsagent_installed_correctly = g_dist_config.install_omsagent() is 0
+        if is_omsagent_installed_correctly:
+            break
+        hutil.error("omsagent install failed (trial #" + str(trialNum) + ").")
+        if trialNum < maxTries:
+            hutil.error("Retrying in 30 seconds...")
+            time.sleep(30)
+    if not is_omsagent_installed_correctly:
+        hutil.error("omsagent install failed " + str(maxTries) + " times. Giving up...")
+        return 1, "omsagent install failed " + str(maxTries) + " times"
 
     # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
     # In other words, OMI httpsport config should be updated only on a fresh OMI install.
@@ -631,29 +618,15 @@ def setup_omi():
             RunGetOutput(
                 "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
             RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-            shouldRestartOmi = True
 
-    # Quick and dirty way of checking if mysql/apache process is running
-    isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
-    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
+    # TODO:
+    #  - Configure syslog (rsyslog or syslog-ng) and restart
+    #    This requires a TCP port assignment, configure (possibly preceded by unconfigure) rsyslog/syslog-ng using
+    #    omsagent's configure_syslog.sh, and restart rsyslog/syslog-ng (again using omsagent's configure_syslog.sh).
+    #  - Configure omsagent (fluentd) & restart
+    #  - Restart omiserver as well
 
-    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
-        mysqladdress = g_ext_settings.read_protected_config("mysqladdress")
-        mysqlusername = g_ext_settings.read_protected_config("mysqlusername")
-        mysqlpassword = g_ext_settings.read_protected_config("mysqlpassword")
-        RunGetOutput(
-            "/opt/microsoft/mysql-cimprov/bin/mycimprovauth default " + mysqladdress + " " + mysqlusername + " '" + mysqlpassword + "'",
-            should_log=False)
-        shouldRestartOmi = True
-
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
-        RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
-        shouldRestartOmi = True
-
-    if shouldRestartOmi:
-        RunGetOutput("/opt/omi/bin/service_control restart")
-
-    return 0, "omi installed"
+    return 0, "omsagent installed & set up correctly"
 
 
 def tear_down_omi():
