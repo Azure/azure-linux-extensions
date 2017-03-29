@@ -217,7 +217,7 @@ class LadConfigAll:
         """
         update_account_settings() helper.
         :param handler_settings: Extension "handlerSettings" Json dictionary.
-        :return: 2-tupe of certificate path and private key path.
+        :return: 2-tuple of certificate path and private key path.
         """
         thumbprint = handler_settings['protectedSettingsCertThumbprint']
         cert_path = self._waagent_dir + '/' + thumbprint + '.crt'

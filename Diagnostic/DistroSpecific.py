@@ -24,8 +24,6 @@ import subprocess
 import re
 from Utils.WAAgentUtil import waagent
 
-omi_universal_install_cmd = 'bash scx-1.6.2-337.universal.x64.sh --upgrade'
-
 
 class CommonActions:
     def __init__(self, logger):
@@ -112,13 +110,6 @@ class CommonActions:
             return None, ''
         version = match.group(1)
         return path, version
-
-    def install_omi(self):
-        """
-        Install OMI
-        :return (int, str): (status code, output of install command).
-        """
-        return self.log_run_ignore_output(omi_universal_install_cmd)
 
     def install_extra_packages(self, packages, with_timeout=False):
         """

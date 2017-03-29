@@ -244,3 +244,14 @@ def write_string_to_file(string, filepath):
     """
     with open(filepath, 'w') as f:
         f.write(string)
+
+
+def append_string_to_file(string, filepath):
+    """
+    Append string content to file
+    :param string: A str object that holds the content to be appended to the file
+    :param filepath: Path to the file to be appended
+    :return: None
+    """
+    with open(filepath, 'a') as f:
+        f.write(string)
