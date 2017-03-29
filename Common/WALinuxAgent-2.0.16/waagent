@@ -97,7 +97,7 @@ RulesFiles = [ "/lib/udev/rules.d/75-persistent-net-generator.rules",
 VarLibDhcpDirectories = ["/var/lib/dhclient", "/var/lib/dhcpcd", "/var/lib/dhcp"]
 EtcDhcpClientConfFiles = ["/etc/dhcp/dhclient.conf", "/etc/dhcp3/dhclient.conf"]
 global LibDir
-LibDir = "/var/lib/waagent"
+LibDir = "/var/lib/waagent" if 'WALA_ROOT' not in os.environ else os.path.join(os.environ['WALA_ROOT'], "var/lib/waagent")
 global provisioned
 provisioned=False
 global provisionError

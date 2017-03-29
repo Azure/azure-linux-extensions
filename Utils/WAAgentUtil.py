@@ -27,6 +27,8 @@ import os.path
 #
 def searchWAAgent():
     agentPath = '/usr/sbin/waagent'
+    if 'WALA_ROOT' in os.environ:
+        agentPath = os.path.join(os.environ['WALA_ROOT'], agentPath.lstrip(os.path.sep))
     if(os.path.isfile(agentPath)):
         return agentPath
     user_paths = os.environ['PYTHONPATH'].split(os.pathsep)

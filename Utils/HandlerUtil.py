@@ -64,6 +64,7 @@ from xml.etree import ElementTree
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
+import azurelinuxagent.common.conf as conf
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -165,8 +166,10 @@ class HandlerUtility:
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 protectedSettings = handlerSettings['protectedSettings']
                 thumb=handlerSettings['protectedSettingsCertThumbprint']
-                cert=waagent.LibDir+'/'+thumb+'.crt'
-                pkey=waagent.LibDir+'/'+thumb+'.prv'
+                conf.load_conf_from_file("/etc/waagent.conf")
+                libdir = conf.get_lib_dir()
+                cert=os.path.join(libdir, thumb+'.crt')
+                pkey=os.path.join(libdir, thumb+'.prv')
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
                 openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
                 cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
