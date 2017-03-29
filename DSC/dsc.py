@@ -38,6 +38,12 @@ DownloadDirectory = 'download'
 
 omi_package_prefix = 'packages/omi-1.0.8.ssl_'
 dsc_package_prefix = 'packages/dsc-1.1.1-70.ssl_'
+omi_major_version = 1
+omi_minor_version = 0
+omi_build = 8
+dsc_major_version = 1
+dsc_minor_version = 1
+dsc_build = 1
 omi_version_deb = '1.0.8.4'
 omi_version_rpm = '1.0.8-4'
 dsc_version_deb = '1.1.1.70'
@@ -267,13 +273,24 @@ def install_dsc_packages():
         rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi')
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc')
 
+def compare_package_version(system_package_version, package_name):
+    if package_name == 'omi':
+        version = re.match('(\d+).(\d+).(\d+)', system_package_version)
+        if version is not None and (int(version.group(1)) >= omi_major_version and int(version.group(2)) >= omi_minor_version and int(version.group(3)) >= omi_build):
+            return 1
+    elif package_name == 'dsc':
+       	version = re.match('(\d+).(\d+).(\d+)', system_package_version)
+        if version is not None and (int(version.group(1)) >= dsc_major_version and int(version.group(2)) >= dsc_minor_version and int(version.group(3)) >= dsc_build):
+            return 1
+    return 0			
+
 def rpm_install_pkg(package_path, package_name):
     code,output = run_cmd('rpm -q --queryformat "%{VERSION}" ' + package_name)
-    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " package_name + ";  existing package version:" + output)
-    hutil.log("package name: " package_name + ";  existing package version:" + output)
-    if code == 0:
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " + package_name + ";  existing package version:" + output)
+    hutil.log("package name: " + package_name + ";  existing package version:" + output)
+    if code == 0 and compare_package_version(output, package_name) == 1:
         # package is already installed
-        hutil.log(package_name + ' is already installed')
+        hutil.log(package_name + ' with higher or equal version is already installed')
         return
     else:
         code,output = run_cmd('rpm -Uvh ' + package_path)
