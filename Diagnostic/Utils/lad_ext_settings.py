@@ -173,14 +173,7 @@ class LadExtSettings(ExtSettings):
         Get 'ladCfg/syslogEvents' setting from LAD 3.0 public settings.
         :return: A dictionary of syslog facility and minSeverity to monitor/ Refer to README.md for more details.
         """
-        diag_mon_cfg_name = 'diagnosticMonitorConfiguration'
-        lad_cfg = self.read_public_config('ladCfg')
-        if not lad_cfg or diag_mon_cfg_name not in lad_cfg:
-            return ''
-        diag_mon_cfg = lad_cfg[diag_mon_cfg_name]
-        if not diag_mon_cfg or 'syslogEvents' not in diag_mon_cfg:
-            return ''
-        return diag_mon_cfg['syslogEvents']
+        return LadUtil.getDiagnosticsMonitorConfigurationElement(self.read_public_config('ladCfg'), 'syslogEvents')
 
     def get_lad30_fileLogs_setting(self):
         """
@@ -189,3 +182,25 @@ class LadExtSettings(ExtSettings):
         destinations of the monitored file. Refer to README.md for more details
         """
         return self.read_public_config('fileLogs')
+
+    def is_syslog_enabled(self):
+        """
+        Check if syslog is enabled in the LAD settings ('enableSyslog' setting)
+        :rtype: bool
+        :return: True if so. False otherwise.
+        """
+        if self._syslog_enabled is None:
+            # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time,
+            # so accommodate it.
+            enable_syslog_setting = self.read_public_config('enableSyslog') if self.has_public_config('enableSyslog') \
+                                    else self.read_public_config('EnableSyslog')
+            if not enable_syslog_setting:
+                self._syslog_enabled = True  # Default is enabled when the setting is not specified
+            elif isinstance(enable_syslog_setting, bool):
+                self._syslog_enabled = enable_syslog_setting
+            elif not isinstance(enable_syslog_setting, basestring):
+                self._syslog_enabled = True  # Ignore non-bool, non-string setting and default it to true
+            else:  # string case.
+                self._syslog_enabled = self.read_public_config('enableSyslog').lower() != 'false' \
+                                       and self.read_public_config('EnableSyslog').lower() != 'false'
+        return self._syslog_enabled
