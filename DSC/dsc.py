@@ -264,11 +264,13 @@ def install_dsc_packages():
         deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
-        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi')
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc')
 
 def rpm_install_pkg(package_path, package_name):
-    code,output = run_cmd('rpm -q ' + package_name)
+    code,output = run_cmd('rpm -q --queryformat "%{VERSION}" ' + package_name)
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " package_name + ";  existing package version:" + output)
+    hutil.log("package name: " package_name + ";  existing package version:" + output)
     if code == 0:
         # package is already installed
         hutil.log(package_name + ' is already installed')
