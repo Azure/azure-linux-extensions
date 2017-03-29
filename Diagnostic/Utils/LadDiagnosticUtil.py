@@ -22,12 +22,15 @@ from collections import defaultdict
 class QueryParameter:
     def __init__(self):
         self.querySelectParameters = []
+
     def append(self, parameter):
         self.querySelectParameters.append(parameter)
+
     def getQuerySelectParameters(self):
         return self.querySelectParameters
 
-# Currently we are using Counter names as \Processor\PercentProcessorTime in the metrics table. 
+
+# Currently we are using Counter names as \Processor\PercentProcessorTime in the metrics table.
 # In order to avoid confusion to users we would allow user to specify both the OMI accepted 
 # class names as well as the class names used in performance counters in metrics table
 classNameMapping = {
@@ -43,6 +46,7 @@ def getOmiClassName(name):
     if name.lower() in classNameMapping:
         name = classNameMapping[name.lower()]
     return name.lower()
+
 
 # Generates OMI queries from omi query configurations
 # Sample input
@@ -72,7 +76,8 @@ def generateOMIQueries(omiQueryConfiguration):
                     if namespace != 'root/scx':
                         perfCfg['namespace'] = namespace
                     if clause:
-                        perfCfg['query'] = queryWithClause.format(selectParameters[:-1], getOmiClassName(className), clause)
+                        perfCfg['query'] = queryWithClause.format(selectParameters[:-1], getOmiClassName(className),
+                                                                  clause)
                     else:
                         perfCfg['query'] = query.format(selectParameters[:-1], getOmiClassName(className))
                     perfCfgList.append(perfCfg)
@@ -108,17 +113,18 @@ def generateOmiQueryConfiguration(performanceCounterConfiguration):
             namespace = performance_counter['namespace']
         else:
             namespace = 'root/scx'
-        if not table_name in omi_queries:
+        if table_name not in omi_queries:
             omi_queries[table_name] = defaultdict(defaultdict)
-        if not namespace in omi_queries[table_name]:
+        if namespace not in omi_queries[table_name]:
             omi_queries[table_name][namespace] = defaultdict(QueryParameter)
-        if not class_name in omi_queries[table_name][namespace]:
+        if class_name not in omi_queries[table_name][namespace]:
             omi_queries[table_name][namespace][class_name] = QueryParameter()
             omi_queries[table_name][namespace][class_name].queryCondition = condition
         else:
             if omi_queries[table_name][namespace][class_name].queryCondition != condition:
                 raise Exception('Cannot have two different conditions on same table')
-        if not performance_counter['counterSpecifier'] in omi_queries[table_name][namespace][class_name].querySelectParameters:
+        if performance_counter['counterSpecifier'] not in omi_queries[table_name][namespace][
+                                                                      class_name].querySelectParameters:
             omi_queries[table_name][namespace][class_name].append(performance_counter['counterSpecifier'])
     return omi_queries
 
@@ -160,6 +166,13 @@ def getEventVolumeFromLadCfg(ladCfg):
     return getDiagnosticsMonitorConfigurationElement(ladCfg, 'eventVolume')
 
 
+# Get default sample rate from LadCfg
+def getDefaultSampleRateFromLadCfg(ladCfg):
+    if ladCfg and 'sampleRateInSeconds' in ladCfg:
+        return ladCfg['sampleRateInSeconds']
+    return None
+
+
 def getPerformanceCounterCfgFromLadCfg(ladCfg):
     """
     Return the array of metric definitions
@@ -184,18 +197,6 @@ def getAggregationPeriodsFromLadCfg(ladCfg):
     return ['PT1H']
 
 
-def getTopLevelSinksFromLadCfg(ladCfg):
-    """
-    Return an array of sinks specified at the top of the config.
-    :param ladCfg:
-    :return: array of strings of sink names
-    """
-    sinks = getDiagnosticsMonitorConfigurationElement(ladCfg, 'sinks')
-    if sinks:
-        return [sink.strip() for sink in sinks.split(",")]
-    return []
-
-
 def getSinkDefinitionFromLadCfg(ladCfg, sink_name):
     """
     Return the JSON object defining a particular sink.
@@ -203,11 +204,22 @@ def getSinkDefinitionFromLadCfg(ladCfg, sink_name):
     :param sink_name: string name of sink
     :return: JSON object or None
     """
-    if 'sinksConfig' not in ladCfg:
-        return None
-    sink_config = ladCfg['sinksConfig']
-    if 'Sink' in sink_config:
-        for sink in sink_config['Sink']:
+    sinkConfig = getDiagnosticsMonitorConfigurationElement(ladCfg, "sinksConfig")
+    if sinkConfig and "Sink" in sinkConfig:
+        sinks = sinkConfig['Sink']
+        for sink in sinks:
             if sink['name'] is sink_name:
                 return sink
     return None
+
+
+def getAllDefinedSinksFromLadCfg(ladCfg):
+    """
+    Return a list of all names of defined sinks.
+    :param ladCfg: JSON config
+    :return: list of names
+    """
+    sinks_config = getDiagnosticsMonitorConfigurationElement(ladCfg, "sinksConfig")
+    if sinks_config and "Sink" in sinks_config:
+        return [sink['name'] for sink in sinks_config['Sink'] if 'name' in sink]
+    return []
