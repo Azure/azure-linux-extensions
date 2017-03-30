@@ -276,11 +276,11 @@ def install_dsc_packages():
 def compare_package_version(system_package_version, package_name):
     if package_name == 'omi':
         version = re.match('(\d+).(\d+).(\d+)', system_package_version)
-        if version is not None and (int(version.group(1)) >= omi_major_version and int(version.group(2)) >= omi_minor_version and int(version.group(3)) >= omi_build):
+        if version is not None and (int(version.group(1)) > omi_major_version) or (int(version.group(1)) == omi_major_version and int(version.group(2)) >= omi_minor_version) or (int(version.group(1)) == omi_major_version and int(version.group(2)) == omi_minor_version and int(version.group(3)) >= omi_build):
             return 1
     elif package_name == 'dsc':
        	version = re.match('(\d+).(\d+).(\d+)', system_package_version)
-        if version is not None and (int(version.group(1)) >= dsc_major_version and int(version.group(2)) >= dsc_minor_version and int(version.group(3)) >= dsc_build):
+        if version is not None and (int(version.group(1)) > dsc_major_version) or (int(version.group(1)) == dsc_major_version and int(version.group(2)) >= dsc_minor_version) or (int(version.group(1)) == dsc_major_version and int(version.group(2)) == dsc_minor_version and int(version.group(3)) >= dsc_build):
             return 1
     return 0			
 
