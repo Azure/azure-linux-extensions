@@ -224,9 +224,9 @@ def UpdateXML(doc):
     """
     global _metrics, _eventNames, _omiClassName
     for group in _metrics:
-        (class_name, instance_id, sample_rate) = group
-        if class_name in _instancedClasses and not instance_id:
-            instance_id = '_Total'
+        (class_name, condition_clause, sample_rate) = group
+        if class_name in _instancedClasses and not condition_clause:
+            condition_clause = 'IsAggregate=TRUE'
         columns = []
         mappings = []
         for metric in _metrics[group]:
@@ -235,12 +235,12 @@ def UpdateXML(doc):
             columns.append(omi_name)
             mappings.append('<MapName name="{0}" {1}>{2}</MapName>'.format(omi_name, scale, metric.label()))
         column_string = ','.join(columns)
-        if instance_id:
-            where_clause = " WHERE name='{0}'".format(instance_id)
+        if condition_clause:
+            where_clause = " WHERE {0}".format(condition_clause)
         else:
             where_clause = ""
         query = '''
-<OMIQuery cqlQuery="SELECT {0} FROM {1}{2}" eventName="{3}" omiNamespace="root/scx" sampleRateInSeconds="{4}" storeType="local">
+<OMIQuery cqlQuery='SELECT {0} FROM {1}{2}' eventName="{3}" omiNamespace="root/scx" sampleRateInSeconds="{4}" storeType="local">
   <Unpivot columnName="CounterName" columnValue="Value" columns="{0}">
     {5}
   </Unpivot>
@@ -252,5 +252,5 @@ def UpdateXML(doc):
             sample_rate,
             '\n    '.join(mappings)
         )
-        XmlUtil.addElement(doc, 'Events', ET.fromstring(query))
+        XmlUtil.addElement(doc, 'Events/OMI', ET.fromstring(query))
     return
