@@ -102,9 +102,11 @@ _eventNames = {}
 
 _defaultSampleRate = 15
 
+
 def SetDefaultSampleRate(rate):
     global _defaultSampleRate
     _defaultSampleRate = rate
+
 
 class BuiltinMetric:
     def __init__(self, counterSpec):
@@ -130,18 +132,27 @@ class BuiltinMetric:
             if t != 'builtin':
                 raise ProvUtil.UnexpectedCounterType('Expected type "builtin" but saw type "{0}"'.format(self._Type))
 
-        self._CounterClass = ProvUtil.GetCounterSetting(counterSpec, 'class').lower()
+        self._CounterClass = ProvUtil.GetCounterSetting(counterSpec, 'class')
+        if self._CounterClass is None:
+            raise ProvUtil.InvalidCounterSpecification('Builtin metric spec missing "class"')
+        self._CounterClass = self._CounterClass.lower()
         if self._CounterClass not in _builtIns:
             raise ProvUtil.InvalidCounterSpecification('Unknown Builtin class {0}'.format(self._CounterClass))
-        self._Counter = ProvUtil.GetCounterSetting(counterSpec, 'counter').lower()
+        self._Counter = ProvUtil.GetCounterSetting(counterSpec, 'counter')
+        if self._Counter is None:
+            raise ProvUtil.InvalidCounterSpecification('Builtin metric spec missing "counter"')
+        self._Counter = self._Counter.lower()
         if self._Counter not in _builtIns[self._CounterClass]:
             raise ProvUtil.InvalidCounterSpecification(
                 'Counter {0} not in builtin class {1}'.format(self._Counter, self._CounterClass))
-        self._InstanceId = ProvUtil.GetCounterSetting(counterSpec, 'instanceId')
+        self._Condition = ProvUtil.GetCounterSetting(counterSpec, 'condition')
         self._Label = ProvUtil.GetCounterSetting(counterSpec, 'counterSpecifier')
+        if self._Label is None:
+            raise ProvUtil.InvalidCounterSpecification(
+                'No counterSpecifier set for builtin {1} {0}'.format(self._Counter, self._CounterClass))
         self._SampleRate = ProvUtil.GetCounterSetting(counterSpec, 'sampleRate')
 
-    def IsType(self, t):
+    def is_type(self, t):
         """
         Returns True if the metric is of the specified type.
         :param t: The name of the metric type to be checked
@@ -149,10 +160,10 @@ class BuiltinMetric:
         """
         return self._Type == t.lower()
 
-    def Class(self):
+    def class_name(self):
         return self._CounterClass
 
-    def Counter(self):
+    def counter_name(self):
         return self._Counter
 
     def omi_counter(self):
@@ -160,13 +171,13 @@ class BuiltinMetric:
             return _builtin_to_omi[self._CounterClass][self._Counter]
         return self._Counter
 
-    def InstanceId(self):
-        return self._InstanceId
+    def condition(self):
+        return self._Condition
 
-    def Label(self):
+    def label(self):
         return self._Label
 
-    def SampleRate(self):
+    def sample_rate(self):
         """
         Determine how often this metric should be retrieved. If the metric didn't define a sample period, return the
         default.
@@ -176,6 +187,7 @@ class BuiltinMetric:
             return _defaultSampleRate
         else:
             return ProvUtil.IntervalToSeconds(self._SampleRate)
+
 
 def AddMetric(counter_spec):
     """
@@ -195,7 +207,7 @@ def AddMetric(counter_spec):
     # matching those constraints. For that set of constraints, we also have a common eventName, the local
     # table where we store the collected metrics.
 
-    key = (metric.Class(), metric.InstanceId(), metric.SampleRate())
+    key = (metric.class_name(), metric.condition(), metric.sample_rate())
     if key not in _eventNames:
         _eventNames[key] = ProvUtil.MakeUniqueEventName('builtin')
     _metrics[key].append(metric)
@@ -219,9 +231,9 @@ def UpdateXML(doc):
         mappings = []
         for metric in _metrics[group]:
             omi_name = metric.omi_counter()
-            scale = _scaling[class_name][metric.Counter()]
+            scale = _scaling[class_name][metric.counter_name()]
             columns.append(omi_name)
-            mappings.append('<MapName name="{0}" {1}>{2}</MapName>'.format(omi_name, scale, metric.Label()))
+            mappings.append('<MapName name="{0}" {1}>{2}</MapName>'.format(omi_name, scale, metric.label()))
         column_string = ','.join(columns)
         if instance_id:
             where_clause = " WHERE name='{0}'".format(instance_id)

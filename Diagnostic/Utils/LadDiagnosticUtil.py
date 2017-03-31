@@ -37,7 +37,8 @@ classNameMapping = {
     'processor': 'scx_processorstatisticalinformation',
     'memory': 'scx_memorystatisticalinformation',
     'physicaldisk': 'scx_diskdrivestatisticalinformation',
-    'networkinterface': 'scx_ethernetportstatistics'
+    'networkinterface': 'scx_ethernetportstatistics',
+    'filesystem': 'scx_filesystemstatisticalinformation'
 }
 
 

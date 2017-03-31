@@ -25,7 +25,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
                             ]
                         },
                         "metrics": {
-                            "resourceId": "/subscriptions",
+                            "resourceId": "/subscriptions/1111-2222-3333-4444/resourcegroups/RG1/compute/foo",
                             "metricAggregation": [
                                 {"scheduledTransferPeriod": "PT5M"},
                                 {"scheduledTransferPeriod": "PT1H"},
@@ -77,7 +77,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
     def test_getEventVolumeFromLadCfg(self):
         self.assertEqual(LadUtil.getEventVolumeFromLadCfg(self.valid_config), "Large")
 
-    def test_getTopLevelSinksFromLadCfg(self):
+    def test_getAllDefinedSinksFromLadCfg(self):
         sinks = LadUtil.getAllDefinedSinksFromLadCfg(self.valid_config)
         self.assertEqual(len(sinks), 1)
         self.assertIn("sink1", sinks)
@@ -102,3 +102,9 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
         metric = definitions[0]
         self.assertIn('counterSpecifier', metric)
         self.assertEqual('/builtin/Processor/PercentIdleTime', metric['counterSpecifier'])
+
+    def test_getResourceIdFromLadCfg(self):
+        self.assertIsNone(LadUtil.getResourceIdFromLadCfg(self.missing_from_config))
+        res_id = LadUtil.getResourceIdFromLadCfg(self.valid_config)
+        self.assertIsNotNone(res_id)
+        self.assertIn("1111-2222-3333-4444", res_id)
