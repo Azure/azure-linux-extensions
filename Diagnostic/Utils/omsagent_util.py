@@ -17,7 +17,107 @@
 # IN THE SOFTWARE.
 
 import os
+import re
 import socket
+from misc_helpers import append_string_to_file
+
+
+# op is either '--upgrade' or '--remove'
+omsagent_universal_sh_cmd_template = 'sh omsagent-*.universal.x64.sh {op}'
+# args is either '-w LAD' or '-x LAD' or '-l'
+omsagent_lad_workspace_cmd_template = 'sh /opt/microsoft/omsagent/bin/omsadmin.sh {args}'
+omsagent_lad_dir = '/etc/opt/microsoft/omsagent/LAD/'
+# args is either 'install fluent-plugin-mdsd-*.gem' or 'uninstall fluent-plugin-mdsd -a'
+fluentd_ruby_gem_cmd_template = '/opt/microsoft/omsagent/ruby/bin/fluent-gem {args}'
+
+
+def setup_omsagent_for_lad(run_command):
+    """
+    Install omsagent by executing the universal shell bundle. Also onboard omsagent for LAD.
+    Also install the out_mdsd fluentd plugin.
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of process exit code and output (run_command's return values as is)
+    """
+    # 1. Install omsagent. It's a noop if it's already installed.
+    cmd_exit_code, cmd_output = run_command(omsagent_universal_sh_cmd_template.format(op='--upgrade'))
+    if cmd_exit_code != 0:
+        return 1, 'setup_omsagent_for_lad(): omsagent universal installer shell execution failed. ' \
+                  'Output: {0}'.format(cmd_output)
+
+    # 2. Onboard to LAD workspace. Should be a noop if it's already done.
+    if not os.path.isdir(omsagent_lad_dir):
+        cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-w LAD'))
+        if cmd_exit_code != 0:
+            return 2, 'setup_omsagent_for_lad(): LAD workspace onboarding failed. Output: {0}'.format(cmd_output)
+
+    # 3. Install fluentd out_mdsd plugin (uninstall existing ones first)
+    run_command(fluentd_ruby_gem_cmd_template.format(args='uninstall fluent-plugin-mdsd -a'))
+    cmd_exit_code, cmd_output = run_command(fluentd_ruby_gem_cmd_template.format(args='install fluent-plugin-mdsd-*.gem'))
+    if cmd_exit_code != 0:
+        return 3, 'setup_omsagent_for_lad(): fluentd out_mdsd plugin install failed. Output: {0}'.format(cmd_output)
+
+    # All succeeded
+    return 0, 'setup_omsagent_for_lad() succeeded'
+
+
+omsagent_control_cmd_template = '/opt/microsoft/omsagent/bin/service_control {op} LAD'
+
+
+def control_omsagent(op, run_command):
+    """
+    Start/stop/restart omsagent service using omsagent service_control script.
+    :param op: Operation type. Must be 'start', 'stop', or 'restart'
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of process exit code and output (run_command's return values as is)
+    """
+    cmd_exit_code, cmd_output = run_command(omsagent_control_cmd_template.format(op=op))
+    if cmd_exit_code != 0:
+        return 1, 'control_omsagent({0}) failed. Output: {1}'.format(op, cmd_output)
+    return 0, 'control_omsagent({0}) succeeded'.format(op)
+
+
+def remove_omsagent_for_lad(run_command):
+    """
+    Remove omsagent by executing the universal shell bundle. Remove LAD workspace before that.
+    Don't remove omsagent if OMSAgentForLinux extension is installed (i.e., if any other omsagent workspace exists).
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of process exit code and output (run_command's return values)
+    """
+    return_msg = ''
+    # 1. Unconfigure syslog. Ignore failure (just collect failure output).
+    cmd_exit_code, cmd_output = unconfigure_syslog(run_command)
+    if cmd_exit_code != 0:
+        return_msg += 'remove_omsagent_for_lad(): unconfigure_syslog() failed. ' \
+                      'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+
+    # 2. Remove LAD workspace. Ignore failure.
+    cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-x LAD'))
+    if cmd_exit_code != 0:
+        return_msg += 'remove_omsagent_for_lad(): remove-LAD-workspace failed. ' \
+                      'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+
+    # 3. Uninstall omsagent. Do this only if there's no other omsagent workspace.
+    cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-l'))
+    if cmd_output.strip().lower() == 'no workspace':
+        cmd_exit_code, cmd_output = run_command(omsagent_universal_sh_cmd_template.format(op='--remove'))
+        if cmd_exit_code != 0:
+            return_msg += 'remove_omsagent_for_lad(): remove-omsagent failed. ' \
+                          'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+    else:
+        return_msg += 'remove_omsagent_for_lad(): omsagent workspace listing failed. ' \
+                      'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+
+    # Done
+    return 0, return_msg if return_msg else 'remove_omsagent_for_lad() succeeded'
+
+
+rsyslog_top_conf_path = '/etc/rsyslog.conf'
+rsyslog_d_path = '/etc/rsyslog.d/'
+rsyslog_d_omsagent_conf_path = '/etc/rsyslog.d/95-omsagent.conf'  # hard-coded by omsagent
+syslog_ng_conf_path = '/etc/syslog-ng/syslog-ng.conf'
 
 
 def is_rsyslog_installed():
@@ -26,7 +126,16 @@ def is_rsyslog_installed():
     :rtype: bool
     :return: True if rsyslog is installed. False otherwise.
     """
-    return os.path.exists('/etc/rsyslog.conf')
+    return os.path.exists(rsyslog_top_conf_path)
+
+
+def is_new_rsyslog_installed():
+    """
+    Returns true iff newer version of rsyslog (that has /etc/rsyslog.d/) is installed on the machine.
+    :rtype: bool
+    :return: True if /etc/rsyslog.d/ exists. False otherwise.
+    """
+    return os.path.exists(rsyslog_d_path)
 
 
 def is_syslog_ng_installed():
@@ -35,7 +144,7 @@ def is_syslog_ng_installed():
     :rtype: bool
     :return: True if syslog-ng is installed. False otherwise.
     """
-    return os.path.exists('/etc/syslog-ng/syslog-ng.conf')
+    return os.path.exists(syslog_ng_conf_path)
 
 
 def get_fluentd_syslog_src_port():
@@ -65,28 +174,130 @@ def get_fluentd_syslog_src_port():
 omsagent_config_syslog_sh_cmd_template = 'sh /opt/microsoft/omsagent/bin/configure_syslog.sh {op} LAD {port}'
 
 
-def run_omsagent_config_syslog_sh(run_command, op, port):
+def run_omsagent_config_syslog_sh(run_command, op, port=''):
     """
     Run omsagent's configure_syslog.sh script for LAD.
     :param run_command: External command execution function (e.g., RunGetOutput)
     :param op: Type of operation. Must be one of 'configure', 'unconfigure', and 'restart'
     :param port: TCP/UDP port number to supply as fluentd in_syslog plugin listen port
     :rtype: int, str
-    :return: 2-tuple of the process exit code and the resulting output string (basically run_command's return value)
+    :return: 2-tuple of the process exit code and the resulting output string (basically run_command's return values)
     """
     return run_command(omsagent_config_syslog_sh_cmd_template.format(op=op, port=port))
 
 
-# Convenience wrappers for run_omsagent_config_syslog_sh()
-def configure_syslog(run_command, port):
-    return run_omsagent_config_syslog_sh(run_command, 'configure', port)
+fluentd_syslog_src_cfg_path = '/etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf'
+syslog_port_pattern_marker = '%SYSLOG_PORT%'
 
 
-def unconfigure_syslog(run_command, port):
-    # TODO port here should be automatically obtained by checking /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
-    # (extract the port number from '  port <...>' line)
-    return run_omsagent_config_syslog_sh(run_command, 'unconfigure', port)
+def configure_syslog(run_command, port, in_syslog_cfg, rsyslog_cfg, syslog_ng_cfg):
+    """
+    Configure rsyslog/syslog-ng and fluentd's in_syslog with the given TCP port.
+    rsyslog/syslog-ng config is done by omsagent's configure_syslog.sh. We also try to unconfigure first,
+    to avoid duplicate entries in the related config files.
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :param port: TCP/UDP port number to be used for rsyslog/syslog-ng and fluentd's in_syslog
+    :param in_syslog_cfg: Fluentd's in_syslog config string. Should be overwritten to omsagent.d/syslog.conf
+    :param rsyslog_cfg: rsyslog config that's generated by LAD syslog configurator, that should be appended to
+                        /etc/rsyslog.d/95-omsagent.conf or /etc/rsyslog.conf
+    :param syslog_ng_cfg: syslog-ng config that's generated by LAD syslog configurator, that should be appended to
+                          /etc/syslog-ng/syslog-ng.conf
+    :rtype: int, str
+    :return: 2-tuple of the process exit code and the resulting output string (run_command's return values)
+    """
+    if not is_rsyslog_installed() and not is_syslog_ng_installed():
+        return 0, 'configure_syslog(): Nothing to do: Neither rsyslog nor syslog-ng is installed on the system'
+
+    # 1. Unconfigure existing instance (if any) to avoid duplicates
+    cmd_exit_code, cmd_output = unconfigure_syslog(run_command)
+    if cmd_exit_code != 0:
+        return 1, 'configure_syslog(): configure_syslog.sh unconfigure failed: ' + cmd_output
+
+    # 2. Configure new instance with port number
+    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'configure', port)
+    if cmd_exit_code != 0:
+        return 2, 'configure_syslog(): configure_syslog.sh configure failed: ' + cmd_output
+
+    # 2.1. Replace '%SYSLOG_PORT%' in all passed configs with the obtained port number
+    in_syslog_cfg = in_syslog_cfg.replace(syslog_port_pattern_marker, str(port))
+    rsyslog_cfg = rsyslog_cfg.replace(syslog_port_pattern_marker, str(port))
+    syslog_ng_cfg = syslog_ng_cfg.replace(syslog_port_pattern_marker, str(port))
+
+    # 3. Configure fluentd in_syslog plugin (write the fluentd plugin config file)
+    try:
+        with open(fluentd_syslog_src_cfg_path, 'w') as f:
+            f.write(in_syslog_cfg)
+    except Exception as e:
+        return 3, 'configure_syslog(): Writing to omsagent.d/syslog.conf failed: {0}'.format(e)
+
+    # 4. Update (add facilities/levels) rsyslog or syslog-ng config
+    try:
+        if is_syslog_ng_installed():
+            append_string_to_file(syslog_ng_cfg, syslog_ng_conf_path)
+        elif is_new_rsyslog_installed():
+            append_string_to_file(rsyslog_cfg, rsyslog_d_omsagent_conf_path)
+        else:  # old rsyslog, so append to rsyslog_top_conf_path
+            append_string_to_file(rsyslog_cfg, rsyslog_top_conf_path)
+    except Exception as e:
+        return 4, 'configure_syslog(): Adding facilities/levels to rsyslog/syslog-ng conf failed: {0}'.format(e)
+
+    # All succeeded
+    return 0, 'configure_syslog(): Succeeded'
+
+
+def unconfigure_syslog(run_command):
+    """
+    Unconfigure rsyslog/syslog-ng and fluentd's in_syslog for LAD. rsyslog/syslog-ng unconfig is done
+    by omsagent's configure_syslog.sh.
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of the process exit code and the resulting output string (run_command's return values)
+    """
+    # 1. Find the port number in fluentd's in_syslog conf..
+    if not os.path.isfile(fluentd_syslog_src_cfg_path):
+        return 0, "unconfigure_syslog(): Nothing to unconfigure: omsagent fluentd's in_syslog is not configured"
+
+    # 2. Read fluentd's in_syslog config
+    try:
+        with open(fluentd_syslog_src_cfg_path) as f:
+            fluentd_syslog_src_cfg = f.read()
+    except Exception as e:
+        return 1, "unconfigure_syslog(): Failed reading fluentd's in_syslog config: {0}".format(e)
+
+    # 3. Extract the port number and run omsagent's configure_syslog.sh to unconfigure
+    port_match = re.search(r'port\s+(\d+)', fluentd_syslog_src_cfg)
+    if not port_match:
+        return 2, 'unconfigure_syslog(): Invalid fluentd in_syslog config: port number setting not found'
+    port = int(port_match.group(1))
+    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'unconfigure', port)
+    if cmd_exit_code != 0:
+        return 3, 'unconfigure_syslog(): configure_syslog.sh failed: ' + cmd_output
+
+    # 4. Remove fluentd's in_syslog conf file
+    try:
+        os.remove(fluentd_syslog_src_cfg_path)
+    except Exception as e:
+        return 4, 'unconfigure_syslog(): Removing omsagent.d/syslog.conf failed: {0}'.format(e)
+
+    #5. All succeeded
+    return 0, 'unconfigure_syslog(): Succeeded'
 
 
 def restart_syslog(run_command):
-    return run_omsagent_config_syslog_sh(run_command, 'restart')
+    """
+    Restart rsyslog/syslog-ng (so that any new config will be applied)
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of the process exit code and the resulting output string (run_command's return values)
+    """
+    return run_omsagent_config_syslog_sh(run_command, 'restart')  # port param is dummy here.
+
+
+def restart_omiserver(run_command):
+    """
+    Restart omiserver as needed (it crashes sometimes, and doesn't restart automatically yet)
+    :param run_command: External command execution function (e.g., RunGetOutput)
+    :rtype: int, str
+    :return: 2-tuple of the process exit code and the resulting output string (run_command's return values)
+    """
+    return run_command('/opt/omi/bin/service_control restart')

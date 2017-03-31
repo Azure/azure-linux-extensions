@@ -23,8 +23,7 @@ import time
 import subprocess
 import re
 from Utils.WAAgentUtil import waagent
-
-omsagent_universal_install_cmd = 'sh omsagent-*.universal.x64.sh --upgrade'
+import Utils.omsagent_util as oms
 
 
 class CommonActions:
@@ -112,13 +111,6 @@ class CommonActions:
             return None, ''
         version = match.group(1)
         return path, version
-
-    def install_omsagent(self):
-        """
-        Install omsagent (fluentd+omi+scx+dsc)
-        :return (int, str): (status code, output of install command).
-        """
-        return self.log_run_ignore_output(omsagent_universal_install_cmd)
 
     def install_extra_packages(self, packages, with_timeout=False):
         """

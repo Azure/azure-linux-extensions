@@ -163,10 +163,10 @@ def setup_dependencies_and_mdsd():
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
 
-    # Install/start omsagent
-    omsagent_installer_exit_code, omsagent_install_output = setup_omsagent()
-    if omsagent_installer_exit_code is not 0:
-        return 4, omsagent_install_output
+    # Set up omsagent
+    omsagent_setup_exit_code, omsagent_setup_output = setup_omsagent()
+    if omsagent_setup_exit_code is not 0:
+        return 4, omsagent_setup_output
 
     return 0, 'success'
 
@@ -185,8 +185,8 @@ def create_core_components_configs():
     """
     Entry point to creating all configs of LAD's core components (mdsd, omsagent, rsyslog/syslog-ng, ...).
     This function shouldn't be called on Install/Enable. Only Daemon op needs to call this.
-    :rtype: bool
-    :return: True if and only if all configs are created correctly.
+    :rtype: LadConfigAll
+    :return: A valid LadConfigAll object if config is valid. None otherwise.
     """
     global g_enable_syslog
 
@@ -206,7 +206,9 @@ def create_core_components_configs():
                                   isSuccess=True,
                                   version=hutil.get_extension_version(),
                                   message=config_invalid_log)
-    return config_valid
+        return None
+
+    return configurator
 
 
 def check_for_supported_waagent_and_distro_version():
@@ -291,8 +293,9 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Enable succeeded")
 
         elif g_ext_op_type is "Daemon":
-            if create_core_components_configs():
-                start_mdsd()
+            configurator = create_core_components_configs()
+            if configurator:
+                start_mdsd(configurator)
 
         elif g_ext_op_type is waagent.WALAEventOperation.Update:
             hutil.do_status_report(g_ext_op_type, "success", '0', "Update succeeded")
@@ -338,9 +341,11 @@ def start_watcher_thread():
     thread_obj.start()
 
 
-def start_mdsd():
+def start_mdsd(configurator):
     """
     Start mdsd and monitor its activities. Report if it crashes or emits error logs.
+    :param configurator: A valid LadConfigAll object that was obtained by create_core_components_config().
+                         This will be used for configuring rsyslog/syslog-ng/fluentd/in_syslog/out_mdsd components
     :return: None
     """
 
@@ -592,21 +597,21 @@ def setup_omsagent():
     # This is needed later to determine whether to reconfigure the omiserver.conf or not for security purpose.
     need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
-    # We now try to install all the time. If it's already installed. Any additional install is a no-op.
-    hutil.log("Begin omsagent installation.")
-    is_omsagent_installed_correctly = False
+    # We now try to install/setup all the time. If it's already installed. Any additional install is a no-op.
+    hutil.log("Begin omsagent setup.")
+    is_omsagent_setup_correctly = False
     maxTries = 5  # Try up to 5 times to install omsagent
     for trialNum in range(1, maxTries + 1):
-        is_omsagent_installed_correctly = g_dist_config.install_omsagent() is 0
-        if is_omsagent_installed_correctly:
+        cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
+        if cmd_exit_code == 0:  # Successfully set up
             break
-        hutil.error("omsagent install failed (trial #" + str(trialNum) + ").")
+        hutil.error("omsagent setup failed (trial #" + str(trialNum) + ").")
         if trialNum < maxTries:
             hutil.error("Retrying in 30 seconds...")
             time.sleep(30)
-    if not is_omsagent_installed_correctly:
-        hutil.error("omsagent install failed " + str(maxTries) + " times. Giving up...")
-        return 1, "omsagent install failed " + str(maxTries) + " times"
+    if not is_omsagent_setup_correctly:
+        hutil.error("omsagent setup failed " + str(maxTries) + " times. Giving up...")
+        return 1, "omsagent setup failed " + str(maxTries) + " times"
 
     # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
     # In other words, OMI httpsport config should be updated only on a fresh OMI install.
@@ -619,14 +624,11 @@ def setup_omsagent():
                 "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
             RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
 
-    # TODO:
-    #  - Configure syslog (rsyslog or syslog-ng) and restart
-    #    This requires a TCP port assignment, configure (possibly preceded by unconfigure) rsyslog/syslog-ng using
-    #    omsagent's configure_syslog.sh, and restart rsyslog/syslog-ng (again using omsagent's configure_syslog.sh).
-    #  - Configure omsagent (fluentd) & restart
-    #  - Restart omiserver as well
+    cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
+    if cmd_exit_code != 0:
+        return 2, 'omsagent setup for lad failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
-    return 0, "omsagent installed & set up correctly"
+    return 0, "omsagent set up correctly"
 
 
 def tear_down_omi():
