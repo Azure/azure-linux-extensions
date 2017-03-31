@@ -38,6 +38,12 @@ DownloadDirectory = 'download'
 
 omi_package_prefix = 'packages/omi-1.0.8.ssl_'
 dsc_package_prefix = 'packages/dsc-1.1.1-70.ssl_'
+omi_major_version = 1
+omi_minor_version = 0
+omi_build = 8
+dsc_major_version = 1
+dsc_minor_version = 1
+dsc_build = 1
 omi_version_deb = '1.0.8.4'
 omi_version_rpm = '1.0.8-4'
 dsc_version_deb = '1.1.1.70'
@@ -264,14 +270,26 @@ def install_dsc_packages():
         deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi-' + omi_version_rpm)
-        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc-' + dsc_version_rpm)
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build)
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build)
 
-def rpm_install_pkg(package_path, package_name):
-    code,output = run_cmd('rpm -q ' + package_name)
-    if code == 0:
+def compare_pkg_version(system_package_version, major_version, minor_version, build):
+    version = re.match('(\d+).(\d+).(\d+)', system_package_version)
+    if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) >= build)):
+        return 1
+    return 0
+
+def check_pkg_exists(package_name, major_version, minor_version, build):
+    code,output = run_cmd('rpm -q --queryformat "%{VERSION}" ' + package_name)
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " + package_name + ";  existing package version:" + output)
+    hutil.log("package name: " + package_name + ";  existing package version:" + output)
+    if code == 0: 
+        return compare_pkg_version(output, major_version, minor_version, build)
+
+def rpm_install_pkg(package_path, package_name, major_version, minor_version, build):
+    if check_pkg_exists(package_name, major_version, minor_version, build) == 1:
         # package is already installed
-        hutil.log(package_name + ' is already installed')
+        hutil.log(package_name + ' with higher or equal version is already installed')
         return
     else:
         code,output = run_cmd('rpm -Uvh ' + package_path)
