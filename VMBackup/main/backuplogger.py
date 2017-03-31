@@ -29,7 +29,6 @@ from Utils.WAAgentUtil import waagent
 class Backuplogger(object):
     def __init__(self, hutil):
         self.msg = ''
-        self.log_message = ''
         self.con_path = '/dev/console'
         self.enforced_local_flag_value = True
         self.hutil = hutil
@@ -45,8 +44,7 @@ class Backuplogger(object):
         if self.enforced_local_flag_value != None:
             local = self.enforced_local_flag_value
         if(local):
-            self.log_message += log_msg
-            self.hutil.log(log_msg)
+            self.hutil.log(str(msg))
         else:
             self.msg += log_msg
 
@@ -94,7 +92,7 @@ class Backuplogger(object):
                     seek_len_abs = length
                 file.seek(0 - seek_len_abs, os.SEEK_END)
                 tail_wala_log = file.read()
-                log_to_blob = self.prev_log + self.log_message + self.msg + "Tail of WALA Log:" + tail_wala_log
+                log_to_blob = self.prev_log + self.hutil.fetch_log_message() + "Tail of WALA Log:" + tail_wala_log
         except Exception as e:
             errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.hutil.log(errMsg)

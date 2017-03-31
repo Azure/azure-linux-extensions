@@ -86,6 +86,7 @@ class HandlerUtility:
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
+        self.log_message = ""
         self._short_name = short_name
         self.patching = None
         self.storageDetailsObj = None
@@ -129,11 +130,16 @@ class HandlerUtility:
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             sys.exit(0)
 
-    def log(self, message):
+    def log(self, message,level='Info'):
         self._log(self._get_log_prefix() + message)
+        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
+
+    def fetch_log_message(self):
+        return self.log_message
 
     def _parse_config(self, ctxt):
         config = None
