@@ -44,7 +44,7 @@ class Backuplogger(object):
         if self.enforced_local_flag_value != None:
             local = self.enforced_local_flag_value
         if(local):
-            self.hutil.log(str(msg))
+            self.hutil.log(str(msg),level)
         else:
             self.msg += log_msg
 
