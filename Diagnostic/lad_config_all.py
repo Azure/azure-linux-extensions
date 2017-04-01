@@ -29,6 +29,45 @@ from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_ele
 import Providers.Builtin as BuiltIn
 
 
+_mdsd_xml_template = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
+  <Accounts>
+    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+  </Accounts>
+
+  <Management defaultRetentionInDays="90" eventVolume="">
+    <Identity>
+      <IdentityComponent name="DeploymentId" />
+      <IdentityComponent name="Host" useComputerName="true" />
+    </Identity>
+    <AgentResourceUsage diskQuotaInMB="50000" />
+  </Management>
+
+  <Schemas>
+  </Schemas>
+
+  <Sources>
+  </Sources>
+
+  <Events>
+    <MdsdEvents>
+    </MdsdEvents>
+
+    <OMI>
+    </OMI>
+
+    <DerivedEvents>
+    </DerivedEvents>
+  </Events>
+
+  <EventStreamingAnnotations>
+  </EventStreamingAnnotations>
+
+</MonitoringManagement>
+"""
+
+
 class LadConfigAll:
     """
     A class to generate configs for all 3 core components of LAD: mdsd, omsagent (fluentd), and syslog
@@ -70,10 +109,10 @@ class LadConfigAll:
         self._fluentd_out_mdsd_config = None
         self._rsyslog_config = None
         self._syslog_ng_config = None
-
-        # This should be assigned in the main API function from an mdsd XML cfg template file.
-        # TODO Consider doing that right away from here. For now, just keeping the existing behavior/logic.
-        self._mdsd_config_xml_tree = None
+        self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
+        self._sink_configs = LadUtil.SinkConfiguration()
+        self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
+        # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
 
     def _add_portal_settings(self, resource_id):
         """
@@ -83,13 +122,10 @@ class LadConfigAll:
         :param resource_id: ARM resource ID to provide as partitionKey in LADQuery elements
         :return: None
         """
-        assert self._mdsd_config_xml_tree is not None
-
-        portal_config = ET.parse(os.path.join(self._ext_dir, 'portal.xml.template'))
-        XmlUtil.setXmlValue(portal_config, './DerivedEvents/DerivedEvent/LADQuery', 'partitionKey', resource_id)
-        root = portal_config.getroot()
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[0])
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[1])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree,
+                            './DerivedEvents/DerivedEvent/LADQuery',
+                            'partitionKey',
+                            resource_id)
 
     def _update_metric_collection_settings(self, ladCfg):
         """
@@ -101,7 +137,6 @@ class LadConfigAll:
         :param ladCfg: ladCfg object from extension config
         :return: None
         """
-        assert self._mdsd_config_xml_tree is not None
         metrics = LadUtil.getPerformanceCounterCfgFromLadCfg(ladCfg)
         if not metrics:
             return
@@ -127,17 +162,19 @@ class LadConfigAll:
 <DerivedEvent  duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
-        '''
+'''
         intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
+        sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for table_name in local_tables:
             for aggregation_interval in intervals:
                 query = ladquery.format(interval=aggregation_interval, localTable=table_name)
                 XmlUtil.addElement(self._mdsd_config_xml_tree, 'DerivedEvents', ET.fromstring(query))
         # Other sinks are handled here
-            sinks = LadUtil.getTopLevelSinksFromLadCfg(ladCfg)
-            if "eventhub" in sinks:
-                eh_sink = LadUtil.getSinkDefinitionFromLadCfg(ladCfg, "eventhub")
-                # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+            for name in sinks.split(','):
+                sink = self._sink_configs.get_sink_by_name(name)
+                if sink['type'] == 'EventHub':
+                    # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+                    pass
 
     def _update_perf_counters_settings(self, omi_queries, for_app_insights=False):
         """
@@ -152,8 +189,6 @@ class LadConfigAll:
                                 AppInsights requires specific names, so we need this.
         :return: None. The mdsd XML tree member is updated accordingly.
         """
-        assert self._mdsd_config_xml_tree is not None
-
         if not omi_queries:
             return
 
@@ -334,49 +369,32 @@ class LadConfigAll:
         Generates XML cfg file for mdsd, from JSON config settings (public & private).
         Also generates rsyslog/syslog-ng configs corresponding to 'syslogEvents' or 'syslogCfg' setting.
         Also generates fluentd's syslog/tail src configs and out_mdsd configs.
-        The rsyslog/syslog-ng and flutned configs are not yet saved to files. They are available through
+        The rsyslog/syslog-ng and fluentd configs are not yet saved to files. They are available through
         the corresponding getter methods of this class (get_fluentd_*_config(), get_*syslog*_config()).
 
         Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
         Returns (False, '...') if config was invalid and the error message.
         """
 
-        # 1. Get the mdsd config XML tree base.
-        #    - 1st priority is from the extension setting's 'mdsdCfg' value.
-        #      Note that we have never used this option.
-        #    - 2nd priority is to use the provided XML template stored in <ext_dir>/mdsdConfig.xml.template.
-        mdsd_cfg_str = self._ext_settings.get_mdsd_cfg()
-        if mdsd_cfg_str:
-            try:
-                self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mdsd_cfg_str))
-            except Exception as e:
-                msg = "Error parsing supplied mdsdCfg string: {0}".format(e)
-                self._logger_error(msg)
-                return False, msg
-        else:
-            self._mdsd_config_xml_tree = ET.parse(os.path.join(self._ext_dir, './mdsdConfig.xml.template'))
-
-        # 2. Add DeploymentId (if available) to identity columns
+        # 1. Add DeploymentId (if available) to identity columns
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
-        # 2.1. Use ladCfg to generate OMIQuery and LADQuery elements
+        # 2. Use ladCfg to generate OMIQuery and LADQuery elements
         lad_cfg = self._ext_settings.read_public_config('ladCfg')
         if lad_cfg:
             self._update_metric_collection_settings(lad_cfg)
-
-        # 2.9. Apply resourceId attribute to LADQuery elements
-        try:
-            resource_id = self._ext_settings.get_resource_id()
-            if resource_id:
-                escaped_resource_id_str = escape_nonalphanumerics(resource_id)
-                self._add_portal_settings(escaped_resource_id_str)
-                instanceID = ""
-                if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                    instanceID = read_uuid(self._run_command)
-                self._set_xml_attr("instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
-        except Exception as e:
-            self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
+            try:
+                resource_id = self._ext_settings.get_resource_id()
+                if resource_id:
+                    escaped_resource_id_str = escape_nonalphanumerics(resource_id)
+                    self._add_portal_settings(escaped_resource_id_str)
+                    instanceID = ""
+                    if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
+                        instanceID = read_uuid(self._run_command)
+                    self._set_xml_attr("instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
+            except Exception as e:
+                self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
 
         # 3. Update perf counter config. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present in ladCfg first, and pass it to the actual helper
