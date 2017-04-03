@@ -94,7 +94,7 @@ class ImdsLogger:
             imds_data = self._imds_data_getter('/metadata/instance/')
         except Exception as e:
             self._ext_log_if_enabled('Exception occurred while getting IMDS data: {0}\n'
-                                     'stacktrace: {1}').format(e, traceback.format_exc())
+                                     'stacktrace: {1}'.format(e, traceback.format_exc()))
             imds_data = '{0}'.format(e)
 
         msg = 'IMDS instance data = {0}'.format(imds_data)

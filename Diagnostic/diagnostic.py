@@ -253,7 +253,7 @@ def main(command):
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde')
             else:
                 stop_mdsd()
-            oms.remove_omsagent_for_lad(RunGetOutput)
+            oms.tear_down_omsagent_for_lad(RunGetOutput, False)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Uninstall:
@@ -262,7 +262,7 @@ def main(command):
                              '&& rm /lib/systemd/system/mdsd-lde.service')
             else:
                 stop_mdsd()
-            oms.remove_omsagent_for_lad(RunGetOutput)
+            oms.tear_down_omsagent_for_lad(RunGetOutput, True)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
@@ -343,11 +343,20 @@ def start_mdsd(configurator):
                          This will be used for configuring rsyslog/syslog-ng/fluentd/in_syslog/out_mdsd components
     :return: None
     """
+    # This must be done first, so that extension enable completion doesn't get delayed.
+    write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
 
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    # We first validate the mdsd config and proceed only when it succeeds.
+    # We first need to install dependencies (omsagent, which includes omi) because even running 'mdsd -v'
+    # requires omi client library (/opt/omi/lib/libmicxx.so).
+    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+    if dependencies_err != 0:
+        g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+        return
+
+    # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
     config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
@@ -358,13 +367,6 @@ def start_mdsd(configurator):
             "Config validation message: {0}.".format(config_validate_cmd_msg)
         hutil.log(message)
         hutil.do_status_report(waagent_ext_event_type, "success", '0', message)
-        return
-
-    write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
-
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
-    if dependencies_err != 0:
-        g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
         return
 
     # Start OMI if it's not running.
@@ -471,8 +473,8 @@ def start_mdsd(configurator):
 
         # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped:" + mdsd_crash_msg)
-        # Need to remove omsagent setup for LAD before returning/exiting if it was set up earlier
-        oms.remove_omsagent_for_lad(RunGetOutput)
+        # Need to tear down omsagent setup for LAD before returning/exiting if it was set up earlier
+        oms.tear_down_omsagent_for_lad(RunGetOutput, False)
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent_ext_event_type,
@@ -589,13 +591,16 @@ def setup_omsagent(configurator):
     # This is needed later to determine whether to reconfigure the omiserver.conf or not for security purpose.
     need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
 
-    # We now try to install/setup all the time. If it's already installed. Any additional install is a no-op.
     hutil.log("Begin omsagent setup.")
+
+    # 1. Install omsagent, onboard to LAD workspace, and install fluentd out_mdsd plugin
+    # We now try to install/setup all the time. If it's already installed. Any additional install is a no-op.
     is_omsagent_setup_correctly = False
     maxTries = 5  # Try up to 5 times to install omsagent
     for trialNum in range(1, maxTries + 1):
         cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
         if cmd_exit_code == 0:  # Successfully set up
+            is_omsagent_setup_correctly = True
             break
         hutil.error("omsagent setup failed (trial #" + str(trialNum) + ").")
         if trialNum < maxTries:
@@ -603,7 +608,8 @@ def setup_omsagent(configurator):
             time.sleep(30)
     if not is_omsagent_setup_correctly:
         hutil.error("omsagent setup failed " + str(maxTries) + " times. Giving up...")
-        return 1, "omsagent setup failed " + str(maxTries) + " times"
+        return 1, "omsagent setup failed {0} times. " \
+                  "Last exit code={1}, Output={2}".format(maxTries, cmd_exit_code, cmd_output)
 
     # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
     # In other words, OMI httpsport config should be updated only on a fresh OMI install.
@@ -615,11 +621,6 @@ def setup_omsagent(configurator):
             RunGetOutput(
                 "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
             RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-
-    # 1. Install omsagent, onboard to LAD workspace, and install fluentd out_mdsd plugin
-    cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
-    if cmd_exit_code != 0:
-        return 2, 'omsagent setup for lad failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     # 2. Configure all fluentd plugins (in_syslog, in_tail, out_mdsd)
     # 2.1. First get a free TCP/UDP port for fluentd in_syslog plugin.

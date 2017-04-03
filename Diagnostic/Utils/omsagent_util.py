@@ -78,11 +78,12 @@ def control_omsagent(op, run_command):
     return 0, 'control_omsagent({0}) succeeded'.format(op)
 
 
-def remove_omsagent_for_lad(run_command):
+def tear_down_omsagent_for_lad(run_command, remove_omsagent):
     """
     Remove omsagent by executing the universal shell bundle. Remove LAD workspace before that.
     Don't remove omsagent if OMSAgentForLinux extension is installed (i.e., if any other omsagent workspace exists).
     :param run_command: External command execution function (e.g., RunGetOutput)
+    :param remove_omsagent: A boolean indicating whether to remove omsagent bundle or not.
     :rtype: int, str
     :return: 2-tuple of process exit code and output (run_command's return values)
     """
@@ -96,19 +97,20 @@ def remove_omsagent_for_lad(run_command):
     # 2. Remove LAD workspace. Ignore failure.
     cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-x LAD'))
     if cmd_exit_code != 0:
-        return_msg += 'remove_omsagent_for_lad(): remove-LAD-workspace failed. ' \
+        return_msg += 'remove_omsagent_for_lad(): LAD workspace removal failed. ' \
                       'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
-    # 3. Uninstall omsagent. Do this only if there's no other omsagent workspace.
-    cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-l'))
-    if cmd_output.strip().lower() == 'no workspace':
-        cmd_exit_code, cmd_output = run_command(omsagent_universal_sh_cmd_template.format(op='--remove'))
-        if cmd_exit_code != 0:
-            return_msg += 'remove_omsagent_for_lad(): remove-omsagent failed. ' \
+    if remove_omsagent:
+        # 3. Uninstall omsagent when specified. Do this only if there's no other omsagent workspace.
+        cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-l'))
+        if cmd_output.strip().lower() == 'no workspace':
+            cmd_exit_code, cmd_output = run_command(omsagent_universal_sh_cmd_template.format(op='--remove'))
+            if cmd_exit_code != 0:
+                return_msg += 'remove_omsagent_for_lad(): remove-omsagent failed. ' \
+                              'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+        else:
+            return_msg += 'remove_omsagent_for_lad(): omsagent workspace listing failed. ' \
                           'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
-    else:
-        return_msg += 'remove_omsagent_for_lad(): omsagent workspace listing failed. ' \
-                      'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     # Done
     return 0, return_msg if return_msg else 'remove_omsagent_for_lad() succeeded'
