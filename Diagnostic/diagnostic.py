@@ -129,7 +129,7 @@ def init_globals():
                                     hutil.get_name(), hutil.get_extension_version())
 
 
-def setup_dependencies_and_mdsd():
+def setup_dependencies_and_mdsd(configurator):
     """
     Set up dependencies for mdsd, such as following:
     1) Distro-specific packages (see DistroSpecific.py)
@@ -155,18 +155,13 @@ def setup_dependencies_and_mdsd():
         hutil.error(install_package_error)
         return 2, install_package_error
 
-    error, msg = setup_rsyslog_for_mdsd()
-    if error != 0:
-        hutil.error(msg)
-        return 3, msg
-
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
 
     # Set up omsagent
-    omsagent_setup_exit_code, omsagent_setup_output = setup_omsagent()
+    omsagent_setup_exit_code, omsagent_setup_output = setup_omsagent(configurator)
     if omsagent_setup_exit_code is not 0:
-        return 4, omsagent_setup_output
+        return 3, omsagent_setup_output
 
     return 0, 'success'
 
@@ -258,6 +253,7 @@ def main(command):
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde')
             else:
                 stop_mdsd()
+            oms.remove_omsagent_for_lad(RunGetOutput)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Uninstall:
@@ -266,8 +262,7 @@ def main(command):
                              '&& rm /lib/systemd/system/mdsd-lde.service')
             else:
                 stop_mdsd()
-            tear_down_omi()
-            tear_down_mdsd_rsyslog_setup(condition=g_enable_syslog)
+            oms.remove_omsagent_for_lad(RunGetOutput)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
@@ -367,7 +362,7 @@ def start_mdsd(configurator):
 
     write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
 
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
+    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
     if dependencies_err != 0:
         g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
         return
@@ -378,8 +373,6 @@ def start_mdsd(configurator):
     omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
     if not omi_running:
         RunGetOutput("/opt/omi/bin/service_control restart")
-
-    tear_down_mdsd_rsyslog_setup(condition=not g_enable_syslog)
 
     log_dir = hutil.get_log_dir()
     err_file_path = os.path.join(log_dir, 'mdsd.err')
@@ -476,13 +469,10 @@ def start_mdsd(configurator):
             mdsd_crash_msg = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_stdout_redirect_path) + tail(err_file_path)
             hutil.error("MDSD crashed:" + mdsd_crash_msg)
 
-            # Need to reset rsyslog omazurelinuxmds config before retrying mdsd if it was set up earlier
-            setup_rsyslog_for_mdsd()
-
         # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped:" + mdsd_crash_msg)
-        # Also need to tear down rsyslog-mdsd OM before returning/exiting if it was set up earlier
-        tear_down_mdsd_rsyslog_setup(condition=g_enable_syslog)
+        # Need to remove omsagent setup for LAD before returning/exiting if it was set up earlier
+        oms.remove_omsagent_for_lad(RunGetOutput)
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent_ext_event_type,
@@ -587,9 +577,11 @@ def get_lad_pids():
     return lad_pids
 
 
-def setup_omsagent():
+def setup_omsagent(configurator):
     """
     Set up omsagent. Install necessary components, configure them as needed, and start the agent.
+    :param configurator: A LadConfigAll object that's obtained from a valid LAD JSON settings config.
+                         This is needed to retrieve the syslog (rsyslog/syslog-ng) and the fluentd configs.
     :return: Pair of status code and message. 0 status code for success. Non-zero status code
             for a failure and the associated failure message.
     """
@@ -624,24 +616,47 @@ def setup_omsagent():
                 "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
             RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
 
+    # 1. Install omsagent, onboard to LAD workspace, and install fluentd out_mdsd plugin
     cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
     if cmd_exit_code != 0:
         return 2, 'omsagent setup for lad failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
-    return 0, "omsagent set up correctly"
+    # 2. Configure all fluentd plugins (in_syslog, in_tail, out_mdsd)
+    # 2.1. First get a free TCP/UDP port for fluentd in_syslog plugin.
+    port = oms.get_fluentd_syslog_src_port()
+    if port < 0:
+        return 3, 'setup_omsagent(): Failed at getting a free TCP/UDP port for fluentd in_syslog'
+    # 2.2. Configure syslog
+    cmd_exit_code, cmd_output = oms.configure_syslog(RunGetOutput, port,
+                                                     configurator.get_fluentd_syslog_src_config(),
+                                                     configurator.get_rsyslog_config(),
+                                                     configurator.get_syslog_ng_config())
+    if cmd_exit_code != 0:
+        return 4, 'setup_omsagent(): Failed at configuring in_syslog. Exit code={0}, Output={1}'.format(cmd_exit_code,
+                                                                                                     cmd_output)
+    # 2.3. Configure filelog
+    cmd_exit_code, cmd_output = oms.configure_filelog(configurator.get_fluentd_tail_src_config())
+    if cmd_exit_code != 0:
+        return 5, 'setup_omsagent(): Failed at configuring in_tail. Exit code={0}, Output={1}'.format(cmd_exit_code,
+                                                                                                      cmd_output)
+    # 2.4. Configure out_mdsd
+    cmd_exit_code, cmd_output = oms.configure_out_mdsd(configurator.get_fluentd_out_mdsd_config())
+    if cmd_exit_code != 0:
+        return 6, 'setup_omsagent(): Failed at configuring out_mdsd. Exit code={0}, Output={1}'.format(cmd_exit_code,
+                                                                                                       cmd_output)
 
+    # 3. Restart syslog (rsyslog/syslog-ng) & omsagent
+    cmd_exit_code, cmd_output = oms.restart_syslog(RunGetOutput)
+    if cmd_exit_code != 0:
+        return 7, 'setup_omsagent(): Failed at restarting syslog (rsyslog or syslog-ng). ' \
+                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+    cmd_exit_code, cmd_output = oms.control_omsagent('restart', RunGetOutput)
+    if cmd_exit_code != 0:
+        return 8, 'setup_omsagent(): Failed at restarting omsagent (fluentd). ' \
+                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
-def tear_down_omi():
-    """
-    Tear down OMI. We currently don't uninstall OMI, but just uninstalls Apache CIM provider if it's installed.
-    Later, we may want to at least stop OMI server, if not uninstalling OMI.
-    :return: status code (0 for success), and message
-    """
-    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache' | grep -v grep")[0] is 0
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
-        RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
-    hutil.log("omi will not be uninstalled")
-    return 0, "do nothing"
+    # All done...
+    return 0, "setup_omsagent(): Succeeded"
 
 
 # Issue #128 LAD should restart OMI if it crashes
@@ -697,70 +712,6 @@ def restart_omi_if_crashed(omi_installed, mdsd):
             syslog.closelog()
 
     return omi_installed
-
-
-# Rsyslog config-related globals (config file paths)
-g_rsyslog_om_mdsd_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds.conf"
-g_rsyslog_im_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-imfile.conf"
-
-
-def setup_rsyslog_for_mdsd():
-    """
-    Set up rsyslog for mdsd by doing the following:
-    1) Install rsyslog mdsd output module
-    2) Configure rsyslog mdsd output module (Update __MDSD_SOCKET_FILE_PTAH__ in the config template)
-    3) Configure rsyslog imfile module (By copying the already-cooked imfileconfig to rsyslog.d)
-    4) Restart rsyslog
-    :return: Status code (0 for success, non-zero for failure), message
-    """
-
-    # Don't bother to set up rsyslog for mdsd if syslog is not enabled.
-    if not g_enable_syslog:
-        return 0, 'syslog is not enabled'
-
-    rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
-    if rsyslog_om_path is None:
-        return 1, "rsyslog not installed"
-
-    if rsyslog_version == '':
-        return 1, "rsyslog version can't be detected"
-    elif rsyslog_version not in ('5', '7', '8'):
-        return 1, "Unsupported rsyslog version ({0})".format(rsyslog_version)
-
-    rsyslog_om_folder = 'rsyslog' + rsyslog_version
-    mdsd_socket_path = g_mdsd_file_resources_prefix + "_json.socket"
-
-    script = """\
-cp -f {0}/omazuremds.so {1};\
-rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf {2};\
-cp -f {3} {4};\
-sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
-    cmd = script.format(rsyslog_om_folder, rsyslog_om_path, g_rsyslog_om_mdsd_conf_path,
-                        g_imfile_config_filename, g_rsyslog_im_file_conf_path, mdsd_socket_path)
-    RunGetOutput(cmd)
-
-    g_dist_config.restart_rsyslog()
-    return 0, "Setting up rsyslog for mdsd completed"
-
-
-def tear_down_mdsd_rsyslog_setup(condition):
-    """
-    Tear down mdsd-related rsyslog setup by doing the following:
-    1) Remove mdsd rsyslog output module binary, config, and imfile config for mdsd destination
-    2) Restart rsyslog
-    :return: Status code and message
-    """
-    # Don't bother to proceed if the passed condition is not met
-    if not condition:
-        return 0, 'rsyslog OM uninstall condition is not met. Not proceeding.'
-
-    rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
-    if os.path.exists(g_rsyslog_om_mdsd_conf_path):
-        cmd = "rm -f {0}/omazuremds.so {1} {2}".format(rsyslog_om_path, g_rsyslog_om_mdsd_conf_path,
-                                                       g_rsyslog_im_file_conf_path)
-        RunGetOutput(cmd)
-    g_dist_config.restart_rsyslog()
-    return 0, "rm omazurelinuxmds done"
 
 
 if __name__ == '__main__':
