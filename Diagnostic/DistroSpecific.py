@@ -135,27 +135,6 @@ class CommonActions:
         """
         return False
 
-    def stop_rsyslog(self):
-        """
-        Stop (shutdown) rsyslogd.
-        :return int: status of operation
-        """
-        return self.log_run_ignore_output("service rsyslog stop")
-
-    def restart_rsyslog(self):
-        """
-        Restart rsyslogd.
-        :return int: status of operation
-        """
-        return self.log_run_ignore_output("service rsyslog restart")
-
-    def get_rsyslog_info(self):
-        """
-        Get rsyslogd configuration information
-        :return (str, str): (path to output modules, major version)
-        """
-        return None, ''
-
     def prepare_for_mdsd_install(self):
         return 0, ''
 
@@ -184,11 +163,6 @@ class DebianActions(CommonActions):
     def install_extra_packages(self, packages, with_timeout=False):
         cmd = 'dpkg-query -l PACKAGE |grep ^ii; if [ ! $? == 0 ]; then apt-get update; apt-get install -y PACKAGE; fi'
         return self.log_run_multiple_cmds([cmd.replace("PACKAGE", p) for p in packages], with_timeout)
-
-    def get_rsyslog_info(self):
-        cmd = r'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|omprog\.so"'
-        error, results = self.log_run_get_output(cmd)
-        return self.extract_om_path_and_version(results)
 
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"})
@@ -230,11 +204,6 @@ class RedhatActions(CommonActions):
     def is_package_handler(self, package_manager):
         return package_manager == "rpm"
 
-    def get_rsyslog_info(self):
-        cmd = r'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\|omprog\.so"'
-        error, results = self.log_run_get_output(cmd)
-        return self.extract_om_path_and_version(results)
-
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"})
 
@@ -249,7 +218,7 @@ class Suse11Actions(RedhatActions):
         return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
 
     def install_required_packages(self):
-        return self.install_extra_packages(('rsyslog',), True)
+        return self.install_extra_packages((), True)
 
     # For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
     def prepare_for_mdsd_install(self):
@@ -264,17 +233,10 @@ class Suse11Actions(RedhatActions):
     def extend_environment(self, env):
         env.update({"SSL_CERT_FILE": self.certs_file})
 
-    def restart_rsyslog(self):
-        return self.log_run_ignore_output("""\
-if [ ! -f /etc/sysconfig/syslog.org_lad ]; then cp /etc/sysconfig/syslog /etc/sysconfig/syslog.org_lad; fi;
-sed -i 's/SYSLOG_DAEMON="syslog-ng"/SYSLOG_DAEMON="rsyslogd"/g' /etc/sysconfig/syslog;
-service syslog restart""")
-
 
 class Suse12Actions(RedhatActions):
     def __init__(self, logger):
         RedhatActions.__init__(self, logger)
-        self.certs_file = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
     def install_extra_packages(self, packages, with_timeout=False):
         install_cmd = 'rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi'
