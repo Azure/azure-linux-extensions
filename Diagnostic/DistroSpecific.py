@@ -165,7 +165,7 @@ class DebianActions(CommonActions):
         return self.log_run_multiple_cmds([cmd.replace("PACKAGE", p) for p in packages], with_timeout)
 
     def extend_environment(self, env):
-        env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"})
+        env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE": "/usr/lib/ssl/cert.pem"})
 
 
 class Ubuntu1510OrHigherActions(DebianActions):
