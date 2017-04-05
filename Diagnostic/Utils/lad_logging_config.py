@@ -17,6 +17,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from xml.etree import ElementTree as ET
+from Utils.omsagent_util import get_syslog_ng_src_name
 
 
 # Mdsd XML config templates defined globally because they are shared by multiple methods
@@ -149,10 +150,11 @@ class LadLoggingConfig:
                 self._oms_syslog_ng_config = ''
             else:
                 # Generate/save/return syslog-ng config string for the facility-severity pairs.
-                # E.g.: "log { source(s_src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
+                # E.g.: "log { source(src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
                 self._oms_syslog_ng_config = \
-                    '\n'.join('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
-                              'destination(d_LAD_oms); }};'.format(syslog_name_to_rsyslog_name(fac),
+                    '\n'.join('log {{ source({0}); filter(f_LAD_oms_f_{1}); filter(f_LAD_oms_ml_{2}); '
+                              'destination(d_LAD_oms); }};'.format(get_syslog_ng_src_name(),
+                                                                   syslog_name_to_rsyslog_name(fac),
                                                                    syslog_name_to_rsyslog_name(sev))
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._oms_syslog_ng_config

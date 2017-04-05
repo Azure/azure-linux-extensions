@@ -155,6 +155,26 @@ def is_syslog_ng_installed():
     return os.path.exists(syslog_ng_conf_path)
 
 
+def get_syslog_ng_src_name():
+    """
+    Some syslog-ng distributions use different source name ("s_src" vs "src"), causing syslog-ng restarts
+    to fail when we provide a non-existent source name. Need to search the syslog-ng.conf file and retrieve
+    the source name as below.
+    :rtype: str
+    :return: syslog-ng source name retrieved from syslog-ng.conf. 'src' if none available.
+    """
+    syslog_ng_src_name = 'src'
+    try:
+        with open(syslog_ng_conf_path, 'r') as f:
+            syslog_ng_cfg = f.read()
+        src_match = re.search(r'source\s+([^\s]+)', syslog_ng_cfg)
+        if src_match:
+            syslog_ng_src_name = src_match.group(1)
+    except Exception as e:
+        pass  # Ignore any errors, because the default ('src') will do.
+
+    return syslog_ng_src_name
+
 def get_fluentd_syslog_src_port():
     """
     Returns a TCP/UDP port number that'll be supplied to the fluentd syslog src plugin (for it to listen to for
