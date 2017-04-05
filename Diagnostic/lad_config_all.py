@@ -83,7 +83,8 @@ class LadConfigAll:
     - /etc/syslog-ng.conf: syslog-ng config for LAD's syslog settings. The content should be appended, not overwritten.
     """
 
-    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id, run_command, logger_log, logger_error):
+    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
+                 fetch_uuid, encrypt_string, logger_log, logger_error):
         """
         Constructor.
         :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) obj wrapping the Json extension settings.
@@ -91,7 +92,8 @@ class LadConfigAll:
         :param waagent_dir: WAAgent directory (e.g., /var/lib/waagent)
         :param deployment_id: Deployment ID string (or None) that should be obtained & passed by the caller
                               from waagent's HostingEnvironmentCfg.xml.
-        :param run_command: External command execution function (e.g., RunGetOutput)
+        :param fetch_uuid: A function which fetches the UUID for the VM
+        :param encrypt_string: A function which encrypts a string, given a cert_path
         :param logger_log: Normal logging function (e.g., hutil.log) that takes only one param for the logged msg.
         :param logger_error: Error logging function (e.g., hutil.error) that takes only one param for the logged msg.
         """
@@ -99,7 +101,8 @@ class LadConfigAll:
         self._ext_dir = ext_dir
         self._waagent_dir = waagent_dir
         self._deployment_id = deployment_id
-        self._run_command = run_command
+        self._fetch_uuid = fetch_uuid
+        self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
 
@@ -109,10 +112,17 @@ class LadConfigAll:
         self._fluentd_out_mdsd_config = None
         self._rsyslog_config = None
         self._syslog_ng_config = None
+
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
         self._sink_configs = LadUtil.SinkConfiguration()
         self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
+
+        # Get encryption settings
+        thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
+        path = '{0}/{1}.{2}'
+        self._cert_path = path.format(waagent_dir, thumbprint, 'crt')
+        self._pkey_path = path.format(waagent_dir, thumbprint, 'prv')
 
     def _add_portal_settings(self, resource_id):
         """
@@ -248,35 +258,13 @@ class LadConfigAll:
             self._logger_error("Failed to create perf config. Error:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
 
-    def _get_handler_cert_pkey_paths(self, handler_settings):
+    def _encrypt_secret_with_cert(self, secret):
         """
         update_account_settings() helper.
-        :param handler_settings: Extension "handlerSettings" Json dictionary.
-        :return: 2-tupe of certificate path and private key path.
-        """
-        thumbprint = handler_settings['protectedSettingsCertThumbprint']
-        cert_path = self._waagent_dir + '/' + thumbprint + '.crt'
-        pkey_path = self._waagent_dir + '/' + thumbprint + '.prv'
-        return cert_path, pkey_path
-
-    def _encrypt_secret_with_cert(self, cert_path, secret):
-        """
-        update_account_settings() helper.
-        :param cert_path: Cert file path
         :param secret: Secret to encrypt
         :return: Encrypted secret string. None if openssl command exec fails.
         """
-        encrypted_secret_tmp_file_path = os.path.join(self._ext_dir, "mdsd_secret.bin")
-        cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
-        cmd_to_run = cmd.format(secret, encrypted_secret_tmp_file_path, cert_path)
-        ret_status, ret_msg = self._run_command(cmd_to_run, should_log=False)
-        if ret_status is not 0:
-            self._logger_error("Encrypting storage secret failed with the following message: " + ret_msg)
-            return None
-        with open(encrypted_secret_tmp_file_path, 'rb') as f:
-            encrypted_secret = f.read()
-        os.remove(encrypted_secret_tmp_file_path)
-        return binascii.b2a_hex(encrypted_secret).upper()
+        return self._encrypt_secret(self._cert_path, secret)
 
     def _update_account_settings(self, account, key, token, endpoint, aikey=None):
         """
@@ -292,26 +280,27 @@ class LadConfigAll:
         assert key or token, "Either key or token must be given."
         assert self._mdsd_config_xml_tree is not None
 
-        handler_cert_path, handler_pkey_path = self._get_handler_cert_pkey_paths(self._ext_settings.get_handler_settings())
         if key:
-            key = self._encrypt_secret_with_cert(handler_cert_path, key)
+            key = self._encrypt_secret_with_cert(key)
+            assert key, "Could not encrypt key"
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "account", account, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "key", key, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "tableEndpoint", endpoint, ['isDefault', 'true'])
             XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'SharedAccessSignature')
         else:  # token
-            token = self._encrypt_secret_with_cert(handler_cert_path, token)
+            token = self._encrypt_secret_with_cert(token)
+            assert token, "Could not encrypt token"
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "account", account, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "key", token, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "tableEndpoint", endpoint, ['isDefault', 'true'])
             XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
@@ -391,7 +380,7 @@ class LadConfigAll:
                     self._add_portal_settings(escaped_resource_id_str)
                     instanceID = ""
                     if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                        instanceID = read_uuid(self._run_command)
+                        instanceID = self._fetch_uuid()
                     self._set_xml_attr("instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
