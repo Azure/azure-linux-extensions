@@ -7,6 +7,7 @@ from xml.etree import ElementTree as ET
 from xmlunittest import XmlTestMixin
 
 from Utils.lad_logging_config import *
+from Utils.omsagent_util import get_syslog_ng_src_name
 
 
 class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
@@ -101,11 +102,14 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.assertGreaterEqual(len(lines), len(cfg._fac_sev_map))
         # Each line should be correctly formatted
         for l in lines:
-            self.assertRegexpMatches(l, r"log \{ source\(s_src\); filter\(f_LAD_oms_f_\w+\); filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}")
+            self.assertRegexpMatches(l, r'log \{{ source\({0}\); filter\(f_LAD_oms_f_\w+\); '
+                                        r'filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}}'
+                                        .format(get_syslog_ng_src_name()))
         # For each facility-severity, there should be corresponding line.
         for fac, sev in cfg._fac_sev_map.iteritems():
-            index = oms_syslog_ng_config.find('log {{ source(s_src); filter(f_LAD_oms_f_{0}); filter(f_LAD_oms_ml_{1}); '
-                                              'destination(d_LAD_oms); }}'.format(syslog_name_to_rsyslog_name(fac),
+            index = oms_syslog_ng_config.find('log {{ source({0}); filter(f_LAD_oms_f_{1}); filter(f_LAD_oms_ml_{2}); '
+                                              'destination(d_LAD_oms); }}'.format(get_syslog_ng_src_name(),
+                                                                                  syslog_name_to_rsyslog_name(fac),
                                                                                   syslog_name_to_rsyslog_name(sev)))
             self.assertGreaterEqual(index, 0)
         print "*** Actual output verified ***\n"

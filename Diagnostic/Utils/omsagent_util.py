@@ -45,6 +45,12 @@ def setup_omsagent_for_lad(run_command):
         return 1, 'setup_omsagent_for_lad(): omsagent universal installer shell execution failed. ' \
                   'Output: {0}'.format(cmd_output)
 
+    # 1.1. Modify configure_syslog.sh to work around on a SLES 11 anomaly: No "syslog-ng" service, but "syslog"
+    #      even though syslog-ng is installed, causing configure_syslog.sh to fail. Strange is that even though
+    #      the configure_syslog.sh fails, it seems syslog collection works, so it's not really a bug, though
+    #      it's just not very clean.
+    run_command(r'sed -i "s/RestartService syslog-ng\\s*$/RestartService syslog-ng || RestartService syslog/g" /opt/microsoft/omsagent/bin/configure_syslog.sh')
+
     # 2. Onboard to LAD workspace. Should be a noop if it's already done.
     if not os.path.isdir(omsagent_lad_dir):
         cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-w LAD'))
@@ -148,6 +154,26 @@ def is_syslog_ng_installed():
     """
     return os.path.exists(syslog_ng_conf_path)
 
+
+def get_syslog_ng_src_name():
+    """
+    Some syslog-ng distributions use different source name ("s_src" vs "src"), causing syslog-ng restarts
+    to fail when we provide a non-existent source name. Need to search the syslog-ng.conf file and retrieve
+    the source name as below.
+    :rtype: str
+    :return: syslog-ng source name retrieved from syslog-ng.conf. 'src' if none available.
+    """
+    syslog_ng_src_name = 'src'
+    try:
+        with open(syslog_ng_conf_path, 'r') as f:
+            syslog_ng_cfg = f.read()
+        src_match = re.search(r'source\s+([^\s]+)', syslog_ng_cfg)
+        if src_match:
+            syslog_ng_src_name = src_match.group(1)
+    except Exception as e:
+        pass  # Ignore any errors, because the default ('src') will do.
+
+    return syslog_ng_src_name
 
 def get_fluentd_syslog_src_port():
     """

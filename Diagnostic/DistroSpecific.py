@@ -34,7 +34,8 @@ class CommonActions:
         Execute a command in a subshell
         :param str cmd: The command to be executed
         :param bool should_log: If true, log command execution
-        :return (int, str): A tuple of (subshell exit code, contents of stdout)
+        :rtype: int, str
+        :return: A tuple of (subshell exit code, contents of stdout)
         """
         if should_log:
             self.logger("RunCmd " + cmd)
@@ -48,7 +49,8 @@ class CommonActions:
         Execute a command in a subshell
         :param str cmd: The command to be executed
         :param bool should_log: True if command execution should be logged. (False preserves privacy of parameters.)
-        :return int: The subshell exit code
+        :rtype: int
+        :return: The subshell exit code
         """
         error, msg = self.log_run_get_output(cmd, should_log)
         return int(error)
@@ -58,7 +60,8 @@ class CommonActions:
         Execute a command in a subshell, killing the subshell if it runs too long
         :param str cmd: The command to be executed
         :param int timeout: The maximum elapsed time, in seconds, to wait for the subshell to return; default 360
-        :return (int, str): (1, "Process timeout\n") if timeout, else (subshell exit code, contents of stdout)
+        :rtype: int, str
+        :return: (1, "Process timeout\n") if timeout, else (subshell exit code, contents of stdout)
         """
         self.logger("Run with timeout: " + cmd)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
@@ -81,7 +84,8 @@ class CommonActions:
         :param Iterable[str] cmds: An iterable of commands to be executed
         :param bool with_timeout: True if commands should be run with timeout
         :param int timeout: The timeout, in seconds; default 360. Ignored if with_timeout is False.
-        :return (int, str): A tuple of (sum of status codes, concatenated stdout from commands)
+        :rtype: int, str
+        :return: A tuple of (sum of status codes, concatenated stdout from commands)
         """
         errors = 0
         output = []
@@ -98,7 +102,8 @@ class CommonActions:
         """
         Get information about rsyslogd
         :param str results: Package information about omprog.so or version
-        :return (str, str): (Path where rsyslogd output modules are installed, major version of rsyslogd)
+        :rtype: str, str
+        :return: (Path where rsyslogd output modules are installed, major version of rsyslogd)
         """
         match = re.search(r"(.+)omprog\.so", results)
         if not match:
@@ -116,14 +121,16 @@ class CommonActions:
         Ensure an arbitrary set of packages is installed
         :param list[str] packages: Iterable of package names
         :param bool with_timeout: true if package installations should be aborted if they take too long
-        :return int:
+        :rtype: int
+        :return:
         """
         return 0, ''
 
     def install_required_packages(self):
         """
         Install packages required by this distro to meet the common bar required of all distros
-        :return (int, str): (status, concatenated stdout from all package installs)
+        :rtyep: int, str
+        :return: (status, concatenated stdout from all package installs)
         """
         return 0, "no additional packages were needed"
 
@@ -131,30 +138,10 @@ class CommonActions:
         """
         Checks if the distro's package manager matches the specified tool.
         :param str package_manager: The tool to be checked against the distro's native package manager
-        :return bool: True if the distro's native package manager is package_manager
+        :rtype: bool
+        :return: True if the distro's native package manager is package_manager
         """
         return False
-
-    def stop_rsyslog(self):
-        """
-        Stop (shutdown) rsyslogd.
-        :return int: status of operation
-        """
-        return self.log_run_ignore_output("service rsyslog stop")
-
-    def restart_rsyslog(self):
-        """
-        Restart rsyslogd.
-        :return int: status of operation
-        """
-        return self.log_run_ignore_output("service rsyslog restart")
-
-    def get_rsyslog_info(self):
-        """
-        Get rsyslogd configuration information
-        :return (str, str): (path to output modules, major version)
-        """
-        return None, ''
 
     def prepare_for_mdsd_install(self):
         return 0, ''
@@ -169,7 +156,8 @@ class CommonActions:
     def use_systemd(self):
         """
         Determine if the distro uses systemd as its system management tool.
-        :return bool: True if the distro uses systemd as its system management tool.
+        :rtype: bool
+        :return: True if the distro uses systemd as its system management tool.
         """
         return False
 
@@ -185,13 +173,8 @@ class DebianActions(CommonActions):
         cmd = 'dpkg-query -l PACKAGE |grep ^ii; if [ ! $? == 0 ]; then apt-get update; apt-get install -y PACKAGE; fi'
         return self.log_run_multiple_cmds([cmd.replace("PACKAGE", p) for p in packages], with_timeout)
 
-    def get_rsyslog_info(self):
-        cmd = r'(dpkg-query -s rsyslog;dpkg-query -L rsyslog) |grep "Version\|omprog\.so"'
-        error, results = self.log_run_get_output(cmd)
-        return self.extract_om_path_and_version(results)
-
     def extend_environment(self, env):
-        env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE ": "/usr/lib/ssl/cert.pem"})
+        env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE": "/usr/lib/ssl/cert.pem"})
 
 
 class Ubuntu1510OrHigherActions(DebianActions):
@@ -230,11 +213,6 @@ class RedhatActions(CommonActions):
     def is_package_handler(self, package_manager):
         return package_manager == "rpm"
 
-    def get_rsyslog_info(self):
-        cmd = r'(rpm -qi rsyslog;rpm -ql rsyslog)|grep "Version\|omprog\.so"'
-        error, results = self.log_run_get_output(cmd)
-        return self.extract_om_path_and_version(results)
-
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"})
 
@@ -249,7 +227,7 @@ class Suse11Actions(RedhatActions):
         return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
 
     def install_required_packages(self):
-        return self.install_extra_packages(('rsyslog',), True)
+        return 0, "no additional packages were needed"
 
     # For SUSE11, we need to create a CA certs file for our statically linked OpenSSL 1.0 libs
     def prepare_for_mdsd_install(self):
@@ -264,17 +242,10 @@ class Suse11Actions(RedhatActions):
     def extend_environment(self, env):
         env.update({"SSL_CERT_FILE": self.certs_file})
 
-    def restart_rsyslog(self):
-        return self.log_run_ignore_output("""\
-if [ ! -f /etc/sysconfig/syslog.org_lad ]; then cp /etc/sysconfig/syslog /etc/sysconfig/syslog.org_lad; fi;
-sed -i 's/SYSLOG_DAEMON="syslog-ng"/SYSLOG_DAEMON="rsyslogd"/g' /etc/sysconfig/syslog;
-service syslog restart""")
-
 
 class Suse12Actions(RedhatActions):
     def __init__(self, logger):
         RedhatActions.__init__(self, logger)
-        self.certs_file = "/etc/ssl/certs/mdsd-ca-certs.pem"
 
     def install_extra_packages(self, packages, with_timeout=False):
         install_cmd = 'rpm -qi PACKAGE; if [ ! $? == 0 ]; then zypper --non-interactive install PACKAGE;fi'

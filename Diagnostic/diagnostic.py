@@ -64,7 +64,6 @@ except Exception as e:
 g_ext_settings = None  # LAD extension settings object
 g_lad_log_helper = None  # LAD logging helper object
 g_dist_config = None  # Distro config object
-g_enable_syslog = True  # EnableSyslog flag
 g_ext_dir = ''  # Extension directory (e.g., /var/lib/waagent/Microsoft.OSTCExtensions.LinuxDiagnostic-x.y.zzzz)
 g_mdsd_file_resources_dir = '/var/run/mdsd'
 g_mdsd_role_name = 'lad_mdsd'  # Different mdsd role name for multiple mdsd process instances
@@ -184,10 +183,6 @@ def create_core_components_configs():
     :rtype: LadConfigAll
     :return: A valid LadConfigAll object if config is valid. None otherwise.
     """
-    global g_enable_syslog
-
-    g_enable_syslog = g_ext_settings.is_syslog_enabled()
-
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
 
     # Define wrappers around a couple misc_helpers. These can easily be mocked out in tests. PEP-8 says use
@@ -368,7 +363,11 @@ def start_mdsd(configurator):
 
     # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
-    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
+    tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
+    g_dist_config.extend_environment(tmp_env_dict)
+    added_env_str = ' '.join('{0}={1}'.format(k, tmp_env_dict[k]) for k in tmp_env_dict)
+    config_validate_cmd = '{0}{1}{2} -v -c {3}'.format(added_env_str, ' ' if added_env_str else '',
+                                                       os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.
