@@ -17,8 +17,7 @@
 #  OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 #  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import binascii
-from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics, write_string_to_file
+from misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
 import traceback
 import xml.etree.ElementTree as ET
@@ -27,6 +26,45 @@ import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems, LadLoggingConfigException
 import Providers.Builtin as BuiltIn
+
+
+_mdsd_xml_template = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
+  <Accounts>
+    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+  </Accounts>
+
+  <Management defaultRetentionInDays="90" eventVolume="">
+    <Identity>
+      <IdentityComponent name="DeploymentId" />
+      <IdentityComponent name="Host" useComputerName="true" />
+    </Identity>
+    <AgentResourceUsage diskQuotaInMB="50000" />
+  </Management>
+
+  <Schemas>
+  </Schemas>
+
+  <Sources>
+  </Sources>
+
+  <Events>
+    <MdsdEvents>
+    </MdsdEvents>
+
+    <OMI>
+    </OMI>
+
+    <DerivedEvents>
+    </DerivedEvents>
+  </Events>
+
+  <EventStreamingAnnotations>
+  </EventStreamingAnnotations>
+
+</MonitoringManagement>
+"""
 
 
 class LadConfigAll:
@@ -43,8 +81,20 @@ class LadConfigAll:
        processed so that the '%SYSLOG_PORT%' pattern is replaced with the assigned TCP port number.
     - /etc/syslog-ng.conf: syslog-ng config for LAD's syslog settings. The content should be appended, not overwritten.
     """
+    _default_perf_cfgs = [
+        {"query": "SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap "
+                  "FROM SCX_MemoryStatisticalInformation",
+         "table": "LinuxMemory"},
+        {"query": "SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime "
+                  "FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
+         "table": "LinuxCpu"},
+        {"query": "SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond "
+                  "FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'",
+         "table": "LinuxDisk"}
+    ]
 
-    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id, run_command, logger_log, logger_error):
+    def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
+                 fetch_uuid, encrypt_string, logger_log, logger_error):
         """
         Constructor.
         :param ext_settings: A LadExtSettings (in Utils/lad_ext_settings.py) obj wrapping the Json extension settings.
@@ -52,7 +102,8 @@ class LadConfigAll:
         :param waagent_dir: WAAgent directory (e.g., /var/lib/waagent)
         :param deployment_id: Deployment ID string (or None) that should be obtained & passed by the caller
                               from waagent's HostingEnvironmentCfg.xml.
-        :param run_command: External command execution function (e.g., RunGetOutput)
+        :param fetch_uuid: A function which fetches the UUID for the VM
+        :param encrypt_string: A function which encrypts a string, given a cert_path
         :param logger_log: Normal logging function (e.g., hutil.log) that takes only one param for the logged msg.
         :param logger_error: Error logging function (e.g., hutil.error) that takes only one param for the logged msg.
         """
@@ -60,7 +111,8 @@ class LadConfigAll:
         self._ext_dir = ext_dir
         self._waagent_dir = waagent_dir
         self._deployment_id = deployment_id
-        self._run_command = run_command
+        self._fetch_uuid = fetch_uuid
+        self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
 
@@ -71,9 +123,19 @@ class LadConfigAll:
         self._rsyslog_config = None
         self._syslog_ng_config = None
 
-        # This should be assigned in the main API function from an mdsd XML cfg template file.
-        # TODO Consider doing that right away from here. For now, just keeping the existing behavior/logic.
-        self._mdsd_config_xml_tree = None
+        self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
+        self._sink_configs = LadUtil.SinkConfiguration()
+        self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
+        # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
+
+        # Get encryption settings
+        thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
+        path = '{0}/{1}.{2}'
+        self._cert_path = path.format(waagent_dir, thumbprint, 'crt')
+        self._pkey_path = path.format(waagent_dir, thumbprint, 'prv')
+
+    def _ladCfg(self):
+        return self._ext_settings.read_public_config('ladCfg')
 
     def _add_portal_settings(self, resource_id):
         """
@@ -83,13 +145,10 @@ class LadConfigAll:
         :param resource_id: ARM resource ID to provide as partitionKey in LADQuery elements
         :return: None
         """
-        assert self._mdsd_config_xml_tree is not None
-
-        portal_config = ET.parse(os.path.join(self._ext_dir, 'portal.xml.template'))
-        XmlUtil.setXmlValue(portal_config, './DerivedEvents/DerivedEvent/LADQuery', 'partitionKey', resource_id)
-        root = portal_config.getroot()
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[0])
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events', root.getchildren()[1])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree,
+                            './DerivedEvents/DerivedEvent/LADQuery',
+                            'partitionKey',
+                            resource_id)
 
     def _update_metric_collection_settings(self, ladCfg):
         """
@@ -101,7 +160,6 @@ class LadConfigAll:
         :param ladCfg: ladCfg object from extension config
         :return: None
         """
-        assert self._mdsd_config_xml_tree is not None
         metrics = LadUtil.getPerformanceCounterCfgFromLadCfg(ladCfg)
         if not metrics:
             return
@@ -111,7 +169,7 @@ class LadConfigAll:
 
         # Add each metric
         for metric in metrics:
-            if metric['class'] is 'builtin':
+            if metric['type'] is 'builtin':
                 local_table_name = BuiltIn.AddMetric(metric)
                 if local_table_name:
                     local_tables.add(local_table_name)
@@ -124,20 +182,25 @@ class LadConfigAll:
         # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
         # later.
         ladquery = '''
-<DerivedEvent  duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
+<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
-        '''
+'''
         intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
+        sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for table_name in local_tables:
             for aggregation_interval in intervals:
-                query = ladquery.format(interval=aggregation_interval, localTable=table_name)
-                XmlUtil.addElement(self._mdsd_config_xml_tree, 'DerivedEvents', ET.fromstring(query))
+                query = ladquery.format(interval=aggregation_interval, localtable=table_name)
+                XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
         # Other sinks are handled here
-            sinks = LadUtil.getTopLevelSinksFromLadCfg(ladCfg)
-            if "eventhub" in sinks:
-                eh_sink = LadUtil.getSinkDefinitionFromLadCfg(ladCfg, "eventhub")
-                # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+            for name in sinks.split(','):
+                sink = self._sink_configs.get_sink_by_name(name)
+                if sink is None:
+                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+                else:
+                    if sink['type'] == 'EventHub':
+                        # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+                        pass
 
     def _update_perf_counters_settings(self, omi_queries, for_app_insights=False):
         """
@@ -152,8 +215,6 @@ class LadConfigAll:
                                 AppInsights requires specific names, so we need this.
         :return: None. The mdsd XML tree member is updated accordingly.
         """
-        assert self._mdsd_config_xml_tree is not None
-
         if not omi_queries:
             return
 
@@ -169,7 +230,8 @@ class LadConfigAll:
             mdsd_omi_query_element.set('omiNamespace', namespace)
             if for_app_insights:
                 AIUtil.updateOMIQueryElement(mdsd_omi_query_element)
-            XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI', el=mdsd_omi_query_element, addOnlyOnce=True)
+            XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
+                               el=mdsd_omi_query_element, addOnlyOnce=True)
 
     def _apply_perf_cfgs(self, include_app_insights=False):
         """
@@ -180,27 +242,17 @@ class LadConfigAll:
         assert self._mdsd_config_xml_tree is not None
 
         perf_cfgs = []
-        default_perf_cfgs = [
-                        {"query": "SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap "
-                                  "FROM SCX_MemoryStatisticalInformation",
-                         "table": "LinuxMemory"},
-                        {"query": "SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime "
-                                  "FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
-                         "table": "LinuxCpu"},
-                        {"query": "SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond "
-                                  "FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'",
-                         "table": "LinuxDisk"}
-                      ]
         try:
             # First try to get perf cfgs from the new 'ladCfg' setting.
-            lad_cfg = self._ext_settings.read_public_config('ladCfg')
-            perf_cfgs = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(lad_cfg)
-            # If none, try the original 'perfCfg' setting.
+            lad_cfg = self._ladCfg()
+            if lad_cfg:
+                perf_cfgs = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(lad_cfg)
+            # If still empty, try the original 'perfCfg' setting.
             if not perf_cfgs:
                 perf_cfgs = self._ext_settings.read_public_config('perfCfg')
-            # If none, use default (3 OMI queries)
-            if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
-                perf_cfgs = default_perf_cfgs
+            # If none, use default (3 OMI queries) DISABLED
+            #if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
+            #    perf_cfgs = LadConfigAll._default_perf_cfgs
         except Exception as e:
             self._logger_error("Failed to parse performance configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
@@ -213,41 +265,19 @@ class LadConfigAll:
             self._logger_error("Failed to create perf config. Error:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
 
-    def _get_handler_cert_pkey_paths(self, handler_settings):
+    def _encrypt_secret_with_cert(self, secret):
         """
         update_account_settings() helper.
-        :param handler_settings: Extension "handlerSettings" Json dictionary.
-        :return: 2-tuple of certificate path and private key path.
-        """
-        thumbprint = handler_settings['protectedSettingsCertThumbprint']
-        cert_path = self._waagent_dir + '/' + thumbprint + '.crt'
-        pkey_path = self._waagent_dir + '/' + thumbprint + '.prv'
-        return cert_path, pkey_path
-
-    def _encrypt_secret_with_cert(self, cert_path, secret):
-        """
-        update_account_settings() helper.
-        :param cert_path: Cert file path
         :param secret: Secret to encrypt
         :return: Encrypted secret string. None if openssl command exec fails.
         """
-        encrypted_secret_tmp_file_path = os.path.join(self._ext_dir, "mdsd_secret.bin")
-        cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
-        cmd_to_run = cmd.format(secret, encrypted_secret_tmp_file_path, cert_path)
-        ret_status, ret_msg = self._run_command(cmd_to_run, should_log=False)
-        if ret_status is not 0:
-            self._logger_error("Encrypting storage secret failed with the following message: " + ret_msg)
-            return None
-        with open(encrypted_secret_tmp_file_path, 'rb') as f:
-            encrypted_secret = f.read()
-        os.remove(encrypted_secret_tmp_file_path)
-        return binascii.b2a_hex(encrypted_secret).upper()
+        return self._encrypt_secret(self._cert_path, secret)
 
     def _update_account_settings(self, account, key, token, endpoint, aikey=None):
         """
         Update the MDSD configuration Account element with Azure table storage properties.
-        Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for Application
-        Insights with the application insights key.
+        Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for
+        Application Insights with the application insights key.
         :param account: Storage account to which LAD should write data
         :param key: Shared key secret for the storage account, if present
         :param token: SAS token to access the storage account, if present
@@ -257,26 +287,27 @@ class LadConfigAll:
         assert key or token, "Either key or token must be given."
         assert self._mdsd_config_xml_tree is not None
 
-        handler_cert_path, handler_pkey_path = self._get_handler_cert_pkey_paths(self._ext_settings.get_handler_settings())
         if key:
-            key = self._encrypt_secret_with_cert(handler_cert_path, key)
+            key = self._encrypt_secret_with_cert(key)
+            assert key, "Could not encrypt key"
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "account", account, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "key", key, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
                                 "tableEndpoint", endpoint, ['isDefault', 'true'])
             XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'SharedAccessSignature')
         else:  # token
-            token = self._encrypt_secret_with_cert(handler_cert_path, token)
+            token = self._encrypt_secret_with_cert(token)
+            assert token, "Could not encrypt token"
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "account", account, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "key", token, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "decryptKeyPath", handler_pkey_path, ['isDefault', 'true'])
+                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "tableEndpoint", endpoint, ['isDefault', 'true'])
             XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
@@ -334,49 +365,32 @@ class LadConfigAll:
         Generates XML cfg file for mdsd, from JSON config settings (public & private).
         Also generates rsyslog/syslog-ng configs corresponding to 'syslogEvents' or 'syslogCfg' setting.
         Also generates fluentd's syslog/tail src configs and out_mdsd configs.
-        The rsyslog/syslog-ng and flutned configs are not yet saved to files. They are available through
+        The rsyslog/syslog-ng and fluentd configs are not yet saved to files. They are available through
         the corresponding getter methods of this class (get_fluentd_*_config(), get_*syslog*_config()).
 
         Returns (True, '') if config was valid and proper xmlCfg.xml was generated.
         Returns (False, '...') if config was invalid and the error message.
         """
 
-        # 1. Get the mdsd config XML tree base.
-        #    - 1st priority is from the extension setting's 'mdsdCfg' value.
-        #      Note that we have never used this option.
-        #    - 2nd priority is to use the provided XML template stored in <ext_dir>/mdsdConfig.xml.template.
-        mdsd_cfg_str = self._ext_settings.get_mdsd_cfg()
-        if mdsd_cfg_str:
-            try:
-                self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mdsd_cfg_str))
-            except Exception as e:
-                msg = "Error parsing supplied mdsdCfg string: {0}".format(e)
-                self._logger_error(msg)
-                return False, msg
-        else:
-            self._mdsd_config_xml_tree = ET.parse(os.path.join(self._ext_dir, './mdsdConfig.xml.template'))
-
-        # 2. Add DeploymentId (if available) to identity columns
+        # 1. Add DeploymentId (if available) to identity columns
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
-        # 2.1. Use ladCfg to generate OMIQuery and LADQuery elements
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
+        # 2. Use ladCfg to generate OMIQuery and LADQuery elements
+        lad_cfg = self._ladCfg()
         if lad_cfg:
             self._update_metric_collection_settings(lad_cfg)
-
-        # 2.9. Apply resourceId attribute to LADQuery elements
-        try:
-            resource_id = self._ext_settings.get_resource_id()
-            if resource_id:
-                escaped_resource_id_str = escape_nonalphanumerics(resource_id)
-                self._add_portal_settings(escaped_resource_id_str)
-                instanceID = ""
-                if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                    instanceID = read_uuid(self._run_command)
-                self._set_xml_attr("instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
-        except Exception as e:
-            self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
+            try:
+                resource_id = self._ext_settings.get_resource_id()
+                if resource_id:
+                    escaped_resource_id_str = escape_nonalphanumerics(resource_id)
+                    self._add_portal_settings(escaped_resource_id_str)
+                    instance_id = ""
+                    if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
+                        instance_id = self._fetch_uuid()
+                    self._set_xml_attr("instanceID", instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
+            except Exception as e:
+                self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
 
         # 3. Update perf counter config. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present in ladCfg first, and pass it to the actual helper
@@ -492,13 +506,12 @@ class LadConfigAll:
         self.__throw_if_output_is_none(self._fluentd_out_mdsd_config)
         return self._fluentd_out_mdsd_config
 
-
     def get_rsyslog_config(self):
         """
         Returns the obtained rsyslog config. This getter (and all that follow) should be called
         after self.generate_mdsd_omsagent_syslog_config() is called.
-        The return value should be appended to /etc/rsyslog.d/95-omsagent.conf if rsyslog ver is new (that is,
-        if /etc/rsyslog.d/ exists). It should be appended to /etc/rsyslog.conf if rsyslog ver is old (no /etc/rsyslog.d/).
+        The return value should be appended to /etc/rsyslog.d/95-omsagent.conf if rsyslog ver is new (that is, if
+        /etc/rsyslog.d/ exists). It should be appended to /etc/rsyslog.conf if rsyslog ver is old (no /etc/rsyslog.d/).
         The appended file (either /etc/rsyslog.d/95-omsagent.conf or /etc/rsyslog.conf) should be processed so that
         the '%SYSLOG_PORT%' pattern in the file is replaced with the assigned TCP port number.
         :rtype: str

@@ -11,10 +11,12 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import tempfile
 import re
 import string
 import traceback
 import xml.dom.minidom
+import binascii
 
 from Utils.WAAgentUtil import waagent
 
@@ -137,8 +139,32 @@ class LadLogHelper(object):
 
 
 def read_uuid(run_command):
-    code, str_ret = run_command("dmidecode |grep UUID |awk '{print $2}'", chk_err=False)
+    code, str_ret = run_command("dmidecode |awk '/UUID/{print $2}'", chk_err=False)
     return str_ret.strip()
+
+
+def encrypt_secret_with_cert(run_command, logger, cert_path, secret):
+    """
+    update_account_settings() helper.
+    :param run_command: Function to run an arbitrary command
+    :param logger: Function to log error messages
+    :param cert_path: Cert file path
+    :param secret: Secret to encrypt
+    :return: Encrypted secret string. None if openssl command exec fails.
+    """
+    f = tempfile.NamedTemporaryFile(suffix='mdsd', delete=True)
+    # Have openssl write to our temporary file (on Linux we don't have an exclusive lock on the temp file).
+    # openssl smime, when asked to put output in a file, simply overwrites the file; it does not unlink/creat or
+    # creat/rename.
+    cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
+    cmd_to_run = cmd.format(secret, f.name, cert_path)
+    ret_status, ret_msg = run_command(cmd_to_run, should_log=False)
+    if ret_status is not 0:
+        logger("Encrypting storage secret failed with the following message: " + ret_msg)
+        return None
+    encrypted_secret = f.read()
+    f.close()   # Deletes the temp file
+    return binascii.b2a_hex(encrypted_secret).upper()
 
 
 def tail(log_file, output_size=1024):
@@ -233,25 +259,3 @@ def write_lad_pids_to_file(pid_file_path, py_pid, mdsd_pid=None):
         f.write(str(py_pid) + '\n')
         if mdsd_pid is not None:
             f.write(str(mdsd_pid) + '\n')
-
-
-def write_string_to_file(string, filepath):
-    """
-    Write string content to file
-    :param string: A str object that holds the content to be written to the file
-    :param filepath: Path to the file to be written
-    :return: None
-    """
-    with open(filepath, 'w') as f:
-        f.write(string)
-
-
-def append_string_to_file(string, filepath):
-    """
-    Append string content to file
-    :param string: A str object that holds the content to be appended to the file
-    :param filepath: Path to the file to be appended
-    :return: None
-    """
-    with open(filepath, 'a') as f:
-        f.write(string)

@@ -13,6 +13,8 @@ import json
 import os
 import subprocess
 import unittest
+import xml.etree.ElementTree as ET
+
 
 from Utils.lad_ext_settings import *
 # The following line will work on an Azure Linux VM (where waagent is installed), but fail on a non-Azure Linux VM
@@ -21,6 +23,9 @@ from Utils.lad_ext_settings import *
 # To work around this on a non-Azure Linux VM, define PYTHONPATH env var
 # with "azure-linux-extensions/Common/WALinuxAgent-2.0.16" included in it.
 # E.g., run 'export PYTHONPATH=<gitroot>/azure-linux-extensions/Common/WALinuxAgent-2.0.16' before running this test.
+#
+# Also, if you're trying to execute this test on a Windows system rather than under Linux, the waagent code relies on
+# three Linux-only modules you'll need to mock out: crypt(crypt()), pwd(getpwnam()), and fcntl(ioctl()).
 from lad_config_all import *
 
 # Mocked waagent/LAD dir/files
@@ -30,40 +35,12 @@ test_lad_settings_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings
 
 
 # Mocked functions
-def test_logger(type, msg):
-    print type + ':' + msg
 
-
-def test_run_command(cmd, should_log=True):
-    if should_log:
-        print "Command to execute: " + cmd
-    try:
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
-    except subprocess.CalledProcessError as e:
-        print "Command execution error. Exit code=" + str(e.returncode) + \
-            ", result=" + e.output[:-1].decode('latin-1')
-        return e.returncode, e.output.decode('latin-1')
-    return 0, output.decode('latin-1')
-
-
-# BADBAD Copied code from HandlerUtil.py to decrypt protectedSettings...
-# Can't import HandlerUtil.py from unittests, because of the waagent dependency...
-# so just copying like this...
+# We're not really interested in testing the ability to decrypt the private settings; that's tested elsewhere.
+# Instead, we assume the test handlerSettings object contains the decrypted Private settings already, since we just
+# need to test our ability to read and manipulate those settings.
 def decrypt_protected_settings(handlerSettings):
-    if handlerSettings.has_key('protectedSettings') and \
-            handlerSettings.has_key("protectedSettingsCertThumbprint") and \
-            handlerSettings['protectedSettings'] is not None and \
-            handlerSettings["protectedSettingsCertThumbprint"] is not None:
-        protectedSettings = handlerSettings['protectedSettings']
-        thumb=handlerSettings['protectedSettingsCertThumbprint']
-        cert=test_waagent_dir+'/'+thumb+'.crt'
-        pkey=test_waagent_dir+'/'+thumb+'.prv'
-        unencodedSettings = base64.standard_b64decode(protectedSettings)
-        openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}".format(cert, pkey)
-        proc = subprocess.Popen([openSSLcmd], shell=True, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                stdout=subprocess.PIPE)
-        output = proc.communicate(unencodedSettings)[0].decode('latin-1')
-        handlerSettings['protectedSettings'] = json.loads(output)
+    pass
 
 
 def print_content_with_header(header_text, content):
@@ -74,20 +51,37 @@ def print_content_with_header(header_text, content):
     print
 
 
+def mock_fetch_uuid():
+    return "DEADBEEF-0000-1111-2222-77DEADBEEF77"
+
+
+def mock_encrypt_secret(cert, secret):
+    return "ENCRYPTED({0})".format(secret)
+
+
+def mock_log_info(msg):
+    print 'LOG:', msg
+
+
+def mock_log_error(msg):
+    print 'ERROR:', msg
+
+
 class LadConfigAllTest(unittest.TestCase):
 
     def setUp(self):
         """
-        Set up a LadConfigAll object with all dependencies properly set up and injected.
+        Set up a LadConfigAll object with all dependencies properly set up and injected. Assumption: Private settings
+        are present in cleartext (rather than as an encrypted-then-base64-encoded blob).
         """
         with open(test_lad_settings_json_file) as f:
             handler_settings = json.loads(f.read())['runtimeSettings'][0]['handlerSettings']
-            decrypt_protected_settings(handler_settings)
-            lad_settings = LadExtSettings(handler_settings)
+        decrypt_protected_settings(handler_settings)
+        lad_settings = LadExtSettings(handler_settings)
 
         self._lad_config_all_helper = LadConfigAll(lad_settings, test_lad_dir, test_waagent_dir,
-                                                   'test_lad_deployment_id', test_run_command,
-                                                   lambda x: test_logger('LOG', x), lambda x: test_logger('ERROR', x))
+                                                   'test_lad_deployment_id', mock_fetch_uuid, mock_encrypt_secret,
+                                                   mock_log_info, mock_log_error)
 
     def test_lad_config_all_basic(self):
         """
@@ -122,3 +116,76 @@ class LadConfigAllTest(unittest.TestCase):
         fluentd_tail_src_cfg = lad_cfg.get_fluentd_tail_src_config()
         print_content_with_header('Generated fluentd tail src cfg', fluentd_tail_src_cfg)
         self.assertTrue(fluentd_tail_src_cfg, 'Empty fluentd tail src cfg is invalid')
+
+    def test_update_metric_collection_settings(self):
+        test_config = \
+            {
+                "diagnosticMonitorConfiguration":
+                    {
+                        "foo": "bar",
+                        "eventVolume": "Large",
+                        "sinksConfig": {
+                            "sink": [
+                                {
+                                    "name": "sink1",
+                                    "type": "EventHub",
+                                    "sasURL": "https://sbnamespace.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
+                                              "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
+                                              "&se=1804371161&skn=writer"
+                                }
+                            ]
+                        },
+                        "metrics": {
+                            "resourceId": "/subscriptions/1111-2222-3333-4444/resourcegroups/RG1/compute/foo",
+                            "metricAggregation": [
+                                {"scheduledTransferPeriod": "PT5M"},
+                                {"scheduledTransferPeriod": "PT1H"},
+                            ]
+                        },
+                        "performanceCounters": {
+                            "sinks": "sink1",
+                            "performanceCounterConfiguration": [
+                                {
+                                    "type": "builtin",
+                                    "class": "Processor",
+                                    "counter": "PercentIdleTime",
+                                    "counterSpecifier": "/builtin/Processor/PercentIdleTime",
+                                    "condition": "IsAggregate=TRUE",
+                                    "sampleRate": "PT15S",
+                                    "unit": "Percent",
+                                    "annotation": [
+                                        {
+                                            "displayName": "Aggregate CPU %idle time",
+                                            "locale": "en-us"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "syslogEvents": {
+                            "syslogEventConfiguration": {
+                                "LOG_LOCAL1": "LOG_INFO",
+                                "LOG_MAIL": "LOG_FATAL"
+                            }
+                        }
+                    },
+                "sampleRateInSeconds": 60
+            }
+
+        test_sinks_config = \
+            {
+                "sink": [
+                    {
+                        "name": "sink1",
+                        "type": "EventHub",
+                        "sasURL": "https://sbnamespace.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
+                                  "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
+                                  "&se=1804371161&skn=writer"
+                    }
+                ]
+            }
+
+        configurator = self._lad_config_all_helper
+        configurator._sink_configs.insert_from_config(test_sinks_config)
+        configurator._update_metric_collection_settings(test_config)
+        print ET.tostring(configurator._mdsd_config_xml_tree.getroot())

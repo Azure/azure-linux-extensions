@@ -37,7 +37,8 @@ classNameMapping = {
     'processor': 'scx_processorstatisticalinformation',
     'memory': 'scx_memorystatisticalinformation',
     'physicaldisk': 'scx_diskdrivestatisticalinformation',
-    'networkinterface': 'scx_ethernetportstatistics'
+    'networkinterface': 'scx_ethernetportstatistics',
+    'filesystem': 'scx_filesystemstatisticalinformation'
 }
 
 
@@ -197,29 +198,58 @@ def getAggregationPeriodsFromLadCfg(ladCfg):
     return ['PT1H']
 
 
-def getSinkDefinitionFromLadCfg(ladCfg, sink_name):
+def getFeatureWideSinksFromLadCfg(ladCfg, feature_name):
     """
-    Return the JSON object defining a particular sink.
-    :param ladCfg: JSON config
-    :param sink_name: string name of sink
-    :return: JSON object or None
+    Returns the comma-separated list of sink names to which all data for the given feature should be forwarded
+    :param ladCfg: The ladCfg JSON config
+    :param feature_name: Name of the feature. Expected to be "performanceCounters" or "syslogEvents"
+    :return: the comma-separated list of names, or an empty string
     """
-    sinkConfig = getDiagnosticsMonitorConfigurationElement(ladCfg, "sinksConfig")
-    if sinkConfig and "Sink" in sinkConfig:
-        sinks = sinkConfig['Sink']
-        for sink in sinks:
-            if sink['name'] is sink_name:
-                return sink
-    return None
+    feature_config = getDiagnosticsMonitorConfigurationElement(ladCfg, feature_name)
+    if feature_config and 'sinks' in feature_config:
+        return feature_config['sinks']
+    return ''
 
 
-def getAllDefinedSinksFromLadCfg(ladCfg):
-    """
-    Return a list of all names of defined sinks.
-    :param ladCfg: JSON config
-    :return: list of names
-    """
-    sinks_config = getDiagnosticsMonitorConfigurationElement(ladCfg, "sinksConfig")
-    if sinks_config and "Sink" in sinks_config:
-        return [sink['name'] for sink in sinks_config['Sink'] if 'name' in sink]
-    return []
+class SinkConfiguration:
+    def __init__(self):
+        self._sinks = {}
+
+    def insert_from_config(self, json):
+        """
+        Walk through the sinksConfig JSON object and add all sinks within it
+        :param json: A hash holding the body of a sinksConfig object
+        :return: A string containing warning messages, or an empty string
+        """
+        msgs = []
+        if json and 'sink' in json:
+            for sink in json['sink']:
+                if 'name' in sink and 'type' in sink:
+                    self._sinks[sink['name']] = sink
+                else:
+                    msgs.append('Ignoring invalid sink definition {0}'.format(sink))
+        return '\n'.join(msgs)
+
+    def get_sink_by_name(self, sink_name):
+        """
+        Return the JSON object defining a particular sink.
+        :param sink_name: string name of sink
+        :return: JSON object or None
+        """
+        if sink_name in self._sinks:
+                return self._sinks[sink_name]
+        return None
+
+    def get_all_sink_names(self):
+        """
+        Return a list of all names of defined sinks.
+        :return: list of names
+        """
+        return self._sinks.keys()
+
+    def get_sinks_by_type(self, sink_type):
+        """
+        Return a list of all names of defined sinks.
+        :return: list of names
+        """
+        return [self._sinks[name] for name in self._sinks if self._sinks[name]['type'] == sink_type]
