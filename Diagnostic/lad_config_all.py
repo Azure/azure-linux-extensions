@@ -131,8 +131,8 @@ class LadConfigAll:
         # Get encryption settings
         thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
         path = '{0}/{1}.{2}'
-        self._cert_path = path.format(waagent_dir, thumbprint, 'crt')
-        self._pkey_path = path.format(waagent_dir, thumbprint, 'prv')
+        self._cert_path = os.path.join(waagent_dir, thumbprint + '.crt')
+        self._pkey_path = os.path.join(waagent_dir, thumbprint + '.prv')
 
     def _ladCfg(self):
         return self._ext_settings.read_public_config('ladCfg')
