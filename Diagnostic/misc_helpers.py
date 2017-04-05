@@ -259,3 +259,14 @@ def write_lad_pids_to_file(pid_file_path, py_pid, mdsd_pid=None):
         f.write(str(py_pid) + '\n')
         if mdsd_pid is not None:
             f.write(str(mdsd_pid) + '\n')
+
+
+def append_string_to_file(string, filepath):
+    """
+    Append string content to file
+    :param string: A str object that holds the content to be appended to the file
+    :param filepath: Path to the file to be appended
+    :return: None
+    """
+    with open(filepath, 'a') as f:
+        f.write(string)
