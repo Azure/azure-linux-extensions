@@ -125,7 +125,7 @@ class TestSinkConfiguration(TestCase):
     def setUp(self):
         config = \
             {
-                "Sink": [
+                "sink": [
                     {
                         "name": "sink1",
                         "type": "EventHub",
@@ -143,7 +143,7 @@ class TestSinkConfiguration(TestCase):
         sinks = LadUtil.SinkConfiguration()
         msgs = sinks.insert_from_config(json_config)
         self.assertEqual(msgs, '')
-        json_config = {'Sink': [{'Name': 'bad case'}]}
+        json_config = {'sink': [{'Name': 'bad case'}]}
         sinks = LadUtil.SinkConfiguration()
         msgs = sinks.insert_from_config(json_config)
         self.assertEqual(msgs, "Ignoring invalid sink definition {'Name': 'bad case'}")

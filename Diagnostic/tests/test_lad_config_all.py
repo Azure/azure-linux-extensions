@@ -13,6 +13,8 @@ import json
 import os
 import subprocess
 import unittest
+import xml.etree.ElementTree as ET
+
 
 from Utils.lad_ext_settings import *
 # The following line will work on an Azure Linux VM (where waagent is installed), but fail on a non-Azure Linux VM
@@ -81,7 +83,6 @@ class LadConfigAllTest(unittest.TestCase):
                                                    'test_lad_deployment_id', mock_fetch_uuid, mock_encrypt_secret,
                                                    mock_log_info, mock_log_error)
 
-    # @unittest.skip("All-up test is the last thing that I'll get working")
     def test_lad_config_all_basic(self):
         """
         Perform basic LadConfigAll object tests, like generating various configs and validating them.
@@ -115,3 +116,76 @@ class LadConfigAllTest(unittest.TestCase):
         fluentd_tail_src_cfg = lad_cfg.get_fluentd_tail_src_config()
         print_content_with_header('Generated fluentd tail src cfg', fluentd_tail_src_cfg)
         self.assertTrue(fluentd_tail_src_cfg, 'Empty fluentd tail src cfg is invalid')
+
+    def test_update_metric_collection_settings(self):
+        test_config = \
+            {
+                "diagnosticMonitorConfiguration":
+                    {
+                        "foo": "bar",
+                        "eventVolume": "Large",
+                        "sinksConfig": {
+                            "sink": [
+                                {
+                                    "name": "sink1",
+                                    "type": "EventHub",
+                                    "sasURL": "https://sbnamespace.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
+                                              "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
+                                              "&se=1804371161&skn=writer"
+                                }
+                            ]
+                        },
+                        "metrics": {
+                            "resourceId": "/subscriptions/1111-2222-3333-4444/resourcegroups/RG1/compute/foo",
+                            "metricAggregation": [
+                                {"scheduledTransferPeriod": "PT5M"},
+                                {"scheduledTransferPeriod": "PT1H"},
+                            ]
+                        },
+                        "performanceCounters": {
+                            "sinks": "sink1",
+                            "performanceCounterConfiguration": [
+                                {
+                                    "type": "builtin",
+                                    "class": "Processor",
+                                    "counter": "PercentIdleTime",
+                                    "counterSpecifier": "/builtin/Processor/PercentIdleTime",
+                                    "condition": "IsAggregate=TRUE",
+                                    "sampleRate": "PT15S",
+                                    "unit": "Percent",
+                                    "annotation": [
+                                        {
+                                            "displayName": "Aggregate CPU %idle time",
+                                            "locale": "en-us"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "syslogEvents": {
+                            "syslogEventConfiguration": {
+                                "LOG_LOCAL1": "LOG_INFO",
+                                "LOG_MAIL": "LOG_FATAL"
+                            }
+                        }
+                    },
+                "sampleRateInSeconds": 60
+            }
+
+        test_sinks_config = \
+            {
+                "sink": [
+                    {
+                        "name": "sink1",
+                        "type": "EventHub",
+                        "sasURL": "https://sbnamespace.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
+                                  "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
+                                  "&se=1804371161&skn=writer"
+                    }
+                ]
+            }
+
+        configurator = self._lad_config_all_helper
+        configurator._sink_configs.insert_from_config(test_sinks_config)
+        configurator._update_metric_collection_settings(test_config)
+        print ET.tostring(configurator._mdsd_config_xml_tree.getroot())

@@ -222,8 +222,8 @@ class SinkConfiguration:
         :return: A string containing warning messages, or an empty string
         """
         msgs = []
-        if json and 'Sink' in json:
-            for sink in json['Sink']:
+        if json and 'sink' in json:
+            for sink in json['sink']:
                 if 'name' in sink and 'type' in sink:
                     self._sinks[sink['name']] = sink
                 else:

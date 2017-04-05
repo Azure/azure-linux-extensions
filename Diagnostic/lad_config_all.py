@@ -17,8 +17,7 @@
 #  OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 #  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import binascii
-from misc_helpers import read_uuid, get_storage_endpoint_with_account, escape_nonalphanumerics, write_string_to_file
+from misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
 import traceback
 import xml.etree.ElementTree as ET
@@ -82,6 +81,17 @@ class LadConfigAll:
        processed so that the '%SYSLOG_PORT%' pattern is replaced with the assigned TCP port number.
     - /etc/syslog-ng.conf: syslog-ng config for LAD's syslog settings. The content should be appended, not overwritten.
     """
+    _default_perf_cfgs = [
+        {"query": "SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap "
+                  "FROM SCX_MemoryStatisticalInformation",
+         "table": "LinuxMemory"},
+        {"query": "SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime "
+                  "FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
+         "table": "LinuxCpu"},
+        {"query": "SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond "
+                  "FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'",
+         "table": "LinuxDisk"}
+    ]
 
     def __init__(self, ext_settings, ext_dir, waagent_dir, deployment_id,
                  fetch_uuid, encrypt_string, logger_log, logger_error):
@@ -124,6 +134,9 @@ class LadConfigAll:
         self._cert_path = path.format(waagent_dir, thumbprint, 'crt')
         self._pkey_path = path.format(waagent_dir, thumbprint, 'prv')
 
+    def _ladCfg(self):
+        return self._ext_settings.read_public_config('ladCfg')
+
     def _add_portal_settings(self, resource_id):
         """
         Update mdsd_config_xml_tree for Azure Portal metric collection setting.
@@ -156,7 +169,7 @@ class LadConfigAll:
 
         # Add each metric
         for metric in metrics:
-            if metric['class'] is 'builtin':
+            if metric['type'] is 'builtin':
                 local_table_name = BuiltIn.AddMetric(metric)
                 if local_table_name:
                     local_tables.add(local_table_name)
@@ -169,7 +182,7 @@ class LadConfigAll:
         # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
         # later.
         ladquery = '''
-<DerivedEvent  duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
+<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
 '''
@@ -177,14 +190,17 @@ class LadConfigAll:
         sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for table_name in local_tables:
             for aggregation_interval in intervals:
-                query = ladquery.format(interval=aggregation_interval, localTable=table_name)
-                XmlUtil.addElement(self._mdsd_config_xml_tree, 'DerivedEvents', ET.fromstring(query))
+                query = ladquery.format(interval=aggregation_interval, localtable=table_name)
+                XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
         # Other sinks are handled here
             for name in sinks.split(','):
                 sink = self._sink_configs.get_sink_by_name(name)
-                if sink['type'] == 'EventHub':
-                    # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
-                    pass
+                if sink is None:
+                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+                else:
+                    if sink['type'] == 'EventHub':
+                        # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+                        pass
 
     def _update_perf_counters_settings(self, omi_queries, for_app_insights=False):
         """
@@ -214,7 +230,8 @@ class LadConfigAll:
             mdsd_omi_query_element.set('omiNamespace', namespace)
             if for_app_insights:
                 AIUtil.updateOMIQueryElement(mdsd_omi_query_element)
-            XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI', el=mdsd_omi_query_element, addOnlyOnce=True)
+            XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
+                               el=mdsd_omi_query_element, addOnlyOnce=True)
 
     def _apply_perf_cfgs(self, include_app_insights=False):
         """
@@ -225,27 +242,17 @@ class LadConfigAll:
         assert self._mdsd_config_xml_tree is not None
 
         perf_cfgs = []
-        default_perf_cfgs = [
-                        {"query": "SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap "
-                                  "FROM SCX_MemoryStatisticalInformation",
-                         "table": "LinuxMemory"},
-                        {"query": "SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime "
-                                  "FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
-                         "table": "LinuxCpu"},
-                        {"query": "SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond "
-                                  "FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'",
-                         "table": "LinuxDisk"}
-                      ]
         try:
             # First try to get perf cfgs from the new 'ladCfg' setting.
-            lad_cfg = self._ext_settings.read_public_config('ladCfg')
-            perf_cfgs = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(lad_cfg)
-            # If none, try the original 'perfCfg' setting.
+            lad_cfg = self._ladCfg()
+            if lad_cfg:
+                perf_cfgs = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(lad_cfg)
+            # If still empty, try the original 'perfCfg' setting.
             if not perf_cfgs:
                 perf_cfgs = self._ext_settings.read_public_config('perfCfg')
-            # If none, use default (3 OMI queries)
-            if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
-                perf_cfgs = default_perf_cfgs
+            # If none, use default (3 OMI queries) DISABLED
+            #if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
+            #    perf_cfgs = LadConfigAll._default_perf_cfgs
         except Exception as e:
             self._logger_error("Failed to parse performance configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
@@ -269,8 +276,8 @@ class LadConfigAll:
     def _update_account_settings(self, account, key, token, endpoint, aikey=None):
         """
         Update the MDSD configuration Account element with Azure table storage properties.
-        Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for Application
-        Insights with the application insights key.
+        Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for
+        Application Insights with the application insights key.
         :param account: Storage account to which LAD should write data
         :param key: Shared key secret for the storage account, if present
         :param token: SAS token to access the storage account, if present
@@ -370,7 +377,7 @@ class LadConfigAll:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
         # 2. Use ladCfg to generate OMIQuery and LADQuery elements
-        lad_cfg = self._ext_settings.read_public_config('ladCfg')
+        lad_cfg = self._ladCfg()
         if lad_cfg:
             self._update_metric_collection_settings(lad_cfg)
             try:
@@ -378,10 +385,10 @@ class LadConfigAll:
                 if resource_id:
                     escaped_resource_id_str = escape_nonalphanumerics(resource_id)
                     self._add_portal_settings(escaped_resource_id_str)
-                    instanceID = ""
+                    instance_id = ""
                     if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                        instanceID = self._fetch_uuid()
-                    self._set_xml_attr("instanceID", instanceID, "Events/DerivedEvents/DerivedEvent/LADQuery")
+                        instance_id = self._fetch_uuid()
+                    self._set_xml_attr("instanceID", instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
 
@@ -499,13 +506,12 @@ class LadConfigAll:
         self.__throw_if_output_is_none(self._fluentd_out_mdsd_config)
         return self._fluentd_out_mdsd_config
 
-
     def get_rsyslog_config(self):
         """
         Returns the obtained rsyslog config. This getter (and all that follow) should be called
         after self.generate_mdsd_omsagent_syslog_config() is called.
-        The return value should be appended to /etc/rsyslog.d/95-omsagent.conf if rsyslog ver is new (that is,
-        if /etc/rsyslog.d/ exists). It should be appended to /etc/rsyslog.conf if rsyslog ver is old (no /etc/rsyslog.d/).
+        The return value should be appended to /etc/rsyslog.d/95-omsagent.conf if rsyslog ver is new (that is, if
+        /etc/rsyslog.d/ exists). It should be appended to /etc/rsyslog.conf if rsyslog ver is old (no /etc/rsyslog.d/).
         The appended file (either /etc/rsyslog.d/95-omsagent.conf or /etc/rsyslog.conf) should be processed so that
         the '%SYSLOG_PORT%' pattern in the file is replaced with the assigned TCP port number.
         :rtype: str
