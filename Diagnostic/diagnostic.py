@@ -72,7 +72,6 @@ g_lad_pids_filepath = ''  # LAD process IDs (diagnostic.py, mdsd) file path. g_e
 g_ext_op_type = None  # Extension operation type (e.g., Install, Enable, HeartBeat, ...)
 g_mdsd_bin_dir = ''  # mdsd binary directory. g_ext_dir + '/bin'
 g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnostic.py'
-g_imfile_config_filename = ''  # Generated rsyslog imfile config file name (not full path)
 # Only 2 globals not following 'g_...' naming convention, for legacy readability...
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
@@ -110,7 +109,7 @@ def init_extension_settings():
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global hutil, g_ext_dir, g_mdsd_file_resources_prefix, g_lad_pids_filepath
-    global g_mdsd_bin_dir, g_diagnostic_py_filepath, g_imfile_config_filename
+    global g_mdsd_bin_dir, g_diagnostic_py_filepath
     global g_lad_log_helper
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
@@ -124,7 +123,6 @@ def init_globals():
     g_lad_pids_filepath = os.path.join(g_ext_dir, 'lad.pids')
     g_mdsd_bin_dir = os.path.join(g_ext_dir, 'bin')
     g_diagnostic_py_filepath = os.path.join(os.getcwd(), __file__)
-    g_imfile_config_filename = os.path.join(g_ext_dir, 'imfileconfig')
     g_lad_log_helper = LadLogHelper(hutil.log, hutil.error, waagent.AddExtensionEvent, hutil.do_status_report,
                                     hutil.get_name(), hutil.get_extension_version())
 
@@ -643,7 +641,7 @@ def setup_omsagent(configurator):
                                                      configurator.get_syslog_ng_config())
     if cmd_exit_code != 0:
         return 4, 'setup_omsagent(): Failed at configuring in_syslog. Exit code={0}, Output={1}'.format(cmd_exit_code,
-                                                                                                     cmd_output)
+                                                                                                        cmd_output)
     # 2.3. Configure filelog
     cmd_exit_code, cmd_output = oms.configure_filelog(configurator.get_fluentd_tail_src_config())
     if cmd_exit_code != 0:
@@ -655,14 +653,10 @@ def setup_omsagent(configurator):
         return 6, 'setup_omsagent(): Failed at configuring out_mdsd. Exit code={0}, Output={1}'.format(cmd_exit_code,
                                                                                                        cmd_output)
 
-    # 3. Restart syslog (rsyslog/syslog-ng) & omsagent
-    cmd_exit_code, cmd_output = oms.restart_syslog(RunGetOutput)
-    if cmd_exit_code != 0:
-        return 7, 'setup_omsagent(): Failed at restarting syslog (rsyslog or syslog-ng). ' \
-                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+    # 3. Restart omsagent. No need to restart syslog, as the configure_syslog above does that...
     cmd_exit_code, cmd_output = oms.control_omsagent('restart', RunGetOutput)
     if cmd_exit_code != 0:
-        return 8, 'setup_omsagent(): Failed at restarting omsagent (fluentd). ' \
+        return 7, 'setup_omsagent(): Failed at restarting omsagent (fluentd). ' \
                   'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     # All done...

@@ -167,7 +167,7 @@ def get_syslog_ng_src_name():
     try:
         with open(syslog_ng_conf_path, 'r') as f:
             syslog_ng_cfg = f.read()
-        src_match = re.search(r'source\s+([^\s]+)', syslog_ng_cfg)
+        src_match = re.search(r'\n\s*source\s+([^\s]+)\s*{', syslog_ng_cfg)
         if src_match:
             syslog_ng_src_name = src_match.group(1)
     except Exception as e:

@@ -177,6 +177,15 @@ class DebianActions(CommonActions):
         env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE": "/usr/lib/ssl/cert.pem"})
 
 
+class CredativActions(DebianActions):
+    def __init__(self, logger):
+        DebianActions.__init__(self, logger)
+
+    def install_required_packages(self):
+        # curl not installed by default on Credative Debian Linux, now required by omsagent
+        return self.install_extra_packages(('curl',), True)
+
+
 class Ubuntu1510OrHigherActions(DebianActions):
     def __init__(self, logger):
         DebianActions.__init__(self, logger)
@@ -272,7 +281,7 @@ class CentosActions(RedhatActions):
 
 
 DistroMap = {
-    'debian': DebianActions, 'Kali': DebianActions,
+    'debian': CredativActions, 'Kali': DebianActions,
     'Ubuntu': DebianActions, 'Ubuntu:15.10': Ubuntu1510OrHigherActions,
     'Ubuntu:16.04': Ubuntu1510OrHigherActions, 'Ubuntu:16.10': Ubuntu1510OrHigherActions,
     'redhat': RedhatActions, 'centos': CentosActions, 'oracle': RedhatActions,
