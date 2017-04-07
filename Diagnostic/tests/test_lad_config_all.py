@@ -31,7 +31,7 @@ from lad_config_all import *
 # Mocked waagent/LAD dir/files
 test_waagent_dir = os.path.join(os.path.dirname(__file__), 'var_lib_waagent')
 test_lad_dir = os.path.join(test_waagent_dir, 'lad_dir')
-test_lad_settings_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings.jq')
+test_lad_settings_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings.json')
 
 
 # Mocked functions

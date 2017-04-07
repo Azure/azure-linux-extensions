@@ -10,7 +10,6 @@ LADSOURCES = \
 	HandlerManifest.json \
 	license.txt \
 	manifest.xml \
-	portal.xml.template \
 	rsyslog5 \
 	rsyslog7 \
 	rsyslog8 \
