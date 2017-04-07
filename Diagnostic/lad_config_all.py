@@ -379,8 +379,8 @@ class LadConfigAll:
         # 2. Use ladCfg to generate OMIQuery and LADQuery elements
         lad_cfg = self._ladCfg()
         if lad_cfg:
-            self._update_metric_collection_settings(lad_cfg)
             try:
+                self._update_metric_collection_settings(lad_cfg)
                 resource_id = self._ext_settings.get_resource_id()
                 if resource_id:
                     escaped_resource_id_str = escape_nonalphanumerics(resource_id)
@@ -391,6 +391,7 @@ class LadConfigAll:
                     self._set_xml_attr("instanceID", instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
+                return False, 'Failed to create portal config from ladCfg (see extension error logs for more details)'
 
         # 3. Update perf counter config. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present in ladCfg first, and pass it to the actual helper
@@ -404,10 +405,11 @@ class LadConfigAll:
                 do_ai = True
             else:
                 self._logger_log("Application Insights key not found.")
+            self._apply_perf_cfgs(do_ai)
         except Exception as e:
             self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
-        self._apply_perf_cfgs(do_ai)
+            return False, 'Failed to update perf counter config (see extension error logs for more details)'
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
@@ -427,6 +429,8 @@ class LadConfigAll:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
                                .format(e, traceback.format_exc()))
+            return False, 'Failed to generate configs for fluentd, syslog, and mdsd for that (' \
+                          'see extension error logs for more details)'
 
         # 5. Before starting to update the storage account settings, log extension's protected settings'
         #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that
@@ -459,7 +463,7 @@ class LadConfigAll:
         self._set_xml_attr("sampleRateInSeconds", "60", "Events/OMI/OMIQuery")
 
         # 10. Finally generate mdsd config XML file out of the constructed XML tree object.
-        self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, './xmlCfg.xml'))
+        self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
         return True, ""
 

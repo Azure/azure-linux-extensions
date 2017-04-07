@@ -194,7 +194,12 @@ def create_core_components_configs():
 
     configurator = lad_cfg.LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
                                         fetch_uuid, encrypt_string, hutil.log, hutil.error)
-    config_valid, config_invalid_reason = configurator.generate_all_configs()
+    try:
+        config_valid, config_invalid_reason = configurator.generate_all_configs()
+    except Exception as e:
+        hutil.error('Unknown exception occurred from generate_all_configs(). Msg: {0}'.format(e))
+        config_valid = False
+
     if not config_valid:
         config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
                              ". Can't proceed, but this will be still considered a success as it's an external error."
