@@ -17,8 +17,6 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import datetime
-import exceptions
-import os
 import os.path
 import platform
 import signal
@@ -29,7 +27,10 @@ import threading
 import time
 import traceback
 import xml.etree.ElementTree as ET
-import misc_helpers
+
+import exceptions
+
+from Utils import misc_helpers
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
@@ -49,7 +50,7 @@ try:
     import DistroSpecific
     import watcherutil
     from Utils.lad_ext_settings import LadExtSettings
-    from misc_helpers import *
+    from Utils.misc_helpers import *
     import lad_config_all as lad_cfg
     from Utils.imds_util import ImdsLogger
     import Utils.omsagent_util as oms

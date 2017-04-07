@@ -17,7 +17,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from unittest import TestCase
-import LadDiagnosticUtil as LadUtil
+import Utils.LadDiagnosticUtil as LadUtil
 
 
 class TestGetDiagnosticsMonitorConfigurationElement(TestCase):

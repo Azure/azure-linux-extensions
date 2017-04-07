@@ -17,16 +17,16 @@
 #  OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 #  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 import os.path
 import traceback
 import xml.etree.ElementTree as ET
+
+import Providers.Builtin as BuiltIn
 import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems, LadLoggingConfigException
-import Providers.Builtin as BuiltIn
-
+from Utils.misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 
 _mdsd_xml_template = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">

@@ -19,8 +19,8 @@
 import os
 import re
 import socket
-from misc_helpers import append_string_to_file
 
+from Utils.misc_helpers import append_string_to_file
 
 # op is either '--upgrade' or '--remove'
 omsagent_universal_sh_cmd_template = 'sh omsagent-*.universal.x64.sh {op}'
