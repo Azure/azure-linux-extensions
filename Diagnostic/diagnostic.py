@@ -17,6 +17,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import datetime
+import exceptions
 import os.path
 import platform
 import signal
@@ -27,10 +28,6 @@ import threading
 import time
 import traceback
 import xml.etree.ElementTree as ET
-
-import exceptions
-
-from Utils import misc_helpers
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
@@ -187,10 +184,10 @@ def create_core_components_configs():
     # Define wrappers around a couple misc_helpers. These can easily be mocked out in tests. PEP-8 says use
     # def, don't assign a lambda to a variable. *shrug*
     def fetch_uuid():
-        return misc_helpers.read_uuid(RunGetOutput)
+        return read_uuid(RunGetOutput)
 
     def encrypt_string(cert, secret):
-        return misc_helpers.encrypt_secret_with_cert(RunGetOutput, hutil.error, cert, secret)
+        return encrypt_secret_with_cert(RunGetOutput, hutil.error, cert, secret)
 
     configurator = lad_cfg.LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
                                         fetch_uuid, encrypt_string, hutil.log, hutil.error)

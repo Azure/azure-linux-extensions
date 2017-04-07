@@ -244,7 +244,14 @@ def configure_syslog(run_command, port, in_syslog_cfg, rsyslog_cfg, syslog_ng_cf
     if cmd_exit_code != 0:
         extra_msg = 'configure_syslog(): configure_syslog.sh unconfigure failed (still proceeding): ' + cmd_output
 
-    # 2. Replace '%SYSLOG_PORT%' in all passed syslog configs with the obtained port number
+    # 2. Configure new syslog instance with port number.
+    #    Ordering is very tricky. This must be done before modifying /etc/syslog-ng/syslog-ng.conf
+    #    or /etc/rsyslog.d/95-omsagent.conf below!
+    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'configure', port)
+    if cmd_exit_code != 0:
+        return 2, 'configure_syslog(): configure_syslog.sh configure failed: ' + cmd_output
+
+    # 2.5. Replace '%SYSLOG_PORT%' in all passed syslog configs with the obtained port number
     in_syslog_cfg = in_syslog_cfg.replace(syslog_port_pattern_marker, str(port))
     rsyslog_cfg = rsyslog_cfg.replace(syslog_port_pattern_marker, str(port))
     syslog_ng_cfg = syslog_ng_cfg.replace(syslog_port_pattern_marker, str(port))
@@ -267,10 +274,11 @@ def configure_syslog(run_command, port, in_syslog_cfg, rsyslog_cfg, syslog_ng_cf
     except Exception as e:
         return 4, 'configure_syslog(): Adding facilities/levels to rsyslog/syslog-ng conf failed: {0}'.format(e)
 
-    # 5. Configure new syslog instance with port number
-    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'configure', port)
+    # 5. Restart syslog
+    cmd_exit_code, cmd_output = restart_syslog(run_command)
     if cmd_exit_code != 0:
-        return 5, 'configure_syslog(): configure_syslog.sh configure failed: ' + cmd_output
+        return 5, 'configure_syslog(): Failed at restarting syslog (rsyslog or syslog-ng). ' \
+                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     # All succeeded
     return 0, 'configure_syslog(): Succeeded. Extra message: {0}'.format(extra_msg if extra_msg else 'None')
@@ -442,11 +450,7 @@ def setup_omsagent(configurator, run_command, logger_log, logger_error):
         return 6, 'setup_omsagent(): Failed at configuring out_mdsd. Exit code={0}, Output={1}'.format(cmd_exit_code,
                                                                                                        cmd_output)
 
-    # 3. Restart syslog (rsyslog/syslog-ng) & omsagent
-    cmd_exit_code, cmd_output = restart_syslog(run_command)
-    if cmd_exit_code != 0:
-        return 7, 'setup_omsagent(): Failed at restarting syslog (rsyslog or syslog-ng). ' \
-                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+    # 3. Restart omsagent
     cmd_exit_code, cmd_output = control_omsagent('restart', run_command)
     if cmd_exit_code != 0:
         return 8, 'setup_omsagent(): Failed at restarting omsagent (fluentd). ' \
