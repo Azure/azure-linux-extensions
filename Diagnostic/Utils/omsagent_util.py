@@ -243,12 +243,7 @@ def configure_syslog(run_command, port, in_syslog_cfg, rsyslog_cfg, syslog_ng_cf
     if cmd_exit_code != 0:
         return 1, 'configure_logging(): configure_syslog.sh unconfigure failed: ' + cmd_output
 
-    # 2. Configure new syslog instance with port number
-    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'configure', port)
-    if cmd_exit_code != 0:
-        return 2, 'configure_logging(): configure_syslog.sh configure failed: ' + cmd_output
-
-    # 2.1. Replace '%SYSLOG_PORT%' in all passed syslog configs with the obtained port number
+    # 2. Replace '%SYSLOG_PORT%' in all passed syslog configs with the obtained port number
     in_syslog_cfg = in_syslog_cfg.replace(syslog_port_pattern_marker, str(port))
     rsyslog_cfg = rsyslog_cfg.replace(syslog_port_pattern_marker, str(port))
     syslog_ng_cfg = syslog_ng_cfg.replace(syslog_port_pattern_marker, str(port))
@@ -270,6 +265,13 @@ def configure_syslog(run_command, port, in_syslog_cfg, rsyslog_cfg, syslog_ng_cf
             append_string_to_file(rsyslog_cfg, rsyslog_top_conf_path)
     except Exception as e:
         return 4, 'configure_logging(): Adding facilities/levels to rsyslog/syslog-ng conf failed: {0}'.format(e)
+
+    # 5. Configure new syslog instance with port number
+    #    This step should be executed after syslog (rsyslog/syslog-ng) is configured,
+    #    because the syslog service will be restarted here as well.
+    cmd_exit_code, cmd_output = run_omsagent_config_syslog_sh(run_command, 'configure', port)
+    if cmd_exit_code != 0:
+        return 5, 'configure_logging(): configure_syslog.sh configure failed: ' + cmd_output
 
     # All succeeded
     return 0, 'configure_logging(): Succeeded'
