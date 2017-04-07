@@ -132,8 +132,7 @@ def setup_dependencies_and_mdsd(configurator):
     """
     Set up dependencies for mdsd, such as following:
     1) Distro-specific packages (see DistroSpecific.py)
-    2) Set up rsyslog for mdsd
-    3) Set up OMI
+    2) Set up omsagent (fluentd), syslog (rsyslog or syslog-ng) for mdsd
     :return: Status code and message
     """
     install_package_error = ""
@@ -158,7 +157,8 @@ def setup_dependencies_and_mdsd(configurator):
     g_dist_config.prepare_for_mdsd_install()
 
     # Set up omsagent
-    omsagent_setup_exit_code, omsagent_setup_output = setup_omsagent(configurator)
+    omsagent_setup_exit_code, omsagent_setup_output = oms.setup_omsagent(configurator, RunGetOutput,
+                                                                         hutil.log, hutil.error)
     if omsagent_setup_exit_code is not 0:
         return 3, omsagent_setup_output
 
@@ -585,83 +585,6 @@ def get_lad_pids():
             else:
                 hutil.log("return not alive " + is_still_alive.strip())
     return lad_pids
-
-
-def setup_omsagent(configurator):
-    """
-    Set up omsagent. Install necessary components, configure them as needed, and start the agent.
-    :param configurator: A LadConfigAll object that's obtained from a valid LAD JSON settings config.
-                         This is needed to retrieve the syslog (rsyslog/syslog-ng) and the fluentd configs.
-    :return: Pair of status code and message. 0 status code for success. Non-zero status code
-            for a failure and the associated failure message.
-    """
-    # Remember whether OMI (not omsagent) needs to be freshly installed.
-    # This is needed later to determine whether to reconfigure the omiserver.conf or not for security purpose.
-    need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
-
-    hutil.log("Begin omsagent setup.")
-
-    # 1. Install omsagent, onboard to LAD workspace, and install fluentd out_mdsd plugin
-    # We now try to install/setup all the time. If it's already installed. Any additional install is a no-op.
-    is_omsagent_setup_correctly = False
-    maxTries = 5  # Try up to 5 times to install omsagent
-    for trialNum in range(1, maxTries + 1):
-        cmd_exit_code, cmd_output = oms.setup_omsagent_for_lad(RunGetOutput)
-        if cmd_exit_code == 0:  # Successfully set up
-            is_omsagent_setup_correctly = True
-            break
-        hutil.error("omsagent setup failed (trial #" + str(trialNum) + ").")
-        if trialNum < maxTries:
-            hutil.error("Retrying in 30 seconds...")
-            time.sleep(30)
-    if not is_omsagent_setup_correctly:
-        hutil.error("omsagent setup failed " + str(maxTries) + " times. Giving up...")
-        return 1, "omsagent setup failed {0} times. " \
-                  "Last exit code={1}, Output={2}".format(maxTries, cmd_exit_code, cmd_output)
-
-    # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
-    # In other words, OMI httpsport config should be updated only on a fresh OMI install.
-    if need_fresh_install_omi:
-        # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
-        omi_listens_to_nonzero_port = RunGetOutput(
-            r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
-        if omi_listens_to_nonzero_port:
-            RunGetOutput(
-                "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
-            RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-
-    # 2. Configure all fluentd plugins (in_syslog, in_tail, out_mdsd)
-    # 2.1. First get a free TCP/UDP port for fluentd in_syslog plugin.
-    port = oms.get_fluentd_syslog_src_port()
-    if port < 0:
-        return 3, 'setup_omsagent(): Failed at getting a free TCP/UDP port for fluentd in_syslog'
-    # 2.2. Configure syslog
-    cmd_exit_code, cmd_output = oms.configure_syslog(RunGetOutput, port,
-                                                     configurator.get_fluentd_syslog_src_config(),
-                                                     configurator.get_rsyslog_config(),
-                                                     configurator.get_syslog_ng_config())
-    if cmd_exit_code != 0:
-        return 4, 'setup_omsagent(): Failed at configuring in_syslog. Exit code={0}, Output={1}'.format(cmd_exit_code,
-                                                                                                        cmd_output)
-    # 2.3. Configure filelog
-    cmd_exit_code, cmd_output = oms.configure_filelog(configurator.get_fluentd_tail_src_config())
-    if cmd_exit_code != 0:
-        return 5, 'setup_omsagent(): Failed at configuring in_tail. Exit code={0}, Output={1}'.format(cmd_exit_code,
-                                                                                                      cmd_output)
-    # 2.4. Configure out_mdsd
-    cmd_exit_code, cmd_output = oms.configure_out_mdsd(configurator.get_fluentd_out_mdsd_config())
-    if cmd_exit_code != 0:
-        return 6, 'setup_omsagent(): Failed at configuring out_mdsd. Exit code={0}, Output={1}'.format(cmd_exit_code,
-                                                                                                       cmd_output)
-
-    # 3. Restart omsagent. No need to restart syslog, as the configure_syslog above does that...
-    cmd_exit_code, cmd_output = oms.control_omsagent('restart', RunGetOutput)
-    if cmd_exit_code != 0:
-        return 7, 'setup_omsagent(): Failed at restarting omsagent (fluentd). ' \
-                  'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
-
-    # All done...
-    return 0, "setup_omsagent(): Succeeded"
 
 
 # Issue #128 LAD should restart OMI if it crashes
