@@ -10,9 +10,6 @@ LADSOURCES = \
 	HandlerManifest.json \
 	license.txt \
 	manifest.xml \
-	rsyslog5 \
-	rsyslog7 \
-	rsyslog8 \
 	run_unittests.sh \
 	services \
 	Utils \
