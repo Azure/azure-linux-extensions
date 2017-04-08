@@ -223,44 +223,39 @@ class LadConfigAll:
 """
 
         for omi_query in omi_queries:
-            mdsd_omi_query_element = XmlUtil.createElement(mdsd_omi_query_schema)
-            mdsd_omi_query_element.set('cqlQuery', omi_query['query'])
-            mdsd_omi_query_element.set('eventName', omi_query['table'])
-            namespace = omi_query['namespace'] if 'namespace' in omi_query else 'root/scx'
-            mdsd_omi_query_element.set('omiNamespace', namespace)
-            if for_app_insights:
-                AIUtil.updateOMIQueryElement(mdsd_omi_query_element)
-            XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
-                               el=mdsd_omi_query_element, addOnlyOnce=True)
+            if 'query' in omi_query and 'table' in omi_query:
+                mdsd_omi_query_element = XmlUtil.createElement(mdsd_omi_query_schema)
+                mdsd_omi_query_element.set('cqlQuery', omi_query['query'])
+                mdsd_omi_query_element.set('eventName', omi_query['table'])
+                namespace = omi_query['namespace'] if 'namespace' in omi_query else 'root/scx'
+                mdsd_omi_query_element.set('omiNamespace', namespace)
+                frequency = omi_query['frequency'] if 'frequency' in omi_query else '300'
+                mdsd_omi_query_element.set('sampleRateInSeconds', frequency)
+                if for_app_insights:
+                    AIUtil.updateOMIQueryElement(mdsd_omi_query_element)
+                XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
+                                   el=mdsd_omi_query_element, addOnlyOnce=True)
+            else:
+                self._logger_log("Ignoring perfCfg array element missing required elements: '{0}'".format(omi_query))
 
-    def _apply_perf_cfgs(self, include_app_insights=False):
+    def _apply_perf_cfg(self, include_app_insights=False):
         """
-        Extract the 'perfCfg' settings from ext_settings and apply them to mdsd config XML root.
+        Extract the 'perfCfg' settings from ext_settings and apply them to mdsd config XML root. These are *not* the
+        ladcfg{performanceCounters{...}} settings; the perfCfg block is found at the top level of the public configs.
         :param include_app_insights: Indicates whether perf counter settings for AppInsights should be included or not.
         :return: None. Changes are applied directly to the mdsd config XML tree member.
         """
         assert self._mdsd_config_xml_tree is not None
 
-        perf_cfgs = []
-        try:
-            # First try to get perf cfgs from the new 'ladCfg' setting.
-            lad_cfg = self._ladCfg()
-            if lad_cfg:
-                perf_cfgs = LadUtil.generatePerformanceCounterConfigurationFromLadCfg(lad_cfg)
-            # If still empty, try the original 'perfCfg' setting.
-            if not perf_cfgs:
-                perf_cfgs = self._ext_settings.read_public_config('perfCfg')
-            # If none, use default (3 OMI queries) DISABLED
-            #if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
-            #    perf_cfgs = LadConfigAll._default_perf_cfgs
-        except Exception as e:
-            self._logger_error("Failed to parse performance configuration with exception:{0}\n"
-                               "Stacktrace: {1}".format(e, traceback.format_exc()))
+        perf_cfg = self._ext_settings.read_public_config('perfCfg')
+        # If none, use default (3 OMI queries) DISABLED
+        # if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
+        #     perf_cfgs = LadConfigAll._default_perf_cfgs
 
         try:
-            self._update_perf_counters_settings(perf_cfgs)
+            self._update_perf_counters_settings(perf_cfg)
             if include_app_insights:
-                self._update_perf_counters_settings(perf_cfgs, True)
+                self._update_perf_counters_settings(perf_cfg, True)
         except Exception as e:
             self._logger_error("Failed to create perf config. Error:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
@@ -392,8 +387,8 @@ class LadConfigAll:
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
 
-        # 3. Update perf counter config. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
-        #    so check if Application Insights key is present in ladCfg first, and pass it to the actual helper
+        # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
+        #    so check if Application Insights key is present and pass it to the actual helper
         #    function (self._apply_perf_cfgs()).
         do_ai = False
         aikey = None
@@ -407,7 +402,7 @@ class LadConfigAll:
         except Exception as e:
             self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
-        self._apply_perf_cfgs(do_ai)
+        self._apply_perf_cfg(do_ai)
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
