@@ -169,7 +169,7 @@ class LadConfigAll:
 
         # Add each metric
         for metric in metrics:
-            if metric['type'] is 'builtin':
+            if metric['type'] == 'builtin':
                 local_table_name = BuiltIn.AddMetric(metric)
                 if local_table_name:
                     local_tables.add(local_table_name)
