@@ -33,8 +33,8 @@ class DiskUtil(object):
         self.patching = patching
         self.logger = logger
 
-    def get_device_items_property(self, dev_name, property_name):
-        get_property_cmd = self.patching.lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
+    def get_device_items_property(self, lsblk_path, dev_name, property_name):
+        get_property_cmd = lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
         get_property_cmd_args = shlex.split(get_property_cmd)
         get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         output,err = get_property_cmd_p.communicate()
@@ -70,10 +70,10 @@ class DiskUtil(object):
 
         for i in range(0,len(device_items)):
             device_item = device_items[i]
-            device_item.file_system = self.get_device_items_property(dev_name=device_item.name,property_name='FSTYPE')
-            device_item.mount_point = self.get_device_items_property(dev_name=device_item.name,property_name='MOUNTPOINT')
-            device_item.label = self.get_device_items_property(dev_name=device_item.name,property_name='LABEL')
-            device_item.uuid = self.get_device_items_property(dev_name=device_item.name,property_name='UUID')
+            device_item.file_system = self.get_device_items_property(lsblk_path=self.patching.lsblk_path,dev_name=device_item.name,property_name='FSTYPE')
+            device_item.mount_point = self.get_device_items_property(lsblk_path=self.patching.lsblk_path,dev_name=device_item.name,property_name='MOUNTPOINT')
+            device_item.label = self.get_device_items_property(lsblk_path=self.patching.lsblk_path,dev_name=device_item.name,property_name='LABEL')
+            device_item.uuid = self.get_device_items_property(lsblk_path=self.patching.lsblk_path,dev_name=device_item.name,property_name='UUID')
             #get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
             if(os.path.exists(model_file_path)):
@@ -89,33 +89,37 @@ class DiskUtil(object):
                     device_item.type = 'part'
         return device_items
 
-    def get_device_items_from_lsblk_list(self,dev_path):
+    def get_device_items_from_lsblk_list(self, lsblk_path, dev_path):
         self.logger.log("get_device_items_from_lsblk_list : getting the blk info from " + str(dev_path), True)
         device_items = []
         #first get all the device names
         if(dev_path is None):
-            get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
+            get_device_cmd = lsblk_path + " -b -nl -o NAME"
         else:
-            get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME " + dev_path
+            get_device_cmd = lsblk_path + " -b -nl -o NAME " + dev_path
         get_device_cmd_args = shlex.split(get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         lines = out_lsblk_output.splitlines()
+        device_items_temp = []
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
                 disk_info_item_array = item_value_str.split()
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
-                device_items.append(device_item)
+                device_items_temp.append(device_item)
 
-        for i in range(0,len(device_items)):
-            device_item = device_items[i]
-            device_item.file_system = self.get_device_items_property(dev_name=device_item.name,property_name='FSTYPE')
-            device_item.mount_point = self.get_device_items_property(dev_name=device_item.name,property_name='MOUNTPOINT')
-            device_item.label = self.get_device_items_property(dev_name=device_item.name,property_name='LABEL')
-            device_item.uuid = self.get_device_items_property(dev_name=device_item.name,property_name='UUID')
-            device_item.type = self.get_device_items_property(dev_name=device_item.name,property_name='TYPE')
+        for i in range(0,len(device_items_temp)):
+            device_item = device_items_temp[i]
+            device_item.mount_point = self.get_device_items_property(lsblk_path=lsblk_path,dev_name=device_item.name,property_name='MOUNTPOINT')
+            if (device_item.mount_point is not None):
+                device_item.file_system = self.get_device_items_property(lsblk_path=lsblk_path,dev_name=device_item.name,property_name='FSTYPE')
+                device_item.label = self.get_device_items_property(lsblk_path=lsblk_path,dev_name=device_item.name,property_name='LABEL')
+                device_item.uuid = self.get_device_items_property(lsblk_path=lsblk_path,dev_name=device_item.name,property_name='UUID')
+                device_item.type = self.get_device_items_property(lsblk_path=lsblk_path,dev_name=device_item.name,property_name='TYPE')
+                device_items.append(device_item)
+                self.logger.log("lsblk MOUNTPOINT=" + str(device_item.mount_point) + ", NAME=" + str(device_item.name) + ", TYPE=" + str(device_item.type) + ", FSTYPE=" + str(device_item.file_system) + ", LABEL=" + str(device_item.label) + ", UUID=" + str(device_item.uuid) + ", MODEL=" + str(device_item.model), True)
         return device_items
 
     def get_lsblk_pairs_output(self, lsblk_path, dev_path):
@@ -187,7 +191,7 @@ class DiskUtil(object):
                      is_lsblk_path_wrong, out_lsblk_output, error_msg = self.get_lsblk_pairs_output(lsblk_path, dev_path)
             # if error_msg contains "invalid option", then get device_items using method get_device_items_from_lsblk_list
             if (error_msg is not None and error_msg.strip() != "" and 'invalid option' in error_msg):
-                device_items = self.get_device_items_from_lsblk_list(dev_path)
+                device_items = self.get_device_items_from_lsblk_list(lsblk_path, dev_path)
             # else get device_items from parsing the lsblk command output
             elif (out_lsblk_output is not None):
                 lines = out_lsblk_output.splitlines()
