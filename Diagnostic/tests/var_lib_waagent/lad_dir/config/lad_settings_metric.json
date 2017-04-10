@@ -1,0 +1,66 @@
+{
+  "runtimeSettings": [
+    {
+      "handlerSettings": {
+        "protectedSettings": {
+          "storageAccountEndPoint": "https://core.windows.net/",
+          "storageAccountKey": "NOT_A_REAL_KEY",
+          "storageAccountName": "ladunittestfakeaccount"
+        },
+        "protectedSettingsCertThumbprint": "B175B535DFE9F93659E5AFD893BF99BBF9DF28A5",
+        "publicSettings": {
+          "ladCfg": {
+            "diagnosticMonitorConfiguration": {
+              "eventVolume": "Large",
+              "metrics": {
+                "resourceId": "/subscriptions/27b750cd-ed43-42fd-9044-8d75e124ae55/resourceGroups/jz-rg/providers/Microsoft.Compute/virtualMachines/jz-lad-scus1",
+                "metricAggregation": [
+                  {
+                    "scheduledTransferPeriod": "PT1H"
+                  },
+                  {
+                    "scheduledTransferPeriod": "PT1M"
+                  }
+                ]
+              },
+              "performanceCounters": {
+                "performanceCounterConfiguration": [
+                  {
+                    "class": "Processor",
+                    "condition": "IsAggregate=TRUE",
+                    "annotation": [
+                      {
+                        "displayName": "Aggregate CPU %utilization",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/processor/PercentProcessorTime",
+                    "counter": "PercentProcessorTime",
+                    "type": "builtin",
+                    "unit": "Percent"
+                  },
+                  {
+                    "class": "Filesystem",
+                    "condition": "Name=\"/\"",
+                    "annotation": [
+                      {
+                        "displayName": "Used disk space on /",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/filesystem/usedspace",
+                    "counter": "UsedSpace",
+                    "type": "builtin",
+                    "unit": "Bytes"
+                  }
+                ]
+              }
+            }
+          },
+          "sampleRateInSeconds": 15,
+          "StorageAccount": "ladtest"
+        }
+      }
+    }
+  ]
+}

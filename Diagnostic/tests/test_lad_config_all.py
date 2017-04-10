@@ -31,7 +31,8 @@ from lad_config_all import *
 # Mocked waagent/LAD dir/files
 test_waagent_dir = os.path.join(os.path.dirname(__file__), 'var_lib_waagent')
 test_lad_dir = os.path.join(test_waagent_dir, 'lad_dir')
-test_lad_settings_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings.json')
+test_lad_settings_logging_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings_logging.json')
+test_lad_settings_metric_json_file = os.path.join(test_lad_dir, 'config', 'lad_settings_metric.json')
 
 
 # Mocked functions
@@ -74,27 +75,39 @@ class LadConfigAllTest(unittest.TestCase):
         Set up a LadConfigAll object with all dependencies properly set up and injected. Assumption: Private settings
         are present in cleartext (rather than as an encrypted-then-base64-encoded blob).
         """
-        with open(test_lad_settings_json_file) as f:
+
+        # Logging-only config test case
+        with open(test_lad_settings_logging_json_file) as f:
             handler_settings = json.loads(f.read())['runtimeSettings'][0]['handlerSettings']
         decrypt_protected_settings(handler_settings)
         lad_settings = LadExtSettings(handler_settings)
 
-        self._lad_config_all_helper = LadConfigAll(lad_settings, test_lad_dir, test_waagent_dir,
-                                                   'test_lad_deployment_id', mock_fetch_uuid, mock_encrypt_secret,
-                                                   mock_log_info, mock_log_error)
+        self._lad_config_all_helper_logging_only = LadConfigAll(lad_settings, test_lad_dir, test_waagent_dir,
+                                                                'test_lad_deployment_id', mock_fetch_uuid,
+                                                                mock_encrypt_secret, mock_log_info, mock_log_error)
 
-    def test_lad_config_all_basic(self):
+        # Metric-only config test case
+        with open(test_lad_settings_metric_json_file) as f:
+            handler_settings = json.loads(f.read())['runtimeSettings'][0]['handlerSettings']
+        decrypt_protected_settings(handler_settings)
+        lad_settings = LadExtSettings(handler_settings)
+
+        self._lad_config_all_helper_metric_only = LadConfigAll(lad_settings, test_lad_dir, test_waagent_dir,
+                                                               'test_lad_deployment_id', mock_fetch_uuid,
+                                                               mock_encrypt_secret, mock_log_info, mock_log_error)
+
+    def test_lad_config_all_logging_only(self):
         """
-        Perform basic LadConfigAll object tests, like generating various configs and validating them.
-        Initially this will be mostly just exercising the API functions, not asserting much.
+        Perform basic LadConfigAll object tests with logging-only configs,
+        like generating various configs and validating them.
         """
-        lad_cfg = self._lad_config_all_helper  # handy reference
+        lad_cfg = self._lad_config_all_helper_logging_only  # handy reference
         result, msg = lad_cfg.generate_all_configs()
         self.assertTrue(result, 'Config generation failed: ' + msg)
 
         with open(os.path.join(test_lad_dir, 'xmlCfg.xml')) as f:
             mdsd_xml_cfg = f.read()
-        print_content_with_header('Generated mdsd XML cfg', mdsd_xml_cfg)
+        print_content_with_header('Generated mdsd XML cfg for logging-only LAD settings', mdsd_xml_cfg)
         self.assertTrue(mdsd_xml_cfg, 'Empty mdsd XML config is invalid!')
 
         rsyslog_cfg = lad_cfg.get_rsyslog_config()
@@ -116,6 +129,20 @@ class LadConfigAllTest(unittest.TestCase):
         fluentd_tail_src_cfg = lad_cfg.get_fluentd_tail_src_config()
         print_content_with_header('Generated fluentd tail src cfg', fluentd_tail_src_cfg)
         self.assertTrue(fluentd_tail_src_cfg, 'Empty fluentd tail src cfg is invalid')
+
+    def test_lad_config_all_metric_only(self):
+        """
+        Perform basic LadConfigAll object tests with metric-only configs,
+        like generating various configs and validating them.
+        """
+        lad_cfg = self._lad_config_all_helper_metric_only  # handy reference
+        result, msg = lad_cfg.generate_all_configs()
+        self.assertTrue(result, 'Config generation failed: ' + msg)
+
+        with open(os.path.join(test_lad_dir, 'xmlCfg.xml')) as f:
+            mdsd_xml_cfg = f.read()
+        print_content_with_header('Generated mdsd XML cfg for metric-only LAD settings', mdsd_xml_cfg)
+        self.assertTrue(mdsd_xml_cfg, 'Empty mdsd XML config is invalid!')
 
     def test_update_metric_collection_settings(self):
         test_config = \
@@ -185,7 +212,7 @@ class LadConfigAllTest(unittest.TestCase):
                 ]
             }
 
-        configurator = self._lad_config_all_helper
+        configurator = self._lad_config_all_helper_logging_only
         configurator._sink_configs.insert_from_config(test_sinks_config)
         configurator._update_metric_collection_settings(test_config)
         print ET.tostring(configurator._mdsd_config_xml_tree.getroot())
