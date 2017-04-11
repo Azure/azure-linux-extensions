@@ -714,23 +714,18 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
-def enable_encryption_format(passphrase, encryption_marker, disk_util):
+def enable_encryption_format(passphrase, disk_format_query, disk_util):
     logger.log('enable_encryption_format')
-    encryption_parameters = encryption_marker.get_encryption_disk_format_query()
-    logger.log('disk format query is {0}'.format(encryption_parameters))
+    logger.log('disk format query is {0}'.format(disk_format_query))
 
-    try:
-        json_parsed = json.loads(encryption_parameters)
+    json_parsed = json.loads(disk_format_query)
 
-        if type(json_parsed) is dict:
-            encryption_format_items = [json_parsed,]
-        elif type(json_parsed) is list:
-            encryption_format_items = json_parsed
-        else:
-            raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
-    except Exception:
-        encryption_marker.clear_config()
-        raise
+    if type(json_parsed) is dict:
+        encryption_format_items = [json_parsed,]
+    elif type(json_parsed) is list:
+        encryption_format_items = json_parsed
+    else:
+        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
 
     for encryption_item in encryption_format_items:
         dev_path_in_query = None
@@ -1631,8 +1626,9 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                              disk_util=disk_util,
                                                              bek_util=bek_util)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat:
+                disk_format_query = encryption_marker.get_encryption_disk_format_query()
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
-                                                       encryption_marker=encryption_marker,
+                                                       disk_format_query=disk_format_query,
                                                        disk_util=disk_util)
             else:
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
