@@ -39,6 +39,7 @@ from Common import *
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
+    device_id_cache = {}
 
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
@@ -670,11 +671,16 @@ class DiskUtil(object):
         return device_path
 
     def get_device_id(self, dev_path):
+        if (dev_path) in DiskUtil.device_id_cache:
+            return DiskUtil.device_id_cache[dev_path]
+
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
         match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
-        return match[0] if match else ""
+        DiskUtil.device_id_cache[dev_path] = match[0] if match else ""
+
+        return DiskUtil.device_id_cache[dev_path]
 
     def get_device_items_property(self, dev_name, property_name):
         if (dev_name, property_name) in DiskUtil.sles_cache:
