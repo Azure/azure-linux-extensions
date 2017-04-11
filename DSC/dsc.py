@@ -36,18 +36,18 @@ import Utils.HandlerUtil as Util
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.0.8.ssl_'
-dsc_package_prefix = 'packages/dsc-1.1.1-70.ssl_'
+omi_package_prefix = 'packages/omi-1.1.0.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
 omi_major_version = 1
-omi_minor_version = 0
-omi_build = 8
+omi_minor_version = 1
+omi_build = 0
 dsc_major_version = 1
 dsc_minor_version = 1
 dsc_build = 1
-omi_version_deb = '1.0.8.4'
-omi_version_rpm = '1.0.8-4'
-dsc_version_deb = '1.1.1.70'
-dsc_version_rpm = '1.1.1-70'
+omi_version_deb = '1.0.1.0'
+omi_version_rpm = '1.0.1.0'
+dsc_version_deb = '1.1.1.294'
+dsc_version_rpm = '1.1.1-294'
 
 # DSC-specific Operation
 class Operation:
@@ -577,7 +577,22 @@ def rpm_uninstall_package(package_name):
 def register_automation():
     registration_key = get_config('RegistrationKey')
     registation_url = get_config('RegistrationUrl')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/Register.py ' + registration_key + ' ' + registation_url)
+	# Optional
+    configuration_name = get_config('ConfigurationName')
+    refresh_freq = get_config('RefreshFrequencyMins')
+    configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
+    configuration_mode = get_config('ConfigurationMode')
+	cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
+          + ' --ServerURL '+ registation_url
+    if configuration_name != '':
+        cmd += ' --ConfigurationName ' + configuration_name
+    if refresh_freq != '':
+        cmd += ' --RefreshFrequencyMins ' + refresh_freq
+    if configuration_mode_freq != '':
+        cmd += ' --ConfigurationModeFrequencyMins ' + configuration_mode_freq
+    if configuration_mode:
+        cmd += ' --ConfigurationMode ' + configuration_mode
+    code,output = run_cmd(cmd)
     if not code == 0:
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
         hutil.error(error_msg)
