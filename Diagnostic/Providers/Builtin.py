@@ -39,23 +39,37 @@ import Utils.ProviderUtil as ProvUtil
 from collections import defaultdict
 import xml.etree.ElementTree as ET
 import Utils.XmlUtil as XmlUtil
+from xml.sax.saxutils import quoteattr
 
 
-# These are the built-in metrics this code provides, grouped by class.
+# These are the built-in metrics this code provides, grouped by class. The builtin countername space is
+# case insensitive; this collection of maps converts to the case-sensitive OMI name.
 _builtIns = {
-    'processor':  [ 'percentidletime', 'percentprocessortime', 'percentiowaittime', 'percentinterrupttime',
-                    'percentusertime', 'percentnicetime', 'percentprivilegedtime' ],
-    'memory':     [ 'availablememory', 'percentavailablememory', 'usedmemory', 'percentusedmemory', 'pagespersec',
-                    'pagesreadpersec', 'pageswrittenpersec', 'availableswap', 'percentavailableswap', 'usedswap',
-                    'percentusedswap' ],
-    'network':    [ 'bytestransmitted', 'bytesreceived', 'bytestotal', 'packetstransmitted', 'packetsreceived',
-                    'totalrxerrors', 'totaltxerrors', 'totalcollisions' ],
-    'filesystem': [ 'freespace', 'usedspace', 'percentfreespace', 'percentusedspace', 'percentfreeinodes',
-                    'percentusedinodes', 'bytesreadpersecond', 'byteswrittenpersecond', 'bytespersecond',
-                    'readspersecond', 'writespersecond', 'transferspersecond' ],
-    'disk':       [ 'readspersecond', 'writespersecond', 'transferspersecond', 'averagereadtime', 'averagewritetime',
-                    'averagetransfertime', 'averagediskqueuelength', 'readbytespersecond', 'writebytespersecond',
-                    'bytespersecond' ]
+    'processor':  { 'percentidletime': 'PercentIdleTime', 'percentprocessortime': 'PercentProcessorTime',
+                    'percentiowaittime': 'PercentIOWaitTime', 'percentinterrupttime': 'PercentInterruptTime',
+                    'percentusertime': 'PercentUserTime', 'percentnicetime': 'PercentNiceTime',
+                    'percentprivilegedtime': 'PercentPrivilegedTime' },
+    'memory':     { 'availablememory': 'AvailableMemory', 'percentavailablememory': 'PercentAvailableMemory',
+                    'usedmemory': 'UsedMemory', 'percentusedmemory': 'PercentUsedMemory',
+                    'pagespersec': 'PagesPerSec', 'pagesreadpersec': 'PagesReadPerSec',
+                    'pageswrittenpersec': 'PagesWrittenPerSec', 'availableswap': 'AvailableSwap',
+                    'percentavailableswap': 'PercentAvailableSwap', 'usedswap': 'UsedSwap',
+                    'percentusedswap': 'PercentUsedSwap'},
+    'network':    { 'bytestransmitted': 'BytesTransmitted', 'bytesreceived': 'BytesReceived',
+                    'bytestotal': 'BytesTotal', 'packetstransmitted': 'PacketsTransmitted',
+                    'packetsreceived': 'PacketsReceived', 'totalrxerrors': 'TotalRXErrors',
+                    'totaltxerrors': 'TotalTXErrors', 'totalcollisions': 'TotalCollisions' },
+    'filesystem': { 'freespace': 'FreeMegabytes', 'usedspace': 'UsedMegabytes',
+                    'percentfreespace': 'PercentFreeSpace', 'percentusedspace': 'PercentUsedSpace',
+                    'percentfreeinodes': 'PercentFreeInodes', 'percentusedinodes': 'PercentUsedInodes',
+                    'bytesreadpersecond': 'BytesReadPerSecond', 'byteswrittenpersecond': 'BytesWrittenPerSecond',
+                    'bytespersecond': 'BytesPerSecond', 'readspersecond': 'ReadsPerSecond',
+                    'writespersecond': 'WritesPerSecond', 'transferspersecond': 'TransfersPerSecond' },
+    'disk':       { 'readspersecond': 'ReadsPerSecond', 'writespersecond': 'WritesPerSecond',
+                    'transferspersecond': 'TransfersPerSecond', 'averagereadtime': 'AverageReadTime',
+                    'averagewritetime': 'AverageWriteTime', 'averagetransfertime': 'AverageTransferTime',
+                    'averagediskqueuelength': 'AverageDiskQueueLength', 'readbytespersecond': 'ReadBytesPerSecond',
+                    'writebytespersecond': 'WriteBytesPerSecond', 'bytespersecond': 'BytesPerSecond' }
     }
 
 _omiClassName = { 'processor': 'SCX_ProcessorStatisticalInformation',
@@ -71,32 +85,22 @@ _instancedClasses = ['network', 'filesystem', 'disk', 'processor']
 # The Azure Metrics infrastructure, along with App Insights, requires that quantities be measured
 # in one of these units: Percent, Count, Seconds, Milliseconds, Bytes, BytesPerSecond, CountPerSecond
 #
-# Some of the built-in metrics are retrieved in some other unit (e.g. "MiB") and need to be scaled
-# to the expected unit before being passed along the pipeline. The _scaling map holds all counterSpecifier
+# Some of the OMI metrics are retrieved in some other unit (e.g. "MiB") and need to be scaled
+# to the expected unit before being passed along the pipeline. The _scaling map holds all OMI counter
 # names that need to be scaled. If a counterSpecifier isn't in this list, no scaling is needed.
 _scaling = defaultdict(lambda:defaultdict(str),
             { 'memory' : defaultdict(str,
-                { 'availablememory': 'scaleUp="1048576"',
-                  'usedmemory': 'scaleUp="1048576"',
-                  'availableswap': 'scaleUp="1048576"',
-                  'usedswap': 'scaleUp="1048576"'
+                { 'AvailableMemory': 'scaleUp="1048576"',
+                  'UsedMemory': 'scaleUp="1048576"',
+                  'AvailableSwap': 'scaleUp="1048576"',
+                  'UsedSwap': 'scaleUp="1048576"'
                 } ),
               'filesystem' : defaultdict(str,
-                 {'freespace': 'scaleUp="1048576"',
-                  'usedspace': 'scaleUp="1048576"',
+                 {'FreeMegabytes': 'scaleUp="1048576"',
+                  'UsedMegabytes': 'scaleUp="1048576"',
                   }),
               } )
 
-# By and large, the names of the builtin metrics are identical to the names of the OMI values fetched by this
-# implementation of the builtin provider. However, there are some exceptions. The builtin_to_omi map translates
-# from the builtin name to the OMI name, by class. If a class or name isn't found in this map, the name should be used
-# without translation
-_builtin_to_omi = {
-    'filesystem': {
-        'freespace': 'freemegabytes',
-        'usedspace': 'usedmegabytes'
-    }
-}
 _metrics = defaultdict(list)
 _eventNames = {}
 
@@ -116,7 +120,8 @@ class BuiltinMetric:
         "type": the provider type. If present, must have value "builtin". If absent, assumed to be "builtin".
         "class": the name of the class within which this metric is scoped. Must be a key in the _builtIns dict.
         "counter": the name of the metric, within the class. Must appear in the list of metric names for this class
-                found in the _builtIns dict.
+                found in the _builtIns dict. In this implementation, the builtin counter name is mapped to the OMI
+                counter name
         "instanceId": the identifier for the specific instance of the metric, if any. Must be "None" for uninstanced
                 metrics.
         "counterSpecifier": the name under which this retrieved metric will be stored
@@ -138,13 +143,14 @@ class BuiltinMetric:
         self._CounterClass = self._CounterClass.lower()
         if self._CounterClass not in _builtIns:
             raise ProvUtil.InvalidCounterSpecification('Unknown Builtin class {0}'.format(self._CounterClass))
-        self._Counter = ProvUtil.GetCounterSetting(counterSpec, 'counter')
-        if self._Counter is None:
+        builtin_raw_counter_name = ProvUtil.GetCounterSetting(counterSpec, 'counter')
+        if builtin_raw_counter_name is None:
             raise ProvUtil.InvalidCounterSpecification('Builtin metric spec missing "counter"')
-        self._Counter = self._Counter.lower()
-        if self._Counter not in _builtIns[self._CounterClass]:
+        builtin_counter_name = builtin_raw_counter_name.lower()
+        if builtin_counter_name not in _builtIns[self._CounterClass]:
             raise ProvUtil.InvalidCounterSpecification(
-                'Counter {0} not in builtin class {1}'.format(self._Counter, self._CounterClass))
+                'Counter {0} not in builtin class {1}'.format(builtin_raw_counter_name, self._CounterClass))
+        self._Counter = _builtIns[self._CounterClass][builtin_counter_name]
         self._Condition = ProvUtil.GetCounterSetting(counterSpec, 'condition')
         self._Label = ProvUtil.GetCounterSetting(counterSpec, 'counterSpecifier')
         if self._Label is None:
@@ -164,11 +170,6 @@ class BuiltinMetric:
         return self._CounterClass
 
     def counter_name(self):
-        return self._Counter
-
-    def omi_counter(self):
-        if self._CounterClass in _builtin_to_omi and self._Counter in _builtin_to_omi[self._CounterClass]:
-            return _builtin_to_omi[self._CounterClass][self._Counter]
         return self._Counter
 
     def condition(self):
@@ -230,27 +231,27 @@ def UpdateXML(doc):
         columns = []
         mappings = []
         for metric in _metrics[group]:
-            omi_name = metric.omi_counter()
-            scale = _scaling[class_name][metric.counter_name()]
+            omi_name = metric.counter_name()
+            scale = _scaling[class_name][omi_name]
             columns.append(omi_name)
             mappings.append('<MapName name="{0}" {1}>{2}</MapName>'.format(omi_name, scale, metric.label()))
         column_string = ','.join(columns)
         if condition_clause:
-            where_clause = " WHERE {0}".format(condition_clause)
+            cql_query = quoteattr("SELECT {0} FROM {1} WHERE {2}".format(column_string,
+                                                                         _omiClassName[class_name], condition_clause))
         else:
-            where_clause = ""
+            cql_query = quoteattr("SELECT {0} FROM {1}".format(column_string, _omiClassName[class_name]))
         query = '''
-<OMIQuery cqlQuery='SELECT {0} FROM {1}{2}' eventName="{3}" omiNamespace="root/scx" sampleRateInSeconds="{4}" storeType="local">
-  <Unpivot columnName="CounterName" columnValue="Value" columns="{0}">
-    {5}
+<OMIQuery cqlQuery={qry} eventName={evname} omiNamespace="root/scx" sampleRateInSeconds="{rate}" storeType="local">
+  <Unpivot columnName="CounterName" columnValue="Value" columns={columns}>
+    {mappings}
   </Unpivot>
 </OMIQuery>'''.format(
-            column_string,
-            _omiClassName[class_name],
-            where_clause,
-            _eventNames[group],
-            sample_rate,
-            '\n    '.join(mappings)
+            qry=cql_query,
+            evname=quoteattr(_eventNames[group]),
+            columns=quoteattr(column_string),
+            rate=sample_rate,
+            mappings='\n    '.join(mappings)
         )
         XmlUtil.addElement(doc, 'Events/OMI', ET.fromstring(query))
     return
