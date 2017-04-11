@@ -137,19 +137,6 @@ class LadConfigAll:
     def _ladCfg(self):
         return self._ext_settings.read_public_config('ladCfg')
 
-    def _add_portal_settings(self, resource_id):
-        """
-        Update mdsd_config_xml_tree for Azure Portal metric collection setting.
-        It's basically applying the resource_id as the partitionKey attribute of LADQuery elements.
-
-        :param resource_id: ARM resource ID to provide as partitionKey in LADQuery elements
-        :return: None
-        """
-        XmlUtil.setXmlValue(self._mdsd_config_xml_tree,
-                            './DerivedEvents/DerivedEvent/LADQuery',
-                            'partitionKey',
-                            resource_id)
-
     def _update_metric_collection_settings(self, ladCfg):
         """
         Update mdsd_config_xml_tree for Azure Portal metric collection. The mdsdCfg performanceCounters element contains
@@ -182,7 +169,7 @@ class LadConfigAll:
         # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
         # later.
         ladquery = '''
-<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
+<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" source="{localtable}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
 '''
@@ -310,14 +297,12 @@ class LadConfigAll:
         if aikey:
             AIUtil.createAccountElement(self._mdsd_config_xml_tree, aikey)
 
-    # Formerly:
-    # def config(xmltree, key, value, xmlpath, selector=[]):
     def _set_xml_attr(self, key, value, xml_path, selector=[]):
         """
         Set XML attribute on the element specified with xml_path.
         :param key: The attribute name to set on the XML element.
-        :param value: The value to be assigned for the attribute, in case there's no public config for that attribute.
-        :param xml_path: The path of the XML element on which the attribute is applied.
+        :param value: The default value to be set, if there's no public config for that attribute.
+        :param xml_path: The path of the XML element(s) to which the attribute is applied.
         :param selector: Selector for finding the actual XML element (see XmlUtil.setXmlValue)
         :return: None. Change is directly applied to mdsd_config_xml_tree XML member object.
         """
@@ -378,8 +363,8 @@ class LadConfigAll:
                 self._update_metric_collection_settings(lad_cfg)
                 resource_id = self._ext_settings.get_resource_id()
                 if resource_id:
-                    escaped_resource_id_str = escape_nonalphanumerics(resource_id)
-                    self._add_portal_settings(escaped_resource_id_str)
+                    XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
+                                        'partitionKey', escape_nonalphanumerics(resource_id))
                     instance_id = ""
                     if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
                         instance_id = self._fetch_uuid()
