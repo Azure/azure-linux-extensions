@@ -35,7 +35,7 @@
                       }
                     ],
                     "counterSpecifier": "/builtin/processor/PercentProcessorTime",
-                    "counter": "PercentProcessorTime",
+                    "counter": "percentprocessorTime",
                     "type": "builtin",
                     "unit": "Percent"
                   },
@@ -52,7 +52,22 @@
                     "counter": "UsedSpace",
                     "type": "builtin",
                     "unit": "Bytes"
+                  },
+                  {
+                    "class": "Filesystem",
+                    "condition": "Name='/'",
+                    "annotation": [
+                      {
+                        "displayName": "Free disk space on /mnt",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/filesystem/freespace(/mnt)",
+                    "counter": "FreeSpace",
+                    "type": "builtin",
+                    "unit": "Bytes"
                   }
+
                 ]
               }
             }
