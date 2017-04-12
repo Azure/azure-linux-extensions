@@ -129,7 +129,7 @@ class CommonActions:
     def install_required_packages(self):
         """
         Install packages required by this distro to meet the common bar required of all distros
-        :rtyep: int, str
+        :rtype: int, str
         :return: (status, concatenated stdout from all package installs)
         """
         return 0, "no additional packages were needed"
@@ -161,6 +161,22 @@ class CommonActions:
         """
         return False
 
+    def install_lad_mdsd(self):
+        """
+        Install the mdsd binary using the bundled .deb/.rpm packages.
+        :rtype: int, str
+        :return: (status, concatenated stdout from the package install)
+        """
+        return 0, ''  # Should be overridden by each direct subclass for Debian/Redhat
+
+    def remove_lad_mdsd(self):
+        """
+        Remove the mdsd binary that was installed with the bundled .deb/.rpm packages.
+        :rtype: int, str
+        :return: (status, concatenated stdout from the package remove)
+        """
+        return 0, ''  # Should be overridden by each direct subclass for Debian/Redhat
+
 
 class DebianActions(CommonActions):
     def __init__(self, logger):
@@ -175,6 +191,12 @@ class DebianActions(CommonActions):
 
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/usr/lib/ssl/certs", "SSL_CERT_FILE": "/usr/lib/ssl/cert.pem"})
+
+    def install_lad_mdsd(self):
+        return self.log_run_get_output('dpkg -i lad-mdsd-*.deb')
+
+    def remove_lad_mdsd(self):
+        return self.log_run_get_output('dpkg -P lad-mdsd')
 
 
 class CredativActions(DebianActions):
@@ -224,6 +246,12 @@ class RedhatActions(CommonActions):
 
     def extend_environment(self, env):
         env.update({"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"})
+
+    def install_lad_mdsd(self):
+        self.log_run_get_output('rpm -i lad-mdsd-*.rpm')
+
+    def remove_lad_mdsd(self):
+        self.log_run_get_output('rpm -e lad-mdsd')
 
 
 class Suse11Actions(RedhatActions):

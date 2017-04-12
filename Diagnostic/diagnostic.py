@@ -68,7 +68,7 @@ g_mdsd_role_name = 'lad_mdsd'  # Different mdsd role name for multiple mdsd proc
 g_mdsd_file_resources_prefix = ''  # Eventually '/var/run/mdsd/lad_mdsd'
 g_lad_pids_filepath = ''  # LAD process IDs (diagnostic.py, mdsd) file path. g_ext_dir + '/lad.pids'
 g_ext_op_type = None  # Extension operation type (e.g., Install, Enable, HeartBeat, ...)
-g_mdsd_bin_dir = ''  # mdsd binary directory. g_ext_dir + '/bin'
+g_mdsd_bin_path = '/usr/local/lad/bin/mdsd'  # mdsd binary path. Fixed w/ lad-mdsd-*.{deb,rpm} pkgs
 g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnostic.py'
 # Only 2 globals not following 'g_...' naming convention, for legacy readability...
 RunGetOutput = None  # External command executor callable
@@ -107,8 +107,7 @@ def init_extension_settings():
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global hutil, g_ext_dir, g_mdsd_file_resources_prefix, g_lad_pids_filepath
-    global g_mdsd_bin_dir, g_diagnostic_py_filepath
-    global g_lad_log_helper
+    global g_diagnostic_py_filepath, g_lad_log_helper
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("LinuxAzureDiagnostic started to handle.")
@@ -119,7 +118,6 @@ def init_globals():
     g_ext_dir = os.getcwd()
     g_mdsd_file_resources_prefix = os.path.join(g_mdsd_file_resources_dir, g_mdsd_role_name)
     g_lad_pids_filepath = os.path.join(g_ext_dir, 'lad.pids')
-    g_mdsd_bin_dir = os.path.join(g_ext_dir, 'bin')
     g_diagnostic_py_filepath = os.path.join(os.getcwd(), __file__)
     g_lad_log_helper = LadLogHelper(hutil.log, hutil.error, waagent.AddExtensionEvent, hutil.do_status_report,
                                     hutil.get_name(), hutil.get_extension_version())
@@ -158,6 +156,11 @@ def setup_dependencies_and_mdsd(configurator):
                                                                          hutil.log, hutil.error)
     if omsagent_setup_exit_code is not 0:
         return 3, omsagent_setup_output
+
+    # Install lad-mdsd pkg (/usr/local/lad/bin/mdsd). Must be done after omsagent install because of dependencies
+    cmd_exit_code, cmd_output = g_dist_config.install_lad_mdsd()
+    if cmd_exit_code != 0:
+        return 4, 'lad-mdsd pkg install failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     return 0, 'success'
 
@@ -268,6 +271,11 @@ def main(command):
                              '&& rm /lib/systemd/system/mdsd-lde.service')
             else:
                 stop_mdsd()
+            # Must remove lad-mdsd package first because of the dependencies
+            cmd_exit_code, cmd_output = g_dist_config.remove_lad_mdsd()
+            if cmd_exit_code != 0:
+                hutil.error('lad-mdsd remove failed. Still proceeding to uninstall. '
+                            'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
@@ -368,7 +376,7 @@ def start_mdsd(configurator):
     g_dist_config.extend_environment(tmp_env_dict)
     added_env_str = ' '.join('{0}={1}'.format(k, tmp_env_dict[k]) for k in tmp_env_dict)
     config_validate_cmd = '{0}{1}{2} -v -c {3}'.format(added_env_str, ' ' if added_env_str else '',
-                                                       os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
+                                                       g_mdsd_bin_path, xml_file)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.
@@ -396,7 +404,6 @@ def start_mdsd(configurator):
     mdsd_stdout_redirect_path = os.path.join(g_ext_dir, "mdsd.log")
     mdsd_stdout_stream = None
     copy_env = os.environ
-    copy_env['LD_LIBRARY_PATH'] = g_mdsd_bin_dir
     g_dist_config.extend_environment(copy_env)
 
     # mdsd http proxy setting
@@ -406,7 +413,7 @@ def start_mdsd(configurator):
 
     # Now prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}'.format(
-        os.path.join(g_mdsd_bin_dir, "mdsd"),
+        g_mdsd_bin_path,
         xml_file,
         g_mdsd_role_name,
         err_file_path,
