@@ -204,3 +204,15 @@ class LadExtSettings(ExtSettings):
                 self._syslog_enabled = self.read_public_config('enableSyslog').lower() != 'false' \
                                        and self.read_public_config('EnableSyslog').lower() != 'false'
         return self._syslog_enabled
+
+    def get_mdsd_trace_option(self):
+        """
+        Return traceFlags, if any, from public config
+        :rtype: str
+        :return: trace flags or an empty string
+        """
+        flags = self.read_public_config('traceFlags')
+        if flags:
+            return " -T {0}".format(flags)
+        else:
+            return ""
