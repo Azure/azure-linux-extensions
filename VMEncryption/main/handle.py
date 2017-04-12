@@ -714,7 +714,7 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
-def enable_encryption_format(passphrase, disk_format_query, disk_util):
+def enable_encryption_format(passphrase, disk_format_query, disk_util, force=False):
     logger.log('enable_encryption_format')
     logger.log('disk format query is {0}'.format(disk_format_query))
 
@@ -744,10 +744,13 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util):
             continue
         else:
             device_item = devices[0]
-            if device_item.file_system is None or device_item.file_system == "":
+            if device_item.file_system is None or device_item.file_system == "" or force:
+                if device_item.mount_point:
+                    disk_util.swapoff()
+                    disk_util.umount(device_item.mount_point)
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
-                if device_item.uuid is not None and device_item.uuid != "":
+                if device_item.uuid is not None and device_item.uuid != "" and not force:
                     device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
                 else:
                     device_to_encrypt_uuid_path = dev_path_in_query
@@ -1634,6 +1637,22 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
+
+            for tmpvol in filter(lambda x: 'resource-part' in x.azure_name, disk_util.get_device_items(None)):
+                if not tmpvol.mount_point:
+                    continue
+
+                disk_format_query = '{"dev_path":"/dev/DEVNAME","name":"MOUNTPOINT","file_system":"FILESYSTEM"}'
+                disk_format_query = disk_format_query.replace('DEVNAME', tmpvol.name)
+                disk_format_query = disk_format_query.replace('MOUNTPOINT', tmpvol.mount_point)
+                disk_format_query = disk_format_query.replace('FILESYSTEM', tmpvol.file_system)
+
+                logger.log("Encrypting resource disk {0}".format(tmpvol.azure_name))
+
+                failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
+                                                       disk_format_query=disk_format_query,
+                                                       disk_util=disk_util,
+                                                       force=True)
 
             if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)

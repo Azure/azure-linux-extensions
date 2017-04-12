@@ -507,6 +507,9 @@ class DiskUtil(object):
         mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
         self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
+    def swapoff(self):
+        return self.command_executor.Execute('swapoff -a')
+
     def umount(self, path):
         umount_cmd = self.distro_patcher.umount_path + ' ' + path
         return self.command_executor.Execute(umount_cmd)
