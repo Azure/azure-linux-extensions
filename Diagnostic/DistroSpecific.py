@@ -248,10 +248,10 @@ class RedhatActions(CommonActions):
         env.update({"SSL_CERT_DIR": "/etc/pki/tls/certs", "SSL_CERT_FILE": "/etc/pki/tls/cert.pem"})
 
     def install_lad_mdsd(self):
-        self.log_run_get_output('rpm -i lad-mdsd-*.rpm')
+        return self.log_run_get_output('rpm -i lad-mdsd-*.rpm')
 
     def remove_lad_mdsd(self):
-        self.log_run_get_output('rpm -e lad-mdsd')
+        return self.log_run_get_output('rpm -e lad-mdsd')
 
 
 class Suse11Actions(RedhatActions):
