@@ -60,22 +60,14 @@ class TestBuiltinMetric(TestCase):
         self.assertRaises(ProvUtil.InvalidCounterSpecification, BProvider.BuiltinMetric, dupe)
         try:
             metric = BProvider.BuiltinMetric(self.basic_valid)
-            self.assertEqual(metric.counter_name(), 'percentidletime')
+            self.assertEqual(metric.counter_name(), 'PercentIdleTime')
         except Exception as ex:
             self.fail("BuiltinMetric Constructor raised exception: {0}".format(ex))
-
-    def test_omi_counter(self):
         try:
             metric = BProvider.BuiltinMetric(self.mapped)
-            self.assertEqual(metric.omi_counter(), 'freemegabytes')
-            self.assertEqual(metric.counter_name(), 'freespace')
+            self.assertEqual(metric.counter_name(), 'FreeMegabytes')
         except Exception as ex:
-            self.fail("BuiltinMetric Constructor (self.mapped) raised exception: {0}".format(ex))
-        try:
-            metric = BProvider.BuiltinMetric(self.basic_valid)
-            self.assertEqual(metric.omi_counter(), 'percentidletime')
-        except Exception as ex:
-            self.fail("BuiltinMetric Constructor (self.basic_valid) raised exception: {0}".format(ex))
+            self.fail("BuiltinMetric Constructor raised exception: {0}".format(ex))
 
     def test_condition(self):
         dupe = self.basic_valid.copy()
@@ -168,7 +160,7 @@ class TestMakeXML(TestCase):
                 "class": "Processor",
                 "counter": "PercentIdleTime",
                 "counterSpecifier": "/builtin/Processor/PercentIdleTime",
-                "condition": 'IsAggregate=TRUE',
+                "condition": "IsAggregate=TRUE",
                 "sampleRate": "PT30S",
             },
             {
@@ -176,14 +168,14 @@ class TestMakeXML(TestCase):
                 "class": "filesystem",
                 "counter": "Freespace",
                 "counterSpecifier": "/builtin/Filesystem/Freespace(/)",
-                "condition": 'Name="/"',
+                "condition": "Name='/'",
             },
             {
                 "type": "builtin",
                 "class": "Processor",
                 "counter": "PercentProcessorTime",
                 "counterSpecifier": "/builtin/Processor/PercentProcessorTime",
-                "condition": 'IsAggregate=TRUE',
+                "condition": "IsAggregate=TRUE",
                 "sampleRate": "PT30S",
             },
             {
@@ -191,7 +183,7 @@ class TestMakeXML(TestCase):
                 "class": "filesystem",
                 "counter": "Freespace",
                 "counterSpecifier": "/builtin/Filesystem/Freespace(/mnt)",
-                "condition": 'Name="/mnt"',
+                "condition": "Name=\"/mnt\"",
             },
         ]
 
