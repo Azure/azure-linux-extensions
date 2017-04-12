@@ -405,13 +405,14 @@ def start_mdsd(configurator):
         copy_env['MDSD_http_proxy'] = proxy_config
 
     # Now prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}'.format(
+    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}{6}'.format(
         os.path.join(g_mdsd_bin_dir, "mdsd"),
         xml_file,
         g_mdsd_role_name,
         err_file_path,
         warn_file_path,
-        info_file_path).split(" ")
+        info_file_path,
+        g_ext_settings.get_mdsd_trace_flags()).split(" ")
 
     try:
         start_watcher_thread()
