@@ -660,28 +660,16 @@ def start_watcher_thread():
 
 
 def start_mdsd():
+    global EnableSyslog, ExtensionOperationType
+    with open(MDSDPidFile, "w") as pidfile:
+         pidfile.write(str(os.getpid())+'\n')
+         pidfile.close()
+
     # Assign correct ext op type for correct ext status/event reporting.
     # start_mdsd() is called only through "./diagnostic.py -daemon"
     # which has to be recognized as "Daemon" ext op type, but it's not a standard Azure ext op
     # type, so it needs to be reverted back to a standard one (which is "Enable").
     ExtensionOperationType = waagent.WALAEventOperation.Enable
-
-    # We first validate the mdsd config and proceed only when it succeeds.
-    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
-    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(MdsdFolder, "mdsd"), xml_file)
-    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
-    if config_validate_cmd_status is not 0:
-        # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
-                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
-        hutil.log(message)
-        hutil.do_status_report(ExtensionOperationType, 'success', '0', message)
-        return
-
-    global EnableSyslog, ExtensionOperationType
-    with open(MDSDPidFile, "w") as pidfile:
-         pidfile.write(str(os.getpid())+'\n')
-         pidfile.close()
 
     dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
     if dependencies_err != 0:
@@ -735,7 +723,19 @@ def start_mdsd():
             hutil.log("mdsdHttpProxy setting was given and will be passed to mdsd, but not logged here in case there's a password in it")
             copy_env['MDSD_http_proxy'] = proxy_config
 
-    # Prepare actual mdsd cmdline.
+    # We now validate the config and proceed only when it succeeds.
+    xml_file = os.path.join(WorkDir, './xmlCfg.xml')
+    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(MdsdFolder, "mdsd"), xml_file)
+    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
+    if config_validate_cmd_status is not 0:
+        # Invalid config. Log error and report success.
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is still considered a success as it's an external error. Config validation result: "\
+                  + config_validate_cmd_msg + ". Terminating LAD as it can't proceed."
+        hutil.log(message)
+        hutil.do_status_report(ExtensionOperationType, 'success', '0', message)
+        return
+
+    # Config validated. Prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -p {2} -R -r {3} -e {4} -w {5} -o {6}'.format(
         os.path.join(MdsdFolder,"mdsd"),
         xml_file,
