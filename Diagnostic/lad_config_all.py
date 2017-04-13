@@ -169,7 +169,7 @@ class LadConfigAll:
         # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
         # later.
         ladquery = '''
-<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" source="{localtable}">
+<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
 '''
