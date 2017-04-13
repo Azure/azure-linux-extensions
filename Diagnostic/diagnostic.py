@@ -412,7 +412,7 @@ def start_mdsd(configurator):
         err_file_path,
         warn_file_path,
         info_file_path,
-        g_ext_settings.get_mdsd_trace_flags()).split(" ")
+        g_ext_settings.get_mdsd_trace_option()).split(" ")
 
     try:
         start_watcher_thread()
