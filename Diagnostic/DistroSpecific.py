@@ -164,18 +164,22 @@ class CommonActions:
     def install_lad_mdsd(self):
         """
         Install the mdsd binary using the bundled .deb/.rpm packages.
+        Should be overridden by each direct subclass for Debian/Redhat.
+        Can't be called for this base class.
         :rtype: int, str
         :return: (status, concatenated stdout from the package install)
         """
-        return 0, ''  # Should be overridden by each direct subclass for Debian/Redhat
+        assert False, "Can't be called on the base class (CommonActions)!"
 
     def remove_lad_mdsd(self):
         """
         Remove the mdsd binary that was installed with the bundled .deb/.rpm packages.
+        Should be overridden by each direct subclass for Debian/Redhat.
+        Can't be called for this base class.
         :rtype: int, str
         :return: (status, concatenated stdout from the package remove)
         """
-        return 0, ''  # Should be overridden by each direct subclass for Debian/Redhat
+        assert False, "Can't be called on the base class (CommonActions)!"
 
 
 class DebianActions(CommonActions):
