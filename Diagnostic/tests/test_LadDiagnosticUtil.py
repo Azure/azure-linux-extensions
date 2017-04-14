@@ -123,7 +123,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
 
 class TestSinkConfiguration(TestCase):
     def setUp(self):
-        config = \
+        self.config = \
             {
                 "sink": [
                     {
@@ -132,11 +132,22 @@ class TestSinkConfiguration(TestCase):
                         "sasURL": "https://sbnamespace.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
                                   "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
                                   "&se=1804371161&skn=writer"
+                    },
+                    {
+                        "name": "sink2",
+                        "type": "CentralJson"
+                    },
+                    {
+                        "name": "sink3",
+                        "type": "EventHub",
+                        "sasURL": "https://sbnamespace2.servicebus.windows.net/raw?sr=https%3a%2f%2fsb"
+                                  "namespace.servicebus.windows.net%2fraw%2f&sig=SIGNATURE%3d"
+                                  "&se=99999999999&skn=writer"
                     }
                 ]
             }
         self.sink_config = LadUtil.SinkConfiguration()
-        self.sink_config.insert_from_config(config)
+        self.sink_config.insert_from_config(self.config)
 
     def test_insert_from_config(self):
         json_config = {}
@@ -150,20 +161,35 @@ class TestSinkConfiguration(TestCase):
 
     def test_get_all_sink_names(self):
         sinks = self.sink_config.get_all_sink_names()
-        self.assertEqual(len(sinks), 1)
+        self.assertEqual(len(sinks), len(self.config["sink"]))
         self.assertIn("sink1", sinks)
+        for sink in self.config["sink"]:
+            self.assertIn(sink["name"], sinks)
+
+    def helper_get_sink_by_name(self, name, type, sasURL=False):
+        sink = self.sink_config.get_sink_by_name(name)
+        self.assertIsNotNone(sink)
+        self.assertEqual(sink['name'], name)
+        self.assertEqual(sink['type'], type)
+        if sasURL:
+            self.assertIn('sasURL', sink)
 
     def test_get_sink_by_name(self):
         self.assertIsNone(self.sink_config.get_sink_by_name("BogusSink"))
-        sink = self.sink_config.get_sink_by_name("sink1")
-        self.assertIsNotNone(sink)
-        self.assertEqual(sink['name'], 'sink1')
-        self.assertEqual(sink['type'], 'EventHub')
-        self.assertIn('sasURL', sink)
+        self.helper_get_sink_by_name('sink1', 'EventHub', True)
+        self.helper_get_sink_by_name('sink2', 'CentralJson')
+        self.helper_get_sink_by_name('sink3', 'EventHub', True)
+
+    def helper_get_sinks_by_type(self, type, names):
+        sink_list = self.sink_config.get_sinks_by_type(type)
+        self.assertEqual(len(sink_list), len(names))
+        # Ugly nested loops... Please suggest any better Pythonic code
+        names_from_sink_list = [sink['name'] for sink in sink_list]
+        for name in names:
+            self.assertIn(name, names_from_sink_list)
 
     def test_get_sinks_by_type(self):
         sink_list = self.sink_config.get_sinks_by_type("Bogus")
         self.assertEqual(len(sink_list), 0)
-        sink_list = self.sink_config.get_sinks_by_type("EventHub")
-        self.assertEqual(len(sink_list), 1)
-        self.assertEqual(sink_list[0]['name'], 'sink1')
+        self.helper_get_sinks_by_type('EventHub', ['sink1', 'sink3'])
+        self.helper_get_sinks_by_type('CentralJson', ['sink2'])
