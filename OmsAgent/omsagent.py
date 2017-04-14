@@ -22,6 +22,7 @@ import re
 import sys
 import traceback
 import tempfile
+import time
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -120,6 +121,24 @@ def dummy_command(operation, status, msg):
     return 0
 
 
+def run_command_with_retries(hutil, cmd, file_directory, operation, extension_short_name, retries,
+                             initial_sleep_time = 5, sleep_increase_factor = 2):
+    try_count = 0
+    sleep_time = initial_sleep_time # seconds
+    while try_count <= retries:
+        exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory,
+                                           operation, extension_short_name,
+                                           hutil.get_extension_version())
+        if exit_code is 0:
+            break
+        try_count += 1
+        hutil.log('Retrying command ' + cmd + ' because it failed with exit code ' + str(exit_code))
+        time.sleep(sleep_time)
+        sleep_time *= sleep_increase_factor
+
+    return exit_code
+
+
 def install(hutil):
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
     file_path = os.path.join(file_directory, BundleFileName)
@@ -127,8 +146,10 @@ def install(hutil):
     os.chmod(file_path, 100)
     cmd = InstallCommandTemplate.format(BundleFileName)
     waagent.Log("Starting command %s --upgrade." %(BundleFileName))
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Install',
-                                       ExtensionShortName, hutil.get_extension_version())
+
+    # Retry, since install can fail due to concurrent package operations
+    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Install', ExtensionShortName,
+                                         retries = 3)
     return exit_code
 
 
@@ -137,8 +158,10 @@ def uninstall(hutil):
 
     cmd = UninstallCommandTemplate.format(BundleFileName)
     waagent.Log("Starting command %s --remove." %(BundleFileName))
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Uninstall',
-                                       ExtensionShortName, hutil.get_extension_version())
+
+    # Retry up to three times, since uninstall can fail due to concurrent package operations
+    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Uninstall',
+                                         ExtensionShortName, retries = 3)
     return exit_code
 
 
@@ -172,6 +195,9 @@ def enable(hutil):
                                                 hutil.get_extension_version(), False,
                                                 interval = 30,
                                                 std_out_file_name = output_file.name)
+        # If no workspace is configured, then the list-workspaces command returns an error, which
+        # should be ignored in the logs
+        waagent.Log("Ignore error from above 'Check If Already Onboarded' command.")
 
         # If the printout includes "No Workspace" then there are no workspaces onboarded to the
         #   machine; otherwise the workspaces that have been onboarded are listed in the output
@@ -215,7 +241,7 @@ def enable(hutil):
                                            ServiceControlWorkingDirectory, 'Enable',
                                            ExtensionShortName, hutil.get_extension_version())
     else:
-        hutil.error(('Onboard failed with exit code {0}; Enable not attempted'i).format(exit_code))
+        hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code))
 
     return exit_code
 
