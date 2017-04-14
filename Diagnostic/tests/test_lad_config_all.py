@@ -11,10 +11,11 @@
 
 import json
 import os
-import subprocess
 import unittest
-import xml.etree.ElementTree as ET
-
+from xml.etree import ElementTree as ET
+# This test suite uses xmlunittest package. Install it by running 'pip install xmlunittest'.
+# Documentation at http://python-xmlunittest.readthedocs.io/en/latest/
+from xmlunittest import XmlTestMixin
 
 from Utils.lad_ext_settings import *
 # The following line will work on an Azure Linux VM (where waagent is installed), but fail on a non-Azure Linux VM
@@ -84,7 +85,7 @@ def load_test_config(filename):
                         mock_encrypt_secret, mock_log_info, mock_log_error)
 
 
-class LadConfigAllTest(unittest.TestCase):
+class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
     def test_lad_config_all_logging_only(self):
         """
         Perform basic LadConfigAll object tests with logging-only configs,
@@ -132,6 +133,72 @@ class LadConfigAllTest(unittest.TestCase):
             mdsd_xml_cfg = f.read()
         print_content_with_header('Generated mdsd XML cfg for metric-only LAD settings', mdsd_xml_cfg)
         self.assertTrue(mdsd_xml_cfg, 'Empty mdsd XML config is invalid!')
+
+        # Verify using xmlunittests
+        root = self.assertXmlDocument(mdsd_xml_cfg)
+        expected_xml_str = """
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
+  <Accounts>
+    <Account account="ladunittestfakeaccount" decryptKeyPath="/home/hosungs/gitroot/azure-linux-extensions/Diagnostic/tests/var_lib_waagent/B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(NOT_A_REAL_KEY)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
+    </Accounts>
+
+  <Management defaultRetentionInDays="90" eventVolume="Large">
+    <Identity>
+      <IdentityComponent name="DeploymentId">test_lad_deployment_id</IdentityComponent>
+      <IdentityComponent name="Host" useComputerName="true" />
+    </Identity>
+    <AgentResourceUsage diskQuotaInMB="50000" />
+  </Management>
+
+  <Schemas>
+  </Schemas>
+
+  <Sources>
+  </Sources>
+
+  <Events>
+    <MdsdEvents>
+    </MdsdEvents>
+
+    <OMI>
+    <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation WHERE Name='/'" eventName="builtin000003" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+  <Unpivot columnName="CounterName" columnValue="Value" columns="FreeMegabytes">
+    <MapName name="FreeMegabytes" scaleUp="1048576">/builtin/filesystem/freespace(/mnt)</MapName>
+  </Unpivot>
+</OMIQuery><OMIQuery cqlQuery="SELECT UsedMegabytes FROM SCX_FileSystemStatisticalInformation WHERE Name=&quot;/&quot;" eventName="builtin000002" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+  <Unpivot columnName="CounterName" columnValue="Value" columns="UsedMegabytes">
+    <MapName name="UsedMegabytes" scaleUp="1048576">/builtin/filesystem/usedspace</MapName>
+  </Unpivot>
+</OMIQuery><OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation WHERE IsAggregate=TRUE" eventName="builtin000001" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+  <Unpivot columnName="CounterName" columnValue="Value" columns="PercentProcessorTime">
+    <MapName name="PercentProcessorTime">/builtin/processor/PercentProcessorTime</MapName>
+  </Unpivot>
+</OMIQuery></OMI>
+
+    <DerivedEvents>
+    <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000001">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000002">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000002">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000003">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000003">
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+</DerivedEvent></DerivedEvents>
+  </Events>
+
+  <EventStreamingAnnotations>
+  </EventStreamingAnnotations>
+
+</MonitoringManagement>
+"""
+        # The following is at least insensitive to whitespaces... Also it's way more complicated
+        # to create XPaths for this, so just use the following API.
+        self.assertXmlEquivalentOutputs(mdsd_xml_cfg, expected_xml_str)
 
     def test_update_metric_collection_settings(self):
         test_config = \

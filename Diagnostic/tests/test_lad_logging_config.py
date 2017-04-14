@@ -1,6 +1,5 @@
 import unittest
 import json
-import os
 from xml.etree import ElementTree as ET
 # This test suite uses xmlunittest package. Install it by running 'pip install xmlunittest'.
 # Documentation at http://python-xmlunittest.readthedocs.io/en/latest/
