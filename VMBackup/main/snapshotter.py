@@ -43,7 +43,7 @@ class SnapshotError(object):
         self.errorcode = CommonVariables.success
         self.sasuri = None
     def __str__(self):
-        return 'errorcode: ' + str(self.errorcode) + ' sasuri: ' + str(self.sasuri)
+        return 'errorcode: ' + str(self.errorcode)
 
 class SnapshotResult(object):
     def __init__(self):
@@ -299,7 +299,7 @@ class Snapshotter(object):
 
     def snapshotall(self, paras, freezer):
         thaw_done = False
-        if self.get_value_from_configfile('doseq') == '1':
+        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) == 1):
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
         else:
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
