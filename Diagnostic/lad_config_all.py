@@ -22,7 +22,6 @@ import traceback
 import xml.etree.ElementTree as ET
 
 import Providers.Builtin as BuiltIn
-import Utils.ApplicationInsightsUtil as AIUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems, LadLoggingConfigException
@@ -189,7 +188,7 @@ class LadConfigAll:
                         # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
                         pass
 
-    def _update_perf_counters_settings(self, omi_queries, for_app_insights=False):
+    def _update_perf_counters_settings(self, omi_queries):
         """
         Update the mdsd XML tree with the OMI queries provided.
         :param omi_queries: List of dictionaries specifying OMI queries and destination tables. E.g.:
@@ -198,8 +197,6 @@ class LadConfigAll:
              {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
              {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
          ]
-        :param for_app_insights: Indicates whether we are updating perf counters settings for AppInsights.
-                                AppInsights requires specific names, so we need this.
         :return: None. The mdsd XML tree member is updated accordingly.
         """
         if not omi_queries:
@@ -218,18 +215,15 @@ class LadConfigAll:
                 mdsd_omi_query_element.set('omiNamespace', namespace)
                 frequency = omi_query['frequency'] if 'frequency' in omi_query else '300'
                 mdsd_omi_query_element.set('sampleRateInSeconds', frequency)
-                if for_app_insights:
-                    AIUtil.updateOMIQueryElement(mdsd_omi_query_element)
                 XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
                                    el=mdsd_omi_query_element, addOnlyOnce=True)
             else:
                 self._logger_log("Ignoring perfCfg array element missing required elements: '{0}'".format(omi_query))
 
-    def _apply_perf_cfg(self, include_app_insights=False):
+    def _apply_perf_cfg(self):
         """
         Extract the 'perfCfg' settings from ext_settings and apply them to mdsd config XML root. These are *not* the
         ladcfg{performanceCounters{...}} settings; the perfCfg block is found at the top level of the public configs.
-        :param include_app_insights: Indicates whether perf counter settings for AppInsights should be included or not.
         :return: None. Changes are applied directly to the mdsd config XML tree member.
         """
         assert self._mdsd_config_xml_tree is not None
@@ -241,8 +235,6 @@ class LadConfigAll:
 
         try:
             self._update_perf_counters_settings(perf_cfg)
-            if include_app_insights:
-                self._update_perf_counters_settings(perf_cfg, True)
         except Exception as e:
             self._logger_error("Failed to create perf config. Error:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
@@ -255,16 +247,14 @@ class LadConfigAll:
         """
         return self._encrypt_secret(self._cert_path, secret)
 
-    def _update_account_settings(self, account, key, token, endpoint, aikey=None):
+    def _update_account_settings(self, account, key, token, endpoint):
         """
         Update the MDSD configuration Account element with Azure table storage properties.
-        Exactly one of (key, token) must be provided. If an aikey is passed, then add a new Account element for
-        Application Insights with the application insights key.
+        Exactly one of (key, token) must be provided.
         :param account: Storage account to which LAD should write data
         :param key: Shared key secret for the storage account, if present
         :param token: SAS token to access the storage account, if present
         :param endpoint: Identifies the Azure instance (public or specific sovereign cloud) where the storage account is
-        :param aikey: Key for accessing AI, if present
         """
         assert key or token, "Either key or token must be given."
         assert self._mdsd_config_xml_tree is not None
@@ -293,9 +283,6 @@ class LadConfigAll:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                                 "tableEndpoint", endpoint, ['isDefault', 'true'])
             XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
-
-        if aikey:
-            AIUtil.createAccountElement(self._mdsd_config_xml_tree, aikey)
 
     def _set_xml_attr(self, key, value, xml_path, selector=[]):
         """
@@ -376,16 +363,8 @@ class LadConfigAll:
         # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present and pass it to the actual helper
         #    function (self._apply_perf_cfg()).
-        do_ai = False
-        aikey = None
         try:
-            aikey = AIUtil.tryGetAiKey(lad_cfg)
-            if aikey:
-                self._logger_log("Application Insights key found.")
-                do_ai = True
-            else:
-                self._logger_log("Application Insights key not found.")
-            self._apply_perf_cfg(do_ai)
+            self._apply_perf_cfg()
         except Exception as e:
             self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
@@ -430,19 +409,12 @@ class LadConfigAll:
             return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
         endpoint = get_storage_endpoint_with_account(account,
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
-        self._update_account_settings(account, key, token, endpoint, aikey)
+        self._update_account_settings(account, key, token, endpoint)
 
-        # 7. Check and add new syslog RouteEvent for Application Insights.
-        if aikey:
-            AIUtil.createSyslogRouteEventElement(self._mdsd_config_xml_tree)
-
-        # 8. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
+        # 7. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
         self._set_event_volume(lad_cfg)
 
-        # 9. Update mdsd config XML's sampleRateInSeconds attribute with default '60'
-        self._set_xml_attr("sampleRateInSeconds", "60", "Events/OMI/OMIQuery")
-
-        # 10. Finally generate mdsd config XML file out of the constructed XML tree object.
+        # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
         return True, ""

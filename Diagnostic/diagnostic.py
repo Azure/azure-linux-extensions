@@ -39,7 +39,6 @@ try:
     import Utils.HandlerUtil as Util
 
     # Old LAD utils
-    import Utils.ApplicationInsightsUtil as AIUtil
     import Utils.LadDiagnosticUtil as LadUtil
     import Utils.XmlUtil as XmlUtil
 
