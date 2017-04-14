@@ -42,13 +42,6 @@ ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
 DisableOmsAgentServiceCommand = './service_control disable'
 EnableOmsAgentServiceCommand = './service_control enable'
 
-# Dictionary of operations strings to methods
-operations = {'Disable' : disable,
-              'Uninstall' : uninstall,
-              'Install' : install,
-              'Enable' : enable
-}
-
 # Change permission of log path
 ext_log_path = '/var/log/azure/'
 if os.path.exists(ext_log_path):
@@ -222,7 +215,7 @@ def enable(hutil):
                                            ServiceControlWorkingDirectory, 'Enable',
                                            ExtensionShortName, hutil.get_extension_version())
     else:
-        hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code)
+        hutil.error(('Onboard failed with exit code {0}; Enable not attempted'i).format(exit_code))
 
     return exit_code
 
@@ -233,6 +226,14 @@ def disable(hutil):
                                        ServiceControlWorkingDirectory, 'Disable',
                                        ExtensionShortName, hutil.get_extension_version())
     return exit_code
+
+
+# Dictionary of operations strings to methods
+operations = {'Disable' : disable,
+              'Uninstall' : uninstall,
+              'Install' : install,
+              'Enable' : enable
+}
 
 
 if __name__ == '__main__' :
