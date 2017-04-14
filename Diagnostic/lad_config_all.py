@@ -372,9 +372,9 @@ class LadConfigAll:
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
-            lad30_syslogEvents = self._ext_settings.get_lad30_syslogEvents_setting()
-            lad30_fileLogs = self._ext_settings.get_lad30_fileLogs_setting()
-            lad_logging_config_helper = LadLoggingConfig(lad30_syslogEvents, lad30_fileLogs)
+            syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
+            fileLogs_setting = self._ext_settings.get_fileLogs_setting()
+            lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting)
             mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
             mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
             copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)

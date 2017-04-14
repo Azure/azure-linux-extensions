@@ -123,87 +123,20 @@ class LadExtSettings(ExtSettings):
                                                       'DiagnosticMonitorConfiguration/Metrics', 'resourceId')
         return resource_id
 
-    def get_syslog_config(self):
-        """
-        Get syslog config from LAD extension settings.
-        First look up 'ladCfg' section's 'syslogCfg' and use it. If none, then use 'syslogCfg' at the top level
-        of public settings. Base64-encoded rsyslogd conf content is currently supported for 'syslogCfg' in either
-        section.
-        :return: rsyslogd configuration content string (base64-decoded 'syslogCfg' setting)
-        """
-        syslog_cfg = ''
-        lad_cfg = self.read_public_config('ladCfg')
-        encoded_syslog_cfg = LadUtil.getDiagnosticsMonitorConfigurationElement(lad_cfg, 'syslogCfg')
-        if not encoded_syslog_cfg:
-            encoded_syslog_cfg = self.read_public_config('syslogCfg')
-        if encoded_syslog_cfg:
-            syslog_cfg = base64.b64decode(encoded_syslog_cfg)
-        return syslog_cfg
-
-    def get_file_monitoring_config(self):
-        """
-        Get rsyslog file monitoring (imfile module) config from LAD extension settings.
-        First look up 'ladCfg' and use it if one is there. If not, then get 'fileCfg' at the top level
-        of public settings.
-        :return: List of dictionaries specifying files to monitor and Azure table names for the destinations
-        of the monitored files. E.g.:
-        [
-          {"file":"/var/log/a.log", "table":"aLog"},
-          {"file":"/var/log/b.log", "table":"bLog"}
-        ]
-        """
-        lad_cfg = self.read_public_config('ladCfg')
-        file_cfg = LadUtil.getFileCfgFromLadCfg(lad_cfg)
-        if not file_cfg:
-            file_cfg = self.read_public_config('fileCfg')
-        return file_cfg
-
-    def get_mdsd_cfg(self):
-        """
-        Get 'mdsdCfg' setting from the LAD public settings. Since it's base64-encoded, decode it for returning.
-        :return: Base64-decoded 'mdsdCfg' LAD public setting. '' if not present.
-        """
-        mdsd_cfg_str = self.read_public_config('mdsdCfg')
-        if mdsd_cfg_str:
-            mdsd_cfg_str = base64.b64decode(mdsd_cfg_str)
-        return mdsd_cfg_str
-
-    def get_lad30_syslogEvents_setting(self):
+    def get_syslogEvents_setting(self):
         """
         Get 'ladCfg/syslogEvents' setting from LAD 3.0 public settings.
         :return: A dictionary of syslog facility and minSeverity to monitor/ Refer to README.md for more details.
         """
         return LadUtil.getDiagnosticsMonitorConfigurationElement(self.read_public_config('ladCfg'), 'syslogEvents')
 
-    def get_lad30_fileLogs_setting(self):
+    def get_fileLogs_setting(self):
         """
         Get 'fileLogs' setting from LAD 3.0 public settings.
         :return: List of dictionaries specifying file to monitor and Azure table name for
         destinations of the monitored file. Refer to README.md for more details
         """
         return self.read_public_config('fileLogs')
-
-    def is_syslog_enabled(self):
-        """
-        Check if syslog is enabled in the LAD settings ('enableSyslog' setting)
-        :rtype: bool
-        :return: True if so. False otherwise.
-        """
-        if self._syslog_enabled is None:
-            # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time,
-            # so accommodate it.
-            enable_syslog_setting = self.read_public_config('enableSyslog') if self.has_public_config('enableSyslog') \
-                                    else self.read_public_config('EnableSyslog')
-            if not enable_syslog_setting:
-                self._syslog_enabled = True  # Default is enabled when the setting is not specified
-            elif isinstance(enable_syslog_setting, bool):
-                self._syslog_enabled = enable_syslog_setting
-            elif not isinstance(enable_syslog_setting, basestring):
-                self._syslog_enabled = True  # Ignore non-bool, non-string setting and default it to true
-            else:  # string case.
-                self._syslog_enabled = self.read_public_config('enableSyslog').lower() != 'false' \
-                                       and self.read_public_config('EnableSyslog').lower() != 'false'
-        return self._syslog_enabled
 
     def get_mdsd_trace_option(self):
         """
