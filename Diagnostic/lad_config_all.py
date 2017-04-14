@@ -178,7 +178,7 @@ class LadConfigAll:
             for aggregation_interval in intervals:
                 query = ladquery.format(interval=aggregation_interval, localtable=table_name)
                 XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
-        # Other sinks are handled here
+            # Other sinks are handled here
             for name in sinks.split(','):
                 sink = self._sink_configs.get_sink_by_name(name)
                 if sink is None:
