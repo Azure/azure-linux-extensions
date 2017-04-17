@@ -41,9 +41,11 @@ dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
 omi_major_version = 1
 omi_minor_version = 1
 omi_build = 0
+omi_release = 0
 dsc_major_version = 1
 dsc_minor_version = 1
 dsc_build = 1
+dsc_release = 294
 omi_version_deb = '1.0.1.0'
 omi_version_rpm = '1.0.1.0'
 dsc_version_deb = '1.1.1.294'
@@ -227,32 +229,54 @@ def get_config(key):
 def remove_old_dsc_packages():
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Deleting DSC and omi packages")
     if distro_category == DistroCategory.debian:
-        deb_remove_old_package('dsc', dsc_version_deb)
+        deb_remove_old_dsc_package()
         # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
         deb_remove_old_package('omiserver', '1.0.8.2')
-        deb_remove_old_package('omi', omi_version_deb)
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_remove_old_package('dsc', dsc_version_rpm)
+        rpm_remove_old_dsc_package()
         # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
         rpm_remove_old_package('omiserver', '1.0.8-2')
-        rpm_remove_old_package('omi', omi_version_rpm)
 
+def deb_remove_old_dsc_package():
+    version = get_deb_pkg_version('dsc')
+    if code == 0:
+        if is_very_old_dsc_package(version):
+            deb_uninstall_package(package_name)
+			
+def rpm_remove_old_dsc_package():
+    code,version = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" dsc')
+    if code == 0:
+        if is_very_old_dsc_package(version):
+            rpm_uninstall_package(package_name)
+
+def is_very_old_dsc_package():
+    version = re.match('(\d+).(\d+).(\d+).(\d+)', output)
+    #uninstall DSC package if the version is 1.0.x because upgrading from 1.0 to 1.1 is broken
+    if version is not None and (int(version.group(1)) == 1 and int(version.group(2)) == 0): 
+	    return True
+    return False
+			
 def deb_remove_old_package(package_name, version):
-    if deb_check_old_package(package_name, version):
+    if deb_is_old_package(package_name, version):
         deb_uninstall_package(package_name)
 
-def rpm_remove_old_package(package_name, version):
-    if rpm_check_old_package(package_name, version):
-        rpm_uninstall_package(package_name)
-
-def deb_check_old_package(package_name, version):
+def get_deb_pkg_version(package_name):
     code,output = run_cmd('dpkg -s ' + package_name + ' | grep Version:')
     if code == 0:
         code,output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
-        if output < version:
+        if code == 0:
+            return output
+    return "0.0.0.0"
+
+def deb_is_old_package(package_name, version):
+    if compare_pkg_version(get_deb_pkg_version(), major_version, minor_version, build) == 0:
             return True
     return False
-
+	
+def rpm_remove_old_package(package_name, version):
+    if rpm_check_old_package(package_name, version):
+        rpm_uninstall_package(package_name)
+		
 def rpm_check_old_package(package_name, version):
     code,output = run_cmd('rpm -q ' + package_name)
     if code == 0:
@@ -270,24 +294,24 @@ def install_dsc_packages():
         deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build)
-        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build)
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
 
-def compare_pkg_version(system_package_version, major_version, minor_version, build):
-    version = re.match('(\d+).(\d+).(\d+)', system_package_version)
-    if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) >= build)):
+def compare_pkg_version(system_package_version, major_version, minor_version, build, release):
+    version = re.match('(\d+).(\d+).(\d+).(\d+)', system_package_version)
+    if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) > build) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) == build and int(version.group(4)) >= release)):
         return 1
     return 0
 
 def check_pkg_exists(package_name, major_version, minor_version, build):
-    code,output = run_cmd('rpm -q --queryformat "%{VERSION}" ' + package_name)
+    code,output = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" ' + package_name)
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " + package_name + ";  existing package version:" + output)
     hutil.log("package name: " + package_name + ";  existing package version:" + output)
     if code == 0: 
         return compare_pkg_version(output, major_version, minor_version, build)
 
-def rpm_install_pkg(package_path, package_name, major_version, minor_version, build):
-    if check_pkg_exists(package_name, major_version, minor_version, build) == 1:
+def rpm_install_pkg(package_path, package_name, major_version, minor_version, build, release):
+    if check_pkg_exists(package_name, major_version, minor_version, build, release) == 1:
         # package is already installed
         hutil.log(package_name + ' with higher or equal version is already installed')
         return
@@ -582,7 +606,7 @@ def register_automation():
     refresh_freq = get_config('RefreshFrequencyMins')
     configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
     configuration_mode = get_config('ConfigurationMode')
-	cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
+    cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
           + ' --ServerURL '+ registation_url
     if configuration_name != '':
         cmd += ' --ConfigurationName ' + configuration_name
