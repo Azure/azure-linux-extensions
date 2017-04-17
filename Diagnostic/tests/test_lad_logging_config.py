@@ -8,6 +8,7 @@ from xmlunittest import XmlTestMixin
 from Utils.lad_logging_config import *
 from Utils.omsagent_util import get_syslog_ng_src_name
 from lad_config_all import _mdsd_xml_template
+import Utils.LadDiagnosticUtil as LadUtil
 
 
 class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
@@ -19,6 +20,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         # "syslogEvents" LAD config example
         syslogEvents_json_ext_settings = """
             {
+                "sinks": "SyslogJsonBlob",
                 "syslogEventConfiguration": {
                     "LOG_LOCAL0": "LOG_CRIT",
                     "LOG_USER": "LOG_ERR"
@@ -30,32 +32,68 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
             [
                 {
                     "file": "/var/log/mydaemonlog1",
-                    "table": "MyDaemon1Events"
+                    "table": "MyDaemon1Events",
+                    "sinks": "Filelog1JsonBlob"
                 },
                 {
                     "file": "/var/log/mydaemonlog2",
-                    "table": "MyDaemon2Events"
+                    "table": "MyDaemon2Events",
+                    "sinks": "Filelog2JsonBlob"
                 }
             ]
             """
+        # "sinksConfig" LAD config example
+        sinksConfig_json_ext_settings = """
+            {
+                "sink": [
+                    {
+                        "name": "sink1",
+                        "type": "EventHub",
+                        "sasURL": "https://fake_sas_url_1"
+                    },
+                    {
+                        "name": "SyslogJsonBlob",
+                        "type": "CentralJson"
+                    },
+                    {
+                        "name": "sink3",
+                        "type": "EventHub",
+                        "sasURL": "https://fake_sas_url_2"
+                    },
+                    {
+                        "name": "Filelog1JsonBlob",
+                        "type": "CentralJson"
+                    },
+                    {
+                        "name": "Filelog2JsonBlob",
+                        "type": "CentralJson"
+                    }
+                ]
+            }
+            """
 
+        sinksConfig = LadUtil.SinkConfiguration()
+        sinksConfig.insert_from_config(json.loads(sinksConfig_json_ext_settings))
         syslogEvents = json.loads(syslogEvents_json_ext_settings)
-        self.cfg_syslog = LadLoggingConfig(syslogEvents, None)
+        self.cfg_syslog = LadLoggingConfig(syslogEvents, None, sinksConfig)
         fileLogs = json.loads(fileLogs_json_ext_settings)
-        self.cfg_filelog = LadLoggingConfig(None, fileLogs)
-        self.cfg_none = LadLoggingConfig(None, None)
+        self.cfg_filelog = LadLoggingConfig(None, fileLogs, sinksConfig)
+        self.cfg_none = LadLoggingConfig(None, None, sinksConfig)
 
         # XPaths representations of expected XML outputs, for use with xmlunittests package
         self.oms_syslog_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
+                                           './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogJsonBlob" and @priority="High" and @storeType="CentralJson"]',
                                           )
         self.oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
                                             './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog1JsonBlob" and @priority="High" and @storeType="CentralJson"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog2JsonBlob" and @priority="High" and @storeType="CentralJson"]',
                                            )
 
     def test_oms_syslog_mdsd_configs(self):

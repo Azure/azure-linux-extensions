@@ -18,6 +18,7 @@
 
 from xml.etree import ElementTree as ET
 from Utils.omsagent_util import get_syslog_ng_src_name
+import Utils.LadDiagnosticUtil as LadUtil
 
 
 # Mdsd XML config templates defined globally because they are shared by multiple methods
@@ -37,8 +38,11 @@ _mdsd_per_source_config_template = """    <Source name="{name}" dynamic_schema="
 """
 
 _mdsd_per_event_source_config_template = """      <MdsdEventSource source="{source}">
-        <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" />
+        {routeevents}
       </MdsdEventSource>
+"""
+
+_mdsd_per_routeevent_config_template = """    <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />
 """
 
 
@@ -50,7 +54,7 @@ class LadLoggingConfig:
     (using the fluentd tail plugin).
     """
 
-    def __init__(self, syslogEvents, fileLogs):
+    def __init__(self, syslogEvents, fileLogs, sinksConfig):
         """
         Constructor to receive/store necessary LAD settings for the desired configuration generation.
 
@@ -59,6 +63,7 @@ class LadLoggingConfig:
 
                              "ladCfg": {
                                  "syslogEvents" : {
+                                     "sinks": "SyslogSinkName0",
                                      "syslogEventConfiguration": {
                                          "facilityName1": "minSeverity1",
                                          "facilityName2": "minSeverity2"
@@ -80,11 +85,13 @@ class LadLoggingConfig:
                              "fileLogConfiguration": [
                                  {
                                      "file": "/var/log/mydaemonlog",
-                                     "table": "MyDaemonEvents"
+                                     "table": "MyDaemonEvents",
+                                     "sinks": "FilelogSinkName1",
                                  },
                                  {
                                      "file": "/var/log/myotherdaemonelog",
-                                     "table": "MyOtherDaemonEvents"
+                                     "table": "MyOtherDaemonEvents",
+                                     "sinks": "FilelogSinkName2"
                                  }
                              ]
                          }
@@ -93,9 +100,12 @@ class LadLoggingConfig:
 
                          "file" is the full path of the log file to be watched and captured. "table" is for the
                          Azure storage table into which the lines of the watched file will be placed (one row per line).
+        :param LadUtil.SinkConfiguration sinksConfig:  SinkConfiguration object that's created out of "sinksConfig"
+                    LAD 3.0 JSON setting. Refer to LadUtil.SinkConfiguraiton documentation.
         """
         self._syslogEvents = syslogEvents
         self._fileLogs = fileLogs
+        self._sinksConfig = sinksConfig
         self._fac_sev_map = None
 
         try:
@@ -106,8 +116,12 @@ class LadLoggingConfig:
 
             if self._fileLogs:
                 # Convert the 'fileLogs' JSON object array into a Python dictionary of 'file' - 'table'
-                # E.g., { '/var/log/mydaemonlog1': 'MyDaemon1Events', '/var/log/mydaemonlog2': 'MyDaemon2Events' }
-                self._file_table_map = dict([(entry['file'], entry['table']) for entry in self._fileLogs])
+                # E.g., [{ 'file': '/var/log/mydaemonlog1', 'table': 'MyDaemon1Events', 'sinks': 'File1Sink'},
+                #        { 'file': '/var/log/mydaemonlog2', 'table': 'MyDaemon2Events', 'sinks': 'File2SinkA,File2SinkB'}]
+                self._file_table_map = dict([(entry['file'], entry['table'] if 'table' in entry else '')
+                                             for entry in self._fileLogs])
+                self._file_sinks_map = dict([(entry['file'], entry['sinks'] if 'sinks' in entry else '')
+                                             for entry in self._fileLogs])
 
             self._oms_rsyslog_config = None
             self._oms_syslog_ng_config = None
@@ -178,9 +192,38 @@ class LadLoggingConfig:
 
         # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
         # dest table (eventName) is 'LinuxSyslog'. This is currently the only supported syslog conf scheme.
+        syslog_routeevents = _mdsd_per_routeevent_config_template.format(event_name='LinuxSyslog', opt_store_type='')
+        # Add RouteEvent elements for specified "sinks" for "syslogEvents" feature
+        if 'sinks' in self._syslogEvents:
+            for sink_name in self._syslogEvents['sinks'].split(','):
+                if sink_name == 'LinuxSyslog':
+                    raise LadLoggingConfigException(
+                        "'LinuxSyslog' can't be used as a sink name. It's reserved for default Azure Table name for syslog events.")
+                syslog_routeevents += self.__generate_routeevent_for_extra_sink(sink_name)
+
         return _mdsd_sources_events_config_template.format(
             sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
-            events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', event_name='LinuxSyslog'))
+            events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', routeevents=syslog_routeevents))
+
+    def __generate_routeevent_for_extra_sink(self, sink_name):
+        """
+        Helper method to generate one RouteEvent element for each extra sink given.
+        :param sink_name: The name of the sink for the RouteEvent.
+        :return: The XML RouteEvent element string for the sink.
+        """
+        sink = self._sinksConfig.get_sink_by_name(sink_name)
+        if not sink:
+            raise LadLoggingConfigException('Sink name "{0}" is not defined in sinksConfig'.format(sink_name))
+        sink_type = sink['type']
+        if not sink_type:
+            raise LadLoggingConfigException('Sink type for sink "{0}" is not defined in sinksConfig'.format(sink_name))
+        if sink_type == 'CentralJson':
+            return _mdsd_per_routeevent_config_template.format(event_name=sink_name,
+                                                               opt_store_type='storeType="CentralJson"')
+        elif sink_type == 'EventHub':
+            raise LadLoggingConfigException('EventHub sink type is not yet supported')
+        else:
+            raise LadLoggingConfigException('{0} sink type is not supported'.format(sink_type))
 
     def get_oms_mdsd_filelog_config(self):
         """
@@ -204,10 +247,18 @@ class LadLoggingConfig:
         filelogs_sources = ''
         filelogs_mdsd_event_sources = ''
         for file_key in sorted(self._file_table_map):
+            if not self._file_table_map[file_key] and not self._file_sinks_map[file_key]:
+                raise LadLoggingConfigException('Neither "table" nor "sinks" defined for file "{0}"'.format(file_key))
             source_name = 'mdsd.filelog{0}'.format(file_key.replace('/', '.'))
             filelogs_sources += _mdsd_per_source_config_template.format(name=source_name)
+            per_file_routeevents = ''
+            if self._file_table_map[file_key]:
+                per_file_routeevents += _mdsd_per_routeevent_config_template.format(event_name=self._file_table_map[file_key], opt_store_type='')
+            if self._file_sinks_map[file_key]:
+                for sink_name in self._file_sinks_map[file_key].split(','):
+                    per_file_routeevents += self.__generate_routeevent_for_extra_sink(sink_name)
             filelogs_mdsd_event_sources += \
-                _mdsd_per_event_source_config_template.format(source=source_name, event_name=self._file_table_map[file_key])
+                _mdsd_per_event_source_config_template.format(source=source_name, routeevents=per_file_routeevents)
         return _mdsd_sources_events_config_template.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources)
 
     def get_oms_fluentd_syslog_src_config(self):

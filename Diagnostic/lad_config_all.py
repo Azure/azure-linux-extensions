@@ -374,7 +374,7 @@ class LadConfigAll:
         try:
             syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
-            lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting)
+            lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs)
             mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
             mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
             copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
@@ -388,8 +388,8 @@ class LadConfigAll:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
                                .format(e, traceback.format_exc()))
-            return False, 'Failed to generate configs for fluentd, syslog, and mdsd for that (' \
-                          'see extension error logs for more details)'
+            return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
+                          '(see extension error logs for more details)'
 
         # 5. Before starting to update the storage account settings, log extension's protected settings'
         #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that

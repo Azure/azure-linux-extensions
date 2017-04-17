@@ -70,6 +70,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
                             ]
                         },
                         "syslogEvents": {
+                            "sinks": "sink2",
                             "syslogEventConfiguration": {
                                 "LOG_LOCAL1": "LOG_INFO",
                                 "LOG_MAIL": "LOG_FATAL"
@@ -117,7 +118,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
         self.assertIn("1111-2222-3333-4444", res_id)
 
     def test_getFeatureWideSinksFromLadCfg(self):
-        self.assertEqual(LadUtil.getFeatureWideSinksFromLadCfg(self.valid_config, 'syslogEvents'), '')
+        self.assertEqual(LadUtil.getFeatureWideSinksFromLadCfg(self.valid_config, 'syslogEvents'), 'sink2')
         self.assertEqual(LadUtil.getFeatureWideSinksFromLadCfg(self.valid_config, 'performanceCounters'), 'sink1')
 
 
