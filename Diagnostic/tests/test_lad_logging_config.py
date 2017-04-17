@@ -53,7 +53,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                     },
                     {
                         "name": "SyslogJsonBlob",
-                        "type": "CentralJson"
+                        "type": "JsonBlob"
                     },
                     {
                         "name": "sink3",
@@ -62,11 +62,11 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                     },
                     {
                         "name": "Filelog1JsonBlob",
-                        "type": "CentralJson"
+                        "type": "JsonBlob"
                     },
                     {
                         "name": "Filelog2JsonBlob",
-                        "type": "CentralJson"
+                        "type": "JsonBlob"
                     }
                 ]
             }
@@ -84,16 +84,16 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.oms_syslog_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
-                                           './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogJsonBlob" and @priority="High" and @storeType="CentralJson"]',
+                                           './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogJsonBlob" and @priority="High" and @storeType="JsonBlob"]',
                                           )
         self.oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
                                             './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
-                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog1JsonBlob" and @priority="High" and @storeType="CentralJson"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog1JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
-                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog2JsonBlob" and @priority="High" and @storeType="CentralJson"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog2JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
                                            )
 
     def test_oms_syslog_mdsd_configs(self):

@@ -136,7 +136,7 @@ class TestSinkConfiguration(TestCase):
                     },
                     {
                         "name": "sink2",
-                        "type": "CentralJson"
+                        "type": "JsonBlob"
                     },
                     {
                         "name": "sink3",
@@ -178,7 +178,7 @@ class TestSinkConfiguration(TestCase):
     def test_get_sink_by_name(self):
         self.assertIsNone(self.sink_config.get_sink_by_name("BogusSink"))
         self.helper_get_sink_by_name('sink1', 'EventHub', True)
-        self.helper_get_sink_by_name('sink2', 'CentralJson')
+        self.helper_get_sink_by_name('sink2', 'JsonBlob')
         self.helper_get_sink_by_name('sink3', 'EventHub', True)
 
     def helper_get_sinks_by_type(self, type, names):
@@ -193,4 +193,4 @@ class TestSinkConfiguration(TestCase):
         sink_list = self.sink_config.get_sinks_by_type("Bogus")
         self.assertEqual(len(sink_list), 0)
         self.helper_get_sinks_by_type('EventHub', ['sink1', 'sink3'])
-        self.helper_get_sinks_by_type('CentralJson', ['sink2'])
+        self.helper_get_sinks_by_type('JsonBlob', ['sink2'])

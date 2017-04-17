@@ -217,9 +217,9 @@ class LadLoggingConfig:
         sink_type = sink['type']
         if not sink_type:
             raise LadLoggingConfigException('Sink type for sink "{0}" is not defined in sinksConfig'.format(sink_name))
-        if sink_type == 'CentralJson':
+        if sink_type == 'JsonBlob':
             return _mdsd_per_routeevent_config_template.format(event_name=sink_name,
-                                                               opt_store_type='storeType="CentralJson"')
+                                                               opt_store_type='storeType="JsonBlob"')
         elif sink_type == 'EventHub':
             raise LadLoggingConfigException('EventHub sink type is not yet supported')
         else:

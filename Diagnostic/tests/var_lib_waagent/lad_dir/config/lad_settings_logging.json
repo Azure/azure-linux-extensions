@@ -47,7 +47,7 @@
                 "name": "sink1"
               },
               {
-                "type": "CentralJson",
+                "type": "JsonBlob",
                 "name": "SyslogJsonBlob"
               },
               {
@@ -56,11 +56,11 @@
                 "name": "sink3"
               },
               {
-                "type": "CentralJson",
+                "type": "JsonBlob",
                 "name": "Filelog1JsonBlob"
               },
               {
-                "type": "CentralJson",
+                "type": "JsonBlob",
                 "name": "Filelog2JsonBlob"
               }
             ]
