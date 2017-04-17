@@ -173,7 +173,12 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
   <Unpivot columnName="CounterName" columnValue="Value" columns="PercentProcessorTime">
     <MapName name="PercentProcessorTime">/builtin/processor/PercentProcessorTime</MapName>
   </Unpivot>
-</OMIQuery></OMI>
+</OMIQuery>
+<OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+<OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="JsonBlob" />
+<OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxFileSystem" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+<OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="FileSystemJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="JsonBlob" />
+</OMI>
 
     <DerivedEvents>
     <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001">

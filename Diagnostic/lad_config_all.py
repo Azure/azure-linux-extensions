@@ -188,7 +188,7 @@ class LadConfigAll:
                         # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
                         pass
 
-    def _update_perf_counters_settings(self, omi_queries):
+    def _update_raw_omi_events_settings(self, omi_queries):
         """
         Update the mdsd XML tree with the OMI queries provided.
         :param omi_queries: List of dictionaries specifying OMI queries and destination tables. E.g.:
@@ -202,23 +202,49 @@ class LadConfigAll:
         if not omi_queries:
             return
 
-        mdsd_omi_query_schema = """
-<OMIQuery cqlQuery="" dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" />
-"""
+        def generate_omi_query_xml_elem(omi_query, sink=()):
+            """
+            Helper for generating OMI event XML element
+            :param omi_query: Python dictionary object for the raw OMI query specified as a LAD 3.0 perfCfg array item
+            :param sink: (name, type) tuple for this OMI query. Not specified implies default XTable sink
+            :return: An XML element object for this OMI event that should be added to the mdsd XML cfg tree
+            """
+            omi_xml_schema = """
+            <OMIQuery cqlQuery="" dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" storeType="" />
+            """ if sink else """
+            <OMIQuery cqlQuery="" dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" />
+            """
+            xml_elem = XmlUtil.createElement(omi_xml_schema)
+            xml_elem.set('cqlQuery', omi_query['query'])
+            xml_elem.set('eventName', sink[0] if sink else omi_query['table'])
+            # Default OMI namespace is 'root/scx'
+            xml_elem.set('omiNamespace', omi_query['namespace'] if 'namespace' in omi_query else 'root/scx')
+            # Default query frequency is 300 seconds
+            xml_elem.set('sampleRateInSeconds', str(omi_query['frequency']) if 'frequency' in omi_query else '300')
+            if sink:
+                xml_elem.set('storeType', sink[1])
+            return xml_elem
 
         for omi_query in omi_queries:
-            if 'query' in omi_query and 'table' in omi_query:
-                mdsd_omi_query_element = XmlUtil.createElement(mdsd_omi_query_schema)
-                mdsd_omi_query_element.set('cqlQuery', omi_query['query'])
-                mdsd_omi_query_element.set('eventName', omi_query['table'])
-                namespace = omi_query['namespace'] if 'namespace' in omi_query else 'root/scx'
-                mdsd_omi_query_element.set('omiNamespace', namespace)
-                frequency = omi_query['frequency'] if 'frequency' in omi_query else '300'
-                mdsd_omi_query_element.set('sampleRateInSeconds', frequency)
-                XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
-                                   el=mdsd_omi_query_element, addOnlyOnce=True)
-            else:
+            if ('query' not in omi_query) or ('table' not in omi_query and 'sinks' not in omi_query):
                 self._logger_log("Ignoring perfCfg array element missing required elements: '{0}'".format(omi_query))
+                continue
+            if 'table' in omi_query:
+                XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
+                                   el=generate_omi_query_xml_elem(omi_query), addOnlyOnce=True)
+            if 'sinks' in omi_query:
+                for sink_name in omi_query['sinks'].split(','):
+                    sink = self._sink_configs.get_sink_by_name(sink_name)
+                    if not sink:
+                        raise LadLoggingConfigException('Sink name "{0}" is not defined in sinksConfig'.format(sink_name))
+                    if 'type' not in sink:
+                        raise LadLoggingConfigException('"type" is not defined in sinksConfig for sink name "{0}"'.format(sink_name))
+                    sink_type = sink['type']
+                    if sink_type != 'JsonBlob':
+                        raise LadLoggingConfigException('Sink type "{0}" is not yet supported'.format(sink_type))
+                    xml_elem = generate_omi_query_xml_elem(omi_query, (sink_name, sink_type))
+                    XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
+                                       el=xml_elem, addOnlyOnce=True)
 
     def _apply_perf_cfg(self):
         """
@@ -229,15 +255,7 @@ class LadConfigAll:
         assert self._mdsd_config_xml_tree is not None
 
         perf_cfg = self._ext_settings.read_public_config('perfCfg')
-        # If none, use default (3 OMI queries) DISABLED
-        # if not perf_cfgs and not self._ext_settings.has_public_config('perfCfg'):
-        #     perf_cfgs = LadConfigAll._default_perf_cfgs
-
-        try:
-            self._update_perf_counters_settings(perf_cfg)
-        except Exception as e:
-            self._logger_error("Failed to create perf config. Error:{0}\n"
-                               "Stacktrace: {1}".format(e, traceback.format_exc()))
+        self._update_raw_omi_events_settings(perf_cfg)
 
     def _encrypt_secret_with_cert(self, secret):
         """

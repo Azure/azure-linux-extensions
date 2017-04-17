@@ -5,7 +5,33 @@
         "protectedSettings": {
           "storageAccountEndPoint": "https://core.windows.net/",
           "storageAccountKey": "NOT_A_REAL_KEY",
-          "storageAccountName": "ladunittestfakeaccount"
+          "storageAccountName": "ladunittestfakeaccount",
+          "sinksConfig": {
+            "sink": [
+              {
+                "sasURL": "https://fake_sas_url_1",
+                "type": "EventHub",
+                "name": "sink1"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "SyslogJsonBlob"
+              },
+              {
+                "sasURL": "https://fake_sas_url_2",
+                "type": "EventHub",
+                "name": "sink3"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "ProcessorInfoJsonBlob"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "FileSystemJsonBlob"
+              }
+            ]
+          }
         },
         "protectedSettingsCertThumbprint": "B175B535DFE9F93659E5AFD893BF99BBF9DF28A5",
         "publicSettings": {
@@ -72,6 +98,22 @@
               }
             }
           },
+          "perfCfg": [
+            {
+              "query": "SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation",
+              "table": "LinuxMemory"
+            },
+            {
+              "query": "SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation",
+              "sinks": "ProcessorInfoJsonBlob",
+              "frequency": 60
+            },
+            {
+              "query": "SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation",
+              "table": "LinuxFileSystem",
+              "sinks": "FileSystemJsonBlob"
+            }
+          ],
           "sampleRateInSeconds": 15,
           "StorageAccount": "ladtest"
         }
