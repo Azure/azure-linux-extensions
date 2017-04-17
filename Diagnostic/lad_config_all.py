@@ -370,10 +370,19 @@ class LadConfigAll:
                 if resource_id:
                     XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
                                         'partitionKey', escape_nonalphanumerics(resource_id))
-                    instance_id = ""
+                    lad_query_instance_id = ""
+                    uuid_for_instance_id = self._fetch_uuid()
                     if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                        instance_id = self._fetch_uuid()
-                    self._set_xml_attr("instanceID", instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
+                        lad_query_instance_id = uuid_for_instance_id
+                    self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
+                    # Set JsonBlob sink-related elements
+                    json_blob_identity_field_template = '<OboDirectPartitionField name="{name}" value="{value}" />'
+                    resource_id_xml = json_blob_identity_field_template.format(name='resourceId', value=resource_id)
+                    agent_id_hash_xml = json_blob_identity_field_template.format(name='agentIdentityHash',
+                                                                                 value=uuid_for_instance_id)
+                    XmlUtil.addElement(self._mdsd_config_xml_tree, 'Management', ET.fromstring(resource_id_xml))
+                    XmlUtil.addElement(self._mdsd_config_xml_tree, 'Management', ET.fromstring(agent_id_hash_xml))
+
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
                 return False, 'Failed to create portal config from ladCfg (see extension error logs for more details)'

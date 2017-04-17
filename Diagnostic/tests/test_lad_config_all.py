@@ -148,6 +148,8 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
       <IdentityComponent name="Host" useComputerName="true" />
     </Identity>
     <AgentResourceUsage diskQuotaInMB="50000" />
+    <OboDirectPartitionField name="resourceId" value="/subscriptions/27b750cd-ed43-42fd-9044-8d75e124ae55/resourceGroups/jz-rg/providers/Microsoft.Compute/virtualMachines/jz-lad-scus1" />
+    <OboDirectPartitionField name="agentIdentityHash" value="DEADBEEF-0000-1111-2222-77DEADBEEF77" />
   </Management>
 
   <Schemas>
