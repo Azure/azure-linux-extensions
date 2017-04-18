@@ -348,8 +348,9 @@ $privateConfig = '{
 * To distribute MOF configurations to the Linux VM with Pull Servers, you need to make sure the cron service is running in the VM.
 
 ## Changelog
+
 ```
-# 3.0 (2017-01-13)
+# 3.0 (2017-04-17)
 - Update to OMI v1.1.0 and Linux DSC v1.1.1-294
 - Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 
   'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.

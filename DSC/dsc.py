@@ -239,7 +239,7 @@ def remove_old_dsc_packages():
 
 def deb_remove_old_dsc_package():
     version = get_deb_pkg_version('dsc')
-    if code == 0:
+    if version is not None:
         if is_very_old_dsc_package(version):
             deb_uninstall_package(package_name)
 			
@@ -257,7 +257,8 @@ def is_very_old_dsc_package():
     return False
 			
 def deb_remove_old_package(package_name, version):
-    if deb_is_old_package(package_name, version):
+    system_pkg_version = get_deb_pkg_version(package_name)
+    if system_pkg_version is not None:
         deb_uninstall_package(package_name)
 
 def get_deb_pkg_version(package_name):
@@ -266,12 +267,6 @@ def get_deb_pkg_version(package_name):
         code,output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
         if code == 0:
             return output
-    return "0.0.0.0"
-
-def deb_is_old_package(package_name, version):
-    if compare_pkg_version(get_deb_pkg_version(), major_version, minor_version, build) == 0:
-            return True
-    return False
 	
 def rpm_remove_old_package(package_name, version):
     if rpm_check_old_package(package_name, version):
