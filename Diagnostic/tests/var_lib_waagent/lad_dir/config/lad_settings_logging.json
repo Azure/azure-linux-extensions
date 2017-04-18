@@ -7,7 +7,7 @@
           "ladCfg": {
             "diagnosticMonitorConfiguration": {
               "syslogEvents": {
-                "sinks": "SyslogJsonBlob",
+                "sinks": "SyslogJsonBlob,SyslogEventHub",
                 "syslogEventConfiguration": {
                   "LOG_USER": "LOG_ERR",
                   "LOG_LOCAL0": "LOG_CRIT"
@@ -18,7 +18,8 @@
           "fileLogs" : [
             {
               "file": "/var/log/mydaemonlog1",
-              "table": "MyDaemon1Events"
+              "table": "MyDaemon1Events",
+              "sinks": "Filelog1JsonBlob,FilelogEventHub"
             },
             {
               "file": "/var/log/mydaemonlog2",
@@ -44,7 +45,7 @@
               {
                 "sasURL": "https://fake_sas_url_1",
                 "type": "EventHub",
-                "name": "sink1"
+                "name": "SyslogEventHub"
               },
               {
                 "type": "JsonBlob",
@@ -53,7 +54,7 @@
               {
                 "sasURL": "https://fake_sas_url_2",
                 "type": "EventHub",
-                "name": "sink3"
+                "name": "FilelogEventHub"
               },
               {
                 "type": "JsonBlob",

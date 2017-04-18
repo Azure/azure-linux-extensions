@@ -20,7 +20,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         # "syslogEvents" LAD config example
         syslogEvents_json_ext_settings = """
             {
-                "sinks": "SyslogJsonBlob",
+                "sinks": "SyslogJsonBlob,SyslogEventHub",
                 "syslogEventConfiguration": {
                     "LOG_LOCAL0": "LOG_CRIT",
                     "LOG_USER": "LOG_ERR"
@@ -33,7 +33,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                 {
                     "file": "/var/log/mydaemonlog1",
                     "table": "MyDaemon1Events",
-                    "sinks": "Filelog1JsonBlob"
+                    "sinks": "Filelog1JsonBlob,FilelogEventHub"
                 },
                 {
                     "file": "/var/log/mydaemonlog2",
@@ -47,18 +47,18 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
             {
                 "sink": [
                     {
-                        "name": "sink1",
+                        "name": "SyslogEventHub",
                         "type": "EventHub",
-                        "sasURL": "https://fake_sas_url_1"
+                        "sasURL": "https://fake_sas_url_for_syslog_eh"
                     },
                     {
                         "name": "SyslogJsonBlob",
                         "type": "JsonBlob"
                     },
                     {
-                        "name": "sink3",
+                        "name": "FilelogEventHub",
                         "type": "EventHub",
-                        "sasURL": "https://fake_sas_url_2"
+                        "sasURL": "https://fake_sas_url_for_filelog_eh"
                     },
                     {
                         "name": "Filelog1JsonBlob",
@@ -85,15 +85,19 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogJsonBlob" and @priority="High" and @storeType="JsonBlob"]',
+                                           './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogEventHub" and @priority="High" and @storeType="local"]',
+                                           './EventStreamingAnnotations/EventStreamingAnnotation[@name="SyslogEventHub"]/EventPublisher/Key',  # TODO Perform CDATA validation
                                           )
         self.oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
                                             './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog1JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
+                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="FilelogEventHub" and @priority="High" and @storeType="local"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog2JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
+                                            './EventStreamingAnnotations/EventStreamingAnnotation[@name="FilelogEventHub"]/EventPublisher/Key',  # TODO Perform CDATA validation
                                            )
 
     def test_oms_syslog_mdsd_configs(self):
@@ -276,17 +280,17 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for blank cfg (syslog disabled)',
                                               expected_out_mdsd_cfg_template.format(optional_lines=''), actual)
 
-    def test_copy_schema_source_mdsdevent_elems(self):
+    def test_copy_schema_source_mdsdevent_eh_url_elems(self):
         """
-        Tests whether copy_schema_source_mdsdevent_elems() works fine.
-        Uses syslog_mdsd_extended_expected_output and filelogs_mdsd_expected_output XML strings
+        Tests whether copy_schema_source_mdsdevent_eh_url_elems() works fine.
+        Uses oms_syslog_expected_xpaths and oms_filelog_expected_xpaths XPath lists
         to test the operation.
         """
         xml_string_srcs = [ self.cfg_syslog.get_oms_mdsd_syslog_config(),
                             self.cfg_filelog.get_oms_mdsd_filelog_config()
                           ]
         dst_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
-        map(lambda x: copy_source_mdsdevent_elems(dst_xml_tree, x), xml_string_srcs)
+        map(lambda x: copy_source_mdsdevent_eh_url_elems(dst_xml_tree, x), xml_string_srcs)
         print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
         xml = ET.tostring(dst_xml_tree.getroot())
         print xml
