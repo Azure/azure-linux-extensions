@@ -22,6 +22,8 @@ import re
 import sys
 import traceback
 import tempfile
+import time
+import platform
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
@@ -30,7 +32,7 @@ import Utils.ScriptUtil as ScriptUtil
 # Global Variables
 ExtensionShortName = "OmsAgentForLinux"
 PackagesDirectory = "packages"
-BundleFileName = 'omsagent-1.3.3-15.universal.x64.sh'
+BundleFileName = 'omsagent-1.3.4-15.universal.x64.sh'
 
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
 InstallCommandTemplate = './{0} --upgrade'
@@ -42,17 +44,11 @@ ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
 DisableOmsAgentServiceCommand = './service_control disable'
 EnableOmsAgentServiceCommand = './service_control enable'
 
-# Dictionary of operations strings to methods
-operations = {'Disable' : disable,
-              'Uninstall' : uninstall,
-              'Install' : install,
-              'Enable' : enable
-}
-
 # Change permission of log path
 ext_log_path = '/var/log/azure/'
 if os.path.exists(ext_log_path):
     os.chmod(ext_log_path, 700)
+
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout', True)
@@ -81,16 +77,14 @@ def main():
 
     # Invoke operation
     try:
-        if operation is 'Update':
-            # Upgrade is noop since omsagent.py->install() will be called everytime upgrade
-            #   is done due to upgradeMode = "UpgradeWithInstall" set in HandlerManifest
-            dummy_command(operation, 'success', operation + ' succeeded')
-        elif operation in operations:
-            hutil = parse_context(operation)
+        hutil = parse_context(operation)
+        if is_vm_supported_for_extension():
             exit_code = operations[operation](hutil)
-            if exit_code is not 0:
-                # If Daniel replies favorably, then if an exit code is among the pre-reqs we can return that and print out the pre-req
-                message = (operation + ' failed with exit code {0}').format(exit_code)
+        else:
+            log_and_exit(hutil, operation, 51, 'Unsupported operation system')
+
+        if exit_code is not 0:
+            message = (operation + ' failed with exit code {0}').format(exit_code)
 
     except ValueError as e:
         exit_code = 11
@@ -105,6 +99,95 @@ def main():
             message = (operation + ' failed with error: {0}').format(e.message)
 
     # Finish up and log messages
+    log_and_exit(hutil, operation, exit_code, message)
+
+
+def parse_context(operation):
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
+    hutil.do_parse_context(operation)
+    return hutil
+
+
+def is_vm_supported_for_extension():
+    '''
+    Returns for platform.linux_distribution() vary widely in format, such as '7.3.1611' returned
+    for a machine with CentOS 7, so the first provided digits must match
+    '''
+    supported_dists = {'redhat' : ('5', '6', '7'), # CentOS
+                       'centos' : ('5', '6', '7'), # CentOS
+                       'red hat' : ('5', '6', '7'), # Oracle, RHEL
+                       'oracle' : ('5', '6', '7'), # Oracle
+                       'debian' : ('6', '7', '8'), # Debian
+                       'ubuntu' : ('12.04', '14.04', '15.04', '15.10', '16.04'), # Ubuntu
+                       'suse' : ('11', '12') #SLES
+    }
+
+    try:
+        vm_dist, vm_ver, vm_id = platform.linux_distribution()
+    except AttributeError:
+        vm_dist, vm_ver, vm_id = platform.dist()
+
+    vm_supported = False
+
+    # Find this VM distribution in the supported list
+    for supported_dist in supported_dists.keys():
+        if not vm_dist.lower().startswith(supported_dist):
+            continue
+
+        # Check if this VM distribution version is supported
+        vm_ver_split = vm_ver.split('.')
+        for supported_ver in supported_dists[supported_dist]:
+            supported_ver_split = supported_ver.split('.')
+
+            vm_ver_match = True
+            for idx, supported_ver_num in enumerate(supported_ver_split):
+                try:
+                    vm_ver_num = vm_ver_split[idx]
+                except IndexError:
+                    vm_ver_match = False
+                    break
+                if vm_ver_num is not supported_ver_num:
+                    vm_ver_match = False
+                    break
+            if vm_ver_match:
+                vm_supported = True
+                break
+
+        if vm_supported:
+            break
+
+    return vm_supported
+
+
+def dummy_command(hutil):
+    return 0
+
+
+def run_command_with_retries(hutil, cmd, file_directory, operation, extension_short_name, retries,
+                             initial_sleep_time = 30, sleep_increase_factor = 1):
+    '''
+    Some commands fail because the package manager is locked (apt-get/dpkg only); this will
+      allow retries on failing commands.
+    Logic used: will retry up to retries times with initial_sleep_time in between tries
+    Note: install operation times out from WAAgent at 15 minutes, so do not wait longer.
+    '''
+    try_count = 0
+    sleep_time = initial_sleep_time # seconds
+    while try_count <= retries:
+        exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory,
+                                           operation, extension_short_name,
+                                           hutil.get_extension_version())
+        if exit_code is 0:
+            break
+        try_count += 1
+        hutil.log('Retrying command ' + cmd + ' because it failed with exit code ' + str(exit_code))
+        time.sleep(sleep_time)
+        sleep_time *= sleep_increase_factor
+
+    return exit_code
+
+
+def log_and_exit(hutil, operation, exit_code = 1, message = ''):
     if exit_code is 0:
         waagent.Log(message)
         hutil.log(message)
@@ -115,18 +198,6 @@ def main():
         hutil.do_exit(exit_code, operation, 'failed', str(exit_code), message)
 
 
-def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
-    hutil.do_parse_context(operation)
-    return hutil
-
-
-def dummy_command(operation, status, msg):
-    hutil = parse_context(operation)
-    hutil.do_exit(0, operation, status, '0', msg)
-    return 0
-
-
 def install(hutil):
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
     file_path = os.path.join(file_directory, BundleFileName)
@@ -134,8 +205,10 @@ def install(hutil):
     os.chmod(file_path, 100)
     cmd = InstallCommandTemplate.format(BundleFileName)
     waagent.Log("Starting command %s --upgrade." %(BundleFileName))
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Install',
-                                       ExtensionShortName, hutil.get_extension_version())
+
+    # Retry, since install can fail due to concurrent package operations
+    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Install', ExtensionShortName,
+                                         retries = 10)
     return exit_code
 
 
@@ -144,8 +217,10 @@ def uninstall(hutil):
 
     cmd = UninstallCommandTemplate.format(BundleFileName)
     waagent.Log("Starting command %s --remove." %(BundleFileName))
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory, 'Uninstall',
-                                       ExtensionShortName, hutil.get_extension_version())
+
+    # Retry up to three times, since uninstall can fail due to concurrent package operations
+    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Uninstall',
+                                         ExtensionShortName, retries = 10)
     return exit_code
 
 
@@ -179,6 +254,9 @@ def enable(hutil):
                                                 hutil.get_extension_version(), False,
                                                 interval = 30,
                                                 std_out_file_name = output_file.name)
+        # If no workspace is configured, then the list-workspaces command returns an error, which
+        # should be ignored in the logs
+        waagent.Log("Ignore error from above 'Check If Already Onboarded' command.")
 
         # If the printout includes "No Workspace" then there are no workspaces onboarded to the
         #   machine; otherwise the workspaces that have been onboarded are listed in the output
@@ -222,7 +300,7 @@ def enable(hutil):
                                            ServiceControlWorkingDirectory, 'Enable',
                                            ExtensionShortName, hutil.get_extension_version())
     else:
-        hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code)
+        hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code))
 
     return exit_code
 
@@ -233,6 +311,17 @@ def disable(hutil):
                                        ServiceControlWorkingDirectory, 'Disable',
                                        ExtensionShortName, hutil.get_extension_version())
     return exit_code
+
+
+# Dictionary of operations strings to methods
+operations = {'Disable' : disable,
+              'Uninstall' : uninstall,
+              'Install' : install,
+              'Enable' : enable,
+              # Upgrade is noop since omsagent.py->install() will be called everytime upgrade
+              #   is done due to upgradeMode = "UpgradeWithInstall" set in HandlerManifest
+              'Update' : dummy_command
+}
 
 
 if __name__ == '__main__' :
