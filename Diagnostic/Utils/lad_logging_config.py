@@ -17,9 +17,10 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from xml.etree import ElementTree as ET
-from Utils.omsagent_util import get_syslog_ng_src_name
-import Utils.LadDiagnosticUtil as LadUtil
 
+import Utils.LadDiagnosticUtil as LadUtil
+from Utils.lad_exceptions import LadLoggingConfigException
+from Utils.omsagent_util import get_syslog_ng_src_name
 
 # Mdsd XML config templates defined globally because they are shared by multiple methods
 _mdsd_sources_events_config_template = """
@@ -402,13 +403,6 @@ def syslog_name_to_rsyslog_name(syslog_name):
     if syslog_name not in syslog_name_to_rsyslog_name_map:
         raise LadLoggingConfigException('Invalid syslog name given: {0}'.format(syslog_name))
     return syslog_name_to_rsyslog_name_map[syslog_name]
-
-
-class LadLoggingConfigException(Exception):
-    """
-    Custom exception class for LAD logging config errors
-    """
-    pass
 
 
 def copy_sub_elems(dst_xml, src_xml, path):

@@ -24,7 +24,8 @@ import xml.etree.ElementTree as ET
 import Providers.Builtin as BuiltIn
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems, LadLoggingConfigException
+from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems
+from Utils.lad_exceptions import LadLoggingConfigException
 from Utils.misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 
 _mdsd_xml_template = """

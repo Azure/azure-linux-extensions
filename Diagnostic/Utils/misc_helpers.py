@@ -19,7 +19,7 @@ import xml.dom.minidom
 import binascii
 
 from Utils.WAAgentUtil import waagent
-from Utils.lad_logging_config import LadLoggingConfigException
+from Utils.lad_exceptions import LadLoggingConfigException
 
 
 def get_extension_operation_type(command):
