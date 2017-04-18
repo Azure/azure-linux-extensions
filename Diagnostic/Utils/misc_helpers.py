@@ -19,6 +19,7 @@ import xml.dom.minidom
 import binascii
 
 from Utils.WAAgentUtil import waagent
+from Utils.lad_logging_config import LadLoggingConfigException
 
 
 def get_extension_operation_type(command):
@@ -139,7 +140,9 @@ class LadLogHelper(object):
 
 
 def read_uuid(run_command):
-    code, str_ret = run_command("dmidecode |awk '/UUID/{print $2}'", chk_err=False)
+    code, str_ret = run_command("dmidecode |awk '/UUID/{print $2}'")
+    if code != 0:
+        raise LadLoggingConfigException('read_uuid() failed. Exit code={0}, Output={1}'.format(code, str_ret))
     return str_ret.strip()
 
 
