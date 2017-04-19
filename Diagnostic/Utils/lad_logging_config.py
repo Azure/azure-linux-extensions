@@ -438,7 +438,7 @@ def copy_sub_elems(dst_xml, src_xml, path):
     """
     Copy sub-elements of src_elem (XML) to dst_elem.
     :param xml.etree.ElementTree.ElementTree dst_xml: Python xml tree object to which sub-elements will be copied.
-    :param xml.etree.ElementTree.ElementTree dst_xml: Python xml tree object from which sub-elements will be copied.
+    :param xml.etree.ElementTree.ElementTree src_xml: Python xml tree object from which sub-elements will be copied.
     :param str path: The path of the element whose sub-elements will be copied.
     :return: None. dst_xml will be updated with copied sub-elements
     """

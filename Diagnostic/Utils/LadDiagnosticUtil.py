@@ -87,7 +87,7 @@ def getAggregationPeriodsFromLadCfg(ladCfg):
 def getSinkList(feature_config):
     """
     Returns the list of sink names to which all data should be forwarded, according to this config
-    :param feature_config: The JSON config for a feature (e.g. the config struct for "performanceCounters" or "syslogEvents")
+    :param feature_config: The JSON config for a feature (e.g. the struct for "performanceCounters" or "syslogEvents")
     :return: the list of names; might be an empty list
     :rtype: [str]
     """
@@ -113,7 +113,8 @@ class SinkConfiguration:
 
     def insert_from_config(self, json):
         """
-        Walk through the sinksConfig JSON object and add all sinks within it
+        Walk through the sinksConfig JSON object and add all sinks within it. Every accepted sink is guaranteed to
+        have a 'name' and 'type' element.
         :param json: A hash holding the body of a sinksConfig object
         :return: A string containing warning messages, or an empty string
         """
@@ -133,7 +134,7 @@ class SinkConfiguration:
         :return: JSON object or None
         """
         if sink_name in self._sinks:
-                return self._sinks[sink_name]
+            return self._sinks[sink_name]
         return None
 
     def get_all_sink_names(self):

@@ -76,6 +76,7 @@ _annotation_xml = """
 </EventStreamingAnnotation>
 """
 
+
 class LadConfigAll:
     """
     A class to generate configs for all 3 core components of LAD: mdsd, omsagent (fluentd), and syslog
@@ -139,7 +140,6 @@ class LadConfigAll:
 
         # Get encryption settings
         thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
-        path = '{0}/{1}.{2}'
         self._cert_path = os.path.join(waagent_dir, thumbprint + '.crt')
         self._pkey_path = os.path.join(waagent_dir, thumbprint + '.prv')
 
@@ -156,6 +156,13 @@ class LadConfigAll:
         """
         return 'WADMetrics{0}P10DV2S'.format(interval)
 
+    def _add_element_from_string(self, path, xml_string):
+        """
+        Add an XML fragment to the mdsd config document in accordance with path
+        :param str path: Where to add the fragment
+        :param str xml_string: A string containing the XML element to add
+        """
+        XmlUtil.addElement(self._mdsd_config_xml_tree, path, ET.fromstring(xml_string))
 
     def _update_metric_collection_settings(self, ladCfg):
         """
@@ -187,8 +194,7 @@ class LadConfigAll:
 
         # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
         # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
-        # output to a new local table, then arrange for additional derived queries to pull from that. (For Event Hub
-        # sinks, place the appropriate annotation on the local table; no additional DerivedQuery is needed.)
+        # output to a new local table, then arrange for additional derived queries to pull from that.
         ladquery = '''
 <DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{where}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
@@ -202,12 +208,12 @@ class LadConfigAll:
                     local_table_name = ProvUtil.MakeUniqueEventName('aggregationLocal')
                     query = ladquery.format(interval=aggregation_interval, source=table_name,
                                             target=local_table_name, where='Local')
+                    self._add_element_from_string('Events/DerivedEvents', query)
+                    self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
                 else:
                     query = ladquery.format(interval=aggregation_interval, source=table_name,
                                             target=LadConfigAll._wad_table_name(aggregation_interval), where='Central')
-                XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
-            if sinks :
-                    self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
+                    self._add_element_from_string('Events/DerivedEvents', query)
 
     def _handle_alternate_sinks(self, interval, sinks, source):
         """
@@ -220,23 +226,19 @@ class LadConfigAll:
         """
         query_text = '<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}"/>'
         query = query_text.format(interval=interval, source=source, target=LadConfigAll._wad_table_name(interval))
-        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
-            if sinks:for name in sinks:
-                sink = self._sink_configs.get_sink_by_name(name)
-                if sink is None:
-                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
-                else:
-                    if sink['type'] == 'EventHub':
-                        if 'sasURL' in sink:
-                        sas = sink['sasURL']
-                        annotation = _annotation_xml.format(table=source, sas=sas)
-                        XmlUtil.addElement(self._mdsd_config_xml_tree,
-                                           'EventStreamingAnnotations',
-                                           ET.fromstring(annotation))
+        self._add_element_from_string('Events/DerivedEvents', query)
+        for name in sinks:
+            sink = self._sink_configs.get_sink_by_name(name)
+            if sink is None:
+                self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+            elif sink['type'] == 'EventHub':
+                    if 'sasURL' in sink:
+                        self._add_element_from_string('EventStreamingAnnotations',
+                                                      _annotation_xml.format(table=source, sas=sink['sasURL']))
                     else:
                         self._logger_log("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
-                else:
-                    self._logger_log("Ignoring EventHub sink '{0}': unknown type".format(name))
+            else:
+                self._logger_log("Ignoring EventHub sink '{0}': unknown type".format(name))
 
     def _update_raw_omi_events_settings(self, omi_queries):
         """
@@ -370,7 +372,7 @@ class LadConfigAll:
 
     def _set_event_volume(self, lad_cfg):
         """
-        Set event volumne in mdsd config. Check if desired event volume is specified,
+        Set event volume in mdsd config. Check if desired event volume is specified,
         first in ladCfg then in public config. If in neither then default to Medium.
         :param lad_cfg: 'ladCfg' Json object to look up for the event volume setting.
         :return: None. The mdsd config XML tree's eventVolume attribute is directly updated.
@@ -430,8 +432,8 @@ class LadConfigAll:
                     resource_id_xml = json_blob_identity_field_template.format(name='resourceId', value=resource_id)
                     agent_id_hash_xml = json_blob_identity_field_template.format(name='agentIdentityHash',
                                                                                  value=uuid_for_instance_id)
-                    XmlUtil.addElement(self._mdsd_config_xml_tree, 'Management', ET.fromstring(resource_id_xml))
-                    XmlUtil.addElement(self._mdsd_config_xml_tree, 'Management', ET.fromstring(agent_id_hash_xml))
+                    self._add_element_from_string('Management', resource_id_xml)
+                    self._add_element_from_string('Management', agent_id_hash_xml)
 
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
@@ -496,7 +498,8 @@ class LadConfigAll:
 
         return True, ""
 
-    def __throw_if_output_is_none(self, output):
+    @staticmethod
+    def __throw_if_output_is_none(output):
         """
         Helper to check if output is already generated (not None) and throw if it's not (None).
         :return: None
@@ -514,7 +517,7 @@ class LadConfigAll:
         :rtype: str
         :return: Fluentd syslog src config string
         """
-        self.__throw_if_output_is_none(self._fluentd_syslog_src_config)
+        LadConfigAll.__throw_if_output_is_none(self._fluentd_syslog_src_config)
         return self._fluentd_syslog_src_config
 
     def get_fluentd_tail_src_config(self):
@@ -525,7 +528,7 @@ class LadConfigAll:
         :rtype: str
         :return: Fluentd tail src config string
         """
-        self.__throw_if_output_is_none(self._fluentd_tail_src_config)
+        LadConfigAll.__throw_if_output_is_none(self._fluentd_tail_src_config)
         return self._fluentd_tail_src_config
 
     def get_fluentd_out_mdsd_config(self):
@@ -536,7 +539,7 @@ class LadConfigAll:
         :rtype: str
         :return: Fluentd out_mdsd config string
         """
-        self.__throw_if_output_is_none(self._fluentd_out_mdsd_config)
+        LadConfigAll.__throw_if_output_is_none(self._fluentd_out_mdsd_config)
         return self._fluentd_out_mdsd_config
 
     def get_rsyslog_config(self):
@@ -550,7 +553,7 @@ class LadConfigAll:
         :rtype: str
         :return: rsyslog config string
         """
-        self.__throw_if_output_is_none(self._rsyslog_config)
+        LadConfigAll.__throw_if_output_is_none(self._rsyslog_config)
         return self._rsyslog_config
 
     def get_syslog_ng_config(self):
@@ -563,5 +566,5 @@ class LadConfigAll:
         :rtype: str
         :return: syslog-ng config string
         """
-        self.__throw_if_output_is_none(self._syslog_ng_config)
+        LadConfigAll.__throw_if_output_is_none(self._syslog_ng_config)
         return self._syslog_ng_config
