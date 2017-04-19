@@ -71,6 +71,7 @@ import datetime
 import Status
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
+import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -272,7 +273,7 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
-        except:
+        except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
@@ -308,13 +309,17 @@ class HandlerUtility:
             total_used = 0
             for i in range(1,len(output)-1):
                 device, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} used space in KB : {1}".format(device,used))
-                total_used = total_used + int(used) #return in KB
+                if not (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used = total_used + int(used) #return in KB
+                else:
+                    HandlerUtility.add_to_telemetery_data("GlusterFSPresent","True")
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
-        except:
-            self.log("Unable to fetch total used space")
+        except Exception as e:
+            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
             return 0,True
 
     def get_storage_details(self):
