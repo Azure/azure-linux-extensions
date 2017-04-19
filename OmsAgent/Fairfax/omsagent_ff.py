@@ -37,9 +37,7 @@ UninstallCommandTemplate = '{0} --remove'
 OmsAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
 WorkspaceCheckCommandTemplate = '{0} -l'
 OnboardCommandWithOptionalParamsTemplate = '{0} -d opinsights.azure.us -w {1} -s {2} {3}'
-ServiceControlPath = '/opt/microsoft/omsagent/bin/service_control'
-DisableOmsAgentServiceCommandTemplate = '{0} disable'
-EnableOmsAgentServiceCommandTemplate = '{0} enable'
+DisableOmsAgentServiceCommand = '/opt/microsoft/omsagent/bin/service_control disable'
 
 # Change permission of log path
 ext_log_path = '/var/log/azure/'
@@ -54,17 +52,17 @@ def main():
     # Determine the operation being executed
     operation = None
     try:
-        for a in sys.argv[1:]:
-            if re.match('^([-/]*)(disable)', a):
-                operation = 'Disable'
-            elif re.match('^([-/]*)(uninstall)', a):
-                operation = 'Uninstall'
-            elif re.match('^([-/]*)(install)', a):
-                operation = 'Install'
-            elif re.match('^([-/]*)(enable)', a):
-                operation = 'Enable'
-            elif re.match('^([-/]*)(update)', a):
-                operation = 'Update'
+        option = sys.argv[1]
+        if re.match('^([-/]*)(disable)', option):
+            operation = 'Disable'
+        elif re.match('^([-/]*)(uninstall)', option):
+            operation = 'Uninstall'
+        elif re.match('^([-/]*)(install)', option):
+            operation = 'Install'
+        elif re.match('^([-/]*)(enable)', option):
+            operation = 'Enable'
+        elif re.match('^([-/]*)(update)', option):
+            operation = 'Update'
     except Exception as e:
         waagent.Error(e.message)
 
@@ -149,7 +147,8 @@ def is_vm_supported_for_extension():
             vm_ver_match = True
             for idx, supported_ver_num in enumerate(supported_ver_split):
                 try:
-                    vm_ver_num = vm_ver_split[idx]
+                    supported_ver_num = int(supported_ver_num)
+                    vm_ver_num = int(vm_ver_split[idx])
                 except IndexError:
                     vm_ver_match = False
                     break
@@ -259,13 +258,18 @@ def enable(hutil):
         check_wkspc_cmd = WorkspaceCheckCommandTemplate.format(OmsAdminPath)
         list_exit_code, output = waagent.RunGetOutput(check_wkspc_cmd, chk_err=False)
 
-        # If the printout includes "No Workspace" then there are no workspaces onboarded to the
-        #   machine; otherwise the workspaces that have been onboarded are listed in the output
-        connectionExists = False
-        if 'No Workspace' not in output:
-            connectionExists = True
+        # If this enable was called a workspace already saved on the machine, then we should
+        #   continue; if this workspace is not saved on the machine, but another workspace
+        #   service is running, then we should stop and warn
+        this_wksp_saved = False
+        connection_exists = False
+        for line in output.split('\n'):
+            if workspaceId in line:
+                this_wksp_saved = True
+            if 'Onboarded(OMSAgent Running)' in line:
+                connection_exists = True
 
-        if connectionExists:
+        if not this_wksp_saved and connection_exists:
             err_msg = ('This machine is already connected to some other Log '
                        'Analytics workspace, please set stopOnMultipleConnections '
                        'to false in public settings or remove this property, '
@@ -289,20 +293,11 @@ def enable(hutil):
                                                           optionalParams)
 
     exit_code = run_command_and_log(hutil, onboard_cmd)
-
-    # If onboard succeeds we continue, otherwise fail fast
-    if exit_code == 0:
-        enable_cmd = EnableOmsAgentServiceCommandTemplate.format(ServiceControlPath)
-        exit_code = run_command_and_log(hutil, enable_cmd)
-    else:
-        hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code))
-
     return exit_code
 
 
 def disable(hutil):
-    cmd = DisableOmsAgentServiceCommandTemplate.format(ServiceControlPath)
-    exit_code = run_command_and_log(hutil, cmd)
+    exit_code = run_command_and_log(hutil, DisableOmsAgentServiceCommand)
     return exit_code
 
 
