@@ -81,7 +81,7 @@ def load_test_config(filename):
     decrypt_protected_settings(handler_settings)
     lad_settings = LadExtSettings(handler_settings)
 
-    return LadConfigAll(lad_settings, test_lad_dir, test_waagent_dir, 'test_lad_deployment_id', mock_fetch_uuid,
+    return LadConfigAll(lad_settings, test_lad_dir, '', 'test_lad_deployment_id', mock_fetch_uuid,
                         mock_encrypt_secret, mock_log_info, mock_log_error)
 
 
@@ -139,7 +139,7 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
         expected_xml_str = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
-    <Account account="ladunittestfakeaccount" decryptKeyPath="/home/hosungs/gitroot/azure-linux-extensions/Diagnostic/tests/var_lib_waagent/B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(NOT_A_REAL_KEY)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
+    <Account account="ladunittestfakeaccount" decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(NOT_A_REAL_KEY)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
     </Accounts>
 
   <Management defaultRetentionInDays="90" eventVolume="Large">
@@ -183,17 +183,17 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
 </OMI>
 
     <DerivedEvents>
-    <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001">
+    <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
-</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000001">
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000001" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
-</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000002">
+</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000002" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
-</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000002">
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000002" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
-</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000003">
+</DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000003" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
-</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000003">
+</DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000003" storeType="Central">
 <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
 </DerivedEvent></DerivedEvents>
   </Events>
