@@ -11,7 +11,7 @@
               {
                 "sasURL": "https://fake_sas_url_1",
                 "type": "EventHub",
-                "name": "sink1"
+                "name": "LinuxMemoryEventHub"
               },
               {
                 "type": "JsonBlob",
@@ -20,7 +20,7 @@
               {
                 "sasURL": "https://fake_sas_url_2",
                 "type": "EventHub",
-                "name": "sink3"
+                "name": "ProcessorInfoEventHub"
               },
               {
                 "type": "JsonBlob",
@@ -39,7 +39,7 @@
             "diagnosticMonitorConfiguration": {
               "eventVolume": "Large",
               "metrics": {
-                "resourceId": "/subscriptions/27b750cd-ed43-42fd-9044-8d75e124ae55/resourceGroups/jz-rg/providers/Microsoft.Compute/virtualMachines/jz-lad-scus1",
+                "resourceId": "ladtest_resource_id",
                 "metricAggregation": [
                   {
                     "scheduledTransferPeriod": "PT1H"
@@ -101,11 +101,12 @@
           "perfCfg": [
             {
               "query": "SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation",
-              "table": "LinuxMemory"
+              "table": "LinuxMemory",
+              "sinks": "LinuxMemoryEventHub"
             },
             {
               "query": "SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation",
-              "sinks": "ProcessorInfoJsonBlob",
+              "sinks": "ProcessorInfoJsonBlob,ProcessorInfoEventHub",
               "frequency": 60
             },
             {

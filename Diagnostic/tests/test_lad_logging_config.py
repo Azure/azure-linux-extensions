@@ -7,7 +7,7 @@ from xmlunittest import XmlTestMixin
 
 from Utils.lad_logging_config import *
 from Utils.omsagent_util import get_syslog_ng_src_name
-from lad_config_all import _mdsd_xml_template
+from Utils.mdsd_xml_templates import entire_xml_cfg_tmpl
 import Utils.LadDiagnosticUtil as LadUtil
 
 
@@ -289,7 +289,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         xml_string_srcs = [ self.cfg_syslog.get_oms_mdsd_syslog_config(),
                             self.cfg_filelog.get_oms_mdsd_filelog_config()
                           ]
-        dst_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
+        dst_xml_tree = ET.ElementTree(ET.fromstring(entire_xml_cfg_tmpl))
         map(lambda x: copy_source_mdsdevent_eh_url_elems(dst_xml_tree, x), xml_string_srcs)
         print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
         xml = ET.tostring(dst_xml_tree.getroot())

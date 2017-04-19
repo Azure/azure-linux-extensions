@@ -148,8 +148,8 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
       <IdentityComponent name="Host" useComputerName="true" />
     </Identity>
     <AgentResourceUsage diskQuotaInMB="50000" />
-    <OboDirectPartitionField name="resourceId" value="/subscriptions/27b750cd-ed43-42fd-9044-8d75e124ae55/resourceGroups/jz-rg/providers/Microsoft.Compute/virtualMachines/jz-lad-scus1" />
-    <OboDirectPartitionField name="agentIdentityHash" value="DEADBEEF-0000-1111-2222-77DEADBEEF77" />
+  <OboDirectPartitionField name="resourceId" value="ladtest_resource_id" />
+  <OboDirectPartitionField name="agentIdentityHash" value="DEADBEEF-0000-1111-2222-77DEADBEEF77" />
   </Management>
 
   <Schemas>
@@ -176,30 +176,42 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
     <MapName name="PercentProcessorTime">/builtin/processor/PercentProcessorTime</MapName>
   </Unpivot>
 </OMIQuery>
-<OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
-<OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="JsonBlob" />
-<OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxFileSystem" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
-<OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="FileSystemJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="JsonBlob" />
-</OMI>
+    <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+    <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemoryEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="local" />
+    <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="JsonBlob" />
+    <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="local" />
+    <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxFileSystem" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+    <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="FileSystemJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="JsonBlob" />
+    </OMI>
 
     <DerivedEvents>
     <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000001" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000002" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000002" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent><DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000003" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent><DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="builtin000003" storeType="Central">
-<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey=":002Fsubscriptions:002F27b750cd:002Ded43:002D42fd:002D9044:002D8d75e124ae55:002FresourceGroups:002Fjz:002Drg:002Fproviders:002FMicrosoft:002ECompute:002FvirtualMachines:002Fjz:002Dlad:002Dscus1" />
+<LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest:005Fresource:005Fid" />
 </DerivedEvent></DerivedEvents>
   </Events>
 
   <EventStreamingAnnotations>
-  </EventStreamingAnnotations>
+  <EventStreamingAnnotation name="LinuxMemoryEventHub">
+       <EventPublisher>
+         <Content />
+         <Key>https://fake_sas_url_1</Key>
+       </EventPublisher>
+    </EventStreamingAnnotation><EventStreamingAnnotation name="ProcessorInfoEventHub">
+       <EventPublisher>
+         <Content />
+         <Key>https://fake_sas_url_2</Key>
+       </EventPublisher>
+    </EventStreamingAnnotation></EventStreamingAnnotations>
 
 </MonitoringManagement>
 """

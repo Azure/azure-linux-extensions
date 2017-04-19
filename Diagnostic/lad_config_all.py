@@ -25,56 +25,10 @@ import Providers.Builtin as BuiltIn
 import Utils.ProviderUtil as ProvUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
+import Utils.mdsd_xml_templates as mxt
+from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
-from Utils.lad_exceptions import LadLoggingConfigException
 from Utils.misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
-
-_mdsd_xml_template = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
-  <Accounts>
-    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-  </Accounts>
-
-  <Management defaultRetentionInDays="90" eventVolume="">
-    <Identity>
-      <IdentityComponent name="DeploymentId" />
-      <IdentityComponent name="Host" useComputerName="true" />
-    </Identity>
-    <AgentResourceUsage diskQuotaInMB="50000" />
-  </Management>
-
-  <Schemas>
-  </Schemas>
-
-  <Sources>
-  </Sources>
-
-  <Events>
-    <MdsdEvents>
-    </MdsdEvents>
-
-    <OMI>
-    </OMI>
-
-    <DerivedEvents>
-    </DerivedEvents>
-  </Events>
-
-  <EventStreamingAnnotations>
-  </EventStreamingAnnotations>
-
-</MonitoringManagement>
-"""
-
-_annotation_xml = """
-<EventStreamingAnnotation name="{table}">
-    <EventPublisher>
-        <Content/>
-        <Key><![CDATA[{sas}]]></Key>
-    </EventPublisher>
-</EventStreamingAnnotation>
-"""
 
 
 class LadConfigAll:
@@ -133,7 +87,7 @@ class LadConfigAll:
         self._rsyslog_config = None
         self._syslog_ng_config = None
 
-        self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(_mdsd_xml_template))
+        self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
         self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
@@ -156,13 +110,24 @@ class LadConfigAll:
         """
         return 'WADMetrics{0}P10DV2S'.format(interval)
 
-    def _add_element_from_string(self, path, xml_string):
+    def _add_element_from_string(self, path, xml_string, add_only_once=True):
         """
         Add an XML fragment to the mdsd config document in accordance with path
         :param str path: Where to add the fragment
         :param str xml_string: A string containing the XML element to add
+        :param bool add_only_once: Indicates whether to perform the addition only to the first match of the path.
         """
-        XmlUtil.addElement(self._mdsd_config_xml_tree, path, ET.fromstring(xml_string))
+        XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path=path, el=ET.fromstring(xml_string),
+                           addOnlyOnce=add_only_once)
+
+    def _add_element_from_element(self, path, xml_elem, add_only_once=True):
+        """
+        Add an XML fragment to the mdsd config document in accordance with pat
+        :param str path: Where to add the fragment
+        :param ElementTree xml_elem: An ElementTree object XML fragment that should be added to the path.
+        :param bool add_only_once: Indicates whether to perform the addition only to the first match of the path.
+        """
+        XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path=path, el=xml_elem, addOnlyOnce=add_only_once)
 
     def _update_metric_collection_settings(self, ladCfg):
         """
@@ -234,14 +199,14 @@ class LadConfigAll:
             elif sink['type'] == 'EventHub':
                 if 'sasURL' in sink:
                     self._add_element_from_string('EventStreamingAnnotations',
-                                                  _annotation_xml.format(table=source, sas=sink['sasURL']))
+                                                  mxt.per_eh_url_tmpl.format(eh_name=source, eh_url=sink['sasURL']))
                 else:
                     self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
             elif sink['type'] == 'JsonBlob':
                 # TODO generate config for JsonBlob
                 pass
             else:
-                self._logger_log("Ignoring EventHub sink '{0}': unknown type".format(name))
+                self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
 
     def _update_raw_omi_events_settings(self, omi_queries):
         """
@@ -277,7 +242,7 @@ class LadConfigAll:
             # Default query frequency is 300 seconds
             xml_elem.set('sampleRateInSeconds', str(omi_query['frequency']) if 'frequency' in omi_query else '300')
             if sink:
-                xml_elem.set('storeType', sink[1])
+                xml_elem.set('storeType', 'local' if sink[1] == 'EventHub' else sink[1])
             return xml_elem
 
         for omi_query in omi_queries:
@@ -285,21 +250,25 @@ class LadConfigAll:
                 self._logger_log("Ignoring perfCfg array element missing required elements: '{0}'".format(omi_query))
                 continue
             if 'table' in omi_query:
-                XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
-                                   el=generate_omi_query_xml_elem(omi_query), addOnlyOnce=True)
-            if 'sinks' in omi_query:
-                for sink_name in omi_query['sinks'].split(','):
-                    sink = self._sink_configs.get_sink_by_name(sink_name)
-                    if not sink:
-                        raise LadLoggingConfigException('Sink name "{0}" is not defined in sinksConfig'.format(sink_name))
-                    if 'type' not in sink:
-                        raise LadLoggingConfigException('"type" is not defined in sinksConfig for sink name "{0}"'.format(sink_name))
-                    sink_type = sink['type']
-                    if sink_type != 'JsonBlob':
-                        raise LadLoggingConfigException('Sink type "{0}" is not yet supported'.format(sink_type))
-                    xml_elem = generate_omi_query_xml_elem(omi_query, (sink_name, sink_type))
-                    XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path='Events/OMI',
-                                       el=xml_elem, addOnlyOnce=True)
+                self._add_element_from_element('Events/OMI', generate_omi_query_xml_elem(omi_query))
+            for sink_name in LadUtil.getSinkList(omi_query):
+                sink = self._sink_configs.get_sink_by_name(sink_name)
+                if not sink:
+                    raise LadPerfCfgConfigException('Sink name "{0}" is not defined in sinksConfig'.format(sink_name))
+                sink_type = sink['type']
+                if sink_type != 'JsonBlob' and sink_type != 'EventHub':
+                    raise LadPerfCfgConfigException('Sink type "{0}" (for sink name="{1}") is not supported'
+                                                    .format(sink_type, sink_name))
+                self._add_element_from_element('Events/OMI', generate_omi_query_xml_elem(omi_query, (sink_name, sink_type)))
+                if sink_type == 'EventHub':
+                    if 'sasURL' not in sink:
+                        raise LadPerfCfgConfigException('No sasURL specified for an EventHub sink (name="{0}")'
+                                                        .format(sink_name))
+                    eh_url_xml_elem = XmlUtil.createElement(mxt.per_eh_url_tmpl.format(eh_name=sink_name,
+                                                                                       eh_url=sink['sasURL']))
+                    self._add_element_from_string('EventStreamingAnnotations',
+                                                  mxt.per_eh_url_tmpl.format(eh_name=sink_name, eh_url=sink['sasURL']))
+
 
     def _apply_perf_cfg(self):
         """

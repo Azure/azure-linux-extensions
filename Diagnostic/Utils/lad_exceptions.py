@@ -19,6 +19,13 @@
 
 class LadLoggingConfigException(Exception):
     """
-    Custom exception class for LAD logging config errors
+    Custom exception class for LAD logging (syslog & filelogs) config errors
+    """
+    pass
+
+
+class LadPerfCfgConfigException(Exception):
+    """
+    Custom exception class for LAD perfCfg (raw OMI queries) config errors
     """
     pass
