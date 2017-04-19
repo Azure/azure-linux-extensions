@@ -21,28 +21,25 @@ import os.path
 import re
 import sys
 import traceback
-import tempfile
 import time
 import platform
 
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil as Util
-import Utils.ScriptUtil as ScriptUtil
 
 # Global Variables
-ExtensionShortName = "OmsAgentForLinux"
-PackagesDirectory = "packages"
+PackagesDirectory = 'packages'
 BundleFileName = 'omsagent-1.3.4-15.universal.x64.sh'
 
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are
-InstallCommandTemplate = './{0} --upgrade'
-UninstallCommandTemplate = './{0} --remove'
-OmsAdminWorkingDirectory = '/opt/microsoft/omsagent/bin'
-WorkspaceCheckCommand = './omsadmin.sh -l'
-OnboardCommandWithOptionalParamsTemplate = './omsadmin.sh -d opinsights.azure.us -w {0} -s {1} {2}'
-ServiceControlWorkingDirectory = '/opt/microsoft/omsagent/bin'
-DisableOmsAgentServiceCommand = './service_control disable'
-EnableOmsAgentServiceCommand = './service_control enable'
+InstallCommandTemplate = '{0} --upgrade'
+UninstallCommandTemplate = '{0} --remove'
+OmsAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
+WorkspaceCheckCommandTemplate = '{0} -l'
+OnboardCommandWithOptionalParamsTemplate = '{0} -d opinsights.azure.us -w {1} -s {2} {3}'
+ServiceControlPath = '/opt/microsoft/omsagent/bin/service_control'
+DisableOmsAgentServiceCommandTemplate = '{0} disable'
+EnableOmsAgentServiceCommandTemplate = '{0} enable'
 
 # Change permission of log path
 ext_log_path = '/var/log/azure/'
@@ -52,24 +49,28 @@ if os.path.exists(ext_log_path):
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout', True)
-    waagent.Log("%s started to handle." %(ExtensionShortName))
+    waagent.Log('OmsAgentForLinux started to handle.')
 
     # Determine the operation being executed
     operation = None
     try:
         for a in sys.argv[1:]:
-            if re.match("^([-/]*)(disable)", a):
+            if re.match('^([-/]*)(disable)', a):
                 operation = 'Disable'
-            elif re.match("^([-/]*)(uninstall)", a):
+            elif re.match('^([-/]*)(uninstall)', a):
                 operation = 'Uninstall'
-            elif re.match("^([-/]*)(install)", a):
+            elif re.match('^([-/]*)(install)', a):
                 operation = 'Install'
-            elif re.match("^([-/]*)(enable)", a):
+            elif re.match('^([-/]*)(enable)', a):
                 operation = 'Enable'
-            elif re.match("^([-/]*)(update)", a):
+            elif re.match('^([-/]*)(update)', a):
                 operation = 'Update'
     except Exception as e:
         waagent.Error(e.message)
+
+    if operation is None:
+        waagent.Error('No valid operation provided')
+        sys.exit(1)
 
     # Set up for exit code and any error messages
     exit_code = 0
@@ -78,15 +79,19 @@ def main():
     # Invoke operation
     try:
         hutil = parse_context(operation)
-        if is_vm_supported_for_extension():
+        vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
+        if vm_supported:
             exit_code = operations[operation](hutil)
         else:
-            log_and_exit(hutil, operation, 51, 'Unsupported operation system')
+            log_and_exit(hutil, operation, 51, 'Unsupported operation system: {0} {1}'.format(
+                         vm_dist, vm_ver))
 
         if exit_code is not 0:
             message = (operation + ' failed with exit code {0}').format(exit_code)
 
-    except ValueError as e:
+    # ValueError may be thrown by enable
+    # KeyError may be thrown by parse_context
+    except (ValueError, KeyError) as e:
         exit_code = 11
         message = (operation + ' failed with error: {0}').format(e.message)
 
@@ -94,7 +99,7 @@ def main():
         exit_code = 1
         message = (operation + ' failed with error: {0}, {1}').format(e, traceback.format_exc())
 
-        if "LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS" in str(e):
+        if 'LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS' in str(e):
             exit_code = 10
             message = (operation + ' failed with error: {0}').format(e.message)
 
@@ -139,6 +144,8 @@ def is_vm_supported_for_extension():
         for supported_ver in supported_dists[supported_dist]:
             supported_ver_split = supported_ver.split('.')
 
+            # If vm_ver is at least as precise (at least as many digits) as supported_ver and
+            #   matches all the supported_ver digits, then this VM is guaranteed to be supported
             vm_ver_match = True
             for idx, supported_ver_num in enumerate(supported_ver_split):
                 try:
@@ -156,14 +163,20 @@ def is_vm_supported_for_extension():
         if vm_supported:
             break
 
-    return vm_supported
+    return vm_supported, vm_dist, vm_ver
 
 
 def dummy_command(hutil):
     return 0
 
 
-def run_command_with_retries(hutil, cmd, file_directory, operation, extension_short_name, retries,
+def run_command_and_log(hutil, cmd, check_error = True, log_cmd = True):
+    exit_code, output = waagent.RunGetOutput(cmd, check_error, log_cmd)
+    hutil.log('Output of command "{0}": \n{1}'.format(cmd, output))
+    return exit_code
+
+
+def run_command_with_retries(hutil, cmd, retries, check_error = True, log_cmd = True,
                              initial_sleep_time = 30, sleep_increase_factor = 1):
     '''
     Some commands fail because the package manager is locked (apt-get/dpkg only); this will
@@ -174,13 +187,12 @@ def run_command_with_retries(hutil, cmd, file_directory, operation, extension_sh
     try_count = 0
     sleep_time = initial_sleep_time # seconds
     while try_count <= retries:
-        exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), file_directory,
-                                           operation, extension_short_name,
-                                           hutil.get_extension_version())
+        exit_code = run_command_and_log(hutil, cmd, check_error, log_cmd)
         if exit_code is 0:
             break
         try_count += 1
-        hutil.log('Retrying command ' + cmd + ' because it failed with exit code ' + str(exit_code))
+        hutil.log('Retrying command {0} because it failed with exit code {1}'.format(cmd,
+                  exit_code))
         time.sleep(sleep_time)
         sleep_time *= sleep_increase_factor
 
@@ -203,102 +215,85 @@ def install(hutil):
     file_path = os.path.join(file_directory, BundleFileName)
 
     os.chmod(file_path, 100)
-    cmd = InstallCommandTemplate.format(BundleFileName)
-    waagent.Log("Starting command %s --upgrade." %(BundleFileName))
+    cmd = InstallCommandTemplate.format(file_path)
+    waagent.Log('Running command "{0}"'.format(cmd))
 
     # Retry, since install can fail due to concurrent package operations
-    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Install', ExtensionShortName,
-                                         retries = 10)
+    exit_code = run_command_with_retries(hutil, cmd, retries = 10)
     return exit_code
 
 
 def uninstall(hutil):
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    file_path = os.path.join(file_directory, BundleFileName)
 
-    cmd = UninstallCommandTemplate.format(BundleFileName)
-    waagent.Log("Starting command %s --remove." %(BundleFileName))
+    os.chmod(file_path, 100)
+    cmd = UninstallCommandTemplate.format(file_path)
+    waagent.Log('Running command "{0}"'.format(cmd))
 
-    # Retry up to three times, since uninstall can fail due to concurrent package operations
-    exit_code = run_command_with_retries(hutil, cmd, file_directory, 'Uninstall',
-                                         ExtensionShortName, retries = 10)
+    # Retry, since uninstall can fail due to concurrent package operations
+    exit_code = run_command_with_retries(hutil, cmd, retries = 10)
     return exit_code
 
 
 def enable(hutil):
-    waagent.Log("Handler not enabled. Starting onboarding.")
+    waagent.Log('Handler not enabled. Starting onboarding.')
     public_settings = hutil.get_public_settings()
     protected_settings = hutil.get_protected_settings()
     if public_settings is None:
-        raise ValueError("Public configuration must be provided")
+        raise ValueError('Public configuration must be provided')
     if protected_settings is None:
-        raise ValueError("Private configuration must be provided")
+        raise ValueError('Private configuration must be provided')
 
-    workspaceId = public_settings.get("workspaceId")
-    workspaceKey = protected_settings.get("workspaceKey")
-    proxy = protected_settings.get("proxy")
-    vmResourceId = protected_settings.get("vmResourceId")
-    stopOnMultipleConnections = public_settings.get("stopOnMultipleConnections")
+    workspaceId = public_settings.get('workspaceId')
+    workspaceKey = protected_settings.get('workspaceKey')
+    proxy = protected_settings.get('proxy')
+    vmResourceId = protected_settings.get('vmResourceId')
+    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if workspaceId is None:
-        raise ValueError("Workspace ID must be provided")
+        raise ValueError('Workspace ID must be provided')
     if workspaceKey is None:
-        raise ValueError("Workspace key must be provided")
+        raise ValueError('Workspace key must be provided')
 
     if stopOnMultipleConnections is not None and stopOnMultipleConnections is True:
-        output_file = tempfile.NamedTemporaryFile('w')
-        output_file.close()
-
-        list_exit_code = ScriptUtil.run_command(hutil,
-                                                ScriptUtil.parse_args(WorkspaceCheckCommand),
-                                                OmsAdminWorkingDirectory,
-                                                'Check If Already Onboarded', ExtensionShortName,
-                                                hutil.get_extension_version(), False,
-                                                interval = 30,
-                                                std_out_file_name = output_file.name)
-        # If no workspace is configured, then the list-workspaces command returns an error, which
-        # should be ignored in the logs
-        waagent.Log("Ignore error from above 'Check If Already Onboarded' command.")
+        check_wkspc_cmd = WorkspaceCheckCommandTemplate.format(OmsAdminPath)
+        list_exit_code, output = waagent.RunGetOutput(check_wkspc_cmd, chk_err=False)
 
         # If the printout includes "No Workspace" then there are no workspaces onboarded to the
         #   machine; otherwise the workspaces that have been onboarded are listed in the output
-        output_file_handle = open(output_file.name, 'r')
         connectionExists = False
-        if "No Workspace" not in output_file_handle.read():
+        if 'No Workspace' not in output:
             connectionExists = True
-        output_file_handle.close()
 
         if connectionExists:
-            err_msg = ("This machine is already connected to some other Log "
-                       "Analytics workspace, please set stopOnMultipleConnections "
-                       "to false in public settings or remove this property, "
-                       "so this machine can connect to new workspaces, also it "
-                       "means this machine will get billed multiple times for "
-                       "each workspace it report to. "
-                       "(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)")
+            err_msg = ('This machine is already connected to some other Log '
+                       'Analytics workspace, please set stopOnMultipleConnections '
+                       'to false in public settings or remove this property, '
+                       'so this machine can connect to new workspaces, also it '
+                       'means this machine will get billed multiple times for '
+                       'each workspace it report to. '
+                       '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
             # This exception will get caught by the main method
             raise Exception(err_msg)
 
-    proxyParam = ""
+    proxyParam = ''
     if proxy is not None:
-        proxyParam = "-p {0}".format(proxy)
+        proxyParam = '-p {0}'.format(proxy)
 
-    vmResourceIdParam = ""
+    vmResourceIdParam = ''
     if vmResourceId is not None:
-        vmResourceIdParam = "-a {0}".format(vmResourceId)
+        vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
-    optionalParams = "{0} {1}".format(proxyParam, vmResourceIdParam)
-    cmd = OnboardCommandWithOptionalParamsTemplate.format(workspaceId, workspaceKey,
+    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    onboard_cmd = OnboardCommandWithOptionalParamsTemplate.format(OmsAdminPath, workspaceId, workspaceKey,
                                                           optionalParams)
 
-    exit_code = ScriptUtil.run_command(hutil, ScriptUtil.parse_args(cmd), OmsAdminWorkingDirectory,
-                                       'Onboard', ExtensionShortName,
-                                       hutil.get_extension_version(), False)
+    exit_code = run_command_and_log(hutil, onboard_cmd)
 
     # If onboard succeeds we continue, otherwise fail fast
     if exit_code == 0:
-        exit_code = ScriptUtil.run_command(hutil,
-                                           ScriptUtil.parse_args(EnableOmsAgentServiceCommand),
-                                           ServiceControlWorkingDirectory, 'Enable',
-                                           ExtensionShortName, hutil.get_extension_version())
+        enable_cmd = EnableOmsAgentServiceCommandTemplate.format(ServiceControlPath)
+        exit_code = run_command_and_log(hutil, enable_cmd)
     else:
         hutil.error(('Onboard failed with exit code {0}; Enable not attempted').format(exit_code))
 
@@ -306,10 +301,8 @@ def enable(hutil):
 
 
 def disable(hutil):
-    exit_code = ScriptUtil.run_command(hutil,
-                                       ScriptUtil.parse_args(DisableOmsAgentServiceCommand),
-                                       ServiceControlWorkingDirectory, 'Disable',
-                                       ExtensionShortName, hutil.get_extension_version())
+    cmd = DisableOmsAgentServiceCommandTemplate.format(ServiceControlPath)
+    exit_code = run_command_and_log(hutil, cmd)
     return exit_code
 
 
