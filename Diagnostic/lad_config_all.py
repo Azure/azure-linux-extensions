@@ -232,11 +232,14 @@ class LadConfigAll:
             if sink is None:
                 self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
             elif sink['type'] == 'EventHub':
-                    if 'sasURL' in sink:
-                        self._add_element_from_string('EventStreamingAnnotations',
-                                                      _annotation_xml.format(table=source, sas=sink['sasURL']))
-                    else:
-                        self._logger_log("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
+                if 'sasURL' in sink:
+                    self._add_element_from_string('EventStreamingAnnotations',
+                                                  _annotation_xml.format(table=source, sas=sink['sasURL']))
+                else:
+                    self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
+            elif sink['type'] == 'JsonBlob':
+                # TODO generate config for JsonBlob
+                pass
             else:
                 self._logger_log("Ignoring EventHub sink '{0}': unknown type".format(name))
 
