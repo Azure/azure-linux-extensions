@@ -32,6 +32,9 @@ _mdsd_sources_events_config_template = """
     <MdsdEvents>
 {events}    </MdsdEvents>
   </Events>
+
+  <EventStreamingAnnotations>
+{eh_urls}  </EventStreamingAnnotations>
 </MonitoringManagement>
 """
 
@@ -44,6 +47,14 @@ _mdsd_per_event_source_config_template = """      <MdsdEventSource source="{sour
 """
 
 _mdsd_per_routeevent_config_template = """    <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />
+"""
+
+_mdsd_per_eh_url_template = """    <EventStreamingAnnotation name="{eh_name}">
+       <EventPublisher>
+         <Content/>
+         <Key><![CDATA[{eh_url}]]></Key>
+       </EventPublisher>
+    </EventStreamingAnnotation>
 """
 
 
@@ -195,22 +206,30 @@ class LadLoggingConfig:
         # dest table (eventName) is 'LinuxSyslog'. This is currently the only supported syslog conf scheme.
         syslog_routeevents = _mdsd_per_routeevent_config_template.format(event_name='LinuxSyslog', opt_store_type='')
         # Add RouteEvent elements for specified "sinks" for "syslogEvents" feature
+        # Also add EventStreamingAnnotation for EventHub sinks
+        syslog_eh_urls = ''
         if 'sinks' in self._syslogEvents:
             for sink_name in self._syslogEvents['sinks'].split(','):
                 if sink_name == 'LinuxSyslog':
                     raise LadLoggingConfigException(
                         "'LinuxSyslog' can't be used as a sink name. It's reserved for default Azure Table name for syslog events.")
-                syslog_routeevents += self.__generate_routeevent_for_extra_sink(sink_name)
+                routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name)
+                syslog_routeevents += routeevent
+                syslog_eh_urls += eh_url
 
         return _mdsd_sources_events_config_template.format(
             sources=_mdsd_per_source_config_template.format(name='mdsd.syslog'),
-            events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', routeevents=syslog_routeevents))
+            events=_mdsd_per_event_source_config_template.format(source='mdsd.syslog', routeevents=syslog_routeevents),
+            eh_urls=syslog_eh_urls)
 
-    def __generate_routeevent_for_extra_sink(self, sink_name):
+    def __generate_routeevent_and_eh_url_for_extra_sink(self, sink_name):
         """
         Helper method to generate one RouteEvent element for each extra sink given.
+        Also generates an EventStreamingAnnotation element for EventHub sinks.
         :param sink_name: The name of the sink for the RouteEvent.
-        :return: The XML RouteEvent element string for the sink.
+        :rtype str,str:
+        :return: A pair of the XML RouteEvent element string for the sink and the EventHubStreamingAnnotation
+                 XML string.
         """
         sink = self._sinksConfig.get_sink_by_name(sink_name)
         if not sink:
@@ -220,11 +239,17 @@ class LadLoggingConfig:
             raise LadLoggingConfigException('Sink type for sink "{0}" is not defined in sinksConfig'.format(sink_name))
         if sink_type == 'JsonBlob':
             return _mdsd_per_routeevent_config_template.format(event_name=sink_name,
-                                                               opt_store_type='storeType="JsonBlob"')
+                                                               opt_store_type='storeType="JsonBlob"'), ''
         elif sink_type == 'EventHub':
-            raise LadLoggingConfigException('EventHub sink type is not yet supported')
+            if 'sasURL' not in sink:
+                raise LadLoggingConfigException('sasURL is not specified for EventHub sink_name={0}'.format(sink_name))
+            eh_routeevent = _mdsd_per_routeevent_config_template.format(event_name=sink_name,
+                                                                        opt_store_type='storeType="local"')
+            eh_url = _mdsd_per_eh_url_template.format(eh_name=sink_name, eh_url=sink['sasURL'])
+            return eh_routeevent, eh_url
         else:
-            raise LadLoggingConfigException('{0} sink type is not supported'.format(sink_type))
+            raise LadLoggingConfigException('{0} sink type (for sink_name={1}) is not supported'.format(sink_type,
+                                                                                                        sink_name))
 
     def get_oms_mdsd_filelog_config(self):
         """
@@ -247,6 +272,7 @@ class LadLoggingConfig:
         # with all '/' replaced by '.'.
         filelogs_sources = ''
         filelogs_mdsd_event_sources = ''
+        filelogs_eh_urls = ''
         for file_key in sorted(self._file_table_map):
             if not self._file_table_map[file_key] and not self._file_sinks_map[file_key]:
                 raise LadLoggingConfigException('Neither "table" nor "sinks" defined for file "{0}"'.format(file_key))
@@ -257,10 +283,13 @@ class LadLoggingConfig:
                 per_file_routeevents += _mdsd_per_routeevent_config_template.format(event_name=self._file_table_map[file_key], opt_store_type='')
             if self._file_sinks_map[file_key]:
                 for sink_name in self._file_sinks_map[file_key].split(','):
-                    per_file_routeevents += self.__generate_routeevent_for_extra_sink(sink_name)
+                    routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name)
+                    per_file_routeevents += routeevent
+                    filelogs_eh_urls += eh_url
             filelogs_mdsd_event_sources += \
                 _mdsd_per_event_source_config_template.format(source=source_name, routeevents=per_file_routeevents)
-        return _mdsd_sources_events_config_template.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources)
+        return _mdsd_sources_events_config_template.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources,
+                                                           eh_urls=filelogs_eh_urls)
 
     def get_oms_fluentd_syslog_src_config(self):
         """
@@ -421,10 +450,11 @@ def copy_sub_elems(dst_xml, src_xml, path):
         dst_elem.append(sub_elem)
 
 
-def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_logging_xml_string):
+def copy_source_mdsdevent_eh_url_elems(mdsd_xml_tree, mdsd_logging_xml_string):
     """
     Copy MonitoringManagement/Schemas/Schema, MonitoringManagement/Sources/Source,
-    MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
+    MonitoringManagement/Events/MdsdEvents/MdsdEventSource elements, and MonitoringManagement/EventStreamingAnnotations
+    /EventStreamingAnnontation elements from mdsd_rsyslog_xml_string to mdsd_xml_tree.
     Used to actually add generated rsyslog mdsd config XML elements to the mdsd config XML tree.
 
     :param xml.etree.ElementTree.ElementTree mdsd_xml_tree: Python xml.etree.ElementTree object that's generated from mdsd config XML template
@@ -442,3 +472,6 @@ def copy_source_mdsdevent_elems(mdsd_xml_tree, mdsd_logging_xml_string):
 
     # Copy MdsdEventSource elements (sub-elements of Events/MdsdEvents element)
     copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'Events/MdsdEvents')
+
+    # Copy EventStreamingAnnotation elements (sub-elements of EventStreamingAnnotations element)
+    copy_sub_elems(mdsd_xml_tree, mdsd_logging_xml_tree, 'EventStreamingAnnotations')

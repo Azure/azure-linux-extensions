@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 import Providers.Builtin as BuiltIn
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
-from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_elems
+from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
 from Utils.lad_exceptions import LadLoggingConfigException
 from Utils.misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
 
@@ -180,14 +180,15 @@ class LadConfigAll:
                 query = ladquery.format(interval=aggregation_interval, localtable=table_name)
                 XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
             # Other sinks are handled here
-            for name in sinks.split(','):
-                sink = self._sink_configs.get_sink_by_name(name)
-                if sink is None:
-                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
-                else:
-                    if sink['type'] == 'EventHub':
-                        # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
-                        pass
+            if sinks:
+                for name in sinks.split(','):
+                    sink = self._sink_configs.get_sink_by_name(name)
+                    if sink is None:
+                        self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+                    else:
+                        if sink['type'] == 'EventHub':
+                            # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
+                            pass
 
     def _update_raw_omi_events_settings(self, omi_queries):
         """
@@ -405,8 +406,8 @@ class LadConfigAll:
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs)
             mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
             mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
-            copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
-            copy_source_mdsdevent_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
+            copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
+            copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
             self._fluentd_syslog_src_config = lad_logging_config_helper.get_oms_fluentd_syslog_src_config()
             self._fluentd_tail_src_config = lad_logging_config_helper.get_oms_fluentd_filelog_src_config()
             self._fluentd_out_mdsd_config = lad_logging_config_helper.get_oms_fluentd_out_mdsd_config()
