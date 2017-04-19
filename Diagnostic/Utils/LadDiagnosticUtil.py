@@ -69,25 +69,42 @@ def getAggregationPeriodsFromLadCfg(ladCfg):
     """
     Return an array of aggregation periods as specified. If nothing appears in the config, default PT1H
     :param ladCfg:
-    :return: array of strings of ISO 8601 intervals
+    :return: array of ISO 8601 intervals
+    :rtype: List(str)
     """
+    results = []
     metrics = getDiagnosticsMonitorConfigurationElement(ladCfg, 'metrics')
     if metrics and 'metricAggregation' in metrics:
-        return [item['scheduledTransferPeriod'] for item in metrics['metricAggregation']]
-    return ['PT1H']
+        for item in metrics['metricAggregation']:
+            if 'scheduledTransferPeriod' in item:
+                # assert isinstance(item['scheduledTransferPeriod'], str)
+                results.append(item['scheduledTransferPeriod'])
+    else:
+        results.append('PT1H')
+    return results
+
+
+def getSinkList(feature_config):
+    """
+    Returns the list of sink names to which all data should be forwarded, according to this config
+    :param feature_config: The JSON config for a feature (e.g. the config struct for "performanceCounters" or "syslogEvents")
+    :return: the list of names; might be an empty list
+    :rtype: [str]
+    """
+    if feature_config and 'sinks' in feature_config and feature_config['sinks']:
+        return feature_config['sinks'].split(',')
+    return []
 
 
 def getFeatureWideSinksFromLadCfg(ladCfg, feature_name):
     """
-    Returns the comma-separated list of sink names to which all data for the given feature should be forwarded
+    Returns the list of sink names to which all data for the given feature should be forwarded
     :param ladCfg: The ladCfg JSON config
-    :param feature_name: Name of the feature. Expected to be "performanceCounters" or "syslogEvents"
-    :return: the comma-separated list of names, or an empty string
+    :param str feature_name: Name of the feature. Expected to be "performanceCounters" or "syslogEvents"
+    :return: the list of names; might be an empty list
+    :rtype: [str]
     """
-    feature_config = getDiagnosticsMonitorConfigurationElement(ladCfg, feature_name)
-    if feature_config and 'sinks' in feature_config:
-        return feature_config['sinks']
-    return ''
+    return getSinkList(getDiagnosticsMonitorConfigurationElement(ladCfg, feature_name))
 
 
 class SinkConfiguration:

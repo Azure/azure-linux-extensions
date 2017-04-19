@@ -22,6 +22,7 @@ import traceback
 import xml.etree.ElementTree as ET
 
 import Providers.Builtin as BuiltIn
+import Utils.ProviderUtil as ProvUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
@@ -66,6 +67,14 @@ _mdsd_xml_template = """
 </MonitoringManagement>
 """
 
+_annotation_xml = """
+<EventStreamingAnnotation name="{table}">
+    <EventPublisher>
+        <Content/>
+        <Key><![CDATA[{sas}]]></Key>
+    </EventPublisher>
+</EventStreamingAnnotation>
+"""
 
 class LadConfigAll:
     """
@@ -137,6 +146,17 @@ class LadConfigAll:
     def _ladCfg(self):
         return self._ext_settings.read_public_config('ladCfg')
 
+    @staticmethod
+    def _wad_table_name(interval):
+        """
+        Build the name and storetype of a metrics table based on the aggregation interval and presence/absence of sinks 
+        :param str interval: String representation of aggregation interval
+        :return: table name
+        :rtype: str
+        """
+        return 'WADMetrics{0}P10DV2S'.format(interval)
+
+
     def _update_metric_collection_settings(self, ladCfg):
         """
         Update mdsd_config_xml_tree for Azure Portal metric collection. The mdsdCfg performanceCounters element contains
@@ -165,11 +185,12 @@ class LadConfigAll:
         # Finalize; update the mdsd config to be prepared to receive the metrics
         BuiltIn.UpdateXML(self._mdsd_config_xml_tree)
 
-        # Pump the received data from the local tables to the desired sinks. The "WADmetrics" shoebox table sink is
-        # always served; after that, check for other sinks and handle appropriately. The partitionKey is filled in
-        # later.
+        # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
+        # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
+        # output to a new local table, then arrange for additional derived queries to pull from that. (For Event Hub
+        # sinks, place the appropriate annotation on the local table; no additional DerivedQuery is needed.)
         ladquery = '''
-<DerivedEvent duration="{interval}" eventName="WADMetrics{interval}P10DV2S" isFullName="true" source="{localtable}">
+<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{where}">
 <LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
 </DerivedEvent>
 '''
@@ -177,18 +198,45 @@ class LadConfigAll:
         sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for table_name in local_tables:
             for aggregation_interval in intervals:
-                query = ladquery.format(interval=aggregation_interval, localtable=table_name)
+                if sinks:
+                    local_table_name = ProvUtil.MakeUniqueEventName('aggregationLocal')
+                    query = ladquery.format(interval=aggregation_interval, source=table_name,
+                                            target=local_table_name, where='Local')
+                else:
+                    query = ladquery.format(interval=aggregation_interval, source=table_name,
+                                            target=LadConfigAll._wad_table_name(aggregation_interval), where='Central')
                 XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
-            # Other sinks are handled here
-            if sinks:
-                for name in sinks.split(','):
-                    sink = self._sink_configs.get_sink_by_name(name)
-                    if sink is None:
-                        self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+            if sinks :
+                    self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
+
+    def _handle_alternate_sinks(self, interval, sinks, source):
+        """
+        Update the XML config to accommodate alternate data sinks. Start by pumping the data from the local source to
+        the actual wad table; then run through the sinks and add annotations or additional DerivedEvents as needed.
+        :param str interval: Aggregation interval
+        :param [str] sinks: List of alternate destinations 
+        :param str source: Name of local table from which data is to be pumped
+        :return: 
+        """
+        query_text = '<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}"/>'
+        query = query_text.format(interval=interval, source=source, target=LadConfigAll._wad_table_name(interval))
+        XmlUtil.addElement(self._mdsd_config_xml_tree, 'Events/DerivedEvents', ET.fromstring(query))
+            if sinks:for name in sinks:
+                sink = self._sink_configs.get_sink_by_name(name)
+                if sink is None:
+                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+                else:
+                    if sink['type'] == 'EventHub':
+                        if 'sasURL' in sink:
+                        sas = sink['sasURL']
+                        annotation = _annotation_xml.format(table=source, sas=sas)
+                        XmlUtil.addElement(self._mdsd_config_xml_tree,
+                                           'EventStreamingAnnotations',
+                                           ET.fromstring(annotation))
                     else:
-                        if sink['type'] == 'EventHub':
-                            # Generate a <DerivedEvent> to extract data (raw or aggregated) and send it to EH
-                            pass
+                        self._logger_log("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
+                else:
+                    self._logger_log("Ignoring EventHub sink '{0}': unknown type".format(name))
 
     def _update_raw_omi_events_settings(self, omi_queries):
         """
