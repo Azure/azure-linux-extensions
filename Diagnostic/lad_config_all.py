@@ -122,12 +122,35 @@ class LadConfigAll:
 
     def _add_element_from_element(self, path, xml_elem, add_only_once=True):
         """
-        Add an XML fragment to the mdsd config document in accordance with pat
+        Add an XML fragment to the mdsd config document in accordance with path
         :param str path: Where to add the fragment
         :param ElementTree xml_elem: An ElementTree object XML fragment that should be added to the path.
         :param bool add_only_once: Indicates whether to perform the addition only to the first match of the path.
         """
         XmlUtil.addElement(xml=self._mdsd_config_xml_tree, path=path, el=xml_elem, addOnlyOnce=add_only_once)
+
+    def _add_derived_event(self, interval, source, event_name, store_type, add_lad_query=False):
+        """
+        Add a <DerivedEvent> element to the configuration
+        :param str interval: Interval at which this DerivedEvent should be run 
+        :param str source: Local table from which this DerivedEvent should pull
+        :param str event_name: Destination table to which this DerivedEvent should push
+        :param str store_type: The storage type of the destination table, e.g. Local, Central, CentralJson
+        :param bool add_lad_query: True if a <LadQuery> subelement should be added to this <DerivedEvent> element
+        """
+        derived_event = mxt.derived_event.format(interval=interval, source=source, target=event_name, type=store_type)
+        element = ET.fromstring(derived_event)
+        if add_lad_query:
+            XmlUtil.addElement(element, ".", ET.fromstring(mxt.lad_query))
+        self._add_element_from_element('Events/DerivedEvents', element)
+
+    def _add_obo_field(self, name, value):
+        """
+        Add an <OboDirectPartitionField> element to the <Management> element.
+        :param name: Name of the field
+        :param value: Value for the field
+        """
+        self._add_element_from_string('Management', mxt.obo_field.format(name=name, value=value))
 
     def _update_metric_collection_settings(self, ladCfg):
         """
@@ -160,25 +183,20 @@ class LadConfigAll:
         # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
         # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
         # output to a new local table, then arrange for additional derived queries to pull from that.
-        ladquery = '''
-<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{where}">
-<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />
-</DerivedEvent>
-'''
         intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
         sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for table_name in local_tables:
             for aggregation_interval in intervals:
                 if sinks:
                     local_table_name = ProvUtil.MakeUniqueEventName('aggregationLocal')
-                    query = ladquery.format(interval=aggregation_interval, source=table_name,
-                                            target=local_table_name, where='Local')
-                    self._add_element_from_string('Events/DerivedEvents', query)
+                    self._add_derived_event(aggregation_interval, table_name,
+                                            local_table_name,
+                                            'Local', add_lad_query=True)
                     self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
                 else:
-                    query = ladquery.format(interval=aggregation_interval, source=table_name,
-                                            target=LadConfigAll._wad_table_name(aggregation_interval), where='Central')
-                    self._add_element_from_string('Events/DerivedEvents', query)
+                    self._add_derived_event(aggregation_interval, table_name,
+                                            LadConfigAll._wad_table_name(aggregation_interval),
+                                            'Central', add_lad_query=True)
 
     def _handle_alternate_sinks(self, interval, sinks, source):
         """
@@ -189,9 +207,7 @@ class LadConfigAll:
         :param str source: Name of local table from which data is to be pumped
         :return: 
         """
-        query_text = '<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}"/>'
-        query = query_text.format(interval=interval, source=source, target=LadConfigAll._wad_table_name(interval))
-        self._add_element_from_string('Events/DerivedEvents', query)
+        self._add_derived_event(interval, source, LadConfigAll._wad_table_name(interval), 'Central')
         for name in sinks:
             sink = self._sink_configs.get_sink_by_name(name)
             if sink is None:
@@ -203,8 +219,7 @@ class LadConfigAll:
                 else:
                     self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
             elif sink['type'] == 'JsonBlob':
-                # TODO generate config for JsonBlob
-                pass
+                self._add_derived_event(interval, source, name, 'CentralJson')
             else:
                 self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
 
@@ -264,8 +279,6 @@ class LadConfigAll:
                     if 'sasURL' not in sink:
                         raise LadPerfCfgConfigException('No sasURL specified for an EventHub sink (name="{0}")'
                                                         .format(sink_name))
-                    eh_url_xml_elem = XmlUtil.createElement(mxt.per_eh_url_tmpl.format(eh_name=sink_name,
-                                                                                       eh_url=sink['sasURL']))
                     self._add_element_from_string('EventStreamingAnnotations',
                                                   mxt.per_eh_url_tmpl.format(eh_name=sink_name, eh_url=sink['sasURL']))
 
@@ -400,12 +413,8 @@ class LadConfigAll:
                         lad_query_instance_id = uuid_for_instance_id
                     self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
                     # Set JsonBlob sink-related elements
-                    json_blob_identity_field_template = '<OboDirectPartitionField name="{name}" value="{value}" />'
-                    resource_id_xml = json_blob_identity_field_template.format(name='resourceId', value=resource_id)
-                    agent_id_hash_xml = json_blob_identity_field_template.format(name='agentIdentityHash',
-                                                                                 value=uuid_for_instance_id)
-                    self._add_element_from_string('Management', resource_id_xml)
-                    self._add_element_from_string('Management', agent_id_hash_xml)
+                    self._add_obo_field(name='resourceId', value=resource_id)
+                    self._add_obo_field(name='agentIdentityHash', value=uuid_for_instance_id)
 
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))

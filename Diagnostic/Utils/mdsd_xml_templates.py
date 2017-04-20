@@ -53,8 +53,20 @@ per_MdsdEventSource_tmpl = """      <MdsdEventSource source="{source}">
 """
 
 
-per_RouteEvent_tmpl = """    <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />
+per_RouteEvent_tmpl = """
+    <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />
 """
+
+
+derived_event = """
+<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{type}"/>
+"""
+
+
+lad_query = '<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />'
+
+
+obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
 
 
 entire_xml_cfg_tmpl = """
