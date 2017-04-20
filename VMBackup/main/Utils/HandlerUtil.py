@@ -310,9 +310,10 @@ class HandlerUtility:
             for i in range(1,len(output)-1):
                 device, size, used, available, percent, mountpoint = output[i].split()
                 if not (mountpoint.startswith('/run/gluster/snaps/')):
-                    self.log("Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
                     total_used = total_used + int(used) #return in KB
                 else:
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
                     HandlerUtility.add_to_telemetery_data("GlusterFSPresent","True")
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
