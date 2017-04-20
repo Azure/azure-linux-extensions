@@ -24,6 +24,9 @@ import Utils.mdsd_xml_templates as mxt
 from Utils.omsagent_util import get_syslog_ng_src_name
 
 
+syslog_src_name = 'mdsd.syslog'
+
+
 class LadLoggingConfig:
     """
     Utility class for obtaining syslog (rsyslog or syslog-ng) configurations for use with fluentd
@@ -183,22 +186,24 @@ class LadLoggingConfig:
         syslog_eh_urls = ''
         for sink_name in LadUtil.getSinkList(self._syslogEvents):
             if sink_name == 'LinuxSyslog':
-                raise LadLoggingConfigException(
-                    "'LinuxSyslog' can't be used as a sink name. It's reserved for default Azure Table name for syslog events.")
-            routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name)
+                raise LadLoggingConfigException("'LinuxSyslog' can't be used as a sink name. "
+                    "It's reserved for default Azure Table name for syslog events.")
+            routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name,
+                                                                                      syslog_src_name)
             syslog_routeevents += routeevent
             syslog_eh_urls += eh_url
 
         return mxt.top_level_tmpl_for_logging_only.format(
-            sources=mxt.per_source_tmpl.format(name='mdsd.syslog'),
-            events=mxt.per_MdsdEventSource_tmpl.format(source='mdsd.syslog', routeevents=syslog_routeevents),
+            sources=mxt.per_source_tmpl.format(name=syslog_src_name),
+            events=mxt.per_MdsdEventSource_tmpl.format(source=syslog_src_name, routeevents=syslog_routeevents),
             eh_urls=syslog_eh_urls)
 
-    def __generate_routeevent_and_eh_url_for_extra_sink(self, sink_name):
+    def __generate_routeevent_and_eh_url_for_extra_sink(self, sink_name, src_name):
         """
         Helper method to generate one RouteEvent element for each extra sink given.
         Also generates an EventStreamingAnnotation element for EventHub sinks.
-        :param sink_name: The name of the sink for the RouteEvent.
+        :param str sink_name: The name of the sink for the RouteEvent.
+        :param str src_name: The name of the ingested source that should be used for EventStreamingAnnotation.
         :rtype str,str:
         :return: A pair of the XML RouteEvent element string for the sink and the EventHubStreamingAnnotation
                  XML string.
@@ -211,15 +216,15 @@ class LadLoggingConfig:
             raise LadLoggingConfigException('Sink type for sink "{0}" is not defined in sinksConfig'.format(sink_name))
         if sink_type == 'JsonBlob':
             return mxt.per_RouteEvent_tmpl.format(event_name=sink_name,
-                                              opt_store_type='storeType="JsonBlob"'), ''
+                                                  opt_store_type='storeType="JsonBlob"'),\
+                   ''  # No EventStreamingAnnotation for JsonBlob
         elif sink_type == 'EventHub':
             if 'sasURL' not in sink:
                 raise LadLoggingConfigException('sasURL is not specified for EventHub sink_name={0}'.format(sink_name))
-            eh_routeevent = mxt.per_RouteEvent_tmpl.format(event_name=sink_name,
-                                                       opt_store_type='storeType="local"')
-            eh_url = mxt.per_eh_url_tmpl.format(eh_name=sink_name, key_path=self._pkey_path,
+            # For syslog/filelogs (ingested events), the source name should be used for EventStreamingAnnotation name.
+            eh_url = mxt.per_eh_url_tmpl.format(eh_name=src_name, key_path=self._pkey_path,
                                                 enc_eh_url=self._encrypt_secret(self._cert_path, sink['sasURL']))
-            return eh_routeevent, eh_url
+            return '', eh_url  # No RouteEvent for logging event's EventHub sink
         else:
             raise LadLoggingConfigException('{0} sink type (for sink_name={1}) is not supported'.format(sink_type,
                                                                                                         sink_name))
@@ -256,7 +261,7 @@ class LadLoggingConfig:
                 per_file_routeevents += mxt.per_RouteEvent_tmpl.format(event_name=self._file_table_map[file_key], opt_store_type='')
             if self._file_sinks_map[file_key]:
                 for sink_name in self._file_sinks_map[file_key].split(','):
-                    routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name)
+                    routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name, source_name)
                     per_file_routeevents += routeevent
                     filelogs_eh_urls += eh_url
             filelogs_mdsd_event_sources += \

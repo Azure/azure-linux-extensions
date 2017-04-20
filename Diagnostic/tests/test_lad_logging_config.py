@@ -88,19 +88,17 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="LinuxSyslog" and @priority="High"]',
                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogJsonBlob" and @priority="High" and @storeType="JsonBlob"]',
-                                           './Events/MdsdEvents/MdsdEventSource[@source="mdsd.syslog"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="SyslogEventHub" and @priority="High" and @storeType="local"]',
-                                           './EventStreamingAnnotations/EventStreamingAnnotation[@name="SyslogEventHub"]/EventPublisher/Key',  # TODO Perform CDATA validation
+                                           './EventStreamingAnnotations/EventStreamingAnnotation[@name="mdsd.syslog"]/EventPublisher/Key',  # TODO Perform CDATA validation
                                           )
         self.oms_filelog_expected_xpaths = ('./Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog1" and @dynamic_schema="true"]',
                                             './Sources/Source[@name="mdsd.filelog.var.log.mydaemonlog2" and @dynamic_schema="true"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon1Events" and @priority="High"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog1JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
-                                            './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog1"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="FilelogEventHub" and @priority="High" and @storeType="local"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="MyDaemon2Events" and @priority="High"]',
                                             './Events/MdsdEvents/MdsdEventSource[@source="mdsd.filelog.var.log.mydaemonlog2"]/RouteEvent[@dontUsePerNDayTable="true" and @eventName="Filelog2JsonBlob" and @priority="High" and @storeType="JsonBlob"]',
-                                            './EventStreamingAnnotations/EventStreamingAnnotation[@name="FilelogEventHub"]/EventPublisher/Key',  # TODO Perform CDATA validation
+                                            './EventStreamingAnnotations/EventStreamingAnnotation[@name="mdsd.filelog.var.log.mydaemonlog1"]/EventPublisher/Key',  # TODO Perform CDATA validation
                                            )
 
     def test_oms_syslog_mdsd_configs(self):
