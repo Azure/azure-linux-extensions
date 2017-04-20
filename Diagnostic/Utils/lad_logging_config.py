@@ -32,7 +32,7 @@ class LadLoggingConfig:
     (using the fluentd tail plugin).
     """
 
-    def __init__(self, syslogEvents, fileLogs, sinksConfig):
+    def __init__(self, syslogEvents, fileLogs, sinksConfig, pkey_path, cert_path, encrypt_secret):
         """
         Constructor to receive/store necessary LAD settings for the desired configuration generation.
 
@@ -80,10 +80,17 @@ class LadLoggingConfig:
                          Azure storage table into which the lines of the watched file will be placed (one row per line).
         :param LadUtil.SinkConfiguration sinksConfig:  SinkConfiguration object that's created out of "sinksConfig"
                     LAD 3.0 JSON setting. Refer to LadUtil.SinkConfiguraiton documentation.
+        :param str pkey_path: Path to the VM's private key that should be passed to mdsd XML for decrypting encrypted
+                    secrets (EH SAS URL)
+        :param str cert_path: Path to the VM's certificate that should be used to encrypt secrets (EH SAS URL)
+        :param encrypt_secret: Function to encrypt a secret (string, 2nd param) with the provided cert path param (1st)
         """
         self._syslogEvents = syslogEvents
         self._fileLogs = fileLogs
         self._sinksConfig = sinksConfig
+        self._pkey_path = pkey_path
+        self._cert_path = cert_path
+        self._encrypt_secret = encrypt_secret
         self._fac_sev_map = None
 
         try:
@@ -101,14 +108,14 @@ class LadLoggingConfig:
                 self._file_sinks_map = dict([(entry['file'], entry['sinks'] if 'sinks' in entry else '')
                                              for entry in self._fileLogs])
 
-            self._oms_rsyslog_config = None
-            self._oms_syslog_ng_config = None
-            self._oms_mdsd_syslog_config = None
-            self._oms_mdsd_filelog_config = None
+            self._rsyslog_config = None
+            self._syslog_ng_config = None
+            self._mdsd_syslog_config = None
+            self._mdsd_filelog_config = None
         except KeyError as e:
             raise LadLoggingConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
 
-    def get_oms_rsyslog_config(self):
+    def get_rsyslog_config(self):
         """
         Returns rsyslog config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
         JSON object given in the construction parameters.
@@ -117,19 +124,19 @@ class LadLoggingConfig:
         :return: rsyslog config string that should be appended to /etc/rsyslog.d/95-omsagent.conf (new rsyslog)
                  or to /etc/rsyslog.conf (old rsyslog)
         """
-        if not self._oms_rsyslog_config:
+        if not self._rsyslog_config:
             if self._syslog_disabled:
-                self._oms_rsyslog_config = ''
+                self._rsyslog_config = ''
             else:
                 # Generate/save/return rsyslog config string for the facility-severity pairs.
                 # E.g.: "user.err @127.0.0.1:%SYSLOG_PORT%\nlocal0.crit @127.0.0.1:%SYSLOG_PORT%\n'
-                self._oms_rsyslog_config = \
+                self._rsyslog_config = \
                     '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
                                                                          syslog_name_to_rsyslog_name(sev))
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
-        return self._oms_rsyslog_config
+        return self._rsyslog_config
 
-    def get_oms_syslog_ng_config(self):
+    def get_syslog_ng_config(self):
         """
         Returns syslog-ng config (for use with omsagent) that corresponds to the syslogEvents or the syslogCfg
         JSON object given in the construction parameters.
@@ -137,31 +144,31 @@ class LadLoggingConfig:
         :rtype: str
         :return: syslog-ng config string that should be appended to /etc/syslog-ng/syslog-ng.conf
         """
-        if not self._oms_syslog_ng_config:
+        if not self._syslog_ng_config:
             if self._syslog_disabled:
-                self._oms_syslog_ng_config = ''
+                self._syslog_ng_config = ''
             else:
                 # Generate/save/return syslog-ng config string for the facility-severity pairs.
                 # E.g.: "log { source(src); filter(f_LAD_oms_f_user); filter(f_LAD_oms_ml_err); destination(d_LAD_oms); };\nlog { source(src); filter(f_LAD_oms_f_local0); filter(f_LAD_oms_ml_crit); destination(d_LAD_oms); };\n"
-                self._oms_syslog_ng_config = \
+                self._syslog_ng_config = \
                     '\n'.join('log {{ source({0}); filter(f_LAD_oms_f_{1}); filter(f_LAD_oms_ml_{2}); '
                               'destination(d_LAD_oms); }};'.format(get_syslog_ng_src_name(),
                                                                    syslog_name_to_rsyslog_name(fac),
                                                                    syslog_name_to_rsyslog_name(sev))
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
-        return self._oms_syslog_ng_config
+        return self._syslog_ng_config
 
-    def get_oms_mdsd_syslog_config(self):
+    def get_mdsd_syslog_config(self):
         """
         Get mdsd XML config string for syslog use with omsagent in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for syslog use with omsagent in LAD 3.0.
         """
-        if not self._oms_mdsd_syslog_config:
-            self._oms_mdsd_syslog_config = self.__generate_oms_mdsd_syslog_config()
-        return self._oms_mdsd_syslog_config
+        if not self._mdsd_syslog_config:
+            self._mdsd_syslog_config = self.__generate_mdsd_syslog_config()
+        return self._mdsd_syslog_config
 
-    def __generate_oms_mdsd_syslog_config(self):
+    def __generate_mdsd_syslog_config(self):
         """
         Helper method to generate oms_mdsd_syslog_config
         """
@@ -210,23 +217,24 @@ class LadLoggingConfig:
                 raise LadLoggingConfigException('sasURL is not specified for EventHub sink_name={0}'.format(sink_name))
             eh_routeevent = mxt.per_RouteEvent_tmpl.format(event_name=sink_name,
                                                        opt_store_type='storeType="local"')
-            eh_url = mxt.per_eh_url_tmpl.format(eh_name=sink_name, eh_url=sink['sasURL'])
+            eh_url = mxt.per_eh_url_tmpl.format(eh_name=sink_name, key_path=self._pkey_path,
+                                                enc_eh_url=self._encrypt_secret(self._cert_path, sink['sasURL']))
             return eh_routeevent, eh_url
         else:
             raise LadLoggingConfigException('{0} sink type (for sink_name={1}) is not supported'.format(sink_type,
                                                                                                         sink_name))
 
-    def get_oms_mdsd_filelog_config(self):
+    def get_mdsd_filelog_config(self):
         """
         Get mdsd XML config string for filelog (tail) use with omsagent in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for filelog use with omsagent in LAD 3.0.
         """
-        if not self._oms_mdsd_filelog_config:
-            self._oms_mdsd_filelog_config = self.__generate_oms_mdsd_filelog_config()
-        return self._oms_mdsd_filelog_config
+        if not self._mdsd_filelog_config:
+            self._mdsd_filelog_config = self.__generate_mdsd_filelog_config()
+        return self._mdsd_filelog_config
 
-    def __generate_oms_mdsd_filelog_config(self):
+    def __generate_mdsd_filelog_config(self):
         """
         Helper method to generate oms_mdsd_filelog_config
         """
@@ -256,7 +264,7 @@ class LadLoggingConfig:
         return mxt.top_level_tmpl_for_logging_only.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources,
                                                       eh_urls=filelogs_eh_urls)
 
-    def get_oms_fluentd_syslog_src_config(self):
+    def get_fluentd_syslog_src_config(self):
         """
         Get Fluentd's syslog source config that should be used for this LAD's syslog configs.
         :rtype: str
@@ -291,7 +299,7 @@ class LadLoggingConfig:
 """
         return '' if self._syslog_disabled else fluentd_syslog_src_config
 
-    def get_oms_fluentd_filelog_src_config(self):
+    def get_fluentd_filelog_src_config(self):
         """
         Get Fluentd's filelog (tail) source config that should be used for this LAD's fileLogs settings.
         :rtype: str
@@ -322,7 +330,7 @@ class LadLoggingConfig:
 """
         return fluentd_tail_src_config_template.format(file_paths=','.join(self._file_table_map.keys()))
 
-    def get_oms_fluentd_out_mdsd_config(self):
+    def get_fluentd_out_mdsd_config(self):
         """
         Get Fluentd's out_mdsd output config that should be used for LAD.
         TODO This is not really syslog-specific, so should be moved outside from here.

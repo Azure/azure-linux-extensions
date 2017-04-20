@@ -214,8 +214,7 @@ class LadConfigAll:
                 self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
             elif sink['type'] == 'EventHub':
                 if 'sasURL' in sink:
-                    self._add_element_from_string('EventStreamingAnnotations',
-                                                  mxt.per_eh_url_tmpl.format(eh_name=source, eh_url=sink['sasURL']))
+                    self._add_streaming_annotation(source, sink['sasURL'])
                 else:
                     self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
             elif sink['type'] == 'JsonBlob':
@@ -279,9 +278,18 @@ class LadConfigAll:
                     if 'sasURL' not in sink:
                         raise LadPerfCfgConfigException('No sasURL specified for an EventHub sink (name="{0}")'
                                                         .format(sink_name))
-                    self._add_element_from_string('EventStreamingAnnotations',
-                                                  mxt.per_eh_url_tmpl.format(eh_name=sink_name, eh_url=sink['sasURL']))
+                    self._add_streaming_annotation(sink_name, sink['sasURL'])
 
+    def _add_streaming_annotation(self, sink_name, sas_url):
+        """
+        Helper to add an EventStreamingAnnotation element for the given sink_name and sas_url
+        :param str sink_name: Name of the EventHub sink name for the SAS URL
+        :param str sas_url: Raw SAS URL string for the EventHub sink
+        """
+        self._add_element_from_string('EventStreamingAnnotations',
+                                      mxt.per_eh_url_tmpl.format(eh_name=sink_name,
+                                                                 key_path=self._pkey_path,
+                                                                 enc_eh_url=self._encrypt_secret_with_cert(sas_url)))
 
     def _apply_perf_cfg(self):
         """
@@ -434,16 +442,17 @@ class LadConfigAll:
         try:
             syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
-            lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs)
-            mdsd_syslog_config = lad_logging_config_helper.get_oms_mdsd_syslog_config()
-            mdsd_filelog_config = lad_logging_config_helper.get_oms_mdsd_filelog_config()
+            lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
+                                                         self._pkey_path, self._cert_path, self._encrypt_secret)
+            mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config()
+            mdsd_filelog_config = lad_logging_config_helper.get_mdsd_filelog_config()
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
-            self._fluentd_syslog_src_config = lad_logging_config_helper.get_oms_fluentd_syslog_src_config()
-            self._fluentd_tail_src_config = lad_logging_config_helper.get_oms_fluentd_filelog_src_config()
-            self._fluentd_out_mdsd_config = lad_logging_config_helper.get_oms_fluentd_out_mdsd_config()
-            self._rsyslog_config = lad_logging_config_helper.get_oms_rsyslog_config()
-            self._syslog_ng_config = lad_logging_config_helper.get_oms_syslog_ng_config()
+            self._fluentd_syslog_src_config = lad_logging_config_helper.get_fluentd_syslog_src_config()
+            self._fluentd_tail_src_config = lad_logging_config_helper.get_fluentd_filelog_src_config()
+            self._fluentd_out_mdsd_config = lad_logging_config_helper.get_fluentd_out_mdsd_config()
+            self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
+            self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"

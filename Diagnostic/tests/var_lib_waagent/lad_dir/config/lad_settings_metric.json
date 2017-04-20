@@ -9,7 +9,7 @@
           "sinksConfig": {
             "sink": [
               {
-                "sasURL": "https://fake_sas_url_1",
+                "sasURL": "https://fake&sas%url;1",
                 "type": "EventHub",
                 "name": "LinuxMemoryEventHub"
               },
@@ -18,7 +18,7 @@
                 "name": "SyslogJsonBlob"
               },
               {
-                "sasURL": "https://fake_sas_url_2",
+                "sasURL": "https://fake&sas%url;2",
                 "type": "EventHub",
                 "name": "ProcessorInfoEventHub"
               },

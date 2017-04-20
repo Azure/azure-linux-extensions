@@ -9,6 +9,7 @@ from Utils.lad_logging_config import *
 from Utils.omsagent_util import get_syslog_ng_src_name
 from Utils.mdsd_xml_templates import entire_xml_cfg_tmpl
 import Utils.LadDiagnosticUtil as LadUtil
+from tests.test_lad_config_all import mock_encrypt_secret
 
 
 class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
@@ -49,7 +50,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                     {
                         "name": "SyslogEventHub",
                         "type": "EventHub",
-                        "sasURL": "https://fake_sas_url_for_syslog_eh"
+                        "sasURL": "https://fake&sas%url;for_syslog_eh"
                     },
                     {
                         "name": "SyslogJsonBlob",
@@ -58,7 +59,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                     {
                         "name": "FilelogEventHub",
                         "type": "EventHub",
-                        "sasURL": "https://fake_sas_url_for_filelog_eh"
+                        "sasURL": "https://fake&sas%url;for_filelog_eh"
                     },
                     {
                         "name": "Filelog1JsonBlob",
@@ -75,10 +76,12 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         sinksConfig = LadUtil.SinkConfiguration()
         sinksConfig.insert_from_config(json.loads(sinksConfig_json_ext_settings))
         syslogEvents = json.loads(syslogEvents_json_ext_settings)
-        self.cfg_syslog = LadLoggingConfig(syslogEvents, None, sinksConfig)
+        mock_pkey_path = "/waagent/dir/mock_pkey.prv"
+        mock_cert_path = "/waagent/dir/mock_cert.crt"
+        self.cfg_syslog = LadLoggingConfig(syslogEvents, None, sinksConfig, mock_pkey_path, mock_cert_path, mock_encrypt_secret)
         fileLogs = json.loads(fileLogs_json_ext_settings)
-        self.cfg_filelog = LadLoggingConfig(None, fileLogs, sinksConfig)
-        self.cfg_none = LadLoggingConfig(None, None, sinksConfig)
+        self.cfg_filelog = LadLoggingConfig(None, fileLogs, sinksConfig, mock_pkey_path, mock_cert_path, mock_encrypt_secret)
+        self.cfg_none = LadLoggingConfig(None, None, sinksConfig, mock_pkey_path, mock_cert_path, mock_encrypt_secret)
 
         # XPaths representations of expected XML outputs, for use with xmlunittests package
         self.oms_syslog_expected_xpaths = ('./Sources/Source[@name="mdsd.syslog" and @dynamic_schema="true"]',
@@ -109,9 +112,9 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         self.__helper_test_oms_syslog_mdsd_configs(self.cfg_syslog, self.oms_syslog_expected_xpaths)
 
         # No syslog config case
-        self.assertFalse(self.cfg_none.get_oms_rsyslog_config())
-        self.assertFalse(self.cfg_none.get_oms_syslog_ng_config())
-        self.assertFalse(self.cfg_none.get_oms_mdsd_syslog_config())
+        self.assertFalse(self.cfg_none.get_rsyslog_config())
+        self.assertFalse(self.cfg_none.get_syslog_ng_config())
+        self.assertFalse(self.cfg_none.get_mdsd_syslog_config())
 
     def __helper_test_oms_syslog_mdsd_configs(self, cfg, expected_xpaths):
         """
@@ -119,7 +122,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         :param cfg: SyslogMdsdConfig object containing syslog config
         """
         print '=== Actual oms rsyslog config output ==='
-        oms_rsyslog_config = cfg.get_oms_rsyslog_config()
+        oms_rsyslog_config = cfg.get_rsyslog_config()
         print oms_rsyslog_config
         print '========================================'
         lines = oms_rsyslog_config.strip().split('\n')
@@ -136,7 +139,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         print "*** Actual output verified ***\n"
 
         print '=== Actual oms syslog-ng config output ==='
-        oms_syslog_ng_config = cfg.get_oms_syslog_ng_config()
+        oms_syslog_ng_config = cfg.get_syslog_ng_config()
         print oms_syslog_ng_config
         print '=========================================='
         lines = oms_syslog_ng_config.strip().split('\n')
@@ -157,7 +160,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         print "*** Actual output verified ***\n"
 
         print '=== Actual oms syslog mdsd XML output ==='
-        xml = cfg.get_oms_mdsd_syslog_config()
+        xml = cfg.get_mdsd_syslog_config()
         print xml
         print '========================================='
         root = self.assertXmlDocument(xml)
@@ -169,7 +172,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         Test whether mdsd XML config for LAD fileLog settings is correctly generated.
         """
         print '=== Actual oms filelog mdsd XML config output ==='
-        xml = self.cfg_filelog.get_oms_mdsd_filelog_config()
+        xml = self.cfg_filelog.get_mdsd_filelog_config()
         print xml
         print '================================================='
         root = self.assertXmlDocument(xml)
@@ -178,8 +181,8 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         print "*** Actual output verified ***\n"
 
         # Other configs should be all ''
-        self.assertFalse(self.cfg_syslog.get_oms_mdsd_filelog_config())
-        self.assertFalse(self.cfg_none.get_oms_mdsd_filelog_config())
+        self.assertFalse(self.cfg_syslog.get_mdsd_filelog_config())
+        self.assertFalse(self.cfg_none.get_mdsd_filelog_config())
 
     def __helper_test_oms_fluentd_config(self, header_text, expected, actual):
         header = "=== Actual output of {0} ===".format(header_text)
@@ -194,7 +197,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         """
         Test whether fluentd syslog/tail source configs & out_mdsd config are correctly generated.
         """
-        actual = self.cfg_syslog.get_oms_fluentd_syslog_src_config()
+        actual = self.cfg_syslog.get_fluentd_syslog_src_config()
         expected = """
 <source>
   type syslog
@@ -222,11 +225,11 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
 """
         self.__helper_test_oms_fluentd_config('fluentd basic syslog src config', expected, actual)
 
-        actual = self.cfg_filelog.get_oms_fluentd_syslog_src_config()
+        actual = self.cfg_filelog.get_fluentd_syslog_src_config()
         expected = ''
         self.__helper_test_oms_fluentd_config('fluentd syslog src config for no syslog', expected, actual)
 
-        actual = self.cfg_syslog.get_oms_fluentd_out_mdsd_config()
+        actual = self.cfg_syslog.get_fluentd_out_mdsd_config()
         expected_out_mdsd_cfg_template = r"""
 # Output to mdsd
 <match mdsd.**>
@@ -250,7 +253,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                                               expected_out_mdsd_cfg_template.format(
                                                   optional_lines=out_mdsd_optional_config_lines), actual)
 
-        actual = self.cfg_filelog.get_oms_fluentd_filelog_src_config()
+        actual = self.cfg_filelog.get_fluentd_filelog_src_config()
         expected = """
 # For all monitored files
 <source>
@@ -272,11 +275,11 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
 """
         self.__helper_test_oms_fluentd_config('fluentd tail src config for fileLogs', expected, actual)
 
-        actual = self.cfg_filelog.get_oms_fluentd_out_mdsd_config()
+        actual = self.cfg_filelog.get_fluentd_out_mdsd_config()
         self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for filelog only (no syslog) cfg',
                                               expected_out_mdsd_cfg_template.format(optional_lines=''), actual)
 
-        actual = self.cfg_none.get_oms_fluentd_out_mdsd_config()
+        actual = self.cfg_none.get_fluentd_out_mdsd_config()
         self.__helper_test_oms_fluentd_config('fluentd out_mdsd config for blank cfg (syslog disabled)',
                                               expected_out_mdsd_cfg_template.format(optional_lines=''), actual)
 
@@ -286,8 +289,8 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         Uses oms_syslog_expected_xpaths and oms_filelog_expected_xpaths XPath lists
         to test the operation.
         """
-        xml_string_srcs = [ self.cfg_syslog.get_oms_mdsd_syslog_config(),
-                            self.cfg_filelog.get_oms_mdsd_filelog_config()
+        xml_string_srcs = [ self.cfg_syslog.get_mdsd_syslog_config(),
+                            self.cfg_filelog.get_mdsd_filelog_config()
                           ]
         dst_xml_tree = ET.ElementTree(ET.fromstring(entire_xml_cfg_tmpl))
         map(lambda x: copy_source_mdsdevent_eh_url_elems(dst_xml_tree, x), xml_string_srcs)

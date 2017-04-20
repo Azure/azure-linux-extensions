@@ -9,6 +9,7 @@
 # The test VM was destroyed immediately. A test storage account was used and deleted immediately.
 # TODO Try to generate priv key/cert/storage shared key dynamically here.
 
+import binascii
 import json
 import os
 import unittest
@@ -58,7 +59,11 @@ def mock_fetch_uuid():
 
 
 def mock_encrypt_secret(cert, secret):
-    return "ENCRYPTED({0})".format(secret)
+    # Encode secret w/ binascii.hex() to avoid invalid chars in XML.
+    # The actual/real return value of the non-mocked encrypt_secret() is in that form.
+    # We still keep the "ENCRYPTED(...)" part here to show that clearly in our test outputs.
+    secret = binascii.b2a_hex(secret).upper()
+    return "ENCRYPTED({0},{1})".format(cert, secret)
 
 
 def mock_log_info(msg):
@@ -139,7 +144,7 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
         expected_xml_str = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
-    <Account account="ladunittestfakeaccount" decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(NOT_A_REAL_KEY)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
+    <Account account="ladunittestfakeaccount" decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.crt,4E4F545F415F5245414C5F4B4559)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
     </Accounts>
 
   <Management defaultRetentionInDays="90" eventVolume="Large">
@@ -176,13 +181,13 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
     <MapName name="PercentProcessorTime">/builtin/processor/PercentProcessorTime</MapName>
   </Unpivot>
 </OMIQuery>
-    <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
-    <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemoryEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="local" />
-    <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="JsonBlob" />
-    <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="local" />
-    <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxFileSystem" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
-    <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="FileSystemJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="JsonBlob" />
-    </OMI>
+  <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+  <OMIQuery cqlQuery="SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxMemoryEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="local" />
+  <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="JsonBlob" />
+  <OMIQuery cqlQuery="SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation" dontUsePerNDayTable="true" eventName="ProcessorInfoEventHub" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" storeType="local" />
+  <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="LinuxFileSystem" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" />
+  <OMIQuery cqlQuery="SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation" dontUsePerNDayTable="true" eventName="FileSystemJsonBlob" omiNamespace="root/scx" priority="High" sampleRateInSeconds="300" storeType="JsonBlob" />
+  </OMI>
 
     <DerivedEvents>
     <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="builtin000001" storeType="Central">
@@ -203,17 +208,16 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
   <EventStreamingAnnotations>
   <EventStreamingAnnotation name="LinuxMemoryEventHub">
        <EventPublisher>
-         <Content />
-         <Key>https://fake_sas_url_1</Key>
+         <Key decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv">ENCRYPTED(B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.crt,68747470733A2F2F66616B65267361732575726C3B31)</Key>
        </EventPublisher>
     </EventStreamingAnnotation><EventStreamingAnnotation name="ProcessorInfoEventHub">
        <EventPublisher>
-         <Content />
-         <Key>https://fake_sas_url_2</Key>
+         <Key decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv">ENCRYPTED(B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.crt,68747470733A2F2F66616B65267361732575726C3B32)</Key>
        </EventPublisher>
     </EventStreamingAnnotation></EventStreamingAnnotations>
 
 </MonitoringManagement>
+
 """
         # The following is at least insensitive to whitespaces... Also it's way more complicated
         # to create XPaths for this, so just use the following API.

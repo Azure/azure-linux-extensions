@@ -20,8 +20,7 @@
 
 per_eh_url_tmpl = """    <EventStreamingAnnotation name="{eh_name}">
        <EventPublisher>
-         <Content/>
-         <Key><![CDATA[{eh_url}]]></Key>
+         <Key decryptKeyPath="{key_path}">{enc_eh_url}</Key>
        </EventPublisher>
     </EventStreamingAnnotation>
 """
