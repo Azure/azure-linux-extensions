@@ -32,6 +32,7 @@ class TestApplyMof(unittest.TestCase):
     def test_apply_mof(self):
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = Dummy()
+        dsc.hutil.error = ''
         dsc.hutil.log = waagent.Log
         dsc.install_dsc_packages()
         dsc.start_omiservice()

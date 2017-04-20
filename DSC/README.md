@@ -351,11 +351,9 @@ $privateConfig = '{
 
 ```
 # 3.0 (2017-04-17)
-- Update to OMI v1.1.0 and Linux DSC v1.1.1-294
-- Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 
-  'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
+- Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
+- Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
 
-```
 # 2.0 (2016-03-10)
 - Pick up Linux DSC v1.1.1
 - Add function to register Azure Automation
