@@ -58,6 +58,7 @@ class CommonVariables:
     error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
+    FailedFsFreezeFailed = 121
 
     """
     Pre-Post Plugin error code definitions
