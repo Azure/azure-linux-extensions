@@ -71,6 +71,7 @@ import datetime
 import Status
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
+import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -86,6 +87,7 @@ class HandlerUtility:
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
+        self.log_message = ""
         self._short_name = short_name
         self.patching = None
         self.storageDetailsObj = None
@@ -129,11 +131,16 @@ class HandlerUtility:
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             sys.exit(0)
 
-    def log(self, message):
+    def log(self, message,level='Info'):
         self._log(self._get_log_prefix() + message)
+        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
+
+    def fetch_log_message(self):
+        return self.log_message
 
     def _parse_config(self, ctxt):
         config = None
@@ -266,7 +273,7 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
-        except:
+        except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
@@ -302,13 +309,18 @@ class HandlerUtility:
             total_used = 0
             for i in range(1,len(output)-1):
                 device, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} used space in KB : {1}".format(device,used))
-                total_used = total_used + int(used) #return in KB
+                if not (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used = total_used + int(used) #return in KB
+                else:
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    HandlerUtility.add_to_telemetery_data("GlusterFSPresent","True")
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
-        except:
-            self.log("Unable to fetch total used space")
+        except Exception as e:
+            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
             return 0,True
 
     def get_storage_details(self):
