@@ -77,12 +77,7 @@ def main():
     # Invoke operation
     try:
         hutil = parse_context(operation)
-        vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
-        if vm_supported:
-            exit_code = operations[operation](hutil)
-        else:
-            log_and_exit(hutil, operation, 51, 'Unsupported operation system: {0} {1}'.format(
-                         vm_dist, vm_ver))
+        exit_code = operations[operation](hutil)
 
         if exit_code is not 0:
             message = (operation + ' failed with exit code {0}').format(exit_code)
@@ -165,6 +160,14 @@ def is_vm_supported_for_extension():
     return vm_supported, vm_dist, vm_ver
 
 
+def exit_if_vm_not_supported(hutil, operation):
+    vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
+    if not vm_supported:
+        log_and_exit(hutil, operation, 51, 'Unsupported operation system: {0} {1}'.format(vm_dist,
+                     vm_ver))
+    return 0
+
+
 def dummy_command(hutil):
     return 0
 
@@ -210,6 +213,8 @@ def log_and_exit(hutil, operation, exit_code = 1, message = ''):
 
 
 def install(hutil):
+    exit_if_vm_not_supported(hutil, 'Install')
+
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
     file_path = os.path.join(file_directory, BundleFileName)
 
