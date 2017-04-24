@@ -324,7 +324,7 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
     else:
         code,output = run_cmd('dpkg -i ' + package_path)
         if code == 0:
-            hutil.log(package_name + ' version ' + major_version + '.' + minor_version + '.' + build + '.' + release + '.' + ' is installed successfully')
+            hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(build) + '.' + str(release) + ' is installed successfully')
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=False, message="Failed to install debian package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
