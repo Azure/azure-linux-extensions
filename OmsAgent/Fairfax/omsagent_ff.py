@@ -36,7 +36,7 @@ InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 OmsAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
 WorkspaceCheckCommandTemplate = '{0} -l'
-OnboardCommandWithOptionalParamsTemplate = '{0} -w {1} -s {2} {3}'
+OnboardCommandWithOptionalParamsTemplate = '{0} -d opinsights.azure.us -w {1} -s {2} {3}'
 DisableOmsAgentServiceCommand = '/opt/microsoft/omsagent/bin/service_control disable'
 
 # Change permission of log path
