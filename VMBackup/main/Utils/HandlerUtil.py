@@ -314,7 +314,7 @@ class HandlerUtility:
                     total_used = total_used + int(used) #return in KB
                 else:
                     self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    HandlerUtility.add_to_telemetery_data("GlusterFSPresent","True")
+                    HandlerUtility.add_to_telemetery_data("glusterFSPresent","True")
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
