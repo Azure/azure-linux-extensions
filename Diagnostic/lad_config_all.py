@@ -135,7 +135,7 @@ class LadConfigAll:
         :param str interval: Interval at which this DerivedEvent should be run 
         :param str source: Local table from which this DerivedEvent should pull
         :param str event_name: Destination table to which this DerivedEvent should push
-        :param str store_type: The storage type of the destination table, e.g. Local, Central, CentralJson
+        :param str store_type: The storage type of the destination table, e.g. Local, Central, JsonBlob
         :param bool add_lad_query: True if a <LadQuery> subelement should be added to this <DerivedEvent> element
         """
         derived_event = mxt.derived_event.format(interval=interval, source=source, target=event_name, type=store_type)
@@ -218,7 +218,7 @@ class LadConfigAll:
                 else:
                     self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
             elif sink['type'] == 'JsonBlob':
-                self._add_derived_event(interval, source, name, 'CentralJson')
+                self._add_derived_event(interval, source, name, 'JsonBlob')
             else:
                 self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
 
