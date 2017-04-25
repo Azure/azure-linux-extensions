@@ -611,7 +611,7 @@ def register_automation():
     waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="RegisterInProgress",
                                   isSuccess=True,
-                                  message="[ConfigurationName=" + configuration_name + "]" + "[RefreshFrequencyMins=" + refresh_freq + "]"  + "[ConfigurationModeFrequencyMins=" + configuration_mode_freq + "]" + + "[ConfigurationMode=" + configuration_mode + "]" )
+                                  message="[ConfigurationName=" + configuration_name + "]" + "[RefreshFrequencyMins=" + str(refresh_freq) + "]"  + "[ConfigurationModeFrequencyMins=" + str(configuration_mode_freq) + "]" + "[ConfigurationMode=" + configuration_mode + "]" )
     code,output = run_cmd(cmd)
     if not code == 0:
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
