@@ -310,42 +310,28 @@ class LadConfigAll:
         """
         return self._encrypt_secret(self._cert_path, secret)
 
-    def _update_account_settings(self, account, key, token, endpoint):
+    def _update_account_settings(self, account, token, endpoint):
         """
         Update the MDSD configuration Account element with Azure table storage properties.
         Exactly one of (key, token) must be provided.
         :param account: Storage account to which LAD should write data
-        :param key: Shared key secret for the storage account, if present
-        :param token: SAS token to access the storage account, if present
+        :param token: SAS token to access the storage account
         :param endpoint: Identifies the Azure instance (public or specific sovereign cloud) where the storage account is
         """
-        assert key or token, "Either key or token must be given."
+        assert token, "Token must be given."
         assert self._mdsd_config_xml_tree is not None
 
-        if key:
-            key = self._encrypt_secret_with_cert(key)
-            assert key, "Could not encrypt key"
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "account", account, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "key", key, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/Account',
-                                "tableEndpoint", endpoint, ['isDefault', 'true'])
-            XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'SharedAccessSignature')
-        else:  # token
-            token = self._encrypt_secret_with_cert(token)
-            assert token, "Could not encrypt token"
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "account", account, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "key", token, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
-            XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                                "tableEndpoint", endpoint, ['isDefault', 'true'])
-            XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
+        token = self._encrypt_secret_with_cert(token)
+        assert token, "Could not encrypt token"
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "account", account, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "key", token, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "tableEndpoint", endpoint, ['isDefault', 'true'])
+        XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
 
     def _set_xml_attr(self, key, value, xml_path, selector=[]):
         """
@@ -470,15 +456,12 @@ class LadConfigAll:
         account = self._ext_settings.read_protected_config('storageAccountName')
         if not account:
             return False, "Empty storageAccountName"
-        key = self._ext_settings.read_protected_config('storageAccountKey')
         token = self._ext_settings.read_protected_config('storageAccountSasToken')
-        if not key and not token:
-            return False, "Neither storageAccountKey nor storageAccountSasToken is given"
-        if key and token:
-            return False, "Either storageAccountKey or storageAccountSasToken (but not both) should be given"
+        if not token:
+            return False, "Empty storageAccountSasToken"
         endpoint = get_storage_endpoint_with_account(account,
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
-        self._update_account_settings(account, key, token, endpoint)
+        self._update_account_settings(account, token, endpoint)
 
         # 7. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
         self._set_event_volume(lad_cfg)

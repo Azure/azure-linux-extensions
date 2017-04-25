@@ -38,7 +38,7 @@
         "protectedSettingsCertThumbprint": "B175B535DFE9F93659E5AFD893BF99BBF9DF28A5",
         "protectedSettings": {
           "storageAccountName":"ladunittestfakeaccount",
-          "storageAccountKey":"NOT_A_REAL_KEY",
+          "storageAccountSasToken":"NOT_A_REAL_TOKEN",
           "storageAccountEndPoint":"https://core.windows.net/",
           "sinksConfig": {
             "sink": [
