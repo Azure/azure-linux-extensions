@@ -57,12 +57,12 @@ This article focuses on how to enable and configure the extension by using Azure
 ## Prerequisites
 
 * **Azure Linux Agent version 2.2.0 or later**.
-  Note that most Azure VM Linux gallery images include version 2.2.7 or later. You can run **WAAgent -version** to confirm which version is installed on the VM. If the VM is running an older version of the guest agent, you can follow [these instructions on GitHub](https://github.com/Azure/WALinuxAgent "instructions") to update it.
+  Note that most Azure VM Linux gallery images include version 2.2.7 or later. You can run **/usr/sbin/waagent -version** to confirm which version is installed on the VM. If the VM is running an older version of the guest agent, you can follow [these instructions on GitHub](https://github.com/Azure/WALinuxAgent "instructions") to update it.
 * **Azure CLI**. Follow [this guidance for installing CLI](../xplat-cli-install.md) to set up the Azure CLI environment on your machine. After Azure CLI is installed, you can use the **azure** command from your command-line interface (Bash, Terminal, or command prompt) to access the Azure CLI commands. For example:
   * Run **azure vm extension set --help** for detailed help information.
   * Run **azure login** to sign in to Azure.
   * Run **azure vm list** to list all the virtual machines that you have on Azure.
-* A storage account to store the data. You will need a storage account name that was created previously and an access key to upload the data to your storage.
+* A storage account to store the data. You will need a storage account name that was created previously and an account SAS token to upload the data to your storage.
 
 ## Protected Settings
 
@@ -81,7 +81,7 @@ This set of configuration information contains sensitive information which shoul
 Name | Value
 ---- | -----
 storageAccountName | The name of the storage account in which data will be written by the extension
-storageAccountEndPoint | The endpoint identifying the cloud in which the storage account exists. For the Azure public cloud, this would be [https://core.windows.net](https://core.windows.net); set this appropriately for a storage account in a national cloud.
+storageAccountEndPoint | (optional) The endpoint identifying the cloud in which the storage account exists. For the Azure public cloud (which is the default when this setting is not given), this would be [https://core.windows.net](https://core.windows.net); set this appropriately for a storage account in a national cloud.
 storageAccountSasToken | An [Account SAS token](https://azure.microsoft.com/en-us/blog/sas-update-account-sas-now-supports-all-storage-services/) for Blob and Table services (ss='bt'), containers and objects (srt='co'), which grants add, create, list, update, and write permissions (sp='acluw')
 mdsdHttpProxy | (optional) HTTP proxy information needed to enable the extension to connect to the specified storage account and endpoint.
 sinksConfig | (optional) Details of alternative destinations to which metrics and events can be delivered. The specific details of the various data sinks supported by the extension are covered below.
@@ -160,7 +160,7 @@ This structure contains various blocks of settings which control the information
 
 Element | Value
 ------- | -----
-mdsdHttpProxy | (optional) Same as in the Private Settings (see above). The public value is overridden by the private value, if set.
+mdsdHttpProxy | (optional) Same as in the Private Settings (see above). The public value is overridden by the private value, if set. If the proxy setting contains a secret (like a password), it shouldn't be specified here, but should be specified in the Private Settings.
 
 The remaining elements are described in detail, below.
 
@@ -203,10 +203,10 @@ Samples of the metrics specified in the performanceCounters section are periodic
 
 Element | Value
 ------- | -----
-resourceId | The ARM resource ID of the VM or of the VM Scale Set to which the VM belongs.
+resourceId | The ARM resource ID of the VM or of the VM Scale Set to which the VM belongs. This setting must be also specified if any JsonBlob sink is used in the configuration.
 scheduledTransferPeriod | The frequency at which aggregate metrics are to be computed and transferred to Azure Metrics, expressed as an IS 8601 time interval. The smallest transfer period is 60 seconds, i.e. PT60S or PT1M.
 
-Samples of the metrics specified in the performanceCounters section are collected every 15 seconds. If multiple scheduledTransferPeriod frequencies appear (as in the example), each aggregation is computed independently. The name of the storage table to which aggregated metrics are written (and from which Acure Metrics reads data) is based, in part, on the transfer period of the aggregated metrics stored within it.
+Samples of the metrics specified in the performanceCounters section are collected every 15 seconds or at the sample rate explicitly defined for the counter. If multiple scheduledTransferPeriod frequencies appear (as in the example), each aggregation is computed independently. The name of the storage table to which aggregated metrics are written (and from which Azure Metrics reads data) is based, in part, on the transfer period of the aggregated metrics stored within it.
 
 #### performanceCounters
 
@@ -263,8 +263,8 @@ The syslogEventConfiguration collection has one entry for each syslog facility o
 Element | Value
 ------- | -----
 sinks | A comma-separated list of names of sinks to which individual log events should be published. All log events matching the restrictions in syslogEventConfiguration will be published to each listed sink. Example: "EHforsyslog"
-facilityName | A syslog facility name (e.g. "LOG_USER" or "LOG_LOCAL0"). See the "facility" section of the [syslog man page](http://man7.org/linux/man-pages/man3/syslog.3.html) for the full list.
-minSeverity | A syslog severity level (e.g. "LOG_ERR") or the value "NONE". See the "level" section of the [syslog man page](http://man7.org/linux/man-pages/man3/syslog.3.html) for the full list. The extension will capture events sent to the facility at or above the specified level. If set to NONE, no log messages from the facility will be captured.
+facilityName | A syslog facility name (e.g. "LOG\_USER" or "LOG\_LOCAL0"). See the "facility" section of the [syslog man page](http://man7.org/linux/man-pages/man3/syslog.3.html) for the full list.
+minSeverity | A syslog severity level (e.g. "LOG\_ERR" or "LOG\_INFO"). See the "level" section of the [syslog man page](http://man7.org/linux/man-pages/man3/syslog.3.html) for the full list. The extension will capture events sent to the facility at or above the specified level.
 
 ### perfCfg
 
@@ -294,7 +294,7 @@ Either "table" or "sinks", or both, must be specified.
 
 ### fileLogs
 
-Controls the capture of log files by rsyslogd. As new text lines are written to the file, rsyslogd captures them and passes them to the diagnostic extension, which in turn writes them as table rows.
+Controls the capture of log files by rsyslogd or syslog-ng. As new text lines are written to the file, rsyslogd/syslog-ng captures them and passes them to the diagnostic extension, which in turn writes them as table rows or to the specified sinks (JsonBlob or EventHub).
 
 ```json
 "fileLogs": {
@@ -310,7 +310,7 @@ Controls the capture of log files by rsyslogd. As new text lines are written to 
 
 Element | Value
 ------- | -----
-file | The full pathname of the log file to be watched and captured.
+file | The full pathname of the log file to be watched and captured. The pathname must name a single file; it cannot name a directory or contain wildcards.
 table | (optional) The Azure storage table, in the designated storage account (see above), into which new lines from the "tail" of the file will be placed.
 sinks | (optional) A comma-separated list of names of additional sinks to which log lines should be published.
 
@@ -427,17 +427,156 @@ Aggregated values across all disks can be obtained by setting "condition" to "Is
 
 Assuming your protected settings are in the file PrivateConfig.json and your public configuration information is in PublicConfig.json, run this command:
 
-> azure vm extension set *vm_name* LinuxDiagnostic Microsoft.Azure.Diagnostics '3.*' --private-config-path PrivateConfig.json --public-config-path PublicConfig.json
+> azure vm extension set *resource_group_name* *vm_name* LinuxDiagnostic Microsoft.Azure.Diagnostics '3.*' --private-config-path PrivateConfig.json --public-config-path PublicConfig.json
+
+Please note that the above command assumes you are in the Azure Resource Management mode (arm) of the Azure CLI and applies only to the Azure ARM VMs, not to any classic Azure VMs. For classic (or ASM, Azure Service Management) VMs, you'll need to set the CLI mode to "asm" (run `azure config mode asm`) before running the above command, and you should also omit the resource group name in the command (there is no notion of resource groups in ASM). For more information on different modes of Azure CLI and how to use them, please refer to related documentation like [this](https://docs.microsoft.com/en-us/azure/xplat-cli-connect).
+
+## An example LAD 3.0 configuration
+
+Based on the above definitions, here's a sample LAD 3.0 extension configuration with some explanation. Please note that in order to apply this sample to your case, you should use your own storage account name, account SAS token, and EventHubs SAS tokens. First, the following private settings (that should be saved in a file as PrivateConfig.json, if you want to use the above Azure CLI command to enable the extension) will configure a storage account, its account SAS token, and various sinks (JsonBlob or EventHubs with SAS tokens):
+
+```json
+{
+  "storageAccountName": "yourdiagstgacct",
+  "storageAccountSasToken": "sv=xxxx-xx-xx&ss=bt&srt=co&sp=wlacu&st=yyyy-yy-yyT21%3A22%3A00Z&se=zzzz-zz-zzT21%3A22%3A00Z&sig=fake_signature",
+  "sinksConfig": {
+    "sink": [
+      {
+        "name": "SyslogJsonBlob",
+        "type": "JsonBlob"
+      },
+      {
+        "name": "FilelogJsonBlob",
+        "type": "JsonBlob"
+      },
+      {
+        "name": "LinuxCpuJsonBlob",
+        "type": "JsonBlob"
+      },
+      {
+        "name": "WADMetricJsonBlob",
+        "type": "JsonBlob"
+      },
+      {
+        "name": "LinuxCpuEventHub",
+        "type": "EventHub",
+        "sasURL": "https://youreventhubnamespace.servicebus.windows.net/youreventhubpublisher?sr=https%3a%2f%2fyoureventhubnamespace.servicebus.windows.net%2fyoureventhubpublisher%2f&sig=fake_signature&se=1808096361&skn=yourehpolicy"
+      },
+      {
+        "name": "WADMetricEventHub",
+        "type": "EventHub",
+        "sasURL": "https://youreventhubnamespace.servicebus.windows.net/youreventhubpublisher?sr=https%3a%2f%2fyoureventhubnamespace.servicebus.windows.net%2fyoureventhubpublisher%2f&sig=yourehpolicy&skn=yourehpolicy"
+      },
+      {
+        "name": "LoggingEventHub",
+        "type": "EventHub",
+        "sasURL": "https://youreventhubnamespace.servicebus.windows.net/youreventhubpublisher?sr=https%3a%2f%2fyoureventhubnamespace.servicebus.windows.net%2fyoureventhubpublisher%2f&sig=yourehpolicy&se=1808096361&skn=yourehpolicy"
+      }
+    ]
+  }
+}
+```
+
+Then the following public settings (that should be saved in a file as PublicConfig.json for the Azure CLI command above) will do the following:
+
+* Uploads percent-processor-time and used-disk-space to Azure Metric service table (this will allow you to view these metrics in the Azure Portal), and your EventHub (as specified in your sink `WADMetricEventHub`) and your Azure Blob storage (container name is `wadmetricjsonblob`).
+* Uploads messages from syslog facility "user" and severity "info" or above to your Azure Table storage (always on by default, and the Azure Table name is `LinuxSyslog*`), your Azure Blob storage (container name is `syslogjsonblob*`), and your EventHubs publisher (as specified in your sink name `LoggingEventHub`).
+* Uploads raw OMI query results (PercentProcessorTime and PercentIdleTime) to your Azure Table storage (table name is `LinuxCpu*`), your Azure Blob storage (container name is `linuxcpujsonblob*`) and your EventHubs publisher (as specified in your sink name `LinuxCpuEventHub`).
+* Uploads appended lines in file `/var/log/myladtestlog` to your Azure Table storage (table name is MyLadTestLog\*), your Azure Blob storage (container name is `filelogjsonblob*`), and to your EventHubs publisher (as specified in your sink name `LoggingEventHub`).
+
+```json
+{
+  "StorageAccount": "yourdiagstgacct",
+  "sampleRateInSeconds": 15,
+  "ladCfg": {
+    "diagnosticMonitorConfiguration": {
+      "performanceCounters": {
+        "sinks": "WADMetricEventHub,WADMetricJsonBlob",
+        "performanceCounterConfiguration": [
+          {
+            "unit": "Percent",
+            "type": "builtin",
+            "counter": "PercentProcessorTime",
+            "counterSpecifier": "/builtin/Processor/PercentProcessorTime",
+            "annotation": [
+              {
+                "locale": "en-us",
+                "displayName": "Aggregate CPU %utilization"
+              }
+            ],
+            "condition": "IsAggregate=TRUE",
+            "class": "Processor"
+          },
+          {
+            "unit": "Bytes",
+            "type": "builtin",
+            "counter": "UsedSpace",
+            "counterSpecifier": "/builtin/FileSystem/UsedSpace",
+            "annotation": [
+              {
+                "locale": "en-us",
+                "displayName": "Used disk space on /"
+              }
+            ],
+            "condition": "Name=\"/\"",
+            "class": "Filesystem"
+          }
+        ]
+      },
+      "metrics": {
+        "metricAggregation": [
+          {
+            "scheduledTransferPeriod": "PT1H"
+          },
+          {
+            "scheduledTransferPeriod": "PT1M"
+          }
+        ],
+        "resourceId": "/subscriptions/your_azure_subscription_id/resourceGroups/your_resource_group_name/providers/Microsoft.Compute/virtualMachines/your_vm_name"
+      },
+      "eventVolume": "Large",
+      "syslogEvents": {
+        "sinks": "SyslogJsonBlob,LoggingEventHub",
+        "syslogEventConfiguration": {
+          "LOG_USER": "LOG_INFO"
+        }
+      }
+    }
+  },
+  "perfCfg": [
+    {
+      "query": "SELECT PercentProcessorTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
+      "table": "LinuxCpu",
+      "frequency": 60,
+      "sinks": "LinuxCpuJsonBlob,LinuxCpuEventHub"
+    }
+  ],
+  "fileLogs": [
+    {
+      "file": "/var/log/myladtestlog",
+      "table": "MyLadTestLog",
+      "sinks": "FilelogJsonBlob,LoggingEventHub"
+    }
+  ]
+}
+```
+
+Please note that you must provide the correct `resourceId` in order for the Azure Metrics service to display your `performanceCounters` data correctly in the Azure Portal charts. The resource ID is also used by JsonBlob sinks as well when forming the names of blobs.
 
 ## Review your data
 
-The performance and diagnostic data are stored in an Azure Storage table. Review [How to use Azure Table Storage from Ruby](../storage/storage-ruby-how-to-use-table-storage.md) to learn how to access the data in the storage table by using Azure CLI scripts.
+The performance and diagnostic data are stored in an Azure Storage table by default. Review [How to use Azure Table Storage from Ruby](../storage/storage-ruby-how-to-use-table-storage.md) to learn how to access the data in the storage table by using Azure Table Storage Ruby API. Note that Azure Storage APIs are available in many other languages and platforms.
 
-In addition, you can use following UI tools to access the data:
+If you specified JsonBlob sinks for your LAD extension configuration, then the same storage account's blob containers will hold your performance and/or diagnostic data. You can consume the blob data using any Azure Blob Storage APIs.
 
+In addition, you can use following UI tools to access the data in Azure Storage:
+
+1. [Microsoft Azure Storage Explorer](http://storageexplorer.com/)
 1. Visual Studio Server Explorer.
 1. [Azure Storage Explorer](https://azurestorageexplorer.codeplex.com/ "Azure Storage Explorer").
 
-![image](./media/virtual-machines-linux-classic-diagnostic-extension/no1.png)
+The following is a snapshot of a Microsoft Azure Storage Explorer session showing the generated Azure Storage tables and containers from a correctly configured LAD 3.0 extension on a test VM. Note that the snapshot doesn't match exactly with the sample LAD 3.0 configuration provided above.
 
-If you've configured fileCfg or perfLogs, you can use Visual Studio Server Explorer and Azure Storage Explorer to view the collected data.
+![image](./media/virtual-machines-linux-diagnostic-extension-v3/stg_explorer.png)
+
+If you specified EventHubs sinks for your LAD extension configuraiton, then you'll want to consume the published EventHubs messages following related EventHubs documentation. You may want to start from [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs).
