@@ -609,7 +609,7 @@ def register_automation():
     if configuration_mode != '':
         cmd += ' --ConfigurationMode ' + configuration_mode
     waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=Operation.RegisterInProgress,
+                                  op="RegisterInProgress",
                                   isSuccess=True,
                                   message="[ConfigurationName=" + configuration_name + "]" + "[RefreshFrequencyMins=" + refresh_freq + "]"  + "[ConfigurationModeFrequencyMins=" + configuration_mode_freq + "]" + + "[ConfigurationMode=" + configuration_mode + "]" )
     code,output = run_cmd(cmd)
