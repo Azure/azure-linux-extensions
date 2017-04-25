@@ -65,7 +65,6 @@ class DistroCategory:
 class Mode:
     push = "push"
     pull = "pull"
-    install = "install"
     remove = "remove"
     register = "register"
 
@@ -132,7 +131,7 @@ def enable():
     hutil.exit_if_enabled()
     try:
         start_omiservice()
-        mode = get_config('Mode')
+        mode = get_config('Operation')
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
         if mode == '':
             mode = Mode.push
@@ -142,8 +141,8 @@ def enable():
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=True,
-                                          message="(03001)Argument error, invalid mode. DSC supports only Push and Pull mode.")
-                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown mode: ' + mode + " DSC supports only Push and Pull mode.")
+                                          message="(03001)Argument error, invalid operation.")
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown operation: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
@@ -295,12 +294,12 @@ def compare_pkg_version(system_package_version, major_version, minor_version, bu
         return 1
     return 0
 
-def rpm_check_pkg_exists(package_name, major_version, minor_version, build):
+def rpm_check_pkg_exists(package_name, major_version, minor_version, build, release):
     code,output = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" ' + package_name)
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " + package_name + ";  existing package version:" + output)
     hutil.log("package name: " + package_name + ";  existing package version:" + output)
     if code == 0: 
-        return compare_pkg_version(output, major_version, minor_version, build)
+        return compare_pkg_version(output, major_version, minor_version, build, release)
 
 def rpm_install_pkg(package_path, package_name, major_version, minor_version, build, release):
     if rpm_check_pkg_exists(package_name, major_version, minor_version, build, release) == 1:
@@ -594,14 +593,14 @@ def register_automation():
     registration_key = get_config('RegistrationKey')
     registation_url = get_config('RegistrationUrl')
 	# Optional
-    configuration_name = get_config('ConfigurationName')
+    node_configuration_name = get_config('NodeConfigurationName')
     refresh_freq = get_config('RefreshFrequencyMins')
     configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
     configuration_mode = get_config('ConfigurationMode')
     cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
           + ' --ServerURL '+ registation_url
-    if configuration_name != '':
-        cmd += ' --ConfigurationName ' + configuration_name
+    if node_configuration_name != '':
+        cmd += ' --ConfigurationName ' + node_configuration_name
     if refresh_freq != '':
         cmd += ' --RefreshFrequencyMins ' + refresh_freq
     if configuration_mode_freq != '':
@@ -611,7 +610,7 @@ def register_automation():
     waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="RegisterInProgress",
                                   isSuccess=True,
-                                  message="[ConfigurationName=" + configuration_name + "]" + "[RefreshFrequencyMins=" + str(refresh_freq) + "]"  + "[ConfigurationModeFrequencyMins=" + str(configuration_mode_freq) + "]" + "[ConfigurationMode=" + configuration_mode + "]" )
+                                  message="Executing this cmd" + cmd)
     code,output = run_cmd(cmd)
     if not code == 0:
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)

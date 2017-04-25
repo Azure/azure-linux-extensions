@@ -9,11 +9,11 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
-* Push MOF configurations to the Linux VM (Push Mode)
-* Distribute MOF configurations to the Linux VM with Pull Servers (Pull Mode)
-* Install custom DSC modules to the Linux VM (Install Mode)
-* Remove custom DSC modules to the Linux VM (Remove Mode)
-* Register the Linux VM to Azure Automation account (Register Mode)
+* Push MOF configurations to the Linux VM (Push Operation)
+* Distribute MOF configurations to the Linux VM with Pull Servers (Pull Operation)
+* Install custom DSC modules to the Linux VM (Install Operation)
+* Remove custom DSC modules to the Linux VM (Remove Operation)
+* Register the Linux VM to Azure Automation account (Register Operation)
 
 # User Guide
 
@@ -25,7 +25,7 @@ Here're all the supported public configuration parameters:
 
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
+* `Operation`: (optional, string) the functional operation, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
 
 ### 1.2 Protected configuration
 
@@ -172,7 +172,7 @@ public.json
 ```json
 {
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"
+  "Operation": "Push"
 }
 ```
 
@@ -185,7 +185,7 @@ $privateConfig = '{
 
 $publicConfig = '{
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"
+  "Operation": "Push"
 }'
 ```
 
@@ -219,7 +219,7 @@ protected.json
 public.json
 ```json
 {
-  "Mode": "Pull",
+  "Operation": "Pull",
   "FileUri": "<meta-mof-file-uri>",
 }
 ```
@@ -232,7 +232,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Pull",
+  "Operation": "Pull",
   "FileUri": "<meta-mof-file-uri>",
 }'
 ```
@@ -242,14 +242,14 @@ public.json
 ```json
 {
   "FileUri": "<meta-mof-file-uri>",
-  "Mode": "Pull"
+  "Operation": "Pull"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
   "FileUri": "<meta-mof-file-uri>",
-  "Mode": "Pull"
+  "Operation": "Pull"
 }'
 ```
 
@@ -264,7 +264,7 @@ protected.json
 public.json
 ```json
 {
-  "Mode": "Install",
+  "Operation": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }
 ```
@@ -277,7 +277,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Install",
+  "Operation": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }'
 ```
@@ -286,14 +286,14 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "Mode": "Install",
+  "Operation": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "Mode": "Install",
+  "Operation": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }'
 ```
@@ -303,14 +303,14 @@ public.json
 ```json
 {
   "ResourceName": "<resource-name>",
-  "Mode": "Remove"
+  "Operation": "Remove"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
   "ResourceName": "<resource-name>",
-  "Mode": "Remove"
+  "Operation": "Remove"
 }'
 ```
 
@@ -322,12 +322,30 @@ protected.json
   "RegistrationKey": "<azure-automation-account-key>"
 }
 ```
+public.json
+```json
+{
+  "Operation" : "Register",
+  "NodeConfigurationName": "<node-configuration-name>",
+  "RefreshFrequencyMins": "<resource-zip-file-uri>"
+  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
+  "ConfigurationModeFrequencyMins": "<resource-zip-file-uri>"
+}
+```
 
 powershell format
 ```powershell
 $privateConfig = '{
   "RegistrationUrl": "<azure-automation-account-url>",
   "RegistrationKey": "<azure-automation-account-key>"
+}'
+
+$publicConfig = '{
+  "Operation" : "Register",
+  "NodeConfigurationName": "<node-configuration-name>",
+  "RefreshFrequencyMins": "<resource-zip-file-uri>"
+  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
+  "ConfigurationModeFrequencyMins": "<resource-zip-file-uri>"
 }'
 ```
 
