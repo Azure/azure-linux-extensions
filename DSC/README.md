@@ -11,7 +11,7 @@ About how to create MOF document, please refer to below documents.
 DSCForLinux Extension can:
 * Register the Linux VM to Azure Automation account (Register Operation)
 * Push MOF configurations to the Linux VM (Push Operation)
-* Distribute MOF configurations to the Linux VM with Pull Servers (Pull Operation)
+* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull Operation)
 * Install custom DSC modules to the Linux VM (Install Operation)
 * Remove custom DSC modules to the Linux VM (Remove Operation)
 
@@ -376,6 +376,7 @@ $publicConfig = '{
 # 3.0 (2017-04-17)
 - Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
 - Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
+- Renamed paramter 'mode' to 'Operation' to avoid confusion with DSC push/pull mode.
 
 # 2.0 (2016-03-10)
 - Pick up Linux DSC v1.1.1

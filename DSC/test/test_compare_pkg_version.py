@@ -22,6 +22,7 @@ import dsc
 import os
 import platform
 from Utils.WAAgentUtil import waagent
+from MockUtil import MockUtil
 
 waagent.LoggerInit('/tmp/test.log','/dev/null')
 
