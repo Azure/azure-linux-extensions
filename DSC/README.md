@@ -163,163 +163,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 ## 3. Scenarios
 
-### 3.1 Apply a MOF configuration file (in Azure Storage Account) to the VM
-
-protected.json
-```json
-{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>"
-}
-```
-
-public.json
-```json
-{
-  "FileUri": "<mof-file-uri>",
-  "Operation": "Push"
-}
-```
-
-powershell format
-```powershell
-$privateConfig = '{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>"
-}'
-
-$publicConfig = '{
-  "FileUri": "<mof-file-uri>",
-  "Operation": "Push"
-}'
-```
-
-
-### 3.2. Apply a MOF configuration file (in public storage) to the VM
-
-public.json
-```json
-{
-  "FileUri": "<mof-file-uri>"
-}
-```
-
-powershell format
-```powershell
-$publicConfig = '{
-  "FileUri": "<mof-file-uri>"
-}'
-```
-
-### 3.3. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
-
-protected.json
-```json
-{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-}
-```
-
-public.json
-```json
-{
-  "Operation": "Pull",
-  "FileUri": "<meta-mof-file-uri>",
-}
-```
-
-powershell format
-```powershell
-$privateConfig = '{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-}'
-
-$publicConfig = '{
-  "Operation": "Pull",
-  "FileUri": "<meta-mof-file-uri>",
-}'
-```
-
-### 3.4. Apply a meta MOF configuration file (in public storage) to the VM
-public.json
-```json
-{
-  "FileUri": "<meta-mof-file-uri>",
-  "Operation": "Pull"
-}
-```
-powershell format
-```powershell
-$publicConfig = '{
-  "FileUri": "<meta-mof-file-uri>",
-  "Operation": "Pull"
-}'
-```
-
-### 3.5. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
-protected.json
-```json
-{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>"
-}
-```
-public.json
-```json
-{
-  "Operation": "Install",
-  "FileUri": "<resource-zip-file-uri>"
-}
-```
-
-powershell format
-```powershell
-$privateConfig = '{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>"
-}'
-
-$publicConfig = '{
-  "Operation": "Install",
-  "FileUri": "<resource-zip-file-uri>"
-}'
-```
-
-### 3.6. Install a custom resource module (ZIP file in public storage) to the VM
-public.json
-```json
-{
-  "Operation": "Install",
-  "FileUri": "<resource-zip-file-uri>"
-}
-```
-powershell format
-```powershell
-$publicConfig = '{
-  "Operation": "Install",
-  "FileUri": "<resource-zip-file-uri>"
-}'
-```
-
-### 3.7. Remove a custom resource module from the VM
-public.json
-```json
-{
-  "ResourceName": "<resource-name>",
-  "Operation": "Remove"
-}
-```
-powershell format
-```powershell
-$publicConfig = '{
-  "ResourceName": "<resource-name>",
-  "Operation": "Remove"
-}'
-```
-
-### 3.8 Register to Azure Automation account
+### 3.1 Register to Azure Automation account
 protected.json
 ```json
 {
@@ -351,6 +195,162 @@ $publicConfig = '{
   "RefreshFrequencyMins": "<value>"
   "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
   "ConfigurationModeFrequencyMins": "<value>"
+}'
+```
+
+### 3.2 Apply a MOF configuration file (in Azure Storage Account) to the VM
+
+protected.json
+```json
+{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}
+```
+
+public.json
+```json
+{
+  "FileUri": "<mof-file-uri>",
+  "Operation": "Push"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}'
+
+$publicConfig = '{
+  "FileUri": "<mof-file-uri>",
+  "Operation": "Push"
+}'
+```
+
+
+### 3.3. Apply a MOF configuration file (in public storage) to the VM
+
+public.json
+```json
+{
+  "FileUri": "<mof-file-uri>"
+}
+```
+
+powershell format
+```powershell
+$publicConfig = '{
+  "FileUri": "<mof-file-uri>"
+}'
+```
+
+### 3.4. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
+
+protected.json
+```json
+{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>",
+}
+```
+
+public.json
+```json
+{
+  "Operation": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>",
+}'
+
+$publicConfig = '{
+  "Operation": "Pull",
+  "FileUri": "<meta-mof-file-uri>",
+}'
+```
+
+### 3.5. Apply a meta MOF configuration file (in public storage) to the VM
+public.json
+```json
+{
+  "FileUri": "<meta-mof-file-uri>",
+  "Operation": "Pull"
+}
+```
+powershell format
+```powershell
+$publicConfig = '{
+  "FileUri": "<meta-mof-file-uri>",
+  "Operation": "Pull"
+}'
+```
+
+### 3.6. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
+protected.json
+```json
+{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}
+```
+public.json
+```json
+{
+  "Operation": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}'
+
+$publicConfig = '{
+  "Operation": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}'
+```
+
+### 3.7. Install a custom resource module (ZIP file in public storage) to the VM
+public.json
+```json
+{
+  "Operation": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}
+```
+powershell format
+```powershell
+$publicConfig = '{
+  "Operation": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}'
+```
+
+### 3.8. Remove a custom resource module from the VM
+public.json
+```json
+{
+  "ResourceName": "<resource-name>",
+  "Operation": "Remove"
+}
+```
+powershell format
+```powershell
+$publicConfig = '{
+  "ResourceName": "<resource-name>",
+  "Operation": "Remove"
 }'
 ```
 
