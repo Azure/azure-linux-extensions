@@ -139,11 +139,17 @@ class LadLogHelper(object):
                                   message=dependencies_err_log_msg)
 
 
-def read_uuid(run_command):
-    code, str_ret = run_command("dmidecode |awk '/UUID/{print $2}'")
-    if code != 0:
-        raise LadLoggingConfigException('read_uuid() failed. Exit code={0}, Output={1}'.format(code, str_ret))
-    return str_ret.strip()
+def read_uuid():
+    uuid = ''
+    uuid_file_path = '/sys/class/dmi/id/product_uuid'
+    try:
+        with open(uuid_file_path) as f:
+            uuid = f.readline().strip()
+    except Exception as e:
+        raise LadLoggingConfigException('read_uuid() failed: Unable to open uuid file {0}'.format(uuid_file_path))
+    if not uuid:
+        raise LadLoggingConfigException('read_uuid() failed: Empty content in uuid file {0}'.format(uuid_file_path))
+    return uuid
 
 
 def encrypt_secret_with_cert(run_command, logger, cert_path, secret):

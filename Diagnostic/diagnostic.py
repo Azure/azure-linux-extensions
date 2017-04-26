@@ -185,14 +185,11 @@ def create_core_components_configs():
 
     # Define wrappers around a couple misc_helpers. These can easily be mocked out in tests. PEP-8 says use
     # def, don't assign a lambda to a variable. *shrug*
-    def fetch_uuid():
-        return read_uuid(RunGetOutput)
-
     def encrypt_string(cert, secret):
         return encrypt_secret_with_cert(RunGetOutput, hutil.error, cert, secret)
 
     configurator = lad_cfg.LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
-                                        fetch_uuid, encrypt_string, hutil.log, hutil.error)
+                                        read_uuid, encrypt_string, hutil.log, hutil.error)
     try:
         config_valid, config_invalid_reason = configurator.generate_all_configs()
     except Exception as e:
