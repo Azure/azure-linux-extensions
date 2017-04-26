@@ -61,10 +61,11 @@ class DistroCategory:
     debian = 1
     redhat = 2
     suse = 3
-
+	
 class Mode:
     push = "push"
     pull = "pull"
+    install = "install"
     remove = "remove"
     register = "register"
 
@@ -131,6 +132,11 @@ def enable():
     hutil.exit_if_enabled()
     try:
         start_omiservice()
+        mode_parameter = get_config('Mode')
+        if mode_parameter != '':
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Mode parameter is NOT supported from 3.0 version to avoid confusion. Please use Operation instead.")
+            hutil.error("Mode parameter is NOT supported from 3.0 version to avoid confusion.")
+            hutil.do_exit(51, 'Enable', 'error', '51', 'Enable Failed. Mode parameter is NOT supported from 3.0 version to avoid confusion. Please use Operation instead.')	
         mode = get_config('Operation')
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
         if mode == '':
@@ -597,6 +603,12 @@ def register_automation():
     refresh_freq = get_config('RefreshFrequencyMins')
     configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
     configuration_mode = get_config('ConfigurationMode')
+    configuration_mode = configuration_mode.lower() 
+    if not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
+        err_msg = "configurationMode: " + configuration_mode + " is not valid"	
+        hutil.error("configurationMode: " + configuration_mode + " is not valid. It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
+        hutil.do_exit(51, 'Install', 'error', '51', err_msg)
     cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
           + ' --ServerURL '+ registation_url
     if node_configuration_name != '':

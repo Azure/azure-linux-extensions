@@ -9,11 +9,11 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
+* Register the Linux VM to Azure Automation account (Register Operation)
 * Push MOF configurations to the Linux VM (Push Operation)
 * Distribute MOF configurations to the Linux VM with Pull Servers (Pull Operation)
 * Install custom DSC modules to the Linux VM (Install Operation)
 * Remove custom DSC modules to the Linux VM (Remove Operation)
-* Register the Linux VM to Azure Automation account (Register Operation)
 
 # User Guide
 
@@ -25,7 +25,12 @@ Here're all the supported public configuration parameters:
 
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Operation`: (optional, string) the functional operation, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
+* `Operation`: (optional, string) the functional operation, valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Operation by default.
+* `NodeConfigurationName`: (optional, string) the name of the configuration to apply.
+* `RefreshFrequencyMins`: (optional, int) pecifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
+       If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
+* `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
+* `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.
 
 ### 1.2 Protected configuration
 
@@ -103,7 +108,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Push",
+  "Operation": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -141,7 +146,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Push",
+  "Operation": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -327,9 +332,9 @@ public.json
 {
   "Operation" : "Register",
   "NodeConfigurationName": "<node-configuration-name>",
-  "RefreshFrequencyMins": "<resource-zip-file-uri>"
+  "RefreshFrequencyMins": "<value>"
   "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
-  "ConfigurationModeFrequencyMins": "<resource-zip-file-uri>"
+  "ConfigurationModeFrequencyMins": "<value>"
 }
 ```
 
@@ -343,9 +348,9 @@ $privateConfig = '{
 $publicConfig = '{
   "Operation" : "Register",
   "NodeConfigurationName": "<node-configuration-name>",
-  "RefreshFrequencyMins": "<resource-zip-file-uri>"
+  "RefreshFrequencyMins": "<value>"
   "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
-  "ConfigurationModeFrequencyMins": "<resource-zip-file-uri>"
+  "ConfigurationModeFrequencyMins": "<value>"
 }'
 ```
 
