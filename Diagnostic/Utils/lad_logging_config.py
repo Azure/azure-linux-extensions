@@ -287,6 +287,7 @@ class LadLoggingConfig:
   port %SYSLOG_PORT%
   bind 127.0.0.1
   protocol_type udp
+  include_source_host true
   tag mdsd.syslog
 </source>
 
@@ -303,7 +304,7 @@ class LadLoggingConfig:
     SendingHost ${record["source_host"]}
     Msg ${record["message"]}
   </record>
-  remove_keys host,ident,pid,message,source_host  # No need of these fields for mdsd so remove
+  remove_keys host,ident,message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
         return '' if self._syslog_disabled else fluentd_syslog_src_config
