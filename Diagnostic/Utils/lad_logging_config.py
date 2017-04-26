@@ -193,10 +193,13 @@ class LadLoggingConfig:
             syslog_routeevents += routeevent
             syslog_eh_urls += eh_url
 
+        mdsd_event_source = ''
+        if syslog_routeevents:  # Do not add MdsdEventSource element if there's no associated RouteEvent generated.
+            mdsd_event_source = mxt.per_MdsdEventSource_tmpl.format(source=syslog_src_name,
+                                                                    routeevents=syslog_routeevents)
+
         return mxt.top_level_tmpl_for_logging_only.format(
-            sources=mxt.per_source_tmpl.format(name=syslog_src_name),
-            events=mxt.per_MdsdEventSource_tmpl.format(source=syslog_src_name, routeevents=syslog_routeevents),
-            eh_urls=syslog_eh_urls)
+            sources=mxt.per_source_tmpl.format(name=syslog_src_name), events=mdsd_event_source, eh_urls=syslog_eh_urls)
 
     def __generate_routeevent_and_eh_url_for_extra_sink(self, sink_name, src_name):
         """
@@ -264,8 +267,9 @@ class LadLoggingConfig:
                     routeevent, eh_url = self.__generate_routeevent_and_eh_url_for_extra_sink(sink_name, source_name)
                     per_file_routeevents += routeevent
                     filelogs_eh_urls += eh_url
-            filelogs_mdsd_event_sources += \
-                mxt.per_MdsdEventSource_tmpl.format(source=source_name, routeevents=per_file_routeevents)
+            if per_file_routeevents:  # Do not add MdsdEventSource element if there's no associated RouteEvent generated.
+                filelogs_mdsd_event_sources += \
+                    mxt.per_MdsdEventSource_tmpl.format(source=source_name, routeevents=per_file_routeevents)
         return mxt.top_level_tmpl_for_logging_only.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources,
                                                       eh_urls=filelogs_eh_urls)
 
