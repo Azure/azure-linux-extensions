@@ -27,7 +27,7 @@ Here're all the supported public configuration parameters:
 * `ResourceName`: (optional, string) the name of the custom resource module
 * `Operation`: (optional, string) the functional operation, valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Operation by default.
 * `NodeConfigurationName`: (optional, string) the name of the configuration to apply.
-* `RefreshFrequencyMins`: (optional, int) pecifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
+* `RefreshFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
        If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
 * `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
 * `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.

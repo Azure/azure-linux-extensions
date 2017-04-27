@@ -46,6 +46,7 @@ dsc_major_version = 1
 dsc_minor_version = 1
 dsc_build = 1
 dsc_release = 294
+package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 
 # DSC-specific Operation
 class Operation:
@@ -244,7 +245,7 @@ def deb_remove_incomptible_dsc_package():
         deb_uninstall_package(package_name)
 			
 def is_incomptible_dsc_package(package_version):
-    version = re.match('(\d+).(\d+).(\d+).(\d+)', package_version)
+    version = re.match(package_pattern, package_version)
     #uninstall DSC package if the version is 1.0.x because upgrading from 1.0 to 1.1 is broken
     if version is not None and (int(version.group(1)) == 1 and int(version.group(2)) == 0): 
 	    return True
@@ -295,7 +296,7 @@ def install_dsc_packages():
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
 
 def compare_pkg_version(system_package_version, major_version, minor_version, build, release):
-    version = re.match('(\d+).(\d+).(\d+).(\d+)', system_package_version)
+    version = re.match(package_pattern, system_package_version)
     if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) > build) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) == build and int(version.group(4)) >= release)):
         return 1
     return 0
@@ -608,7 +609,7 @@ def register_automation():
         err_msg = "configurationMode: " + configuration_mode + " is not valid"	
         hutil.error("configurationMode: " + configuration_mode + " is not valid. It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
-        hutil.do_exit(51, 'Install', 'error', '51', err_msg)
+        hutil.do_exit(51, 'Enable', 'error', '51', err_msg)
     cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
           + ' --ServerURL '+ registation_url
     if node_configuration_name != '':
