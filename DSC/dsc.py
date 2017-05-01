@@ -133,12 +133,9 @@ def enable():
     hutil.exit_if_enabled()
     try:
         start_omiservice()
-        mode_parameter = get_config('Mode')
-        if mode_parameter != '':
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Mode parameter is NOT supported from 3.0 version to avoid confusion. Please use Operation instead.")
-            hutil.error("Mode parameter is NOT supported from 3.0 version to avoid confusion.")
-            hutil.do_exit(51, 'Enable', 'error', '51', 'Enable Failed. Mode parameter is NOT supported from 3.0 version to avoid confusion. Please use Operation instead.')	
-        mode = get_config('Operation')
+        mode = get_config('Mode')
+        if mode != '':
+            mode = get_config('Operation')
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
         if mode == '':
             mode = Mode.push
@@ -148,8 +145,8 @@ def enable():
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=True,
-                                          message="(03001)Argument error, invalid operation.")
-                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown operation: ' + mode)
+                                          message="(03001)Argument error, invalid operation/mode.")
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown operation/mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
@@ -505,7 +502,9 @@ def prepare_download_dir(seq_no):
     return cur_download_dir
 
 def apply_dsc_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)	
+    code,output = run_cmd(cmd)	
     if code == 0:
         code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
@@ -519,7 +518,9 @@ def apply_dsc_configuration(config_file_path):
         raise Exception(error_msg)
 
 def apply_dsc_meta_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)
+    code,output = run_cmd(cmd)
     if code == 0:
         code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output

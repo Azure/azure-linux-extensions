@@ -1,7 +1,7 @@
 # DSCForLinux Extension
 Allow the owner of the Azure Virtual Machines to configure the VM using Desired State Configuration (DSC) for Linux.
 
-Latest version is 3.0.
+Latest version is 2.3
 
 About how to create MOF document, please refer to below documents.
 * [Get started with Desired State Configuration (DSC) for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
@@ -9,7 +9,7 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
-* Register the Linux VM to Azure Automation account (Register Operation)
+* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register Operation)
 * Push MOF configurations to the Linux VM (Push Operation)
 * Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull Operation)
 * Install custom DSC modules to the Linux VM (Install Operation)
@@ -31,6 +31,7 @@ Here're all the supported public configuration parameters:
        If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
 * `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
 * `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.
+NOTE: If you are using a version < 2.3, mode parameter is same as Operation. Mode seems to be a overloaded term. Therefore to avoid the confusion, Operation is being used from 2.3 version onwards. For backward compatibility, extension supports both mode and Operation. 
 
 ### 1.2 Protected configuration
 
@@ -373,10 +374,11 @@ $publicConfig = '{
 ## Changelog
 
 ```
-# 3.0 (2017-04-17)
+# 2.3 (2017-04-17)
 - Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
 - Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
-- Renamed paramter 'mode' to 'Operation' to avoid confusion with DSC push/pull mode.
+- Added a new parameter 'Operation' to replace 'mode' to avoid confusion with DSC push/pull mode.
+- Supports mode parameter for backward compatibility.
 
 # 2.0 (2016-03-10)
 - Pick up Linux DSC v1.1.1

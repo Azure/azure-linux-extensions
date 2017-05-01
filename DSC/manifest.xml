@@ -2,7 +2,7 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
   <Type>DSCForLinux</Type>
-  <Version>3.0.0.0</Version>
+  <Version>2.3.0.0</Version>
   <Label>Microsoft Azure DSC Extension for Linux Virtual Machines</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
