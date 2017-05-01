@@ -367,7 +367,7 @@ def start_mdsd(configurator):
         return
 
     # We then validate the mdsd config and proceed only when it succeeds.
-    xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
+    xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
     tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
     g_dist_config.extend_environment(tmp_env_dict)
     added_env_str = ' '.join('{0}={1}'.format(k, tmp_env_dict[k]) for k in tmp_env_dict)
@@ -376,11 +376,8 @@ def start_mdsd(configurator):
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
-            "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
-            "Config validation message: {0}.".format(config_validate_cmd_msg)
-        hutil.log(message)
-        hutil.do_status_report(waagent_ext_event_type, "success", '0', message)
+        g_lad_log_helper.log_and_report_invalid_mdsd_cfg(g_ext_op_type,
+                                                         config_validate_cmd_msg, read_file_to_string(xml_file))
         return
 
     # Start OMI if it's not running.

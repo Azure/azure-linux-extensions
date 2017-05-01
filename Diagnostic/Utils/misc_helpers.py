@@ -138,6 +138,24 @@ class LadLogHelper(object):
                                   version=self._ext_ver,
                                   message=dependencies_err_log_msg)
 
+    def log_and_report_invalid_mdsd_cfg(self, ext_event_type, config_validate_cmd_msg, mdsd_cfg_xml):
+        """
+        Report invalid result from 'mdsd -v -c xmlCfg.xml'
+        :param ext_event_type: Type of extension event being performed (most likely 'HeartBeat')
+        :param config_validate_cmd_msg: Output of 'mdsd -v -c xmlCfg.xml'
+        :param mdsd_cfg_xml: Content of xmlCfg.xml to be sent to Geneva
+        :return: None
+        """
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
+                  "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
+                  "Config validation message: {0}.".format(config_validate_cmd_msg)
+        self._logger_log(message)
+        self._status_reporter(ext_event_type, 'success', '0', message)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_event_type,
+                                  isSuccess=True,  # Note this is True, because it must be a user error.
+                                  version=self._ext_ver,
+                                  message="Invalid mdsd config encountered: {0}".format(mdsd_cfg_xml))
 
 def read_uuid():
     uuid = ''
@@ -279,3 +297,16 @@ def append_string_to_file(string, filepath):
     """
     with open(filepath, 'a') as f:
         f.write(string)
+
+
+def read_file_to_string(filepath):
+    """
+    Read entire file and return it as string. If file can't be read, return "Can't read <filepath>"
+    :param filepath: Path of the file to read
+    :return: Content of the file in a single string, or "Can't read <filepath>" if file can't be read.
+    """
+    try:
+        with open(filepath) as f:
+            return f.read()
+    except Exception as e:
+        return "Can't read {0}".format(filepath)
