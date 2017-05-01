@@ -70,6 +70,8 @@ import subprocess
 import datetime
 import Status
 from MachineIdentity import MachineIdentity
+import ExtensionErrorCodeHelper
+import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -81,9 +83,11 @@ class HandlerContext:
 
 class HandlerUtility:
     telemetry_data = []
+    ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
+        self.log_message = ""
         self._short_name = short_name
         self.patching = None
         self.storageDetailsObj = None
@@ -127,11 +131,16 @@ class HandlerUtility:
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             sys.exit(0)
 
-    def log(self, message):
+    def log(self, message,level='Info'):
         self._log(self._get_log_prefix() + message)
+        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
+
+    def fetch_log_message(self):
+        return self.log_message
 
     def _parse_config(self, ctxt):
         config = None
@@ -264,7 +273,7 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
-        except:
+        except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
@@ -300,13 +309,18 @@ class HandlerUtility:
             total_used = 0
             for i in range(1,len(output)-1):
                 device, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} used space in KB : {1}".format(device,used))
-                total_used = total_used + int(used) #return in KB
+                if not (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used = total_used + int(used) #return in KB
+                else:
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    HandlerUtility.add_to_telemetery_data("glusterFSPresent","True")
 
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
-        except:
-            self.log("Unable to fetch total used space")
+        except Exception as e:
+            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
             return 0,True
 
     def get_storage_details(self):
@@ -317,10 +331,14 @@ class HandlerUtility:
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info):
+    def SetExtErrorCode(self, extErrorCode):
+        if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
+            self.ExtErrorCode = extErrorCode
+
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
@@ -427,7 +445,8 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info)
+        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -440,7 +459,7 @@ class HandlerUtility:
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None)
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
@@ -475,6 +494,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
+            HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]))
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
@@ -488,3 +508,26 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
+
+    def is_prev_in_transition(self):
+        last_seq = self.get_last_seq()
+        self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
+        status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+        if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
+            searchfile = open(status_file_prev, "r")
+            for line in searchfile:
+                if "transition" in line: 
+                    self.log("transitioning found in the previous status file")
+                    searchfile.close()
+                    return True
+            searchfile.close()
+        return False
+
+    def get_prev_log(self):
+        with open(self._context._log_file, "r") as f:
+            lines = f.readlines()
+        if(len(lines) > 100):
+            lines = lines[-100:]
+            return ''.join(str(x) for x in lines)
+        else:
+            return ''.join(str(x) for x in lines)

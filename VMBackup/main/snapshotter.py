@@ -16,14 +16,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import urlparse
 import httplib
 import traceback
 import datetime
+import ConfigParser
 import multiprocessing as mp
+import datetime
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status
+from fsfreezer import FsFreezer
 
 class SnapshotInfoIndexerObj():
     def __init__(self, index, isSuccessful, snapshotTs, errorMessage):
@@ -39,7 +43,7 @@ class SnapshotError(object):
         self.errorcode = CommonVariables.success
         self.sasuri = None
     def __str__(self):
-        return 'errorcode: ' + str(self.errorcode) + ' sasuri: ' + str(self.sasuri)
+        return 'errorcode: ' + str(self.errorcode)
 
 class SnapshotResult(object):
     def __init__(self):
@@ -55,6 +59,7 @@ class Snapshotter(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
+        self.configfile='/etc/azure/vmbackup.conf'
 
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         temp_logger=''
@@ -62,13 +67,13 @@ class Snapshotter(object):
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         if(sasuri is None):
-            error_logger = error_logger + " Failed to do the snapshot because sasuri is none "
+            error_logger = error_logger + str(datetime.datetime.now()) + " Failed to do the snapshot because sasuri is none "
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         try:
             sasuri_obj = urlparse.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
-                error_logger = error_logger + " Failed to parse the sasuri "
+                error_logger = error_logger + str(datetime.datetime.now()) + " Failed to parse the sasuri "
                 snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
@@ -76,29 +81,36 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                for meta in meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
+                if(meta_data is not None): 
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
-                temp_logger = temp_logger + 'start calling the snapshot rest api. '
+                temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
-                temp_logger = temp_logger + ' handle_snapshot_http_response message: ' + str(message)
-                
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                if(result == CommonVariables.success and httpResp != None):
+                    # retrieve snapshot information from http response
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    temp_logger = temp_logger + str(datetime.datetime.now()) + ' httpresponse_get_snapshot_info message: ' + str(message)
+                else:
+                    # HttpCall failed
+                    error_logger = error_logger + str(datetime.datetime.now()) + " snapshot HttpCallGetResponse failed "
+                    error_logger = error_logger + str(datetime.datetime.now()) + str(errMsg)
+                    snapshot_error.errorcode = CommonVariables.error
+                    snapshot_error.sasuri = sasuri
                 end_time = datetime.datetime.utcnow()
                 time_taken=end_time-start_time
-                temp_logger = temp_logger + ' time taken for snapshot ' + str(time_taken)
+                temp_logger = temp_logger + str(datetime.datetime.now()) + ' time taken for snapshot ' + str(time_taken)
         except Exception as e:
             errorMsg = " Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            error_logger = error_logger + errorMsg
+            error_logger = error_logger + str(datetime.datetime.now()) + errorMsg
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
-        temp_logger=temp_logger + ' snapshot ends..'
+        temp_logger=temp_logger + str(datetime.datetime.now()) + ' snapshot ends..'
         global_logger.put(temp_logger)
         global_error_logger.put(error_logger)
         snapshot_result_error.put(snapshot_error)
@@ -122,19 +134,25 @@ class Snapshotter(object):
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
-                for meta in meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
+                if(meta_data is not None):
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                resp = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                # retrieve snapshot infor from http response
-                snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(resp, sasuri_index, sasuri)
-                self.logger.log("get_snapshot_info: " + str(message))
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                if(result == CommonVariables.success and httpResp != None):
+                    # retrieve snapshot information from http response
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    self.logger.log(' httpresponse_get_snapshot_info message: ' + str(message))
+                else:
+                    # HttpCall failed
+                    self.logger.log(" snapshot HttpCallGetResponse failed ")
+                    self.logger.log(str(errMsg))
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
@@ -142,22 +160,26 @@ class Snapshotter(object):
             snapshot_error.sasuri = sasuri
         return snapshot_error, snapshot_info_indexer
 
-
-    def snapshotall(self, paras):
-        self.logger.log("doing snapshotall now...")
+    def snapshotall_parallel(self, paras, freezer, thaw_done):
+        self.logger.log("doing snapshotall now in parallel...")
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
         all_failed = True
+        exceptOccurred = False
+        is_inconsistent = False
+        thaw_done_local = thaw_done
+        unable_to_sleep = False
         try:
             mp_jobs = []
-            global_logger = mp.Queue() 
+            global_logger = mp.Queue()
             global_error_logger = mp.Queue()
             snapshot_result_error = mp.Queue()
             snapshot_info_indexer_queue = mp.Queue()
+            time_before_snapshot_start = datetime.datetime.now()
             blobs = paras.blobs
             if blobs is not None:
                 # initialize snapshot_info_array
-                mp_jobs = []                
+                mp_jobs = []
                 blob_index = 0
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
@@ -168,14 +190,29 @@ class Snapshotter(object):
 
                 for job in mp_jobs:
                     job.start()
+
+                time_after_snapshot_start = datetime.datetime.now()
+                timeout = self.get_value_from_configfile('timeout')
+                if timeout == None:
+                    timeout = 60
+
                 for job in mp_jobs:
                     job.join()
+                thaw_result = None
+                if thaw_done_local == False:
+                    thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    thaw_done_local = True
+                self.logger.log('T:S thaw result ' + str(thaw_result))
+                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                    is_inconsistent = True
+                    snapshot_result.errors.append(thaw_result.errors)
+                    return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
                 self.logger.log('end of snapshot process')
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
                 error_logging = [global_error_logger.get() for job in mp_jobs]
                 self.logger.log(error_logging,False,'Error')
-                if not snapshot_result_error.empty(): 
+                if not snapshot_result_error.empty():
                     results = [snapshot_result_error.get() for job in mp_jobs]
                     for result in results:
                         if(result.errorcode != CommonVariables.success):
@@ -189,14 +226,27 @@ class Snapshotter(object):
                             all_failed = False
                         self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
-                return snapshot_result, snapshot_info_array, all_failed
+                return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array, all_failed
+                return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
         except Exception as e:
-            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(errorMsg, False, 'Error')
-            self.logger.log("Do sequential snapshoting")
+            errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+            exceptOccurred = True
+            return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
+
+
+    def snapshotall_seq(self, paras, freezer, thaw_done):
+        exceptOccurred = False
+        self.logger.log("doing snapshotall now in sequence...")
+        snapshot_result = SnapshotResult()
+        snapshot_info_array = []
+        all_failed = True
+        is_inconsistent = False
+        thaw_done_local = thaw_done
+        unable_to_sleep = False
+        try:
             blobs = paras.blobs
             if blobs is not None:
                 blob_index = 0
@@ -212,10 +262,50 @@ class Snapshotter(object):
                     if (snapshot_info_array[blob_index].isSuccessful == True):
                         all_failed = False
                     blob_index = blob_index + 1
-                return snapshot_result, snapshot_info_array, all_failed
+                thaw_result= None
+                if thaw_done_local== False:
+                    thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    thaw_done_local = True
+                self.logger.log('T:S thaw result ' + str(thaw_result))
+                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                    snapshot_result.errors.append(thaw_result.errors)
+                    is_inconsistent= True
+                return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
             else:
                 self.logger.log("the blobs are None")
-                return snapshot_result, snapshot_info_array, all_failed
+                return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
+        except Exception as e:
+            errorMsg = " Unable to perform sequential snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+            exceptOccurred = True
+            return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
+
+    def get_value_from_configfile(self, key):
+        value = None
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParser.ConfigParser()
+                config.read(configfile)
+                if config.has_option('SnapshotThread',key):
+                    value = config.get('SnapshotThread',key)
+                else:
+                    self.logger.log("Config File doesn't have the key :" + key)
+        except Exception as e:
+            errorMsg = " Unable to ed config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+        return value
+
+
+    def snapshotall(self, paras, freezer):
+        thaw_done = False
+        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) == 1):
+            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
+        else:
+            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
+            if exceptOccurred and thaw_done == False:
+                snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
+        return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
         snapshot_error = SnapshotError()
@@ -223,12 +313,9 @@ class Snapshotter(object):
         result = CommonVariables.error_http_failure
         message = ""
         if(resp != None):
+            message = message + str(datetime.datetime.now()) + " snapshot resp status: " + str(resp.status) + " "
             resp_headers = resp.getheaders()
-            message = message + "snapshot resp-header: " + str(resp_headers)
-            message = message + "snapshot resp status: " + str(resp.status)
-            responseBody = resp.read()
-            if(responseBody is not None):
-                message = message + "snapshot responseBody: " + (responseBody).decode('utf-8-sig')
+            message = message + str(datetime.datetime.now()) + " snapshot resp-header: " + str(resp_headers) + " "
 
             if(resp.status == 200 or resp.status == 201):
                 result = CommonVariables.success
@@ -238,9 +325,9 @@ class Snapshotter(object):
                 result = resp.status
                 snapshot_info_indexer.errorMessage = resp.status
         else:
-            message = message + "snapshot Http connection response is None"
+            message = message + str(datetime.datetime.now()) + " snapshot Http connection response is None" + " "
 
-        message = message + ' snapshot api returned: {0} '.format(result)
+        message = message + str(datetime.datetime.now()) + ' snapshot api returned: {0} '.format(result) + " "
         if(result != CommonVariables.success):
             snapshot_error.errorcode = result
             snapshot_error.sasuri = sasuri
@@ -259,4 +346,5 @@ class Snapshotter(object):
         else:
             snapshot_info.isSuccessful = False
             snapshot_info.snapshotUri = None
+
 

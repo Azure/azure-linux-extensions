@@ -1,3 +1,5 @@
+DSC/DSC.zip
+
 compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -66,6 +68,7 @@ VMBackup/MANIFEST
 #VMBackup/*.pyproj
 VMBackup/*.pyproj.user
 VMBackup/*.suo
+VMBackup/main/safefreeze/bin/*
 
 # CustomScript ignors
 CustomScript/test/download/0/stdout

@@ -1,7 +1,7 @@
 # Diagnostic Extension
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 2.3.9015.
+Latest version is 2.3.9021.
 
 You can read the User Guide below for detail:
 * [Use the Linux Diagnostic Extension to monitor the performance and diagnostic data of a Linux VM](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-linux-diagnostic-extension/)
@@ -83,7 +83,7 @@ Note that the `storageAccountKey` property may be deprecated in the near future.
 An account SAS token should be of the following format:
 
 ```
-sv=2015-12-11&ss=bt&srt=co&sp=rwlacu&st=2016-11-09T00%3A04%3A00Z&se=9999-11-10T00%3A04%3A00Z&sig=[signed-signature-string]
+sv=2015-12-11&ss=bt&srt=co&sp=wlacu&st=2016-11-09T00%3A04%3A00Z&se=9999-11-10T00%3A04%3A00Z&sig=[signed-signature-string]
 ```
 
 Details on how to construct an account SAS token can be found in
@@ -98,7 +98,7 @@ In order for the given account SAS to work with the Linux Azure Diagnostic exten
 the following requirements must be met:
 
 * Services (ss) must include Blobs (b) and Tables (t).
-* Permissions (sp) must include Read (r), Write (w), List (l), Add (a), Create (c), and Update (u).
+* Permissions (sp) must include Write (w), List (l), Add (a), Create (c), and Update (u).
 * Resource Types (srt) must include Container (c) and Object (o).
 * Start time (st) and Expiry time (se) should be valid for the duration of time
 the SAS will be used. We recommend to set the Start time with today's date and
