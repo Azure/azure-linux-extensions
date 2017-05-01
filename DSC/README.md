@@ -31,7 +31,8 @@ Here're all the supported public configuration parameters:
        If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
 * `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
 * `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.
-NOTE: If you are using a version < 2.3, mode parameter is same as Operation. Mode seems to be a overloaded term. Therefore to avoid the confusion, Operation is being used from 2.3 version onwards. For backward compatibility, extension supports both mode and Operation. 
+
+> **NOTE:** If you are using a version < 2.3, mode parameter is same as Operation. Mode seems to be a overloaded term. Therefore to avoid the confusion, Operation is being used from 2.3 version onwards. For backward compatibility, the extension supports both mode and Operation. 
 
 ### 1.2 Protected configuration
 
