@@ -115,11 +115,11 @@ class LadLogHelper(object):
                           "Recycling mdsd to self-mitigate.".format(int((memory_usage_in_KB + 1023) / 1024))
         self._logger_log(memory_leak_msg)
         # Add a telemetry for a possible statistical analysis
-        self._waagent_event_add(name=self._ext_name,
-                                op=ext_op,
-                                isSuccess=True,
-                                version=self._ext_ver,
-                                message=memory_leak_msg)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_op,
+                                  isSuccess=True,
+                                  version=self._ext_ver,
+                                  message=memory_leak_msg)
         mdsd_process.kill()
 
     def report_mdsd_dependency_setup_failure(self, ext_event_type, failure_msg):
