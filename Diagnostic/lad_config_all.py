@@ -446,10 +446,9 @@ class LadConfigAll:
             return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
                           '(see extension error logs for more details)'
 
-        # 5. Before starting to update the storage account settings, log extension's protected settings'
-        #    keys only (except well-known values), for diagnostic purpose. This is mainly to make sure that
-        #    the extension's Json settings include a correctly entered 'storageEndpoint'.
-        self._ext_settings.log_protected_settings_keys(self._logger_log, self._logger_error)
+        # 5. Before starting to update the storage account settings, log extension's entire settings
+        #    with secrets redacted, for diagnostic purpose.
+        self._ext_settings.log_ext_settings_with_secrets_redacted(self._logger_log, self._logger_error)
 
         # 6. Actually update the storage account settings on mdsd config XML tree (based on extension's
         #    protectedSettings).

@@ -138,6 +138,25 @@ class LadLogHelper(object):
                                   version=self._ext_ver,
                                   message=dependencies_err_log_msg)
 
+    def log_and_report_failed_config_generation(self, ext_event_type, config_invalid_reason, redacted_handler_settings):
+        """
+        Report failed config generation from configurator.generate_all_configs().
+        :param str ext_event_type: Type of extension event being performed (most likely 'HeartBeat')
+        :param str config_invalid_reason: Msg from configurator.generate_all_configs()
+        :param str redacted_handler_settings: JSON string for the extension's protected/public settings after redacting
+                    secrets in the protected settings. This is for logging to Geneva for diagnostic purposes.
+        :return: None
+        """
+        config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
+                             ". Can't proceed, but this will be still considered a success as it's an external error."
+        self._logger_log(config_invalid_log)
+        self._status_reporter(ext_event_type, 'success', '0', config_invalid_log)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_event_type,
+                                  isSuccess=True,  # Note this is True, because it is a user error.
+                                  version=self._ext_ver,
+                                  message="Invalid handler settings encountered: {0}".format(redacted_handler_settings))
+
     def log_and_report_invalid_mdsd_cfg(self, ext_event_type, config_validate_cmd_msg, mdsd_cfg_xml):
         """
         Report invalid result from 'mdsd -v -c xmlCfg.xml'
@@ -153,7 +172,7 @@ class LadLogHelper(object):
         self._status_reporter(ext_event_type, 'success', '0', message)
         self._waagent_event_adder(name=self._ext_name,
                                   op=ext_event_type,
-                                  isSuccess=True,  # Note this is True, because it must be a user error.
+                                  isSuccess=True,  # Note this is True, because it is a user error.
                                   version=self._ext_ver,
                                   message="Invalid mdsd config encountered: {0}".format(mdsd_cfg_xml))
 
@@ -302,11 +321,12 @@ def append_string_to_file(string, filepath):
 def read_file_to_string(filepath):
     """
     Read entire file and return it as string. If file can't be read, return "Can't read <filepath>"
-    :param filepath: Path of the file to read
+    :param str filepath: Path of the file to read
+    :rtype: str
     :return: Content of the file in a single string, or "Can't read <filepath>" if file can't be read.
     """
     try:
         with open(filepath) as f:
             return f.read()
     except Exception as e:
-        return "Can't read {0}".format(filepath)
+        return "Can't read {0}. Exception thrown: {1}".format(filepath, e)

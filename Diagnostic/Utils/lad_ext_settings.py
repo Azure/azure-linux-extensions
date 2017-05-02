@@ -11,6 +11,7 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import base64
+import json
 import traceback
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
@@ -77,31 +78,43 @@ class LadExtSettings(ExtSettings):
     """
     def __init__(self, handler_settings):
         super(LadExtSettings, self).__init__(handler_settings)
-        self._syslog_enabled = None
 
-    def log_protected_settings_keys(self, logger_log, logger_err):
+    def redacted_handler_settings(self):
         """
-        Log some protected settings information. Keys only for credentials and both key/value for known public
-        values (e.g., storageAccountEndPoint). This was introduced to help ourselves find any misconfiguration
-        issues related to the storageAccountEndPoint easier.
+        Get handler settings in string after redacting secrets (for diagnostic purpose w/ Geneva telemetry)
+        :rtype: str
+        :return: String for the handler settings JSON object with secrets redacted.
+        """
+        # The logic below could have been a general-purpose JSON tree walker, but since the specific
+        # knowledge of where secrets are needs be applied anyway, it's coded for this specific schema anyway.
+        # Secrets are stored only in the following paths: .storageAccountSasToken, and .sinksConfig.sink[].sasURL.
+
+        handler_settings = dict(self.get_handler_settings())  # Get and work on a copy of the handler settings dict
+        protected_settings = handler_settings['protectedSettings']
+        if protected_settings:
+            if 'storageAccountSasToken' in protected_settings:
+                protected_settings['storageAccountSasToken'] = 'REDACTED_SECRET'
+            if 'sinksConfig' in protected_settings and 'sink' in protected_settings['sinksConfig']:
+                for each_sink_dict in protected_settings['sinksConfig']['sink']:
+                    if 'sasURL' in each_sink_dict:
+                        each_sink_dict['sasURL'] = 'REDACTED_SECRET'
+        return json.dumps(handler_settings, sort_keys=True)
+
+    def log_ext_settings_with_secrets_redacted(self, logger_log, logger_err):
+        """
+        Log entire extension settings with secrets redacted. This was introduced to help ourselves find any
+        misconfiguration issues related to the storageAccountEndPoint easier, and later extended to log all
+        extension settings with secrets redacted, for better diagnostics.
         :param logger_log: Normal logging function (e.g., hutil.log)
         :param logger_err: Error logging function (e.g., hutil.error)
         :return: None
         """
         try:
-            msg = "Keys in privateSettings (and some non-secret values): "
-            first = True
-            for key in self._protected_settings:
-                if first:
-                    first = False
-                else:
-                    msg += ", "
-                msg += key
-                if key == 'storageAccountEndPoint':
-                    msg += ":" + self._protected_settings[key]
+            msg = "LAD settings with secrets redacted: {0}".format(
+                self.redacted_handler_settings())
             logger_log(msg)
         except Exception as e:
-            logger_err("Failed to log keys in privateSettings. Error:{0}\n"
+            logger_err("Failed to log LAD settings with secrets redacted. Error:{0}\n"
                        "Stacktrace: {1}".format(e, traceback.format_exc()))
 
     def get_resource_id(self):

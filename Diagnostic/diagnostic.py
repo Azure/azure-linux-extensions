@@ -197,15 +197,9 @@ def create_core_components_configs():
         config_valid = False
 
     if not config_valid:
-        config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
-                             ". Can't proceed, but this will be still considered a success as it's an external error."
-        hutil.log(config_invalid_log)
-        hutil.do_status_report(g_ext_op_type, "success", '0', config_invalid_log)
-        waagent.AddExtensionEvent(name=hutil.get_name(),
-                                  op=g_ext_op_type,
-                                  isSuccess=True,
-                                  version=hutil.get_extension_version(),
-                                  message=config_invalid_log)
+        g_lad_log_helper.log_and_report_failed_config_generation(
+            g_ext_op_type, config_invalid_reason,
+            g_ext_settings.get_handler_settings_in_string_with_secrets_redacted())
         return None
 
     return configurator
@@ -660,7 +654,7 @@ if __name__ == '__main__':
             if len(sys.argv) == 2:
                 # Add a telemetry only if this is executed through waagent (in which
                 # we are guaranteed to have just one cmdline arg './diagnostic -xxx').
-                waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
+                waagent.AddExtensionEvent(name="Microsoft.Azure.Diagnostic.LinuxDiagnostic",
                                           op=wala_event_type,
                                           isSuccess=False,
                                           version=ext_version,
