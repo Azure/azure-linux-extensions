@@ -81,11 +81,13 @@ def main():
     global public_settings
     public_settings = hutil.get_public_settings()
     if not public_settings:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="Public settings are NOT provided.")
         public_settings = {}
 
     global protected_settings
     protected_settings = hutil.get_protected_settings()
     if not protected_settings:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="protected settings are NOT provided.")	
         protected_settings = {}
 
     global distro_category
@@ -135,8 +137,8 @@ def enable():
         start_omiservice()
         mode = get_config('Mode')
         if mode != '':
-            mode = get_config('Operation')
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
+            mode = get_config('ExtensionAction')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode/ExtensionAction: " + mode)
         if mode == '':
             mode = Mode.push
         else:
@@ -145,12 +147,20 @@ def enable():
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=True,
-                                          message="(03001)Argument error, invalid operation/mode.")
-                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown operation/mode: ' + mode)
+                                          message="(03001)Argument error, invalid ExtensionAction/mode.")
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown ExtensionAction/mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
-            register_automation()
+            registration_key = get_config('RegistrationKey')
+            registation_url = get_config('RegistrationUrl')
+	        # Optional
+            node_configuration_name = get_config('NodeConfigurationName')
+            refresh_freq = get_config('RefreshFrequencyMins')
+            configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
+            configuration_mode = get_config('ConfigurationMode')  		   
+            exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode)
+            hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
         else:
             file_path = download_file()
             if mode == Mode.pull:
@@ -510,11 +520,8 @@ def apply_dsc_configuration(config_file_path):
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: {0}'.format(output)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.ApplyMof, isSuccess=True, message=error_msg)
         hutil.error(error_msg)
-        waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=Operation.ApplyMof,
-                                  isSuccess=False,
-                                  message="(03105)" + error_msg)
         raise Exception(error_msg)
 
 def apply_dsc_meta_configuration(config_file_path):
@@ -542,7 +549,12 @@ def check_dsc_configuration(current_config):
 
 def install_module(file_path):
     install_package('unzip')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path
+    code,output = run_cmd(cmd)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op="InstallModuleInProgress",
+                              isSuccess=True,
+                              message="Running the cmd: " + cmd)
     if not code == 0:
         error_msg = 'Failed to install DSC Module ' + file_path + ':{0}'.format(output)
         hutil.error(error_msg)
@@ -558,7 +570,12 @@ def install_module(file_path):
 
 def remove_module():
     module_name = get_config('ResourceName')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name)
+    cmd = '/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name
+    code,output = run_cmd(cmd)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op="RemoveModuleInProgress",
+                              isSuccess=True,
+                              message="Running the cmd: " + cmd)	
     if not code == 0:
         error_msg = 'Failed to remove DSC Module ' + module_name + ': {0}'.format(output)
         hutil.error(error_msg)
@@ -597,48 +614,48 @@ def rpm_uninstall_package(package_name):
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
 
-def register_automation():
-    registration_key = get_config('RegistrationKey')
-    registation_url = get_config('RegistrationUrl')
-	# Optional
-    node_configuration_name = get_config('NodeConfigurationName')
-    refresh_freq = get_config('RefreshFrequencyMins')
-    configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
-    configuration_mode = get_config('ConfigurationMode')
-    configuration_mode = configuration_mode.lower() 
-    if not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
-        err_msg = "configurationMode: " + configuration_mode + " is not valid"	
-        hutil.error("configurationMode: " + configuration_mode + " is not valid. It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
+def register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode):
+    if (registration_key == '' or registation_url == ''):
+        err_msg = "Either the Registration Key or Registration URL is NOT provided"
+        hutil.error(err_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
-        hutil.do_exit(51, 'Enable', 'error', '51', err_msg)
+        return 51, err_msg
+	configuration_mode = configuration_mode.lower() 
+    if configuration_mode != '' and not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
+        err_msg = "ConfigurationMode: " + configuration_mode + " is not valid."	
+        hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
+        return 51, err_msg
     cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
           + ' --ServerURL '+ registation_url
+    optional_parameters = ""
     if node_configuration_name != '':
-        cmd += ' --ConfigurationName ' + node_configuration_name
+        optional_parameters += ' --ConfigurationName ' + node_configuration_name
     if refresh_freq != '':
-        cmd += ' --RefreshFrequencyMins ' + refresh_freq
+        optional_parameters += ' --RefreshFrequencyMins ' + refresh_freq
     if configuration_mode_freq != '':
-        cmd += ' --ConfigurationModeFrequencyMins ' + configuration_mode_freq
+        optional_parameters += ' --ConfigurationModeFrequencyMins ' + configuration_mode_freq
     if configuration_mode != '':
-        cmd += ' --ConfigurationMode ' + configuration_mode
+        optional_parameters += ' --ConfigurationMode ' + configuration_mode
     waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op="RegisterInProgress",
                                   isSuccess=True,
-                                  message="Executing this cmd" + cmd)
-    code,output = run_cmd(cmd)
+                                  message="Registration URL " + registation_url + "Optional parameters to Registration" + optional_parameters)
+    code,output = run_cmd(cmd + optional_parameters)
     if not code == 0:
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.Register,
-                                  isSuccess=False,
+                                  isSuccess=True,
                                   message="(03109)" + error_msg)
-        raise Exception(error_msg)
+        return 1, err_msg
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=Operation.Register,
                               isSuccess=True,
                               message="(03108)Succeeded to register with Azure Automation DSC")
-    
+    return 0, ''
+	
 if __name__ == '__main__':
     main()
 

@@ -9,11 +9,11 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
-* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register Operation)
-* Push MOF configurations to the Linux VM (Push Operation)
-* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull Operation)
-* Install custom DSC modules to the Linux VM (Install Operation)
-* Remove custom DSC modules to the Linux VM (Remove Operation)
+* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register Action)
+* Push MOF configurations to the Linux VM (Push Action)
+* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull Action)
+* Install custom DSC modules to the Linux VM (Install Action)
+* Remove custom DSC modules to the Linux VM (Remove Action)
 
 # User Guide
 
@@ -25,14 +25,14 @@ Here're all the supported public configuration parameters:
 
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Operation`: (optional, string) the functional operation, valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Operation by default.
+* `ExtensionAction`: (optional, string) Specifies what an extension does. valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Action by default.
 * `NodeConfigurationName`: (optional, string) the name of the configuration to apply.
 * `RefreshFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
        If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
 * `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
 * `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.
 
-> **NOTE:** If you are using a version < 2.3, mode parameter is same as Operation. Mode seems to be a overloaded term. Therefore to avoid the confusion, Operation is being used from 2.3 version onwards. For backward compatibility, the extension supports both mode and Operation. 
+> **NOTE:** If you are using a version < 2.3, mode parameter is same as ExtensionAction. Mode seems to be a overloaded term. Therefore to avoid the confusion, ExtensionAction is being used from 2.3 version onwards. For backward compatibility, the extension supports both mode and ExtensionAction. 
 
 ### 1.2 Protected configuration
 
@@ -110,7 +110,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Operation": "Push",
+  "ExtensionAction": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -148,7 +148,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Operation": "Push",
+  "ExtensionAction": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -176,7 +176,7 @@ protected.json
 public.json
 ```json
 {
-  "Operation" : "Register",
+  "ExtensionAction" : "Register",
   "NodeConfigurationName": "<node-configuration-name>",
   "RefreshFrequencyMins": "<value>"
   "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
@@ -192,7 +192,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Operation" : "Register",
+  "ExtensionAction" : "Register",
   "NodeConfigurationName": "<node-configuration-name>",
   "RefreshFrequencyMins": "<value>"
   "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
@@ -214,7 +214,7 @@ public.json
 ```json
 {
   "FileUri": "<mof-file-uri>",
-  "Operation": "Push"
+  "ExtensionAction": "Push"
 }
 ```
 
@@ -227,7 +227,7 @@ $privateConfig = '{
 
 $publicConfig = '{
   "FileUri": "<mof-file-uri>",
-  "Operation": "Push"
+  "ExtensionAction": "Push"
 }'
 ```
 
@@ -261,7 +261,7 @@ protected.json
 public.json
 ```json
 {
-  "Operation": "Pull",
+  "ExtensionAction": "Pull",
   "FileUri": "<meta-mof-file-uri>",
 }
 ```
@@ -274,7 +274,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Operation": "Pull",
+  "ExtensionAction": "Pull",
   "FileUri": "<meta-mof-file-uri>",
 }'
 ```
@@ -284,14 +284,14 @@ public.json
 ```json
 {
   "FileUri": "<meta-mof-file-uri>",
-  "Operation": "Pull"
+  "ExtensionAction": "Pull"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
   "FileUri": "<meta-mof-file-uri>",
-  "Operation": "Pull"
+  "ExtensionAction": "Pull"
 }'
 ```
 
@@ -306,7 +306,7 @@ protected.json
 public.json
 ```json
 {
-  "Operation": "Install",
+  "ExtensionAction": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }
 ```
@@ -319,7 +319,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Operation": "Install",
+  "ExtensionAction": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }'
 ```
@@ -328,14 +328,14 @@ $publicConfig = '{
 public.json
 ```json
 {
-  "Operation": "Install",
+  "ExtensionAction": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "Operation": "Install",
+  "ExtensionAction": "Install",
   "FileUri": "<resource-zip-file-uri>"
 }'
 ```
@@ -345,14 +345,14 @@ public.json
 ```json
 {
   "ResourceName": "<resource-name>",
-  "Operation": "Remove"
+  "ExtensionAction": "Remove"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
   "ResourceName": "<resource-name>",
-  "Operation": "Remove"
+  "ExtensionAction": "Remove"
 }'
 ```
 
@@ -378,7 +378,7 @@ $publicConfig = '{
 # 2.3 (2017-04-17)
 - Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
 - Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
-- Added a new parameter 'Operation' to replace 'mode' to avoid confusion with DSC push/pull mode.
+- Added a new parameter 'ExtensionAction' to replace 'mode' to avoid confusion with DSC push/pull mode.
 - Supports mode parameter for backward compatibility.
 
 # 2.0 (2016-03-10)
