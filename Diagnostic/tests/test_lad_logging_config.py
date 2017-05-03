@@ -219,7 +219,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
     SendingHost ${record["source_host"]}
     Msg ${record["message"]}
   </record>
-  remove_keys host,ident,message,source_host  # No need of these fields for mdsd so remove
+  remove_keys host,message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
         self.__helper_test_oms_fluentd_config('fluentd basic syslog src config', expected, actual)
