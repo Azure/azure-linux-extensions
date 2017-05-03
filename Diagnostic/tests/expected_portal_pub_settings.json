@@ -1,0 +1,665 @@
+{
+  "StorageAccount": "__DIAGNOSTIC_STORAGE_ACCOUNT__", 
+  "ladCfg": {
+    "diagnosticMonitorConfiguration": {
+      "eventVolume": "Large", 
+      "metrics": {
+        "metricAggregation": [
+          {
+            "scheduledTransferPeriod": "PT1H"
+          }, 
+          {
+            "scheduledTransferPeriod": "PT1M"
+          }
+        ], 
+        "resourceId": "__VM_RESOURCE_ID__"
+      }, 
+      "performanceCounters": {
+        "performanceCounterConfiguration": [
+          {
+            "annotation": [
+              {
+                "displayName": "Disk read guest OS", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "ReadBytesPerSecond", 
+            "counterSpecifier": "/builtin/Disk/ReadBytesPerSecond", 
+            "type": "builtin", 
+            "unit": "BytesPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk writes", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "WritesPerSecond", 
+            "counterSpecifier": "/builtin/Disk/WritesPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk transfer time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "AverageTransferTime", 
+            "counterSpecifier": "/builtin/Disk/AverageTransferTime", 
+            "type": "builtin", 
+            "unit": "Seconds"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk transfers", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "TransfersPerSecond", 
+            "counterSpecifier": "/builtin/Disk/TransfersPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk write guest OS", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "WriteBytesPerSecond", 
+            "counterSpecifier": "/builtin/Disk/WriteBytesPerSecond", 
+            "type": "builtin", 
+            "unit": "BytesPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk read time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "AverageReadTime", 
+            "counterSpecifier": "/builtin/Disk/AverageReadTime", 
+            "type": "builtin", 
+            "unit": "Seconds"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk write time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "AverageWriteTime", 
+            "counterSpecifier": "/builtin/Disk/AverageWriteTime", 
+            "type": "builtin", 
+            "unit": "Seconds"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk total bytes", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "BytesPerSecond", 
+            "counterSpecifier": "/builtin/Disk/BytesPerSecond", 
+            "type": "builtin", 
+            "unit": "BytesPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk reads", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "ReadsPerSecond", 
+            "counterSpecifier": "/builtin/Disk/ReadsPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Disk queue length", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Disk", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "AverageDiskQueueLength", 
+            "counterSpecifier": "/builtin/Disk/AverageDiskQueueLength", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Network in guest OS", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "BytesReceived", 
+            "counterSpecifier": "/builtin/Network/BytesReceived", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Network total bytes", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "BytesTotal", 
+            "counterSpecifier": "/builtin/Network/BytesTotal", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Network out guest OS", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "BytesTransmitted", 
+            "counterSpecifier": "/builtin/Network/BytesTransmitted", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Network collisions", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "TotalCollisions", 
+            "counterSpecifier": "/builtin/Network/TotalCollisions", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Packets received errors", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "TotalRxErrors", 
+            "counterSpecifier": "/builtin/Network/TotalRxErrors", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Packets sent", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "PacketsTransmitted", 
+            "counterSpecifier": "/builtin/Network/PacketsTransmitted", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Packets received", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "PacketsReceived", 
+            "counterSpecifier": "/builtin/Network/PacketsReceived", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Packets sent errors", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Network", 
+            "counter": "TotalTxErrors", 
+            "counterSpecifier": "/builtin/Network/TotalTxErrors", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem transfers/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "TransfersPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/TransfersPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem % free space", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "PercentFreeSpace", 
+            "counterSpecifier": "/builtin/Filesystem/PercentFreeSpace", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem % used space", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "PercentUsedSpace", 
+            "counterSpecifier": "/builtin/Filesystem/PercentUsedSpace", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem read bytes/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "ReadBytesPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/ReadBytesPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem used megabytes", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "UsedMegabytes", 
+            "counterSpecifier": "/builtin/Filesystem/UsedMegabytes", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem % free inodes", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "PercentFreeInodes", 
+            "counterSpecifier": "/builtin/Filesystem/PercentFreeInodes", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem free megabytes", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "FreeMegabytes", 
+            "counterSpecifier": "/builtin/Filesystem/FreeMegabytes", 
+            "type": "builtin", 
+            "unit": "Count"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem bytes/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "BytesPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/BytesPerSecond", 
+            "type": "builtin", 
+            "unit": "BytesPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem reads/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "ReadsPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/ReadsPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem write bytes/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "WriteBytesPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/WriteBytesPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem writes/sec", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "WritesPerSecond", 
+            "counterSpecifier": "/builtin/Filesystem/WritesPerSecond", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem % used inodes", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "Filesystem", 
+            "counter": "PercentUsedInodes", 
+            "counterSpecifier": "/builtin/Filesystem/PercentUsedInodes", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU IO wait time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentIOWaitTime", 
+            "counterSpecifier": "/builtin/Processor/PercentIOWaitTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU user time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentUserTime", 
+            "counterSpecifier": "/builtin/Processor/PercentUserTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU nice time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentNiceTime", 
+            "counterSpecifier": "/builtin/Processor/PercentNiceTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU percentage guest OS", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentProcessorTime", 
+            "counterSpecifier": "/builtin/Processor/PercentProcessorTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU interrupt time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentInterruptTime", 
+            "counterSpecifier": "/builtin/Processor/PercentInterruptTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU idle time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentIdleTime", 
+            "counterSpecifier": "/builtin/Processor/PercentIdleTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "CPU privileged time", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Processor", 
+            "condition": "Name=\"_Total\"", 
+            "counter": "PercentPrivilegedTime", 
+            "counterSpecifier": "/builtin/Processor/PercentPrivilegedTime", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Memory available", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "AvailableMemory", 
+            "counterSpecifier": "/builtin/Memory/AvailableMemory", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Swap percent used", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PercentUsedSwap", 
+            "counterSpecifier": "/builtin/Memory/PercentUsedSwap", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Memory used", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "UsedMemory", 
+            "counterSpecifier": "/builtin/Memory/UsedMemory", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Page reads", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PagesReadPerSec", 
+            "counterSpecifier": "/builtin/Memory/PagesReadPerSec", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Swap available", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "AvailableSwap", 
+            "counterSpecifier": "/builtin/Memory/AvailableSwap", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Swap percent available", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PercentAvailableSwap", 
+            "counterSpecifier": "/builtin/Memory/PercentAvailableSwap", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Mem. percent available", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PercentAvailableMemory", 
+            "counterSpecifier": "/builtin/Memory/PercentAvailableMemory", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Pages", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PagesPerSec", 
+            "counterSpecifier": "/builtin/Memory/PagesPerSec", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Swap used", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "UsedSwap", 
+            "counterSpecifier": "/builtin/Memory/UsedSwap", 
+            "type": "builtin", 
+            "unit": "Bytes"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Memory percentage", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PercentUsedMemory", 
+            "counterSpecifier": "/builtin/Memory/PercentUsedMemory", 
+            "type": "builtin", 
+            "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Page writes", 
+                "locale": "en-us"
+              }
+            ], 
+            "class": "Memory", 
+            "counter": "PagesWrittenPerSec", 
+            "counterSpecifier": "/builtin/Memory/PagesWrittenPerSec", 
+            "type": "builtin", 
+            "unit": "CountPerSecond"
+          }
+        ]
+      }
+    }, 
+    "sampleRateInSeconds": 15
+  }
+}

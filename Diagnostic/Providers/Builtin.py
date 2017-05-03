@@ -57,12 +57,12 @@ _builtIns = {
                     'percentusedswap': 'PercentUsedSwap'},
     'network':    { 'bytestransmitted': 'BytesTransmitted', 'bytesreceived': 'BytesReceived',
                     'bytestotal': 'BytesTotal', 'packetstransmitted': 'PacketsTransmitted',
-                    'packetsreceived': 'PacketsReceived', 'totalrxerrors': 'TotalRXErrors',
-                    'totaltxerrors': 'TotalTXErrors', 'totalcollisions': 'TotalCollisions' },
+                    'packetsreceived': 'PacketsReceived', 'totalrxerrors': 'TotalRxErrors',
+                    'totaltxerrors': 'TotalTxErrors', 'totalcollisions': 'TotalCollisions' },
     'filesystem': { 'freespace': 'FreeMegabytes', 'usedspace': 'UsedMegabytes',
                     'percentfreespace': 'PercentFreeSpace', 'percentusedspace': 'PercentUsedSpace',
                     'percentfreeinodes': 'PercentFreeInodes', 'percentusedinodes': 'PercentUsedInodes',
-                    'bytesreadpersecond': 'BytesReadPerSecond', 'byteswrittenpersecond': 'BytesWrittenPerSecond',
+                    'bytesreadpersecond': 'ReadBytesPerSecond', 'byteswrittenpersecond': 'WriteBytesPerSecond',
                     'bytespersecond': 'BytesPerSecond', 'readspersecond': 'ReadsPerSecond',
                     'writespersecond': 'WritesPerSecond', 'transferspersecond': 'TransfersPerSecond' },
     'disk':       { 'readspersecond': 'ReadsPerSecond', 'writespersecond': 'WritesPerSecond',
@@ -80,7 +80,8 @@ _omiClassName = { 'processor': 'SCX_ProcessorStatisticalInformation',
                 }
 
 # There can be multiple NICs, multiple drives and filesystems, multiple cores... only one pile of memory.
-_instancedClasses = ['network', 'filesystem', 'disk', 'processor']
+_instancedClasses = [  # 'network',  # _instancecClasses is used for IsAggregate=TRUE condition clause, and for some reason, 'Network' class doesn't work with it, so remove it.
+    'filesystem', 'disk', 'processor']
 
 # The Azure Metrics infrastructure, along with App Insights, requires that quantities be measured
 # in one of these units: Percent, Count, Seconds, Milliseconds, Bytes, BytesPerSecond, CountPerSecond

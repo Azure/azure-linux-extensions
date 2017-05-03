@@ -1,7 +1,10 @@
 from unittest import TestCase
 import Providers.Builtin as BProvider
 import Utils.ProviderUtil as ProvUtil
+from Utils.mdsd_xml_templates import entire_xml_cfg_tmpl
 import xml.etree.ElementTree as ET
+import json
+import re
 
 
 class TestBuiltinMetric(TestCase):
@@ -115,44 +118,7 @@ class TestBuiltinMetric(TestCase):
 
 class TestMakeXML(TestCase):
     def setUp(self):
-        self.base_xml = """
-<MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
-  <Accounts>
-    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-  </Accounts>
-
-  <Management defaultRetentionInDays="90" eventVolume="">
-    <Identity>
-      <IdentityComponent name="DeploymentId" />
-      <IdentityComponent name="Host" useComputerName="true" />
-    </Identity>
-    <AgentResourceUsage diskQuotaInMB="50000" />
-  </Management>
-
-  <Schemas>
-  </Schemas>
-
-  <Sources>
-  </Sources>
-
-  <Events>
-    <MdsdEvents>
-    </MdsdEvents>
-
-    <OMI>
-    </OMI>
-
-    <DerivedEvents>
-    </DerivedEvents>
-  </Events>
-
-  <EventStreamingAnnotations>
-  </EventStreamingAnnotations>
-
-</MonitoringManagement>
-"""
-
+        self.base_xml = entire_xml_cfg_tmpl
     def test_two_and_two(self):
         specs = [
             {
@@ -201,3 +167,140 @@ class TestMakeXML(TestCase):
         BProvider.UpdateXML(doc)
         # xml_string = ET.tostring(doc.getroot())
         # print xml_string
+
+
+class StandardPortalPublicSettingsGenerator(TestCase):
+
+    def test_generate_standard_portal_public_settings(self):
+        """
+        This is rather a utility function that attempts to generate a standard LAD 3.0 protected settings JSON string
+        for the Azure Portal charts experience. Unit, displayName, and condition are inferred/auto-filled from
+        a sample Azure Insights metric definitions JSON pulled from ACIS.
+        """
+        pub_settings = {
+            "StorageAccount": "__DIAGNOSTIC_STORAGE_ACCOUNT__",
+            "ladCfg": {
+                "sampleRateInSeconds": 15,
+                "diagnosticMonitorConfiguration": {
+                    "eventVolume": "Large",
+                    "metrics": {
+                        "metricAggregation": [
+                            {
+                                "scheduledTransferPeriod": "PT1H"
+                            },
+                            {
+                                "scheduledTransferPeriod": "PT1M"
+                            }
+                        ],
+                        "resourceId": "__VM_RESOURCE_ID__"
+                    },
+                    "performanceCounters": {
+                        "performanceCounterConfiguration": []
+                    }
+                }
+            }
+        }
+        each_perf_counter_cfg_template = {
+            "unit": "__TO_BE_FILLED__",
+            "type": "builtin",
+            "class": "__TO_BE_REPLACED_BY_CODE",
+            "counter": "__TO_BE_REPLACED_BY_CODE__",
+            "counterSpecifier": "__TO_BE_REPLACED_BY_CODE__",
+            "annotation": "__TO_BE_FILLED__",  # Needs to be assigned a new instance to avoid shallow copy
+            # [
+            #     {
+            #         "locale": "en-us",
+            #         "displayName": "__TO_BE_FILLED__"
+            #     }
+            # ],
+            "condition": "__TO_BE_FILLED__"
+        }
+
+        perf_counter_cfg_list = pub_settings['ladCfg']['diagnosticMonitorConfiguration']['performanceCounters']['performanceCounterConfiguration']
+        units_and_names = self.extract_perf_counter_units_and_names_from_metrics_def_sample()
+
+        for key_name in BProvider._builtIns:
+            class_name = key_name.title()
+            for _, counter_name in BProvider._builtIns[key_name].iteritems():
+                perf_counter_cfg = dict(each_perf_counter_cfg_template)
+                perf_counter_cfg['class'] = class_name
+                perf_counter_cfg['counter'] = counter_name
+                counter_specifier = '/builtin/{0}/{1}'.format(class_name, counter_name)
+                perf_counter_cfg['counterSpecifier'] = counter_specifier
+                perf_counter_cfg['condition'] = self.default_cql_condition_for_class(class_name)
+                if not perf_counter_cfg['condition']:
+                    del perf_counter_cfg['condition']
+                if counter_specifier in units_and_names:
+                    perf_counter_cfg['unit'] = units_and_names[counter_specifier]['unit']
+                    perf_counter_cfg['annotation'] = [{
+                        'displayName': units_and_names[counter_specifier]['displayName'],
+                        'locale': 'en-us'
+                    }]
+                else:
+                    # Use some ad hoc logic to auto-fill missing values (all from FileSystem class)
+                    perf_counter_cfg['unit'] = self.inferred_unit_name_from_counter_name(counter_name)
+                    perf_counter_cfg['annotation'] = [{
+                        'displayName': self.inferred_display_name_from_class_counter_names(class_name, counter_name),
+                        'local': 'en-us'
+                    }]
+                perf_counter_cfg_list.append(perf_counter_cfg)
+
+        actual = json.dumps(pub_settings, sort_keys=True, indent=2)
+        print actual
+        with open('expected_portal_pub_settings.json') as f:
+            expected = f.read()
+        self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
+                         json.dumps(json.loads(actual), sort_keys=True))
+        to_be_filled = re.findall(r'"__.*?__"', actual)
+        self.assertEqual(2, len(to_be_filled))
+        self.assertIn('"__DIAGNOSTIC_STORAGE_ACCOUNT__"', to_be_filled)
+        self.assertIn('"__VM_RESOURCE_ID__"', to_be_filled)
+
+    def default_cql_condition_for_class(self, class_name):
+        # Only the following 2 classes have WHERE condition 'Name=_Total' in LAD 2.3.
+        if class_name == 'Processor' or class_name == 'Disk':
+            return 'Name="_Total"'
+        # May need to change logic here later for more appropriate defaults
+        return ''
+
+    def inferred_unit_name_from_counter_name(self, counter_name):
+        if 'Percent' in counter_name:
+            return 'Percent'
+        if re.match(r'Bytes.*PerSecond', counter_name):
+            return 'BytesPerSecond'  # According to the ACIS-pulled metric definitions sample...
+        if 'PerSecond' in counter_name:
+            return 'CountPerSecond'  # Again according to the ACIS-pulled metric defs sample...
+        if 'Megabytes' in counter_name:
+            return 'Count'  # Not sure if this is correct...? Certainly it shouldn't be "Bytes", I think...?
+
+    def inferred_display_name_from_class_counter_names(self, class_name, counter_name):
+        desc = counter_name
+        desc = desc.replace('PerSecond', '/sec')
+        desc = ' '.join([word.lower() for word in re.findall('[A-Z]+[^A-Z]*', desc)])
+        desc = desc.replace('percent', '%')
+        return '{0} {1}'.format(class_name, desc)
+
+
+    def extract_perf_counter_units_and_names_from_metrics_def_sample(self):
+        """
+        Another utility function that extracts perf counter units and display names from an Azure metrics
+        definition sample file (not included in the repo). Again this is to be used only manually under
+        the desired environment when needed.
+        :return: Dictionary of counter specifier to unit/displayName map.
+        """
+        results = {}
+        metric_definitions = {}
+        with open('/tmp/lad_metric_definitions_sample.json') as f:
+            metric_definitions = json.load(f)
+        for dict_item in metric_definitions['value']:  # This is a list of dictionaries for all metrics
+            # E.g., '\\Memory\\AvailableMemory' to '/builtin/Memory/AvailableMemory'
+            # Also, Azure Insights uses 'PhysicalDisk' and 'NetworkInterface' instead of 'Disk' and 'Network',
+            # so replace them as well.
+            counter_specifier = '/builtin{0}'.format(dict_item['name']['value'].replace('\\', '/')
+                                                     .replace('PhysicalDisk', 'Disk')
+                                                     .replace('NetworkInterface', 'Network'))
+            display_name = dict_item['name']['localizedValue']  # E.g., 'Memory available'
+            unit = dict_item['unit']  # E.g., 'Bytes'
+            results[counter_specifier] = { 'unit': unit, 'displayName': display_name }
+        return results
+
