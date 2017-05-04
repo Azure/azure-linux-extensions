@@ -9,11 +9,11 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
-* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register Action)
-* Push MOF configurations to the Linux VM (Push Action)
-* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull Action)
-* Install custom DSC modules to the Linux VM (Install Action)
-* Remove custom DSC modules to the Linux VM (Remove Action)
+* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register ExtensionAction)
+* Push MOF configurations to the Linux VM (Push ExtensionAction)
+* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull ExtensionAction)
+* Install custom DSC modules to the Linux VM (Install ExtensionAction)
+* Remove custom DSC modules to the Linux VM (Remove ExtensionAction)
 
 # User Guide
 
