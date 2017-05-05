@@ -6,7 +6,7 @@ from Utils.lad_ext_settings import *
 class LadExtSettingsTest(unittest.TestCase):
 
     def setUp(self):
-        handler_settings_sample_in_str = """
+        self._handler_settings_sample_in_str = """
 {
   "protectedSettings": {
     "storageAccountName": "mystgacct",
@@ -46,7 +46,7 @@ class LadExtSettingsTest(unittest.TestCase):
   }
 }
 """
-        self._lad_settings = LadExtSettings(json.loads(handler_settings_sample_in_str))
+        self._lad_settings = LadExtSettings(json.loads(self._handler_settings_sample_in_str))
 
     def test_redacted_handler_settings(self):
         expected = """
@@ -93,3 +93,8 @@ class LadExtSettingsTest(unittest.TestCase):
         print json.dumps(actual_json, sort_keys=True, indent=2)
         self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
                          json.dumps(actual_json, sort_keys=True))
+        # Validate that the original wasn't modified (that is, redaction should be on a deep copy)
+        print "===== Original handler setting (shouldn't be redacted, must be different from the deep copy) ====="
+        print json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True, indent=2)
+        self.assertNotEqual(json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True),
+                            json.dumps(actual_json, sort_keys=True))

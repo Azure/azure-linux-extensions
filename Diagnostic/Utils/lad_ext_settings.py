@@ -11,6 +11,7 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import base64
+import copy
 import json
 import traceback
 import Utils.LadDiagnosticUtil as LadUtil
@@ -89,7 +90,9 @@ class LadExtSettings(ExtSettings):
         # knowledge of where secrets are needs be applied anyway, it's coded for this specific schema anyway.
         # Secrets are stored only in the following paths: .storageAccountSasToken, and .sinksConfig.sink[].sasURL.
 
-        handler_settings = dict(self.get_handler_settings())  # Get and work on a copy of the handler settings dict
+        # Get and work on a copy of the handler settings dict. Note that it must be a deep copy!
+        # dict(self.get_handler_settings()) doesn't work!
+        handler_settings = copy.deepcopy(self.get_handler_settings())
         protected_settings = handler_settings['protectedSettings']
         if protected_settings:
             if 'storageAccountSasToken' in protected_settings:
