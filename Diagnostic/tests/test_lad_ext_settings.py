@@ -6,7 +6,7 @@ from Utils.lad_ext_settings import *
 class LadExtSettingsTest(unittest.TestCase):
 
     def setUp(self):
-        self._handler_settings_sample_in_str = """
+        handler_settings_sample_in_str = """
 {
   "protectedSettings": {
     "storageAccountName": "mystgacct",
@@ -46,7 +46,7 @@ class LadExtSettingsTest(unittest.TestCase):
   }
 }
 """
-        self._lad_settings = LadExtSettings(json.loads(self._handler_settings_sample_in_str))
+        self._lad_settings = LadExtSettings(json.loads(handler_settings_sample_in_str))
 
     def test_redacted_handler_settings(self):
         expected = """

@@ -79,9 +79,16 @@ _omiClassName = { 'processor': 'SCX_ProcessorStatisticalInformation',
                   'disk': 'SCX_DiskDriveStatisticalInformation'
                 }
 
-# There can be multiple NICs, multiple drives and filesystems, multiple cores... only one pile of memory.
-_instancedClasses = [  # 'network',  # _instancecClasses is used for IsAggregate=TRUE condition clause, and for some reason, 'Network' class doesn't work with it, so remove it.
-    'filesystem', 'disk', 'processor']
+# Default CQL condition clause (WHERE ...) for relevant counter classes
+_defaultCqlCondition = {
+                        #'network': '...',  # No 'Name' or 'IsAggregate' columns from SCX_EthernetPort... cql query.
+                                            # If there are multiple NICs, this might cause some issue. Beware.
+                                            # The column/value distinguishing NICs is e.g., 'InstanceID="eth0"'.
+                        'filesystem': 'IsAggregate=TRUE',  # For specific file system (e.g., root fs), use 'Name="/"'
+                        'disk': 'IsAggregate=TRUE',  # For specific disk (e.g., /dev/sda), use 'Name="sda"'
+                        'processor': 'IsAggregate=TRUE',  # For specific processor core, use 'Name="0"'
+                        #'memory': 'IsAggregate=TRUE',  # No separate instances of memory, so no WHERE condition is needed
+                       }
 
 # The Azure Metrics infrastructure, along with App Insights, requires that quantities be measured
 # in one of these units: Percent, Count, Seconds, Milliseconds, Bytes, BytesPerSecond, CountPerSecond
@@ -111,6 +118,10 @@ _defaultSampleRate = 15
 def SetDefaultSampleRate(rate):
     global _defaultSampleRate
     _defaultSampleRate = rate
+
+
+def default_condition(class_name):
+    return _defaultCqlCondition[class_name] if class_name in _defaultCqlCondition else ''
 
 
 class BuiltinMetric:
@@ -227,8 +238,8 @@ def UpdateXML(doc):
     global _metrics, _eventNames, _omiClassName
     for group in _metrics:
         (class_name, condition_clause, sample_rate) = group
-        if class_name in _instancedClasses and not condition_clause:
-            condition_clause = 'IsAggregate=TRUE'
+        if not condition_clause:
+            condition_clause = default_condition(class_name)
         columns = []
         mappings = []
         for metric in _metrics[group]:

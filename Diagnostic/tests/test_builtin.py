@@ -219,34 +219,37 @@ class StandardPortalPublicSettingsGenerator(TestCase):
         perf_counter_cfg_list = pub_settings['ladCfg']['diagnosticMonitorConfiguration']['performanceCounters']['performanceCounterConfiguration']
         units_and_names = self.extract_perf_counter_units_and_names_from_metrics_def_sample()
 
-        for key_name in BProvider._builtIns:
-            class_name = key_name.title()
-            for _, counter_name in BProvider._builtIns[key_name].iteritems():
+        for class_name in BProvider._builtIns:
+            for lad_counter_name, scx_counter_name in BProvider._builtIns[class_name].iteritems():
                 perf_counter_cfg = dict(each_perf_counter_cfg_template)
                 perf_counter_cfg['class'] = class_name
-                perf_counter_cfg['counter'] = counter_name
-                counter_specifier = '/builtin/{0}/{1}'.format(class_name, counter_name)
+                perf_counter_cfg['counter'] = lad_counter_name
+                counter_specifier = '/builtin/{0}/{1}'.format(class_name, lad_counter_name)
                 perf_counter_cfg['counterSpecifier'] = counter_specifier
-                perf_counter_cfg['condition'] = self.default_cql_condition_for_class(class_name)
+                perf_counter_cfg['condition'] = BProvider.default_condition(class_name)
                 if not perf_counter_cfg['condition']:
                     del perf_counter_cfg['condition']
-                if counter_specifier in units_and_names:
-                    perf_counter_cfg['unit'] = units_and_names[counter_specifier]['unit']
+                counter_specifier_with_scx_name = '/builtin/{0}/{1}'.format(class_name.title(), scx_counter_name)
+                if counter_specifier_with_scx_name in units_and_names:
+                    perf_counter_cfg['unit'] = units_and_names[counter_specifier_with_scx_name]['unit']
                     perf_counter_cfg['annotation'] = [{
-                        'displayName': units_and_names[counter_specifier]['displayName'],
+                        'displayName': units_and_names[counter_specifier_with_scx_name]['displayName'],
                         'locale': 'en-us'
                     }]
                 else:
                     # Use some ad hoc logic to auto-fill missing values (all from FileSystem class)
-                    perf_counter_cfg['unit'] = self.inferred_unit_name_from_counter_name(counter_name)
+                    perf_counter_cfg['unit'] = self.inferred_unit_name_from_counter_name(scx_counter_name)
                     perf_counter_cfg['annotation'] = [{
-                        'displayName': self.inferred_display_name_from_class_counter_names(class_name, counter_name),
+                        'displayName': self.inferred_display_name_from_class_counter_names(class_name, scx_counter_name),
                         'local': 'en-us'
                     }]
                 perf_counter_cfg_list.append(perf_counter_cfg)
 
         actual = json.dumps(pub_settings, sort_keys=True, indent=2)
         print actual
+        # Uncomment the following 2 lines when generating expected JSON file (of course after validating the actual)
+        #with open('expected_portal_pub_settings.json', 'w') as f:
+        #    f.write(actual)
         with open('expected_portal_pub_settings.json') as f:
             expected = f.read()
         self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
@@ -256,29 +259,23 @@ class StandardPortalPublicSettingsGenerator(TestCase):
         self.assertIn('"__DIAGNOSTIC_STORAGE_ACCOUNT__"', to_be_filled)
         self.assertIn('"__VM_RESOURCE_ID__"', to_be_filled)
 
-    def default_cql_condition_for_class(self, class_name):
-        # Only the following 2 classes have WHERE condition 'Name=_Total' in LAD 2.3.
-        if class_name == 'Processor' or class_name == 'Disk':
-            return 'Name="_Total"'
-        # May need to change logic here later for more appropriate defaults
-        return ''
-
-    def inferred_unit_name_from_counter_name(self, counter_name):
-        if 'Percent' in counter_name:
+    def inferred_unit_name_from_counter_name(self, scx_counter_name):
+        if 'Percent' in scx_counter_name:
             return 'Percent'
-        if re.match(r'Bytes.*PerSecond', counter_name):
+        if re.match(r'Bytes.*PerSecond', scx_counter_name):
             return 'BytesPerSecond'  # According to the ACIS-pulled metric definitions sample...
-        if 'PerSecond' in counter_name:
+        if 'PerSecond' in scx_counter_name:
             return 'CountPerSecond'  # Again according to the ACIS-pulled metric defs sample...
-        if 'Megabytes' in counter_name:
-            return 'Count'  # Not sure if this is correct...? Certainly it shouldn't be "Bytes", I think...?
+        if scx_counter_name in BProvider._scaling['memory'] or scx_counter_name in BProvider._scaling['filesystem']:
+            return 'Bytes'  # Scaled MiB to Bytes counters, so use Bytes as unit
+        raise Exception("Can't infer unit name from scx counter name ({0})".format(scx_counter_name))
 
-    def inferred_display_name_from_class_counter_names(self, class_name, counter_name):
-        desc = counter_name
+    def inferred_display_name_from_class_counter_names(self, class_name, scx_counter_name):
+        desc = scx_counter_name
         desc = desc.replace('PerSecond', '/sec')
         desc = ' '.join([word.lower() for word in re.findall('[A-Z]+[^A-Z]*', desc)])
-        desc = desc.replace('percent', '%')
-        return '{0} {1}'.format(class_name, desc)
+        desc = desc.replace('percent', '%').replace('megabytes', 'space')
+        return '{0} {1}'.format(class_name.title(), desc)
 
 
     def extract_perf_counter_units_and_names_from_metrics_def_sample(self):

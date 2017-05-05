@@ -23,10 +23,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "ReadBytesPerSecond", 
-            "counterSpecifier": "/builtin/Disk/ReadBytesPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "readbytespersecond", 
+            "counterSpecifier": "/builtin/disk/readbytespersecond", 
             "type": "builtin", 
             "unit": "BytesPerSecond"
           }, 
@@ -37,10 +37,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "WritesPerSecond", 
-            "counterSpecifier": "/builtin/Disk/WritesPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "writespersecond", 
+            "counterSpecifier": "/builtin/disk/writespersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -51,10 +51,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "AverageTransferTime", 
-            "counterSpecifier": "/builtin/Disk/AverageTransferTime", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "averagetransfertime", 
+            "counterSpecifier": "/builtin/disk/averagetransfertime", 
             "type": "builtin", 
             "unit": "Seconds"
           }, 
@@ -65,10 +65,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "TransfersPerSecond", 
-            "counterSpecifier": "/builtin/Disk/TransfersPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "transferspersecond", 
+            "counterSpecifier": "/builtin/disk/transferspersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -79,10 +79,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "WriteBytesPerSecond", 
-            "counterSpecifier": "/builtin/Disk/WriteBytesPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "writebytespersecond", 
+            "counterSpecifier": "/builtin/disk/writebytespersecond", 
             "type": "builtin", 
             "unit": "BytesPerSecond"
           }, 
@@ -93,10 +93,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "AverageReadTime", 
-            "counterSpecifier": "/builtin/Disk/AverageReadTime", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "averagereadtime", 
+            "counterSpecifier": "/builtin/disk/averagereadtime", 
             "type": "builtin", 
             "unit": "Seconds"
           }, 
@@ -107,10 +107,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "AverageWriteTime", 
-            "counterSpecifier": "/builtin/Disk/AverageWriteTime", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "averagewritetime", 
+            "counterSpecifier": "/builtin/disk/averagewritetime", 
             "type": "builtin", 
             "unit": "Seconds"
           }, 
@@ -121,10 +121,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "BytesPerSecond", 
-            "counterSpecifier": "/builtin/Disk/BytesPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "bytespersecond", 
+            "counterSpecifier": "/builtin/disk/bytespersecond", 
             "type": "builtin", 
             "unit": "BytesPerSecond"
           }, 
@@ -135,10 +135,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "ReadsPerSecond", 
-            "counterSpecifier": "/builtin/Disk/ReadsPerSecond", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "readspersecond", 
+            "counterSpecifier": "/builtin/disk/readspersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -149,10 +149,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Disk", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "AverageDiskQueueLength", 
-            "counterSpecifier": "/builtin/Disk/AverageDiskQueueLength", 
+            "class": "disk", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "averagediskqueuelength", 
+            "counterSpecifier": "/builtin/disk/averagediskqueuelength", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -163,9 +163,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "BytesReceived", 
-            "counterSpecifier": "/builtin/Network/BytesReceived", 
+            "class": "network", 
+            "counter": "bytesreceived", 
+            "counterSpecifier": "/builtin/network/bytesreceived", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -176,9 +176,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "BytesTotal", 
-            "counterSpecifier": "/builtin/Network/BytesTotal", 
+            "class": "network", 
+            "counter": "bytestotal", 
+            "counterSpecifier": "/builtin/network/bytestotal", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -189,9 +189,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "BytesTransmitted", 
-            "counterSpecifier": "/builtin/Network/BytesTransmitted", 
+            "class": "network", 
+            "counter": "bytestransmitted", 
+            "counterSpecifier": "/builtin/network/bytestransmitted", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -202,9 +202,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "TotalCollisions", 
-            "counterSpecifier": "/builtin/Network/TotalCollisions", 
+            "class": "network", 
+            "counter": "totalcollisions", 
+            "counterSpecifier": "/builtin/network/totalcollisions", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -215,9 +215,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "TotalRxErrors", 
-            "counterSpecifier": "/builtin/Network/TotalRxErrors", 
+            "class": "network", 
+            "counter": "totalrxerrors", 
+            "counterSpecifier": "/builtin/network/totalrxerrors", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -228,9 +228,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "PacketsTransmitted", 
-            "counterSpecifier": "/builtin/Network/PacketsTransmitted", 
+            "class": "network", 
+            "counter": "packetstransmitted", 
+            "counterSpecifier": "/builtin/network/packetstransmitted", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -241,9 +241,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "PacketsReceived", 
-            "counterSpecifier": "/builtin/Network/PacketsReceived", 
+            "class": "network", 
+            "counter": "packetsreceived", 
+            "counterSpecifier": "/builtin/network/packetsreceived", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -254,9 +254,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Network", 
-            "counter": "TotalTxErrors", 
-            "counterSpecifier": "/builtin/Network/TotalTxErrors", 
+            "class": "network", 
+            "counter": "totaltxerrors", 
+            "counterSpecifier": "/builtin/network/totaltxerrors", 
             "type": "builtin", 
             "unit": "Count"
           }, 
@@ -267,9 +267,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "TransfersPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/TransfersPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "transferspersecond", 
+            "counterSpecifier": "/builtin/filesystem/transferspersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -280,9 +281,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "PercentFreeSpace", 
-            "counterSpecifier": "/builtin/Filesystem/PercentFreeSpace", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentfreespace", 
+            "counterSpecifier": "/builtin/filesystem/percentfreespace", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -293,11 +295,26 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "PercentUsedSpace", 
-            "counterSpecifier": "/builtin/Filesystem/PercentUsedSpace", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentusedspace", 
+            "counterSpecifier": "/builtin/filesystem/percentusedspace", 
             "type": "builtin", 
             "unit": "Percent"
+          }, 
+          {
+            "annotation": [
+              {
+                "displayName": "Filesystem used space", 
+                "local": "en-us"
+              }
+            ], 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "usedspace", 
+            "counterSpecifier": "/builtin/filesystem/usedspace", 
+            "type": "builtin", 
+            "unit": "Bytes"
           }, 
           {
             "annotation": [
@@ -306,24 +323,26 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "ReadBytesPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/ReadBytesPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "bytesreadpersecond", 
+            "counterSpecifier": "/builtin/filesystem/bytesreadpersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
           {
             "annotation": [
               {
-                "displayName": "Filesystem used megabytes", 
+                "displayName": "Filesystem free space", 
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "UsedMegabytes", 
-            "counterSpecifier": "/builtin/Filesystem/UsedMegabytes", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "freespace", 
+            "counterSpecifier": "/builtin/filesystem/freespace", 
             "type": "builtin", 
-            "unit": "Count"
+            "unit": "Bytes"
           }, 
           {
             "annotation": [
@@ -332,24 +351,12 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "PercentFreeInodes", 
-            "counterSpecifier": "/builtin/Filesystem/PercentFreeInodes", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentfreeinodes", 
+            "counterSpecifier": "/builtin/filesystem/percentfreeinodes", 
             "type": "builtin", 
             "unit": "Percent"
-          }, 
-          {
-            "annotation": [
-              {
-                "displayName": "Filesystem free megabytes", 
-                "local": "en-us"
-              }
-            ], 
-            "class": "Filesystem", 
-            "counter": "FreeMegabytes", 
-            "counterSpecifier": "/builtin/Filesystem/FreeMegabytes", 
-            "type": "builtin", 
-            "unit": "Count"
           }, 
           {
             "annotation": [
@@ -358,9 +365,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "BytesPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/BytesPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "bytespersecond", 
+            "counterSpecifier": "/builtin/filesystem/bytespersecond", 
             "type": "builtin", 
             "unit": "BytesPerSecond"
           }, 
@@ -371,9 +379,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "ReadsPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/ReadsPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "readspersecond", 
+            "counterSpecifier": "/builtin/filesystem/readspersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -384,9 +393,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "WriteBytesPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/WriteBytesPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "byteswrittenpersecond", 
+            "counterSpecifier": "/builtin/filesystem/byteswrittenpersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -397,9 +407,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "WritesPerSecond", 
-            "counterSpecifier": "/builtin/Filesystem/WritesPerSecond", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "writespersecond", 
+            "counterSpecifier": "/builtin/filesystem/writespersecond", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -410,9 +421,10 @@
                 "local": "en-us"
               }
             ], 
-            "class": "Filesystem", 
-            "counter": "PercentUsedInodes", 
-            "counterSpecifier": "/builtin/Filesystem/PercentUsedInodes", 
+            "class": "filesystem", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentusedinodes", 
+            "counterSpecifier": "/builtin/filesystem/percentusedinodes", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -423,10 +435,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentIOWaitTime", 
-            "counterSpecifier": "/builtin/Processor/PercentIOWaitTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentiowaittime", 
+            "counterSpecifier": "/builtin/processor/percentiowaittime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -437,10 +449,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentUserTime", 
-            "counterSpecifier": "/builtin/Processor/PercentUserTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentusertime", 
+            "counterSpecifier": "/builtin/processor/percentusertime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -451,10 +463,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentNiceTime", 
-            "counterSpecifier": "/builtin/Processor/PercentNiceTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentnicetime", 
+            "counterSpecifier": "/builtin/processor/percentnicetime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -465,10 +477,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentProcessorTime", 
-            "counterSpecifier": "/builtin/Processor/PercentProcessorTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentprocessortime", 
+            "counterSpecifier": "/builtin/processor/percentprocessortime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -479,10 +491,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentInterruptTime", 
-            "counterSpecifier": "/builtin/Processor/PercentInterruptTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentinterrupttime", 
+            "counterSpecifier": "/builtin/processor/percentinterrupttime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -493,10 +505,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentIdleTime", 
-            "counterSpecifier": "/builtin/Processor/PercentIdleTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentidletime", 
+            "counterSpecifier": "/builtin/processor/percentidletime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -507,10 +519,10 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Processor", 
-            "condition": "Name=\"_Total\"", 
-            "counter": "PercentPrivilegedTime", 
-            "counterSpecifier": "/builtin/Processor/PercentPrivilegedTime", 
+            "class": "processor", 
+            "condition": "IsAggregate=TRUE", 
+            "counter": "percentprivilegedtime", 
+            "counterSpecifier": "/builtin/processor/percentprivilegedtime", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -521,9 +533,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "AvailableMemory", 
-            "counterSpecifier": "/builtin/Memory/AvailableMemory", 
+            "class": "memory", 
+            "counter": "availablememory", 
+            "counterSpecifier": "/builtin/memory/availablememory", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -534,9 +546,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PercentUsedSwap", 
-            "counterSpecifier": "/builtin/Memory/PercentUsedSwap", 
+            "class": "memory", 
+            "counter": "percentusedswap", 
+            "counterSpecifier": "/builtin/memory/percentusedswap", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -547,9 +559,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "UsedMemory", 
-            "counterSpecifier": "/builtin/Memory/UsedMemory", 
+            "class": "memory", 
+            "counter": "usedmemory", 
+            "counterSpecifier": "/builtin/memory/usedmemory", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -560,9 +572,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PagesReadPerSec", 
-            "counterSpecifier": "/builtin/Memory/PagesReadPerSec", 
+            "class": "memory", 
+            "counter": "pagesreadpersec", 
+            "counterSpecifier": "/builtin/memory/pagesreadpersec", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -573,9 +585,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "AvailableSwap", 
-            "counterSpecifier": "/builtin/Memory/AvailableSwap", 
+            "class": "memory", 
+            "counter": "availableswap", 
+            "counterSpecifier": "/builtin/memory/availableswap", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -586,9 +598,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PercentAvailableSwap", 
-            "counterSpecifier": "/builtin/Memory/PercentAvailableSwap", 
+            "class": "memory", 
+            "counter": "percentavailableswap", 
+            "counterSpecifier": "/builtin/memory/percentavailableswap", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -599,9 +611,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PercentAvailableMemory", 
-            "counterSpecifier": "/builtin/Memory/PercentAvailableMemory", 
+            "class": "memory", 
+            "counter": "percentavailablememory", 
+            "counterSpecifier": "/builtin/memory/percentavailablememory", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -612,9 +624,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PagesPerSec", 
-            "counterSpecifier": "/builtin/Memory/PagesPerSec", 
+            "class": "memory", 
+            "counter": "pagespersec", 
+            "counterSpecifier": "/builtin/memory/pagespersec", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }, 
@@ -625,9 +637,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "UsedSwap", 
-            "counterSpecifier": "/builtin/Memory/UsedSwap", 
+            "class": "memory", 
+            "counter": "usedswap", 
+            "counterSpecifier": "/builtin/memory/usedswap", 
             "type": "builtin", 
             "unit": "Bytes"
           }, 
@@ -638,9 +650,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PercentUsedMemory", 
-            "counterSpecifier": "/builtin/Memory/PercentUsedMemory", 
+            "class": "memory", 
+            "counter": "percentusedmemory", 
+            "counterSpecifier": "/builtin/memory/percentusedmemory", 
             "type": "builtin", 
             "unit": "Percent"
           }, 
@@ -651,9 +663,9 @@
                 "locale": "en-us"
               }
             ], 
-            "class": "Memory", 
-            "counter": "PagesWrittenPerSec", 
-            "counterSpecifier": "/builtin/Memory/PagesWrittenPerSec", 
+            "class": "memory", 
+            "counter": "pageswrittenpersec", 
+            "counterSpecifier": "/builtin/memory/pageswrittenpersec", 
             "type": "builtin", 
             "unit": "CountPerSecond"
           }
