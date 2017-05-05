@@ -136,7 +136,7 @@ def enable():
     try:
         start_omiservice()
         mode = get_config('Mode')
-        if mode != '':
+        if mode == '':
             mode = get_config('ExtensionAction')
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode/ExtensionAction: " + mode)
         if mode == '':
@@ -159,7 +159,7 @@ def enable():
             refresh_freq = get_config('RefreshFrequencyMins')
             configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
             configuration_mode = get_config('ConfigurationMode')  		   
-            exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode)
+            exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
         else:
             file_path = download_file()
@@ -620,7 +620,6 @@ def register_automation(registration_key, registation_url, node_configuration_na
         hutil.error(err_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
         return 51, err_msg
-	configuration_mode = configuration_mode.lower() 
     if configuration_mode != '' and not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
         err_msg = "ConfigurationMode: " + configuration_mode + " is not valid."	
         hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
