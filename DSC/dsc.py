@@ -160,7 +160,8 @@ def enable():
             configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
             configuration_mode = get_config('ConfigurationMode')  		   
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
-            hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
+            if exit_code != 0:
+                hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
         else:
             file_path = download_file()
             if mode == Mode.pull:
