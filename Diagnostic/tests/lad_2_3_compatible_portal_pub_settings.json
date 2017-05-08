@@ -2,7 +2,7 @@
   "StorageAccount": "__DIAGNOSTIC_STORAGE_ACCOUNT__", 
   "ladCfg": {
     "diagnosticMonitorConfiguration": {
-      "eventVolume": "Large", 
+      "eventVolume": "Medium", 
       "metrics": {
         "metricAggregation": [
           {
@@ -670,6 +670,30 @@
             "unit": "CountPerSecond"
           }
         ]
+      }, 
+      "syslogEvents": {
+        "syslogEventConfiguration": {
+          "LOG_AUTH": "LOG_DEBUG", 
+          "LOG_AUTHPRIV": "LOG_DEBUG", 
+          "LOG_CRON": "LOG_DEBUG", 
+          "LOG_DAEMON": "LOG_DEBUG", 
+          "LOG_FTP": "LOG_DEBUG", 
+          "LOG_KERN": "LOG_DEBUG", 
+          "LOG_LOCAL0": "LOG_DEBUG", 
+          "LOG_LOCAL1": "LOG_DEBUG", 
+          "LOG_LOCAL2": "LOG_DEBUG", 
+          "LOG_LOCAL3": "LOG_DEBUG", 
+          "LOG_LOCAL4": "LOG_DEBUG", 
+          "LOG_LOCAL5": "LOG_DEBUG", 
+          "LOG_LOCAL6": "LOG_DEBUG", 
+          "LOG_LOCAL7": "LOG_DEBUG", 
+          "LOG_LPR": "LOG_DEBUG", 
+          "LOG_MAIL": "LOG_DEBUG", 
+          "LOG_NEWS": "LOG_DEBUG", 
+          "LOG_SYSLOG": "LOG_DEBUG", 
+          "LOG_USER": "LOG_DEBUG", 
+          "LOG_UUCP": "LOG_DEBUG"
+        }
       }
     }, 
     "sampleRateInSeconds": 15

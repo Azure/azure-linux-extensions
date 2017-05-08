@@ -56,7 +56,6 @@ class TestBuiltinMetric(TestCase):
         except Exception as ex:
             self.fail("BuiltinMetric Constructor raised exception: {0}".format(ex))
 
-
     def test_Counter(self):
         dupe = self.basic_valid.copy()
         del dupe['counter']
@@ -169,9 +168,9 @@ class TestMakeXML(TestCase):
         # print xml_string
 
 
-class StandardPortalPublicSettingsGenerator(TestCase):
+class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
 
-    def test_generate_standard_portal_public_settings(self):
+    def test_lad_2_3_compatible_portal_public_settings(self):
         """
         This is rather a utility function that attempts to generate a standard LAD 3.0 protected settings JSON string
         for the Azure Portal charts experience. Unit, displayName, and condition are inferred/auto-filled from
@@ -182,7 +181,7 @@ class StandardPortalPublicSettingsGenerator(TestCase):
             "ladCfg": {
                 "sampleRateInSeconds": 15,
                 "diagnosticMonitorConfiguration": {
-                    "eventVolume": "Large",
+                    "eventVolume": "Medium",
                     "metrics": {
                         "metricAggregation": [
                             {
@@ -196,6 +195,30 @@ class StandardPortalPublicSettingsGenerator(TestCase):
                     },
                     "performanceCounters": {
                         "performanceCounterConfiguration": []
+                    },
+                    "syslogEvents": {
+                        "syslogEventConfiguration": {
+                            'LOG_AUTH': 'LOG_DEBUG',
+                            'LOG_AUTHPRIV': 'LOG_DEBUG',
+                            'LOG_CRON': 'LOG_DEBUG',
+                            'LOG_DAEMON': 'LOG_DEBUG',
+                            'LOG_FTP': 'LOG_DEBUG',
+                            'LOG_KERN': 'LOG_DEBUG',
+                            'LOG_LOCAL0': 'LOG_DEBUG',
+                            'LOG_LOCAL1': 'LOG_DEBUG',
+                            'LOG_LOCAL2': 'LOG_DEBUG',
+                            'LOG_LOCAL3': 'LOG_DEBUG',
+                            'LOG_LOCAL4': 'LOG_DEBUG',
+                            'LOG_LOCAL5': 'LOG_DEBUG',
+                            'LOG_LOCAL6': 'LOG_DEBUG',
+                            'LOG_LOCAL7': 'LOG_DEBUG',
+                            'LOG_LPR': 'LOG_DEBUG',
+                            'LOG_MAIL': 'LOG_DEBUG',
+                            'LOG_NEWS': 'LOG_DEBUG',
+                            'LOG_SYSLOG': 'LOG_DEBUG',
+                            'LOG_USER': 'LOG_DEBUG',
+                            'LOG_UUCP': 'LOG_DEBUG'
+                        }
                     }
                 }
             }
@@ -248,9 +271,9 @@ class StandardPortalPublicSettingsGenerator(TestCase):
         actual = json.dumps(pub_settings, sort_keys=True, indent=2)
         print actual
         # Uncomment the following 2 lines when generating expected JSON file (of course after validating the actual)
-        #with open('expected_portal_pub_settings.json', 'w') as f:
+        #with open('lad_2_3_compatible_portal_pub_settings.json', 'w') as f:
         #    f.write(actual)
-        with open('expected_portal_pub_settings.json') as f:
+        with open('lad_2_3_compatible_portal_pub_settings.json') as f:
             expected = f.read()
         self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
                          json.dumps(json.loads(actual), sort_keys=True))

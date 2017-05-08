@@ -21,8 +21,6 @@ ms.author: jasonzio@microsoft.com
 
 ## Introduction
 
-(**Note**: The Linux Diagnostic Extension is open-sourced on [Github](https://github.com/Azure/azure-linux-extensions/tree/master/Diagnostic) where the most current information on the extension is first published. You might want to check the [Github page](https://github.com/Azure/azure-linux-extensions/tree/master/Diagnostic) first.)
-
 The Linux Diagnostic Extension helps a user monitor the health of a Linux VM running on Microsoft Azure. It has the following capabilities:
 
 * Collects system performance metrics from the VM and stores them in a specific table in a designated storage account (usually the account in which the VM's boot vhd is stored).
@@ -562,6 +560,37 @@ Then the following public settings (that should be saved in a file as PublicConf
 ```
 
 Please note that you must provide the correct `resourceId` in order for the Azure Metrics service to display your `performanceCounters` data correctly in the Azure Portal charts. The resource ID is also used by JsonBlob sinks as well when forming the names of blobs.
+
+## Configuring and enabling the extension for Azure Portal metrics charting experiences
+
+Here's a sample configuration (provided in the `wget` URL below), and installation instructions, that will configure LAD 3.0 to capture and store exactly the same metrics (actually file system metrics are newly added in LAD 3.0) as were provided by LAD 2.3 for Azure Portal VM metrics charting experiences (and default syslog collection as enabled on LAD 2.3). You should consider this just an example; you'll want to modify the metrics to suit your own needs.
+
+If you'd like to proceed, please execute the following commands on your Azure CLI terminal after [installing Azure CLI 2.0](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) and wget (run `sudo apt-get install wget` on a Debian-based Linux disro or `sudo yum install wget` on a Redhat-based Linux distro). Also make sure to provide correct values for your Azure VM diagnostic paremeters in the first 3 lines.
+
+```bash
+# Set your Azure VM diagnostic parameters correctly below
+my_resource_group=<your_azure_resource_group_name_containing_your_azure_linux_vm>
+my_linux_vm=<your_azure_linux_vm_name>
+my_diagnostic_storage_account=<your_azure_storage_account_for_storing_vm_diagnostic_data>
+
+# Should login to Azure first before anything else
+az login
+
+# Get VM resource ID as well, and replace storage account name and resource ID in the public settings.
+my_vm_resource_id=$(az vm show -g $my_resource_group -n $my_linux_vm --query id | awk -F '"' '{ print $2 }')
+wget https://raw.githubusercontent.com/Azure/azure-linux-extensions/lad-3.0.101/Diagnostic/tests/lad_2_3_compatible_portal_pub_settings.json -O portal_public_settings.json
+sed -i "s#__DIAGNOSTIC_STORAGE_ACCOUNT__#$my_diagnostic_storage_account#g" portal_public_settings.json
+sed -i "s#__VM_RESOURCE_ID__#$my_vm_resource_id#g" portal_public_settings.json
+
+# Set protected settings (storage account SAS token)
+my_diagnostic_storage_account_sastoken=$(az storage account generate-sas --account-name $my_diagnostic_storage_account --expiry 9999-12-31T23:59Z --permissions wlacu --resource-types co --services bt | awk -F '"' '{ print $2 }')
+my_lad_protected_settings="{'storageAccountName': '$my_diagnostic_storage_account', 'storageAccountSasToken': '$my_diagnostic_storage_account_sastoken'}"
+
+# Finallly enable (set) the extension for the Portal metrics charts experience
+az vm extension set --publisher Microsoft.Azure.Diagnostics --name LinuxDiagnostic --version 3.0 --resource-group $my_resource_group --vm-name $my_linux_vm --protected-settings "${my_lad_protected_settings}" --settings portal_public_settings.json
+```
+
+The URL and its contents are subject to change. You should download a copy of the portal settings JSON file and customize it for your needs; any templates or automation you construct should use your own copy, rather than downloading that URL each time.
 
 ## Review your data
 
