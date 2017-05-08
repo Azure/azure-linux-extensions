@@ -18,7 +18,6 @@
 
 import datetime
 import exceptions
-import os
 import os.path
 import platform
 import signal
@@ -31,14 +30,15 @@ import traceback
 import xml.etree.ElementTree as ET
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
-# Also for any potential local imports that may throw, let's do try-except here on them.
+# Actually waagent import can succeed even on a Linux machine without waagent installed,
+# by setting PYTHONPATH env var to the azure-linux-extensions/Common/WALinuxAgent-2.0.16,
+# but let's just keep this try-except here on them for any potential local imports that may throw.
 try:
     # waagent, ext handler
     from Utils.WAAgentUtil import waagent
     import Utils.HandlerUtil as Util
 
     # Old LAD utils
-    import Utils.ApplicationInsightsUtil as AIUtil
     import Utils.LadDiagnosticUtil as LadUtil
     import Utils.XmlUtil as XmlUtil
 
@@ -46,30 +46,29 @@ try:
     import DistroSpecific
     import watcherutil
     from Utils.lad_ext_settings import LadExtSettings
-    from misc_helpers import *
-    from config_mdsd_rsyslog import *
+    from Utils.misc_helpers import *
+    import lad_config_all as lad_cfg
     from Utils.imds_util import ImdsLogger
+    import Utils.omsagent_util as oms
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
           'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print 'Are you running without waagent for some reason? Just passing here for now...'
-    # We may add some waagent mock later to support this scenario.
+    print "Can't proceed. Exiting with a special exit code 119."
+    sys.exit(119)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
 # Globals declaration/initialization (with const values only) for IDE
 g_ext_settings = None  # LAD extension settings object
 g_lad_log_helper = None  # LAD logging helper object
 g_dist_config = None  # Distro config object
-g_enable_syslog = True  # EnableSyslog flag
 g_ext_dir = ''  # Extension directory (e.g., /var/lib/waagent/Microsoft.OSTCExtensions.LinuxDiagnostic-x.y.zzzz)
 g_mdsd_file_resources_dir = '/var/run/mdsd'
 g_mdsd_role_name = 'lad_mdsd'  # Different mdsd role name for multiple mdsd process instances
 g_mdsd_file_resources_prefix = ''  # Eventually '/var/run/mdsd/lad_mdsd'
 g_lad_pids_filepath = ''  # LAD process IDs (diagnostic.py, mdsd) file path. g_ext_dir + '/lad.pids'
 g_ext_op_type = None  # Extension operation type (e.g., Install, Enable, HeartBeat, ...)
-g_mdsd_bin_dir = ''  # mdsd binary directory. g_ext_dir + '/bin'
+g_mdsd_bin_path = '/usr/local/lad/bin/mdsd'  # mdsd binary path. Fixed w/ lad-mdsd-*.{deb,rpm} pkgs
 g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnostic.py'
-g_imfile_config_filename = ''  # Generated rsyslog imfile config file name (not full path)
 # Only 2 globals not following 'g_...' naming convention, for legacy readability...
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
@@ -84,12 +83,11 @@ def init_distro_specific_actions():
     # TODO Exit immediately if distro is unknown
     global g_dist_config, RunGetOutput
     dist = platform.dist()
-    distroNameAndVersion = dist[0] + ":" + dist[1]
     try:
         g_dist_config = DistroSpecific.get_distro_actions(dist[0], dist[1], hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
     except exceptions.LookupError as ex:
-        hutil.error("os version:" + distroNameAndVersion + " not supported")
+        hutil.error("os version: {0}:{1} not supported".format(dist[0], dist[1]))
         # TODO Exit immediately if distro is unknown. This is currently done in main().
         g_dist_config = None
 
@@ -108,8 +106,7 @@ def init_extension_settings():
 def init_globals():
     """Initialize all the globals in a function so that we can catch any exceptions that might be raised."""
     global hutil, g_ext_dir, g_mdsd_file_resources_prefix, g_lad_pids_filepath
-    global g_mdsd_bin_dir, g_diagnostic_py_filepath, g_imfile_config_filename
-    global g_lad_log_helper
+    global g_diagnostic_py_filepath, g_lad_log_helper
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("LinuxAzureDiagnostic started to handle.")
@@ -120,19 +117,16 @@ def init_globals():
     g_ext_dir = os.getcwd()
     g_mdsd_file_resources_prefix = os.path.join(g_mdsd_file_resources_dir, g_mdsd_role_name)
     g_lad_pids_filepath = os.path.join(g_ext_dir, 'lad.pids')
-    g_mdsd_bin_dir = os.path.join(g_ext_dir, 'bin')
     g_diagnostic_py_filepath = os.path.join(os.getcwd(), __file__)
-    g_imfile_config_filename = os.path.join(g_ext_dir, 'imfileconfig')
     g_lad_log_helper = LadLogHelper(hutil.log, hutil.error, waagent.AddExtensionEvent, hutil.do_status_report,
                                     hutil.get_name(), hutil.get_extension_version())
 
 
-def setup_dependencies_and_mdsd():
+def setup_dependencies_and_mdsd(configurator):
     """
     Set up dependencies for mdsd, such as following:
     1) Distro-specific packages (see DistroSpecific.py)
-    2) Set up rsyslog for mdsd
-    3) Set up OMI
+    2) Set up omsagent (fluentd), syslog (rsyslog or syslog-ng) for mdsd
     :return: Status code and message
     """
     install_package_error = ""
@@ -153,19 +147,19 @@ def setup_dependencies_and_mdsd():
         hutil.error(install_package_error)
         return 2, install_package_error
 
-    if g_enable_syslog:
-        error, msg = setup_rsyslog_for_mdsd()
-        if error != 0:
-            hutil.error(msg)
-            return 3, msg
-
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
 
-    # Install/start OMI
-    omi_err, omi_msg = setup_omi()
-    if omi_err is not 0:
-        return 4, omi_msg
+    # Set up omsagent
+    omsagent_setup_exit_code, omsagent_setup_output = oms.setup_omsagent(configurator, RunGetOutput,
+                                                                         hutil.log, hutil.error)
+    if omsagent_setup_exit_code is not 0:
+        return 3, omsagent_setup_output
+
+    # Install lad-mdsd pkg (/usr/local/lad/bin/mdsd). Must be done after omsagent install because of dependencies
+    cmd_exit_code, cmd_output = g_dist_config.install_lad_mdsd()
+    if cmd_exit_code != 0:
+        return 4, 'lad-mdsd pkg install failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
 
     return 0, 'success'
 
@@ -180,42 +174,50 @@ def install_lad_as_systemd_service():
     RunGetOutput('systemctl daemon-reload')
 
 
-def main(command):
-    init_globals()
-
-    global g_enable_syslog, g_ext_op_type
-
-    # 'enableSyslog' is to be used for consistency, but we've had 'EnableSyslog' all the time, so accommodate it.
-    g_enable_syslog = g_ext_settings.read_public_config('enableSyslog').lower() != 'false' \
-                      and g_ext_settings.read_public_config('EnableSyslog').lower() != 'false'
-
-    g_ext_op_type = get_extension_operation_type(command)
-
+def create_core_components_configs():
+    """
+    Entry point to creating all configs of LAD's core components (mdsd, omsagent, rsyslog/syslog-ng, ...).
+    This function shouldn't be called on Install/Enable. Only Daemon op needs to call this.
+    :rtype: LadConfigAll
+    :return: A valid LadConfigAll object if config is valid. None otherwise.
+    """
     deployment_id = get_deployment_id_from_hosting_env_cfg(waagent.LibDir, hutil.log, hutil.error)
-    mdsd_rsyslog_configurator = ConfigMdsdRsyslog(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
-                                                  g_imfile_config_filename, RunGetOutput, hutil.log, hutil.error)
-    config_valid, config_invalid_reason = mdsd_rsyslog_configurator.generate_mdsd_rsyslog_configs()
-    if not config_valid:
-        config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
-                             ". Install will proceed, but enable can't proceed, " \
-                             "in which case it's still considered a success as it's an external error."
-        hutil.log(config_invalid_log)
-        if g_ext_op_type is waagent.WALAEventOperation.Enable:
-            hutil.do_status_report(g_ext_op_type, "success", '0', config_invalid_log)
-            waagent.AddExtensionEvent(name=hutil.get_name(),
-                                      op=g_ext_op_type,
-                                      isSuccess=True,
-                                      version=hutil.get_extension_version(),
-                                      message=config_invalid_log)
-            return
 
+    # Define wrappers around a couple misc_helpers. These can easily be mocked out in tests. PEP-8 says use
+    # def, don't assign a lambda to a variable. *shrug*
+    def encrypt_string(cert, secret):
+        return encrypt_secret_with_cert(RunGetOutput, hutil.error, cert, secret)
+
+    configurator = lad_cfg.LadConfigAll(g_ext_settings, g_ext_dir, waagent.LibDir, deployment_id,
+                                        read_uuid, encrypt_string, hutil.log, hutil.error)
+    try:
+        config_valid, config_invalid_reason = configurator.generate_all_configs()
+    except Exception as e:
+        hutil.error('Unknown exception occurred from generate_all_configs(). Msg: {0}'.format(e))
+        config_valid = False
+
+    if not config_valid:
+        g_lad_log_helper.log_and_report_failed_config_generation(
+            g_ext_op_type, config_invalid_reason,
+            g_ext_settings.get_handler_settings_in_string_with_secrets_redacted())
+        return None
+
+    return configurator
+
+
+def check_for_supported_waagent_and_distro_version():
+    """
+    Checks & returns if the installed waagent and the Linux distro/version are supported by this LAD.
+    :rtype: bool
+    :return: True iff so.
+    """
     for notsupport in ('WALinuxAgent-2.0.5', 'WALinuxAgent-2.0.4', 'WALinuxAgent-1'):
         code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent",
                                              chk_err=False)
         if code == 0 and str_ret.find(notsupport) > -1:
             hutil.log("cannot run this extension on  " + notsupport)
             hutil.do_status_report(g_ext_op_type, "error", '1', "cannot run this extension on  " + notsupport)
-            return
+            return False
 
     if g_dist_config is None:
         msg = ("LAD does not support distro/version ({0}); not installed. This extension install/enable operation is "
@@ -227,7 +229,21 @@ def main(command):
                                   isSuccess=True,
                                   version=hutil.get_extension_version(),
                                   message="Can't be installed on this OS " + str(platform.dist()))
+        return False
+
+    return True
+
+
+def main(command):
+    init_globals()
+
+    global g_ext_op_type
+
+    g_ext_op_type = get_extension_operation_type(command)
+
+    if not check_for_supported_waagent_and_distro_version():
         return
+
     try:
         hutil.log("Dispatching command:" + command)
 
@@ -236,6 +252,7 @@ def main(command):
                 RunGetOutput('systemctl stop mdsd-lde && systemctl disable mdsd-lde')
             else:
                 stop_mdsd()
+            oms.tear_down_omsagent_for_lad(RunGetOutput, False)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Uninstall:
@@ -244,9 +261,12 @@ def main(command):
                              '&& rm /lib/systemd/system/mdsd-lde.service')
             else:
                 stop_mdsd()
-            tear_down_omi()
-            if g_enable_syslog:
-                tear_down_mdsd_rsyslog_setup()
+            # Must remove lad-mdsd package first because of the dependencies
+            cmd_exit_code, cmd_output = g_dist_config.remove_lad_mdsd()
+            if cmd_exit_code != 0:
+                hutil.error('lad-mdsd remove failed. Still proceeding to uninstall. '
+                            'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
+            oms.tear_down_omsagent_for_lad(RunGetOutput, True)
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
@@ -272,7 +292,9 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Enable succeeded")
 
         elif g_ext_op_type is "Daemon":
-            start_mdsd()
+            configurator = create_core_components_configs()
+            if configurator:
+                start_mdsd(configurator)
 
         elif g_ext_op_type is waagent.WALAEventOperation.Update:
             hutil.do_status_report(g_ext_op_type, "success", '0', "Update succeeded")
@@ -318,19 +340,38 @@ def start_watcher_thread():
     thread_obj.start()
 
 
-def start_mdsd():
+def start_mdsd(configurator):
     """
     Start mdsd and monitor its activities. Report if it crashes or emits error logs.
+    :param configurator: A valid LadConfigAll object that was obtained by create_core_components_config().
+                         This will be used for configuring rsyslog/syslog-ng/fluentd/in_syslog/out_mdsd components
     :return: None
     """
+    # This must be done first, so that extension enable completion doesn't get delayed.
     write_lad_pids_to_file(g_lad_pids_filepath, os.getpid())
 
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd()
+    # We first need to install dependencies (omsagent, which includes omi) because even running 'mdsd -v'
+    # requires omi client library (/opt/omi/lib/libmicxx.so).
+    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
     if dependencies_err != 0:
         g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+        return
+
+    # We then validate the mdsd config and proceed only when it succeeds.
+    xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
+    tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
+    g_dist_config.extend_environment(tmp_env_dict)
+    added_env_str = ' '.join('{0}={1}'.format(k, tmp_env_dict[k]) for k in tmp_env_dict)
+    config_validate_cmd = '{0}{1}{2} -v -c {3}'.format(added_env_str, ' ' if added_env_str else '',
+                                                       g_mdsd_bin_path, xml_file)
+    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
+    if config_validate_cmd_status is not 0:
+        # Invalid config. Log error and report success.
+        g_lad_log_helper.log_and_report_invalid_mdsd_cfg(g_ext_op_type,
+                                                         config_validate_cmd_msg, read_file_to_string(xml_file))
         return
 
     # Start OMI if it's not running.
@@ -339,9 +380,6 @@ def start_mdsd():
     omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
     if not omi_running:
         RunGetOutput("/opt/omi/bin/service_control restart")
-
-    if not g_enable_syslog:
-        tear_down_mdsd_rsyslog_setup()
 
     log_dir = hutil.get_log_dir()
     err_file_path = os.path.join(log_dir, 'mdsd.err')
@@ -353,7 +391,6 @@ def start_mdsd():
     mdsd_stdout_redirect_path = os.path.join(g_ext_dir, "mdsd.log")
     mdsd_stdout_stream = None
     copy_env = os.environ
-    copy_env['LD_LIBRARY_PATH'] = g_mdsd_bin_dir
     g_dist_config.extend_environment(copy_env)
 
     # mdsd http proxy setting
@@ -361,28 +398,15 @@ def start_mdsd():
     if proxy_config:
         copy_env['MDSD_http_proxy'] = proxy_config
 
-    xml_file = os.path.join(g_ext_dir, './xmlCfg.xml')
-
-    # We now validate the config and proceed only when it succeeds.
-    config_validate_cmd = '{0} -v -c {1}'.format(os.path.join(g_mdsd_bin_dir, "mdsd"), xml_file)
-    config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
-    if config_validate_cmd_status is not 0:
-        # Invalid config. Log error and report success.
-        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
-            "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
-            "Config validation message: {0}."
-        hutil.log(message.format(config_validate_cmd_msg))
-        # No need to do success status report (it's already done). Just silently return.
-        return
-
-    # Config validated. Prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}'.format(
-        os.path.join(g_mdsd_bin_dir, "mdsd"),
+    # Now prepare actual mdsd cmdline.
+    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}{6}'.format(
+        g_mdsd_bin_path,
         xml_file,
         g_mdsd_role_name,
         err_file_path,
         warn_file_path,
-        info_file_path).split(" ")
+        info_file_path,
+        g_ext_settings.get_mdsd_trace_option()).split(" ")
 
     try:
         start_watcher_thread()
@@ -452,12 +476,10 @@ def start_mdsd():
             mdsd_crash_msg = "MDSD crash(uptime=" + str(mdsd_up_time) + "):" + tail(mdsd_stdout_redirect_path) + tail(err_file_path)
             hutil.error("MDSD crashed:" + mdsd_crash_msg)
 
-            # Needs to reset rsyslog omazurelinuxmds config before retrying mdsd
-            setup_rsyslog_for_mdsd()
-
         # mdsd all 3 allowed quick/consecutive crashes exhausted
         hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped:" + mdsd_crash_msg)
-
+        # Need to tear down omsagent setup for LAD before returning/exiting if it was set up earlier
+        oms.tear_down_omsagent_for_lad(RunGetOutput, False)
         try:
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent_ext_event_type,
@@ -562,94 +584,6 @@ def get_lad_pids():
     return lad_pids
 
 
-def setup_omi():
-    """
-    Set up OMI. Install necessary components, configure them as needed, and start OMI
-    :return: Pair of status code and message. 0 status code for success. Non-zero status code
-            for a failure and the associated failure message.
-    """
-    need_fresh_install_omi = not os.path.exists('/opt/omi/bin/omiserver')
-
-    isMysqlInstalled = RunGetOutput("which mysql")[0] is 0
-    isApacheInstalled = RunGetOutput("which apache2 || which httpd || which httpd2")[0] is 0
-
-    # Explicitly uninstall apache-cimprov & mysql-cimprov on rpm-based distros
-    # to avoid hitting the scx upgrade issue (from 1.6.2-241 to 1.6.2-337)
-    omi_version = RunGetOutput('/opt/omi/bin/omiserver -v', should_log=False)[1]
-    if 'OMI-1.0.8-4' in omi_version and g_dist_config.is_package_handler('rpm'):
-        RunGetOutput('rpm --erase apache-cimprov', should_log=False)
-        RunGetOutput('rpm --erase mysql-cimprov', should_log=False)
-
-    need_install_omi = ('OMI-1.0.8-6' not in omi_version) \
-        or (isMysqlInstalled and not os.path.exists("/opt/microsoft/mysql-cimprov")) \
-        or (isApacheInstalled and not os.path.exists("/opt/microsoft/apache-cimprov"))
-
-    if need_install_omi:
-        hutil.log("Begin omi installation.")
-        is_omi_installed_correctly = False
-        maxTries = 5  # Try up to 5 times to install OMI
-        for trialNum in range(1, maxTries + 1):
-            is_omi_installed_correctly = g_dist_config.install_omi() is 0
-            if is_omi_installed_correctly:
-                break
-            hutil.error("OMI install failed (trial #" + str(trialNum) + ").")
-            if trialNum < maxTries:
-                hutil.error("Retrying in 30 seconds...")
-                time.sleep(30)
-        if not is_omi_installed_correctly:
-            hutil.error("OMI install failed " + str(maxTries) + " times. Giving up...")
-            return 1, "OMI install failed " + str(maxTries) + " times"
-
-    shouldRestartOmi = False
-
-    # Issue #265. OMI httpsport shouldn't be reconfigured when LAD is re-enabled or just upgraded.
-    # In other words, OMI httpsport config should be updated only on a fresh OMI install.
-    if need_fresh_install_omi:
-        # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
-        omi_listens_to_nonzero_port = RunGetOutput(
-            r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf | grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
-        if omi_listens_to_nonzero_port:
-            RunGetOutput(
-                "/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf > /etc/opt/omi/conf/omiserver.conf_temp")
-            RunGetOutput("mv /etc/opt/omi/conf/omiserver.conf_temp /etc/opt/omi/conf/omiserver.conf")
-            shouldRestartOmi = True
-
-    # Quick and dirty way of checking if mysql/apache process is running
-    isMysqlRunning = RunGetOutput("ps -ef | grep mysql | grep -v grep")[0] is 0
-    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache2' | grep -v grep")[0] is 0
-
-    if os.path.exists("/opt/microsoft/mysql-cimprov/bin/mycimprovauth") and isMysqlRunning:
-        mysqladdress = g_ext_settings.read_protected_config("mysqladdress")
-        mysqlusername = g_ext_settings.read_protected_config("mysqlusername")
-        mysqlpassword = g_ext_settings.read_protected_config("mysqlpassword")
-        RunGetOutput(
-            "/opt/microsoft/mysql-cimprov/bin/mycimprovauth default " + mysqladdress + " " + mysqlusername + " '" + mysqlpassword + "'",
-            should_log=False)
-        shouldRestartOmi = True
-
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
-        RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -c")
-        shouldRestartOmi = True
-
-    if shouldRestartOmi:
-        RunGetOutput("/opt/omi/bin/service_control restart")
-
-    return 0, "omi installed"
-
-
-def tear_down_omi():
-    """
-    Tear down OMI. We currently don't uninstall OMI, but just uninstalls Apache CIM provider if it's installed.
-    Later, we may want to at least stop OMI server, if not uninstalling OMI.
-    :return: status code (0 for success), and message
-    """
-    isApacheRunning = RunGetOutput("ps -ef | grep -E 'httpd|apache' | grep -v grep")[0] is 0
-    if os.path.exists("/opt/microsoft/apache-cimprov/bin/apache_config.sh") and isApacheRunning:
-        RunGetOutput("/opt/microsoft/apache-cimprov/bin/apache_config.sh -u")
-    hutil.log("omi will not be uninstalled")
-    return 0, "do nothing"
-
-
 # Issue #128 LAD should restart OMI if it crashes
 def restart_omi_if_crashed(omi_installed, mdsd):
     """
@@ -705,60 +639,6 @@ def restart_omi_if_crashed(omi_installed, mdsd):
     return omi_installed
 
 
-# Rsyslog config-related globals (config file paths)
-g_rsyslog_om_mdsd_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds.conf"
-g_rsyslog_im_file_conf_path = "/etc/rsyslog.d/10-omazurelinuxmds-imfile.conf"
-
-
-def setup_rsyslog_for_mdsd():
-    """
-    Set up rsyslog for mdsd by doing the following:
-    1) Install rsyslog mdsd output module
-    2) Configure rsyslog mdsd output module (Update __MDSD_SOCKET_FILE_PTAH__ in the config template)
-    3) Configure rsyslog imfile module (By copying the already-cooked imfileconfig to rsyslog.d)
-    4) Restart rsyslog
-    :return: Status code (0 for success, non-zero for failure), message
-    """
-    rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
-    if rsyslog_om_path is None:
-        return 1, "rsyslog not installed"
-
-    if rsyslog_version == '':
-        return 1, "rsyslog version can't be detected"
-    elif rsyslog_version not in ('5', '7', '8'):
-        return 1, "Unsupported rsyslog version ({0})".format(rsyslog_version)
-
-    rsyslog_om_folder = 'rsyslog' + rsyslog_version
-    mdsd_socket_path = g_mdsd_file_resources_prefix + "_json.socket"
-
-    script = """\
-cp -f {0}/omazuremds.so {1};\
-rm -f /etc/rsyslog.d/omazurelinuxmds.conf /etc/rsyslog.d/omazurelinuxmds_fileom.conf {2};\
-cp -f {3} {4};\
-sed 's#__MDSD_SOCKET_FILE_PATH__#{5}#g' {0}/omazurelinuxmds.conf > {2}"""
-    cmd = script.format(rsyslog_om_folder, rsyslog_om_path, g_rsyslog_om_mdsd_conf_path,
-                        g_imfile_config_filename, g_rsyslog_im_file_conf_path, mdsd_socket_path)
-    RunGetOutput(cmd)
-
-    g_dist_config.restart_rsyslog()
-    return 0, "Setting up rsyslog for mdsd completed"
-
-
-def tear_down_mdsd_rsyslog_setup():
-    """
-    Tear down mdsd-related rsyslog setup by doing the following:
-    1) Remove mdsd rsyslog output module binary, config, and imfile config for mdsd destination
-    2) Restart rsyslog
-    :return: Status code and message
-    """
-    rsyslog_om_path, rsyslog_version = g_dist_config.get_rsyslog_info()
-    if os.path.exists(g_rsyslog_om_mdsd_conf_path):
-        cmd = "rm -f {0}/omazuremds.so {1} {2}"
-        RunGetOutput(cmd.format(rsyslog_om_path, g_rsyslog_om_mdsd_conf_path, g_rsyslog_im_file_conf_path))
-    g_dist_config.restart_rsyslog()
-    return 0, "rm omazurelinuxmds done"
-
-
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print('No command line argument was specified.\nYou must be executing this program manually for testing.\n'
@@ -774,7 +654,7 @@ if __name__ == '__main__':
             if len(sys.argv) == 2:
                 # Add a telemetry only if this is executed through waagent (in which
                 # we are guaranteed to have just one cmdline arg './diagnostic -xxx').
-                waagent.AddExtensionEvent(name="Microsoft.OSTCExtension.LinuxDiagnostic",
+                waagent.AddExtensionEvent(name="Microsoft.Azure.Diagnostic.LinuxDiagnostic",
                                           op=wala_event_type,
                                           isSuccess=False,
                                           version=ext_version,

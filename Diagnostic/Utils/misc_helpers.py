@@ -11,12 +11,15 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import tempfile
 import re
 import string
 import traceback
 import xml.dom.minidom
+import binascii
 
 from Utils.WAAgentUtil import waagent
+from Utils.lad_exceptions import LadLoggingConfigException
 
 
 def get_extension_operation_type(command):
@@ -112,11 +115,11 @@ class LadLogHelper(object):
                           "Recycling mdsd to self-mitigate.".format(int((memory_usage_in_KB + 1023) / 1024))
         self._logger_log(memory_leak_msg)
         # Add a telemetry for a possible statistical analysis
-        self._waagent_event_add(name=self._ext_name,
-                                op=ext_op,
-                                isSuccess=True,
-                                version=self._ext_ver,
-                                message=memory_leak_msg)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_op,
+                                  isSuccess=True,
+                                  version=self._ext_ver,
+                                  message=memory_leak_msg)
         mdsd_process.kill()
 
     def report_mdsd_dependency_setup_failure(self, ext_event_type, failure_msg):
@@ -135,10 +138,79 @@ class LadLogHelper(object):
                                   version=self._ext_ver,
                                   message=dependencies_err_log_msg)
 
+    def log_and_report_failed_config_generation(self, ext_event_type, config_invalid_reason, redacted_handler_settings):
+        """
+        Report failed config generation from configurator.generate_all_configs().
+        :param str ext_event_type: Type of extension event being performed (most likely 'HeartBeat')
+        :param str config_invalid_reason: Msg from configurator.generate_all_configs()
+        :param str redacted_handler_settings: JSON string for the extension's protected/public settings after redacting
+                    secrets in the protected settings. This is for logging to Geneva for diagnostic purposes.
+        :return: None
+        """
+        config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
+                             ". Can't proceed, but this will be still considered a success as it's an external error."
+        self._logger_log(config_invalid_log)
+        self._status_reporter(ext_event_type, 'success', '0', config_invalid_log)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_event_type,
+                                  isSuccess=True,  # Note this is True, because it is a user error.
+                                  version=self._ext_ver,
+                                  message="Invalid handler settings encountered: {0}".format(redacted_handler_settings))
 
-def read_uuid(run_command):
-    code, str_ret = run_command("dmidecode |grep UUID |awk '{print $2}'", chk_err=False)
-    return str_ret.strip()
+    def log_and_report_invalid_mdsd_cfg(self, ext_event_type, config_validate_cmd_msg, mdsd_cfg_xml):
+        """
+        Report invalid result from 'mdsd -v -c xmlCfg.xml'
+        :param ext_event_type: Type of extension event being performed (most likely 'HeartBeat')
+        :param config_validate_cmd_msg: Output of 'mdsd -v -c xmlCfg.xml'
+        :param mdsd_cfg_xml: Content of xmlCfg.xml to be sent to Geneva
+        :return: None
+        """
+        message = "Invalid mdsd config given. Can't enable. This extension install/enable operation is reported as " \
+                  "successful so the VM can complete successful startup. Linux Diagnostic Extension will exit. " \
+                  "Config validation message: {0}.".format(config_validate_cmd_msg)
+        self._logger_log(message)
+        self._status_reporter(ext_event_type, 'success', '0', message)
+        self._waagent_event_adder(name=self._ext_name,
+                                  op=ext_event_type,
+                                  isSuccess=True,  # Note this is True, because it is a user error.
+                                  version=self._ext_ver,
+                                  message="Invalid mdsd config encountered: {0}".format(mdsd_cfg_xml))
+
+def read_uuid():
+    uuid = ''
+    uuid_file_path = '/sys/class/dmi/id/product_uuid'
+    try:
+        with open(uuid_file_path) as f:
+            uuid = f.readline().strip()
+    except Exception as e:
+        raise LadLoggingConfigException('read_uuid() failed: Unable to open uuid file {0}'.format(uuid_file_path))
+    if not uuid:
+        raise LadLoggingConfigException('read_uuid() failed: Empty content in uuid file {0}'.format(uuid_file_path))
+    return uuid
+
+
+def encrypt_secret_with_cert(run_command, logger, cert_path, secret):
+    """
+    update_account_settings() helper.
+    :param run_command: Function to run an arbitrary command
+    :param logger: Function to log error messages
+    :param cert_path: Cert file path
+    :param secret: Secret to encrypt
+    :return: Encrypted secret string. None if openssl command exec fails.
+    """
+    f = tempfile.NamedTemporaryFile(suffix='mdsd', delete=True)
+    # Have openssl write to our temporary file (on Linux we don't have an exclusive lock on the temp file).
+    # openssl smime, when asked to put output in a file, simply overwrites the file; it does not unlink/creat or
+    # creat/rename.
+    cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
+    cmd_to_run = cmd.format(secret, f.name, cert_path)
+    ret_status, ret_msg = run_command(cmd_to_run, should_log=False)
+    if ret_status is not 0:
+        logger("Encrypting storage secret failed with the following message: " + ret_msg)
+        return None
+    encrypted_secret = f.read()
+    f.close()   # Deletes the temp file
+    return binascii.b2a_hex(encrypted_secret).upper()
 
 
 def tail(log_file, output_size=1024):
@@ -233,3 +305,28 @@ def write_lad_pids_to_file(pid_file_path, py_pid, mdsd_pid=None):
         f.write(str(py_pid) + '\n')
         if mdsd_pid is not None:
             f.write(str(mdsd_pid) + '\n')
+
+
+def append_string_to_file(string, filepath):
+    """
+    Append string content to file
+    :param string: A str object that holds the content to be appended to the file
+    :param filepath: Path to the file to be appended
+    :return: None
+    """
+    with open(filepath, 'a') as f:
+        f.write(string)
+
+
+def read_file_to_string(filepath):
+    """
+    Read entire file and return it as string. If file can't be read, return "Can't read <filepath>"
+    :param str filepath: Path of the file to read
+    :rtype: str
+    :return: Content of the file in a single string, or "Can't read <filepath>" if file can't be read.
+    """
+    try:
+        with open(filepath) as f:
+            return f.read()
+    except Exception as e:
+        return "Can't read {0}. Exception thrown: {1}".format(filepath, e)

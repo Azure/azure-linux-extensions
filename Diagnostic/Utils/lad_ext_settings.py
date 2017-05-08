@@ -11,6 +11,8 @@
 # THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import base64
+import copy
+import json
 import traceback
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
@@ -78,29 +80,44 @@ class LadExtSettings(ExtSettings):
     def __init__(self, handler_settings):
         super(LadExtSettings, self).__init__(handler_settings)
 
-    def log_protected_settings_keys(self, logger_log, logger_err):
+    def redacted_handler_settings(self):
         """
-        Log some protected settings information. Keys only for credentials and both key/value for known public
-        values (e.g., storageAccountEndPoint). This was introduced to help ourselves find any misconfiguration
-        issues related to the storageAccountEndPoint easier.
+        Get handler settings in string after redacting secrets (for diagnostic purpose w/ Geneva telemetry)
+        :rtype: str
+        :return: String for the handler settings JSON object with secrets redacted.
+        """
+        # The logic below could have been a general-purpose JSON tree walker, but since the specific
+        # knowledge of where secrets are needs be applied anyway, it's coded for this specific schema anyway.
+        # Secrets are stored only in the following paths: .storageAccountSasToken, and .sinksConfig.sink[].sasURL.
+
+        # Get and work on a copy of the handler settings dict. Note that it must be a deep copy!
+        # dict(self.get_handler_settings()) doesn't work!
+        handler_settings = copy.deepcopy(self.get_handler_settings())
+        protected_settings = handler_settings['protectedSettings']
+        if protected_settings:
+            if 'storageAccountSasToken' in protected_settings:
+                protected_settings['storageAccountSasToken'] = 'REDACTED_SECRET'
+            if 'sinksConfig' in protected_settings and 'sink' in protected_settings['sinksConfig']:
+                for each_sink_dict in protected_settings['sinksConfig']['sink']:
+                    if 'sasURL' in each_sink_dict:
+                        each_sink_dict['sasURL'] = 'REDACTED_SECRET'
+        return json.dumps(handler_settings, sort_keys=True)
+
+    def log_ext_settings_with_secrets_redacted(self, logger_log, logger_err):
+        """
+        Log entire extension settings with secrets redacted. This was introduced to help ourselves find any
+        misconfiguration issues related to the storageAccountEndPoint easier, and later extended to log all
+        extension settings with secrets redacted, for better diagnostics.
         :param logger_log: Normal logging function (e.g., hutil.log)
         :param logger_err: Error logging function (e.g., hutil.error)
         :return: None
         """
         try:
-            msg = "Keys in privateSettings (and some non-secret values): "
-            first = True
-            for key in self._protected_settings:
-                if first:
-                    first = False
-                else:
-                    msg += ", "
-                msg += key
-                if key == 'storageAccountEndPoint':
-                    msg += ":" + self._protected_settings[key]
+            msg = "LAD settings with secrets redacted: {0}".format(
+                self.redacted_handler_settings())
             logger_log(msg)
         except Exception as e:
-            logger_err("Failed to log keys in privateSettings. Error:{0}\n"
+            logger_err("Failed to log LAD settings with secrets redacted. Error:{0}\n"
                        "Stacktrace: {1}".format(e, traceback.format_exc()))
 
     def get_resource_id(self):
@@ -122,47 +139,29 @@ class LadExtSettings(ExtSettings):
                                                       'DiagnosticMonitorConfiguration/Metrics', 'resourceId')
         return resource_id
 
-    def get_syslog_config(self):
+    def get_syslogEvents_setting(self):
         """
-        Get syslog config from LAD extension settings.
-        First look up 'ladCfg' section's 'syslogCfg' and use it. If none, then use 'syslogCfg' at the top level
-        of public settings. Base64-encoded rsyslogd conf content is currently supported for 'syslogCfg' in either
-        section.
-        :return: rsyslogd configuration content string (base64-decoded 'syslogCfg' setting)
+        Get 'ladCfg/syslogEvents' setting from LAD 3.0 public settings.
+        :return: A dictionary of syslog facility and minSeverity to monitor/ Refer to README.md for more details.
         """
-        syslog_cfg = ''
-        lad_cfg = self.read_public_config('ladCfg')
-        encoded_syslog_cfg = LadUtil.getDiagnosticsMonitorConfigurationElement(lad_cfg, 'syslogCfg')
-        if not encoded_syslog_cfg:
-            encoded_syslog_cfg = self.read_public_config('syslogCfg')
-        if encoded_syslog_cfg:
-            syslog_cfg = base64.b64decode(encoded_syslog_cfg)
-        return syslog_cfg
+        return LadUtil.getDiagnosticsMonitorConfigurationElement(self.read_public_config('ladCfg'), 'syslogEvents')
 
-    def get_file_monitoring_config(self):
+    def get_fileLogs_setting(self):
         """
-        Get rsyslog file monitoring (imfile module) config from LAD extension settings.
-        First look up 'ladCfg' and use it if one is there. If not, then get 'fileCfg' at the top level
-        of public settings.
-        :return: List of dictionaries specifying files to monitor and Azure table names for the destinations
-        of the monitored files. E.g.:
-        [
-          {"file":"/var/log/a.log", "table":"aLog"},
-          {"file":"/var/log/b.log", "table":"bLog"}
-        ]
+        Get 'fileLogs' setting from LAD 3.0 public settings.
+        :return: List of dictionaries specifying file to monitor and Azure table name for
+        destinations of the monitored file. Refer to README.md for more details
         """
-        lad_cfg = self.read_public_config('ladCfg')
-        file_cfg = LadUtil.getFileCfgFromLadCfg(lad_cfg)
-        if not file_cfg:
-            file_cfg = self.read_public_config('fileCfg')
-        return file_cfg
+        return self.read_public_config('fileLogs')
 
-    def get_mdsd_cfg(self):
+    def get_mdsd_trace_option(self):
         """
-        Get 'mdsdCfg' setting from the LAD public settings. Since it's base64-encoded, decode it for returning.
-        :return: Base64-decoded 'mdsdCfg' LAD public setting. '' if not present.
+        Return traceFlags, if any, from public config
+        :rtype: str
+        :return: trace flags or an empty string
         """
-        mdsd_cfg_str = self.read_public_config('mdsdCfg')
-        if mdsd_cfg_str:
-            mdsd_cfg_str = base64.b64decode(mdsd_cfg_str)
-        return mdsd_cfg_str
+        flags = self.read_public_config('traceFlags')
+        if flags:
+            return " -T {0}".format(flags)
+        else:
+            return ""
