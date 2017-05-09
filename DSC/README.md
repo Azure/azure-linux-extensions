@@ -26,7 +26,7 @@ Here're all the supported public configuration parameters:
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
 * `ExtensionAction`: (optional, string) Specifies what an extension does. valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Action by default.
-* `NodeConfigurationName`: (optional, string) the name of the configuration to apply.
+* `NodeConfigurationName`: (optional, string) the name of a node configuration to apply.
 * `RefreshFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
        If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
 * `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
@@ -177,10 +177,10 @@ public.json
 ```json
 {
   "ExtensionAction" : "Register",
-  "NodeConfigurationName": "<node-configuration-name>",
-  "RefreshFrequencyMins": "<value>"
-  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
-  "ConfigurationModeFrequencyMins": "<value>"
+  "NodeConfigurationName" : "<node-configuration-name>",
+  "RefreshFrequencyMins" : "<value>"
+  "ConfigurationMode" : "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
+  "ConfigurationModeFrequencyMins" : "<value>"
 }
 ```
 
