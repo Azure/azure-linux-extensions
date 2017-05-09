@@ -373,10 +373,10 @@ $publicConfig = '{
 ## Changelog
 
 ```
-# 2.3 (2017-04-17)
+# 2.3 (2017-05-08)
 - Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
-- Add optional public.json parmeters: 'ConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
-- Added a new parameter 'ExtensionAction' to replace 'mode' to avoid confusion with DSC push/pull mode.
+- Added optional public.json parmeters: 'NodeConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
+- Added a new parameter 'ExtensionAction' to replace 'mode' to avoid confusion with DSC terminology: push/pull mode.
 - Supports mode parameter for backward compatibility.
 
 # 2.0 (2016-03-10)
