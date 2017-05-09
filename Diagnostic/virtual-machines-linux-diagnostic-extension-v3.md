@@ -578,7 +578,7 @@ az login
 
 # Get VM resource ID as well, and replace storage account name and resource ID in the public settings.
 my_vm_resource_id=$(az vm show -g $my_resource_group -n $my_linux_vm --query id | awk -F '"' '{ print $2 }')
-wget https://raw.githubusercontent.com/Azure/azure-linux-extensions/lad-3.0.101/Diagnostic/tests/lad_2_3_compatible_portal_pub_settings.json -O portal_public_settings.json
+wget https://github.com/Azure/azure-linux-extensions/blob/master/Diagnostic/tests/lad_2_3_compatible_portal_pub_settings.json -O portal_public_settings.json
 sed -i "s#__DIAGNOSTIC_STORAGE_ACCOUNT__#$my_diagnostic_storage_account#g" portal_public_settings.json
 sed -i "s#__VM_RESOURCE_ID__#$my_vm_resource_id#g" portal_public_settings.json
 
@@ -588,9 +588,18 @@ my_lad_protected_settings="{'storageAccountName': '$my_diagnostic_storage_accoun
 
 # Finallly enable (set) the extension for the Portal metrics charts experience
 az vm extension set --publisher Microsoft.Azure.Diagnostics --name LinuxDiagnostic --version 3.0 --resource-group $my_resource_group --vm-name $my_linux_vm --protected-settings "${my_lad_protected_settings}" --settings portal_public_settings.json
+
 ```
 
 The URL and its contents are subject to change. You should download a copy of the portal settings JSON file and customize it for your needs; any templates or automation you construct should use your own copy, rather than downloading that URL each time.
+
+### Important notes on customizing the downloaded `portal_public_settings.json`
+
+After experimenting with the downloaded `portal_public_settings.json` configuration as is, you may want to customize it for your own fit. For example, you may want to remove the entire `syslogEvents` section of the downloaded `portal_public_settings.json` if you don't need to collect syslog events at all. You can also remove unneeded entries in the `performanceCounterConfiguration` section of the downloaded `portal_public_settings.json` if you are not interested in some metrics. However, you should not modify other settings without fully understanding what they are and how they work. Only recommended customization at this point is to remove unwanted metrics or syslog events, and possibly changing the `displayName` values for metrics of your interest.
+
+### Important notes on upgrading to LAD 3.0 from LAD 2.3
+
+**Please use a new/different storage account for LAD 3.0** if you are upgrading from LAD 2.3. As mentioned earlier, you should uninstall LAD 2.3 first in order to upgrade to LAD 3.0, and if you specify the same storage account for LAD 3.0 as used in LAD 2.3, the syslog events collection with the new LAD 3.0 may not work because of a small change in LAD 3.0's syslog Azure Table name. Therefore, you should use a new storage account for LAD 3.0 if you still want to collect syslog events.
 
 ## Review your data
 
