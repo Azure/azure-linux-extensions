@@ -1,7 +1,7 @@
 # DSCForLinux Extension
 Allow the owner of the Azure Virtual Machines to configure the VM using Desired State Configuration (DSC) for Linux.
 
-Latest version is 2.0.
+Latest version is 2.3
 
 About how to create MOF document, please refer to below documents.
 * [Get started with Desired State Configuration (DSC) for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
@@ -9,11 +9,11 @@ About how to create MOF document, please refer to below documents.
 * [DSC for Linux releases] (https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases)
 
 DSCForLinux Extension can:
-* Push MOF configurations to the Linux VM (Push Mode)
-* Distribute MOF configurations to the Linux VM with Pull Servers (Pull Mode)
-* Install custom DSC modules to the Linux VM (Install Mode)
-* Remove custom DSC modules to the Linux VM (Remove Mode)
-* Register the Linux VM to Azure Automation account (Register Mode)
+* Register the Linux VM to Azure Automation account in order to pull configurations from Azure Automation service (Register ExtensionAction)
+* Push MOF configurations to the Linux VM (Push ExtensionAction)
+* Applies Meta MOF configuration to the Linux VM to configure Pull Server in order to pull Node Configuration (Pull ExtensionAction)
+* Install custom DSC modules to the Linux VM (Install ExtensionAction)
+* Remove custom DSC modules to the Linux VM (Remove ExtensionAction)
 
 # User Guide
 
@@ -25,7 +25,14 @@ Here're all the supported public configuration parameters:
 
 * `FileUri`: (optional, string) the uri of the MOF file/Meta MOF file/custom resource ZIP file.
 * `ResourceName`: (optional, string) the name of the custom resource module
-* `Mode`: (optional, string) the functional mode, valid values: Push, Pull, Install, Remove, Register. If not specified, it's considered as Push mode by default.
+* `ExtensionAction`: (optional, string) Specifies what an extension does. valid values: Register, Push, Pull, Install, Remove. If not specified, it's considered as Push Action by default.
+* `NodeConfigurationName`: (optional, string) the name of a node configuration to apply.
+* `RefreshFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC attempts to obtain the configuration from the pull server. 
+       If configuration on the pull server differs from the current one on the target node, it is copied to the pending store and applied.
+* `ConfigurationMode`: (optional, string) Specifies how DSC should apply the configuration. Valid values are: ApplyOnly, ApplyAndMonitor, ApplyAndAutoCorrect.
+* `ConfigurationModeFrequencyMins`: (optional, int) Specifies how often (in minutes) DSC ensures that the configuration is in the desired state.
+
+> **NOTE:** If you are using a version < 2.3, mode parameter is same as ExtensionAction. Mode seems to be a overloaded term. Therefore to avoid the confusion, ExtensionAction is being used from 2.3 version onwards. For backward compatibility, the extension supports both mode and ExtensionAction. 
 
 ### 1.2 Protected configuration
 
@@ -103,7 +110,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Push",
+  "ExtensionAction": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -141,7 +148,7 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Push",
+  "ExtensionAction": "Push",
   "FileUri": "<mof-file-uri>"
 }'
 
@@ -158,7 +165,42 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 ## 3. Scenarios
 
-### 3.1 Apply a MOF configuration file (in Azure Storage Account) to the VM
+### 3.1 Register to Azure Automation account
+protected.json
+```json
+{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}
+```
+public.json
+```json
+{
+  "ExtensionAction" : "Register",
+  "NodeConfigurationName" : "<node-configuration-name>",
+  "RefreshFrequencyMins" : "<value>",
+  "ConfigurationMode" : "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>",
+  "ConfigurationModeFrequencyMins" : "<value>"
+}
+```
+
+powershell format
+```powershell
+$privateConfig = '{
+  "RegistrationUrl": "<azure-automation-account-url>",
+  "RegistrationKey": "<azure-automation-account-key>"
+}'
+
+$publicConfig = '{
+  "ExtensionAction" : "Register",
+  "NodeConfigurationName": "<node-configuration-name>",
+  "RefreshFrequencyMins": "<value>",
+  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>",
+  "ConfigurationModeFrequencyMins": "<value>"
+}'
+```
+
+### 3.2 Apply a MOF configuration file (in Azure Storage Account) to the VM
 
 protected.json
 ```json
@@ -172,7 +214,7 @@ public.json
 ```json
 {
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"
+  "ExtensionAction": "Push"
 }
 ```
 
@@ -185,12 +227,12 @@ $privateConfig = '{
 
 $publicConfig = '{
   "FileUri": "<mof-file-uri>",
-  "Mode": "Push"
+  "ExtensionAction": "Push"
 }'
 ```
 
 
-### 3.2. Apply a MOF configuration file (in public storage) to the VM
+### 3.3. Apply a MOF configuration file (in public storage) to the VM
 
 public.json
 ```json
@@ -206,54 +248,8 @@ $publicConfig = '{
 }'
 ```
 
-### 3.3. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
+### 3.4. Apply a meta MOF configuration file (in Azure Storage Account) to the VM
 
-protected.json
-```json
-{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-}
-```
-
-public.json
-```json
-{
-  "Mode": "Pull",
-  "FileUri": "<meta-mof-file-uri>",
-}
-```
-
-powershell format
-```powershell
-$privateConfig = '{
-  "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
-}'
-
-$publicConfig = '{
-  "Mode": "Pull",
-  "FileUri": "<meta-mof-file-uri>",
-}'
-```
-
-### 3.4. Apply a meta MOF configuration file (in public storage) to the VM
-public.json
-```json
-{
-  "FileUri": "<meta-mof-file-uri>",
-  "Mode": "Pull"
-}
-```
-powershell format
-```powershell
-$publicConfig = '{
-  "FileUri": "<meta-mof-file-uri>",
-  "Mode": "Pull"
-}'
-```
-
-### 3.5. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
 protected.json
 ```json
 {
@@ -261,11 +257,12 @@ protected.json
   "StorageAccountKey": "<storage-account-key>"
 }
 ```
+
 public.json
 ```json
 {
-  "Mode": "Install",
-  "FileUri": "<resource-zip-file-uri>"
+  "ExtensionAction": "Pull",
+  "FileUri": "<meta-mof-file-uri>"
 }
 ```
 
@@ -277,68 +274,94 @@ $privateConfig = '{
 }'
 
 $publicConfig = '{
-  "Mode": "Install",
-  "FileUri": "<resource-zip-file-uri>"
+  "ExtensionAction": "Pull",
+  "FileUri": "<meta-mof-file-uri>"
 }'
 ```
 
-### 3.6. Install a custom resource module (ZIP file in public storage) to the VM
+### 3.5. Apply a meta MOF configuration file (in public storage) to the VM
 public.json
 ```json
 {
-  "Mode": "Install",
-  "FileUri": "<resource-zip-file-uri>"
+  "FileUri": "<meta-mof-file-uri>",
+  "ExtensionAction": "Pull"
 }
 ```
 powershell format
 ```powershell
 $publicConfig = '{
-  "Mode": "Install",
-  "FileUri": "<resource-zip-file-uri>"
+  "FileUri": "<meta-mof-file-uri>",
+  "ExtensionAction": "Pull"
 }'
 ```
 
-### 3.7. Remove a custom resource module from the VM
-public.json
-```json
-{
-  "ResourceName": "<resource-name>",
-  "Mode": "Remove"
-}
-```
-powershell format
-```powershell
-$publicConfig = '{
-  "ResourceName": "<resource-name>",
-  "Mode": "Remove"
-}'
-```
-
-### 3.8 Register to Azure Automation account
+### 3.6. Install a custom resource module (ZIP file in Azure Storage Account) to the VM
 protected.json
 ```json
 {
-  "RegistrationUrl": "<azure-automation-account-url>",
-  "RegistrationKey": "<azure-automation-account-key>"
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}
+```
+public.json
+```json
+{
+  "ExtensionAction": "Install",
+  "FileUri": "<resource-zip-file-uri>"
 }
 ```
 
 powershell format
 ```powershell
 $privateConfig = '{
-  "RegistrationUrl": "<azure-automation-account-url>",
-  "RegistrationKey": "<azure-automation-account-key>"
+  "StorageAccountName": "<storage-account-name>",
+  "StorageAccountKey": "<storage-account-key>"
+}'
+
+$publicConfig = '{
+  "ExtensionAction": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}'
+```
+
+### 3.7. Install a custom resource module (ZIP file in public storage) to the VM
+public.json
+```json
+{
+  "ExtensionAction": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}
+```
+powershell format
+```powershell
+$publicConfig = '{
+  "ExtensionAction": "Install",
+  "FileUri": "<resource-zip-file-uri>"
+}'
+```
+
+### 3.8. Remove a custom resource module from the VM
+public.json
+```json
+{
+  "ResourceName": "<resource-name>",
+  "ExtensionAction": "Remove"
+}
+```
+powershell format
+```powershell
+$publicConfig = '{
+  "ResourceName": "<resource-name>",
+  "ExtensionAction": "Remove"
 }'
 ```
 
 ## 4. Supported Linux Distributions
-- Ubuntu 12.04 LTS, 14.04 LTS
+- Ubuntu 12.04 LTS, 14.04 LTS, 16.04 LTS, 16.10 LTS
 - CentOS 6.5 and higher
 - RHEL 6.5 and higher
-- Oracle Linux 6.4 and higher
 - openSUSE 13.1 and higher
 - SUSE Linux Enterprise Server 11 SP3 and higher
-- Debian 7 and 8
 
 ## 5. Debug
 * The status of the extension is reported back to Azure so that user can see the status on Azure Portal
@@ -350,6 +373,12 @@ $privateConfig = '{
 ## Changelog
 
 ```
+# 2.3 (2017-05-08)
+- Update to OMI v1.1.0-8 and Linux DSC v1.1.1-294
+- Added optional public.json parmeters: 'NodeConfigurationName', 'RefreshFrequencyMins', 'ConfigurationMode' and 'ConfigurationModeFrequencyMins'.
+- Added a new parameter 'ExtensionAction' to replace 'mode' to avoid confusion with DSC terminology: push/pull mode.
+- Supports mode parameter for backward compatibility.
+
 # 2.0 (2016-03-10)
 - Pick up Linux DSC v1.1.1
 - Add function to register Azure Automation
