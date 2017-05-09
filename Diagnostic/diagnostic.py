@@ -199,7 +199,7 @@ def create_core_components_configs():
     if not config_valid:
         g_lad_log_helper.log_and_report_failed_config_generation(
             g_ext_op_type, config_invalid_reason,
-            g_ext_settings.get_handler_settings_in_string_with_secrets_redacted())
+            g_ext_settings.redacted_handler_settings())
         return None
 
     return configurator
