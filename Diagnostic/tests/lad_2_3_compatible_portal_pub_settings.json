@@ -1,5 +1,4 @@
 {
-  "StorageAccount": "__DIAGNOSTIC_STORAGE_ACCOUNT__", 
   "ladCfg": {
     "diagnosticMonitorConfiguration": {
       "eventVolume": "Medium", 
