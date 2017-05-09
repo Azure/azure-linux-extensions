@@ -177,6 +177,7 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
         a sample Azure Insights metric definitions JSON pulled from ACIS.
         """
         pub_settings = {
+            "StorageAccount": "__DIAGNOSTIC_STORAGE_ACCOUNT__",
             "ladCfg": {
                 "sampleRateInSeconds": 15,
                 "diagnosticMonitorConfiguration": {
@@ -277,7 +278,8 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
         self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
                          json.dumps(json.loads(actual), sort_keys=True))
         to_be_filled = re.findall(r'"__.*?__"', actual)
-        self.assertEqual(1, len(to_be_filled))
+        self.assertEqual(2, len(to_be_filled))
+        self.assertIn('"__DIAGNOSTIC_STORAGE_ACCOUNT__"', to_be_filled)
         self.assertIn('"__VM_RESOURCE_ID__"', to_be_filled)
 
     def inferred_unit_name_from_counter_name(self, scx_counter_name):
