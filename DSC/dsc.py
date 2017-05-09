@@ -36,18 +36,17 @@ import Utils.HandlerUtil as Util
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.0.8.ssl_'
-dsc_package_prefix = 'packages/dsc-1.1.1-70.ssl_'
+omi_package_prefix = 'packages/omi-1.1.0.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
 omi_major_version = 1
-omi_minor_version = 0
-omi_build = 8
+omi_minor_version = 1
+omi_build = 0
+omi_release = 0
 dsc_major_version = 1
 dsc_minor_version = 1
 dsc_build = 1
-omi_version_deb = '1.0.8.4'
-omi_version_rpm = '1.0.8-4'
-dsc_version_deb = '1.1.1.70'
-dsc_version_rpm = '1.1.1-70'
+dsc_release = 294
+package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 
 # DSC-specific Operation
 class Operation:
@@ -63,7 +62,7 @@ class DistroCategory:
     debian = 1
     redhat = 2
     suse = 3
-
+	
 class Mode:
     push = "push"
     pull = "pull"
@@ -82,11 +81,13 @@ def main():
     global public_settings
     public_settings = hutil.get_public_settings()
     if not public_settings:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="Public settings are NOT provided.")
         public_settings = {}
 
     global protected_settings
     protected_settings = hutil.get_protected_settings()
     if not protected_settings:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="protected settings are NOT provided.")	
         protected_settings = {}
 
     global distro_category
@@ -135,7 +136,9 @@ def enable():
     try:
         start_omiservice()
         mode = get_config('Mode')
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode: " + mode)
+        if mode == '':
+            mode = get_config('ExtensionAction')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enabling the DSC extension - mode/ExtensionAction: " + mode)
         if mode == '':
             mode = Mode.push
         else:
@@ -144,12 +147,21 @@ def enable():
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Enable,
                                           isSuccess=True,
-                                          message="(03001)Argument error, invalid mode. DSC supports only Push and Pull mode.")
-                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown mode: ' + mode + " DSC supports only Push and Pull mode.")
+                                          message="(03001)Argument error, invalid ExtensionAction/mode.")
+                hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown ExtensionAction/mode: ' + mode)
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
-            register_automation()
+            registration_key = get_config('RegistrationKey')
+            registation_url = get_config('RegistrationUrl')
+	        # Optional
+            node_configuration_name = get_config('NodeConfigurationName')
+            refresh_freq = get_config('RefreshFrequencyMins')
+            configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
+            configuration_mode = get_config('ConfigurationMode')  		   
+            exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
+            if exit_code != 0:
+                hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
         else:
             file_path = download_file()
             if mode == Mode.pull:
@@ -227,38 +239,56 @@ def get_config(key):
 def remove_old_dsc_packages():
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Deleting DSC and omi packages")
     if distro_category == DistroCategory.debian:
-        deb_remove_old_package('dsc', dsc_version_deb)
+        deb_remove_incomptible_dsc_package()
         # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
-        deb_remove_old_package('omiserver', '1.0.8.2')
-        deb_remove_old_package('omi', omi_version_deb)
+        deb_remove_old_oms_package('omiserver', '1.0.8.2')
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_remove_old_package('dsc', dsc_version_rpm)
+        rpm_remove_incomptible_dsc_package()
         # remove the package installed by Linux DSC 1.0, in later versions the package name is changed to 'omi'
-        rpm_remove_old_package('omiserver', '1.0.8-2')
-        rpm_remove_old_package('omi', omi_version_rpm)
+        rpm_remove_old_oms_package('omiserver', '1.0.8-2')
 
-def deb_remove_old_package(package_name, version):
-    if deb_check_old_package(package_name, version):
+def deb_remove_incomptible_dsc_package():
+    version = deb_get_pkg_version('dsc')
+    if version is not None and is_incomptible_dsc_package(version):
+        deb_uninstall_package(package_name)
+			
+def is_incomptible_dsc_package(package_version):
+    version = re.match(package_pattern, package_version)
+    #uninstall DSC package if the version is 1.0.x because upgrading from 1.0 to 1.1 is broken
+    if version is not None and (int(version.group(1)) == 1 and int(version.group(2)) == 0): 
+	    return True
+    return False
+
+def is_old_oms_server(package_name):
+    if package_name == 'omiserver':
+        return True
+    return False	
+			
+def deb_remove_old_oms_package(package_name, version):
+    system_pkg_version = deb_get_pkg_version(package_name)
+    if system_pkg_version is not None and is_old_oms_server(package_name):
         deb_uninstall_package(package_name)
 
-def rpm_remove_old_package(package_name, version):
-    if rpm_check_old_package(package_name, version):
-        rpm_uninstall_package(package_name)
-
-def deb_check_old_package(package_name, version):
+def deb_get_pkg_version(package_name):
     code,output = run_cmd('dpkg -s ' + package_name + ' | grep Version:')
     if code == 0:
         code,output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
-        if output < version:
-            return True
-    return False
+        if code == 0:
+            return output
 
-def rpm_check_old_package(package_name, version):
+def rpm_remove_incomptible_dsc_package():
+    code,version = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" dsc')
+    if code == 0 and is_incomptible_dsc_package(version):
+        rpm_uninstall_package(package_name)
+			
+def rpm_remove_old_oms_package(package_name, version):
+    if rpm_check_old_oms_package(package_name, version):
+        rpm_uninstall_package(package_name)
+		
+def rpm_check_old_oms_package(package_name, version):
     code,output = run_cmd('rpm -q ' + package_name)
-    if code == 0:
-        l = len(package_name) + 1
-        if output[l:] < version:
-            return True
+    if code == 0 and is_old_oms_server(package_name):
+        return True
     return False
 
 def install_dsc_packages():
@@ -267,29 +297,28 @@ def install_dsc_packages():
     dsc_package_path = dsc_package_prefix + openssl_version
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Installing omipackage version: " + omi_package_path + "; dsc package version: " +  dsc_package_path)
     if distro_category == DistroCategory.debian:
-        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_version_deb)
-        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_version_deb )
+        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
+        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build)
-        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build)
+        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
+        rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
 
-def compare_pkg_version(system_package_version, major_version, minor_version, build):
-    version = re.match('(\d+).(\d+).(\d+)', system_package_version)
-    if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) >= build)):
+def compare_pkg_version(system_package_version, major_version, minor_version, build, release):
+    version = re.match(package_pattern, system_package_version)
+    if version is not None and ((int(version.group(1)) > major_version) or (int(version.group(1)) == major_version and int(version.group(2)) > minor_version) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) > build) or (int(version.group(1)) == major_version and int(version.group(2)) == minor_version and int(version.group(3)) == build and int(version.group(4)) >= release)):
         return 1
     return 0
 
-def check_pkg_exists(package_name, major_version, minor_version, build):
-    code,output = run_cmd('rpm -q --queryformat "%{VERSION}" ' + package_name)
+def rpm_check_pkg_exists(package_name, major_version, minor_version, build, release):
+    code,output = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" ' + package_name)
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="package name: " + package_name + ";  existing package version:" + output)
     hutil.log("package name: " + package_name + ";  existing package version:" + output)
     if code == 0: 
-        return compare_pkg_version(output, major_version, minor_version, build)
+        return compare_pkg_version(output, major_version, minor_version, build, release)
 
-def rpm_install_pkg(package_path, package_name, major_version, minor_version, build):
-    if check_pkg_exists(package_name, major_version, minor_version, build) == 1:
+def rpm_install_pkg(package_path, package_name, major_version, minor_version, build, release):
+    if rpm_check_pkg_exists(package_name, major_version, minor_version, build, release) == 1:
         # package is already installed
-        hutil.log(package_name + ' with higher or equal version is already installed')
         return
     else:
         code,output = run_cmd('rpm -Uvh ' + package_path)
@@ -299,18 +328,19 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install RPM package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
-def deb_install_pkg(package_path, package_name, package_version):
-    code,output = run_cmd('dpkg -s ' + package_name + ' | grep "Version: ' + package_version + '"')
-    if code == 0:
+def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release):
+    version = deb_get_pkg_version(package_name)
+    if version is not None and compare_pkg_version(version, major_version, minor_version, build, release) == 1:
         # package is already installed
-        hutil.log(package_name + ' version ' + package_version + ' is already installed')
+        hutil.log(package_name + ' version ' + version + ' is already installed')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="dsc package with version: " + version + "is already installed.")
         return
     else:
         code,output = run_cmd('dpkg -i ' + package_path)
         if code == 0:
-            hutil.log(package_name + ' version ' + package_version + ' is installed successfully')
+            hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(build) + '.' + str(release) + ' is installed successfully')
         else:
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install debian package :" + package_path)
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=False, message="Failed to install debian package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
 def install_package(package):
@@ -483,21 +513,22 @@ def prepare_download_dir(seq_no):
     return cur_download_dir
 
 def apply_dsc_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)	
+    code,output = run_cmd(cmd)	
     if code == 0:
         code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: {0}'.format(output)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.ApplyMof, isSuccess=True, message=error_msg)
         hutil.error(error_msg)
-        waagent.AddExtensionEvent(name=ExtensionShortName,
-                                  op=Operation.ApplyMof,
-                                  isSuccess=False,
-                                  message="(03105)" + error_msg)
         raise Exception(error_msg)
 
 def apply_dsc_meta_configuration(config_file_path):
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)
+    code,output = run_cmd(cmd)
     if code == 0:
         code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output
@@ -519,7 +550,12 @@ def check_dsc_configuration(current_config):
 
 def install_module(file_path):
     install_package('unzip')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path)
+    cmd = '/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path
+    code,output = run_cmd(cmd)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op="InstallModuleInProgress",
+                              isSuccess=True,
+                              message="Running the cmd: " + cmd)
     if not code == 0:
         error_msg = 'Failed to install DSC Module ' + file_path + ':{0}'.format(output)
         hutil.error(error_msg)
@@ -535,7 +571,12 @@ def install_module(file_path):
 
 def remove_module():
     module_name = get_config('ResourceName')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name)
+    cmd = '/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name
+    code,output = run_cmd(cmd)
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                              op="RemoveModuleInProgress",
+                              isSuccess=True,
+                              message="Running the cmd: " + cmd)	
     if not code == 0:
         error_msg = 'Failed to remove DSC Module ' + module_name + ': {0}'.format(output)
         hutil.error(error_msg)
@@ -574,23 +615,47 @@ def rpm_uninstall_package(package_name):
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
 
-def register_automation():
-    registration_key = get_config('RegistrationKey')
-    registation_url = get_config('RegistrationUrl')
-    code,output = run_cmd('/opt/microsoft/dsc/Scripts/Register.py ' + registration_key + ' ' + registation_url)
+def register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode):
+    if (registration_key == '' or registation_url == ''):
+        err_msg = "Either the Registration Key or Registration URL is NOT provided"
+        hutil.error(err_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
+        return 51, err_msg
+    if configuration_mode != '' and not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
+        err_msg = "ConfigurationMode: " + configuration_mode + " is not valid."	
+        hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
+        return 51, err_msg
+    cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey '+ registration_key \
+          + ' --ServerURL '+ registation_url
+    optional_parameters = ""
+    if node_configuration_name != '':
+        optional_parameters += ' --ConfigurationName ' + node_configuration_name
+    if refresh_freq != '':
+        optional_parameters += ' --RefreshFrequencyMins ' + refresh_freq
+    if configuration_mode_freq != '':
+        optional_parameters += ' --ConfigurationModeFrequencyMins ' + configuration_mode_freq
+    if configuration_mode != '':
+        optional_parameters += ' --ConfigurationMode ' + configuration_mode
+    waagent.AddExtensionEvent(name=ExtensionShortName,
+                                  op="RegisterInProgress",
+                                  isSuccess=True,
+                                  message="Registration URL " + registation_url + "Optional parameters to Registration" + optional_parameters)
+    code,output = run_cmd(cmd + optional_parameters)
     if not code == 0:
         error_msg = 'Failed to register with Azure Automation DSC: {0}'.format(output)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.Register,
-                                  isSuccess=False,
+                                  isSuccess=True,
                                   message="(03109)" + error_msg)
-        raise Exception(error_msg)
+        return 1, err_msg
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op=Operation.Register,
                               isSuccess=True,
                               message="(03108)Succeeded to register with Azure Automation DSC")
-    
+    return 0, ''
+	
 if __name__ == '__main__':
     main()
 

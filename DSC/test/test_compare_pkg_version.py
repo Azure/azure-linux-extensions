@@ -22,6 +22,7 @@ import dsc
 import os
 import platform
 from Utils.WAAgentUtil import waagent
+from MockUtil import MockUtil
 
 waagent.LoggerInit('/tmp/test.log','/dev/null')
 
@@ -33,21 +34,21 @@ class CompareRPMPackageVersions(unittest.TestCase):
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = Dummy()
         dsc.hutil.log = waagent.Log 
-        output = dsc.compare_pkg_version('1.0.8', 1, 0, 8)
+        output = dsc.compare_pkg_version('1.1.1.294', 1, 1, 1, 294)
         self.assertEqual(1, output)
 
     def test_with_higher_version(self):
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = Dummy()
         dsc.hutil.log = waagent.Log 
-        output = dsc.compare_pkg_version('1.2.0', 1, 0, 8)
+        output = dsc.compare_pkg_version('1.2.0.35', 1, 1, 1, 294)
         self.assertEqual(1, output)	
 
     def test_with_lower_version(self):
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = Dummy()
         dsc.hutil.log = waagent.Log 
-        output = dsc.compare_pkg_version('1.0.4', 1, 0, 8)
+        output = dsc.compare_pkg_version('1.0.4.35', 1, 1, 1, 294)
         self.assertEqual(0, output)			
 
 if __name__ == '__main__':
