@@ -178,8 +178,8 @@ public.json
 {
   "ExtensionAction" : "Register",
   "NodeConfigurationName" : "<node-configuration-name>",
-  "RefreshFrequencyMins" : "<value>"
-  "ConfigurationMode" : "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
+  "RefreshFrequencyMins" : "<value>",
+  "ConfigurationMode" : "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>",
   "ConfigurationModeFrequencyMins" : "<value>"
 }
 ```
@@ -194,8 +194,8 @@ $privateConfig = '{
 $publicConfig = '{
   "ExtensionAction" : "Register",
   "NodeConfigurationName": "<node-configuration-name>",
-  "RefreshFrequencyMins": "<value>"
-  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>"
+  "RefreshFrequencyMins": "<value>",
+  "ConfigurationMode": "<ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly>",
   "ConfigurationModeFrequencyMins": "<value>"
 }'
 ```
@@ -254,7 +254,7 @@ protected.json
 ```json
 {
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
+  "StorageAccountKey": "<storage-account-key>"
 }
 ```
 
@@ -270,7 +270,7 @@ powershell format
 ```powershell
 $privateConfig = '{
   "StorageAccountName": "<storage-account-name>",
-  "StorageAccountKey": "<storage-account-key>",
+  "StorageAccountKey": "<storage-account-key>"
 }'
 
 $publicConfig = '{
