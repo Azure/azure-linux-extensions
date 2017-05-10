@@ -2,7 +2,7 @@
 
 Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
 
-Latest version is 3.0.101.
+Latest version is 3.0.103.
 
 Linux Azure Diagnostic (LAD) extension version 3.0 is released with the following changes:
 
