@@ -273,9 +273,10 @@ class LadLoggingConfig:
         return mxt.top_level_tmpl_for_logging_only.format(sources=filelogs_sources, events=filelogs_mdsd_event_sources,
                                                       eh_urls=filelogs_eh_urls)
 
-    def get_fluentd_syslog_src_config(self):
+    def get_fluentd_syslog_src_config(self, resource_id):
         """
         Get Fluentd's syslog source config that should be used for this LAD's syslog configs.
+        :param str resource_id: Azure resource Id for the VM that should be included in syslog records. Could be None.
         :rtype: str
         :return: Fluentd config string that should be overwritten to
                  /etc/opt/microsoft/omsagent/LAD/conf/omsagent.d/syslog.conf
@@ -296,18 +297,21 @@ class LadLoggingConfig:
   type record_transformer
   enable_ruby
   <record>
-    # Fields expected by mdsd for syslog messages
+    # Fields for backward compatibility with Azure Shoebox V1 (Table storage)
     Ignore "syslog"
-    Facility ${tag_parts[2]}
-    Severity ${tag_parts[3]}
-    EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
-    SendingHost ${record["source_host"]}
-    Msg ${record["message"]}
-  </record>
-  remove_keys host,message,source_host  # No need of these fields for mdsd so remove
+    Facility ${{tag_parts[2]}}
+    Severity ${{tag_parts[3]}}
+    EventTime ${{time.strftime('%Y-%m-%dT%H:%M:%S%z')}}
+    SendingHost ${{record["source_host"]}}
+    Msg ${{record["message"]}}
+    # Fields for EventHubs. ${{hostname}} is Ruby's Socket.gethostname result
+    hostname ${{hostname}}
+{resource_id_cfg}  </record>
+  remove_keys message,source_host  # No need of these fields for mdsd so remove
 </filter>
 """
-        return '' if self._syslog_disabled else fluentd_syslog_src_config
+        resource_id_cfg = '' if not resource_id else '    resourceId {0}\n'.format(resource_id)
+        return '' if self._syslog_disabled else fluentd_syslog_src_config.format(resource_id_cfg=resource_id_cfg)
 
     def get_fluentd_filelog_src_config(self):
         """
@@ -412,6 +416,10 @@ def syslog_name_to_rsyslog_name(syslog_name):
     :rtype: str
     :return: Corresponding rsyslog name (e.g., "user" or "error")
     """
+    if syslog_name == '*':
+        # We accept '*' as a facility name (also as a severity name, though it's not required)
+        # to allow customers to collect for reserved syslog facility numeric IDs (12-15)
+        return '*'
     if syslog_name not in syslog_name_to_rsyslog_name_map:
         raise LadLoggingConfigException('Invalid syslog name given: {0}'.format(syslog_name))
     return syslog_name_to_rsyslog_name_map[syslog_name]
