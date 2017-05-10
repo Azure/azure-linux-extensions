@@ -1,0 +1,6 @@
+devpts  /dev/pts          devpts  mode=0620,gid=5 0 0
+proc    /proc             proc    defaults        0 0
+sysfs   /sys              sysfs   noauto          0 0
+debugfs /sys/kernel/debug debugfs noauto          0 0
+tmpfs   /run              tmpfs   noauto          0 0
+/dev/disk/by-uuid/6f45e622-cfbd-4da8-a46b-ab62cdcd23c7 / ext4 defaults 1 1
