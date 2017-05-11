@@ -1642,6 +1642,15 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 if not tmpvol.mount_point:
                     continue
 
+                proc_comm = ProcessCommunicator()
+                executor = CommandExecutor(logger)
+                command = 'find {0} -type f -print | grep -v swapfile | grep -v DATALOSS_WARNING_README.txt | wc -l'.format(tmpvol.mount_point)
+                executor.ExecuteInBash(command, communicator=proc_comm)
+
+                if int(proc_comm.stdout) != 0:
+                    logger.log("Resource disk mounted at {0} is not empty".format(tmpvol.mount_point))
+                    continue
+
                 disk_format_query = '{"dev_path":"/dev/DEVNAME","name":"MOUNTPOINT","file_system":"FILESYSTEM"}'
                 disk_format_query = disk_format_query.replace('DEVNAME', tmpvol.name)
                 disk_format_query = disk_format_query.replace('MOUNTPOINT', tmpvol.mount_point)
