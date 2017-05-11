@@ -516,7 +516,7 @@ class HandlerUtility:
         if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
             searchfile = open(status_file_prev, "r")
             for line in searchfile:
-                if "transition" in line: 
+                if "Transition" in line: 
                     self.log("transitioning found in the previous status file")
                     searchfile.close()
                     return True
