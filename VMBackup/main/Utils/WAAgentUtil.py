@@ -36,11 +36,29 @@ def searchWAAgent():
             return agentPath
     return None
 
-agentPath = searchWAAgent()
-if(agentPath):
-    waagent = imp.load_source('waagent', agentPath)
-else:
-    raise Exception("Can't load waagent.")
+def searchWAAgentOld():
+    agentPath = '/usr/sbin/waagent'
+    if(os.path.isfile(agentPath)):
+        return agentPath
+    user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
+    for user_path in user_paths:
+        agentPath = os.path.join(user_path, 'waagent')
+        if(os.path.isfile(agentPath)):
+            return agentPath
+    return None
+
+try:
+    agentPath = searchWAAgent()
+    if(agentPath):
+        waagent = imp.load_source('waagent', agentPath)
+    else:
+        raise Exception("Can't load waagent.")
+except Exception as e:
+    agentPath = searchWAAgentOld()
+    if(agentPath):
+        waagent = imp.load_source('waagent', agentPath)
+    else:
+        raise Exception("Can't load waagent old.")
 
 if not hasattr(waagent, "AddExtensionEvent"):
     """
