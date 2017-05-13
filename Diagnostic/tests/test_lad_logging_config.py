@@ -195,7 +195,7 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         """
         Test whether fluentd syslog/tail source configs & out_mdsd config are correctly generated.
         """
-        actual = self.cfg_syslog.get_fluentd_syslog_src_config('test_azure_vm_resource_id')
+        actual = self.cfg_syslog.get_fluentd_syslog_src_config()
         expected = """
 <source>
   type syslog
@@ -218,16 +218,15 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
     EventTime ${time.strftime('%Y-%m-%dT%H:%M:%S%z')}
     SendingHost ${record["source_host"]}
     Msg ${record["message"]}
-    # Fields for EventHubs. ${hostname} is Ruby's Socket.gethostname result
-    hostname ${hostname}
-    resourceId test_azure_vm_resource_id
+    # Rename 'host' key, as mdsd will add 'Host' for Azure Table and it'll be confusing
+    hostname ${record["host"]}
   </record>
-  remove_keys message,source_host  # No need of these fields for mdsd so remove
+  remove_keys host,message,source_host  # Renamed (duplicated) fields, so just remove
 </filter>
 """
         self.__helper_test_oms_fluentd_config('fluentd basic syslog src config', expected, actual)
 
-        actual = self.cfg_filelog.get_fluentd_syslog_src_config('test_azure_vm_resource_id')
+        actual = self.cfg_filelog.get_fluentd_syslog_src_config()
         expected = ''
         self.__helper_test_oms_fluentd_config('fluentd syslog src config for no syslog', expected, actual)
 

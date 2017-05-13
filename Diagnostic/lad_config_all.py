@@ -394,7 +394,6 @@ class LadConfigAll:
                                 self._deployment_id, ["name", "DeploymentId"])
         # 2. Use ladCfg to generate OMIQuery and LADQuery elements
         lad_cfg = self._ladCfg()
-        resource_id = None
         if lad_cfg:
             try:
                 self._update_metric_collection_settings(lad_cfg)
@@ -435,7 +434,7 @@ class LadConfigAll:
             mdsd_filelog_config = lad_logging_config_helper.get_mdsd_filelog_config()
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
-            self._fluentd_syslog_src_config = lad_logging_config_helper.get_fluentd_syslog_src_config(resource_id)
+            self._fluentd_syslog_src_config = lad_logging_config_helper.get_fluentd_syslog_src_config()
             self._fluentd_tail_src_config = lad_logging_config_helper.get_fluentd_filelog_src_config()
             self._fluentd_out_mdsd_config = lad_logging_config_helper.get_fluentd_out_mdsd_config()
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
