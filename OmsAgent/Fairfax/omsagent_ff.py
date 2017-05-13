@@ -433,7 +433,7 @@ def run_command_with_retries(hutil, cmd, retries, check_error = True,
         exit_code, output = run_command_and_log(hutil, cmd, check_error, log_cmd)
         if exit_code is 0:
             break
-        elif re.match('^.*dpkg.+lock.*$', output):
+        elif not re.match('^.*dpkg.+lock.*$', output):
             break
         try_count += 1
         hutil_log_info(hutil, 'Retrying command "{0}" because package manager ' \
