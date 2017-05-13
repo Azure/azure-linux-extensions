@@ -4,7 +4,7 @@
       "handlerSettings": {
         "protectedSettings": {
           "storageAccountEndPoint": "https://core.windows.net/",
-          "storageAccountSasToken": "NOT_A_REAL_TOKEN",
+          "storageAccountSasToken": "?NOT_A_REAL_TOKEN",
           "storageAccountName": "ladunittestfakeaccount",
           "sinksConfig": {
             "sink": [

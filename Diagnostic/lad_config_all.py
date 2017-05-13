@@ -455,7 +455,9 @@ class LadConfigAll:
         account = self._ext_settings.read_protected_config('storageAccountName')
         if not account:
             return False, "Empty storageAccountName"
-        token = self._ext_settings.read_protected_config('storageAccountSasToken')
+        token = self._ext_settings.read_protected_config('storageAccountSasToken').strip()
+        if '?' == token[0]:
+            token = token[1:]
         if not token:
             return False, "Empty storageAccountSasToken"
         endpoint = get_storage_endpoint_with_account(account,
