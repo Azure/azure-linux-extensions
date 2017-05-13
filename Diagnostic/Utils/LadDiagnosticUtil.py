@@ -92,7 +92,7 @@ def getSinkList(feature_config):
     :rtype: [str]
     """
     if feature_config and 'sinks' in feature_config and feature_config['sinks']:
-        return map(str.strip, feature_config['sinks'].split(','))
+        return [sink_name.strip() for sink_name in feature_config['sinks'].split(',')]
     return []
 
 
