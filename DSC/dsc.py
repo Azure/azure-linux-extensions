@@ -297,7 +297,7 @@ def install_dsc_packages():
     dsc_package_path = dsc_package_prefix + openssl_version
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Installing omipackage version: " + omi_package_path + "; dsc package version: " +  dsc_package_path)
     if distro_category == DistroCategory.debian:
-        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release, ' --force-confold --force-confdef --install --refuse-downgrade ')
+        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release, ' --force-confold --force-confdef --refuse-downgrade ')
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release, '')
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
         rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
@@ -337,7 +337,7 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
         return
     else:
         cmd = 'dpkg -i ' + install_options + ' ' + package_path	
-        code,output = run_cmd()
+        code,output = run_cmd(cmd)
         if code == 0:
             hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(build) + '.' + str(release) + ' is installed successfully')
         else:
