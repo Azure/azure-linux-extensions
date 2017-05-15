@@ -37,6 +37,9 @@ class CommandExecutor(object):
         self.logger = logger
 
     def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
+        if type(command_to_execute) == unicode:
+            command_to_execute = command_to_execute.encode('ascii', 'ignore')
+
         if not suppress_logging:
             self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
