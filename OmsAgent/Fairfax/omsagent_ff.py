@@ -26,6 +26,7 @@ import platform
 import subprocess
 import json
 import base64
+import inspect
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -100,8 +101,9 @@ def main():
 
         # For common problems, provide a more descriptive message
         if exit_code is 1 and operation == 'Install':
-            message = 'Install failed with exit code 1. Please make sure ' \
-                      'curl, libcurl, and python-ctypes are installed'
+            message = 'Install failed with exit code 1. Please check that ' \
+                      'dependencies such as curl and python-ctypes are ' \
+                      'installed.'
         elif exit_code is InstallTarErrorCode and operation == 'Install':
             message = 'Install failed with exit code {0}: please install ' \
                       'tar'.format(InstallTarErrorCode)
@@ -320,8 +322,9 @@ def is_vm_supported_for_extension():
     Returns for platform.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a machine with CentOS 7, so the first provided
     digits must match
-    Though Ubuntu 16.10 is not officially supported, we will allow it to
-    install and onboard through the VM extension
+    The supported distros of the OMSAgent-for-Linux, as well as Ubuntu 16.10,
+    are allowed to utilize this VM extension. All other distros will get
+    error code 51
     """
     supported_dists = {'redhat' : ('5', '6', '7'), # CentOS
                        'centos' : ('5', '6', '7'), # CentOS
@@ -627,7 +630,23 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
     Run shell command and return exit code and output
     """
     if 'Utils.WAAgentUtil' in sys.modules:
-        exit_code, output = waagent.RunGetOutput(cmd, chk_err, log_cmd)
+        # WALinuxAgent-2.0.14 allows only 2 parameters for RunGetOutput
+        # If checking the number of parameters fails, pass 2
+        try:
+            sig = inspect.signature(waagent.RunGetOutput)
+            params = sig.parameters
+            waagent_params = len(params)
+        except:
+            try:
+                spec = inspect.getargspec(waagent.RunGetOutput)
+                params = spec.args
+                waagent_params = len(params)
+            except:
+                waagent_params = 2
+        if waagent_params >= 3:
+            exit_code, output = waagent.RunGetOutput(cmd, chk_err, log_cmd)
+        else:
+            exit_code, output = waagent.RunGetOutput(cmd, chk_err)
     else:
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
