@@ -297,8 +297,8 @@ def install_dsc_packages():
     dsc_package_path = dsc_package_prefix + openssl_version
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Installing omipackage version: " + omi_package_path + "; dsc package version: " +  dsc_package_path)
     if distro_category == DistroCategory.debian:
-        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
-        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
+        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release, ' --force-confold --force-confdef --refuse-downgrade ')
+        deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release, '')
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
         rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build, omi_release)
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build, dsc_release)
@@ -328,7 +328,7 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install RPM package :" + package_path)
             raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
 
-def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release):
+def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release, install_options):
     version = deb_get_pkg_version(package_name)
     if version is not None and compare_pkg_version(version, major_version, minor_version, build, release) == 1:
         # package is already installed
@@ -336,7 +336,8 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="dsc package with version: " + version + "is already installed.")
         return
     else:
-        code,output = run_cmd('dpkg -i ' + package_path)
+        cmd = 'dpkg -i ' + install_options + ' ' + package_path	
+        code,output = run_cmd(cmd)
         if code == 0:
             hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(build) + '.' + str(release) + ' is installed successfully')
         else:
