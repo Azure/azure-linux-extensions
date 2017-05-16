@@ -60,6 +60,7 @@ import json
 import tempfile
 import time
 from os.path import join
+import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
@@ -181,6 +182,11 @@ class HandlerUtility:
     def do_parse_context(self, operation):
         self.operation = operation
         _context = self.try_parse_context()
+        getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
+        if(getWaagentPathUsed == 0):
+            self.log("waagent old path is used")
+        else:
+            self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
             sys.exit(0)

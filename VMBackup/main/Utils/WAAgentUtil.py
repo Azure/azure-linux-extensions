@@ -47,18 +47,20 @@ def searchWAAgentOld():
             return agentPath
     return None
 
+pathUsed = 0 
 try:
-    agentPath = searchWAAgent()
-    if(agentPath):
-        waagent = imp.load_source('waagent', agentPath)
-    else:
-        raise Exception("Can't load waagent.")
-except Exception as e:
     agentPath = searchWAAgentOld()
     if(agentPath):
         waagent = imp.load_source('waagent', agentPath)
     else:
-        raise Exception("Can't load waagent old.")
+        raise Exception("Can't load old waagent.")
+except Exception as e:
+    pathUsed = 1 
+    agentPath = searchWAAgent()
+    if(agentPath):
+        waagent = imp.load_source('waagent', agentPath)
+    else:
+        raise Exception("Can't load new waagent.")
 
 if not hasattr(waagent, "AddExtensionEvent"):
     """
@@ -94,3 +96,6 @@ def AddExtensionEvent(name=__ExtensionName__,
                                   op=op,
                                   isSuccess=isSuccess,
                                   message=message)
+
+def GetPathUsed():
+    return pathUsed
