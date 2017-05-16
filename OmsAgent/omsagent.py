@@ -37,7 +37,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.3.4-127.universal.x64.sh'
+BundleFileName = 'omsagent-1.3.5-127.universal.x64.sh'
 
 # Always use upgrade - will handle install if scx, omi are not installed or
 # upgrade if they are
@@ -731,7 +731,7 @@ def log_and_exit(hutil, operation, exit_code = 1, message = ''):
     if hutil is not None:
         hutil.do_exit(exit_code, operation, exit_status, str(exit_code), message)
     else:
-        update_status_file(operation, exit_code, exit_status, message)
+        update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
 
 
