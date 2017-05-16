@@ -10,6 +10,6 @@
             "updateCommand": "main/handle.py -update"
         }, 
         "name": "VMBackupForLinuxExtension", 
-        "version": "1.0.9111.1"
+        "version": "1.0.9113.0"
     }
 ]
