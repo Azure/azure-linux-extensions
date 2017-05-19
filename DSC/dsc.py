@@ -401,12 +401,12 @@ def start_omiservice():
         raise Exception('Failed to start service omid, status : {0}'.format(output))
 
 def download_file():
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file")
     download_dir = prepare_download_dir(hutil.get_seq_no())
-
     storage_account_name = get_config('StorageAccountName')
     storage_account_key = get_config('StorageAccountKey')
     file_uri = get_config('FileUri')
-
+    
     if not file_uri:
         error_msg = 'Missing FileUri configuration'
         waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -421,10 +421,12 @@ def download_file():
         return path
     else:
         hutil.log('Downloading file from external link...')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file from external link...")		
         path = download_external_file(file_uri, download_dir)
         return path
 
 def download_azure_blob(account_name, account_key, file_uri, download_dir):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading from azure blob")
     (blob_name, container_name) = parse_blob_uri(file_uri)
     host_base = get_host_base_from_uri(file_uri)
     download_path = os.path.join(download_dir, blob_name)
@@ -454,6 +456,7 @@ def parse_blob_uri(blob_uri):
     path = get_path_from_uri(blob_uri).strip('/')
     first_sep = path.find('/')
     if first_sep == -1:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="Error occured while extracting container and blob name.")	
         hutil.error("Failed to extract container and blob name from " + blob_uri)
     blob_name = path[first_sep+1:]
     container_name = path[:first_sep]
@@ -471,6 +474,7 @@ def get_host_base_from_uri(blob_uri):
     return netloc[netloc.find('.'):]
 
 def download_external_file(file_uri, download_dir):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading from external file")
     path = get_path_from_uri(file_uri)
     file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
@@ -478,6 +482,7 @@ def download_external_file(file_uri, download_dir):
     for retry in range(1, max_retry + 1):
         try:
             download_and_save_file(file_uri, file_path)
+            waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.Download, isSuccess=True, message="(03302)Succeeded to download file from public URI")			
             return file_path
         except Exception:
             hutil.error('Failed to download public file, retry = ' + str(retry) + ', max_retry = ' + str(max_retry))
@@ -490,10 +495,6 @@ def download_external_file(file_uri, download_dir):
                                           isSuccess=False,
                                           message="(03304)Failed to download file from public URI")
                 raise Exception('Failed to download public file: ' + file_name)
-    waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=Operation.Download,
-                              isSuccess=True,
-                              message="(03302)Succeeded to download file from public URI")
 
 def download_and_save_file(uri, file_path):
     src = urllib2.urlopen(uri)
