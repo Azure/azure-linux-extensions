@@ -19,7 +19,7 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    extension_name = 'VMBackupForLinuxExtension'
+    extension_name = 'MyBackupTestLinuxInt'
     extension_version = "1.0.9111.1"
     extension_type = extension_name
     extension_media_link = 'https://sopattna.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'

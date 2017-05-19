@@ -92,11 +92,12 @@ manifest_file.write(manifest_str)
 manifest_file.close()
 
 
+
 """
 generate the extension xml file
 """
 extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
+<ProviderNameSpace>Microsoft.Azure.Backup.Test</ProviderNameSpace>
 <Type>%s</Type>
 <Version>%s</Version>
 <Label>%s</Label>
@@ -111,15 +112,11 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <CompanyName>Microsoft Open Source Technology Center</CompanyName>
 </ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
 
-extension_xml_file = open(CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.xml', 'w')
-extension_xml_file.write(extension_xml_file_content)
-extension_xml_file.close()
-
 """
 setup script, to package the files up
 """
 setup(name = CommonVariables.extension_name,
-      version = CommonVariables.extension_version,
+      version = '1',
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
@@ -138,12 +135,19 @@ setup(name = CommonVariables.extension_name,
 """
 unzip the package files and re-package it.
 """
+
+
+
 target_zip_file_location = './dist/'
-target_folder_name = CommonVariables.extension_name + '-' + str(CommonVariables.extension_version)
+target_folder_name = CommonVariables.extension_name  + '-1'
 target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
+
+extension_xml_file = open(target_zip_file_location + target_folder_name + '/manifest.xml', 'w')
+extension_xml_file.write(extension_xml_file_content)
+extension_xml_file.close()
 
 def dos2unix(src):
     args = ["dos2unix",src]
