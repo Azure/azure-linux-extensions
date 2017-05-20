@@ -427,10 +427,17 @@ def download_file():
 
 def download_azure_blob(account_name, account_key, file_uri, download_dir):
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading from azure blob")
-    (blob_name, container_name) = parse_blob_uri(file_uri)
-    host_base = get_host_base_from_uri(file_uri)
-    download_path = os.path.join(download_dir, blob_name)
-    blob_service = BlobService(account_name, account_key, host_base=host_base)
+    try:
+        (blob_name, container_name) = parse_blob_uri(file_uri)
+        host_base = get_host_base_from_uri(file_uri)
+        
+        download_path = os.path.join(download_dir, blob_name)
+        blob_service = BlobService(account_name, account_key, host_base=host_base)
+    except Exception as e:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='DownloadInProgress', isSuccess=True, message="Enable failed with the azure storage error " + str(e))
+        hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
+    
     max_retry = 3
     for retry in range(1, max_retry + 1):
         try:
