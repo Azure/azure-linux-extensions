@@ -9,7 +9,9 @@
             "uninstallCommand": "main/handle.py -uninstall", 
             "updateCommand": "main/handle.py -update"
         }, 
-        "name": "VMBackupForLinuxExtension", 
-        "version": "1.0.9113.0"
+      
+        "name": "MyBackupTestLinuxInt", 
+        "version": "1.0.9111.1"
+
     }
 ]
