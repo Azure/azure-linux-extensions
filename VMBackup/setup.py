@@ -116,7 +116,7 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 setup script, to package the files up
 """
 setup(name = CommonVariables.extension_name,
-      version = '1',
+      version = CommonVariables.extension_zip_version,
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
@@ -139,7 +139,7 @@ unzip the package files and re-package it.
 
 
 target_zip_file_location = './dist/'
-target_folder_name = CommonVariables.extension_name  + '-1'
+target_folder_name = CommonVariables.extension_name  + '-' + CommonVariables.extension_zip_version
 target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 
 target_zip_file = ZipFile(target_zip_file_path)
