@@ -9,7 +9,9 @@
             "uninstallCommand": "main/handle.py -uninstall", 
             "updateCommand": "main/handle.py -update"
         }, 
+      
         "name": "MyBackupTestLinuxInt", 
         "version": "1.0.9111.1"
+
     }
 ]

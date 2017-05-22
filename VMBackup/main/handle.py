@@ -174,7 +174,7 @@ def freeze_snapshot(timeout):
         is_inconsistent =  False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
         if(freeze_result is not None and len(freeze_result.errors) > 0):
-            run_result = CommonVariables.error
+            run_result = CommonVariables.FailedFsFreezeFailed
             run_status = 'error'
             error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
@@ -489,6 +489,7 @@ def enable():
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         if(hutil.is_prev_in_transition()):
+            backup_logger.log('retrieving the previous logs for this', True)
             backup_logger.set_prev_log()
         hutil.save_seq()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
