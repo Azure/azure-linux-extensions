@@ -22,17 +22,14 @@ import dsc
 import os
 import platform
 from Utils.WAAgentUtil import waagent
+from MockUtil import MockUtil
 
 waagent.LoggerInit('/tmp/test.log','/dev/null')
-
-class Dummy(object):
-    pass
 
 class TestApplyMof(unittest.TestCase):
     def test_apply_mof(self):
         dsc.distro_category = dsc.get_distro_category()
-        dsc.hutil = Dummy()
-        dsc.hutil.log = waagent.Log
+        dsc.hutil = MockUtil(self)
         dsc.install_dsc_packages()
         dsc.start_omiservice()
         config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.mof')

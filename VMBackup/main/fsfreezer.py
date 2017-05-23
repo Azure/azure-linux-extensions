@@ -24,6 +24,7 @@ import os
 import time
 import sys
 import signal
+import traceback
 from DiskUtil import DiskUtil 
 
 class FreezeError(object):
@@ -56,7 +57,7 @@ class FreezeHandler(object):
 
     def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
-        if(self.child.poll() is not None):
+        if(self.child is not None and self.child.poll() is not None):
             self.logger.log("binary child terminated",True)
             self.sig_handle=2
 
@@ -84,7 +85,7 @@ class FsFreezer:
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
-            errMsg="Failed to retrieve mount points"
+            errMsg='Failed to retrieve mount points, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
             self.logger.log(str(e), True)
             self.mounts = None
@@ -122,17 +123,18 @@ class FsFreezer:
             self.logger.enforce_local_flag(False)
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
-                while True:
-                    line=self.freeze_handler.child.stdout.readline()
-                    if(line != ''):
-                        self.logger.log(line.rstrip(), True)
-                    else:
-                        break
+                if (self.freeze_handler.child is not None):
+                    while True:
+                        line=self.freeze_handler.child.stdout.readline()
+                        if(line != ''):
+                            self.logger.log(line.rstrip(), True)
+                        else:
+                            break
                 error_msg="freeze failed for some mount"
                 freeze_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         except Exception as e:
-            error_msg="freeze failed for some mount with exception " + str(e)
+            error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         return freeze_result
