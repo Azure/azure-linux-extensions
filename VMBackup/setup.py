@@ -36,6 +36,7 @@ import json
 import sys
 import subprocess
 import shutil
+import time
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
@@ -111,6 +112,20 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <IsJsonExtension>true</IsJsonExtension>
 <CompanyName>Microsoft Open Source Technology Center</CompanyName>
 </ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
+
+"""
+generate the safe freeze binary
+"""
+cur_dir = os.getcwd()
+os.chdir("./main/safefreeze")
+chil = subprocess.Popen(["make"], stdout=subprocess.PIPE)
+process_wait_time = 5
+while(process_wait_time >0 and chil.poll() is None):
+    time.sleep(1)
+    process_wait_time -= 1
+
+os.chdir(cur_dir)
+
 
 """
 setup script, to package the files up
