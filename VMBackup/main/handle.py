@@ -124,11 +124,12 @@ def status_report(status, status_code, message, snapshot_info = None):
         err_msg='cannot write status to the status blob'
         backup_logger.log(err_msg, True, 'Warning')
 
-def exit_with_commit_log(error_msg, para_parser):
+def exit_with_commit_log(status,result,error_msg, para_parser):
     global backup_logger
     backup_logger.log(error_msg, True, 'Error')
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
+    status_report(status, result, error_msg, None)
     sys.exit(0)
 
 def exit_if_same_taskId(taskId):  
@@ -468,6 +469,13 @@ def enable():
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
+        if(bool(public_settings) and not protected_settings):
+            error_msg = "unable to load certificate"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
+            temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
+            temp_status= 'error'
+            exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
             utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
             backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
@@ -481,7 +489,10 @@ def enable():
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
             if(abs(total_span_in_seconds) > MAX_TIMESPAN):
                 error_msg = 'the call time stamp is out of date. so skip it.'
-                exit_with_commit_log(error_msg, para_parser)
+                temp_result=CommonVariables.error
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
+                temp_status= 'error'
+                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
@@ -504,7 +515,11 @@ def enable():
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
-        exit_with_commit_log(errMsg, para_parser)
+        temp_status= 'error'
+        temp_result=CommonVariables.error
+        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
+        error_msg = 'Failed to call the daemon'
+        exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]

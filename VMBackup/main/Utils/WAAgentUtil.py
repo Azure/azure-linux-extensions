@@ -26,17 +26,6 @@ import os.path
 # it as a submodule of current module
 #
 def searchWAAgent():
-    agentPath = os.path.join(os.getcwd(), "main/WaagentLib.py")
-    if(os.path.isfile(agentPath)):
-        return agentPath
-    user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
-    for user_path in user_paths:
-        agentPath = os.path.join(user_path, 'waagent')
-        if(os.path.isfile(agentPath)):
-            return agentPath
-    return None
-
-def searchWAAgentOld():
     agentPath = '/usr/sbin/waagent'
     if(os.path.isfile(agentPath)):
         return agentPath
@@ -47,20 +36,11 @@ def searchWAAgentOld():
             return agentPath
     return None
 
-pathUsed = 0 
-try:
-    agentPath = searchWAAgentOld()
-    if(agentPath):
-        waagent = imp.load_source('waagent', agentPath)
-    else:
-        raise Exception("Can't load old waagent.")
-except Exception as e:
-    pathUsed = 1 
-    agentPath = searchWAAgent()
-    if(agentPath):
-        waagent = imp.load_source('waagent', agentPath)
-    else:
-        raise Exception("Can't load new waagent.")
+agentPath = searchWAAgent()
+if(agentPath):
+    waagent = imp.load_source('waagent', agentPath)
+else:
+    raise Exception("Can't load waagent.")
 
 if not hasattr(waagent, "AddExtensionEvent"):
     """
@@ -96,6 +76,3 @@ def AddExtensionEvent(name=__ExtensionName__,
                                   op=op,
                                   isSuccess=isSuccess,
                                   message=message)
-
-def GetPathUsed():
-    return pathUsed

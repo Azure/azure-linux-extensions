@@ -6,7 +6,7 @@ from pwd import getpwuid
 from stat import *
 from common import CommonVariables
 import traceback
-
+from Utils import HandlerUtil
 
     # config.json --------structure---------
     # {
@@ -86,6 +86,8 @@ class ScriptRunner(object):
                 self.timeoutInSeconds = min(configData['timeoutInSeconds'],self.maxTimeOut)
             if 'pluginName' in configDataKeys:
                 self.pluginName = configData['pluginName']
+            if 'appName' in configDataKeys:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data('appName',configData['appName'])
             self.preScriptLocation = configData['preScriptLocation']
             self.postScriptLocation = configData['postScriptLocation']
             if 'preScriptParams' in configDataKeys:
