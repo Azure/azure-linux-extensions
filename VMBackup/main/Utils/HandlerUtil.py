@@ -60,6 +60,7 @@ import json
 import tempfile
 import time
 from os.path import join
+import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
@@ -181,6 +182,11 @@ class HandlerUtility:
     def do_parse_context(self, operation):
         self.operation = operation
         _context = self.try_parse_context()
+        getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
+        if(getWaagentPathUsed == 0):
+            self.log("waagent old path is used")
+        else:
+            self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
             sys.exit(0)
@@ -516,7 +522,7 @@ class HandlerUtility:
         if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
             searchfile = open(status_file_prev, "r")
             for line in searchfile:
-                if "transition" in line: 
+                if "Transition" in line: 
                     self.log("transitioning found in the previous status file")
                     searchfile.close()
                     return True

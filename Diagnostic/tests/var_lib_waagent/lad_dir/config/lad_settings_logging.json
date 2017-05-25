@@ -1,0 +1,73 @@
+{
+  "runtimeSettings": [
+    {
+      "handlerSettings": {
+        "publicSettings": {
+          "StorageAccount": "ladunittestdiag487",
+          "ladCfg": {
+            "diagnosticMonitorConfiguration": {
+              "syslogEvents": {
+                "sinks": "SyslogJsonBlob,SyslogEventHub",
+                "syslogEventConfiguration": {
+                  "LOG_USER": "LOG_ERR",
+                  "LOG_LOCAL0": "LOG_CRIT"
+                }
+              }
+            }
+          },
+          "fileLogs" : [
+            {
+              "file": "/var/log/mydaemonlog1",
+              "table": "MyDaemon1Events",
+              "sinks": "Filelog1JsonBlob,FilelogEventHub"
+            },
+            {
+              "file": "/var/log/mydaemonlog2",
+              "sinks": "Filelog2JsonBlob"
+            }
+          ],
+          "perfCfg":  [
+            {"query": "SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation",
+             "table": "LinuxMemory"},
+            {"query": "SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'",
+             "table": "LinuxCpu"},
+            {"query": "SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'",
+             "table": "LinuxDisk"}
+          ]
+        },
+        "protectedSettingsCertThumbprint": "B175B535DFE9F93659E5AFD893BF99BBF9DF28A5",
+        "protectedSettings": {
+          "storageAccountName":"ladunittestfakeaccount",
+          "storageAccountSasToken":"NOT_A_REAL_TOKEN",
+          "storageAccountEndPoint":"https://core.windows.net/",
+          "sinksConfig": {
+            "sink": [
+              {
+                "sasURL": "https://fake_sas_url_1",
+                "type": "EventHub",
+                "name": "SyslogEventHub"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "SyslogJsonBlob"
+              },
+              {
+                "sasURL": "https://fake_sas_url_2",
+                "type": "EventHub",
+                "name": "FilelogEventHub"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "Filelog1JsonBlob"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "Filelog2JsonBlob"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
