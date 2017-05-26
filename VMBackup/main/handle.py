@@ -249,6 +249,16 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
+
+    #Adding python version to the telemetry
+    try:
+        python_version_info = sys.version_info
+        python_version = str(sys.version_info[0])+ '.'  + str(sys.version_info[1]) + '.'  + str(sys.version_info[2])
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("pythonVersion", python_version)
+    except Exception as e:
+        errMsg = 'Failed to do retrieve python version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, True, 'Error')
+
     try:
         if(freezer.mounts is not None):
             hutil.partitioncount = len(freezer.mounts.mounts)
@@ -469,7 +479,7 @@ def enable():
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings)
 
-        if(bool(public_settings) and not protected_settings):
+        if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
             error_msg = "unable to load certificate"
             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
             temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
@@ -487,12 +497,6 @@ def enable():
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
-            if(abs(total_span_in_seconds) > MAX_TIMESPAN):
-                error_msg = 'the call time stamp is out of date. so skip it.'
-                temp_result=CommonVariables.error
-                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
-                temp_status= 'error'
-                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)

@@ -103,15 +103,16 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
-<MediaLink>%s</MediaLink>
 <Description>%s</Description>
 <IsInternalExtension>true</IsInternalExtension>
 <Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
 <PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
 <IsJsonExtension>true</IsJsonExtension>
+<SupportedOS>Linux</SupportedOS>
 <CompanyName>Microsoft Open Source Technology Center</CompanyName>
-</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
+<!--%%REGIONS%%-->
+</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_description)
 
 """
 generate the safe freeze binary
