@@ -153,6 +153,8 @@ class Snapshotter(object):
                     # HttpCall failed
                     self.logger.log(" snapshot HttpCallGetResponse failed ")
                     self.logger.log(str(errMsg))
+                    snapshot_error.errorcode = CommonVariables.error
+                    snapshot_error.sasuri = sasuri
         except Exception as e:
             errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')

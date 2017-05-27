@@ -56,7 +56,8 @@ class CommonVariables:
     error_wrong_time = 13
     error_same_taskid = 14
     error_http_failure = 15
-    error_upload_status_blob = 16
+    FailedHandlerGuestAgentCertificateNotFound = 16
+    #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
     FailedFsFreezeFailed = 121

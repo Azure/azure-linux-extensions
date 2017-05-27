@@ -76,12 +76,12 @@ class PluginHost(object):
         fsFreeze_on = True
 
         if not os.path.isfile(self.configLocation):
-            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
+            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
             self.configLocation = './main/VMSnapshotPluginHost.conf'
         
         permissions = self.get_permissions(self.configLocation)
         if not os.path.isfile(self.configLocation):
-            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
+            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
             errorCode =CommonVariables.FailedPrepostPluginhostConfigNotFound
         elif  not (int(permissions[1]) == 0 or int(permissions[1]) == 4) or not (int(permissions[2]) == 0 or int(permissions[2]) == 4):
             self.logger.log('Plugin host Config file does not have desired permissions', True, 'Error')
