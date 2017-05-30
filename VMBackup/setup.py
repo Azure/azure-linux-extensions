@@ -103,6 +103,7 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
+<MediaLink></MediaLink>
 <Description>%s</Description>
 <IsInternalExtension>true</IsInternalExtension>
 <Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
