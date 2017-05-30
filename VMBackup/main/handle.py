@@ -282,6 +282,9 @@ def daemon():
         WATCHOUT that, the _context_config are using the most freshest timestamp.
         if the time sync is alive, this should be right.
         """
+        if(hutil.is_prev_in_transition()):
+            backup_logger.log('retrieving the previous logs for this again inside daemon', True)
+            backup_logger.set_prev_log()
 
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -503,10 +506,10 @@ def enable():
             exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
+        hutil.save_seq()
         if(hutil.is_prev_in_transition()):
             backup_logger.log('retrieving the previous logs for this', True)
             backup_logger.set_prev_log()
-        hutil.save_seq()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
             backup_logger.commit(para_parser.logsBlobUri)
         temp_status= 'transitioning'
