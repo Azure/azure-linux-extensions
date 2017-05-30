@@ -1,3 +1,6 @@
+2017-05-16: LAD-3.0.107
+    - Move resourceId field generation for JSON events from LAD to mdsd
+
 2017-05-10: LAD-3.0.103
     - Allow '*' in syslog spec, add more fields in syslog records for
       EventHubs
