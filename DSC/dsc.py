@@ -126,7 +126,7 @@ def install():
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="successfully installed DSCForLinux extension")
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to install an extension with error" + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to install an extension with error: {0} and stacktrace: {1}".format(str(e), traceback.format_exc()))
         hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '1', 'Install Failed.')
 
@@ -197,7 +197,7 @@ def enable():
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error " + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -229,11 +229,11 @@ def get_config(key):
     if public_settings.has_key(key):
         value = public_settings.get(key)
         if value:
-            return value.strip()
+            return str(value).strip()
     if protected_settings.has_key(key):
         value = protected_settings.get(key)
         if value:
-            return value.strip()
+            return str(value).strip()
     return ''
 
 def remove_old_dsc_packages():
@@ -434,7 +434,7 @@ def download_azure_blob(account_name, account_key, file_uri, download_dir):
         download_path = os.path.join(download_dir, blob_name)
         blob_service = BlobService(account_name, account_key, host_base=host_base)
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='DownloadInProgress', isSuccess=True, message="Enable failed with the azure storage error " + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='DownloadInProgress', isSuccess=True, message='Enable failed with the azure storage error : {0}, stack trace: {1}'.format(str(e), traceback.format_exc()))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -500,7 +500,7 @@ def download_external_file(file_uri, download_dir):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Download,
                                           isSuccess=False,
-                                          message="(03304)Failed to download file from public URI")
+                                          message='(03304)Failed to download file from public URI,  error : %s, stack trace: %s' %(str(e), traceback.format_exc()))
                 raise Exception('Failed to download public file: ' + file_name)
 
 def download_and_save_file(uri, file_path):
