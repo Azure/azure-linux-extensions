@@ -324,20 +324,21 @@ class LadLoggingConfig:
         fluentd_tail_src_config_template = """
 # For all monitored files
 <source>
-  @type tail
+  @type sudo_tail
   path {file_paths}
   pos_file /var/opt/microsoft/omsagent/LAD/tmp/filelogs.pos
   tag mdsd.filelog.*
   format none
-  message_key Msg  # LAD uses "Msg" as the field name
 </source>
 
-# Add FileTag field (existing LAD behavior)
+# Add FileTag field, rename message to Msg
 <filter mdsd.filelog.**>
   @type record_transformer
   <record>
     FileTag ${{tag_suffix[2]}}
+    Msg ${{record["message"]}}
   </record>
+  remove_keys message
 </filter>
 """
         return fluentd_tail_src_config_template.format(file_paths=','.join(self._file_table_map.keys()))
