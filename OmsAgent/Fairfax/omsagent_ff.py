@@ -48,8 +48,7 @@ WorkspaceCheckCommandTemplate = '{0} -l'
 OnboardCommandWithOptionalParamsTemplate = '{0} -d opinsights.azure.us -w {1} -s {2} {3}'
 OmsAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
 DisableOmsAgentServiceCommandTemplate = '{0} disable'
-InstallPythonCtypesErrorCode = 61
-InstallTarErrorCode = 62
+DPKGLockedErrorCode = 12
 
 # Configuration
 SettingsSequenceNumber = None
@@ -99,19 +98,17 @@ def main():
         hutil = parse_context(operation)
         exit_code = operations[operation](hutil)
 
-        # For common problems, provide a more descriptive message
+        # Exit code 1 indicates a general problem that doesn't have a more
+        # specific error code; it often indicates a missing dependency
         if exit_code is 1 and operation == 'Install':
             message = 'Install failed with exit code 1. Please check that ' \
-                      'dependencies such as curl and python-ctypes are ' \
-                      'installed.'
-        elif exit_code is InstallTarErrorCode and operation == 'Install':
-            message = 'Install failed with exit code {0}: please install ' \
-                      'tar'.format(InstallTarErrorCode)
-        elif (exit_code is InstallPythonCtypesErrorCode
-                and operation == 'Install'):
-            message = 'Install failed with exit code {0}: please install ' \
-                      'the Python ctypes library or package (python-' \
-                      'ctypes)'.format(InstallPythonCtypesErrorCode)
+                      'dependencies are installed. For details, check logs ' \
+                      'in /var/log/azure/Microsoft.EnterpriseCloud.' \
+                      'Monitoring.OmsAgentForLinux'
+        elif (exit_code is DPKGLockedErrorCode and operation == 'Install'):
+            message = 'Install failed with exit code {0} because the ' \
+                      'package manager on the VM is currently locked: ' \
+                      'please wait and try again'.format(DPKGLockedErrorCode)
         elif exit_code is not 0:
             message = '{0} failed with exit code {1}'.format(operation,
                                                              exit_code)
@@ -432,11 +429,14 @@ def run_command_with_retries(hutil, cmd, retries, check_error = True,
     """
     try_count = 0
     sleep_time = initial_sleep_time # seconds
+    dpkg_locked_search = r'^.*dpkg.+lock.*$'
+    dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
+
     while try_count <= retries:
         exit_code, output = run_command_and_log(hutil, cmd, check_error, log_cmd)
         if exit_code is 0:
             break
-        elif not re.match('^.*dpkg.+lock.*$', output):
+        if not dpkg_locked_re.search(output):
             break
         try_count += 1
         hutil_log_info(hutil, 'Retrying command "{0}" because package manager ' \
@@ -444,6 +444,11 @@ def run_command_with_retries(hutil, cmd, retries, check_error = True,
                               '{1}'.format(cmd, exit_code))
         time.sleep(sleep_time)
         sleep_time *= sleep_increase_factor
+
+    if exit_code is not 0 and dpkg_locked_re.search(output):
+        hutil_log_info(hutil, 'The package manager still appears to be ' \
+                              'locked, so installation cannot completed.')
+        exit_code = DPKGLockedErrorCode
 
     return exit_code
 
