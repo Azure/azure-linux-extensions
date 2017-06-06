@@ -263,9 +263,17 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                       isSuccess=False,
                                       message="(02100)Failed to reset ssh key.")
 
+## get the sudoers file for FreeBSD platform
+def _get_sudoers_FreeBSD():
+    sudoersFile = '/usr/local/etc/sudoers.d/waagent'
+    if not os.path.exists(sudoersFile):
+        hutil.error("The file {0} does not exist!".format(sudoersFile))
+    return sudoersFile
 
 def _get_other_sudoers(userName):
     sudoersFile = '/etc/sudoers.d/waagent'
+    if 'FreeBSD' in platform.system():
+        sudoersFile = _get_sudoers_FreeBSD()
     if not os.path.isfile(sudoersFile):
         return None
     sudoers = waagent.GetFileContents(sudoersFile).split("\n")
@@ -276,10 +284,12 @@ def _get_other_sudoers(userName):
 
 def _save_other_sudoers(sudoers):
     sudoersFile = '/etc/sudoers.d/waagent'
+    if 'FreeBSD' in platform.system():
+        sudoersFile = _get_sudoers_FreeBSD()
     if sudoers is None:
         return
     waagent.AppendFileContents(sudoersFile, "\n".join(sudoers))
-    os.chmod("/etc/sudoers.d/waagent", 0o440)
+    os.chmod(sudoersFile, 0o440)
 
 
 def _allow_password_auth():
