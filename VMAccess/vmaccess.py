@@ -35,6 +35,10 @@ BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
+SudoersBaseDir = '/etc/sudoers.d'
+if not os.path.isdir(SudoersBaseDir):
+    ## sudoers.d folder on FreeBSD
+    SudoersBaseDir = '/usr/local/etc/sudoers.d'
 
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
@@ -265,7 +269,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
 
 def _get_other_sudoers(userName):
-    sudoersFile = '/etc/sudoers.d/waagent'
+    sudoersFile = SudoersBaseDir + '/waagent'
     if not os.path.isfile(sudoersFile):
         return None
     sudoers = waagent.GetFileContents(sudoersFile).split("\n")
@@ -275,11 +279,11 @@ def _get_other_sudoers(userName):
 
 
 def _save_other_sudoers(sudoers):
-    sudoersFile = '/etc/sudoers.d/waagent'
+    sudoersFile = SudoersBaseDir + '/waagent'
     if sudoers is None:
         return
     waagent.AppendFileContents(sudoersFile, "\n".join(sudoers))
-    os.chmod("/etc/sudoers.d/waagent", 0o440)
+    os.chmod(sudoersFile, 0o440)
 
 
 def _allow_password_auth():
