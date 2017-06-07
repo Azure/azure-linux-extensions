@@ -126,7 +126,7 @@ def install():
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="successfully installed DSCForLinux extension")
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to install an extension with error" + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to install an extension with error: {0} and stacktrace: {1}".format(str(e), traceback.format_exc()))
         hutil.error("Failed to install the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '1', 'Install Failed.')
 
@@ -197,7 +197,7 @@ def enable():
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error " + str(e))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
     
@@ -229,11 +229,11 @@ def get_config(key):
     if public_settings.has_key(key):
         value = public_settings.get(key)
         if value:
-            return value.strip()
+            return str(value).strip()
     if protected_settings.has_key(key):
         value = protected_settings.get(key)
         if value:
-            return value.strip()
+            return str(value).strip()
     return ''
 
 def remove_old_dsc_packages():
@@ -401,12 +401,12 @@ def start_omiservice():
         raise Exception('Failed to start service omid, status : {0}'.format(output))
 
 def download_file():
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file")
     download_dir = prepare_download_dir(hutil.get_seq_no())
-
     storage_account_name = get_config('StorageAccountName')
     storage_account_key = get_config('StorageAccountKey')
     file_uri = get_config('FileUri')
-
+    
     if not file_uri:
         error_msg = 'Missing FileUri configuration'
         waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -421,14 +421,23 @@ def download_file():
         return path
     else:
         hutil.log('Downloading file from external link...')
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file from external link...")		
         path = download_external_file(file_uri, download_dir)
         return path
 
 def download_azure_blob(account_name, account_key, file_uri, download_dir):
-    (blob_name, container_name) = parse_blob_uri(file_uri)
-    host_base = get_host_base_from_uri(file_uri)
-    download_path = os.path.join(download_dir, blob_name)
-    blob_service = BlobService(account_name, account_key, host_base=host_base)
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading from azure blob")
+    try:
+        (blob_name, container_name) = parse_blob_uri(file_uri)
+        host_base = get_host_base_from_uri(file_uri)
+        
+        download_path = os.path.join(download_dir, blob_name)
+        blob_service = BlobService(account_name, account_key, host_base=host_base)
+    except Exception as e:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='DownloadInProgress', isSuccess=True, message='Enable failed with the azure storage error : {0}, stack trace: {1}'.format(str(e), traceback.format_exc()))
+        hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
+    
     max_retry = 3
     for retry in range(1, max_retry + 1):
         try:
@@ -454,6 +463,7 @@ def parse_blob_uri(blob_uri):
     path = get_path_from_uri(blob_uri).strip('/')
     first_sep = path.find('/')
     if first_sep == -1:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="Error occured while extracting container and blob name.")	
         hutil.error("Failed to extract container and blob name from " + blob_uri)
     blob_name = path[first_sep+1:]
     container_name = path[:first_sep]
@@ -471,6 +481,7 @@ def get_host_base_from_uri(blob_uri):
     return netloc[netloc.find('.'):]
 
 def download_external_file(file_uri, download_dir):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading from external file")
     path = get_path_from_uri(file_uri)
     file_name = path.split('/')[-1]
     file_path = os.path.join(download_dir, file_name)
@@ -478,6 +489,7 @@ def download_external_file(file_uri, download_dir):
     for retry in range(1, max_retry + 1):
         try:
             download_and_save_file(file_uri, file_path)
+            waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.Download, isSuccess=True, message="(03302)Succeeded to download file from public URI")			
             return file_path
         except Exception:
             hutil.error('Failed to download public file, retry = ' + str(retry) + ', max_retry = ' + str(max_retry))
@@ -488,12 +500,8 @@ def download_external_file(file_uri, download_dir):
                 waagent.AddExtensionEvent(name=ExtensionShortName,
                                           op=Operation.Download,
                                           isSuccess=False,
-                                          message="(03304)Failed to download file from public URI")
+                                          message='(03304)Failed to download file from public URI,  error : %s, stack trace: %s' %(str(e), traceback.format_exc()))
                 raise Exception('Failed to download public file: ' + file_name)
-    waagent.AddExtensionEvent(name=ExtensionShortName,
-                              op=Operation.Download,
-                              isSuccess=True,
-                              message="(03302)Succeeded to download file from public URI")
 
 def download_and_save_file(uri, file_path):
     src = urllib2.urlopen(uri)

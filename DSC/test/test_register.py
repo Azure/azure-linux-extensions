@@ -27,6 +27,7 @@ waagent.LoggerInit('/tmp/test.log','/dev/null')
 
 class TestRegister(unittest.TestCase):
     def test_register_without_registration_info(self):
+        print "Register test case with invalid Registration url and Registration key"
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
         dsc.install_dsc_packages()
@@ -35,6 +36,7 @@ class TestRegister(unittest.TestCase):
         self.assertEqual(exit_code, 51)
 		
     def test_register_invalid_configuration_mode(self):
+        print "Register test case with invalid configuration mode"
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
         dsc.install_dsc_packages()
@@ -43,11 +45,12 @@ class TestRegister(unittest.TestCase):
         self.assertEqual(exit_code, 51)
 	
     def test_register(self):
+        print "Register test case with valid parameters"
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
         dsc.install_dsc_packages()
         dsc.start_omiservice()
-        exit_code, output = dsc.register_automation('somekey','http://dummy','','','','')
+        exit_code, output = dsc.register_automation('somekey','http://dummy','test.localhost.mof','15','30','applyandmonitor')
         self.assertEqual(exit_code, 0)
         
 if __name__ == '__main__':
