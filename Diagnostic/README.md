@@ -1,20 +1,22 @@
-# Diagnostic Extension
+# Linux Diagnostic Extension (LAD)
 
-Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine.
+Allow the owner of a Linux-based Azure Virtual Machine to obtain diagnostic data.
 
-Latest version is 3.0.107.
+Current version is 3.0.107.
 
 Linux Azure Diagnostic (LAD) extension version 3.0 is released with the following changes:
 
-- Fully configurable Azure Portal metrics: Currently only available through CLI. Azure Portal configuration support will be coming soon.
+- Fully configurable Azure Portal metrics, including a broader set of metrics to choose from.
 - Syslog message collection is now opt-in (off by default), and customers can selectively pick and choose syslog facilities and minimum severities of their interests.
 - Customers can now use CLI to configure their Azure Linux VMs for Azure Portal VM metrics charting experiences.
 - Customers can now send any metrics and logs as Azure EventHubs events (additional Azure EventHubs charges may apply).
 - Customers can also store any metrics and logs in Azure Storage JSON blobs (additional Azure Storage charges may apply).
 
-Please note that LAD 3.0 is NOT compatible with LAD 2.3. Therefore, if you'd like to use LAD 3.0, you must first uninstall existing LAD 2.3 on your VMs and reinstall LAD 3.0. Please note that LAD 2.3 will be deprecated soon, so please do upgrade to LAD 3.0 as soon as possible. Currently only CLI-based installation is available, and the Azure Portal installation/configuration of LAD 3.0 will be coming soon.
+LAD 3.0 is NOT compatible with LAD 2.3. Users of LAD 2.3 must first uninstall that extension before installing LAD 3.0.
 
-This README.md file will be finalized very soon with the official documentation. In the meantime, please refer to [this document](virtual-machines-linux-diagnostic-extension-v3.md) for more details on LAD 3.0.
+LAD 3.0 is installed and configured via Azure CLI, Azure PowerShell cmdlets, or Azure Resource Manager templates. The Azure Portal controls installation and configuration of LAD 2.3 only. The Azure Metrics UI can display performance counters collected by either version of LAD.
+
+Please refer to [this document](https://docs.microsoft.com/azure/virtual-machines/linux/diagnostic-extension) for more details on configuring and using LAD 3.0. [tests/lad2_3_compatible_portal_pub_settings.json](tests/lad2_3_compatible_portal_pub_settings.json) contains a sample JSON configuration which sets LAD 3.0 to collecting exactly the same metrics and logs as the default configuration for LAD 2.3 collected. 
 
 ## Supported Linux Distributions
 
@@ -22,7 +24,7 @@ Please note that the distros/versions listed below apply only to Azure-endorsed 
 images. 3rd party BYOL/BYOS images (e.g., appliances) are not generally supported for the
 Linux Diagnostic extension.
 
-- Ubuntu 12.04 and higher.
+- Ubuntu 14.04 and higher.
 - CentOS 6.5 and higher
 - Oracle Linux 6.4.0.0.0 and higher
 - OpenSUSE 13.1 and higher

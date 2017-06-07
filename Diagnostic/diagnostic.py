@@ -193,7 +193,8 @@ def create_core_components_configs():
     try:
         config_valid, config_invalid_reason = configurator.generate_all_configs()
     except Exception as e:
-        hutil.error('Unknown exception occurred from generate_all_configs(). Msg: {0}'.format(e))
+        config_invalid_reason = 'Unknown exception occurred from generate_all_configs(). Msg: {0}'.format(e)
+        hutil.error(config_invalid_reason)
         config_valid = False
 
     if not config_valid:
