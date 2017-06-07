@@ -20,7 +20,7 @@ class TestBuiltinMetric(TestCase):
             "annotation": [
                 {
                     "displayName": "Aggregate CPU %idle time",
-                    "local": "en-us"
+                    "locale": "en-us"
                 }
             ]
         }
@@ -34,7 +34,7 @@ class TestBuiltinMetric(TestCase):
             "annotation": [
                 {
                     "displayName": "Free space on /",
-                    "local": "en-us"
+                    "locale": "en-us"
                 }
             ]
         }
@@ -264,7 +264,7 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
                     perf_counter_cfg['unit'] = self.inferred_unit_name_from_counter_name(scx_counter_name)
                     perf_counter_cfg['annotation'] = [{
                         'displayName': self.inferred_display_name_from_class_counter_names(class_name, scx_counter_name),
-                        'local': 'en-us'
+                        'locale': 'en-us'
                     }]
                 perf_counter_cfg_list.append(perf_counter_cfg)
 
