@@ -36,6 +36,7 @@ import json
 import sys
 import subprocess
 import shutil
+import time
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
@@ -92,34 +93,47 @@ manifest_file.write(manifest_str)
 manifest_file.close()
 
 
+
 """
 generate the extension xml file
 """
 extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
+<ProviderNameSpace>Microsoft.Azure.Backup.Test</ProviderNameSpace>
 <Type>%s</Type>
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
-<MediaLink>%s</MediaLink>
+<MediaLink></MediaLink>
 <Description>%s</Description>
 <IsInternalExtension>true</IsInternalExtension>
 <Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
 <PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
 <IsJsonExtension>true</IsJsonExtension>
+<SupportedOS>Linux</SupportedOS>
 <CompanyName>Microsoft Open Source Technology Center</CompanyName>
-</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
+<!--%%REGIONS%%-->
+</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_description)
 
-extension_xml_file = open(CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.xml', 'w')
-extension_xml_file.write(extension_xml_file_content)
-extension_xml_file.close()
+"""
+generate the safe freeze binary
+"""
+cur_dir = os.getcwd()
+os.chdir("./main/safefreeze")
+chil = subprocess.Popen(["make"], stdout=subprocess.PIPE)
+process_wait_time = 5
+while(process_wait_time >0 and chil.poll() is None):
+    time.sleep(1)
+    process_wait_time -= 1
+
+os.chdir(cur_dir)
+
 
 """
 setup script, to package the files up
 """
 setup(name = CommonVariables.extension_name,
-      version = CommonVariables.extension_version,
+      version = CommonVariables.extension_zip_version,
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
@@ -138,12 +152,19 @@ setup(name = CommonVariables.extension_name,
 """
 unzip the package files and re-package it.
 """
+
+
+
 target_zip_file_location = './dist/'
-target_folder_name = CommonVariables.extension_name + '-' + str(CommonVariables.extension_version)
+target_folder_name = CommonVariables.extension_name  + '-' + CommonVariables.extension_zip_version
 target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
+
+extension_xml_file = open(target_zip_file_location + target_folder_name + '/manifest.xml', 'w')
+extension_xml_file.write(extension_xml_file_content)
+extension_xml_file.close()
 
 def dos2unix(src):
     args = ["dos2unix",src]

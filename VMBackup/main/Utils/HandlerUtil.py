@@ -167,10 +167,7 @@ class HandlerUtility:
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
-                jctxt = ''
+                jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
@@ -516,24 +513,26 @@ class HandlerUtility:
         return self.get_handler_settings().get('publicSettings')
 
     def is_prev_in_transition(self):
-        last_seq = self.get_last_seq()
-        self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
-        status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
-        if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
-            searchfile = open(status_file_prev, "r")
-            for line in searchfile:
-                if "Transition" in line: 
-                    self.log("transitioning found in the previous status file")
-                    searchfile.close()
-                    return True
-            searchfile.close()
+        curr_seq = self.get_last_seq()
+        last_seq = curr_seq - 1
+        if last_seq >= 0:
+            self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
+            status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+            if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
+                searchfile = open(status_file_prev, "r")
+                for line in searchfile:
+                    if "Transition" in line: 
+                        self.log("transitioning found in the previous status file")
+                        searchfile.close()
+                        return True
+                searchfile.close()
         return False
 
     def get_prev_log(self):
         with open(self._context._log_file, "r") as f:
             lines = f.readlines()
-        if(len(lines) > 100):
-            lines = lines[-100:]
+        if(len(lines) > 300):
+            lines = lines[-300:]
             return ''.join(str(x) for x in lines)
         else:
             return ''.join(str(x) for x in lines)

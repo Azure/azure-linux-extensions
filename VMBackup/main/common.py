@@ -19,8 +19,9 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "1.0.9113.0"
+    extension_name = 'MyBackupTestLinuxInt'
+    extension_version = "1.0.9113"
+    extension_zip_version = "1"
     extension_type = extension_name
     extension_media_link = 'https://sopattna.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
@@ -55,7 +56,8 @@ class CommonVariables:
     error_wrong_time = 13
     error_same_taskid = 14
     error_http_failure = 15
-    error_upload_status_blob = 16
+    FailedHandlerGuestAgentCertificateNotFound = 16
+    #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
     FailedFsFreezeFailed = 121

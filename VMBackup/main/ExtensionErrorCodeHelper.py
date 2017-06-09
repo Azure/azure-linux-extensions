@@ -9,7 +9,8 @@ class ExtensionErrorCodeEnum():
     error_wrong_time = 13
     error_same_taskid = 14
     error_http_failure = 15
-    error_upload_status_blob = 16
+    FailedHandlerGuestAgentCertificateNotFound = 16
+    #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
@@ -46,6 +47,7 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : Status.ExtVmHealthStateEnum.yellow,
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : Status.ExtVmHealthStateEnum.yellow,
@@ -82,6 +84,7 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
+            ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",
