@@ -98,3 +98,6 @@ class LadExtSettingsTest(unittest.TestCase):
         print json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True, indent=2)
         self.assertNotEqual(json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True),
                             json.dumps(actual_json, sort_keys=True))
+
+if __name__ == '__main__':
+    unittest.main()

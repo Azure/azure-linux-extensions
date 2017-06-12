@@ -295,3 +295,6 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
         configurator._sink_configs.insert_from_config(test_sinks_config)
         configurator._update_metric_collection_settings(test_config)
         print ET.tostring(configurator._mdsd_config_xml_tree.getroot())
+
+if __name__ == '__main__':
+    unittest.main()

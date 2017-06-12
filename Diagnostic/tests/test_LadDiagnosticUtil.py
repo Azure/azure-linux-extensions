@@ -16,11 +16,11 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from unittest import TestCase
+import unittest
 import Utils.LadDiagnosticUtil as LadUtil
 
 
-class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
+class TestGetDiagnosticsMonitorConfigurationElement(unittest.TestCase):
     def setUp(self):
         self.empty_config = {}
         self.bogus_config = {"foo": "bar"}
@@ -122,7 +122,7 @@ class TestGetDiagnosticsMonitorConfigurationElement(TestCase):
         self.assertEqual(LadUtil.getFeatureWideSinksFromLadCfg(self.valid_config, 'performanceCounters'), ['sink1'])
 
 
-class TestSinkConfiguration(TestCase):
+class TestSinkConfiguration(unittest.TestCase):
     def setUp(self):
         self.config = \
             {
@@ -194,3 +194,6 @@ class TestSinkConfiguration(TestCase):
         self.assertEqual(len(sink_list), 0)
         self.helper_get_sinks_by_type('EventHub', ['sink1', 'sink3'])
         self.helper_get_sinks_by_type('JsonBlob', ['sink2'])
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,4 +1,4 @@
-from unittest import TestCase
+import unittest
 import Providers.Builtin as BProvider
 import Utils.ProviderUtil as ProvUtil
 from Utils.mdsd_xml_templates import entire_xml_cfg_tmpl
@@ -7,7 +7,7 @@ import json
 import re
 
 
-class TestBuiltinMetric(TestCase):
+class TestBuiltinMetric(unittest.TestCase):
     def setUp(self):
         self.basic_valid = {
             "type": "builtin",
@@ -115,7 +115,7 @@ class TestBuiltinMetric(TestCase):
             self.fail("BuiltinMetric Constructor raised exception: {0}".format(ex))
 
 
-class TestMakeXML(TestCase):
+class TestMakeXML(unittest.TestCase):
     def setUp(self):
         self.base_xml = entire_xml_cfg_tmpl
     def test_two_and_two(self):
@@ -168,8 +168,9 @@ class TestMakeXML(TestCase):
         # print xml_string
 
 
-class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
+class Lad2_3CompatiblePortalPublicSettingsGenerator(unittest.TestCase):
 
+    @unittest.skip("Lad2_3Compat test needs redesign to be useful outside of internal development environment")
     def test_lad_2_3_compatible_portal_public_settings(self):
         """
         This is rather a utility function that attempts to generate a standard LAD 3.0 protected settings JSON string
@@ -300,7 +301,6 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
         desc = desc.replace('percent', '%').replace('megabytes', 'space')
         return '{0} {1}'.format(class_name.title(), desc)
 
-
     def extract_perf_counter_units_and_names_from_metrics_def_sample(self):
         """
         Another utility function that extracts perf counter units and display names from an Azure metrics
@@ -324,3 +324,5 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(TestCase):
             results[counter_specifier] = { 'unit': unit, 'displayName': display_name }
         return results
 
+if __name__ == '__main__':
+    unittest.main()
