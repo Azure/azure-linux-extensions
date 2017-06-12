@@ -285,21 +285,24 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
-            Filesystem     1K-blocks    Used Available Use% Mounted on
-            udev             1756684      12   1756672   1% /dev
-            tmpfs             352312     420    351892   1% /run
-            /dev/sda1       30202916 2598292  26338592   9% /
-            none                   4       0         4   0% /sys/fs/cgroup
-            none                5120       0      5120   0% /run/lock
-            none             1761552       0   1761552   0% /run/shm
-            none              102400       0    102400   0% /run/user
-            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
-            tmpfs                  4       4         0 100% /etc/ruxitagentproc
-            /dev/sdb1        7092664   16120   6693216   1% /mnt
+            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
+            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
+            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
+            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
+            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
+            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
+            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
+            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
+            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
+            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
+            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
+            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
             process_wait_time = 30
@@ -311,8 +314,10 @@ class HandlerUtility:
             output = output.split("\n")
             total_used = 0
             for i in range(1,len(output)-1):
-                device, size, used, available, percent, mountpoint = output[i].split()
-                if not (mountpoint.startswith('/run/gluster/snaps/')):
+                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                if "fuse" in fstype or "nfs" in fstype or "cifs" in fstype:
+                    self.log("Not Adding Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
+                elif not (mountpoint.startswith('/run/gluster/snaps/')):
                     self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
                     total_used = total_used + int(used) #return in KB
                 else:
