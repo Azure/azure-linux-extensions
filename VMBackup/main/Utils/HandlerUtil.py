@@ -315,6 +315,7 @@ class HandlerUtility:
             total_used = 0
             for i in range(1,len(output)-1):
                 device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
                 if "fuse" in fstype or "nfs" in fstype or "cifs" in fstype:
                     self.log("Not Adding Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
                 elif not (mountpoint.startswith('/run/gluster/snaps/')):
