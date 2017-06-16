@@ -16,7 +16,7 @@ LAD 3.0 is NOT compatible with LAD 2.3. Users of LAD 2.3 must first uninstall th
 
 LAD 3.0 is installed and configured via Azure CLI, Azure PowerShell cmdlets, or Azure Resource Manager templates. The Azure Portal controls installation and configuration of LAD 2.3 only. The Azure Metrics UI can display performance counters collected by either version of LAD.
 
-Please refer to [this document](https://docs.microsoft.com/azure/virtual-machines/linux/diagnostic-extension) for more details on configuring and using LAD 3.0. [tests/lad2_3_compatible_portal_pub_settings.json](tests/lad2_3_compatible_portal_pub_settings.json) contains a sample JSON configuration which sets LAD 3.0 to collecting exactly the same metrics and logs as the default configuration for LAD 2.3 collected. 
+Please refer to [this document](https://docs.microsoft.com/azure/virtual-machines/linux/diagnostic-extension) for more details on configuring and using LAD 3.0. The tests folder contains [a sample JSON configuration](https://raw.githubusercontent.com/Azure/azure-linux-extensions/master/Diagnostic/tests/lad_2_3_compatible_portal_pub_settings.json) which sets LAD 3.0 to collecting exactly the same metrics and logs as the default configuration for LAD 2.3 collected. 
 
 ## Supported Linux Distributions
 
