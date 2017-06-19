@@ -110,12 +110,12 @@ def get_distro_category():
     distro_name = distro_info[0].lower()
     if distro_name == 'ubuntu' or distro_name == 'debian':
         return DistroCategory.debian
-    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle linux server':
+    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
         return DistroCategory.redhat
     elif distro_name == 'suse':
         return DistroCategory.suse 
-    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported distro" + distro_info)
-    hutil.do_exit(51, 'Install', 'error', '51', distro_info + 'is not supported.')
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported distro :" + distro_name)
+    hutil.do_exit(51, 'Install', 'error', '51', distro_name + 'is not supported.')
 
 def install():
     hutil.do_parse_context('Install')
