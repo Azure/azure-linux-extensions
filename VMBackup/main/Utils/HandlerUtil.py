@@ -313,28 +313,30 @@ class HandlerUtility:
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
-            total_used_with_network_shares = 0
-            network_fs_type = []
+            total_used_network_shares = 0
+            total_used_gluster = 0
+            network_fs_types = []
             for i in range(1,len(output)-1):
                 device, fstype, size, used, available, percent, mountpoint = output[i].split()
                 self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
-                if "fuse" in fstype or "nfs" in fstype or "cifs" in fstype:
-                    if fstype not in network_fs_type :
-                        network_fs_type.append(fstype)
-                    self.log("Not Adding Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
-                    total_used_with_network_shares = total_used_with_network_shares + int(used)
-                elif not (mountpoint.startswith('/run/gluster/snaps/')):
+                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
+                    if fstype not in network_fs_types :
+                        network_fs_types.append(fstype)
+                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
+                    total_used_network_shares = total_used_network_shares + int(used)
+                elif (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used_gluster = total_used_gluster + int(used)
+                else:
                     self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
                     total_used = total_used + int(used) #return in KB
-                    total_used_with_network_shares = total_used_with_network_shares + int(used)
-                else:
-                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    HandlerUtility.add_to_telemetery_data("glusterFSPresent","True")
 
-            if not len(network_fs_type) == 0:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_type))
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("TotalUsedWithNetworkShare",str(total_used_with_network_shares))
-            self.log("Total used space in Bytes with network shares : {0}".format(total_used_with_network_shares * 1024))
+            if not len(network_fs_types) == 0:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+            if total_used_gluster !=0 :
+                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
+            self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
         except Exception as e:
