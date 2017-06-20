@@ -334,9 +334,9 @@ class HandlerUtility:
             if not len(network_fs_types) == 0:
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
             if total_used_gluster !=0 :
                 HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
-            self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
         except Exception as e:
