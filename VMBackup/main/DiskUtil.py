@@ -26,6 +26,7 @@ import shutil
 import uuid
 import glob
 from common import DeviceItem
+from Utils import HandlerUtil
 import traceback
 
 class DiskUtil(object):
@@ -296,7 +297,11 @@ class DiskUtil(object):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
                             # If there is a duplicate, keep only the first instance
                             if(mount_point not in mount_points):
-                                self.logger.log("mount command mount :" + str(mount_point) + ": and fstype :"+ str(fs_type) + ":", True)
+                                self.logger.log("mount command mount :" + str(mount_point) + ": and fstype :"+ str(fs_type) + ":", True) 
                                 fs_types.append(fs_type)
                                 mount_points.append(mount_point)
+        for fstype in fs_types:
+            if ("fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower()):
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
+                break
         return mount_points, fs_types
