@@ -249,8 +249,15 @@ class AbstractPatching(object):
                 msg = "The parameter \"startTime\" is empty or invalid. It defaults to 03:00."
                 self.log_and_syslog(logging.WARNING, msg)
                 start_time = "03:00"
-            self.start_time = datetime.datetime.strptime(start_time, '%H:%M')
-            self.download_time = self.start_time - datetime.timedelta(seconds=self.download_duration)
+            try:
+                start_time_dt = datetime.datetime.strptime(start_time, '%H:%M')
+                self.start_time = datetime.time(start_time_dt.hour, start_time_dt.minute)
+            except ValueError:
+                msg = "The parameter \"startTime\" is invalid. It defaults to 03:00."
+                self.log_and_syslog(logging.WARNING, msg)
+                self.start_time = datetime.time(3)
+            download_time_dt = start_time_dt - datetime.timedelta(seconds=self.download_duration)
+            self.download_time = datetime.time(download_time_dt.hour, download_time_dt.minute)
             self.current_configs["startTime"] = start_time
  
             day_of_week = settings.get("dayOfWeek")
@@ -350,12 +357,12 @@ class AbstractPatching(object):
         if self.disabled:
             new_line = '\n'
         else:
+            if self.download_time > self.start_time:
+                dow = ','.join([str((day - 1) % 7) for day in self.day_of_week])
+            else:
+                dow = ','.join([str(day % 7) for day in self.day_of_week])
             hr = str(self.download_time.hour)
             minute = str(self.download_time.minute)
-            if self.download_time.day != self.start_time.day:
-                dow = ','.join([str(day - 1) for day in self.day_of_week])
-            else:
-                dow = ','.join([str(day) for day in self.day_of_week])
             new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-download > /dev/null 2>&1\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, '\n'.join(filter(lambda a: a and (old_line_end not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
@@ -367,12 +374,19 @@ class AbstractPatching(object):
         if self.disabled:
             new_line = '\n'
         else:
-            hr = str(self.start_time.hour)
-            minute = str(self.start_time.minute)
-            minute_cleanup = str(self.start_time.minute + 1)
-            dow = ','.join([str(day) for day in self.day_of_week])
-            new_line = ' '.join(['\n' + minute, hr, '* *', dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
-            new_line += ' '.join([minute_cleanup, hr, '* *', dow, 'root rm -f', self.stop_flag_path, '\n'])
+            start_time_dt = datetime.datetime(100, 1, 1, self.start_time.hour, self.start_time.minute)
+            start_hr = str(self.start_time.hour)
+            start_minute = str(self.start_time.minute)
+            start_dow = ','.join([str(day % 7) for day in self.day_of_week])
+            cleanup_time_dt = start_time_dt + datetime.timedelta(minutes=1)
+            cleanup_hr = str(cleanup_time_dt.hour)
+            cleanup_minute = str(cleanup_time_dt.minute)
+            if start_time_dt.day < cleanup_time_dt.day:
+                cleanup_dow = ','.join([str((day + 1) % 7) for day in self.day_of_week])
+            else:
+                cleanup_dow = ','.join([str(day % 7) for day in self.day_of_week])
+            new_line = ' '.join(['\n' + start_minute, start_hr, '* *', start_dow, 'root cd', script_dir, '&& python check.py', self.interval_of_weeks, '&& python', script_file, '-patch >/dev/null 2>&1\n'])
+            new_line += ' '.join([cleanup_minute, cleanup_hr, '* *', cleanup_dow, 'root rm -f', self.stop_flag_path, '\n'])
         waagent.ReplaceFileContentsAtomic(self.crontab, "\n".join(filter(lambda a: a and (old_line_end not in a) and (self.stop_flag_path not in a), waagent.GetFileContents(self.crontab).split('\n'))) + new_line)
 
     def restart_cron(self):
