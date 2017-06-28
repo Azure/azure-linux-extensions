@@ -26,6 +26,7 @@ import urllib2
 import urlparse
 import time
 import platform
+import json
 
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
@@ -47,6 +48,7 @@ dsc_minor_version = 1
 dsc_build = 1
 dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
+nodeid_path = '/etc/opt/omi/conf/omsconfig/agentid'
 
 # DSC-specific Operation
 class Operation:
@@ -62,7 +64,7 @@ class DistroCategory:
     debian = 1
     redhat = 2
     suse = 3
-	
+    
 class Mode:
     push = "push"
     pull = "pull"
@@ -87,7 +89,7 @@ def main():
     global protected_settings
     protected_settings = hutil.get_protected_settings()
     if not protected_settings:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="protected settings are NOT provided.")	
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='MainInProgress', isSuccess=True, message="protected settings are NOT provided.")    
         protected_settings = {}
 
     global distro_category
@@ -154,11 +156,11 @@ def enable():
         elif mode == Mode.register:
             registration_key = get_config('RegistrationKey')
             registation_url = get_config('RegistrationUrl')
-	        # Optional
+            # Optional
             node_configuration_name = get_config('NodeConfigurationName')
             refresh_freq = get_config('RefreshFrequencyMins')
             configuration_mode_freq = get_config('ConfigurationModeFrequencyMins')
-            configuration_mode = get_config('ConfigurationMode')  		   
+            configuration_mode = get_config('ConfigurationMode')             
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             if exit_code != 0:
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
@@ -195,6 +197,12 @@ def enable():
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
+        agent_id = get_nodeid(nodeid_path)
+        vm_uuid = get_vmuuid()
+        if vm_uuid is not None and agent_id is not None:
+            status_filepath = get_statusfile_path()
+            update_statusfile(status_filepath, agent_id, vm_uuid)
+              
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
@@ -251,19 +259,19 @@ def deb_remove_incomptible_dsc_package():
     version = deb_get_pkg_version('dsc')
     if version is not None and is_incomptible_dsc_package(version):
         deb_uninstall_package(package_name)
-			
+            
 def is_incomptible_dsc_package(package_version):
     version = re.match(package_pattern, package_version)
     #uninstall DSC package if the version is 1.0.x because upgrading from 1.0 to 1.1 is broken
     if version is not None and (int(version.group(1)) == 1 and int(version.group(2)) == 0): 
-	    return True
+        return True
     return False
 
 def is_old_oms_server(package_name):
     if package_name == 'omiserver':
         return True
-    return False	
-			
+    return False    
+            
 def deb_remove_old_oms_package(package_name, version):
     system_pkg_version = deb_get_pkg_version(package_name)
     if system_pkg_version is not None and is_old_oms_server(package_name):
@@ -280,11 +288,11 @@ def rpm_remove_incomptible_dsc_package():
     code,version = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" dsc')
     if code == 0 and is_incomptible_dsc_package(version):
         rpm_uninstall_package(package_name)
-			
+            
 def rpm_remove_old_oms_package(package_name, version):
     if rpm_check_old_oms_package(package_name, version):
         rpm_uninstall_package(package_name)
-		
+        
 def rpm_check_old_oms_package(package_name, version):
     code,output = run_cmd('rpm -q ' + package_name)
     if code == 0 and is_old_oms_server(package_name):
@@ -336,7 +344,7 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="dsc package with version: " + version + "is already installed.")
         return
     else:
-        cmd = 'dpkg -i ' + install_options + ' ' + package_path	
+        cmd = 'dpkg -i ' + install_options + ' ' + package_path    
         code,output = run_cmd(cmd)
         if code == 0:
             hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(build) + '.' + str(release) + ' is installed successfully')
@@ -421,7 +429,7 @@ def download_file():
         return path
     else:
         hutil.log('Downloading file from external link...')
-        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file from external link...")		
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file from external link...")        
         path = download_external_file(file_uri, download_dir)
         return path
 
@@ -463,7 +471,7 @@ def parse_blob_uri(blob_uri):
     path = get_path_from_uri(blob_uri).strip('/')
     first_sep = path.find('/')
     if first_sep == -1:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="Error occured while extracting container and blob name.")	
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="Error occured while extracting container and blob name.")    
         hutil.error("Failed to extract container and blob name from " + blob_uri)
     blob_name = path[first_sep+1:]
     container_name = path[:first_sep]
@@ -489,7 +497,7 @@ def download_external_file(file_uri, download_dir):
     for retry in range(1, max_retry + 1):
         try:
             download_and_save_file(file_uri, file_path)
-            waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.Download, isSuccess=True, message="(03302)Succeeded to download file from public URI")			
+            waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.Download, isSuccess=True, message="(03302)Succeeded to download file from public URI")            
             return file_path
         except Exception:
             hutil.error('Failed to download public file, retry = ' + str(retry) + ', max_retry = ' + str(max_retry))
@@ -523,8 +531,8 @@ def prepare_download_dir(seq_no):
 
 def apply_dsc_configuration(config_file_path):
     cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
-    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)	
-    code,output = run_cmd(cmd)	
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message='running the cmd: ' + cmd)    
+    code,output = run_cmd(cmd)    
     if code == 0:
         code,output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
@@ -549,6 +557,88 @@ def apply_dsc_meta_configuration(config_file_path):
                                   isSuccess=False,
                                   message="(03107)" + error_msg)
         raise Exception(error_msg)
+
+def get_statusfile_path():
+    seq_no = hutil.get_seq_no()
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="sequence number is :" + seq_no)
+    status_file = None
+    
+    handlerEnvironment = None
+    handler_env_path = os.path.join(os.getcwd(), 'HandlerEnvironment.json')
+    try:
+        with open(handler_env_path, 'r') as handler_env_file:
+            handler_env_txt = handler_env_file.read()
+        handler_env=json.loads(handler_env_txt)
+        if type(handler_env) == list:
+            handler_env = handler_env[0]
+        handlerEnvironment = handler_env
+    except Exception as e:
+        waagent.Error(e.message)
+    
+    status_dir = handlerEnvironment['handlerEnvironment']['statusFolder']
+    status_file = status_dir + '/' + seq_no + '.status'
+    if os.path.exists(status_file):
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="status file path: " + status_file)
+        return status_file
+    return None
+
+def update_statusfile(status_filepath, node_id, vmuuid):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
+    if status_filepath is None:
+        error_msg = "Unable to locate a status file"
+        waagent.Error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message=error_msg)
+        return None
+        
+    status_data = None
+    if os.path.exists(status_filepath):
+        jsonData = open(status_filepath)
+        status_data = json.load(jsonData)
+        jsonData.close()
+
+    if status_data is not None and os.path.exists(status_filepath):
+        with open(status_filepath, "w") as fp:
+            metadatastatus = {"status" : "success", "name": "metadata", "formatedMessage": {"message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}} 
+            substatusArray = []
+            if 'substatus' not in status_data:
+                substatusArray.append(metadatastatus)
+                status_data[0]['status']['substatus'] = substatusArray
+            substatusArray = status_data[0]['status']['substatus']
+            isMetaDataFound = False
+            for substatusDict in substatusArray:
+                if 'metadata' in  substatusDict.viewvalues():
+                    isMetaDataFound = True
+
+            if     isMetaDataFound == False:
+                substatusArray.append(metadatastatus)
+                status_data[0]['status']['substatus'] = substatusArray
+            json.dump(status_data, fp)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="successfully written/updated nodeid and vmuuid")
+
+def get_nodeid(file_path):
+    id = None
+    try:
+        if os.path.exists(file_path):
+            with open(file_path) as f:
+                id = f.readline().strip()
+    except Exception as e:
+        error_msg = 'get_nodeid() failed: Unable to open id file {0}'.format(file_path)
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message=error_msg)
+        return None
+    if not id:
+        error_msg = 'get_nodeid() failed: Empty content in id file {0}'.format(file_path)
+        hutil.error(error_msg)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message=error_msg)
+        return None
+    return id
+
+def get_vmuuid():
+    UUID = None
+    code, output = run_cmd("dmidecode | grep UUID | sed -e 's/UUID: //'")
+    if code == 0:
+        UUID = output.strip()
+    return UUID
 
 def check_dsc_configuration(current_config):
     outputlist = re.split("\n", current_config)
@@ -585,7 +675,7 @@ def remove_module():
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="RemoveModuleInProgress",
                               isSuccess=True,
-                              message="Running the cmd: " + cmd)	
+                              message="Running the cmd: " + cmd)    
     if not code == 0:
         error_msg = 'Failed to remove DSC Module ' + module_name + ': {0}'.format(output)
         hutil.error(error_msg)
@@ -631,7 +721,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
         return 51, err_msg
     if configuration_mode != '' and not (configuration_mode == 'applyandmonitor' or configuration_mode == 'applyandautocorrect' or configuration_mode == 'applyonly'):
-        err_msg = "ConfigurationMode: " + configuration_mode + " is not valid."	
+        err_msg = "ConfigurationMode: " + configuration_mode + " is not valid."    
         hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
         return 51, err_msg
@@ -664,7 +754,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
                               isSuccess=True,
                               message="(03108)Succeeded to register with Azure Automation DSC")
     return 0, ''
-	
+    
 if __name__ == '__main__':
     main()
 
