@@ -478,7 +478,7 @@ class HandlerUtility:
         
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+        if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
