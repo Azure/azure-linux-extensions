@@ -40,31 +40,6 @@ class TestStatusUpdate(unittest.TestCase):
     
     #case 1update should work if there is no status file
     #         should return without executing
-    
-    @patch.object(dsc, 'get_statusfile_path')
-    def test_status_update(self):
-        dsc.get_statusfile_path = 'status/0.status'
-        dsc.distro_category = dsc.get_distro_category()
-        dsc.hutil = MockUtil(self)
-        update_statusfile('123','345')
-        if os.path.exists(status_file):
-            jsonData = open(status_file)
-            status_data = json.load(jsonData)
-            self.assertTrue('status' in status_data, "status doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")            
-            substatusArray = status_data[0]['status']['substatus']
-            isMetaDataFound = False
-            metasubstatus = None
-            for substatusDict in substatusArray:
-                if 'metadata' in  substatusDict.viewvalues():
-                    isMetaDataFound = True
-                    metasubstatus = substatusDict
-            self.assertTrue(isMetaDataFound, "metadata doesn't exists")
-            self.assertTrue('formatedMessage' in metasubstatus, "formatedMessage doesn't exists")
-            formatedMessage = metasubstatus['formatedMessage']
-            self.assertTrue('message' in formatedMessage, "message doesn't exists")
-            self.assertTrue('AgentID' in formatedMessage['message'], "AgentID doesn't exists")
     '''
     
     def test_vmuuid(self):
@@ -88,17 +63,15 @@ class TestStatusUpdate(unittest.TestCase):
         self.assertTrue(nodeid is None, "nodeid is not none")
     
     def test_status_update(self):
-	status_file = 'status/0.status'
+        status_file = 'status/0.status'
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
         dsc.update_statusfile(status_file, '123','345')
         if os.path.exists(status_file):
             jsonData = open(status_file)
-            status_data = json.load(jsonData)
+            status_data = json.load(jsonData)[0]
             self.assertTrue('status' in status_data, "status doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")            
-            substatusArray = status_data[0]['status']['substatus']
+            substatusArray = status_data['status']['substatus']
             isMetaDataFound = False
             metasubstatus = None
             for substatusDict in substatusArray:
@@ -114,11 +87,9 @@ class TestStatusUpdate(unittest.TestCase):
     def verify_nodeid(self, status_file):
         if os.path.exists(status_file):
             jsonData = open(status_file)
-            status_data = json.load(jsonData)
+            status_data = json.load(jsonData)[0]
             self.assertTrue('status' in status_data, "status doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")
-            self.assertTrue('substatus' in status_data, "substatus doesn't exists")            
-            substatusArray = status_data[0]['status']['substatus']
+            substatusArray = status_data['status']['substatus']
             isMetaDataFound = False
             metasubstatus = None
             for substatusDict in substatusArray:

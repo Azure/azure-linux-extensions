@@ -27,6 +27,7 @@ import urlparse
 import time
 import platform
 import json
+import datetime
 
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
@@ -48,7 +49,8 @@ dsc_minor_version = 1
 dsc_build = 1
 dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
-nodeid_path = '/etc/opt/omi/conf/omsconfig/agentid'
+nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
+DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 # DSC-specific Operation
 class Operation:
@@ -560,7 +562,7 @@ def apply_dsc_meta_configuration(config_file_path):
 
 def get_statusfile_path():
     seq_no = hutil.get_seq_no()
-    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="sequence number is :" + seq_no)
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="sequence number is :" + seq_no)
     status_file = None
     
     handlerEnvironment = None
@@ -577,13 +579,11 @@ def get_statusfile_path():
     
     status_dir = handlerEnvironment['handlerEnvironment']['statusFolder']
     status_file = status_dir + '/' + seq_no + '.status'
-    if os.path.exists(status_file):
-        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="status file path: " + status_file)
-        return status_file
-    return None
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="status file path: " + status_file)
+    return status_file
 
 def update_statusfile(status_filepath, node_id, vmuuid):
-    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
     if status_filepath is None:
         error_msg = "Unable to locate a status file"
         waagent.Error(error_msg)
@@ -596,9 +596,9 @@ def update_statusfile(status_filepath, node_id, vmuuid):
         status_data = json.load(jsonData)
         jsonData.close()
 
+    metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formatedMessage": {"message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
     if status_data is not None and os.path.exists(status_filepath):
         with open(status_filepath, "w") as fp:
-            metadatastatus = {"status" : "success", "name": "metadata", "formatedMessage": {"message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}} 
             substatusArray = []
             if 'substatus' not in status_data:
                 substatusArray.append(metadatastatus)
@@ -613,8 +613,20 @@ def update_statusfile(status_filepath, node_id, vmuuid):
                 substatusArray.append(metadatastatus)
                 status_data[0]['status']['substatus'] = substatusArray
             json.dump(status_data, fp)
-        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message="successfully written/updated nodeid and vmuuid")
-
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully updated nodeid and vmuuid")
+    elif status_data is None:
+        with open(status_filepath, "w") as fp:
+            status_file_content = [{"status": 
+                                        {"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
+                                        "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
+                                        "substatus" : metadatastatus 
+                                        }, 
+                                        "version": "1.0", "timestampUTC":   time.strftime(DateTimeFormat, time.gmtime())
+                                    }]
+            json.dump(status_file_content, fp)
+            waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
+            sys.exit(0)        
+            
 def get_nodeid(file_path):
     id = None
     try:
