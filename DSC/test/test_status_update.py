@@ -28,20 +28,22 @@ waagent.LoggerInit('/tmp/test.log','/dev/null')
 
 class TestStatusUpdate(unittest.TestCase):
 
-    '''
-        case1: if there is no status file        
-        --> return
-        
-        case 2: if there is a status file, only if enable is success
-                update status file
-        case 3: enable re-runs again and again
-                code should be idempotent
-        
-    
-    #case 1update should work if there is no status file
-    #         should return without executing
-    '''
-    
+    def verify_nodeid_vmuuid(self, status_file):
+        self.assertTrue(os.path.exists(status_file), "file exists")
+        if os.path.exists(status_file):
+            jsonData = open(status_file)
+            status_data = json.load(jsonData)[0]
+            self.assertTrue('status' in status_data, "status doesn't exists")
+            substatusArray = status_data['status']['substatus']
+            isMetaDataFound = False
+            metasubstatus = None
+            if 'metadata' in  substatusArray[0].viewvalues():
+                metasubstatus = substatusArray[0]
+            self.assertTrue('formatedMessage' in metasubstatus, "formatedMessage doesn't exists")
+            formatedMessage = metasubstatus['formatedMessage']
+            self.assertTrue('message' in formatedMessage, "message doesn't exists")
+            self.assertTrue('AgentID' in formatedMessage['message'], "AgentID doesn't exists")
+            
     def test_vmuuid(self):
         dsc.hutil = MockUtil(self)
         vmuuid = dsc.get_vmuuid()
@@ -62,45 +64,51 @@ class TestStatusUpdate(unittest.TestCase):
         nodeid = dsc.get_nodeid('/etc/opt/omi/conf/omsconfig/agentid1')
         self.assertTrue(nodeid is None, "nodeid is not none")
     
-    def test_status_update(self):
+    def test_statusfile_update(self):
         status_file = 'status/0.status'
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
         dsc.update_statusfile(status_file, '123','345')
-        if os.path.exists(status_file):
-            jsonData = open(status_file)
-            status_data = json.load(jsonData)[0]
-            self.assertTrue('status' in status_data, "status doesn't exists")
-            substatusArray = status_data['status']['substatus']
-            isMetaDataFound = False
-            metasubstatus = None
-            for substatusDict in substatusArray:
-                if 'metadata' in  substatusDict.viewvalues():
-                    isMetaDataFound = True
-                    metasubstatus = substatusDict
-            self.assertTrue(isMetaDataFound, "metadata doesn't exists")
-            self.assertTrue('formatedMessage' in metasubstatus, "formatedMessage doesn't exists")
-            formatedMessage = metasubstatus['formatedMessage']
-            self.assertTrue('message' in formatedMessage, "message doesn't exists")
-            self.assertTrue('AgentID' in formatedMessage['message'], "AgentID doesn't exists")
+        self.verify_nodeid_vmuuid(status_file)
+        
+    def test_is_statusfile_update_idempotent(self):
+        status_file = 'status/0.status'
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        dsc.update_statusfile(status_file, '123','345')
+        dsc.update_statusfile(status_file, '123','345')
+        self.verify_nodeid_vmuuid(status_file)
 
-    def verify_nodeid(self, status_file):
-        if os.path.exists(status_file):
-            jsonData = open(status_file)
-            status_data = json.load(jsonData)[0]
-            self.assertTrue('status' in status_data, "status doesn't exists")
-            substatusArray = status_data['status']['substatus']
-            isMetaDataFound = False
-            metasubstatus = None
-            for substatusDict in substatusArray:
-                if 'metadata' in  substatusDict.viewvalues():
-                    isMetaDataFound = True
-                    metasubstatus = substatusDict
-            self.assertTrue(isMetaDataFound, "metadata doesn't exists")
-            self.assertTrue('formatedMessage' in metasubstatus, "formatedMessage doesn't exists")
-            formatedMessage = metasubstatus['formatedMessage']
-            self.assertTrue('message' in formatedMessage, "message doesn't exists")
-            self.assertTrue('AgentID' in formatedMessage['message'], "AgentID doesn't exists")
+    def test_is_statusfile_update_register(self):
+        status_file = 'status/0.status'
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        dsc.install_dsc_packages()
+        dsc.start_omiservice()
+        exit_code, output = dsc.register_automation('somekey','http://dummy','','','','')
+        self.verify_nodeid_vmuuid(status_file)
+
+    def test_is_statusfile_update_pull(self):
+        status_file = 'status/0.status'
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        dsc.install_dsc_packages()
+        dsc.start_omiservice()
+        config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.mof')
+        self.assertTrue('ReturnValue=0' in config)
+        self.verify_nodeid_vmuuid(status_file)
+
+    def test_is_statusfile_update_push(self):
+        status_file = 'status/0.status'
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        dsc.install_dsc_packages()
+        dsc.start_omiservice()
+        config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.push.mof')
+        dsc.apply_dsc_configuration('mof/localhost.nxFile.mof')
+        self.assertTrue(os.path.exists('/tmp/dsctest'))
+        self.verify_nodeid_vmuuid(status_file)
+
         
 if __name__ == '__main__':
     unittest.main()

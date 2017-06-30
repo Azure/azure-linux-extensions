@@ -186,7 +186,6 @@ def enable():
                                               op=Operation.ApplyMetaMof,
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
-                hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
             else:
                 if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -199,11 +198,13 @@ def enable():
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
+                
         agent_id = get_nodeid(nodeid_path)
         vm_uuid = get_vmuuid()
         if vm_uuid is not None and agent_id is not None:
             status_filepath = get_statusfile_path()
             update_statusfile(status_filepath, agent_id, vm_uuid)
+	    sys.exit(0)
               
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
@@ -575,7 +576,8 @@ def get_statusfile_path():
             handler_env = handler_env[0]
         handlerEnvironment = handler_env
     except Exception as e:
-        waagent.Error(e.message)
+        hutil.error(e.message)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message='exception in retrieving status_dir error : %s, stack trace: %s' %(str(e), traceback.format_exc()))
     
     status_dir = handlerEnvironment['handlerEnvironment']['statusFolder']
     status_file = status_dir + '/' + seq_no + '.status'
@@ -586,7 +588,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
     if status_filepath is None:
         error_msg = "Unable to locate a status file"
-        waagent.Error(error_msg)
+        hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=False, message=error_msg)
         return None
         
@@ -597,35 +599,16 @@ def update_statusfile(status_filepath, node_id, vmuuid):
         jsonData.close()
 
     metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formatedMessage": {"message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
-    if status_data is not None and os.path.exists(status_filepath):
-        with open(status_filepath, "w") as fp:
-            substatusArray = []
-            if 'substatus' not in status_data:
-                substatusArray.append(metadatastatus)
-                status_data[0]['status']['substatus'] = substatusArray
-            substatusArray = status_data[0]['status']['substatus']
-            isMetaDataFound = False
-            for substatusDict in substatusArray:
-                if 'metadata' in  substatusDict.viewvalues():
-                    isMetaDataFound = True
-
-            if     isMetaDataFound == False:
-                substatusArray.append(metadatastatus)
-                status_data[0]['status']['substatus'] = substatusArray
-            json.dump(status_data, fp)
-        waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully updated nodeid and vmuuid")
-    elif status_data is None:
-        with open(status_filepath, "w") as fp:
-            status_file_content = [{"status": 
-                                        {"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
-                                        "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
-                                        "substatus" : metadatastatus 
-                                        }, 
-                                        "version": "1.0", "timestampUTC":   time.strftime(DateTimeFormat, time.gmtime())
-                                    }]
-            json.dump(status_file_content, fp)
-            waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
-            sys.exit(0)        
+    with open(status_filepath, "w") as fp:
+	status_file_content = [{"status": 
+				{"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
+			       "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
+				"substatus" : metadatastatus 
+				}, 
+				"version": "1.0", "timestampUTC":   time.strftime(DateTimeFormat, time.gmtime())
+				}]
+	json.dump(status_file_content, fp)
+	waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
             
 def get_nodeid(file_path):
     id = None
