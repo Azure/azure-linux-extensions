@@ -37,7 +37,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.3.5-127.universal.x64.sh'
+BundleFileName = 'omsagent-1.4.0-45.universal.x64.sh'
 
 # Always use upgrade - will handle install if scx, omi are not installed or
 # upgrade if they are
@@ -49,16 +49,23 @@ OnboardCommandWithOptionalParamsTemplate = '{0} -w {1} -s {2} {3}'
 OmsAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
 DisableOmsAgentServiceCommandTemplate = '{0} disable'
 DPKGLockedErrorCode = 12
+EnableCalledBeforeSuccessfulInstall = 20
+EnableErrorOMSReturned403 = 5
+EnableErrorOMSReturnedNon200 = 6
+EnableErrorResolvingHost = 7
 
 # Configuration
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
 
-# Change permission of log path
-ext_log_path = '/var/log/azure/'
-if os.path.exists(ext_log_path):
-    os.chmod(ext_log_path, 700)
+# Change permission of log path - if we fail, that is not an exit case
+try:
+    ext_log_path = '/var/log/azure/'
+    if os.path.exists(ext_log_path):
+        os.chmod(ext_log_path, 700)
+except:
+    pass
 
 
 def main():
@@ -105,7 +112,7 @@ def main():
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.EnterpriseCloud.' \
                       'Monitoring.OmsAgentForLinux'
-        elif (exit_code is DPKGLockedErrorCode and operation == 'Install'):
+        elif exit_code is DPKGLockedErrorCode and operation == 'Install':
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
                       'please wait and try again'.format(DPKGLockedErrorCode)
@@ -125,6 +132,13 @@ def main():
         exit_code = 10
         message = '{0} failed due to multiple connections: ' \
                   '{1}'.format(operation, e.message)
+    except OmsAgentCannotConnectToOMSException as e:
+        exit_code = 55 # error code to indicate no internet access
+        message = 'The agent could not connect to the Microsoft Operations ' \
+                  'Management Suite service. Please check that the system ' \
+                  'either has Internet access, or that a valid HTTP proxy ' \
+                  'has been configured for the agent. Please also check the ' \
+                  'correctness of the workspace ID.'
     except Exception as e:
         exit_code = 1
         message = '{0} failed with error: {1}\n' \
@@ -146,6 +160,8 @@ def install(hutil):
     """
     Ensure that this VM distro and version are supported.
     Install the OMSAgent shell bundle, using retries.
+    Note: install operation times out from WAAgent at 15 minutes, so do not
+    wait longer.
     """
     exit_if_vm_not_supported(hutil, 'Install')
 
@@ -157,7 +173,9 @@ def install(hutil):
     hutil_log_info(hutil, 'Running command "{0}"'.format(cmd))
 
     # Retry, since install can fail due to concurrent package operations
-    exit_code = run_command_with_retries(hutil, cmd, retries = 10)
+    exit_code = run_command_with_retries(hutil, cmd, retries = 15,
+                                         retry_check = retry_if_dpkg_locked,
+                                         final_check = final_check_if_dpkg_locked)
     return exit_code
 
 
@@ -165,6 +183,7 @@ def uninstall(hutil):
     """
     Uninstall the OMSAgent shell bundle.
     This is a somewhat soft uninstall. It is not a purge.
+    Note: uninstall operation times out from WAAgent at 5 minutes
     """
     file_directory = os.path.join(os.getcwd(), PackagesDirectory)
     file_path = os.path.join(file_directory, BundleFileName)
@@ -174,7 +193,9 @@ def uninstall(hutil):
     hutil_log_info(hutil, 'Running command "{0}"'.format(cmd))
 
     # Retry, since uninstall can fail due to concurrent package operations
-    exit_code = run_command_with_retries(hutil, cmd, retries = 10)
+    exit_code = run_command_with_retries(hutil, cmd, retries = 5,
+                                         retry_check = retry_if_dpkg_locked,
+                                         final_check = final_check_if_dpkg_locked)
     return exit_code
 
 
@@ -184,6 +205,7 @@ def enable(hutil):
     This includes enabling the OMS process on the machine.
     This call will return non-zero if the settings provided are incomplete or
     incorrect.
+    Note: enable operation times out from WAAgent at 5 minutes
     """
     exit_if_vm_not_supported(hutil, 'Enable')
 
@@ -239,9 +261,9 @@ def enable(hutil):
 
     # Check if omsadmin script is available
     if not os.path.exists(OmsAdminPath):
-        log_and_exit(hutil, 'Enable', 1, 'OMSAgent onboarding script {0} not ' \
-                                         'exist. Enable cannot be called ' \
-                                         'before install.'.format(OmsAdminPath))
+        log_and_exit(hutil, 'Enable', EnableCalledBeforeSuccessfulInstall,
+                     'OMSAgent onboarding script {0} not exist. Enable ' \
+                     'cannot be called before install.'.format(OmsAdminPath))
 
     proxyParam = ''
     if proxy is not None:
@@ -258,15 +280,18 @@ def enable(hutil):
                                                                   optionalParams)
 
     hutil_log_info(hutil, 'Handler initiating onboarding.')
-    exit_code, output = run_get_output(onboard_cmd)
-    # To avoid exposing the shared key, print output separately
-    hutil_log_info(hutil, 'Output of onboarding command: \n{0}'.format(output))
+    # To avoid exposing the shared key, do not print the command itself
+    exit_code = run_command_with_retries(hutil, onboard_cmd, retries = 5,
+                                         retry_check = retry_onboarding,
+                                         final_check = raise_if_no_internet,
+                                         check_error = True, log_cmd = False)
     return exit_code
 
 
 def disable(hutil):
     """
     Disable all OMS workspace processes on the machine.
+    Note: disable operation times out from WAAgent at 15 minutes
     """
     # Check if the service control script is available
     if not os.path.exists(OmsAgentServiceScript):
@@ -409,47 +434,111 @@ def run_command_and_log(hutil, cmd, check_error = True, log_cmd = True):
     """
     Run the provided shell command and log its output, including stdout and
     stderr.
+    The output should not contain any PII, but the command might. In this case,
+    log_cmd should be set to False.
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
-    hutil_log_info(hutil, 'Output of command "{0}": \n{1}'.format(cmd,
-                                                                  output))
+    if log_cmd:
+        hutil_log_info(hutil, 'Output of command "{0}": \n{1}'.format(cmd,
+                                                                      output))
+    else:
+        hutil_log_info(hutil, 'Output: \n{0}'.format(output))
     return exit_code, output
 
 
-def run_command_with_retries(hutil, cmd, retries, check_error = True,
+def run_command_with_retries(hutil, cmd, retries, retry_check,
+                             final_check = None, check_error = True,
                              log_cmd = True, initial_sleep_time = 30,
                              sleep_increase_factor = 1):
     """
-    Some commands fail because the package manager is locked (apt-get/dpkg
-    only); this will allow retries on failing commands.
+    Caller provides a method, retry_check, to use to determine if a retry
+    should be performed. This must be a function with two parameters:
+    exit_code and output
+    The final_check can be provided as a method to perform a final check after
+    retries have been exhausted
     Logic used: will retry up to retries times with initial_sleep_time in
     between tries
-    Note: install operation times out from WAAgent at 15 minutes, so do not
-    wait longer.
     """
     try_count = 0
     sleep_time = initial_sleep_time # seconds
-    dpkg_locked_search = r'^.*dpkg.+lock.*$'
-    dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
 
     while try_count <= retries:
         exit_code, output = run_command_and_log(hutil, cmd, check_error, log_cmd)
-        if exit_code is 0:
-            break
-        if not dpkg_locked_re.search(output):
+        should_retry, retry_message = retry_check(exit_code, output)
+        if not should_retry:
             break
         try_count += 1
-        hutil_log_info(hutil, 'Retrying command "{0}" because package manager ' \
-                              'is locked. Command failed with exit code ' \
-                              '{1}'.format(cmd, exit_code))
+        hutil_log_info(hutil, retry_message)
         time.sleep(sleep_time)
         sleep_time *= sleep_increase_factor
 
-    if exit_code is not 0 and dpkg_locked_re.search(output):
-        hutil_log_info(hutil, 'The package manager still appears to be ' \
-                              'locked, so installation cannot completed.')
-        exit_code = DPKGLockedErrorCode
+    if final_check is not None:
+        exit_code = final_check(exit_code, output)
 
+    return exit_code
+
+
+def is_dpkg_locked(exit_code, output):
+    """
+    If dpkg is locked, the output will contain a message similar to 'dpkg 
+    status database is locked by another process'
+    """
+    if exit_code is not 0:
+        dpkg_locked_search = r'^.*dpkg.+lock.*$'
+        dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
+        if dpkg_locked_re.search(output):
+            return True
+    return False
+
+
+def retry_if_dpkg_locked(exit_code, output):
+    """
+    Some commands fail because the package manager is locked (apt-get/dpkg
+    only); this will allow retries on failing commands.
+    """
+    dpkg_locked = is_dpkg_locked(exit_code, output)
+    if dpkg_locked:
+        return True, 'Retrying command because package manager is locked.'
+    else:
+        return False, ''
+
+
+def final_check_if_dpkg_locked(exit_code, output):
+    """
+    If dpkg is still locked after the retries, we want to return a specific
+    error code
+    """
+    dpkg_locked = is_dpkg_locked(exit_code, output)
+    if dpkg_locked:
+        exit_code = DPKGLockedErrorCode
+    return exit_code
+
+
+def retry_onboarding(exit_code, output):
+    """
+    Retry under any of these conditions:
+    - If the onboarding request returns 403: this may indicate that the agent
+      GUID and certificate should be re-generated
+    - If the onboarding request returns a different non-200 code: the OMS
+      service may be temporarily unavailable
+    """
+    if exit_code is EnableErrorOMSReturned403:
+        return True, 'Retrying the onboarding command to attempt generating ' \
+                     'a new agent ID and certificate.'
+    elif exit_code is EnableErrorOMSReturnedNon200:
+        return True, 'Retrying; the OMS service may be temporarily ' \
+                     'unavailable.'
+    return False, ''
+
+
+def raise_if_no_internet(exit_code, output):
+    """
+    Raise the OmsAgentCannotConnectToOMSException exception if the onboarding
+    script returns the error code to indicate that the OMS service can't be
+    resolved
+    """
+    if exit_code is EnableErrorResolvingHost:
+        raise OmsAgentCannotConnectToOMSException
     return exit_code
 
 
@@ -759,6 +848,13 @@ class OmsAgentUnwantedMultipleConnectionsException(Exception):
     """
     This machine is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
+    """
+    pass
+
+
+class OmsAgentCannotConnectToOMSException(Exception):
+    """
+    The OMSAgent cannot connect to the OMS service
     """
     pass
 
