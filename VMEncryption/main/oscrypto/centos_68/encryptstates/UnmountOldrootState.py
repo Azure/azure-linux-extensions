@@ -73,6 +73,9 @@ class UnmountOldrootState(OSEncryptionState):
                 service = splitted[0]
                 self.command_executor.Execute('service {0} restart'.format(service))
 
+        self.command_executor.Execute('umount -a')
+        self.command_executor.Execute('mount -t proc proc /proc')
+        self.command_executor.Execute('mount -t sysfs sysfs /sys')
         self.command_executor.Execute('swapoff -a', True)
 
         self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
@@ -137,7 +140,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
-        self.command_executor.Execute('umount /oldroot', True)
+        self.command_executor.ExecuteInBash('for mp in `grep /oldroot /proc/mounts | cut -f2 -d\' \' | sort -r`; do umount $mp; done', True)
 
         sleep(3)
 
