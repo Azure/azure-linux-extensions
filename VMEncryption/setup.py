@@ -116,6 +116,7 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <IsJsonExtension>true</IsJsonExtension>
 <SupportedOS>Linux</SupportedOS>
 <CompanyName>Microsoft</CompanyName>
+<!--%%REGIONS%%-->
 </ExtensionImage>""" % (CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_description)
 
 extension_xml_file = open('manifest.xml', 'w')
