@@ -598,7 +598,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
         status_data = json.load(jsonData)
         jsonData.close()
 
-    metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formatedMessage": {"message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
+    metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formattedMessage": {"lang": "en-US", "message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
     with open(status_filepath, "w") as fp:
 	status_file_content = [{"status": 
 				{"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
