@@ -38,6 +38,8 @@ from Common import *
 
 class DiskUtil(object):
     os_disk_lvm = None
+    sles_cache = {}
+    device_id_cache = {}
 
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
@@ -505,6 +507,9 @@ class DiskUtil(object):
         mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
         self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
+    def swapoff(self):
+        return self.command_executor.Execute('swapoff -a')
+
     def umount(self, path):
         umount_cmd = self.distro_patcher.umount_path + ' ' + path
         return self.command_executor.Execute(umount_cmd)
@@ -658,20 +663,44 @@ class DiskUtil(object):
         sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
         return self.query_dev_uuid_path_by_sdx_path(sdx_path)
 
-    def get_device_items_property(self, dev_name, property_name):
-        self.logger.log("getting property of device {0}".format(dev_name))
-
+    def get_device_path(self, dev_name):
         device_path = None
+
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
         elif os.path.exists("/dev/mapper/" + dev_name):
             device_path = "/dev/mapper/" + dev_name
 
+        return device_path
+
+    def get_device_id(self, dev_path):
+        if (dev_path) in DiskUtil.device_id_cache:
+            return DiskUtil.device_id_cache[dev_path]
+
+        udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
+        proc_comm = ProcessCommunicator()
+        self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
+        match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
+        DiskUtil.device_id_cache[dev_path] = match[0] if match else ""
+
+        return DiskUtil.device_id_cache[dev_path]
+
+    def get_device_items_property(self, dev_name, property_name):
+        if (dev_name, property_name) in DiskUtil.sles_cache:
+            return DiskUtil.sles_cache[(dev_name, property_name)]
+
+        self.logger.log("getting property of device {0}".format(dev_name))
+
+        device_path = self.get_device_path(dev_name)
+        property_value = ""
+
         if property_name == "SIZE":
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
-            return proc_comm.stdout.strip()
+            property_value = proc_comm.stdout.strip()
+        elif property_name == "DEVICE_ID":
+            property_value = self.get_device_id(device_path)
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
@@ -681,9 +710,22 @@ class DiskUtil(object):
                     disk_info_item_array = line.strip().split()
                     if dev_name == disk_info_item_array[0]:
                         if len(disk_info_item_array) > 1:
-                            return disk_info_item_array[1]
+                            property_value = disk_info_item_array[1]
 
-        return
+        DiskUtil.sles_cache[(dev_name, property_name)] = property_value
+        return property_value
+
+    def get_azure_symlinks(self):
+        azure_udev_links = {}
+
+        if os.path.exists('/dev/disk/azure'):
+            wdbackup = os.getcwd()
+            os.chdir('/dev/disk/azure')
+            for symlink in os.listdir('/dev/disk/azure'):
+                azure_udev_links[os.path.basename(symlink)] = os.path.realpath(symlink)
+            os.chdir(wdbackup)
+
+        return azure_udev_links
 
     def get_device_items_sles(self, dev_path):
         if dev_path:
@@ -713,6 +755,12 @@ class DiskUtil(object):
             device_item.label = self.get_device_items_property(dev_name=device_item.name, property_name='LABEL')
             device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
             device_item.majmin = self.get_device_items_property(dev_name=device_item.name, property_name='MAJ:MIN')
+            device_item.device_id = self.get_device_items_property(dev_name=device_item.name, property_name='DEVICE_ID')
+
+            device_item.azure_name = ''
+            for symlink, target in self.get_azure_symlinks().items():
+                if device_item.name in target:
+                    device_item.azure_name = symlink
 
             # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
@@ -797,6 +845,8 @@ class DiskUtil(object):
                         if property_item_pair[0] == 'MAJ:MIN':
                             device_item.majmin = property_item_pair[1].strip('"')
 
+                    device_item.device_id = self.get_device_id(self.get_device_path(device_item.name))
+
                     if device_item.type is None:
                         device_item.type = ''
 
@@ -806,6 +856,11 @@ class DiskUtil(object):
 
                             if majmin == device_item.majmin:
                                 device_item.name = lvm_item.vg_name + '/' + lvm_item.lv_name
+
+                    device_item.azure_name = ''
+                    for symlink, target in self.get_azure_symlinks().items():
+                        if device_item.name in target:
+                            device_item.azure_name = symlink
 
                     device_items.append(device_item)
 
@@ -870,7 +925,7 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
-    def should_skip_for_inplace_encryption(self, device_item):
+    def should_skip_for_inplace_encryption(self, device_item, encrypt_volume_type):
         """
         TYPE="raid0"
         TYPE="part"
@@ -880,6 +935,16 @@ class DiskUtil(object):
         if the type is disk, then to check whether it have child-items, say the part, lvm or crypt luks.
         if the answer is yes, then skip it.
         """
+
+        if encrypt_volume_type.lower() == 'data':
+            self.logger.log(msg="enabling encryption for data volumes", level=CommonVariables.WarningLevel)
+            if device_item.device_id.startswith('00000000-0000'):
+                self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
+                return True
+            if device_item.device_id.startswith('00000000-0001'):
+                self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
+                return True
+
         if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
             return True

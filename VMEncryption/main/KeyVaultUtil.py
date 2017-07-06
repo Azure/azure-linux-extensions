@@ -92,7 +92,7 @@ class KeyVaultUtil(object):
             return secret_id
         except Exception as e:
             self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
-            return None
+            raise
 
     def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
         if not AADClientSecret and not AADClientCertThumbprint:

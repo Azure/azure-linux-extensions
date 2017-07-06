@@ -128,6 +128,11 @@ class redhatPatching(AbstractPatching):
                     'openssl-devel',
                     'python-devel']
 
+        if self.distro_info[1].startswith("6."):
+            packages.remove('cryptsetup')
+            packages.remove('procps-ng')
+            packages.remove('util-linux')
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 

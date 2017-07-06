@@ -33,6 +33,9 @@ class EncryptionMarkConfig(object):
                                                  'encryption_request_queue',
                                                  self.logger)
 
+    def get_volume_type(self):
+        return self.encryption_mark_config.get_config(CommonVariables.EncryptionVolumeTypeKey)
+
     def get_current_command(self):
         return self.encryption_mark_config.get_config(CommonVariables.EncryptionEncryptionOperationKey)
 
