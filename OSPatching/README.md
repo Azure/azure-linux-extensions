@@ -185,7 +185,7 @@ $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
 $Version = '<version>'
 
-$PublicConf = ConvertTo-Json -InputObject @{
+$PrivateConf = ConvertTo-Json -InputObject @{
     "disabled" = $false;
     "stop" = $true|$false;
     "rebootAfterPatch" = "RebootIfNeed|Required|NotRequired|Auto";
@@ -253,7 +253,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ## 3. Scenarios
 
 ### 3.1 Setting up regularly scheduled patching
-* Protected Settings
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -268,8 +268,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ```
 
 ### 3.2 Setting up one-off patching
-
-* Protected Settings
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -283,7 +282,7 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 ### 3.3 Stop the running patching
 You can stop the OS updates to debug issues. Once the `stop` parameter is set to `true`, the OS update will stop after the current update is finished.
-* Protected Settings
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -293,7 +292,7 @@ You can stop the OS updates to debug issues. Once the `stop` parameter is set to
 
 ### 3.4 Test the idle before patching and the health after patching
 If the `vmStatusTest` scripts are stored in Azure Storage private containers, you have to provide the `storageAccountName` and `storageAccountKey`.
-* Protected Settings
+**Protected Settings**
 ```json
 {
   "disabled": false,
