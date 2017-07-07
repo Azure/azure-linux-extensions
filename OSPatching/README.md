@@ -5,9 +5,6 @@ is scheduled as a cron job.
 
 Lastest version is 2.3.
 
-# :warning: Maintenance Mode :warning:
-The OSPatching Extension is and has been in maintenance mode for some time. This means no new features are planned or funded. Report bugs by creating a new issue in the [GitHub repo](https://github.com/Azure/azure-linux-extensions/issues) and they'll get fixed as resourcing allows. Pull requests for bug fixes or fixing Distro Support issues are welcome and appreciated. Pull Requests for new features will be resisted and a convincing argument will be needed to merge it into the repo.
-
 You can read the User Guide, [Automate Linux VM OS Updates Using OSPatching Extension (outdated, needs to update)](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/).
 
 OSPatching Extension can:
