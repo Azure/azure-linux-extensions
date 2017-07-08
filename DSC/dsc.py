@@ -50,7 +50,7 @@ dsc_build = 1
 dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
-DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
+date_time_format = "%Y-%m-%dT%H:%M:%SZ"
 
 # DSC-specific Operation
 class Operation:
@@ -606,7 +606,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
 			       "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
 				"substatus" : metadatastatus 
 				}, 
-				"version": "1.0", "timestampUTC":   time.strftime(DateTimeFormat, time.gmtime())
+				"version": "1.0", "timestampUTC":   time.strftime(date_time_format, time.gmtime())
 				}]
 	json.dump(status_file_content, fp)
 	waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
