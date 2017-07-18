@@ -26,7 +26,7 @@ import shutil
 import uuid
 import glob
 from common import DeviceItem
-from Utils import HandlerUtil
+import HandlerUtil
 import traceback
 
 class DiskUtil(object):
@@ -257,6 +257,7 @@ class DiskUtil(object):
         self.logger.log("getting the mount-points info using mount command ", True)
         mount_points = []
         fs_types = []
+	file_systems = []
         mount_path = self.patching.mount_path
         is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
         if (is_mount_path_wrong == True):
@@ -281,6 +282,9 @@ class DiskUtil(object):
             for line in lines:
                 line = line.strip()
                 if(line != ""):
+		    file_system = line.split()[0]
+		    if file_system not in file_systems:
+			file_systems.append(file_system)
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):
@@ -304,4 +308,4 @@ class DiskUtil(object):
             if ("fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower()):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
                 break
-        return mount_points, fs_types
+        return mount_points, fs_types, file_systems
