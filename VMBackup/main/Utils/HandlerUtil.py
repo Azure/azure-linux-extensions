@@ -60,6 +60,7 @@ import json
 import tempfile
 import time
 from os.path import join
+import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
@@ -71,6 +72,7 @@ import datetime
 import Status
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
+import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -86,6 +88,7 @@ class HandlerUtility:
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
+        self.log_message = ""
         self._short_name = short_name
         self.patching = None
         self.storageDetailsObj = None
@@ -129,11 +132,16 @@ class HandlerUtility:
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             sys.exit(0)
 
-    def log(self, message):
+    def log(self, message,level='Info'):
         self._log(self._get_log_prefix() + message)
+        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
+
+    def fetch_log_message(self):
+        return self.log_message
 
     def _parse_config(self, ctxt):
         config = None
@@ -159,10 +167,7 @@ class HandlerUtility:
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
-                jctxt = ''
+                jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
@@ -174,6 +179,11 @@ class HandlerUtility:
     def do_parse_context(self, operation):
         self.operation = operation
         _context = self.try_parse_context()
+        getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
+        if(getWaagentPathUsed == 0):
+            self.log("waagent old path is used")
+        else:
+            self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
             sys.exit(0)
@@ -266,7 +276,7 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
-        except:
+        except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
@@ -275,21 +285,24 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
-            Filesystem     1K-blocks    Used Available Use% Mounted on
-            udev             1756684      12   1756672   1% /dev
-            tmpfs             352312     420    351892   1% /run
-            /dev/sda1       30202916 2598292  26338592   9% /
-            none                   4       0         4   0% /sys/fs/cgroup
-            none                5120       0      5120   0% /run/lock
-            none             1761552       0   1761552   0% /run/shm
-            none              102400       0    102400   0% /run/user
-            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
-            tmpfs                  4       4         0 100% /etc/ruxitagentproc
-            /dev/sdb1        7092664   16120   6693216   1% /mnt
+            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
+            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
+            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
+            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
+            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
+            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
+            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
+            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
+            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
+            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
+            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
+            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
             process_wait_time = 30
@@ -300,15 +313,35 @@ class HandlerUtility:
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
+            total_used_network_shares = 0
+            total_used_gluster = 0
+            network_fs_types = []
             for i in range(1,len(output)-1):
-                device, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} used space in KB : {1}".format(device,used))
-                total_used = total_used + int(used) #return in KB
+                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
+                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
+                    if fstype not in network_fs_types :
+                        network_fs_types.append(fstype)
+                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
+                    total_used_network_shares = total_used_network_shares + int(used)
+                elif (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used_gluster = total_used_gluster + int(used)
+                else:
+                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used = total_used + int(used) #return in KB
 
+            if not len(network_fs_types) == 0:
+                HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
+                HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
+            if total_used_gluster !=0 :
+                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
-        except:
-            self.log("Unable to fetch total used space")
+        except Exception as e:
+            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
             return 0,True
 
     def get_storage_details(self):
@@ -433,7 +466,7 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], status_code)
+        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
@@ -445,7 +478,7 @@ class HandlerUtility:
         
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+        if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
@@ -496,3 +529,28 @@ class HandlerUtility:
 
     def get_public_settings(self):
         return self.get_handler_settings().get('publicSettings')
+
+    def is_prev_in_transition(self):
+        curr_seq = self.get_last_seq()
+        last_seq = curr_seq - 1
+        if last_seq >= 0:
+            self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
+            status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+            if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
+                searchfile = open(status_file_prev, "r")
+                for line in searchfile:
+                    if "Transition" in line: 
+                        self.log("transitioning found in the previous status file")
+                        searchfile.close()
+                        return True
+                searchfile.close()
+        return False
+
+    def get_prev_log(self):
+        with open(self._context._log_file, "r") as f:
+            lines = f.readlines()
+        if(len(lines) > 300):
+            lines = lines[-300:]
+            return ''.join(str(x) for x in lines)
+        else:
+            return ''.join(str(x) for x in lines)

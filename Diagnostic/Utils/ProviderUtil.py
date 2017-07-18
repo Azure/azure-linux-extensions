@@ -41,9 +41,9 @@ def IntervalToSeconds(specified_interval):
     """
     interval = specified_interval.upper()
     if interval[0] != 'P':
-        raise ValueError('Not an ISO8601 duration string')
+        raise ValueError('"{0}" is not an IS8601 duration string'.format(interval))
     if interval[1] != 'T':
-        raise ValueError('ISO8601 durations based on days or larger intervals are not supported')
+        raise ValueError('IS8601 durations based on days or larger intervals are not supported: "{0}"'.format(interval))
 
     seconds = 0
     matches = re.findall(r'(\d+)(S|M|H)', interval[2:].upper())

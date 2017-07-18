@@ -10,7 +10,11 @@ ConditionFileIsExecutable={WORKDIR}/diagnostic.py
 Type=simple
 WorkingDirectory={WORKDIR}/
 ExecStart=/usr/bin/python2 {WORKDIR}/diagnostic.py -daemon
-Restart=always
+Restart=on-failure
+TimeoutSec=60
+RestartSec=30
+StartLimitBurst=10
+StartLimitInterval=3600
 
 [Install]
 WantedBy=multi-user.target

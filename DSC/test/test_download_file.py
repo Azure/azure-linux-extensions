@@ -21,12 +21,14 @@ import env
 import dsc
 import os
 from Utils.WAAgentUtil import waagent
+from MockUtil import MockUtil
 
 waagent.LoggerInit('/tmp/test.log','/dev/null')
 
 class TestDownloadFile(unittest.TestCase):
     def test_download_file(self):
-        dsc.download_external_file('https://github.com/Azure/WALinuxAgent/archive/2.0.zip', '/tmp')
+        dsc.hutil = MockUtil(self)	
+        dsc.download_external_file('https://raw.githubusercontent.com/balukambala/azure-linux-extensions/master/DSC/test/mof/dscnode.nxFile.meta.mof', '/tmp')
         
 if __name__ == '__main__':
     unittest.main()
