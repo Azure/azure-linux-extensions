@@ -10,9 +10,8 @@ from DiskUtil import DiskUtil
 import HandlerUtil
 import traceback
 import subprocess
-DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
-   
-class Billing:
+
+class Billing(object):
 
     def __init__(self,patching,logger):
         self.patching=patching
@@ -21,7 +20,9 @@ class Billing:
 
     def get_loop_devices(self):
         disk_util = DiskUtil(patching = self.patching,logger = self.logger)
-        mount_points, fs_types,file_systems = disk_util.get_mount_points()
+        file_systems = disk_util.get_mount_file_systems()
+        self.logger.log("file_systems list : ",True)
+        self.logger.log(str(file_systems),True)
         disk_loop_devices_file_systems = []
         for file_system in file_systems:
             if 'loop' in file_system:
@@ -30,7 +31,7 @@ class Billing:
 
     def get_total_used_size(self):
         try:
-	    df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
@@ -50,15 +51,15 @@ class Billing:
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
-	    
+        
             process_wait_time = 30
             while(process_wait_time >0 and df.poll() is None):
                 time.sleep(1)
                 process_wait_time -= 1
 
-            disk_loop_devices_file_systems = self.get_loop_devices();
+            disk_loop_devices_file_systems = self.get_loop_devices()
             output = df.stdout.read()
-            output = output.split("\n")
+            output = output.strip().split("\n")
             total_used = 0
             total_used_network_shares = 0
             total_used_gluster = 0
@@ -66,30 +67,30 @@ class Billing:
             total_used_temporary_disks = 0 
             total_used_ram_disks = 0 
             network_fs_types = []
-	   
-            for i in range(1,len(output)-1):
-                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+      
+            for line in output[1:]:
+                device, fstype, size, used, available, percent, mountpoint = line.split()
                 self.logger.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint),True)
                 if device == '/dev/sdb1' :
-                    self.logger.log("Not Adding as temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used) 
 
                 elif "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
                     if fstype not in network_fs_types :
                         network_fs_types.append(fstype)
-                    self.logger.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
                 elif "tmpfs" in fstype.lower() or "devtmpfs" in fstype.lower() or "ramdiskfs" in fstype.lower():
-                    self.logger.log("Not Adding as RAM disks, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    self.logger.log("Not Adding RAM disks, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_ram_disks = total_used_ram_disks + int(used)
 
                 elif 'loop' in device and device not in disk_loop_devices_file_systems:
-                    self.logger.log("Not Adding as Loop Device , Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    self.logger.log("Not Adding Loop Device , Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_loop_device = total_used_loop_device + int(used)
 
                 elif (mountpoint.startswith('/run/gluster/snaps/')):
-                    self.logger.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
+                    self.logger.log("Not Adding Gluster Device , Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
                     total_used_gluster = total_used_gluster + int(used)   
 
                 else:
@@ -102,17 +103,17 @@ class Billing:
                 self.logger.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024),True)
             if total_used_gluster !=0 :
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
-	    if total_used_temporary_disks !=0:
-		HandlerUtil.HandlerUtility.add_to_telemetery_data("TemporaryDisksSize",str(total_used_temporary_disks))
-	    if total_used_ram_disks != 0:
-		HandlerUtil.HandlerUtility.add_to_telemetery_data("RamDisksSize",str(total_used_ram_disks))
-	    if total_used_loop_device != 0 :
-		HandlerUtil.HandlerUtility.add_to_telemetery_data("LoopDevicesSize",str(total_used_loop_device))
+            if total_used_temporary_disks !=0:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("tempDisksSize",str(total_used_temporary_disks))
+            if total_used_ram_disks != 0:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("ramDisksSize",str(total_used_ram_disks))
+            if total_used_loop_device != 0 :
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
             return total_used * 1024,False #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-     	    self.logger.log(errMsg,True)
+            self.logger.log(errMsg,True)
             return 0,True
 
 

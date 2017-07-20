@@ -102,16 +102,22 @@ def status_report(status, status_code, message, snapshot_info = None):
     global MyPatching,backup_logger,hutil,para_parser
     trans_report_msg = None
     try:
-	billing = Billing.Billing(patching = MyPatching , logger = backup_logger)
+        billing = Billing.Billing(patching = MyPatching , logger = backup_logger)
         total_size,failure_flag = billing.get_total_used_size()
-
+        number_of_blobs = len(para_parser.blobs)
+        maximum_possible_size = number_of_blobs * 1099511627776
+        if(total_size>maximum_possible_size):
+            total_size = maximum_possible_size   
+        backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_size,maximum_possible_size),True) 
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
             trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
                     taskId=para_parser.taskId,\
                     commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                    snapshot_info=snapshot_info,total_size = total_size,failure_flag = failure_flag)
+                    snapshot_info=snapshot_info,\
+                    total_size = total_size,\
+                    failure_flag = failure_flag)
     except Exception as e:
         err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(err_msg, True, 'Warning')
