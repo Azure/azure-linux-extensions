@@ -25,7 +25,7 @@ import time
 import sys
 import signal
 import traceback
-from DiskUtil import DiskUtil 
+
 
 class FreezeError(object):
     def __init__(self):
