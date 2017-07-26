@@ -43,7 +43,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
-from Utils import Billing 
+from Utils import SizeCalculation
 from Utils import Status
 from urlparse import urlparse
 from snapshotter import Snapshotter
@@ -57,13 +57,15 @@ from PluginHost import PluginHost
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed
     try:
         run_result = CommonVariables.success
         run_status = 'success'
         error_msg = ''
         freeze_result = None
         snapshot_info_array = None
+        total_used_size = -1
+        size_calculation_failed = False
         HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
         HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -99,16 +101,17 @@ def timedelta_total_seconds(delta):
         return delta.total_seconds()
 
 def status_report(status, status_code, message, snapshot_info = None):
-    global MyPatching,backup_logger,hutil,para_parser
+    global MyPatching,backup_logger,hutil,para_parser,total_used_size,size_calculation_failed
     trans_report_msg = None
     try:
-        billing = Billing.Billing(patching = MyPatching , logger = backup_logger)
-        total_size,failure_flag = billing.get_total_used_size()
-        number_of_blobs = len(para_parser.blobs)
-        maximum_possible_size = number_of_blobs * 1099511627776
-        if(total_size>maximum_possible_size):
-            total_size = maximum_possible_size   
-        backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_size,maximum_possible_size),True) 
+        if total_used_size == -1 :
+            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
+            total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
+            number_of_blobs = len(para_parser.blobs)
+            maximum_possible_size = number_of_blobs * 1099511627776
+            if(total_used_size>maximum_possible_size):
+                total_used_size = maximum_possible_size
+            backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
             trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
@@ -116,8 +119,8 @@ def status_report(status, status_code, message, snapshot_info = None):
                     taskId=para_parser.taskId,\
                     commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                     snapshot_info=snapshot_info,\
-                    total_size = total_size,\
-                    failure_flag = failure_flag)
+                    total_size = total_used_size,\
+                    failure_flag = size_calculation_failed)
     except Exception as e:
         err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(err_msg, True, 'Warning')

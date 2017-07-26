@@ -286,18 +286,35 @@ class DiskUtil(object):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
                 break
         return mount_points, fs_types
+
     def get_mount_file_systems(self):
         out_mount_output = self.get_mount_output()
-        file_systems = []
+        file_systems_info = []
         if (out_mount_output is not None):
             lines = out_mount_output.splitlines()
             for line in lines:
                 line = line.strip()
                 if(line != ""):
                     file_system = line.split()[0]
-                    if file_system not in file_systems:
-                        file_systems.append(file_system)
-        return file_systems
+                    mountPrefixStr = " on /"
+                    prefixIndex = line.find(mountPrefixStr)
+                    if(prefixIndex >= 0):
+                        mountpointStart = prefixIndex + len(mountPrefixStr) - 1
+                        fstypePrefixStr = " type "
+                        mountpointEnd = line.find(fstypePrefixStr, mountpointStart)
+                        if(mountpointEnd >= 0):
+                            mount_point = line[mountpointStart:mountpointEnd]
+                            fs_type = ""
+                            fstypeStart = line.find(fstypePrefixStr) + len(fstypePrefixStr) - 1
+                            if(line.find(fstypePrefixStr) >= 0):
+                                fstypeEnd = line.find(" ", fstypeStart+1)
+                                if(fstypeEnd >=0):
+                                    fs_type = line[fstypeStart+1:fstypeEnd]
+                            # If there is a duplicate, keep only the first instance
+                    if (file_system,fs_type,mount_point) not in file_systems_info:
+                        file_systems_info.append((file_system,fs_type,mount_point))
+        return file_systems_info
+
     def get_mount_output(self):
         # Get the output on the mount command
         self.logger.log("getting the mount-points info using mount command ", True)

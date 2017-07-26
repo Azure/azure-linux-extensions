@@ -11,27 +11,29 @@ import HandlerUtil
 import traceback
 import subprocess
 
-class Billing(object):
+class SizeCalculation(object):
 
     def __init__(self,patching,logger):
         self.patching=patching
         self.logger=logger
+        self.file_systems_info = []
         
 
     def get_loop_devices(self):
         disk_util = DiskUtil(patching = self.patching,logger = self.logger)
-        file_systems = disk_util.get_mount_file_systems()
+        if len(self.file_systems_info) == 0 :
+            self.file_systems_info = disk_util.get_mount_file_systems()
         self.logger.log("file_systems list : ",True)
-        self.logger.log(str(file_systems),True)
+        self.logger.log(str(self.file_systems_info),True)
         disk_loop_devices_file_systems = []
-        for file_system in file_systems:
-            if 'loop' in file_system:
-                disk_loop_devices_file_systems.append(file_system)
+        for file_system_info in self.file_systems_info:
+            if 'loop' in file_system_info[0]:
+                disk_loop_devices_file_systems.append(file_system_info[0])
         return disk_loop_devices_file_systems
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
@@ -68,8 +70,15 @@ class Billing(object):
             total_used_ram_disks = 0 
             network_fs_types = []
       
+            if len(self.file_systems_info) == 0 :
+                self.file_systems_info = disk_util.get_mount_file_systems()
+
             for line in output[1:]:
-                device, fstype, size, used, available, percent, mountpoint = line.split()
+                device, size, used, available, percent, mountpoint = line.split()
+                fstype = ''
+                for file_system_info in self.file_systems_info:
+                    if device == file_system_info[0] and mountpoint == file_system_info[2]:
+                        fstype = file_system_info[1]
                 self.logger.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint),True)
                 if device == '/dev/sdb1' :
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)

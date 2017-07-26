@@ -252,13 +252,6 @@ class ScriptRunner(object):
 
         result = ScriptRunnerResult()
 
-        if not self.PreScriptCompletedSuccessfully:
-            self.logger.log('PreScript execution did not complete for ' + self.pluginName + ' .So, Post Script is not triggered', True, 'Info')
-            postScriptCompleted[pluginIndex] = True
-            result.continueBackup = self.continueBackupOnFailure
-            postScriptResult[pluginIndex] = result
-            return
-
         result.requiredNoOfRetries = self.postScriptNoOfRetries
 
         paramsStr = ['sh',str(self.postScriptLocation)]
