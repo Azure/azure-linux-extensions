@@ -32,7 +32,7 @@ def thread_for_binary(self,args):
     time.sleep(5)
     self.logger.log("Waited in thread for 5 seconds",True)
     self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-    self.logger.log("",True)
+    self.logger.log("Binary subprocess Created",True)
 
 class FreezeError(object):
     def __init__(self):
