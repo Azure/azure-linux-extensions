@@ -1,3 +1,20 @@
+# IMPORTANT
+**The OSPatching extension for Linux is being deprecated.**
+
+OSPatchingForLinux is no longer supported, maintained, and will have no future
+bug fixes or version releases.
+
+Your Linux distro has well supported and maintained ways to enable automatic updates
+for your VMs to include VMs you use in Production environments. It is highly
+recommended that you consult your distro's best practices for automatic updates.
+
+## Linux Distributions
+- Ubuntu
+  - See the [unattended-upgrades](https://help.ubuntu.com/lts/serverguide/automatic-updates.html) package documentation
+- CentOS and RHEL
+  - See the manpage of `yum-cron` for the auto-update mechanism documentation
+
+
 # OSPatching Extension
 Allows the owner of the Azure VM to configure a Linux VM patching schedule cycle
 or perform OS patching on-demand as a one-time task. The actual patching operation
@@ -324,23 +341,12 @@ a no-op (nothing will happen). If you need to run scripts repeatedly, you can ad
 ### 3.6 Disable the extension
 If you want to switch to manual OS update temporarily, you can set the `disable` parameter to `true` instead of uninstalling the OSPatching Extension.
 
-## Supported Linux Distributions
-- Ubuntu 12.04 and higher
-- CentOS 6.5 and higher
-- Oracle Linux 6.4.0.0.0 and higher
-- OpenSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 11 SP3 and higher
-
 ## Debugging
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 * The installation status of the extension is reported back to Azure so that the user can see the status on Azure Portal.
   This does not mean the OSPatching Extension successfully applied the current configuration to the VM.
 * Attempting to enable the OSPatching Extension 2 or more times with the same configuration will result in nothing happening.
   See [Enable the extension repeatedly](#3.5 Enable the extension repeatedly) section above for more details.
-
-## Mitigations
-If the OSPatching Extension is not working, your Linux distro likely has a recommended way to configure automatic updates. Some distros such as Ubuntu will have an automated way to keep your machine patched. Please refer to your distro's documentation for more information.
-* [Ubuntu Automatic Updates](https://help.ubuntu.com/lts/serverguide/automatic-updates.html)
 
 # Known Issues
 * If the scheduled task does not run on some RedHat distros, there may be a selinux-policy problem. Please refer to
