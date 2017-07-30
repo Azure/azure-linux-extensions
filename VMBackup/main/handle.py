@@ -142,13 +142,29 @@ def exit_with_commit_log(status,result,error_msg, para_parser):
     status_report(status, result, error_msg, None)
     sys.exit(0)
 
-def exit_if_same_taskId(taskId):  
-    global backup_logger  
-    taskIdentity = TaskIdentity()  
-    last_taskId = taskIdentity.stored_identity()  
-    if(taskId == last_taskId):  
-        backup_logger.log("TaskId is same as last, so skip, current:" + str(taskId) + "== last:" + str(last_taskId), True)  
-        sys.exit(0)  
+def exit_if_same_taskId(taskId):
+    global backup_logger,hutil,para_parser
+    trans_report_msg = None
+    taskIdentity = TaskIdentity()
+    last_taskId = taskIdentity.stored_identity()
+    if(taskId == last_taskId):
+        backup_logger.log("TaskId is same as last, so skip with Processed Status, current:" + str(taskId) + "== last:" + str(last_taskId), True)
+        status= 'success'
+        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput)
+        status_code=CommonVariables.SuccessAlreadyProcessedInput
+        message='TaskId same nothing to do'
+        try:
+            if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+                trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
+                        status_code=str(status_code),\
+                        message=message,\
+                        taskId=para_parser.taskId,\
+                        commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
+                        snapshot_info=None)
+        except Exception as e:
+            err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
+            backup_logger.log(err_msg, True, 'Warning')
+        sys.exit(0)
 
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
@@ -517,15 +533,16 @@ def enable():
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         hutil.save_seq()
+        status_upload_thread=Thread(target=thread_for_status_upload)
+        status_upload_thread.start() 
         if(hutil.is_prev_in_transition()):
             backup_logger.log('retrieving the previous logs for this', True)
             backup_logger.set_prev_log()
         if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-            backup_logger.commit(para_parser.logsBlobUri)
-        temp_status= 'transitioning'
-        temp_result=CommonVariables.success
-        temp_msg='Transitioning state in enable'
-        status_report(temp_status, temp_result, temp_msg, None)
+            log_upload_thread=Thread(target=thread_for_log_upload)
+            log_upload_thread.start()
+            log_upload_thread.join(60)
+        status_upload_thread.join(60)
         start_daemon();
         sys.exit(0)
     except Exception as e:
@@ -537,6 +554,16 @@ def enable():
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+
+def thread_for_status_upload():
+    temp_status= 'transitioning'
+    temp_result=CommonVariables.success
+    temp_msg='Transitioning state in enable'
+    status_report(temp_status, temp_result, temp_msg, None)
+
+def thread_for_log_upload():
+    global para_parser,backup_logger
+    backup_logger.commit(para_parser.logsBlobUri)
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), __file__), "-daemon"]
