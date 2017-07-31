@@ -54,8 +54,8 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
-test_manifest = "manifest.xml"
-prod_manifest = "prodmanifest.xml"
+test_manifest = "testmanifest.xml"
+prod_manifest = "manifest.xml"
 
 """
 copy the dependency to the local
