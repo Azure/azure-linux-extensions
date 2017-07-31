@@ -83,7 +83,8 @@ class HandlerContext:
         return
 
 class HandlerUtility:
-    telemetry_data = []
+    telemetry_data = {} 
+    serializable_telemetry_data = []
     ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
@@ -446,11 +447,7 @@ class HandlerUtility:
 
     @staticmethod
     def add_to_telemetery_data(key,value):
-        temp_dict = {}
-        temp_dict["Value"] = value
-        temp_dict["Key"] = key
-        if(temp_dict not in HandlerUtility.telemetry_data):
-            HandlerUtility.telemetry_data.append(temp_dict)
+        HandlerUtility.telemetry_data[key]=value
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
@@ -458,7 +455,15 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
-
+    
+    def convert_telemetery_data_to_bcm_serializable_format(self):
+        HandlerUtility.serializable_telemetry_data = []
+        for k,v in HandlerUtility.telemetry_data.items():
+            each_telemetry_data = {}
+            each_telemetry_data["Value"] = v
+            each_telemetry_data["Key"] = k
+            HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
+ 
     def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
@@ -466,7 +471,8 @@ class HandlerUtility:
         self.add_telemetry_data()
 
         vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
+        self.convert_telemetery_data_to_bcm_serializable_format()
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -486,10 +492,13 @@ class HandlerUtility:
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
-        if self._context._status_file:
-            with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept_file)
-
+        try:
+            if self._context._status_file:
+                with open(self._context._status_file,'w+') as f:
+                    f.write(stat_rept_file)
+        except Exception as e:
+            errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
         return stat_rept
 
     def backup_settings_status_file(self, _seq_no):

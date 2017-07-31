@@ -61,6 +61,7 @@ class CommonVariables:
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
     FailedFsFreezeFailed = 121
+    SuccessAlreadyProcessedInput = 3
 
     """
     Pre-Post Plugin error code definitions
