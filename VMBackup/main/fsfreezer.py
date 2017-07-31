@@ -25,7 +25,14 @@ import time
 import sys
 import signal
 import traceback
+import threading
 
+def thread_for_binary(self,args):
+    self.logger.log("Thread for binary is called",True)
+    time.sleep(5)
+    self.logger.log("Waited in thread for 5 seconds",True)
+    self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+    self.logger.log("Binary subprocess Created",True)
 
 class FreezeError(object):
     def __init__(self):
@@ -61,9 +68,11 @@ class FreezeHandler(object):
             self.logger.log("binary child terminated",True)
             self.sig_handle=2
 
+
     def startproc(self,args):
-        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-        for i in range(0,30):
+        binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+        binary_thread.start()
+        for i in range(0,33):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
