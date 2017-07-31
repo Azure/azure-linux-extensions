@@ -149,16 +149,16 @@ def exit_if_same_taskId(taskId):
     last_taskId = taskIdentity.stored_identity()
     if(taskId == last_taskId):
         backup_logger.log("TaskId is same as last, so skip with Processed Status, current:" + str(taskId) + "== last:" + str(last_taskId), True)
-        status= 'success'
+        status=CommonVariables.status_success 
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput)
         status_code=CommonVariables.SuccessAlreadyProcessedInput
-        message='TaskId same nothing to do'
+        message='TaskId AlreadyProcessed nothing to do'
         try:
-            if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+            if(para_parser is not None):
                 trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                         status_code=str(status_code),\
                         message=message,\
-                        taskId=para_parser.taskId,\
+                        taskId=taskId,\
                         commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                         snapshot_info=None)
         except Exception as e:
