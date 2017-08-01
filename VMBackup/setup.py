@@ -55,7 +55,8 @@ patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
 test_manifest = "testmanifest.xml"
-prod_manifest = "manifest.xml"
+manifest = "manifest.xml"
+prod_manifest = "prodmanifest.xml"
 
 """
 copy the dependency to the local
@@ -175,6 +176,7 @@ copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
 copy(test_manifest,final_folder_path)
+copy(manifest,final_folder_path)
 copy(prod_manifest,final_folder_path)
 zip(final_folder_path, target_zip_file_path)
 
