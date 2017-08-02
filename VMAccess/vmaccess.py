@@ -25,9 +25,7 @@ import time
 import traceback
 
 import Utils.HandlerUtil as Util
-from waagentloader import load_waagent
-
-waagent = load_waagent()
+from Utils import waagent20 as waagent
 
 # Define global variables
 ExtensionShortName = 'VMAccess'
