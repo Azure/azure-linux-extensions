@@ -25,29 +25,8 @@ import os.path
 # The following code will search and load waagent code and expose
 # it as a submodule of current module
 #
-def searchWAAgent():
-    # if the extension ships waagent in its package to default to this version first
-    pkg_agent_path = os.path.join(os.getcwd(), 'waagent')
-    if os.path.isfile(pkg_agent_path):
-        return pkg_agent_path
 
-    agentPath = '/usr/sbin/waagent'
-    if os.path.isfile(agentPath):
-        return agentPath
-
-    user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
-    for user_path in user_paths:
-        agentPath = os.path.join(user_path, 'waagent')
-        if os.path.isfile(agentPath):
-            return agentPath
-    return None
-
-waagent = None
-agentPath = searchWAAgent()
-if agentPath:
-    waagent = imp.load_source('waagent', agentPath)
-else:
-    raise Exception("Can't load waagent.")
+from . import waagent20 as waagent
 
 if not hasattr(waagent, "AddExtensionEvent"):
     """

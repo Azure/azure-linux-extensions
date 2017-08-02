@@ -62,8 +62,7 @@ import time
 
 from xml.etree import ElementTree
 from os.path import join
-from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
+from .waagent20 import LoggerInit
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
