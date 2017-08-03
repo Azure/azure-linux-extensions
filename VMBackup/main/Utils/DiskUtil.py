@@ -26,7 +26,7 @@ import shutil
 import uuid
 import glob
 from common import DeviceItem
-from Utils import HandlerUtil
+import HandlerUtil
 import traceback
 
 class DiskUtil(object):
@@ -253,28 +253,9 @@ class DiskUtil(object):
         return is_mount_path_wrong, out_mount_output, error_msg
 
     def get_mount_points(self):
-        # Get the output on the mount command
-        self.logger.log("getting the mount-points info using mount command ", True)
         mount_points = []
         fs_types = []
-        mount_path = self.patching.mount_path
-        is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        if (is_mount_path_wrong == True):
-            if self.patching.usr_flag == 1:
-                self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
-                mount_path = "/bin/mount"
-            else:
-                self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
-                mount_path = "/usr/bin/mount"
-            is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        # if mount_path was still wrong, mount_path using "which" command
-        if (is_mount_path_wrong == True):
-            self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
-            out_which_output, which_error_msg = self.get_which_command_result('mount')
-            # get mount command output
-            if (out_which_output is not None):
-                 mount_path = str(out_which_output)
-                 is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+        out_mount_output = self.get_mount_output()
         if (out_mount_output is not None):
             #Extract the list of mnt_point in order
             lines = out_mount_output.splitlines()
@@ -305,3 +286,55 @@ class DiskUtil(object):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
                 break
         return mount_points, fs_types
+
+    def get_mount_file_systems(self):
+        out_mount_output = self.get_mount_output()
+        file_systems_info = []
+        if (out_mount_output is not None):
+            lines = out_mount_output.splitlines()
+            for line in lines:
+                line = line.strip()
+                if(line != ""):
+                    file_system = line.split()[0]
+                    mountPrefixStr = " on /"
+                    prefixIndex = line.find(mountPrefixStr)
+                    if(prefixIndex >= 0):
+                        mountpointStart = prefixIndex + len(mountPrefixStr) - 1
+                        fstypePrefixStr = " type "
+                        mountpointEnd = line.find(fstypePrefixStr, mountpointStart)
+                        if(mountpointEnd >= 0):
+                            mount_point = line[mountpointStart:mountpointEnd]
+                            fs_type = ""
+                            fstypeStart = line.find(fstypePrefixStr) + len(fstypePrefixStr) - 1
+                            if(line.find(fstypePrefixStr) >= 0):
+                                fstypeEnd = line.find(" ", fstypeStart+1)
+                                if(fstypeEnd >=0):
+                                    fs_type = line[fstypeStart+1:fstypeEnd]
+                            # If there is a duplicate, keep only the first instance
+                    if (file_system,fs_type,mount_point) not in file_systems_info:
+                        file_systems_info.append((file_system,fs_type,mount_point))
+        return file_systems_info
+
+    def get_mount_output(self):
+        # Get the output on the mount command
+        self.logger.log("getting the mount-points info using mount command ", True)
+        mount_path = self.patching.mount_path
+        is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+        if (is_mount_path_wrong == True):
+            if self.patching.usr_flag == 1:
+                self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
+                mount_path = "/bin/mount"
+            else:
+                self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
+                mount_path = "/usr/bin/mount"
+            is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+        # if mount_path was still wrong, mount_path using "which" command
+        if (is_mount_path_wrong == True):
+            self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
+            out_which_output, which_error_msg = self.get_which_command_result('mount')
+            # get mount command output
+            if (out_which_output is not None):
+                 mount_path = str(out_which_output)
+                 is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+        return out_mount_output
+
