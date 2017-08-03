@@ -52,6 +52,11 @@ def install():
         hutil.do_exit(1, 'Install', 'error', '0', 'Install Failed.')
 
 def enable():
+    hutil.log("WARNING: The OSPatching extension for Linux has been deprecated. "
+              "Please see the GitHub project "
+              "(https://github.com/Azure/azure-linux-extensions/tree/master/OSPatching) "
+              "for more information.")
+
     hutil.do_parse_context('Enable')
     try:
         protected_settings = hutil.get_protected_settings()
