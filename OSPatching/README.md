@@ -1,12 +1,11 @@
 # IMPORTANT
 **The OSPatching extension for Linux is being deprecated.**
 
-OSPatchingForLinux is no longer supported, maintained, and will have no future
-bug fixes or version releases.
+OSPatchingForLinux is deprecated and will be retired February 2018.
 
 Your Linux distro has well supported and maintained ways to enable automatic updates
-for your VMs to include VMs you use in Production environments. It is highly
-recommended that you consult your distro's best practices for automatic updates.
+for your VMs to include VMs you use in Production environments. It is recommended
+that you consult your distro's best practices for automatic updates.
 
 ## Linux Distributions
 - Ubuntu
