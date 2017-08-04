@@ -329,6 +329,7 @@ class LadLoggingConfig:
   pos_file /var/opt/microsoft/omsagent/LAD/tmp/filelogs.pos
   tag mdsd.filelog.*
   format none
+  run_interval 15s
 </source>
 
 # Add FileTag field, rename message to Msg
