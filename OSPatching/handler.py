@@ -75,7 +75,7 @@ def enable():
         copy_vmstatustestscript(hutil.get_seq_no(), oneoff)
         MyPatching.enable()
         current_config = MyPatching.get_current_config()
-        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded. Current Configuration: ' + current_config)
+        hutil.do_exit(0, 'Enable', 'warning', '0', 'Enable Succeeded. OSPatching is deprecated. See https://github.com/Azure/azure-linux-extensions/tree/master/OSPatching for more info. Current Configuration: ' + current_config)
     except Exception, e:
         current_config = MyPatching.get_current_config()
         hutil.error("Failed to enable the extension with error: %s, stack trace: %s" %(str(e), traceback.format_exc()))
