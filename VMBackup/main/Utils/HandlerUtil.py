@@ -83,7 +83,8 @@ class HandlerContext:
         return
 
 class HandlerUtility:
-    telemetry_data = []
+    telemetry_data = {} 
+    serializable_telemetry_data = []
     ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
@@ -285,21 +286,24 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
-            Filesystem     1K-blocks    Used Available Use% Mounted on
-            udev             1756684      12   1756672   1% /dev
-            tmpfs             352312     420    351892   1% /run
-            /dev/sda1       30202916 2598292  26338592   9% /
-            none                   4       0         4   0% /sys/fs/cgroup
-            none                5120       0      5120   0% /run/lock
-            none             1761552       0   1761552   0% /run/shm
-            none              102400       0    102400   0% /run/user
-            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
-            tmpfs                  4       4         0 100% /etc/ruxitagentproc
-            /dev/sdb1        7092664   16120   6693216   1% /mnt
+            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
+            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
+            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
+            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
+            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
+            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
+            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
+            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
+            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
+            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
+            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
+            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
             process_wait_time = 30
@@ -310,15 +314,30 @@ class HandlerUtility:
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
+            total_used_network_shares = 0
+            total_used_gluster = 0
+            network_fs_types = []
             for i in range(1,len(output)-1):
-                device, size, used, available, percent, mountpoint = output[i].split()
-                if not (mountpoint.startswith('/run/gluster/snaps/')):
+                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
+                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
+                    if fstype not in network_fs_types :
+                        network_fs_types.append(fstype)
+                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
+                    total_used_network_shares = total_used_network_shares + int(used)
+                elif (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used_gluster = total_used_gluster + int(used)
+                else:
                     self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
                     total_used = total_used + int(used) #return in KB
-                else:
-                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    HandlerUtility.add_to_telemetery_data("glusterFSPresent","True")
 
+            if not len(network_fs_types) == 0:
+                HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
+                HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
+            if total_used_gluster !=0 :
+                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
         except Exception as e:
@@ -326,9 +345,8 @@ class HandlerUtility:
             self.log(errMsg)
             return 0,True
 
-    def get_storage_details(self):
+    def get_storage_details(self,total_size,failure_flag):
         if(self.storageDetailsObj == None):
-            total_size,failure_flag = self.get_total_used_size()
             self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
@@ -338,10 +356,10 @@ class HandlerUtility:
         if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
             self.ExtErrorCode = extErrorCode
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(total_size,failure_flag), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
         top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
@@ -429,11 +447,7 @@ class HandlerUtility:
 
     @staticmethod
     def add_to_telemetery_data(key,value):
-        temp_dict = {}
-        temp_dict["Value"] = value
-        temp_dict["Key"] = key
-        if(temp_dict not in HandlerUtility.telemetry_data):
-            HandlerUtility.telemetry_data.append(temp_dict)
+        HandlerUtility.telemetry_data[key]=value
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
@@ -441,15 +455,24 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
-
-    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None):
+    
+    def convert_telemetery_data_to_bcm_serializable_format(self):
+        HandlerUtility.serializable_telemetry_data = []
+        for k,v in HandlerUtility.telemetry_data.items():
+            each_telemetry_data = {}
+            each_telemetry_data["Value"] = v
+            each_telemetry_data["Key"] = k
+            HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
+ 
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
 
         vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        self.convert_telemetery_data_to_bcm_serializable_format()
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -460,19 +483,22 @@ class HandlerUtility:
         
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+        if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
-        if self._context._status_file:
-            with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept_file)
-
+        try:
+            if self._context._status_file:
+                with open(self._context._status_file,'w+') as f:
+                    f.write(stat_rept_file)
+        except Exception as e:
+            errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
         return stat_rept
 
     def backup_settings_status_file(self, _seq_no):

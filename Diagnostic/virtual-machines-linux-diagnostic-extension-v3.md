@@ -295,15 +295,13 @@ Either "table" or "sinks", or both, must be specified.
 Controls the capture of log files by rsyslogd or syslog-ng. As new text lines are written to the file, rsyslogd/syslog-ng captures them and passes them to the diagnostic extension, which in turn writes them as table rows or to the specified sinks (JsonBlob or EventHub).
 
 ```json
-"fileLogs": {
-    "fileLogConfiguration": [
-        {
-            "file": "/var/log/mydaemonlog",
-            "table": "MyDaemonEvents",
-            "sinks": ""
-        }
-    ]
-}
+"fileLogs": [
+    {
+        "file": "/var/log/mydaemonlog",
+        "table": "MyDaemonEvents",
+        "sinks": ""
+    }
+]
 ```
 
 Element | Value

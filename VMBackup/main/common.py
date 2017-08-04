@@ -20,7 +20,7 @@ class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
     extension_name = 'MyBackupTestLinuxInt'
-    extension_version = "1.0.9113"
+    extension_version = "1.0.9118.0"
     extension_zip_version = "1"
     extension_type = extension_name
     extension_media_link = 'https://sopattna.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
@@ -61,6 +61,7 @@ class CommonVariables:
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
     FailedFsFreezeFailed = 121
+    SuccessAlreadyProcessedInput = 3
 
     """
     Pre-Post Plugin error code definitions

@@ -22,7 +22,7 @@ import re
 import sys
 import subprocess
 import types
-from DiskUtil import DiskUtil
+from Utils.DiskUtil import DiskUtil
 
 from StringIO import StringIO
 

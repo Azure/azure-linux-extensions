@@ -54,6 +54,10 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+test_manifest = "testmanifest.xml"
+manifest = "manifest.xml"
+prod_manifest = "prodmanifest.xml"
+
 """
 copy the dependency to the local
 """
@@ -91,29 +95,6 @@ manifest_str = json.dumps(manifest_obj, sort_keys = True, indent = 4)
 manifest_file = open("HandlerManifest.json", "w") 
 manifest_file.write(manifest_str)
 manifest_file.close()
-
-
-
-"""
-generate the extension xml file
-"""
-extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.Azure.Backup.Test</ProviderNameSpace>
-<Type>%s</Type>
-<Version>%s</Version>
-<Label>%s</Label>
-<HostingResources>VmRole</HostingResources>
-<MediaLink></MediaLink>
-<Description>%s</Description>
-<IsInternalExtension>true</IsInternalExtension>
-<Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
-<PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
-<HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
-<IsJsonExtension>true</IsJsonExtension>
-<SupportedOS>Linux</SupportedOS>
-<CompanyName>Microsoft Open Source Technology Center</CompanyName>
-<!--%%REGIONS%%-->
-</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_description)
 
 """
 generate the safe freeze binary
@@ -162,10 +143,6 @@ target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
 
-extension_xml_file = open(target_zip_file_location + target_folder_name + '/manifest.xml', 'w')
-extension_xml_file.write(extension_xml_file_content)
-extension_xml_file.close()
-
 def dos2unix(src):
     args = ["dos2unix",src]
     devnull = open(os.devnull, 'w')
@@ -198,5 +175,8 @@ final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
+copy(test_manifest,final_folder_path)
+copy(manifest,final_folder_path)
+copy(prod_manifest,final_folder_path)
 zip(final_folder_path, target_zip_file_path)
 

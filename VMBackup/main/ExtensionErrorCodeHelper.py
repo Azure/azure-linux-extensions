@@ -36,6 +36,7 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
+    SuccessAlreadyProcessedInput = 3
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -44,6 +45,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
+            ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
@@ -81,6 +83,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : "ExtensionTempTerminalState",
             ExtensionErrorCodeEnum.error : "error",
             ExtensionErrorCodeEnum.error_12 : "error_12",
+            ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : "SuccessAlreadyProcessedInput",
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",

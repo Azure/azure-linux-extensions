@@ -1,7 +1,7 @@
 # OmsAgent Extension
 Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboard to Operations Management Suite
 
-Latest version is 1.3.
+Latest version is 1.4.
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
@@ -34,7 +34,7 @@ Schema for the protected configuration file looks like this:
 
 * `workspaceKey`: (required, string) the primary/secondary shared key of the workspace
 * `proxy`: (optional, string) the proxy connection string - of the form \[user:pass@\]host\[:port\]
-* `vmResourceId`: (optional, string) the full azure resource id of the vm - of the form /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/virtualMachines/{vmName}
+* `vmResourceId`: (optional, string) the full azure resource id of the vm - of the form /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/virtualMachines/{vmName} for Resource Manager VMs and of the form /subscriptions/{subscriptionId}/resourceGroups/{vmName}/providers/Microsoft.ClassicCompute/virtualMachines/{vmName} for Classic VMs
 
 ```json
 {
@@ -180,7 +180,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.EnterpriseCloud.Monitoring",
     "type": "OmsAgentForLinux",
-    "typeHandlerVersion": "1.3",
+    "typeHandlerVersion": "1.4",
     "settings": {
       "workspaceId": "<workspace id>",
       "stopOnMultipleConnections": true/false
@@ -230,29 +230,18 @@ and the tail of the output is logged into the log directory specified
 in HandlerEnvironment.json and reported back to Azure
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
 
-### Error codes and their meanings
+### Common error codes and their meanings
 
 | Error Code | Meaning | Possible Action |
 | :---: | --- | --- |
-| 2 | Invalid option provided to the shell bundle | |
-| 3 | No option provided to the shell bundle | |
-| 4 | Invalid package type | |
-| 5 | The shell bundle must be executed as root | |
-| 6 | Invalid package architecture | |
 | 10 | VM is already connected to an OMS workspace | To connect the VM to the workspace specified in the extension schema, set stopOnMultipleConnections to false in public settings or remove this property. This VM gets billed once for each workspace it is connected to. |
 | 11 | Invalid config provided to the extension | Follow the preceding examples to set all property values necessary for deployment. |
-| 20 | Installation of SCX/OMI failed | |
-| 21 | Installation of SCX/Provider kits failed | |
-| 22 | Installation of bundled package failed | |
-| 23 | SCX or OMI package already installed | |
-| 30 | Internal bundle error | |
+| 12 | The dpkg package manager is locked | Make sure all dpkg update operations on the machine have finished and retry. |
+| 20 | Enable called prematurely | [Update the Azure Linux Agent](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/update-agent) to the latest available version. |
 | 51 | This extension is not supported on the VM's operation system | |
-| 60 | Unsupported version of OpenSSL | Install a version of OpenSSL meeting our [package requirements](https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/docs/OMS-Agent-for-Linux.md#package-requirements). |
-| 61 | Missing Python ctypes library | Install the Python ctypes library or package (python-ctypes). |
-| 62 | Missing tar program | Install tar. |
-| 63 | Missing sed program | Install sed. |
+| 55 | Cannot connect to the Microsoft Operations Management Suite service | Check that the system either has Internet access, or that a valid HTTP proxy has been provided. Additionally, check the correctness of the workspace ID. |
 
-Additional troubleshooting information can be found on the [OMS-Agent-for-Linux Troubleshooting Guide](https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/docs/Troubleshooting.md#).
+Additional error codes and troubleshooting information can be found on the [OMS-Agent-for-Linux Troubleshooting Guide](https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/docs/Troubleshooting.md#).
 
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
