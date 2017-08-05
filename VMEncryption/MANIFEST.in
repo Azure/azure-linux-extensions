@@ -1,4 +1,4 @@
-include HandlerManifest.json handler.py
+include HandlerManifest.json manifest.xml
 recursive-include main/oscrypto/rhel_72_lvm/encryptpatches *.patch
 recursive-include main/oscrypto/rhel_72/encryptpatches *.patch
 recursive-include main/oscrypto/rhel_68/encryptpatches *.patch

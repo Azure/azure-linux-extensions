@@ -402,9 +402,6 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         else:
             logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
 
-    if bek_util:
-        bek_util.umount_azure_passhprase(encryption_config)
-
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
