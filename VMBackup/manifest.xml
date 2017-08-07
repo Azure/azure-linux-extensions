@@ -1,6 +1,6 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.Azure.Backup.Test</ProviderNameSpace>
-<Type>MyBackupTestLinuxInt</Type>
+<ProviderNameSpace>Microsoft.Azure.RecoveryServices</ProviderNameSpace>
+<Type>VMSnapshotLinux</Type>
 <Version>1.0.9118.0</Version>
 <Label>Windows Azure VMBackup Extension for Linux IaaS</Label>
 <HostingResources>VmRole</HostingResources>
