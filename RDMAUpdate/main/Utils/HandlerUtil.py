@@ -57,6 +57,7 @@ import os.path
 import sys
 import json
 import time
+import tempfile
 from os.path import join
 from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
@@ -148,13 +149,14 @@ class HandlerUtility:
                 thumb = handlerSettings['protectedSettingsCertThumbprint']
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
-                waagent.SetFileContents('/tmp/kk', protectedSettings)
-                cleartxt = None
-                cleartxt = waagent.RunGetOutput("base64 -d /tmp/kk | openssl smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                os.remove("/tmp/kk")
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1,operation,'error','1', operation + ' Failed')
+                f = tempfile.NamedTemporaryFile(delete=False)
+                f.close()
+                waagent.SetFileContents(f.name, protectedSettings)
+                cleartxt = waagent.RunGetOutput("base64 -d " + f.name + " | openssl smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                os.remove(f.name)
+                if cleartxt is None:
+                    self.error("OpenSSL decode error using thumbprint " + thumb)
+                    do_exit(1,'Enable','error','1', 'Failed to decode protectedSettings')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
