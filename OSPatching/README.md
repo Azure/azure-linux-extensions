@@ -1,5 +1,5 @@
-# IMPORTANT
-**The OSPatching extension for Linux is being deprecated.**
+# :warning: IMPORTANT :warning:
+**The OSPatching extension for Linux is deprecated.**
 
 OSPatchingForLinux is deprecated and will be retired February 2018.
 
