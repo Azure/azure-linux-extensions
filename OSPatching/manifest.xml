@@ -2,7 +2,7 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
   <Type>OSPatchingForLinux</Type>
-  <Version>2.3.0.1</Version>
+  <Version>2.3.1.0</Version>
   <Label>Microsoft Azure OS Patching Extension for Linux Virtual Machines</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
