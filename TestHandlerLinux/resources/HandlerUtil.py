@@ -139,7 +139,7 @@ def doParse(Log,operation):
     ctxt=waagent.GetFileContents(settings_file)
     if ctxt == None :
         waagent.Error('Unable to read ' + settings_file + '. ')    
-        doExit(name,seqNo,version,1,status_file,heartbeat_file,operation,'errior','1', operation+' Failed', 'Read .settings', 'error', '1','Unable to read ' + settings_file + '. ','NotReady','1','Exiting')
+        doExit(name,seqNo,version,1,status_file,heartbeat_file,operation,'error','1', operation+' Failed', 'Read .settings', 'error', '1','Unable to read ' + settings_file + '. ','NotReady','1','Exiting')
     waagent.Log("Read: " + ctxt)
     # parse json
     config = None

@@ -21,6 +21,7 @@ import platform
 import re
 import shutil
 import sys
+import tempfile
 import time
 import traceback
 
@@ -95,10 +96,12 @@ def enable():
             _backup_sshd_config(SshdConfigPath)
 
         if reset_ssh:
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="reset-ssh")
             _reset_sshd_config(SshdConfigPath)
             hutil.log("Succeeded in reset sshd_config.")
 
         if remove_user:
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="remove-user")
             _remove_user_account(remove_user, hutil)
 
         _set_user_account_pub_key(protect_settings, hutil)
@@ -154,6 +157,7 @@ def update():
 
 def _remove_user_account(user_name, hutil):
     hutil.log("Removing user account")
+
     try:
         sudoers = _get_other_sudoers(user_name)
         waagent.MyDistro.DeleteAccount(user_name)
@@ -208,6 +212,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     # Allow password authentication if user_pass is provided
     if user_pass is not None:
+        waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="create-user-with-password")
         _allow_password_auth()
 
     # Reset ssh key with the new public key passed in or reuse old public key.
@@ -228,6 +233,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                     waagent.MyDistro.setSelinuxContext(pub_path,
                         'unconfined_u:object_r:ssh_home_t:s0')
                     waagent.ChangeOwner(pub_path, user_name)
+                    waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="create-user")
                     hutil.log("Succeeded in resetting ssh_key.")
                 else:
                     err_msg = "Failed to reset ssh key because the cert content is empty."
@@ -255,6 +261,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 waagent.ChangeOwner(pub_path, user_name)
                 os.remove('temp.pub')
                 os.remove('temp.crt')
+                waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="create-user")
                 hutil.log("Succeeded in resetting ssh_key.")
         except Exception as e:
             hutil.log(str(e))
@@ -324,7 +331,9 @@ def _reset_sshd_config(sshd_file_path):
                     break
 
         # Prepare cloud init config for coreos-cloudinit
-        cfg_tempfile = "/tmp/cloudinit.cfg"
+        f = tempfile.NamedTemporaryFile(delete=False)
+        f.close()
+        cfg_tempfile = f.name
         cfg_content = "#cloud-config\n\n"
 
         # Overwrite /etc/ssh/sshd_config
@@ -415,11 +424,13 @@ def check_and_repair_disk(hutil):
             hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
 
         if check_disk:
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="check_disk")
             outretcode = _fsck_check(hutil)
             hutil.log("Successfully checked disk")
             return outretcode
 
         if repair_disk:
+            waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="repair_disk")
             outdata = _fsck_repair(hutil, disk_name)
             hutil.log("Repaired and remounted disk")
             return outdata
