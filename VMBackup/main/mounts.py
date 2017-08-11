@@ -22,7 +22,7 @@ import re
 import sys
 import subprocess
 import types
-from DiskUtil import DiskUtil
+from Utils.DiskUtil import DiskUtil
 
 from StringIO import StringIO
 
@@ -42,7 +42,7 @@ class Mounts:
         added_mount_point_names = [] 
         disk_util = DiskUtil(patching,logger)
         # Get mount points 
-        mount_points, fs_types = disk_util.get_mount_points(None) 
+        mount_points, fs_types = disk_util.get_mount_points() 
         # Get lsblk devices 
         device_items = disk_util.get_device_items(None);
         lsblk_mounts = [] 

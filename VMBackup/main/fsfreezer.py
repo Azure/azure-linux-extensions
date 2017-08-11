@@ -24,7 +24,15 @@ import os
 import time
 import sys
 import signal
-from DiskUtil import DiskUtil 
+import traceback
+import threading
+
+def thread_for_binary(self,args):
+    self.logger.log("Thread for binary is called",True)
+    time.sleep(5)
+    self.logger.log("Waited in thread for 5 seconds",True)
+    self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+    self.logger.log("Binary subprocess Created",True)
 
 class FreezeError(object):
     def __init__(self):
@@ -56,13 +64,15 @@ class FreezeHandler(object):
 
     def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
-        if(self.child.poll() is not None):
+        if(self.child is not None and self.child.poll() is not None):
             self.logger.log("binary child terminated",True)
             self.sig_handle=2
 
+
     def startproc(self,args):
-        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-        for i in range(0,30):
+        binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+        binary_thread.start()
+        for i in range(0,33):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
@@ -84,7 +94,7 @@ class FsFreezer:
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
-            errMsg="Failed to retrieve mount points"
+            errMsg='Failed to retrieve mount points, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
             self.logger.log(str(e), True)
             self.mounts = None
@@ -122,24 +132,25 @@ class FsFreezer:
             self.logger.enforce_local_flag(False)
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
-                while True:
-                    line=self.freeze_handler.child.stdout.readline()
-                    if(line != ''):
-                        self.logger.log(line.rstrip(), True)
-                    else:
-                        break
+                if (self.freeze_handler.child is not None):
+                    while True:
+                        line=self.freeze_handler.child.stdout.readline()
+                        if(line != ''):
+                            self.logger.log(line.rstrip(), True)
+                        else:
+                            break
                 error_msg="freeze failed for some mount"
                 freeze_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         except Exception as e:
-            error_msg="freeze failed for some mount with exception " + str(e)
+            error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         return freeze_result
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
-        is_inconsistent = False
+        unable_to_sleep = False
         if(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
@@ -162,125 +173,21 @@ class FsFreezer:
                 self.logger.log(error_msg, True, 'Error')
         else:
             self.logger.log("Binary output after process end when no thaw sent: ", True)
+            if(self.freeze_handler.child.returncode==2):
+                error_msg = 'Unable to execute sleep'
+                thaw_result.errors.append(error_msg)
+                unable_to_sleep = True
+            else:
+                error_msg = 'snapshot result inconsistent'
+                thaw_result.errors.append(error_msg)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:
                     break
-            error_msg = 'snapshot result inconsistent'
-            is_inconsistent = True
-            thaw_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
-        return thaw_result, is_inconsistent
+        return thaw_result, unable_to_sleep
 
-    def freeze(self, mount):
-        """
-        for xfs we should use the xfs_freeze, or we just use fsfreeze
-        """
-        global unfreeze_done
-        freeze_error = FreezeError()
-        path = mount.mount_point
-        freeze_return_code = 0
-        if not unfreeze_done:
-            if(path in self.frozen_items):
-                self.logger.log("skipping the mount point because we already freezed it")
-            else:
-                self.logger.log('freeze...')
-                if(self.should_skip(mount)):
-                    self.logger.log('skip for the unknown file systems')
-                else:
-                    before_freeze = datetime.datetime.utcnow()
-                    self.frozen_items.add(path)
-                    freeze_return_code = subprocess.call(['fsfreeze', '-f', path])
-                    after_freeze=datetime.datetime.utcnow()
-                    time_taken=after_freeze-before_freeze
-                    self.logger.log('time taken for freeze :' + str(time_taken))
-                self.logger.log('freeze_result...' + str(freeze_return_code))
-            freeze_error.errorcode = freeze_return_code
-
-        if(freeze_return_code != 0):
-            freeze_error.path = path
-        return freeze_error
-
-    def unfreeze(self, mount):
-        """
-        for xfs we should use the xfs_freeze -u, or we just use fsfreeze -u
-        """
-        freeze_error = FreezeError()
-        path = mount.mount_point
-        self.logger.log('unfreeze...')
-        unfreeze_return_code = 0 
-        if(self.should_skip(mount)):
-            self.logger.log('skip for the type ')
-        else:
-            if(not path in self.unfrozen_items):
-                freeze_return_code = 0
-                self.unfrozen_items.add(path)
-                unfreeze_return_code = subprocess.call(['fsfreeze', '-u', path])
-            else:
-                self.logger.log('the item is already unfreezed, so skip it')
-        self.logger.log('unfreeze_result...' + str(unfreeze_return_code))
-        freeze_error.errorcode = unfreeze_return_code
-        if(unfreeze_return_code != 0):
-            freeze_error.path = path
-        return freeze_error
-
-    def freezeall(self):
-        global unfreeze_done
-        unfreeze_done= False
-        self.root_seen = False
-        freeze_result = FreezeResult()
-        for mount in self.mounts.mounts:
-            if(mount.mount_point == '/'):
-                self.root_seen = True
-                self.root_mount = mount
-            elif(mount.mount_point):
-                try:
-                    freezeError = self.freeze(mount)
-                    if(freezeError.errorcode != 0):
-                        freeze_result.errors.append(freezeError)
-                except Exception, e:
-                    freezeError = FreezeError()
-                    freezeError.errorcode = -1
-                    freezeError.path = mount.mount_point
-                    freeze_result.errors.append(freezeError)
-                    self.logger.log(str(e))
-
-        if(self.root_seen):
-            freezeError = self.freeze(self.root_mount)
-            if(freezeError.errorcode != 0):
-                freeze_result.errors.append(freezeError)
-        return freeze_result
-
-    def unfreezeall(self):
-        global unfreeze_done
-        self.root_seen = False
-        unfreeze_result = FreezeResult()
-        try:
-            commandToExecute="kill $(ps aux | grep \'fsfreeze\' | awk \'{print $2}\')"
-            subprocess.call(commandToExecute,shell=True)
-        except Exception,e:
-            self.logger.log('killing fsfreeze running process failed')
-        unfreeze_done= True
-        for mount in self.mounts.mounts:
-            if(mount.mount_point == '/'):
-                self.root_seen = True
-                self.root_mount = mount
-            elif(mount.mount_point):
-                try:
-                    freezeError = self.unfreeze(mount)
-                    if(freezeError.errorcode != 0):
-                        unfreeze_result.errors.append(freezeError)
-                except Exception,e:
-                    freezeError = FreezeError()
-                    freezeError.errorcode = -1
-                    freezeError.path = mount.mount_point
-                    unfreeze_result.errors.append(freezeError)
-        if(self.root_seen):
-            freezeError = self.unfreeze(self.root_mount)
-            if(freezeError.errorcode != 0):
-                unfreeze_result.errors.append(freezeError)
-        return unfreeze_result
 

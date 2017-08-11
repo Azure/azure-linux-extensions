@@ -24,6 +24,8 @@
 #include <sys/ioctl.h>
 #include <time.h>
 #include <string.h>
+#include<unistd.h>
+#include<sys/stat.h>
 
 
 #define JUMPWITHSTATUS(x)        \
@@ -52,7 +54,6 @@ int gThaw = 0;
 
 void globalSignalHandler(int signum)
 {
-    logger("SignalHandler signum: %d\n", signum);
     if (signum == SIGUSR1)
     {
         gThaw = 1;
@@ -169,19 +170,22 @@ int main(int argc, char *argv[])
         {
             break;
         }
-        else if (sleep(1) != 0)
+        else
         {
-           while(currenttime<starttime+i+1)
-           {
-                currenttime=time(NULL);
-           }
+            sleep(1);
+            logger("sleep for 1 second \n");
         }
     }
-
-    if (gThaw != 1)
+    currenttime=time(NULL);
+    if (gThaw != 1 && currenttime > starttime+timeout-1)
     {
         logger("Failed to receive timely Thaw from parent process\n");
         JUMPWITHSTATUS(EXIT_FAILURE);
+    }
+    else if (gThaw != 1)
+    {
+        logger("Inconsistent snapshot because of SLEEP failure \n");
+        JUMPWITHSTATUS(2);
     }
     
 CLEANUP:
