@@ -24,7 +24,7 @@ import string
 import shlex
 
 import LogUtil
-from WAAgentUtil import waagent
+from . import waagent20 as waagent
 
 DefaultStdoutFile = "stdout"
 DefaultErroutFile = "errout"
