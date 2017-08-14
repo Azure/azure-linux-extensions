@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 import traceback
+import subprocess
 
 import Utils.HandlerUtil as Util
 from waagentloader import load_waagent
