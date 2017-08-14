@@ -4,6 +4,7 @@ EXTENSIONS = \
 	CustomScript \
 	DSC \
 	OSPatching \
+	VMAccess \
 	VMBackup
 
 clean:
@@ -12,7 +13,7 @@ clean:
 init:
 	@mkdir -p build
 
-build: init $(EXTENSIONS) VMAccess
+build: init $(EXTENSIONS)
 
 define make-extension-zip
 $(eval NAME    = $(shell grep -Pom1 "(?<=<Type>)[^<]+" $@/manifest.xml))
@@ -25,10 +26,7 @@ endef
 
 $(EXTENSIONS):
 	$(make-extension-zip)
-
-VMAccess:
-	$(make-extension-zip)
 	@cd Common/ && echo ./waagentloader.py           | zip -9 -@ ../build/$(NAME)-$(VERSION).zip > /dev/null
 	@cd Common/WALinuxAgent-2.0.16 && echo ./waagent | zip -9 -@ ../../build/$(NAME)-$(VERSION).zip > /dev/null
 
-.PHONY: clean build $(EXTENSIONS) VMAccess
+.PHONY: clean build $(EXTENSIONS)
