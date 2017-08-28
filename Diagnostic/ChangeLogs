@@ -1,3 +1,10 @@
+2017-08-11: LAD-3.0.109
+    - Fix waagent-related issue on Debian distros
+    - Add additional unit tests
+    - Replace multiple uses of "local" with "locale"
+    - Improve error reporting when catching an exception
+    - Fix #398, #399, #340
+
 2017-05-16: LAD-3.0.107
     - Move resourceId field generation for JSON events from LAD to mdsd
 

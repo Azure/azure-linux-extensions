@@ -2,7 +2,7 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
   <Type>CustomScriptForLinux</Type>
-  <Version>1.5.2.1</Version>
+  <Version>1.5.2.2</Version>
   <Label>Microsoft Azure Custom Script Extension for Linux Virtual Machines</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
