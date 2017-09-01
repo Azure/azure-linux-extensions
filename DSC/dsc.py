@@ -243,7 +243,7 @@ def send_heart_beat_msg_to_agent_service():
             waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
             return response
     except Exception as e:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Failed to send heartbeat message to DSC agent service: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Failed to send heartbeat message to DSC agent service: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to send heartbeat message to DSC agent service: %s, stack trace: %s' %(str(e), traceback.format_exc()))
 
 def get_lcm_config_setting(setting_name, lcmconfig):
