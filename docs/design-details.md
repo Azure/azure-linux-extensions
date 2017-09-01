@@ -2,7 +2,6 @@
 
 This page descibes the design details of the extension. You can write an extension from scrach folloing this page.
 
-<a name="handler-artifacts"/>
 ## Handler Artifacts
 
 An Azure Extension Handler is composed of the following artifacts:
@@ -13,7 +12,6 @@ An Azure Extension Handler is composed of the following artifacts:
 
 3. **Handler Configuration**: This is a configuration file that contains various settings needed to configure this Handler at runtime. Extension configuration is the input provided by the end user based on the schema provided by the handler publisher during registration. For example, a handler might get the client authentication details for writing logs to his storage account via the handler configuration.
 
-<a name="handler-package"/>
 ### Handler Package
 
 The Handlers are packaged as simple zip files for being registered in the Azure ecosystem. The zip file is supposed to contain the following:
@@ -81,7 +79,6 @@ The Handlers are packaged as simple zip files for being registered in the Azure 
   }]
   ```
 
-<a name="handler-environment"/>
 ### HandlerEnvironment
 
 When WALA installs a handler on the VM, it creates a bunch of files and folders that are needed by the handler at runtime for various purposes. The location of all these files and folders are communicated to the handler via the HandlerEnvironment.json file.
@@ -114,7 +111,6 @@ HandlerEnvironment.json is the file that is created under the root directory whe
 
 Errors while reading HandlerEnvironment.json – In rare cases a handler might encounter errors when trying to read the HandlerEnvironment.json file, since WALA might be writing the file at the same time as well. The handler should be capable of handling such errors. Our recommendation for handler publishers would be to have a retry logic with some sort of backoff.
 
-<a name="handler-configuration"/>
 ### Handler Configuration
 
 There are scenarios when a handler needs some user input parameters to configure its handler. All such user provided input is communicated from WALA to the handler via the configuration file. For e.g. a handler might require the user to provide the account name and the key of a user storage account where the logs will be saved. This account information can be passed by the user to the handler via the configuration file.
@@ -172,12 +168,10 @@ In the above example the storageaccountname and storageaccountkey are protected 
 }
 ```
 
-<a name="location-of-handler-configuration"/>
 #### Location of Handler Configuration
 
 The location where the configuration setting files will be written can be retrieved by the "configFolder" property in the HandlerEnvironment.json file.
 
-<a name="handler-configuration-filename"/>
 #### Handler Configuration Filename
 
 Whenever a new configuration is received, WALA will write the configuration settings file named <SequenceNumber>.settings under the configFolder with the configuration provided by the user and launches [the enable command of the handler](#enable). 
@@ -248,7 +242,6 @@ In both these cases WALA will identify that a handler with the same name and pub
 4. WALA will invoke the uninstall command on the existing handler with lower version.
 5. WALA will invoke the enable command on the newly downloaded package
 
-<a name="reporting-status-and-heartbeat"/>
 ## Reporting Status and Heartbeat
 
 Microsoft Azure provides two facilities to report back the health of the handler and the status of the operations being performed by it.
@@ -454,7 +447,6 @@ In German it might be:
   {1} fehler beim Anschluss an {0} herzustellen
   ```
 
-<a name="logging"/>
-# Logging
+## Logging
 
 Handlers should use the folder provided in the "logfolder" property of the handler environment for writing logs required for debugging their handlers in lieu of any issues reported on a live customer VM.
