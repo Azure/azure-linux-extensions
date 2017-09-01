@@ -1,7 +1,10 @@
 all: package
 
 SOURCES = \
-	dsc.py \
+	serializerfactory.py \
+        httpclient.py \
+        urllib2httpclient.py \
+        dsc.py \
 	test \
 	HandlerManifest.json \
 	manifest.xml \
