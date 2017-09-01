@@ -66,7 +66,7 @@ def main():
         snapshot_info_array = None
         total_used_size = -1
         size_calculation_failed = False
-        HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+        HandlerUtil.LoggerInit('/dev/console','/dev/stdout')
         HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
