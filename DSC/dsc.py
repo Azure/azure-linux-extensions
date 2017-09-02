@@ -693,7 +693,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
             }, 
             "version": "1.0", "timestampUTC":   time.strftime(date_time_format, time.gmtime())
             }]
-    json.dump(status_file_content, fp)
+    	json.dump(status_file_content, fp)
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
 
 def get_nodeid(file_path):
