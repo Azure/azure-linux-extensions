@@ -80,7 +80,7 @@ generate the HandlerManifest.json file.
 """
 manifest_obj = [{
   "name": CommonVariables.extension_name,
-  "version": CommonVariables.extension_version,
+  "version": "1.0",
   "handlerManifest": {
     "installCommand": main_entry + " -install",
     "uninstallCommand": main_entry + " -uninstall",
@@ -107,17 +107,19 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <Version>%s</Version>
 <Label>%s</Label>
 <HostingResources>VmRole</HostingResources>
-<MediaLink>%s</MediaLink>
+<MediaLink></MediaLink>
 <Description>%s</Description>
-<IsInternalExtension>false</IsInternalExtension>
-<Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
-<PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
+<IsInternalExtension>true</IsInternalExtension>
+<Eula>https://azure.microsoft.com/en-us/support/legal/</Eula>
+<PrivacyUri>https://azure.microsoft.com/en-us/support/legal/</PrivacyUri>
 <HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
 <IsJsonExtension>true</IsJsonExtension>
-<CompanyName>Microsoft Open Source Technology Center</CompanyName>
-</ExtensionImage>""" % (CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_media_link, CommonVariables.extension_description)
+<SupportedOS>Linux</SupportedOS>
+<CompanyName>Microsoft</CompanyName>
+<!--%%REGIONS%%-->
+</ExtensionImage>""" % (CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_description)
 
-extension_xml_file = open(CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.xml', 'w')
+extension_xml_file = open('manifest.xml', 'w')
 extension_xml_file.write(extension_xml_file_content)
 extension_xml_file.close()
 

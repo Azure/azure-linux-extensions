@@ -43,6 +43,9 @@ class BekUtil(object):
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated
 
+    #
+    # Returns the LinuxPassPhraseFileName path
+    #
     def get_bek_passphrase_file(self, encryption_config):
         bek_filename = encryption_config.get_bek_filename()
 
