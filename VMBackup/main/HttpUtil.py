@@ -103,6 +103,7 @@ class HttpUtil(object):
             resp = None
             if(self.proxyHost == None or self.proxyPort == None):
                 connection = httplib.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
+                self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path) + " query: " + str(sasuri_obj.query))
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
                 resp = connection.getresponse()
                 connection.close()

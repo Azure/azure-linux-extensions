@@ -66,7 +66,7 @@ def main():
         snapshot_info_array = None
         total_used_size = -1
         size_calculation_failed = False
-        HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
+        HandlerUtil.LoggerInit('/dev/console','/dev/stdout')
         HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
@@ -197,7 +197,12 @@ def set_do_seq_flag():
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
+        snap_shotter = Snapshotter(backup_logger)
+        snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
+        time_before_freeze = datetime.datetime.now()
         freeze_result = freezer.freeze_safe(timeout) 
+        time_after_freeze = datetime.datetime.now()
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
         run_result = CommonVariables.success
         run_status = 'success'
         all_failed= False
@@ -212,8 +217,10 @@ def freeze_snapshot(timeout):
             backup_logger.log(error_msg, True, 'Warning')
         else:
             backup_logger.log('T:S doing snapshot now...')
-            snap_shotter = Snapshotter(backup_logger)
+            time_before_snapshot = datetime.datetime.now()
             snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
+            time_after_snapshot = datetime.datetime.now()
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
             backup_logger.log('T:S snapshotall ends...', True)
             if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                 if unable_to_sleep:
@@ -322,13 +329,13 @@ def daemon():
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
         backup_logger.log(commandToExecute,True)
-        if(commandToExecute.lower() == CommonVariables.iaas_install_command):
+        if(CommonVariables.iaas_install_command in commandToExecute.lower()):
             backup_logger.log('install succeed.',True)
             run_status = 'success'
             error_msg = 'Install Succeeded'
             run_result = CommonVariables.success
             backup_logger.log(error_msg)
-        elif(commandToExecute.lower() == CommonVariables.iaas_vmbackup_command):
+        elif(CommonVariables.iaas_vmbackup_command in commandToExecute.lower()):
             if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
