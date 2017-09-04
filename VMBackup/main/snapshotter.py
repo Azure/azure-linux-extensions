@@ -298,13 +298,39 @@ class Snapshotter(object):
             self.logger.log(errorMsg)
         return value
 
+    def set_value_to_configfile(self, key, value):
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            config = ConfigParser.RawConfigParser()
+            if os.path.exists(configfile):
+                config.read(configfile)
+                if config.has_section('SnapshotThread'):
+                    if config.has_option('SnapshotThread', key):
+                        config.remove_option('SnapshotThread', key)
+                        config.set('SnapshotThread', key, value)
+                    else:
+                        config.set('SnapshotThread', key, value)
+                else:
+                    config.add_section('SnapshotThread')
+                    config.set('SnapshotThread', key, value)
+            else:
+                config.add_section('SnapshotThread')
+                config.set('SnapshotThread', key, value)
+            with open(configfile, 'wb') as config_file:
+                config.write(config_file)
+        except Exception as e:
+            errorMsg = " Unable to ed config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+        return value
 
     def snapshotall(self, paras, freezer):
         thaw_done = False
-        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) == 1):
+        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) <= 4):
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
         else:
+            self.set_value_to_configfile('doseq','1')
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
+            self.set_value_to_configfile('doseq','0')
             if exceptOccurred and thaw_done == False:
                 snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep

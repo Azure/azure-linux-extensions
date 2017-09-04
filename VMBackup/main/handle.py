@@ -100,9 +100,30 @@ def timedelta_total_seconds(delta):
     else:
         return delta.total_seconds()
 
-def status_report(status, status_code, message, snapshot_info = None):
+def status_report_to_file(file_report_msg):
+    global backup_logger,hutil
+    hutil.write_to_status_file(file_report_msg)
+    backup_logger.log(file_report_msg,True)
+
+def status_report_to_blob(blob_report_msg):
+    global backup_logger,hutil,para_parser
+    try:
+        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+            blobWriter = BlobWriter(hutil)
+            if(blob_report_msg is not None):
+                blobWriter.WriteBlob(blob_report_msg,para_parser.statusBlobUri)
+                backup_logger.log("blob status report message:",True)
+                backup_logger.log(blob_report_msg,True)
+            else:
+                backup_logger.log("blob_report_msg is none",True)
+    except Exception as e:
+        err_msg='cannot write status to the status blob'
+        backup_logger.log(err_msg, True, 'Warning')
+
+def get_status_to_report(status, status_code, message, snapshot_info = None):
     global MyPatching,backup_logger,hutil,para_parser,total_used_size,size_calculation_failed
-    trans_report_msg = None
+    blob_report_msg = None
+    file_report_msg = None
     try:
         if total_used_size == -1 :
             sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
@@ -113,7 +134,7 @@ def status_report(status, status_code, message, snapshot_info = None):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
         if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-            trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
+            blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
                     taskId=para_parser.taskId,\
@@ -122,27 +143,18 @@ def status_report(status, status_code, message, snapshot_info = None):
                     total_size = total_used_size,\
                     failure_flag = size_calculation_failed)
     except Exception as e:
-        err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
+        err_msg='cannot get status report parameters , Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(err_msg, True, 'Warning')
-    try:
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-            blobWriter = BlobWriter(hutil)
-            if(trans_report_msg is not None):
-                blobWriter.WriteBlob(trans_report_msg,para_parser.statusBlobUri)
-                backup_logger.log("trans status report message:",True)
-                backup_logger.log(trans_report_msg,True)
-            else:
-                backup_logger.log("trans_report_msg is none",True)
-    except Exception as e:
-        err_msg='cannot write status to the status blob'
-        backup_logger.log(err_msg, True, 'Warning')
+    return blob_report_msg, file_report_msg
 
 def exit_with_commit_log(status,result,error_msg, para_parser):
     global backup_logger
     backup_logger.log(error_msg, True, 'Error')
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
-    status_report(status, result, error_msg, None)
+    blob_report_msg, file_report_msg = get_status_to_report(status, result, error_msg, None)
+    status_report_to_file(file_report_msg)
+    status_report_to_blob(blob_report_msg)
     sys.exit(0)
 
 def exit_if_same_taskId(taskId):
@@ -158,12 +170,13 @@ def exit_if_same_taskId(taskId):
         message='TaskId AlreadyProcessed nothing to do'
         try:
             if(para_parser is not None):
-                trans_report_msg = hutil.do_status_report(operation='Enable',status=status,\
+                blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                         status_code=str(status_code),\
                         message=message,\
                         taskId=taskId,\
                         commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
                         snapshot_info=None)
+                status_report_to_file(file_report_msg)
         except Exception as e:
             err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             backup_logger.log(err_msg, True, 'Warning')
@@ -343,7 +356,10 @@ def daemon():
                 temp_status= 'success'
                 temp_result=CommonVariables.ExtensionTempTerminalState
                 temp_msg='Transitioning state in extension'
-                status_report(temp_status, temp_result, temp_msg, None)
+                blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
+                if(hutil.is_status_file_exists()):
+                    status_report_to_file(file_report_msg)
+                status_report_to_blob(blob_report_msg)
                 backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -457,7 +473,10 @@ def daemon():
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
-        status_report(run_status,run_result,error_msg, snapshot_info_array)
+        blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
+        if(hutil.is_status_file_exists()):
+            status_report_to_file(file_report_msg)
+        status_report_to_blob(blob_report_msg)
     except Exception as e:
         errMsg = 'Failed to log status in extension'
         backup_logger.log(errMsg, True, 'Error')
@@ -536,8 +555,14 @@ def enable():
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         hutil.save_seq()
-        status_upload_thread=Thread(target=thread_for_status_upload)
-        status_upload_thread.start() 
+        temp_status= 'transitioning'
+        temp_result=CommonVariables.success
+        temp_msg='Transitioning state in enable'
+        blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
+        file_status_upload_thread=Thread(target=status_report_to_file, args=(file_report_msg,))
+        file_status_upload_thread.start()
+        blob_status_upload_thread=Thread(target=status_report_to_blob, args=(blob_report_msg,))
+        blob_status_upload_thread.start()
         if(hutil.is_prev_in_transition()):
             backup_logger.log('retrieving the previous logs for this', True)
             backup_logger.set_prev_log()
@@ -545,7 +570,8 @@ def enable():
             log_upload_thread=Thread(target=thread_for_log_upload)
             log_upload_thread.start()
             log_upload_thread.join(60)
-        status_upload_thread.join(60)
+        file_status_upload_thread.join(30)
+        blob_status_upload_thread.join(60)
         start_daemon();
         sys.exit(0)
     except Exception as e:
@@ -558,18 +584,12 @@ def enable():
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
-def thread_for_status_upload():
-    temp_status= 'transitioning'
-    temp_result=CommonVariables.success
-    temp_msg='Transitioning state in enable'
-    status_report(temp_status, temp_result, temp_msg, None)
-
 def thread_for_log_upload():
     global para_parser,backup_logger
     backup_logger.commit(para_parser.logsBlobUri)
 
 def start_daemon():
-    args = [os.path.join(os.getcwd(), __file__), "-daemon"]
+    args = [os.path.join(os.getcwd(), "main/handle.sh"), "daemon"]
     backup_logger.log("start_daemon with args: {0}".format(args), True)
     #This process will start a new background process by calling
     #    handle.py -daemon
