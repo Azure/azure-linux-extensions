@@ -27,6 +27,7 @@ import datetime
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status
+from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 
 class SnapshotInfoIndexerObj():
@@ -202,7 +203,10 @@ class Snapshotter(object):
                     job.join()
                 thaw_result = None
                 if thaw_done_local == False:
+                    time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    time_after_thaw = datetime.datetime.now()
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
                 self.logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
@@ -266,7 +270,10 @@ class Snapshotter(object):
                     blob_index = blob_index + 1
                 thaw_result= None
                 if thaw_done_local== False:
+                    time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    time_after_thaw = datetime.datetime.now()
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
                 self.logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0):
