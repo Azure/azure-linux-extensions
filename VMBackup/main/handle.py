@@ -238,7 +238,6 @@ def freeze_snapshot(timeout):
         if(get_value_from_configfile('doseq') != '1'):
             set_value_to_configfile('doseq', '2')
         snap_shotter = Snapshotter(backup_logger)
-        snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
         time_before_freeze = datetime.datetime.now()
         freeze_result = freezer.freeze_safe(timeout) 
         time_after_freeze = datetime.datetime.now()
