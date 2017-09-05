@@ -228,7 +228,7 @@ def send_heart_beat_msg_to_agent_service():
         retry_count = 0
         canRetry = True 
         while retry_count <= 5 and canRetry:
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="In send_heart_beat_msg_to_agent_service method")
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="In send_heart_beat_msg_to_agent_service method. Retry_count: " + str(retry_count))
             code,output = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
             if code == 0 and "RefreshMode=Pull" in output:
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="sends heartbeat message in pullmode")
