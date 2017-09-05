@@ -511,7 +511,7 @@ class HandlerUtility:
             else:
                 return False
         except Exception as e:
-            self.log("exception is getting status file")
+            self.log("exception is getting status file" + traceback.format_exc())
             return False
 
     def backup_settings_status_file(self, _seq_no):
@@ -577,10 +577,9 @@ class HandlerUtility:
             return ''.join(str(x) for x in lines)
     
     def get_shell_script_log(self):
+        lines = None
         with open(self._context._shell_log_file, "r") as f:
             lines = f.readlines()
         if(len(lines) > 10):
             lines = lines[-10:]
-            return ''.join(str(x) for x in lines)
-        else:
-            return ''.join(str(x) for x in lines)
+        return ''.join(str(x) for x in lines)
