@@ -247,6 +247,7 @@ def send_heart_beat_msg_to_agent_service():
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
                 if response.status_code >=500 and response.status_code < 600:
                     canRetry = True
+                    time.sleep(10)
                 else:
                     canRetry = False
                 retry_count += 1
