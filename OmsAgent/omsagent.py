@@ -186,8 +186,6 @@ def install():
         raise ParameterMissingException('Public configuration must be ' \
                                         'provided')
     workspaceId = public_settings.get('workspaceId')
-    if workspaceId is None:
-        raise ParameterMissingException('Workspace ID must be provided')
     check_workspace_id(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
@@ -277,10 +275,6 @@ def enable():
     else:
         workspaceId = public_settings.get('workspaceId')
         workspaceKey = protected_settings.get('workspaceKey')
-        if workspaceId is None:
-            raise ParameterMissingException('Workspace ID must be provided')
-        if workspaceKey is None:
-            raise ParameterMissingException('Workspace key must be provided')
         check_workspace_id_and_key(workspaceId, workspaceKey)
 
     # Check if omsadmin script is available
@@ -494,7 +488,11 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
     Validate formats of workspace_id and workspace_key
     """
     check_workspace_id(workspace_id)
+
     # Validate that workspace_key is of the correct format (base64-encoded)
+    if workspace_key is None:
+        raise OMSAgentParameterMissingError('Workspace key must be provided')
+
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
         if encoded_key != workspace_key:
@@ -507,6 +505,9 @@ def check_workspace_id(workspace_id):
     """
     Validate that workspace_id matches the GUID regex
     """
+    if workspace_id is None:
+        raise OMSAgentParameterMissingError('Workspace ID must be provided')
+
     search = re.compile(GUIDOnlyRegex, re.M)
     if not search.match(workspace_id):
         raise InvalidParameterError('Workspace ID is invalid')
