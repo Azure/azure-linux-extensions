@@ -12,7 +12,7 @@ poststr1=${resultstr#*\"}
 postsubstr1=${poststr1#*\"}
 resultstrlen1=`expr ${#poststr1} - 1 - ${#postsubstr1}`
 
-logfolder=$(echo $poststr | cut -b 1-$resultstrlen)
+logfolder=$(echo $poststr1 | cut -b 1-$resultstrlen1)
 logfile=$logfolder'/shell.log'
 
 if [ "$1" == "enable" ]; then
