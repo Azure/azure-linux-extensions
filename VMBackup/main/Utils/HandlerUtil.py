@@ -221,6 +221,7 @@ class HandlerUtility:
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+        self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
         self._change_log_file()
         self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
         self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
@@ -492,6 +493,9 @@ class HandlerUtility:
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
+        return stat_rept, stat_rept_file
+
+    def write_to_status_file(self, stat_rept_file):
         try:
             if self._context._status_file:
                 with open(self._context._status_file,'w+') as f:
@@ -499,7 +503,16 @@ class HandlerUtility:
         except Exception as e:
             errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
-        return stat_rept
+
+    def is_status_file_exists(self):
+        try:
+            if os.path.exists(self._context._status_file):
+                return True
+            else:
+                return False
+        except Exception as e:
+            self.log("exception is getting status file")
+            return False
 
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
@@ -559,6 +572,15 @@ class HandlerUtility:
             lines = f.readlines()
         if(len(lines) > 300):
             lines = lines[-300:]
+            return ''.join(str(x) for x in lines)
+        else:
+            return ''.join(str(x) for x in lines)
+    
+    def get_shell_script_log(self):
+        with open(self._context._shell_log_file, "r") as f:
+            lines = f.readlines()
+        if(len(lines) > 10):
+            lines = lines[-10:]
             return ''.join(str(x) for x in lines)
         else:
             return ''.join(str(x) for x in lines)

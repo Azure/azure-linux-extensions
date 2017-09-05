@@ -305,10 +305,9 @@ class Snapshotter(object):
             self.logger.log(errorMsg)
         return value
 
-
     def snapshotall(self, paras, freezer):
         thaw_done = False
-        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) == 1):
+        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) <= 4):
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
         else:
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
