@@ -37,26 +37,41 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.4.0-45.universal.x64.sh'
-HUtilObject = None
+BundleFileName = 'omsagent-1.4.1-45.universal.x64.sh'
+GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+GUIDOnlyRegex = r'^' + GUIDRegex + '$'
+SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
+SCOMPort = 1270
 
+# Paths
+OMSAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
+OMSAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
+OMIConfigEditorPath = '/opt/omi/bin/omiconfigeditor'
+OMIServerConfPath = '/etc/opt/omi/conf/omiserver.conf'
+EtcOMSAgentPath = '/etc/opt/microsoft/omsagent/'
+SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
+
+# Commands
 # Always use upgrade - will handle install if scx, omi are not installed or
 # upgrade if they are
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
-OmsAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
-WorkspaceCheckCommandTemplate = '{0} -l'
+WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParamsTemplate = '{0} -w {1} -s {2} {3}'
-OmsAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
-DisableOmsAgentServiceCommandTemplate = '{0} disable'
+RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
+DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
+
+# Error codes
 DPKGLockedErrorCode = 12
 InstallErrorCurlNotInstalled = 64
 EnableCalledBeforeSuccessfulInstall = 20
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
+UnsupportedOpenSSL = 60
 
 # Configuration
+HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
@@ -123,19 +138,19 @@ def main():
             message = '{0} failed with exit code {1}'.format(operation,
                                                              exit_code)
 
-    except OmsAgentParameterMissingError as e:
+    except OMSAgentParameterMissingError as e:
         exit_code = 11
         message = '{0} failed due to a missing parameter: ' \
                   '{1}'.format(operation, e.message)
-    except OmsAgentInvalidParameterError as e:
+    except OMSAgentInvalidParameterError as e:
         exit_code = 11
         message = '{0} failed due to an invalid parameter: ' \
                   '{1}'.format(operation, e.message)
-    except OmsAgentUnwantedMultipleConnectionsException as e:
+    except OMSAgentUnwantedMultipleConnectionsException as e:
         exit_code = 10
         message = '{0} failed due to multiple connections: ' \
                   '{1}'.format(operation, e.message)
-    except OmsAgentCannotConnectToOMSException as e:
+    except OMSAgentCannotConnectToOMSException as e:
         exit_code = 55 # error code to indicate no internet access
         message = 'The agent could not connect to the Microsoft Operations ' \
                   'Management Suite service. Please check that the system ' \
@@ -168,11 +183,27 @@ def install():
     """
     exit_if_vm_not_supported('Install')
 
-    file_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    file_path = os.path.join(file_directory, BundleFileName)
+    public_settings, protected_settings = get_settings()
+    if public_settings is None:
+        raise OMSAgentParameterMissingError('Public configuration must be ' \
+                                            'provided')
+    workspaceId = public_settings.get('workspaceId')
+    if workspaceId is None:
+        raise OMSAgentParameterMissingError('Workspace ID must be provided')
+    check_workspace_id(workspaceId)
 
-    os.chmod(file_path, 100)
-    cmd = InstallCommandTemplate.format(file_path)
+    # In the case where a SCOM connection is already present, we should not
+    # create conflicts by installing the OMSAgent packages
+    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
+    if (stopOnMultipleConnections is not None
+            and stopOnMultipleConnections is True):
+        detect_multiple_connections(workspaceId)
+
+    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    bundle_path = os.path.join(package_directory, BundleFileName)
+
+    os.chmod(bundle_path, 100)
+    cmd = InstallCommandTemplate.format(bundle_path)
     hutil_log_info('Running command "{0}"'.format(cmd))
 
     # Retry, since install can fail due to concurrent package operations
@@ -188,11 +219,11 @@ def uninstall():
     This is a somewhat soft uninstall. It is not a purge.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
-    file_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    file_path = os.path.join(file_directory, BundleFileName)
+    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    bundle_path = os.path.join(package_directory, BundleFileName)
 
-    os.chmod(file_path, 100)
-    cmd = UninstallCommandTemplate.format(file_path)
+    os.chmod(bundle_path, 100)
+    cmd = UninstallCommandTemplate.format(bundle_path)
     hutil_log_info('Running command "{0}"'.format(cmd))
 
     # Retry, since uninstall can fail due to concurrent package operations
@@ -206,67 +237,36 @@ def enable():
     """
     Onboard the OMSAgent to the specified OMS workspace.
     This includes enabling the OMS process on the machine.
-    This call will return non-zero if the settings provided are incomplete or
-    incorrect.
+    This call will return non-zero or throw an exception if
+    the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
     exit_if_vm_not_supported('Enable')
 
     public_settings, protected_settings = get_settings()
     if public_settings is None:
-        raise OmsAgentParameterMissingError('Public configuration must be ' \
+        raise OMSAgentParameterMissingError('Public configuration must be ' \
                                             'provided')
     if protected_settings is None:
-        raise OmsAgentParameterMissingError('Private configuration must be ' \
+        raise OMSAgentParameterMissingError('Private configuration must be ' \
                                             'provided')
 
     workspaceId = public_settings.get('workspaceId')
     workspaceKey = protected_settings.get('workspaceKey')
     proxy = protected_settings.get('proxy')
     vmResourceId = protected_settings.get('vmResourceId')
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if workspaceId is None:
-        raise OmsAgentParameterMissingError('Workspace ID must be provided')
+        raise OMSAgentParameterMissingError('Workspace ID must be provided')
     if workspaceKey is None:
-        raise OmsAgentParameterMissingError('Workspace key must be provided')
+        raise OMSAgentParameterMissingError('Workspace key must be provided')
 
     check_workspace_id_and_key(workspaceId, workspaceKey)
 
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections is True):
-        check_wkspc_cmd = WorkspaceCheckCommandTemplate.format(OmsAdminPath)
-        list_exit_code, output = run_get_output(check_wkspc_cmd,
-                                                chk_err = False)
-
-        # If this enable was called a workspace already saved on the machine,
-        # then we should continue; if this workspace is not saved on the
-        # machine, but another workspace service is running, then we should
-        # stop and warn
-        this_wksp_saved = False
-        connection_exists = False
-        for line in output.split('\n'):
-            if workspaceId in line:
-                this_wksp_saved = True
-            if 'Onboarded(OMSAgent Running)' in line:
-                connection_exists = True
-
-        if not this_wksp_saved and connection_exists:
-            err_msg = ('This machine is already connected to some other Log ' \
-                       'Analytics workspace, please set ' \
-                       'stopOnMultipleConnections to false in public ' \
-                       'settings or remove this property, so this machine ' \
-                       'can connect to new workspaces, also it means this ' \
-                       'machine will get billed multiple times for each ' \
-                       'workspace it report to. ' \
-                       '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
-            # This exception will get caught by the main method
-            raise OmsAgentUnwantedMultipleConnectionsException(err_msg)
-
     # Check if omsadmin script is available
-    if not os.path.exists(OmsAdminPath):
+    if not os.path.exists(OMSAdminPath):
         log_and_exit('Enable', EnableCalledBeforeSuccessfulInstall,
                      'OMSAgent onboarding script {0} not exist. Enable ' \
-                     'cannot be called before install.'.format(OmsAdminPath))
+                     'cannot be called before install.'.format(OMSAdminPath))
 
     proxyParam = ''
     if proxy is not None:
@@ -277,7 +277,7 @@ def enable():
         vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
     optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
-    onboard_cmd = OnboardCommandWithOptionalParamsTemplate.format(OmsAdminPath,
+    onboard_cmd = OnboardCommandWithOptionalParamsTemplate.format(OMSAdminPath,
                                                                   workspaceId,
                                                                   workspaceKey,
                                                                   optionalParams)
@@ -287,6 +287,13 @@ def enable():
                                          retry_check = retry_onboarding,
                                          final_check = raise_if_no_internet,
                                          check_error = True, log_cmd = False)
+
+    # Sleep to prevent bombarding the processes, then restart all processes to
+    # resolve any issues with auto-started processes from --upgrade
+    if exit_code is 0:
+        time.sleep(5) # 5 seconds
+        run_command_and_log(RestartOMSAgentServiceCommand)
+
     return exit_code
 
 
@@ -296,14 +303,13 @@ def disable():
     Note: disable operation times out from WAAgent at 15 minutes
     """
     # Check if the service control script is available
-    if not os.path.exists(OmsAgentServiceScript):
+    if not os.path.exists(OMSAgentServiceScript):
         log_and_exit('Disable', 1, 'OMSAgent service control script {0} ' \
                                    'does not exist. Disable cannot be ' \
-                                   'called before install.'.format(OmsAgentServiceScript))
+                                   'called before install.'.format(OMSAgentServiceScript))
         return 1
 
-    cmd = DisableOmsAgentServiceCommandTemplate.format(OmsAgentServiceScript)
-    exit_code, output = run_command_and_log(cmd)
+    exit_code, output = run_command_and_log(DisableOMSAgentServiceCommand)
     return exit_code
 
 
@@ -334,7 +340,7 @@ def parse_context(operation):
         except KeyError as e:
             waagent_log_error('Unable to parse context with error: ' \
                               '{0}'.format(e.message))
-            raise OmsAgentParameterMissingError
+            raise OMSAgentParameterMissingError
     return hutil
 
 
@@ -411,23 +417,250 @@ def exit_if_vm_not_supported(operation):
     return 0
 
 
+def exit_if_openssl_unavailable(operation):
+    """
+    Check if the openssl commandline interface is available to use
+    If not, throw error to return UnsupportedOpenSSL error code
+    """
+    exit_code, output = run_get_output('which openssl', True, False)
+    if exit_code is not 0:
+        log_and_exit(operation, UnsupportedOpenSSL, 'OpenSSL is not available')
+    return 0
+
+
 def check_workspace_id_and_key(workspace_id, workspace_key):
     """
     Validate formats of workspace_id and workspace_key
     """
-    # Validate that workspace_id matches the GUID regex
-    guid_regex = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-    search = re.compile(guid_regex, re.M)
-    if not search.match(workspace_id):
-        raise OmsAgentInvalidParameterError('Workspace ID is invalid')
-
+    check_workspace_id(workspace_id)
     # Validate that workspace_key is of the correct format (base64-encoded)
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
         if encoded_key != workspace_key:
-            raise OmsAgentInvalidParameterError('Workspace key is invalid')
+            raise OMSAgentInvalidParameterError('Workspace key is invalid')
     except TypeError:
-        raise OmsAgentInvalidParameterError('Workspace key is invalid')
+        raise OMSAgentInvalidParameterError('Workspace key is invalid')
+
+
+def check_workspace_id(workspace_id):
+    """
+    Validate that workspace_id matches the GUID regex
+    """
+    search = re.compile(GUIDOnlyRegex, re.M)
+    if not search.match(workspace_id):
+        raise OMSAgentInvalidParameterError('Workspace ID is invalid')
+
+
+def detect_multiple_connections(workspace_id):
+    """
+    If the VM already has a workspace/SCOM configured, then we should
+    disallow a new connection when stopOnMultipleConnections is used
+
+    Throw an exception in these cases:
+    - The workspace with the given workspace_id has not been onboarded
+      to the VM, but at least one other workspace has been
+    - The workspace with the given workspace_id has not been onboarded
+      to the VM, and the VM is connected to SCOM
+
+    If the extension operation is connecting to an already-configured
+    workspace, it is not a stopping case
+    """
+    other_connection_exists = False
+    if os.path.exists(OMSAdminPath):
+        exit_code, output = run_get_output(WorkspaceCheckCommand,
+                                           chk_err = False)
+
+        if output.strip().lower() != 'no workspace':
+            for line in output.split('\n'):
+                if workspace_id in line:
+                    hutil_log_info('The workspace to be enabled has already ' \
+                                   'been configured on the VM before; ' \
+                                   'continuing despite ' \
+                                   'stopOnMultipleConnections flag')
+                    return
+                else:
+                    # Note: if scom workspace dir is created, a line containing
+                    # "Workspace(SCOM Workspace): scom" will be here
+                    # If any other line is here, it may start sending data later
+                    other_connection_exists = True
+    else:
+        for dir_name, sub_dirs, files in os.walk(EtcOMSAgentPath):
+            for sub_dir in sub_dirs:
+                sub_dir_name = os.path.basename(sub_dir)
+                workspace_search = re.compile(GUIDOnlyRegex, re.M)
+                if sub_dir_name == workspace_id:
+                    hutil_log_info('The workspace to be enabled has already ' \
+                                   'been configured on the VM before; ' \
+                                   'continuing despite ' \
+                                   'stopOnMultipleConnections flag')
+                    return
+                elif workspace_search.match(sub_dir_name) or sub_dir_name == 'scom':
+                    other_connection_exists = True
+
+    if other_connection_exists:
+        err_msg = ('This machine is already connected to some other Log ' \
+                   'Analytics workspace, please set ' \
+                   'stopOnMultipleConnections to false in public ' \
+                   'settings or remove this property, so this machine ' \
+                   'can connect to new workspaces, also it means this ' \
+                   'machine will get billed multiple times for each ' \
+                   'workspace it report to. ' \
+                   '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
+        # This exception will get caught by the main method
+        raise OMSAgentUnwantedMultipleConnectionsException(err_msg)
+    else:
+        detect_scom_connection()
+
+
+def detect_scom_connection():
+    """
+    If these two conditions are met, then we can assume the
+    VM is monitored
+    by SCOM:
+    1. SCOMPort is open and omiserver is listening on it
+    2. scx certificate is signed by SCOM server
+
+    To determine it check for existence of below two
+    conditions:
+    1. SCOMPort is open and omiserver is listening on it:
+       /etc/omi/conf/omiserver.conf can be parsed to
+       determine it.
+    2. scx certificate is signed by SCOM server: scom cert
+       is present @ /etc/opt/omi/ssl/omi-host-<hostname>.pem
+       (/etc/opt/microsoft/scx/ssl/scx.pem is a softlink to
+       this). If the machine is monitored by SCOM then issuer
+       field of the certificate will have a value like
+       CN=SCX-Certificate/title=<GUID>, DC=<SCOM server hostname>
+       (e.g CN=SCX-Certificate/title=SCX94a1f46d-2ced-4739-9b6a-1f06156ca4ac,
+       DC=NEB-OM-1502733)
+
+    Otherwise, if a scom configuration directory has been
+    created, we assume SCOM is in use
+    """
+    scom_port_open = None # return when determine this is false
+    cert_signed_by_scom = False
+
+    if os.path.exists(OMSAdminPath):
+        scom_port_open = detect_scom_using_omsadmin()
+        if scom_port_open is False:
+            return
+
+    # If omsadmin.sh option is not available, use omiconfigeditor
+    if (scom_port_open is None and os.path.exists(OMIConfigEditorPath)
+            and os.path.exists(OMIServerConfPath)):
+        scom_port_open = detect_scom_using_omiconfigeditor()
+        if scom_port_open is False:
+            return
+
+    # If omiconfigeditor option is not available, directly parse omiserver.conf
+    if scom_port_open is None and os.path.exists(OMIServerConfPath):
+        scom_port_open = detect_scom_using_omiserver_conf()
+        if scom_port_open is False:
+            return
+
+    if scom_port_open is None:
+        hutil_log_info('SCOM port could not be determined to be open')
+        return
+
+    # Parse the certificate to determine if SCOM issued it
+    if os.path.exists(SCOMCertPath):
+        exit_if_openssl_unavailable('Install')
+        cert_cmd = 'openssl x509 -in {0} -noout -text'.format(SCOMCertPath)
+        cert_exit_code, cert_output = run_get_output(cert_cmd, chk_err = False,
+                                                     log_cmd = False)
+        if cert_exit_code is 0:
+            issuer_re = re.compile(SCOMCertIssuerRegex, re.M)
+            if issuer_re.search(cert_output):
+                hutil_log_info('SCOM cert exists and is signed by SCOM server')
+                cert_signed_by_scom = True
+            else:
+                hutil_log_info('SCOM cert exists but is not signed by SCOM ' \
+                               'server')
+        else:
+            hutil_log_error('Error reading SCOM cert; cert could not be ' \
+                            'determined to be signed by SCOM server')
+    else:
+        hutil_log_info('SCOM cert does not exist')
+
+    if scom_port_open and cert_signed_by_scom:
+        err_msg = ('This machine may already be connected to a System ' \
+                   'Center Operations Manager server. Please set ' \
+                   'stopOnMultipleConnections to false in public settings ' \
+                   'or remove this property to allow connection to the Log ' \
+                   'Analytics workspace. ' \
+                   '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
+        raise OMSAgentUnwantedMultipleConnectionsException(err_msg)
+
+
+def detect_scom_using_omsadmin():
+    """
+    This method assumes that OMSAdminPath exists; if packages have not
+    been installed yet, this may not exist
+    Returns True if omsadmin.sh indicates that SCOM port is open
+    """
+    omsadmin_cmd = '{0} -o'.format(OMSAdminPath)
+    exit_code, output = run_get_output(omsadmin_cmd, False, False)
+    # Guard against older omsadmin.sh versions
+    if ('illegal option' not in output.lower()
+            and 'unknown option' not in output.lower()):
+        if exit_code is 0:
+            hutil_log_info('According to {0}, SCOM port is ' \
+                           'open'.format(omsadmin_cmd))
+            return True
+        elif exit_code is 1:
+            hutil_log_info('According to {0}, SCOM port is not ' \
+                           'open'.format(omsadmin_cmd))
+    return False
+
+
+def detect_scom_using_omiconfigeditor():
+    """
+    This method assumes that the relevant files exist
+    Returns True if omiconfigeditor indicates that SCOM port is open
+    """
+    omi_cmd = '{0} httpsport -q {1} < {2}'.format(OMIConfigEditorPath,
+                                                  SCOMPort, OMIServerConfPath)
+    exit_code, output = run_get_output(omi_cmd, False, False)
+    # Guard against older omiconfigeditor versions
+    if ('illegal option' not in output.lower()
+            and 'unknown option' not in output.lower()):
+        if exit_code is 0:
+            hutil_log_info('According to {0}, SCOM port is ' \
+                           'open'.format(omi_cmd))
+            return True
+        elif exit_code is 1:
+            hutil_log_info('According to {0}, SCOM port is not ' \
+                           'open'.format(omi_cmd))
+    return False
+
+
+def detect_scom_using_omiserver_conf():
+    """
+    This method assumes that the relevant files exist
+    Returns True if omiserver.conf indicates that SCOM port is open
+    """
+    with open(OMIServerConfPath, 'r') as omiserver_file:
+        omiserver_txt = omiserver_file.read()
+
+    httpsport_search = r'^[\s]*httpsport[\s]*=(.*)$'
+    httpsport_re = re.compile(httpsport_search, re.M)
+    httpsport_matches = httpsport_re.search(omiserver_txt)
+    if (httpsport_matches is not None and
+            httpsport_matches.group(1) is not None):
+        ports = httpsport_matches.group(1)
+        ports = ports.replace(',', ' ')
+        ports_list = ports.split(' ')
+        if str(SCOMPort) in ports_list:
+            hutil_log_info('SCOM port is listed in ' \
+                           '{0}'.format(OMIServerConfPath))
+            return True
+        else:
+            hutil_log_info('SCOM port is not listed in ' \
+                           '{0}'.format(OMIServerConfPath))
+    else:
+        hutil_log_info('SCOM port is not listed in ' \
+                           '{0}'.format(OMIServerConfPath))
+    return False
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True):
@@ -554,12 +787,12 @@ def retry_onboarding(exit_code, output):
 
 def raise_if_no_internet(exit_code, output):
     """
-    Raise the OmsAgentCannotConnectToOMSException exception if the onboarding
+    Raise the OMSAgentCannotConnectToOMSException exception if the onboarding
     script returns the error code to indicate that the OMS service can't be
     resolved
     """
     if exit_code is EnableErrorResolvingHost:
-        raise OmsAgentCannotConnectToOMSException
+        raise OMSAgentCannotConnectToOMSException
     return exit_code
 
 
@@ -849,14 +1082,14 @@ def log_and_exit(operation, exit_code = 1, message = ''):
         sys.exit(exit_code)
 
 
-class OmsAgentParameterMissingError(ValueError):
+class OMSAgentParameterMissingError(ValueError):
     """
     There is a missing parameter for the OmsAgentForLinux Extension
     """
     pass
 
 
-class OmsAgentInvalidParameterError(ValueError):
+class OMSAgentInvalidParameterError(ValueError):
     """
     There is an invalid parameter for the OmsAgentForLinux Extension
     ex. Workspace ID does not match GUID regex
@@ -864,7 +1097,7 @@ class OmsAgentInvalidParameterError(ValueError):
     pass
 
 
-class OmsAgentUnwantedMultipleConnectionsException(Exception):
+class OMSAgentUnwantedMultipleConnectionsException(Exception):
     """
     This machine is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
@@ -872,7 +1105,7 @@ class OmsAgentUnwantedMultipleConnectionsException(Exception):
     pass
 
 
-class OmsAgentCannotConnectToOMSException(Exception):
+class OMSAgentCannotConnectToOMSException(Exception):
     """
     The OMSAgent cannot connect to the OMS service
     """
