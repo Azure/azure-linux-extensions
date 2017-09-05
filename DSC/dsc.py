@@ -223,28 +223,37 @@ def enable():
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
 
 def send_heart_beat_msg_to_agent_service():
+    response = None
     try:
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="In send_heart_beat_msg_to_agent_service method")
-        code,output = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
-        if code == 0 and "RefreshMode=Pull" in output:
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="sends heartbeat message in pullmode")
-            m = re.search("ServerURL=([^\n]+)", output)
-            if not m:
-                return
-            registration_url = m.group(1)
-            agent_id = get_nodeid(nodeid_path)
-            node_extended_properties_url = registration_url + "/Nodes(AgentId='" + agent_id + "')/ExtendedProperties"
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Url is " + node_extended_properties_url)
-            headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
-            data = construct_node_extension_properties(output)
-            
-            request = urllib2httpclient.Urllib2HttpClient("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
-            response = request.post(node_extended_properties_url, headers=headers, data=data)
-            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
-            return response
+        retry_count = 0
+        canRetry = True 
+        while retry_count <= 5 and canRetry:
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="In send_heart_beat_msg_to_agent_service method")
+            code,output = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
+            if code == 0 and "RefreshMode=Pull" in output:
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="sends heartbeat message in pullmode")
+                m = re.search("ServerURL=([^\n]+)", output)
+                if not m:
+                    return
+                registration_url = m.group(1)
+                agent_id = get_nodeid(nodeid_path)
+                node_extended_properties_url = registration_url + "/Nodes(AgentId='" + agent_id + "')/ExtendedProperties"
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Url is " + node_extended_properties_url)
+                headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
+                data = construct_node_extension_properties(output)
+                
+                request = urllib2httpclient.Urllib2HttpClient("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
+                response = request.post(node_extended_properties_url, headers=headers, data=data)
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
+                if response.status_code >=500 and response.status_code < 600:
+                    canRetry = True
+                else:
+                    canRetry = False
+                retry_count += 1
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Failed to send heartbeat message to DSC agent service: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to send heartbeat message to DSC agent service: %s, stack trace: %s' %(str(e), traceback.format_exc()))
+    return response    
 
 def get_lcm_config_setting(setting_name, lcmconfig):
     valuegroup = re.search(setting_name + "=([^\n]+)", lcmconfig)
@@ -258,6 +267,13 @@ def construct_node_extension_properties(lcmconfig):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
     distro_info = platform.dist()
+    if len(distro_info[1].split('.')) == 1:
+        major_version = distro_info[1].split('.')[0]
+        minor_version = 0
+    if len(distro_info[1].split('.')) == 2:
+        major_version = distro_info[1].split('.')[0]
+        minor_version = distro_info[1].split('.')[1]
+    
     VMUUID = get_vmuuid()
     node_config_names = get_lcm_config_setting('ConfigurationNames', lcmconfig)
     configuration_mode = get_lcm_config_setting("ConfigurationMode", lcmconfig)
@@ -281,8 +297,8 @@ def construct_node_extension_properties(lcmconfig):
         "OSProfile":{
               "Name":distro_info[0],
               "Type":"Linux",
-              "MinorVersion":distro_info[1].split('.')[0],
-              "MajorVersion":distro_info[1].split('.')[1], 
+              "MinorVersion": major_version,
+              "MajorVersion": minor_version, 
               "VMUUID": VMUUID
         },   
        "RegistrationMetaData":{
@@ -693,7 +709,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
             }, 
             "version": "1.0", "timestampUTC":   time.strftime(date_time_format, time.gmtime())
             }]
-    	json.dump(status_file_content, fp)
+        json.dump(status_file_content, fp)
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
 
 def get_nodeid(file_path):
