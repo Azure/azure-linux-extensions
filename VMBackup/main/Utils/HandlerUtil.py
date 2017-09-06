@@ -578,8 +578,12 @@ class HandlerUtility:
     
     def get_shell_script_log(self):
         lines = None
-        with open(self._context._shell_log_file, "r") as f:
-            lines = f.readlines()
-        if(len(lines) > 10):
-            lines = lines[-10:]
-        return ''.join(str(x) for x in lines)
+        try:
+            with open(self._context._shell_log_file, "r") as f:
+                lines = f.readlines()
+            if(len(lines) > 10):
+                lines = lines[-10:]
+            return ''.join(str(x) for x in lines)
+        except Exception as e:
+            self.log("Can't receive shell log file: " + str(e))
+            return lines

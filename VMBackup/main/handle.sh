@@ -7,6 +7,7 @@ outputstr="$output"
 poststr=${outputstr#*logFolder\"}
 postsubstr=${poststr#*\"configFolder}
 resultstrlen=`expr ${#poststr} - 13 - ${#postsubstr}`
+resultstr=$(echo $poststr | cut -b 1-$resultstrlen)
 ##parsing further to remove " : and spaces
 poststr1=${resultstr#*\"}
 postsubstr1=${poststr1#*\"}
