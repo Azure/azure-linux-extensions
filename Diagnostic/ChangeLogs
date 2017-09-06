@@ -1,3 +1,7 @@
+2017-09-05: LAD-3.0.111
+    - Ensure SAS storage token is supplied
+    - Explicitly reject deprecated use of LAD 2.3's storageAccountKey
+
 2017-08-11: LAD-3.0.109
     - Fix waagent-related issue on Debian distros
     - Add additional unit tests

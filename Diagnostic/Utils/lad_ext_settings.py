@@ -89,6 +89,9 @@ class LadExtSettings(ExtSettings):
         # The logic below could have been a general-purpose JSON tree walker, but since the specific
         # knowledge of where secrets are needs be applied anyway, it's coded for this specific schema anyway.
         # Secrets are stored only in the following paths: .storageAccountSasToken, and .sinksConfig.sink[].sasURL.
+        # LAD 2.3 used to support storageAccountKey; although LAD 3.0 does not support it, some users might mistakenly
+        # supply it. We redact it, if present, even though we're going to throw an error later on; the protected
+        # settings are logged before we inspect them to pull out the credentials.
 
         # Get and work on a copy of the handler settings dict. Note that it must be a deep copy!
         # dict(self.get_handler_settings()) doesn't work!
@@ -97,6 +100,8 @@ class LadExtSettings(ExtSettings):
         if protected_settings:
             if 'storageAccountSasToken' in protected_settings:
                 protected_settings['storageAccountSasToken'] = 'REDACTED_SECRET'
+            if 'storageAccountKey' in protected_settings:
+                protected_settings['storageAccountKey'] = 'REDACTED_SECRET'
             if 'sinksConfig' in protected_settings and 'sink' in protected_settings['sinksConfig']:
                 for each_sink_dict in protected_settings['sinksConfig']['sink']:
                     if 'sasURL' in each_sink_dict:
