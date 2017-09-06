@@ -178,5 +178,6 @@ copy(plugin_conf, final_plugin_conf_path)
 copy(test_manifest,final_folder_path)
 copy(manifest,final_folder_path)
 copy(prod_manifest,final_folder_path)
+copy(main_entry,final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
 
