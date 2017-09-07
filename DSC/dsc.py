@@ -31,6 +31,7 @@ import datetime
 import serializerfactory
 import httpclient
 import urllib2httpclient
+import httpclientfactory
 
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
@@ -242,11 +243,14 @@ def send_heart_beat_msg_to_agent_service():
                 headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
                 data = construct_node_extension_properties(output)
                 
-                request = urllib2httpclient.Urllib2HttpClient("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
-                response = request.post(node_extended_properties_url, headers=headers, data=data)
+                http_client_factory = httpclientfactory.HttpClientFactory("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
+                http_client = http_client_factory.create_http_client(sys.version_info)
+                
+                response = http_client.post(node_extended_properties_url, headers=headers, data=data)
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
                 if response.status_code >=500 and response.status_code < 600:
                     canRetry = True
+                    time.sleep(10)
                 else:
                     canRetry = False
                 retry_count += 1

@@ -1,7 +1,8 @@
 all: package
 
 SOURCES = \
-	subprocessfactory.py \
+	httpclientfactory.py \
+        subprocessfactory.py \
 	curlhttpclient.py \
         serializerfactory.py \
         httpclient.py \
