@@ -122,7 +122,7 @@ def main():
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
     except Exception as e:
-        waagent_log_error(e.message)
+        waagent_log_error(str(e))
 
     if operation is None:
         log_and_exit('Unknown', 1, 'No valid operation provided')
@@ -305,9 +305,21 @@ def enable():
                                          final_check = raise_if_no_internet,
                                          check_error = True, log_cmd = False)
 
-    # Sleep to prevent bombarding the processes, then restart all processes to
-    # resolve any issues with auto-started processes from --upgrade
     if exit_code is 0:
+        # TODO fix line lengths
+        # Create a marker file to denote the workspace that was onboarded using the extension
+        extension_marker_path = os.path.join(EtcOMSAgentPath, workspaceId, 'conf/.azure_extension_marker')
+        if os.path.exists(extension_marker_path):
+            hutil_log_info('Extension marker file {0} already created'.format(extension_marker_path))
+        else:
+            try:
+                open(extension_marker_path, 'w').close()
+                hutil_log_info('Created extension marker file {0}'.format(extension_marker_path))
+            except IOError as e:
+                hutil_log_error('Error creating {0} with error: {1}'.format(extension_marker_path, str(e)))
+
+        # Sleep to prevent bombarding the processes, then restart all processes to
+        # resolve any issues with auto-started processes from --upgrade
         time.sleep(5) # 5 seconds
         run_command_and_log(RestartOMSAgentServiceCommand)
 
@@ -395,6 +407,7 @@ def parse_context(operation):
         except KeyError as e:
             waagent_log_error('Unable to parse context with error: ' \
                               '{0}'.format(e.message))
+            # TODO double-check all instances of *ParameterMissingException* where redefined to ParameterMissingException
             raise ParameterMissingException
     return hutil
 
@@ -991,7 +1004,7 @@ def get_handler_env():
                 handler_env = handler_env[0]
             HandlerEnvironment = handler_env
         except Exception as e:
-            waagent_log_error(e.message)
+            waagent_log_error(str(e))
     return HandlerEnvironment
 
 
