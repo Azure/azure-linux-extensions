@@ -577,7 +577,7 @@ class HandlerUtility:
             return ''.join(str(x) for x in lines)
     
     def get_shell_script_log(self):
-        lines = None
+        lines = "" 
         try:
             with open(self._context._shell_log_file, "r") as f:
                 lines = f.readlines()
