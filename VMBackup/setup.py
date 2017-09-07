@@ -43,7 +43,7 @@ from main.common import CommonVariables
 
 packages_array = []
 main_folder = 'main'
-main_entry = main_folder + '/handle.py'
+main_entry = main_folder + '/handle.sh'
 binary_entry = main_folder + '/safefreeze'
 packages_array.append(main_folder)
 
@@ -81,11 +81,11 @@ manifest_obj = [{
   "name": CommonVariables.extension_name,
   "version": CommonVariables.extension_version,
   "handlerManifest": {
-    "installCommand": main_entry + " -install",
-    "uninstallCommand": main_entry + " -uninstall",
-    "updateCommand": main_entry + " -update",
-    "enableCommand": main_entry + " -enable",
-    "disableCommand": main_entry + " -disable",
+    "installCommand": main_entry + " install",
+    "uninstallCommand": main_entry + " uninstall",
+    "updateCommand": main_entry + " update",
+    "enableCommand": main_entry + " enable",
+    "disableCommand": main_entry + " disable",
     "rebootAfterInstall": False,
     "reportHeartbeat": False
   }
@@ -178,5 +178,6 @@ copy(plugin_conf, final_plugin_conf_path)
 copy(test_manifest,final_folder_path)
 copy(manifest,final_folder_path)
 copy(prod_manifest,final_folder_path)
+copy(main_entry,final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
 

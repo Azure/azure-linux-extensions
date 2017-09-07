@@ -92,7 +92,7 @@ class Backuplogger(object):
                     seek_len_abs = length
                 file.seek(0 - seek_len_abs, os.SEEK_END)
                 tail_wala_log = file.read()
-                log_to_blob = self.hutil.fetch_log_message() + "Tail of previous logs:" + self.prev_log + "Tail of WALA Log:" + tail_wala_log
+                log_to_blob = self.hutil.fetch_log_message() + "Tail of previous logs:" + self.prev_log + "Tail of WALA Log:" + tail_wala_log + "Tail of shell script log:" + self.hutil.get_shell_script_log()
         except Exception as e:
             errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.hutil.log(errMsg)

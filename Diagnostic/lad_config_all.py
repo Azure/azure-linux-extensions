@@ -452,14 +452,16 @@ class LadConfigAll:
 
         # 6. Actually update the storage account settings on mdsd config XML tree (based on extension's
         #    protectedSettings).
-        account = self._ext_settings.read_protected_config('storageAccountName')
+        account = self._ext_settings.read_protected_config('storageAccountName').strip()
         if not account:
-            return False, "Empty storageAccountName"
+            return False, "Must specify storageAccountName"
+        if self._ext_settings.read_protected_config('storageAccountKey'):
+            return False, "The storageAccountKey protected setting is not supported and must not be used"
         token = self._ext_settings.read_protected_config('storageAccountSasToken').strip()
+        if not token or token == '?':
+            return False, "Must specify storageAccountSasToken"
         if '?' == token[0]:
             token = token[1:]
-        if not token:
-            return False, "Empty storageAccountSasToken"
         endpoint = get_storage_endpoint_with_account(account,
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
         self._update_account_settings(account, token, endpoint)

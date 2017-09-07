@@ -28,6 +28,9 @@ import time
 import platform
 import json
 import datetime
+import serializerfactory
+import httpclient
+import urllib2httpclient
 
 from azure.storage import BlobService
 from Utils.WAAgentUtil import waagent
@@ -51,6 +54,8 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
+extension_handler_version = "2.70.0.0"
+extension_status_event = "ExtensionUpgrade"
 
 # DSC-specific Operation
 class Operation:
@@ -167,10 +172,12 @@ def enable():
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             if exit_code != 0:
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
+            extension_status_event = "ExtensionUpgrade"    
         else:
             file_path = download_file()
             if mode == Mode.pull:
                 current_config = apply_dsc_meta_configuration(file_path)
+                extension_status_event = "ExtensionUpgrade"
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
             else:
@@ -199,24 +206,118 @@ def enable():
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
-                
+        
+        send_heart_beat_msg_to_agent_service()
+        
         agent_id = get_nodeid(nodeid_path)
         vm_uuid = get_vmuuid()
         if vm_uuid is not None and agent_id is not None:
             status_filepath = get_statusfile_path()
             update_statusfile(status_filepath, agent_id, vm_uuid)
-	    sys.exit(0)
+            sys.exit(0)
               
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True, message="Enable failed with the error: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
+
+def send_heart_beat_msg_to_agent_service():
+    response = None
+    try:
+        retry_count = 0
+        canRetry = True 
+        while retry_count <= 5 and canRetry:
+            waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="In send_heart_beat_msg_to_agent_service method")
+            code,output = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
+            if code == 0 and "RefreshMode=Pull" in output:
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="sends heartbeat message in pullmode")
+                m = re.search("ServerURL=([^\n]+)", output)
+                if not m:
+                    return
+                registration_url = m.group(1)
+                agent_id = get_nodeid(nodeid_path)
+                node_extended_properties_url = registration_url + "/Nodes(AgentId='" + agent_id + "')/ExtendedProperties"
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Url is " + node_extended_properties_url)
+                headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
+                data = construct_node_extension_properties(output)
+                
+                request = urllib2httpclient.Urllib2HttpClient("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
+                response = request.post(node_extended_properties_url, headers=headers, data=data)
+                waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="response code is " + str(response.status_code))
+                if response.status_code >=500 and response.status_code < 600:
+                    canRetry = True
+                else:
+                    canRetry = False
+                retry_count += 1
+    except Exception as e:
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Failed to send heartbeat message to DSC agent service: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
+        hutil.error('Failed to send heartbeat message to DSC agent service: %s, stack trace: %s' %(str(e), traceback.format_exc()))
+    return response    
+
+def get_lcm_config_setting(setting_name, lcmconfig):
+    valuegroup = re.search(setting_name + "=([^\n]+)", lcmconfig)
+    if not valuegroup:
+        return
+    value = valuegroup.group(1)
     
+    return value
+    
+def construct_node_extension_properties(lcmconfig):
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Getting properties")
+    OMSCLOUD_ID = get_omscloudid()
+    distro_info = platform.dist()
+    if len(distro_info[1].split('.')) == 1:
+        major_version = distro_info[1].split('.')[0]
+        minor_version = 0
+    if len(distro_info[1].split('.')) == 2:
+        major_version = distro_info[1].split('.')[0]
+        minor_version = distro_info[1].split('.')[1]
+    
+    VMUUID = get_vmuuid()
+    node_config_names = get_lcm_config_setting('ConfigurationNames', lcmconfig)
+    configuration_mode = get_lcm_config_setting("ConfigurationMode", lcmconfig)
+    configuration_mode_frequency = get_lcm_config_setting("ConfigurationModeFrequencyMins", lcmconfig)
+    refresh_frequency_mins = get_lcm_config_setting("RefreshFrequencyMins", lcmconfig)
+    reboot_node = get_lcm_config_setting("RebootNodeIfNeeded", lcmconfig)
+    action_after_reboot = get_lcm_config_setting("ActionAfterReboot", lcmconfig)
+    allow_module_overwrite = get_lcm_config_setting("AllowModuleOverwrite", lcmconfig)
+
+    waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Constructing properties data")
+    
+    properties_data = {   
+      "OMSCloudId": OMSCLOUD_ID,      
+       "TimeStamp": time.strftime(date_time_format, time.gmtime()),
+      "VMResourceId":"",
+        "ExtensionStatusEvent": extension_status_event,
+        "ExtensionInformation":{
+              "Name":"Microsoft.OSTCExtensions.DSCForLinux",
+              "Version": extension_handler_version
+        },   
+        "OSProfile":{
+              "Name":distro_info[0],
+              "Type":"Linux",
+              "MinorVersion": major_version,
+              "MajorVersion": minor_version, 
+              "VMUUID": VMUUID
+        },   
+       "RegistrationMetaData":{
+          "NodeConfigurationName": node_config_names,
+          "ConfigurationMode": configuration_mode,
+          "ConfigurationModeFrequencyMins":configuration_mode_frequency,
+          "RefreshFrequencyMins":refresh_frequency_mins,
+          "RebootNodeIfNeeded":reboot_node,
+          "ActionAfterReboot": action_after_reboot,
+          "AllowModuleOverwrite":allow_module_overwrite
+       }
+    }
+    return properties_data
+
 def uninstall():
     hutil.do_parse_context('Uninstall')
     try:
-        uninstall_package('dsc')
+        extension_status_event = "ExtensionUninstall"
+        send_heart_beat_msg_to_agent_service()
         hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded')
     except Exception as e:
         hutil.error('Failed to uninstall the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -601,16 +702,16 @@ def update_statusfile(status_filepath, node_id, vmuuid):
 
     metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formattedMessage": {"lang": "en-US", "message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
     with open(status_filepath, "w") as fp:
-	status_file_content = [{"status": 
-				{"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
-			       "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
-				"substatus" : metadatastatus 
-				}, 
-				"version": "1.0", "timestampUTC":   time.strftime(date_time_format, time.gmtime())
-				}]
-	json.dump(status_file_content, fp)
-	waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
-            
+        status_file_content = [{"status": 
+            {"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 
+            "operation": "Enable", "code": "0", "name": "Microsoft.OSTCExtensions.DSCForLinux",
+            "substatus" : metadatastatus 
+            }, 
+            "version": "1.0", "timestampUTC":   time.strftime(date_time_format, time.gmtime())
+            }]
+        json.dump(status_file_content, fp)
+    waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
+
 def get_nodeid(file_path):
     id = None
     try:
@@ -631,10 +732,17 @@ def get_nodeid(file_path):
 
 def get_vmuuid():
     UUID = None
-    code, output = run_cmd("dmidecode | grep UUID | sed -e 's/UUID: //'")
+    code, output = run_cmd("sudo dmidecode | grep UUID | sed -e 's/UUID: //'")
     if code == 0:
         UUID = output.strip()
     return UUID
+
+def get_omscloudid():
+    OMSCLOUD_ID = None
+    code, output = run_cmd("sudo dmidecode | grep 'Tag: 77' | sed -e 's/Asset Tag: //'")
+    if code == 0:
+        OMSCLOUD_ID = output.strip()
+    return OMSCLOUD_ID
 
 def check_dsc_configuration(current_config):
     outputlist = re.split("\n", current_config)
