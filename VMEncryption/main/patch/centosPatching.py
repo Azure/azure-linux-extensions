@@ -39,7 +39,7 @@ class centosPatching(redhatPatching):
         super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
         self.command_executor = CommandExecutor(logger)
-        if distro_info[1] in ["6.9", "6.8", "6.7", ,"6.6", "6.5"]:
+        if distro_info[1] in ["6.9", "6.8", "6.7", "6.6", "6.5"]:
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
