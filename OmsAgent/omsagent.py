@@ -232,7 +232,7 @@ def uninstall():
 def enable():
     """
     Onboard the OMSAgent to the specified OMS workspace.
-    This includes enabling the OMS process on the machine.
+    This includes enabling the OMS process on the VM.
     This call will return non-zero or throw an exception if
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
@@ -308,6 +308,7 @@ def enable():
     if exit_code is 0:
         # TODO fix line lengths
         # Create a marker file to denote the workspace that was onboarded using the extension
+        # This will allow supporting multi-homing through the extension like Windows does
         extension_marker_path = os.path.join(EtcOMSAgentPath, workspaceId, 'conf/.azure_extension_marker')
         if os.path.exists(extension_marker_path):
             hutil_log_info('Extension marker file {0} already created'.format(extension_marker_path))
@@ -365,7 +366,7 @@ def retrieve_managed_workspace(protected_settings):
 
 def disable():
     """
-    Disable all OMS workspace processes on the machine.
+    Disable all OMS workspace processes on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
     # Check if the service control script is available
@@ -416,7 +417,7 @@ def is_vm_supported_for_extension():
     """
     Checks if the VM this extension is running on is supported by OMSAgent
     Returns for platform.linux_distribution() vary widely in format, such as
-    '7.3.1611' returned for a machine with CentOS 7, so the first provided
+    '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match
     The supported distros of the OMSAgent-for-Linux, as well as Ubuntu 16.10,
     are allowed to utilize this VM extension. All other distros will get
@@ -604,7 +605,7 @@ def detect_scom_connection():
     2. scx certificate is signed by SCOM server: scom cert
        is present @ /etc/opt/omi/ssl/omi-host-<hostname>.pem
        (/etc/opt/microsoft/scx/ssl/scx.pem is a softlink to
-       this). If the machine is monitored by SCOM then issuer
+       this). If the VM is monitored by SCOM then issuer
        field of the certificate will have a value like
        CN=SCX-Certificate/title=<GUID>, DC=<SCOM server hostname>
        (e.g CN=SCX-Certificate/title=SCX94a1f46d-2ced-4739-9b6a-1f06156ca4ac,
@@ -799,7 +800,7 @@ def is_dpkg_locked(exit_code, output):
     return False
 
 
-def is_curl_found(exit_code):
+def was_curl_found(exit_code, output):
     """
     Returns false if exit_code indicates that curl was not installed; this can
     occur when package lists need to be updated, or when some archives are
@@ -814,16 +815,25 @@ def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     """
     Some commands fail because the package manager is locked (apt-get/dpkg
     only); this will allow retries on failing commands.
+    Sometimes curl's dependencies (i.e. libcurl) are not installed; if this
+    is the case on a VM with apt-get, 'apt-get -f install' should be run
     Sometimes curl is not installed and is also not found in the package list;
-    if this is the case on a machine with apt-get, update the package list
+    if this is the case on a VM with apt-get, update the package list
     """
     dpkg_locked = is_dpkg_locked(exit_code, output)
-    curl_found = is_curl_found(exit_code)
+    curl_found = was_curl_found(exit_code, output)
     apt_get_exit_code, apt_get_output = run_get_output('which apt-get',
                                                        chk_err = False,
                                                        log_cmd = False)
     if dpkg_locked:
         return True, 'Retrying command because package manager is locked.'
+    elif (not curl_found and apt_get_exit_code is 0 and
+            ('apt-get -f install' in output
+            or 'Unmet dependencies' in output.lower())):
+        hutil_log_info('Installing all dependencies of curl:')
+        run_command_and_log('apt-get -f install')
+        return True, 'Retrying command because curl and its dependencies ' \
+                     'needed to be installed'
     elif not curl_found and apt_get_exit_code is 0:
         hutil_log_info('Updating package lists to make curl available')
         run_command_and_log('apt-get update')
@@ -1414,7 +1424,7 @@ class InvalidParameterError(OmsAgentForLinuxException):
 
 class UnwantedMultipleConnectionsException(OmsAgentForLinuxException):
     """
-    This machine is already connected to a different Log Analytics workspace
+    This VM is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
     """
     error_code = 10
