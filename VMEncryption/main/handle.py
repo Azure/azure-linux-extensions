@@ -1500,7 +1500,7 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif distro_name == 'centos' and distro_version == '6.8':
+        elif distro_name == 'centos' and (distro_version == '6.8' or distro_version == '6.9'):
             from oscrypto.centos_68 import CentOS68EncryptionStateMachine
             os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
                                                            distro_patcher=DistroPatcher,
