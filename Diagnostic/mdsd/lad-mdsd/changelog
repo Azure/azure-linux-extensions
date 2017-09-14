@@ -1,0 +1,341 @@
+PACKAGE (1.4.101) stable; urgency=low
+ *  Bug fix: Emit schema md5 hashes at the end of Event Hub
+    Notification event bodies.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Jun 21 16:30:00 UTC 2017
+
+PACKAGE (1.4.100) stable; urgency=low
+ *  Release mdsd binary with libraries static-linked as much as
+    possible. Gcc-built azure-mdsd deb pkg has more libraries
+    statically linked than clang-built azure-mdsd-clang deb pkg.
+
+ * Fixed mdsd http proxy bug.
+
+ -- Azure Linux <azlinux@microsoft.com>  Thur Jun 15 16:30:00 UTC 2017
+
+PACKAGE (1.3.101) stable; urgency=low
+ *  Mdsd daemon pidfile is changed from /var/run/mdsd.pid to
+    <mdsd-role-name>.pid, default is /var/run/mdsd/default.pid.
+
+ -- Azure Linux <azlinux@microsoft.com>  Thu Apr 27 17:40:00 UTC 2017
+
+PACKAGE (1.3.100) stable; urgency=low
+ *  New feature: support new store type CentralJson. Data are uploaded
+    to Azure storage as JSON blob.
+ *  New feature: support EventHub publishing with embedded SAS keys.
+    Data are uploaded to Azure EventHub service directly.
+ *  New feature: environment variables MDSD_CONFIG_DIR, MDSD_RUN_DIR,
+    and MDSD_LOG_DIR.
+ *  Bug fix: print clear error when mdsd pidport file was already locked.
+ *  Bug fix: suppress transient rsyslog-mdsd OM connect() error log.
+ *  Bug fix: fix mdsd SysV script reload bug.
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon Apr 10 22:20:00 UTC 2017
+
+PACKAGE (1.2.109) stable; urgency=low
+ *  Bug fix: parse double number properly for dynamic json data.
+ *  Bug fix: handle metadata conflicts for dynamic schema data.
+ *  Bug fix: add UNIX socket filepath length validation.
+ *  Bug fix: add EventHub max data size validation.
+
+ -- Azure Linux <azlinux@microsoft.com>  Thur Feb 16 22:20:00 UTC 2017
+
+PACKAGE (1.2.108) stable; urgency=low
+ *  Bug fix: retry OMI task up to 30-minute if start-up fails.
+ *  Bug fix: fix EventHub reliability issue when EventHub blob is not found.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Jan 11 23:20:00 UTC 2017
+
+PACKAGE (1.2.107) stable; urgency=low
+ *  Don't load EventHub SAS keys when mdsd.xml doesn't have related storetype.
+ *  Bug fix: fix ETW event SchemaID issue.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Dec 6 00:40:00 UTC 2016
+
+PACKAGE (1.2.106) stable; urgency=low
+ *  Bug fix: add EventHub blob download failure retry.
+ *  When SAS key loads fails, retry in 1-minute instead of 6-hours.
+ *  Refactor Centralbond sink and request code.
+ *  Modified bond and djson protocols so that mdsd sets PreciseTimeStamp value.
+ *  Account SAS support for LAD shared storage key.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Nov 11 23:40:00 UTC 2016
+
+PACKAGE (1.2.105) stable; urgency=low
+
+ *  Bug fix: remove /tmp dependency for autokey downloading and parsing.
+ *  Bug fix: rm ucf in mdsd debian pkg to avoid unwanted prompt.
+ *  Improvement: FileSink open()s file lazilly, close on flush().
+ *  Test improvement: add ingest stress tests; rm unwanted credentials.
+
+ -- Azure Linux <azlinux@microsoft.com>  Thu Oct 20 23:40:00 UTC 2016
+
+PACKAGE (1.2.104) stable; urgency=low
+
+ *  Bug fix for LAD2AI config validation crash.
+ *  Bug fix for "too many open files" error during EventHub file parsing.
+ *  Bug fix for a memory corruption in StreamListener() when ProcessLoop() has error.
+ *  Performance improvement: defer destroying entries until after unlocking LocalSink.
+ *  Restart mdsd per N-hour in cron job.
+ *  Change openssl to latest release in mdsd-static.
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Oct 4 23:40:00 UTC 2016
+
+PACKAGE (1.2.103) stable; urgency=low
+ *  Enable finer-grained tracing of ingest and bond.
+ *  Add sanity checks to old-style JSON ingest.
+ *  rsyslog module: enforce a maximum event size of 1MB, bigger ones will be dropped.
+ *  Bug fix: EventHub async fire-and-forget model may use object out of lifetime.
+ *  Bug fix: EventHub async task is waiting for wrong task.
+ *  Buf fix: EventHub SAS key should be set by AutoKey reload timer.
+ *  Bug fix in rsyslog module: handle partial send(); handle concurrent send().
+ *  Bug fix in rsyslog module: handle ack msg from mdsd in separate thread to avoid livelock.
+ *  Bug fix in rsyslog module: throttle event resend to a peak of 20MBps.
+ *  Bug fix: Skip sending an ACK for an ingested event if sending it would block.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Sep 23 17:00:00 UTC 2016
+
+PACKAGE (1.2.102) stable; urgency=low
+
+ *  Performance improvement at uploading EventHub message.
+ *  Bug fix: restore identity columns after LADQuery stage.
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Aug 30 17:00:00 UTC 2016
+
+PACKAGE (1.2.101) stable; urgency=low
+
+ *  Add unix socket support for rsyslog module
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Aug 2 19:00:00 UTC 2016
+
+PACKAGE (1.2.100) stable; urgency=low
+
+ *  Increase version number.
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Aug 2 12:00:00 UTC 2016
+
+PACKAGE (1.1.106) stable; urgency=low
+
+ *   Added support for input over unix domain sockets.
+ *   Added support for two new input encoding/protocols (bond & json) that allow dynamic schema definition
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Jul 14 12:00:00 UTC 2016
+
+PACKAGE (1.1.105) stable; urgency=low
+
+ * Add identity columns on CentralBond as well
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Jul 8 23:50:00 UTC 2016
+
+PACKAGE (1.1.104) stable; urgency=low
+
+ *   Revert cJSON library source code due to regression (missing messages due
+     to JSON parsing errors)
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Jun 29 23:50:00 UTC 2016
+
+PACKAGE (1.1.103) stable; urgency=low
+
+ *   Make CentralBond type to send schemas to SchemasTable.
+
+ -- Azure Linux <azlinux@microsoft.com>  Tue Jun 28 23:50:00 UTC 2016
+
+PACKAGE (1.1.102) stable; urgency=low
+
+ *   Updated cJSON source code to fix a memory corruption bug
+ *   Aborts main loop when accept() fails, to avoid spin loop.
+ *   Avoid cascaded SIGABRT handler calls that could cause deadlock on malloc/free
+ *   LocalSink lock scope improvement
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon Jun 20 23:50:00 UTC 2016
+
+PACKAGE (1.1.101) stable; urgency=low
+
+ *   Add signal handler for SIGPIPE.
+ *   Fix error handling when mdsd echos back to event sender and fails.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Jun 15 23:50:00 UTC 2016
+
+PACKAGE (1.1.100) stable; urgency=low
+
+ *   Supports remote update of agent XML primary config file from Geneva based on namespace/tenant/role/roleinstance
+ *   Supports log rotation via SIGUSR2
+ *   Supports mapped storage monikers
+ *   Enables use of a random JSON-listener port if the requested port is unavailable
+ *   Reports actual listening port via a “pid and port” file
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon Jun 14 20:00:00 UTC 2016
+
+PACKAGE (1.0.100) unstable; urgency=low
+
+ *   CentralBond support
+ *   EventHub support for some Geneva pipeline services (dgrep, kusto, cosmos/coldpath)
+ *   Statically link required libraries when possible
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon May 16 19:52:43 UTC 2016
+
+PACKAGE (0.9.5) unstable; urgency=low
+
+ *   Proxy support
+ *   CPPREST 2.8, Storage C++ SDK 2.3 upgrades (for proxy support)
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon Mar  7 11:26:35 PST 2016
+
+PACKAGE (0.9.4) unstable; urgency=low
+
+ *   Fix JSON parsing error when the last character in the buffer is backslash
+ *   Improve reporting of XML parse errors and warnings
+ *   Enable stack trace on crash earlier in startup
+ *   AppInsights: Add metadata for metrics and traces
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Mar 4 19:24:45 UTC 2016
+
+PACKAGE (0.9.3) unstable; urgency=low
+
+ *   Integration with hotfixed OMI/SCX
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Jan 29 23:14:28 UTC 2016
+
+PACKAGE (0.9.2) unstable; urgency=low
+
+ *   Add -C option to enable dropping a core file on fatal signal
+ *   Improve logging by adding timestamp to all logs.
+
+ -- Azure Linux <azlinux@microsoft.com>  Thu Jan 14 18:00:00 UTC 2016
+
+PACKAGE (0.9.1) unstable; urgency=low
+
+ *   Write MDS metadata table entry correctly for MDS tables with long names (see 0.8.1)
+ *   Lookup typeconverters by string instead of ustring
+ *   Show known type converters when an unsupported type conversion is requested
+ *   Improved error message at JSON event parsing against schema from config file.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Dec 02 23:00:00 UTC 2015
+
+PACKAGE (0.9.0) unstable; urgency=low
+
+ *   Add support for AISDK library with graceful fail if not present
+
+ -- Azure Linux <azlinux@microsoft.com>  Mon Nov 23 12:04:40 UTC 2015
+ 
+PACKAGE (0.8.3) unstable; urgency=low
+
+ *   Fix the inverse-timestamp in shoebox rowkeys
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Oct 21 21:04:40 UTC 2015
+
+PACKAGE (0.8.2) unstable; urgency=low
+
+ *   Resolve a compatibility conflict with omazuremds.so
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Sep 17 00:44:00 UTC 2015
+
+PACKAGE (0.8.1) unstable; urgency=low
+
+ *   When <Import>ing a config file, ignore the attributes of <MonitoringManagement>
+     elements contained therein.
+ *   Create correct SchemasTable entries for tables whose full names (with prefix
+     and all suffixes) exceed 63 characters in length.
+ *   Eliminate some compiler warnings.
+ *   Funnel all use of write() to a single WriteWithNewline() function that checks
+     return status.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Sep 9 23:19:00 UTC 2015
+
+PACKAGE (0.8.0) unstable; urgency=low
+
+ *   Add support for full "shoebox" rowkey schema via instanceID attribute on
+     the <LADQuery> element.
+ *   Minor corrections to config-file parse error messages.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Aug 28 00:37:45 UTC 2015
+
+PACKAGE (0.7.10) unstable; urgency=low
+
+ *   Replace sprintf with snprintf
+ *   Remove execvp from daemon execution; daemon is no longer started via a second
+     command line invocation.
+ *   Add secure compilation options (PIC/PIE, stack protection, immediate binding)
+     to mdsd and autokey.
+ 
+ -- Azure Linux <azlinux@microsoft.com>  Tue Aug 18 11:10:01 UTC 2015
+
+PACKAGE (0.7.9) unstable; urgency=low
+
+ *   Enforce actual XTable limits (column size, total row size).
+ *   Fixed a rare case that could result in events being uploaded twice.
+ *   Expunge expired tags on an open ingest connection even if no new events are
+     arriving on that connection.
+ *   Add dupeWindowSeconds to <AgentResourceUsage> element; specifies the time
+     window during which duplicate events must be detected. Min 60; max 3600.
+ *   Fixed a rare problem in which receipt of a partial JSON event from a sender
+     corrupts the reassembly buffer during buffer expansion.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri Jun 26 23:18:01 UTC 2015
+
+PACKAGE (0.7.8) unstable; urgency=low
+
+ *   Close event-ingest connection if sync is lost while trying to find JSON. Event
+     senders are required to detect the closed connection and resend any event that
+     was not acknowledged (i.e. for which it did not see the TAG echoed back on the
+     connection).
+    
+ -- Azure Linux <azlinux@microsoft.com>  Fri Jun 19 23:18:01 UTC 2015
+
+PACKAGE (0.7.7) unstable; urgency=low
+
+ *   Fix a regression in the generation of the MDS Table Search schema.
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Jun 10 23:52:26 UTC 2015
+
+PACKAGE (0.7.6) unstable; urgency=low
+
+ *   Flush unneeded event data from local tables held in memory.
+ *   Fix a crash (SIGSEGV) on process exit (seen only when using the -v option).
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri May 18 01:55:45 UTC 2015
+ 
+PACKAGE (0.7.5) unstable; urgency=low
+
+ *   Add scaleUp and scaleDown attributes to <MapName> to scale specific values retrieved
+     from OMI and unpivoted. <MapName> transforms more than just the column name and is
+     thus somewhat misnamed, but changing it is a breaking schema change.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri May 08 01:55:45 UTC 2015
+
+PACKAGE (0.7.4) unstable; urgency=low
+
+ *   Build against libazurestorage 1.0.0. Stop suppressing certain warnings during build.
+
+ -- Azure Linux <azlinux@microsoft.com>  Fri May 01 01:55:45 UTC 2015
+ 
+PACKAGE (0.7.3) unstable; urgency=low
+
+ *   Don't emit an error message when creating a missing table.
+
+ -- Azure Linux <azlinux@microsoft.com>  Sat Apr 25 01:55:45 UTC 2015
+ 
+PACKAGE (0.7.2) unstable; urgency=low
+
+ *   Force mt_int32 values to remain 32 bits and not scaled up by the storage API.
+ *   Store TIMESTAMP as a true DateTime (as implemented in PPLX utility::datetime and as
+     expected by the storage SDK).
+ *   RowKey for the LAD Query has metric name and timestamp separated by only two
+     underscores, not the three that MDS uses when combining strings.  Also, the hex
+     expansions of non-alphanumerics are expected to use all uppercase hex digits.
+
+ -- Azure Linux <azlinux@microsoft.com>  Sat Apr 25 01:55:45 UTC 2015
+
+PACKAGE (0.7.0) unstable; urgency=low
+
+ *   Store events to unpersisted local tables (storeType="local").
+ *   <Unpivot> element within <OMIQuery> will unpivot specified columns into separate rows.
+ *   <MapName> within <Unpivot> will rename specific unpivoted datum names (e.g. change
+     "AvailableMemory" to "MEMORY\Available").
+ *   <DerivedEvents> and <LADQuery> enable querying of data from a local table to produce
+     a set of aggregates. The query is fixed to meet the needs of Linux Azure Diagnostics
+     and includes customized partition and row keys.
+ *   Create missing tables if full storage account credentials are suppplied.
+ *   Enable mocking of MDS through storing events in a disk file (storeType="file").
+
+ -- Azure Linux <azlinux@microsoft.com>  Wed Apr 22 01:55:45 UTC 2015

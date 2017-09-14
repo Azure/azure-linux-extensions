@@ -1,0 +1,7 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://msazure.visualstudio.com/One/_git/Compute-Runtime-Tux/
+
+Files: *
+Copyright: 2015 Microsoft Corporation
+License: Microsoft Internal Use ONLY
+
