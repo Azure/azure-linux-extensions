@@ -1,0 +1,84 @@
+namespace mdsdinput
+
+struct Time
+{
+	// Seconds
+    0: required uint64 sec;
+
+	// Nanoseconds
+    1: uint32 nsec;
+}
+
+// These fields types map to the Mds Field types
+enum FieldType
+{
+    FT_INVALID = 0,	// This signifies an invalid field type.
+    FT_BOOL = 1,	// The field is encoded as BT_BOOL
+    FT_INT32 = 2,	// The field is encoded as BT_INT32
+    FT_INT64 = 3,	// The field is encoded as BT_INT64
+    FT_DOUBLE = 4,	// The field is encoded as BT_DOUBLE
+    FT_TIME = 5,	// The field is encoded as Time (all times are expected to be UTC)
+    FT_STRING = 6,	// The field is encoded as BT_STRING
+}
+
+// Represents on field definition
+struct FieldDef
+{
+	// The field name
+    0: required string name;
+
+	// The field type
+    1: required FieldType fieldType = FT_INVALID;
+}
+
+// Schema describing the data in a Message
+struct SchemaDef
+{
+	// The field definitions (in the order that they will appear in the Message data)
+    0: required vector<FieldDef> fields;
+
+    // The index of the field that is to be treated as the event timestamp value (PreciseTimeStamp)
+    // If the value is null, the index index is < 0, > fields size, or the refrenced field is not of type FT_TIME,
+    // then the event timestamp will be set at the time of event reception
+    1: nullable<uint32> timestampFieldIdx;
+}
+
+// A single mdsd message (to be recorded by mdsd as a single MDS row)
+struct Message
+{
+	// The source of the message (Used for routing messages in mdsd)
+    0: required string source;
+
+	// The message id. Must be unique for all messages sent during a single session (e.g. life of TCP stream).
+    1: required uint64 msgId;
+
+	// The id of the schema that describes the data in the message
+    3: required uint64 schemaId;
+
+	// The schema to associate with schemaId. This should be null if the schema for schemaId was previously transmitted during the same session.
+    4: nullable<SchemaDef> schema;
+
+	// The message data, encoded according to the schema identified by schemaId
+    5: required blob data;
+}
+
+// The response code describing the result of processing a Message
+enum ResponseCode
+{
+    ACK_SUCCESS = 0,			 // The message was decoded and stored in mdsd's memory
+    ACK_FAILED = 1,				 // The message could not be processed for an unknown reason
+    ACK_UNKNOWN_SCHEMA_ID = 2,	 // The message's schemaId is unknown (no schema was transmitted for that id)
+    ACK_DECODE_ERROR = 3,		 // The message data could not be decoded using the schema identified by message schemaId
+    ACK_INVALID_SOURCE = 4,		 // The message's source is invalid
+    ACK_DUPLICATE_SCHEMA_ID = 5, // The message's schema id was already used by a different schema
+}
+
+// An acknowledgement sent by mdsd. One Ack will be sent for each Message recieved.
+struct Ack
+{
+	// The Message.msgId
+    0: required uint64 msgId;
+
+	// The result of processing the message
+    1: ResponseCode code = ACK_SUCCESS;
+}
