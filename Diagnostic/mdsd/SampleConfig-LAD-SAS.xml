@@ -1,0 +1,137 @@
+<MonitoringManagement eventVersion="2" namespace="" timestamp="2014-12-01T20:00:00.000" version="1.0">
+ <Accounts>
+ <SharedAccessSignature moniker="ladtestmoniker" account="ladtest" isDefault="true" key="valid account SAS with ss including bt, srt sco, sp rwlacu. Expiry should be infinite." />
+ </Accounts>
+  <Management defaultRetentionInDays="90" eventVolume="Medium">
+    <Identity>
+      <IdentityComponent name="DeploymentId">c9c8552dc3a1421da8ecc0c284082a39</IdentityComponent>
+      <IdentityComponent name="Host" useComputerName="true" />
+    </Identity>
+    <AgentResourceUsage diskQuotaInMB="50000" />
+  </Management>
+
+    <Schemas>
+    <Schema name="syslog">
+      <Column mdstype="mt:wstr" name="Ignore" type="str" />
+      <Column mdstype="mt:wstr" name="Facility" type="str" />
+      <Column mdstype="mt:int32" name="Severity" type="str" />
+      <Column mdstype="mt:utc" name="EventTime" type="str-rfc3339" />
+      <Column mdstype="mt:wstr" name="SendingHost" type="str" />
+      <Column mdstype="mt:wstr" name="Msg" type="str" />
+    </Schema>
+
+    <Schema name="ladfile">
+      <Column mdstype="mt:wstr" name="FileTag" type="str" />
+      <Column mdstype="mt:wstr" name="Msg" type="str" />
+    </Schema>
+
+  </Schemas>
+
+
+  <Sources>
+    <Source name="syslog" schema="syslog" />
+  </Sources>
+
+ <Events>
+    <MdsdEvents>
+      <MdsdEventSource source="syslog">
+        <RouteEvent dontUsePerNDayTable="true" eventName="Linuxsyslog" priority="High" />
+      </MdsdEventSource>
+    </MdsdEvents>
+
+<OMI>
+<OMIQuery cqlQuery="SELECT PercentAvailableMemory FROM SCX_MemoryStatisticalInformation" dontUsePerNDayTable="true" eventName="DiagnosticTestMemory" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" /><OMIQuery cqlQuery="SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'" dontUsePerNDayTable="true" eventName="DiagnosticTestCpu" omiNamespace="root/scx" priority="High" sampleRateInSeconds="60" /></OMI>
+
+
+<OMI>
+    <OMIQuery cqlQuery="SELECT AvailableMemory, PercentAvailableMemory, UsedMemory, PercentUsedMemory, PercentUsedByCache, PagesPerSec, PagesReadPerSec, PagesWrittenPerSec, AvailableSwap, PercentAvailableSwap, UsedSwap, PercentUsedSwap FROM SCX_MemoryStatisticalInformation " eventName="memoryStats" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+        <Unpivot columnName="CounterName" columnValue="Value" columns="AvailableMemory, PercentAvailableMemory, UsedMemory,PercentUsedMemory, PercentUsedByCache, PagesPerSec, PagesReadPerSec, PagesWrittenPerSec, AvailableSwap, PercentAvailableSwap, UsedSwap, PercentUsedSwap">
+      <MapName name="AvailableMemory" scaleUp="1048576">\Memory\AvailableMemory</MapName>
+<MapName name="PercentAvailableMemory">\Memory\PercentAvailableMemory</MapName>
+<MapName name="UsedMemory" scaleUp="1048576">\Memory\UsedMemory</MapName>
+<MapName name="PercentUsedMemory">\Memory\PercentUsedMemory</MapName>
+<MapName name="PercentUsedByCache">\Memory\PercentUsedByCache</MapName>
+<MapName name="PagesPerSec">\Memory\PagesPerSec</MapName>
+<MapName name="PagesReadPerSec">\Memory\PagesReadPerSec</MapName>
+<MapName name="PagesWrittenPerSec">\Memory\PagesWrittenPerSec</MapName>
+<MapName name="AvailableSwap" scaleUp="1048576">\Memory\AvailableSwap</MapName>
+<MapName name="PercentAvailableSwap">\Memory\PercentAvailableSwap</MapName>
+<MapName name="UsedSwap" scaleUp="1048576">\Memory\UsedSwap</MapName>
+<MapName name="PercentUsedSwap">\Memory\PercentUsedSwap</MapName>
+
+    </Unpivot> </OMIQuery>
+
+     <OMIQuery cqlQuery="SELECT PercentIdleTime,PercentUserTime,PercentNiceTime,PercentPrivilegedTime,PercentInterruptTime,PercentDPCTime,PercentProcessorTime,PercentIOWaitTime from SCX_ProcessorStatisticalInformation where Name='_Total'" eventName="cpuStats" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+       <Unpivot columnName="CounterName" columnValue="Value" columns=" PercentUserTime,PercentNiceTime,PercentPrivilegedTime,PercentInterruptTime,PercentDPCTime,PercentProcessorTime,PercentIOWaitTime">
+       <MapName name="PercentIdleTime">\Processor\PercentIdleTime</MapName>
+<MapName name="PercentUserTime">\Processor\PercentUserTime</MapName>
+<MapName name="PercentNiceTime">\Processor\PercentNiceTime</MapName>
+<MapName name="PercentPrivilegedTime">\Processor\PercentPrivilegedTime</MapName>
+<MapName name="PercentInterruptTime">\Processor\PercentInterruptTime</MapName>
+<MapName name="PercentDPCTime">\Processor\PercentDPCTime</MapName>
+<MapName name="PercentProcessorTime">\Processor\PercentProcessorTime</MapName>
+<MapName name="PercentIOWaitTime">\Processor\PercentIOWaitTime</MapName>
+
+         </Unpivot>
+    </OMIQuery>
+
+  <OMIQuery cqlQuery="SELECT BytesPerSecond ,ReadBytesPerSecond,WriteBytesPerSecond,TransfersPerSecond,ReadsPerSecond,WritesPerSecond,AverageReadTime,AverageWriteTime,AverageTransferTime,AverageDiskQueueLength  from SCX_DiskDriveStatisticalInformation  where Name='_Total' " eventName="diskStats" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+ <Unpivot columnName="CounterName" columnValue="Value" columns="  BytesPerSecond ,ReadBytesPerSecond,WriteBytesPerSecond,TransfersPerSecond,ReadsPerSecond,WritesPerSecond,AverageReadTime,AverageWriteTime,AverageTransferTime,AverageDiskQueueLength">
+  <MapName name="BytesPerSecond">\PhysicalDisk\BytesPerSecond</MapName>
+<MapName name="ReadBytesPerSecond">\PhysicalDisk\ReadBytesPerSecond</MapName>
+<MapName name="WriteBytesPerSecond">\PhysicalDisk\WriteBytesPerSecond</MapName>
+<MapName name="TransfersPerSecond">\PhysicalDisk\TransfersPerSecond</MapName>
+<MapName name="ReadsPerSecond">\PhysicalDisk\ReadsPerSecond</MapName>
+<MapName name="WritesPerSecond">\PhysicalDisk\WritesPerSecond</MapName>
+<MapName name="AverageReadTime">\PhysicalDisk\AverageReadTime</MapName>
+<MapName name="AverageWriteTime">\PhysicalDisk\AverageWriteTime</MapName>
+<MapName name="AverageTransferTime">\PhysicalDisk\AverageTransferTime</MapName>
+<MapName name="AverageDiskQueueLength">\PhysicalDisk\AverageDiskQueueLength</MapName>
+
+   </Unpivot>
+    </OMIQuery>
+  <OMIQuery cqlQuery=" SELECT BytesTransmitted,BytesReceived,PacketsTransmitted,PacketsReceived,BytesTotal,TotalRxErrors,TotalTxErrors,TotalCollisions from SCX_EthernetPortStatistics  " eventName="netStats" omiNamespace="root/scx" sampleRateInSeconds="15" storeType="local">
+<Unpivot columnName="CounterName" columnValue="Value" columns="  BytesTransmitted,BytesReceived,PacketsTransmitted,PacketsReceived,BytesTotal,TotalRxErrors,TotalTxErrors,TotalCollisions from SCX_EthernetPortStatistics">
+<MapName name="BytesTransmitted">\NetworkInterface\BytesTransmitted</MapName>
+<MapName name="BytesReceived">\NetworkInterface\BytesReceived</MapName>
+<MapName name="PacketsTransmitted">\NetworkInterface\PacketsTransmitted</MapName>
+<MapName name="PacketsReceived">\NetworkInterface\PacketsReceived</MapName>
+<MapName name="BytesTotal">\NetworkInterface\BytesTotal</MapName>
+<MapName name="TotalRxErrors">\NetworkInterface\TotalRxErrors</MapName>
+<MapName name="TotalTxErrors">\NetworkInterface\TotalTxErrors</MapName>
+<MapName name="TotalCollisions">\NetworkInterface\TotalCollisions</MapName>
+
+</Unpivot>
+    </OMIQuery>
+</OMI>
+    <DerivedEvents>
+      <DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="memoryStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+
+      <DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="cpuStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+ <DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="diskStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+ <DerivedEvent duration="PT1M" eventName="WADMetricsPT1MP10DV2S" isFullName="true" source="netStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+ <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="memoryStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+
+      <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="cpuStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+ <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="diskStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+      </DerivedEvent>
+ <DerivedEvent duration="PT1H" eventName="WADMetricsPT1HP10DV2S" isFullName="true" source="netStats">
+        <LADQuery columnName="CounterName" columnValue="Value" instanceID="" partitionKey="ladtest" />
+       </DerivedEvent>
+
+</DerivedEvents>
+</Events>
+</MonitoringManagement>
