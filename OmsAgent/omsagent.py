@@ -70,6 +70,7 @@ EnableCalledBeforeSuccessfulInstall = 20
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
+EnableErrorOnboarding = 8
 UnsupportedOpenSSL = 60
 # OneClick error codes
 OneClickErrorCode = 40
@@ -280,7 +281,7 @@ def enable():
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
         log_and_exit('Enable', EnableCalledBeforeSuccessfulInstall,
-                     'OMSAgent onboarding script {0} not exist. Enable ' \
+                     'OMSAgent onboarding script {0} does not exist. Enable ' \
                      'cannot be called before install.'.format(OMSAdminPath))
 
     proxy = protected_settings.get('proxy')
@@ -300,6 +301,7 @@ def enable():
                                                                   optionalParams)
 
     hutil_log_info('Handler initiating onboarding.')
+    # TODO If onboarding fails with exit code 8 (general onboarding fails, should run omsdmin.sh with -v), how can I run it with -v without outputting the workspace key and cert? Should I create a new option to hide sensitive info like that?
     exit_code = run_command_with_retries(onboard_cmd, retries = 5,
                                          retry_check = retry_onboarding,
                                          final_check = raise_if_no_internet,
@@ -309,18 +311,22 @@ def enable():
         # TODO fix line lengths
         # Create a marker file to denote the workspace that was onboarded using the extension
         # This will allow supporting multi-homing through the extension like Windows does
-        extension_marker_path = os.path.join(EtcOMSAgentPath, workspaceId, 'conf/.azure_extension_marker')
+        extension_marker_path = os.path.join(EtcOMSAgentPath, workspaceId,
+                                             'conf/.azure_extension_marker')
         if os.path.exists(extension_marker_path):
-            hutil_log_info('Extension marker file {0} already created'.format(extension_marker_path))
+            hutil_log_info('Extension marker file {0} already ' \
+                           'created'.format(extension_marker_path))
         else:
             try:
                 open(extension_marker_path, 'w').close()
-                hutil_log_info('Created extension marker file {0}'.format(extension_marker_path))
+                hutil_log_info('Created extension marker file ' \
+                               '{0}'.format(extension_marker_path))
             except IOError as e:
-                hutil_log_error('Error creating {0} with error: {1}'.format(extension_marker_path, str(e)))
+                hutil_log_error('Error creating {0} with error: ' \
+                               '{1}'.format(extension_marker_path, str(e)))
 
-        # Sleep to prevent bombarding the processes, then restart all processes to
-        # resolve any issues with auto-started processes from --upgrade
+        # Sleep to prevent bombarding the processes, then restart all processes
+        # to resolve any issues with auto-started processes from --upgrade
         time.sleep(5) # 5 seconds
         run_command_and_log(RestartOMSAgentServiceCommand)
 
@@ -767,13 +773,21 @@ def run_command_with_retries(cmd, retries, retry_check, final_check = None,
     retries have been exhausted
     Logic used: will retry up to retries times with initial_sleep_time in
     between tries
+    If the retry_check returns True for retry_verbosely, we will try cmd with
+    the standard -v verbose flag added
     """
     try_count = 0
     sleep_time = initial_sleep_time # seconds
+    run_cmd = cmd
+    run_verbosely = False
 
     while try_count <= retries:
-        exit_code, output = run_command_and_log(cmd, check_error, log_cmd)
-        should_retry, retry_message = retry_check(exit_code, output)
+        if run_verbosely:
+            run_cmd = cmd + ' -v'
+        exit_code, output = run_command_and_log(run_cmd, check_error, log_cmd)
+        # TODO modify all retry_check methods to return a third value for run_verbosely
+        should_retry, retry_message, run_verbosely = retry_check(exit_code,
+                                                                   output)
         if not should_retry:
             break
         try_count += 1
@@ -820,27 +834,28 @@ def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     Sometimes curl is not installed and is also not found in the package list;
     if this is the case on a VM with apt-get, update the package list
     """
+    retry_verbosely = False
     dpkg_locked = is_dpkg_locked(exit_code, output)
     curl_found = was_curl_found(exit_code, output)
     apt_get_exit_code, apt_get_output = run_get_output('which apt-get',
                                                        chk_err = False,
                                                        log_cmd = False)
     if dpkg_locked:
-        return True, 'Retrying command because package manager is locked.'
+        return True, 'Retrying command because package manager is locked.', retry_verbosely
     elif (not curl_found and apt_get_exit_code is 0 and
             ('apt-get -f install' in output
             or 'Unmet dependencies' in output.lower())):
         hutil_log_info('Installing all dependencies of curl:')
         run_command_and_log('apt-get -f install')
         return True, 'Retrying command because curl and its dependencies ' \
-                     'needed to be installed'
+                     'needed to be installed', retry_verbosely
     elif not curl_found and apt_get_exit_code is 0:
         hutil_log_info('Updating package lists to make curl available')
         run_command_and_log('apt-get update')
         return True, 'Retrying command because package lists needed to be ' \
-                     'updated'
+                     'updated', retry_verbosely
     else:
-        return False, ''
+        return False, '', False
 
 
 def final_check_if_dpkg_locked(exit_code, output):
@@ -861,14 +876,20 @@ def retry_onboarding(exit_code, output):
       GUID and certificate should be re-generated
     - If the onboarding request returns a different non-200 code: the OMS
       service may be temporarily unavailable
+    - If the onboarding curl command returns an unaccounted-for error code,
+      we should retry with verbose logging
     """
+    retry_verbosely = False
+
     if exit_code is EnableErrorOMSReturned403:
         return True, 'Retrying the onboarding command to attempt generating ' \
-                     'a new agent ID and certificate.'
+                     'a new agent ID and certificate.', retry_verbosely
     elif exit_code is EnableErrorOMSReturnedNon200:
         return True, 'Retrying; the OMS service may be temporarily ' \
-                     'unavailable.'
-    return False, ''
+                     'unavailable.', retry_verbosely
+    elif exit_code is EnableErrorOnboarding:
+        return True, 'Retrying with verbose logging.', True
+    return False, '', False
 
 
 def raise_if_no_internet(exit_code, output):
