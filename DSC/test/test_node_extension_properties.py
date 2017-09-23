@@ -54,6 +54,17 @@ class TestNodeExtensionProperties(unittest.TestCase):
         
         response  = dsc.send_heart_beat_msg_to_agent_service()
         self.assertEqual(response.status_code, 200)
+  
+    def test_push_request_properties(self):
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        dsc.install_dsc_packages()
+        dsc.start_omiservice()
+        config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.push.mof')
+        self.assertTrue('ReturnValue=0' in config)
+        
+        response  = dsc.send_heart_beat_msg_to_agent_service()
+        self.assertIsNone(response)
        
 if __name__ == '__main__':
     unittest.main()
