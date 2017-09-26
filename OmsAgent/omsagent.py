@@ -271,7 +271,7 @@ def enable():
             except InvalidParameterError as e:
                 raise OMSServiceOneClickException('Received invalid ' \
                                                   'workspace info: ' \
-                                                  '{0}'.format(e.message))
+                                                  '{0}'.format(e))
 
     else:
         workspaceId = public_settings.get('workspaceId')
@@ -301,7 +301,6 @@ def enable():
                                                                   optionalParams)
 
     hutil_log_info('Handler initiating onboarding.')
-    # TODO If onboarding fails with exit code 8 (general onboarding fails, should run omsdmin.sh with -v), how can I run it with -v without outputting the workspace key and cert? Should I create a new option to hide sensitive info like that?
     exit_code = run_command_with_retries(onboard_cmd, retries = 5,
                                          retry_check = retry_onboarding,
                                          final_check = raise_if_no_internet,
@@ -309,8 +308,9 @@ def enable():
 
     if exit_code is 0:
         # TODO fix line lengths
-        # Create a marker file to denote the workspace that was onboarded using the extension
-        # This will allow supporting multi-homing through the extension like Windows does
+        # Create a marker file to denote the workspace that was
+        # onboarded using the extension. This will allow supporting
+        # multi-homing through the extension like Windows does
         extension_marker_path = os.path.join(EtcOMSAgentPath, workspaceId,
                                              'conf/.azure_extension_marker')
         if os.path.exists(extension_marker_path):
@@ -323,10 +323,11 @@ def enable():
                                '{0}'.format(extension_marker_path))
             except IOError as e:
                 hutil_log_error('Error creating {0} with error: ' \
-                               '{1}'.format(extension_marker_path, str(e)))
+                               '{1}'.format(extension_marker_path, e))
 
         # Sleep to prevent bombarding the processes, then restart all processes
         # to resolve any issues with auto-started processes from --upgrade
+        # TODO make sleep amounts constant at top of file?
         time.sleep(5) # 5 seconds
         run_command_and_log(RestartOMSAgentServiceCommand)
 
@@ -413,8 +414,7 @@ def parse_context(operation):
         # present in settings
         except KeyError as e:
             waagent_log_error('Unable to parse context with error: ' \
-                              '{0}'.format(e.message))
-            # TODO double-check all instances of *ParameterMissingException* where redefined to ParameterMissingException
+                              '{0}'.format(e))
             raise ParameterMissingException
     return hutil
 
@@ -511,7 +511,7 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
 
     # Validate that workspace_key is of the correct format (base64-encoded)
     if workspace_key is None:
-        raise OMSAgentParameterMissingError('Workspace key must be provided')
+        raise ParameterMissingException('Workspace key must be provided')
 
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
@@ -526,7 +526,7 @@ def check_workspace_id(workspace_id):
     Validate that workspace_id matches the GUID regex
     """
     if workspace_id is None:
-        raise OMSAgentParameterMissingError('Workspace ID must be provided')
+        raise ParameterMissingException('Workspace ID must be provided')
 
     search = re.compile(GUIDOnlyRegex, re.M)
     if not search.match(workspace_id):
@@ -785,9 +785,8 @@ def run_command_with_retries(cmd, retries, retry_check, final_check = None,
         if run_verbosely:
             run_cmd = cmd + ' -v'
         exit_code, output = run_command_and_log(run_cmd, check_error, log_cmd)
-        # TODO modify all retry_check methods to return a third value for run_verbosely
         should_retry, retry_message, run_verbosely = retry_check(exit_code,
-                                                                   output)
+                                                                 output)
         if not should_retry:
             break
         try_count += 1
