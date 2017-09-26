@@ -30,6 +30,7 @@ class UnmountOldrootState(OSEncryptionState):
     def __init__(self, context):
         super(UnmountOldrootState, self).__init__('UnmountOldrootState', context)
 
+
     def should_enter(self):
         self.context.logger.log("Verifying if machine should enter unmount_oldroot state")
 
@@ -45,16 +46,8 @@ class UnmountOldrootState(OSEncryptionState):
                 
         return True
 
-    def enter(self):
-        if not self.should_enter():
-            return
 
-        self.context.logger.log("Entering unmount_oldroot state")
-
-        self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
-        self.command_executor.ExecuteInBash('systemctl restart sshd.service')
-        self.command_executor.ExecuteInBash('dhclient')
-        
+    def restart_all_services(self):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="systemctl list-units",
                                       raise_exception_on_failure=True,
@@ -71,6 +64,19 @@ class UnmountOldrootState(OSEncryptionState):
             if match:
                 service = match.groups()[0]
                 self.command_executor.Execute('systemctl restart {0}'.format(service))
+
+
+    def enter(self):
+        if not self.should_enter():
+            return
+
+        self.context.logger.log("Entering unmount_oldroot state")
+
+        self.command_executor.ExecuteInBash('mkdir -p /var/empty/sshd', True)
+        self.command_executor.ExecuteInBash('systemctl restart sshd.service')
+        self.command_executor.ExecuteInBash('dhclient')
+
+        self.restart_systemd_services()
 
         self.command_executor.Execute('swapoff -a', True)
 
@@ -112,11 +118,36 @@ class UnmountOldrootState(OSEncryptionState):
 
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
+        # Re-execute systemd, get pid 1 to use the new root
         self.command_executor.Execute('telinit u', True)
 
         sleep(3)
 
         self.command_executor.Execute('umount /oldroot', True)
+
+        self.restart_systemd_services()
+        proc_comm = ProcessCommunicator()
+        self.command_executor.ExecuteInBash(
+                command_to_execute="grep {0} /proc/*/task/*/mountinfo".format(self.rootfs_block_device),
+                raise_exception_on_failure=True,
+                communicator=proc_comm)
+
+        procs_to_kill = filter(lambda path: path.startswith('/proc/'), proc_comm.stdout.split())
+        procs_to_kill = map(lambda path: int(path.split('/')[2]), procs_to_kill)
+        procs_to_kill = reversed(sorted(procs_to_kill))
+        self.context.logger.log("Processes with tasks using {0}:\n{1}".format(self.rootfs_block_device, procs_to_kill))
+
+        for victim in procs_to_kill:
+            if int(victim) == os.getpid():
+                self.context.logger.log("Apparently this extension holding on to {0}. "
+                        "This is not expected...".format(self.rootfs_block_device))
+                continue
+
+            if int(victim) == 1:
+                self.context.logger.log("Skipping init")
+                continue
+
+            self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         sleep(3)
 
@@ -136,11 +167,10 @@ class UnmountOldrootState(OSEncryptionState):
 
             attempt += 1
 
-        self.command_executor.Execute('systemctl restart NetworkManager', True)
-        self.command_executor.Execute('systemctl restart systemd-hostnamed', True)
         sleep(3)
 
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
+
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit unmount_oldroot state")
