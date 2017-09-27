@@ -55,7 +55,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.0"
+extension_handler_version = "2.70.0.3"
 extension_status_event = "ExtensionUpgrade"
 
 # DSC-specific Operation
@@ -253,7 +253,7 @@ def send_heart_beat_msg_to_agent_service():
                     time.sleep(10)
                 else:
                     canRetry = False
-                retry_count += 1
+            retry_count += 1
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Failed to send heartbeat message to DSC agent service: {0}, stacktrace: {1} ".format(str(e), traceback.format_exc()))
         hutil.error('Failed to send heartbeat message to DSC agent service: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -262,7 +262,7 @@ def send_heart_beat_msg_to_agent_service():
 def get_lcm_config_setting(setting_name, lcmconfig):
     valuegroup = re.search(setting_name + "=([^\n]+)", lcmconfig)
     if not valuegroup:
-        return
+        return ""
     value = valuegroup.group(1)
     
     return value
@@ -274,7 +274,7 @@ def construct_node_extension_properties(lcmconfig):
     if len(distro_info[1].split('.')) == 1:
         major_version = distro_info[1].split('.')[0]
         minor_version = 0
-    if len(distro_info[1].split('.')) == 2:
+    if len(distro_info[1].split('.')) >= 2:
         major_version = distro_info[1].split('.')[0]
         minor_version = distro_info[1].split('.')[1]
     
@@ -301,8 +301,8 @@ def construct_node_extension_properties(lcmconfig):
         "OSProfile":{
               "Name":distro_info[0],
               "Type":"Linux",
-              "MinorVersion": major_version,
-              "MajorVersion": minor_version, 
+              "MinorVersion": minor_version,
+              "MajorVersion": major_version, 
               "VMUUID": VMUUID
         },   
        "RegistrationMetaData":{
