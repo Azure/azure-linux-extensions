@@ -47,7 +47,7 @@ class UnmountOldrootState(OSEncryptionState):
         return True
 
 
-    def restart_all_services(self):
+    def restart_systemd_services(self):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(command_to_execute="systemctl list-units",
                                       raise_exception_on_failure=True,
