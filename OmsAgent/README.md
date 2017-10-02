@@ -238,6 +238,7 @@ in HandlerEnvironment.json and reported back to Azure
 | 11 | Invalid config provided to the extension | Follow the preceding examples to set all property values necessary for deployment. |
 | 12 | The dpkg package manager is locked | Make sure all dpkg update operations on the machine have finished and retry. |
 | 20 | Enable called prematurely | [Update the Azure Linux Agent](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/update-agent) to the latest available version. |
+| 40-44 | Issue with the Automatic Management scenario | Please contact support with the details from the /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/<version>/extension.log |
 | 51 | This extension is not supported on the VM's operation system | |
 | 55 | Cannot connect to the Microsoft Operations Management Suite service | Check that the system either has Internet access, or that a valid HTTP proxy has been provided. Additionally, check the correctness of the workspace ID. |
 

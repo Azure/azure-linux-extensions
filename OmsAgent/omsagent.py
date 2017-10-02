@@ -27,6 +27,8 @@ import subprocess
 import json
 import base64
 import inspect
+import urllib
+import urllib2
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -69,12 +71,24 @@ EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 UnsupportedOpenSSL = 60
+# OneClick error codes
+OneClickErrorCode = 40
+ManagedIdentityExtMissingErrorCode = 41
+ManagedIdentityExtErrorCode = 42
+MetadataAPIErrorCode = 43
+OMSServiceOneClickErrorCode = 44
 
 # Configuration
 HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
+
+# OneClick Constants
+ManagedIdentityExtListeningURLPath = '/var/lib/waagent/ManagedIdentity-Settings'
+GUIDRegex = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+OAuthTokenResource = 'https://management.core.windows.net/'
+OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -111,7 +125,7 @@ def main():
         waagent_log_error(e.message)
 
     if operation is None:
-        log_and_exit(None, 'Unknown', 1, 'No valid operation provided')
+        log_and_exit('Unknown', 1, 'No valid operation provided')
 
     # Set up for exit code and any error messages
     exit_code = 0
@@ -138,25 +152,9 @@ def main():
             message = '{0} failed with exit code {1}'.format(operation,
                                                              exit_code)
 
-    except OMSAgentParameterMissingError as e:
-        exit_code = 11
-        message = '{0} failed due to a missing parameter: ' \
-                  '{1}'.format(operation, e.message)
-    except OMSAgentInvalidParameterError as e:
-        exit_code = 11
-        message = '{0} failed due to an invalid parameter: ' \
-                  '{1}'.format(operation, e.message)
-    except OMSAgentUnwantedMultipleConnectionsException as e:
-        exit_code = 10
-        message = '{0} failed due to multiple connections: ' \
-                  '{1}'.format(operation, e.message)
-    except OMSAgentCannotConnectToOMSException as e:
-        exit_code = 55 # error code to indicate no internet access
-        message = 'The agent could not connect to the Microsoft Operations ' \
-                  'Management Suite service. Please check that the system ' \
-                  'either has Internet access, or that a valid HTTP proxy ' \
-                  'has been configured for the agent. Please also check the ' \
-                  'correctness of the workspace ID.'
+    except OmsAgentForLinuxException as e:
+        exit_code = e.error_code
+        message = e.get_error_message(operation)
     except Exception as e:
         exit_code = 1
         message = '{0} failed with error: {1}\n' \
@@ -185,11 +183,11 @@ def install():
 
     public_settings, protected_settings = get_settings()
     if public_settings is None:
-        raise OMSAgentParameterMissingError('Public configuration must be ' \
-                                            'provided')
+        raise ParameterMissingException('Public configuration must be ' \
+                                        'provided')
     workspaceId = public_settings.get('workspaceId')
     if workspaceId is None:
-        raise OMSAgentParameterMissingError('Workspace ID must be provided')
+        raise ParameterMissingException('Workspace ID must be provided')
     check_workspace_id(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
@@ -244,23 +242,46 @@ def enable():
     exit_if_vm_not_supported('Enable')
 
     public_settings, protected_settings = get_settings()
+
     if public_settings is None:
-        raise OMSAgentParameterMissingError('Public configuration must be ' \
-                                            'provided')
+        raise ParameterMissingException('Public configuration must be ' \
+                                        'provided')
     if protected_settings is None:
-        raise OMSAgentParameterMissingError('Private configuration must be ' \
-                                            'provided')
+        raise ParameterMissingException('Private configuration must be ' \
+                                        'provided')
 
-    workspaceId = public_settings.get('workspaceId')
-    workspaceKey = protected_settings.get('workspaceKey')
-    proxy = protected_settings.get('proxy')
-    vmResourceId = protected_settings.get('vmResourceId')
-    if workspaceId is None:
-        raise OMSAgentParameterMissingError('Workspace ID must be provided')
-    if workspaceKey is None:
-        raise OMSAgentParameterMissingError('Workspace key must be provided')
+    enableAutomaticManagement = public_settings.get('enableAutomaticManagement')
 
-    check_workspace_id_and_key(workspaceId, workspaceKey)
+    if (enableAutomaticManagement is not None
+           and enableAutomaticManagement is True):
+        hutil_log_info('enableAutomaticManagement is set to true; the ' \
+                       'workspace ID and key will be determined by the OMS ' \
+                       'service.')
+
+        workspaceInfo = retrieve_managed_workspace(protected_settings)
+        if (workspaceInfo is None or 'WorkspaceId' not in workspaceInfo
+                or 'WorkspaceKey' not in workspaceInfo):
+            raise OneClickException('Workspace info was not determined')
+        else:
+            # Note: do NOT log workspace keys!
+            hutil_log_info('Managed workspaceInfo has been retrieved')
+            workspaceId = workspaceInfo['WorkspaceId']
+            workspaceKey = workspaceInfo['WorkspaceKey']
+            try:
+                check_workspace_id_and_key(workspaceId, workspaceKey)
+            except InvalidParameterError as e:
+                raise OMSServiceOneClickException('Received invalid ' \
+                                                  'workspace info: ' \
+                                                  '{0}'.format(e.message))
+
+    else:
+        workspaceId = public_settings.get('workspaceId')
+        workspaceKey = protected_settings.get('workspaceKey')
+        if workspaceId is None:
+            raise ParameterMissingException('Workspace ID must be provided')
+        if workspaceKey is None:
+            raise ParameterMissingException('Workspace key must be provided')
+        check_workspace_id_and_key(workspaceId, workspaceKey)
 
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
@@ -268,10 +289,12 @@ def enable():
                      'OMSAgent onboarding script {0} not exist. Enable ' \
                      'cannot be called before install.'.format(OMSAdminPath))
 
+    proxy = protected_settings.get('proxy')
     proxyParam = ''
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
+    vmResourceId = protected_settings.get('vmResourceId')
     vmResourceIdParam = ''
     if vmResourceId is not None:
         vmResourceIdParam = '-a {0}'.format(vmResourceId)
@@ -297,6 +320,43 @@ def enable():
     return exit_code
 
 
+def retrieve_managed_workspace(protected_settings):
+    """
+    EnableAutomaticManagement has been set to true; the
+    ManagedIdentity extension and the VM Resource ID are also
+    required for the OneClick scenario
+    Using these and the Metadata API, we will call the OMS service
+    to determine what workspace ID and key to onboard to
+    """
+    # Check for OneClick scenario requirements:
+    if not os.path.exists(ManagedIdentityExtListeningURLPath):
+        raise ManagedIdentityExtMissingException
+
+    vm_resource_id = protected_settings.get('vmResourceId')
+    if vm_resource_id is None:
+        raise ParameterMissingException('VM Resource ID must be provided ' \
+                  'for Automatic Management to be enabled. Please set ' \
+                  'EnableAutomaticManagement to false in public settings or ' \
+                  'provide the value for vmResourceId in protected settings.')
+
+    # Determine the Tenant ID using the Metadata API
+    tenant_id = get_tenant_id_from_metadata_api(vm_resource_id)
+
+    # Retrieve an OAuth token using the ManagedIdentity extension
+    if tenant_id is not None:
+        hutil_log_info('Tenant ID from Metadata API is {0}'.format(tenant_id))
+        access_token = get_access_token(tenant_id, OAuthTokenResource)
+    else:
+        return None
+
+    # Query OMS service for the workspace info for onboarding
+    if tenant_id is not None and access_token is not None:
+        return get_workspace_info_from_oms(vm_resource_id, tenant_id,
+                                           access_token)
+    else:
+        return None
+
+
 def disable():
     """
     Disable all OMS workspace processes on the machine.
@@ -304,9 +364,9 @@ def disable():
     """
     # Check if the service control script is available
     if not os.path.exists(OMSAgentServiceScript):
-        log_and_exit('Disable', 1, 'OMSAgent service control script {0} ' \
-                                   'does not exist. Disable cannot be ' \
-                                   'called before install.'.format(OMSAgentServiceScript))
+        log_and_exit('Disable', 1, 'OMSAgent service control script {0} does' \
+                                   'not exist. Disable cannot be called ' \
+                                   'before install.'.format(OMSAgentServiceScript))
         return 1
 
     exit_code, output = run_command_and_log(DisableOMSAgentServiceCommand)
@@ -331,7 +391,8 @@ def parse_context(operation):
     If the required modules have not been imported, this will return None.
     """
     hutil = None
-    if 'Utils.WAAgentUtil' in sys.modules and 'Utils.HandlerUtil' in sys.modules:
+    if ('Utils.WAAgentUtil' in sys.modules
+            and 'Utils.HandlerUtil' in sys.modules):
         try:
             hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error)
             hutil.do_parse_context(operation)
@@ -340,7 +401,7 @@ def parse_context(operation):
         except KeyError as e:
             waagent_log_error('Unable to parse context with error: ' \
                               '{0}'.format(e.message))
-            raise OMSAgentParameterMissingError
+            raise ParameterMissingException
     return hutil
 
 
@@ -437,9 +498,9 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
         if encoded_key != workspace_key:
-            raise OMSAgentInvalidParameterError('Workspace key is invalid')
+            raise InvalidParameterError('Workspace key is invalid')
     except TypeError:
-        raise OMSAgentInvalidParameterError('Workspace key is invalid')
+        raise InvalidParameterError('Workspace key is invalid')
 
 
 def check_workspace_id(workspace_id):
@@ -448,7 +509,7 @@ def check_workspace_id(workspace_id):
     """
     search = re.compile(GUIDOnlyRegex, re.M)
     if not search.match(workspace_id):
-        raise OMSAgentInvalidParameterError('Workspace ID is invalid')
+        raise InvalidParameterError('Workspace ID is invalid')
 
 
 def detect_multiple_connections(workspace_id):
@@ -494,7 +555,8 @@ def detect_multiple_connections(workspace_id):
                                    'continuing despite ' \
                                    'stopOnMultipleConnections flag')
                     return
-                elif workspace_search.match(sub_dir_name) or sub_dir_name == 'scom':
+                elif (workspace_search.match(sub_dir_name)
+                        or sub_dir_name == 'scom'):
                     other_connection_exists = True
 
     if other_connection_exists:
@@ -507,7 +569,7 @@ def detect_multiple_connections(workspace_id):
                    'workspace it report to. ' \
                    '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
         # This exception will get caught by the main method
-        raise OMSAgentUnwantedMultipleConnectionsException(err_msg)
+        raise UnwantedMultipleConnectionsException(err_msg)
     else:
         detect_scom_connection()
 
@@ -589,7 +651,7 @@ def detect_scom_connection():
                    'or remove this property to allow connection to the Log ' \
                    'Analytics workspace. ' \
                    '(LINUXOMSAGENTEXTENSION_ERROR_MULTIPLECONNECTIONS)')
-        raise OMSAgentUnwantedMultipleConnectionsException(err_msg)
+        raise UnwantedMultipleConnectionsException(err_msg)
 
 
 def detect_scom_using_omsadmin():
@@ -659,7 +721,7 @@ def detect_scom_using_omiserver_conf():
                            '{0}'.format(OMIServerConfPath))
     else:
         hutil_log_info('SCOM port is not listed in ' \
-                           '{0}'.format(OMIServerConfPath))
+                       '{0}'.format(OMIServerConfPath))
     return False
 
 
@@ -723,7 +785,7 @@ def is_dpkg_locked(exit_code, output):
     return False
 
 
-def is_curl_found(exit_code, output):
+def is_curl_found(exit_code):
     """
     Returns false if exit_code indicates that curl was not installed; this can
     occur when package lists need to be updated, or when some archives are
@@ -742,7 +804,7 @@ def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     if this is the case on a machine with apt-get, update the package list
     """
     dpkg_locked = is_dpkg_locked(exit_code, output)
-    curl_found = is_curl_found(exit_code, output)
+    curl_found = is_curl_found(exit_code)
     apt_get_exit_code, apt_get_output = run_get_output('which apt-get',
                                                        chk_err = False,
                                                        log_cmd = False)
@@ -787,12 +849,12 @@ def retry_onboarding(exit_code, output):
 
 def raise_if_no_internet(exit_code, output):
     """
-    Raise the OMSAgentCannotConnectToOMSException exception if the onboarding
+    Raise the CannotConnectToOMSException exception if the onboarding
     script returns the error code to indicate that the OMS service can't be
     resolved
     """
     if exit_code is EnableErrorResolvingHost:
-        raise OMSAgentCannotConnectToOMSException
+        raise CannotConnectToOMSException
     return exit_code
 
 
@@ -845,8 +907,8 @@ def get_settings():
                                                       settings_thumbprint))
             decoded_settings = base64.standard_b64decode(encoded_settings)
             decrypt_cmd = 'openssl smime -inform DER -decrypt -recip {0} ' \
-                                   '-inkey {1}'.format(encoded_cert_path,
-                                                       encoded_key_path)
+                          '-inkey {1}'.format(encoded_cert_path,
+                                              encoded_key_path)
 
             try:
                 session = subprocess.Popen([decrypt_cmd], shell = True,
@@ -854,13 +916,13 @@ def get_settings():
                                            stderr = subprocess.STDOUT,
                                            stdout = subprocess.PIPE)
                 output = session.communicate(decoded_settings)
-            except OSError, e:
+            except OSError:
                 pass
             protected_settings_str = output[0]
 
             if protected_settings_str is None:
                 log_and_exit('Enable', 1, 'Failed decrypting ' \
-                                                 'protectedSettings')
+                                          'protectedSettings')
             protected_settings = ''
             try:
                 protected_settings = json.loads(protected_settings_str)
@@ -880,11 +942,9 @@ def update_status_file(operation, exit_code, exit_status, message):
     handler_env = get_handler_env()
     try:
         extension_version = str(handler_env['version'])
-        config_dir = str(handler_env['handlerEnvironment']['configFolder'])
         status_dir = str(handler_env['handlerEnvironment']['statusFolder'])
     except:
         extension_version = "1.0"
-        config_dir = os.path.join(os.getcwd(), 'config')
         status_dir = os.path.join(os.getcwd(), 'status')
 
     status_txt = [{
@@ -925,7 +985,7 @@ def get_handler_env():
         try:
             with open(handler_env_path, 'r') as handler_env_file:
                 handler_env_txt = handler_env_file.read()
-            handler_env=json.loads(handler_env_txt)
+            handler_env = json.loads(handler_env_txt)
             if type(handler_env) == list:
                 handler_env = handler_env[0]
             HandlerEnvironment = handler_env
@@ -950,14 +1010,14 @@ def get_latest_seq_no():
         cur_seq_no = -1
         latest_time = None
         try:
-            for dir_name, sub_dirs, files in os.walk(config_dir):
-                for file in files:
-                    file_basename = os.path.basename(file)
+            for dir_name, sub_dirs, file_names in os.walk(config_dir):
+                for file_name in file_names:
+                    file_basename = os.path.basename(file_name)
                     match = re.match(r'[0-9]{1,10}\.settings', file_basename)
                     if match is None:
                         continue
                     cur_seq_no = int(file_basename.split('.')[0])
-                    file_path = os.path.join(config_dir, file)
+                    file_path = os.path.join(config_dir, file_name)
                     cur_time = os.path.getmtime(file_path)
                     if latest_time is None or cur_time > latest_time:
                         latest_time = cur_time
@@ -1006,13 +1066,229 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
     return exit_code, output.encode('utf-8').strip()
 
 
+def get_tenant_id_from_metadata_api(vm_resource_id):
+    """
+    Retrieve the Tenant ID using the Metadata API of the VM resource ID
+    Since we have not authenticated, the Metadata API will throw a 401, but
+    the headers of the 401 response will contain the tenant ID
+    """
+    tenant_id = None
+    metadata_endpoint = get_metadata_api_endpoint(vm_resource_id)
+    metadata_request = urllib2.Request(metadata_endpoint)
+    try:
+        # This request should fail with code 401
+        metadata_response = urllib2.urlopen(metadata_request)
+        hutil_log_info('Request to Metadata API did not fail as expected; ' \
+                       'attempting to use headers from response to ' \
+                       'determine Tenant ID')
+        metadata_headers = metadata_response.headers
+    except urllib2.HTTPError as e:
+        metadata_headers = e.headers
+
+    if metadata_headers is not None and 'WWW-Authenticate' in metadata_headers:
+        auth_header = metadata_headers['WWW-Authenticate']
+        auth_header_regex = r'authorization_uri=\"https:\/\/login\.windows\.net/(' + GUIDRegex + ')\"'
+        auth_header_search = re.compile(auth_header_regex)
+        auth_header_matches = auth_header_search.search(auth_header)
+        if not auth_header_matches:
+            raise MetadataAPIException('The WWW-Authenticate header in the ' \
+                                       'response does not contain expected ' \
+                                       'authorization_uri format')
+        else:
+            tenant_id = auth_header_matches.group(1)
+    else:
+        raise MetadataAPIException('Expected information from Metadata API ' \
+                                   'is not present')
+
+    return tenant_id
+
+
+def get_metadata_api_endpoint(vm_resource_id):
+    """
+    Extrapolate Metadata API endpoint from VM Resource ID
+    Example VM resource ID: /subscriptions/306ee7f1-3d0a-4605-9f39-ff253cc02708/resourceGroups/LinuxExtVMResourceGroup/providers/Microsoft.Compute/virtualMachines/lagalbraOCUb16C
+    Corresponding example endpoint: https://management.azure.com/subscriptions/306ee7f1-3d0a-4605-9f39-ff253cc02708/resourceGroups/LinuxExtVMResourceGroup?api-version=2016-09-01
+    """
+    # Will match for ARM and Classic VMs, Availability Sets, VM Scale Sets
+    vm_resource_id_regex = r'^\/subscriptions\/(' + GUIDRegex + ')\/' \
+                            'resourceGroups\/([^\/]+)\/providers\/Microsoft' \
+                            '\.(?:Classic){0,1}Compute\/(?:virtualMachines|' \
+                            'availabilitySets|virtualMachineScaleSets)' \
+                            '\/[^\/]+$'
+    vm_resource_id_search = re.compile(vm_resource_id_regex, re.M)
+    vm_resource_id_matches = vm_resource_id_search.search(vm_resource_id)
+    if not vm_resource_id_matches:
+        raise InvalidParameterError('VM Resource ID is invalid')
+    else:
+        subscription_id = vm_resource_id_matches.group(1)
+        resource_group = vm_resource_id_matches.group(2)
+
+    metadata_url = 'https://management.azure.com/subscriptions/{0}' \
+                   '/resourceGroups/{1}'.format(subscription_id,
+                                                resource_group)
+    metadata_data = urllib.urlencode({'api-version' : '2016-09-01'})
+    metadata_endpoint = '{0}?{1}'.format(metadata_url, metadata_data)
+    return metadata_endpoint
+
+
+def get_access_token(tenant_id, resource):
+    """
+    Retrieve an OAuth token by sending an OAuth2 token exchange
+    request to the local URL that the ManagedIdentity extension is
+    listening to
+    """
+    # Extract the endpoint that the ManagedIdentity extension is listening on
+    with open(ManagedIdentityExtListeningURLPath, 'r') as listening_file:
+        listening_settings_txt = listening_file.read()
+    try:
+        listening_settings = json.loads(listening_settings_txt)
+        listening_url = listening_settings['url']
+    except:
+        raise ManagedIdentityExtException('Could not extract listening URL ' \
+                                          'from settings file')
+
+    # Send an OAuth token exchange request
+    oauth_data = {'authority' : 'https://login.microsoftonline.com/' \
+                                '{0}'.format(tenant_id),
+                  'resource' : resource
+    }
+    oauth_request = urllib2.Request(listening_url + '/oauth2/token',
+                                    urllib.urlencode(oauth_data))
+    oauth_request.add_header('Metadata', 'true')
+    try:
+        oauth_response = urllib2.urlopen(oauth_request)
+        oauth_response_txt = oauth_response.read()
+    except urllib2.HTTPError as e:
+        hutil_log_error('Request to ManagedIdentity extension listening URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from ManagedIdentity extension: ' \
+                       '{0}'.format(e.read()))
+        raise ManagedIdentityExtException('Request to listening URL failed ' \
+                                          'with HTTPError {0}'.format(e))
+    except:
+        raise ManagedIdentityExtException('Unexpected error from request to ' \
+                                          'listening URL')
+
+    try:
+        oauth_response_json = json.loads(oauth_response_txt)
+    except:
+        raise ManagedIdentityExtException('Error parsing JSON from ' \
+                                          'listening URL response')
+
+    if (oauth_response_json is not None
+            and 'access_token' in oauth_response_json):
+        return oauth_response_json['access_token']
+    else:
+        raise ManagedIdentityExtException('Could not retrieve access token ' \
+                                          'in the listening URL response')
+
+
+def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
+    """
+    Send a request to the OMS service with the VM information to
+    determine the workspace the OMSAgent should onboard to
+    """
+    oms_data = {'ResourceId' : vm_resource_id,
+                'TenantId' : tenant_id,
+                'JwtToken' : access_token
+    }
+    oms_request_json = json.dumps(oms_data)
+    oms_request = urllib2.Request(OMSServiceValidationEndpoint)
+    oms_request.add_header('Content-Type', 'application/json')
+
+    retries = 5
+    initial_sleep_time = 20
+    sleep_increase_factor = 1
+    try_count = 0
+    sleep_time = initial_sleep_time  #seconds
+
+    # Workspace may not be provisioned yet; sleep and retry if
+    # provisioning has been accepted
+    while try_count <= retries:
+        try:
+            oms_response = urllib2.urlopen(oms_request, oms_request_json)
+            oms_response_txt = oms_response.read()
+        except urllib2.HTTPError as e:
+            hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
+            hutil_log_info('Response from OMS: {0}'.format(e.read()))
+            raise OMSServiceOneClickException('ValidateMachineIdentity request ' \
+                                              'returned an error HTTP code: ' \
+                                              '{0}'.format(e))
+        except:
+            raise OMSServiceOneClickException('Unexpected error from ' \
+                                              'ValidateMachineIdentity request')
+
+        should_retry = retry_get_workspace_info_from_oms(oms_response)
+        if not should_retry:
+            # TESTED
+            break
+        elif try_count == retries:
+            # TESTED
+            hutil_log_error('Retries for ValidateMachineIdentity request ran ' \
+                            'out: required workspace information cannot be ' \
+                            'extracted')
+            raise OneClickException('Workspace provisioning did not complete ' \
+                                    'within the allotted time')
+
+        # TESTED
+        try_count += 1
+        time.sleep(sleep_time)
+        sleep_time *= sleep_increase_factor
+
+    if not oms_response_txt:
+        raise OMSServiceOneClickException('Body from ValidateMachineIdentity ' \
+                                          'response is empty; required ' \
+                                          'workspace information cannot be ' \
+                                          'extracted')
+    try:
+        oms_response_json = json.loads(oms_response_txt)
+    except:
+        raise OMSServiceOneClickException('Error parsing JSON from ' \
+                                          'ValidateMachineIdentity response')
+
+    if (oms_response_json is not None and 'WorkspaceId' in oms_response_json
+            and 'WorkspaceKey' in oms_response_json):
+        return oms_response_json
+    else:
+        hutil_log_error('Could not retrieve both workspace ID and key from ' \
+                        'the OMS service response {0}; cannot determine ' \
+                        'workspace ID and key'.format(oms_response_json))
+        raise OMSServiceOneClickException('Required workspace information ' \
+                                          'was not found in the ' \
+                                          'ValidateMachineIdentity response')
+
+
+def retry_get_workspace_info_from_oms(oms_response):
+    """
+    Return True to retry if the response from OMS for the
+    ValidateMachineIdentity request incidates that the request has
+    been accepted, but the managed workspace is still being
+    provisioned
+    """
+    try:
+        oms_response_http_code = oms_response.getcode()
+    except:
+        hutil_log_error('Unable to get HTTP code from OMS repsonse')
+        return False
+
+    if oms_response_http_code is 202 or oms_response_http_code is 204:
+        hutil_log_info('Retrying ValidateMachineIdentity OMS request ' \
+                       'because workspace is still being provisioned; HTTP ' \
+                       'code from OMS is {0}'.format(oms_response_http_code))
+        return True
+    else:
+        hutil_log_info('Workspace is provisioned; HTTP code from OMS is ' \
+                       '{0}'.format(oms_response_http_code))
+        return False
+
+
 def init_waagent_logger():
     """
     Initialize waagent logger
     If waagent has not been imported, catch the exception
     """
     try:
-        waagent.LoggerInit('/var/log/waagent.log','/dev/stdout', True)
+        waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout', True)
     except Exception as e:
         print('Unable to initialize waagent log because of exception ' \
               '{0}'.format(e))
@@ -1076,40 +1352,127 @@ def log_and_exit(operation, exit_code = 1, message = ''):
         exit_status = 'failed'
 
     if HUtilObject is not None:
-        HUtilObject.do_exit(exit_code, operation, exit_status, str(exit_code), message)
+        HUtilObject.do_exit(exit_code, operation, exit_status, str(exit_code),
+                            message)
     else:
         update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
 
 
-class OMSAgentParameterMissingError(ValueError):
+# Exceptions
+# If these exceptions are expected to be caught by the main method, they
+# include an error_code field with an integer with which to exit from main
+
+class OmsAgentForLinuxException(Exception):
+    """
+    Base exception class for all exceptions; as such, its error code is the
+    basic error code traditionally returned in Linux: 1
+    """
+    error_code = 1
+    def get_error_message(self, operation):
+        """
+        Return a descriptive error message based on this type of exception
+        """
+        return '{0} failed with exit code {1}'.format(operation,
+                                                      self.error_code)
+
+
+class ParameterMissingException(OmsAgentForLinuxException):
     """
     There is a missing parameter for the OmsAgentForLinux Extension
     """
-    pass
+    error_code = 11
+    def get_error_message(self, operation):
+        return '{0} failed due to a missing parameter: {1}'.format(operation,
+                                                                   self)
 
 
-class OMSAgentInvalidParameterError(ValueError):
+class InvalidParameterError(OmsAgentForLinuxException):
     """
     There is an invalid parameter for the OmsAgentForLinux Extension
     ex. Workspace ID does not match GUID regex
     """
-    pass
+    error_code = 11
+    def get_error_message(self, operation):
+        return '{0} failed due to an invalid parameter: {1}'.format(operation,
+                                                                    self)
 
 
-class OMSAgentUnwantedMultipleConnectionsException(Exception):
+class UnwantedMultipleConnectionsException(OmsAgentForLinuxException):
     """
     This machine is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
     """
-    pass
+    error_code = 10
+    def get_error_message(self, operation):
+        return '{0} failed due to multiple connections: {1}'.format(operation,
+                                                                    self)
 
 
-class OMSAgentCannotConnectToOMSException(Exception):
+class CannotConnectToOMSException(OmsAgentForLinuxException):
     """
     The OMSAgent cannot connect to the OMS service
     """
-    pass
+    error_code = 55 # error code to indicate no internet access
+    def get_error_message(self, operation):
+        return 'The agent could not connect to the Microsoft Operations ' \
+               'Management Suite service. Please check that the system ' \
+               'either has Internet access, or that a valid HTTP proxy has ' \
+               'been configured for the agent. Please also check the ' \
+               'correctness of the workspace ID.'
+
+
+class OneClickException(OmsAgentForLinuxException):
+    """
+    A generic exception for OneClick-related issues
+    """
+    error_code = OneClickErrorCode
+    def get_error_message(self, operation):
+        return 'Encountered an issue related to the OneClick scenario: ' \
+               '{0}'.format(self)
+
+
+class ManagedIdentityExtMissingException(OneClickException):
+    """
+    This extension being present is required for the OneClick scenario
+    """
+    error_code = ManagedIdentityExtMissingErrorCode
+    def get_error_message(self, operation):
+        return 'The ManagedIdentity extension is required to be installed ' \
+               'for Automatic Management to be enabled. Please set ' \
+               'EnableAutomaticManagement to false in public settings or ' \
+               'install the ManagedIdentityExtensionForLinux Azure VM ' \
+               'extension.'
+
+
+class ManagedIdentityExtException(OneClickException):
+    """
+    Thrown when we encounter an issue with ManagedIdentityExtensionForLinux
+    """
+    error_code = ManagedIdentityExtErrorCode
+    def get_error_message(self, operation):
+        return 'Encountered an issue with the ManagedIdentity extension: ' \
+               '{0}'.format(self)
+
+
+class MetadataAPIException(OneClickException):
+    """
+    Thrown when we encounter an issue with Metadata API
+    """
+    error_code = MetadataAPIErrorCode
+    def get_error_message(self, operation):
+        return 'Encountered an issue with the Metadata API: {0}'.format(self)
+
+
+class OMSServiceOneClickException(OneClickException):
+    """
+    Thrown when prerequisites were satisfied but could not retrieve the managed
+    workspace information from OMS service
+    """
+    error_code = OMSServiceOneClickErrorCode
+    def get_error_message(self, operation):
+        return 'Encountered an issue with the OMS service: ' \
+               '{0}'.format(self)
 
 
 if __name__ == '__main__' :
