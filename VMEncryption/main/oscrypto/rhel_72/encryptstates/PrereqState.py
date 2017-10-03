@@ -47,6 +47,7 @@ class PrereqState(OSEncryptionState):
 
         if ((distro_info[0] == 'redhat' and distro_info[1] == '7.2') or
             (distro_info[0] == 'redhat' and distro_info[1] == '7.3') or
+            (distro_info[0] == 'redhat' and distro_info[1] == '7.4') or
             (distro_info[0] == 'centos' and distro_info[1] == '7.3.1611') or
             (distro_info[0] == 'centos' and distro_info[1] == '7.2.1511')):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
