@@ -44,6 +44,8 @@ GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
 SCOMPort = 1270
+PostOnboardingSleepSeconds = 5
+InitialRetrySleepSeconds = 30
 
 # Paths
 OMSAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
@@ -59,7 +61,7 @@ SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParamsTemplate = '{0} -w {1} -s {2} {3}'
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
@@ -90,6 +92,7 @@ ManagedIdentityExtListeningURLPath = '/var/lib/waagent/ManagedIdentity-Settings'
 GUIDRegex = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
+AutoManagedWorkspaceCreationSleepSeconds = 20
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -295,10 +298,10 @@ def enable():
         vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
     optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
-    onboard_cmd = OnboardCommandWithOptionalParamsTemplate.format(OMSAdminPath,
-                                                                  workspaceId,
-                                                                  workspaceKey,
-                                                                  optionalParams)
+    onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
+                                                          workspaceId,
+                                                          workspaceKey,
+                                                          optionalParams)
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code = run_command_with_retries(onboard_cmd, retries = 5,
@@ -307,7 +310,6 @@ def enable():
                                          check_error = True, log_cmd = False)
 
     if exit_code is 0:
-        # TODO fix line lengths
         # Create a marker file to denote the workspace that was
         # onboarded using the extension. This will allow supporting
         # multi-homing through the extension like Windows does
@@ -327,8 +329,7 @@ def enable():
 
         # Sleep to prevent bombarding the processes, then restart all processes
         # to resolve any issues with auto-started processes from --upgrade
-        # TODO make sleep amounts constant at top of file?
-        time.sleep(5) # 5 seconds
+        time.sleep(PostOnboardingSleepSeconds)
         run_command_and_log(RestartOMSAgentServiceCommand)
 
     return exit_code
@@ -763,7 +764,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
 
 def run_command_with_retries(cmd, retries, retry_check, final_check = None,
                              check_error = True, log_cmd = True,
-                             initial_sleep_time = 30,
+                             initial_sleep_time = InitialRetrySleepSeconds,
                              sleep_increase_factor = 1):
     """
     Caller provides a method, retry_check, to use to determine if a retry
@@ -777,7 +778,7 @@ def run_command_with_retries(cmd, retries, retry_check, final_check = None,
     the standard -v verbose flag added
     """
     try_count = 0
-    sleep_time = initial_sleep_time # seconds
+    sleep_time = initial_sleep_time
     run_cmd = cmd
     run_verbosely = False
 
@@ -840,7 +841,8 @@ def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
                                                        chk_err = False,
                                                        log_cmd = False)
     if dpkg_locked:
-        return True, 'Retrying command because package manager is locked.', retry_verbosely
+        return True, 'Retrying command because package manager is locked.', \
+               retry_verbosely
     elif (not curl_found and apt_get_exit_code is 0 and
             ('apt-get -f install' in output
             or 'Unmet dependencies' in output.lower())):
@@ -1241,10 +1243,10 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
     oms_request.add_header('Content-Type', 'application/json')
 
     retries = 5
-    initial_sleep_time = 20
+    initial_sleep_time = AutoManagedWorkspaceCreationSleepSeconds
     sleep_increase_factor = 1
     try_count = 0
-    sleep_time = initial_sleep_time  #seconds
+    sleep_time = initial_sleep_time
 
     # Workspace may not be provisioned yet; sleep and retry if
     # provisioning has been accepted
@@ -1255,12 +1257,13 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
         except urllib2.HTTPError as e:
             hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
             hutil_log_info('Response from OMS: {0}'.format(e.read()))
-            raise OMSServiceOneClickException('ValidateMachineIdentity request ' \
-                                              'returned an error HTTP code: ' \
-                                              '{0}'.format(e))
+            raise OMSServiceOneClickException('ValidateMachineIdentity ' \
+                                              'request returned an error ' \
+                                              'HTTP code: {0}'.format(e))
         except:
             raise OMSServiceOneClickException('Unexpected error from ' \
-                                              'ValidateMachineIdentity request')
+                                              'ValidateMachineIdentity ' \
+                                              'request')
 
         should_retry = retry_get_workspace_info_from_oms(oms_response)
         if not should_retry:
