@@ -79,18 +79,14 @@ class UnmountOldrootState(OSEncryptionState):
         self.restart_systemd_services()
 
         self.command_executor.Execute('swapoff -a', True)
-
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 
         proc_comm = ProcessCommunicator()
-
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-
         self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout))
-
         procs_to_kill = filter(lambda p: p.isdigit(), proc_comm.stdout.split())
         procs_to_kill = reversed(sorted(procs_to_kill))
 
@@ -101,7 +97,6 @@ class UnmountOldrootState(OSEncryptionState):
                 # This is a workaround for the bug on CentOS/RHEL 7.2 where systemd-udevd
                 # needs to be restarted and the drive mounted/unmounted.
                 # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
-
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
                 self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
@@ -109,7 +104,6 @@ class UnmountOldrootState(OSEncryptionState):
                 self.bek_util.get_bek_passphrase_file(self.encryption_config)
                 self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
-
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)
 
             if int(victim) == 1:
@@ -120,11 +114,8 @@ class UnmountOldrootState(OSEncryptionState):
 
         # Re-execute systemd, get pid 1 to use the new root
         self.command_executor.Execute('telinit u', True)
-
         sleep(3)
-
         self.command_executor.Execute('umount /oldroot', True)
-
         self.restart_systemd_services()
 
         #
@@ -141,7 +132,6 @@ class UnmountOldrootState(OSEncryptionState):
                 command_to_execute="grep {0} /proc/*/task/*/mountinfo | grep -v grep".format(self.rootfs_sdx_path),
                 raise_exception_on_failure=True,
                 communicator=proc_comm)
-
         procs_to_kill = filter(lambda path: path.startswith('/proc/'), proc_comm.stdout.split())
         procs_to_kill = map(lambda path: int(path.split('/')[2]), procs_to_kill)
         procs_to_kill = list(reversed(sorted(procs_to_kill)))
@@ -160,7 +150,6 @@ class UnmountOldrootState(OSEncryptionState):
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         sleep(3)
-
         attempt = 1
 
         while True:
@@ -169,7 +158,6 @@ class UnmountOldrootState(OSEncryptionState):
 
             self.context.logger.log("Attempt #{0} for restarting systemd-udevd".format(attempt))
             self.command_executor.Execute('systemctl restart systemd-udevd')
-
             sleep(10)
 
             if self.command_executor.ExecuteInBash('[ -b {0} ]'.format(self.rootfs_block_device), False) == 0:
@@ -178,7 +166,6 @@ class UnmountOldrootState(OSEncryptionState):
             attempt += 1
 
         sleep(3)
-
         self.command_executor.Execute('xfs_repair {0}'.format(self.rootfs_block_device), True)
 
 
