@@ -130,7 +130,7 @@ class UnmountOldrootState(OSEncryptionState):
         # If grep -v grep is not applied, then the command throws an exception
         self.command_executor.ExecuteInBash(
                 command_to_execute="grep {0} /proc/*/task/*/mountinfo | grep -v grep".format(self.rootfs_sdx_path),
-                raise_exception_on_failure=True,
+                raise_exception_on_failure=False,
                 communicator=proc_comm)
         procs_to_kill = filter(lambda path: path.startswith('/proc/'), proc_comm.stdout.split())
         procs_to_kill = map(lambda path: int(path.split('/')[2]), procs_to_kill)
