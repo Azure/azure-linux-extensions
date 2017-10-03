@@ -126,21 +126,31 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('umount /oldroot', True)
 
         self.restart_systemd_services()
+
+        #
+        # With the recent release of 7.4 it was found that even after unmounting
+        # oldroot, there were some open handles to the root file system block device.
+        # The below logic tries to find the offending mount by grepping /proc/*/task/*/mountinfo
+        # and kill the respective processes so that encryption can proceed
+        #
         proc_comm = ProcessCommunicator()
+
+        # Example: grep for /dev/sda2 in the files /proc/*task/*/mountinfo and remove results of the grep process itself.
+        # If grep -v grep is not applied, then the command throws an exception
         self.command_executor.ExecuteInBash(
-                command_to_execute="grep {0} /proc/*/task/*/mountinfo".format(self.rootfs_block_device),
+                command_to_execute="grep {0} /proc/*/task/*/mountinfo | grep -v grep".format(self.rootfs_sdx_path),
                 raise_exception_on_failure=True,
                 communicator=proc_comm)
 
         procs_to_kill = filter(lambda path: path.startswith('/proc/'), proc_comm.stdout.split())
         procs_to_kill = map(lambda path: int(path.split('/')[2]), procs_to_kill)
-        procs_to_kill = reversed(sorted(procs_to_kill))
-        self.context.logger.log("Processes with tasks using {0}:\n{1}".format(self.rootfs_block_device, procs_to_kill))
+        procs_to_kill = list(reversed(sorted(procs_to_kill)))
+        self.context.logger.log("Processes with tasks using {0}:\n{1}".format(self.rootfs_sdx_path, procs_to_kill))
 
         for victim in procs_to_kill:
             if int(victim) == os.getpid():
-                self.context.logger.log("Apparently this extension holding on to {0}. "
-                        "This is not expected...".format(self.rootfs_block_device))
+                self.context.logger.log("This extension is holding on to {0}. "
+                        "This is not expected...".format(self.rootfs_sdx_path))
                 continue
 
             if int(victim) == 1:
