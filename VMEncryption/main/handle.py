@@ -1300,7 +1300,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
         format_query_element["file_system"] = str(device_item.file_system)
         return format_query_element
 
-    device_format_query = json.dumps(
+    disk_format_query = json.dumps(
         [single_device_item_to_format_query_dict(device_item) for device_item in device_items])
 
     return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
