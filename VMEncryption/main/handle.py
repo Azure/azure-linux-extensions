@@ -1261,15 +1261,54 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      status_prefix,
                                      ongoing_item_config)
 
-def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+
+def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, bek_util):
     """
-    if return None for the success case, or return the device item which failed.
+    In case of success return None, otherwise return the device item which failed.
     """
-    logger.log(msg="executing the enableencryption_all_inplace command.")
+    logger.log(msg="executing the enable_encryption_all_format command")
+    device_items = disk_util.get_device_items(None)
+
+    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
+    logger.log(msg);
+
+    hutil.do_status_report(operation='EnableEncryptionAllFormat',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message=msg)
+    return encrypt_format_device_items(passphrase_file, device_items, disk_util)
+
+def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
+    """
+    Formats the block devices represented by the supplied device_item.
+
+    This is done by contstructing a disk format query based on the supplied device items
+    and passing it on to the enable_encryption_format method.
+
+    Returns None if all items are successfully format-encrypted
+    Otherwise returns the device item which failed.
+    """
+    
+    def single_device_item_to_format_query_dict(device_item):
+        """
+        Converts a single device_item into an dictionary than will be later "json-stringified"
+        """
+        format_query_element = {}
+        format_query_element["dev_path"] = os.path.join("/dev/", device_item.name)
+        format_query_element["name"] = str(device_item.mount_point)
+        format_query_element["file_system"] = str(device_item.file_system)
+        return format_query_element
+
+    device_format_query = json.dumps(
+        [single_device_item_to_format_query_dict(device_item) for device_item in device_items])
+
+    return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
+
+
+def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     device_items = disk_util.get_device_items(None)
     device_items_to_encrypt = []
-    encrypted_items = []
-    error_message = ""
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
@@ -1278,13 +1317,19 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
             if device_item.name == bek_util.passphrase_device:
                 logger.log("skip for the passphrase disk ".format(device_item))
                 should_skip = True
-            if device_item.uuid in encrypted_items:
-                logger.log("already did a operation {0} so skip it".format(device_item))
-                should_skip = True
         if not should_skip and \
            not any(di.name == device_item.name for di in device_items_to_encrypt):
             device_items_to_encrypt.append(device_item)
+    return device_items_to_encrypt
 
+
+def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+    """
+    if return None for the success case, or return the device item which failed.
+    """
+    logger.log(msg="executing the enableencryption_all_inplace command.")
+
+    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
@@ -1300,7 +1345,6 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         if umount_status_code != CommonVariables.success:
             logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
         else:
-            encrypted_items.append(device_item.uuid)
             logger.log(msg=("encrypting: {0}".format(device_item)))
             no_header_file_support = not_support_header_option_distro(DistroPatcher)
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
@@ -1353,7 +1397,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
-            sdx_device_name = "/dev/" + device_item.name
+            sdx_device_name = os.path.join("/dev/", device_item.name)
             if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
                 return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
             else:
@@ -1631,6 +1675,11 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
                                                        disk_format_query=disk_format_query,
                                                        disk_util=disk_util)
+            elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
+                failed_item = enable_encryption_all_format(passphrase_file=bek_passphrase_file,
+                                                           encryption_marker=encryption_marker,
+                                                           disk_util=disk_util,
+                                                           bek_util=bek_util)
             else:
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)

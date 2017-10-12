@@ -71,6 +71,7 @@ class CommonVariables:
     """
     EnableEncryption = 'EnableEncryption'
     EnableEncryptionFormat = 'EnableEncryptionFormat'
+    EnableEncryptionFormatAll = 'EnableEncryptionFormatAll'
     UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
