@@ -118,7 +118,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.Execute("partprobe", False)
 
         retry_counter = 0
-        while not os.path.isfile(self.bootfs_block_device) and retry_counter < 10:
+        while not os.path.exists(self.bootfs_block_device) and retry_counter < 10:
             sleep(5)
             self.command_executor.Execute("partprobe", False)
             retry_counter += 1
