@@ -508,7 +508,7 @@ def get_openssl_version():
     else:
         error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*'
         hutil.error(error_msg)
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + package)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + openssl_version)
         hutil.do_exit(51, 'Install', 'error', '51', openssl_version + 'is not supported.')
         
 def start_omiservice():
