@@ -55,7 +55,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.3"
+extension_handler_version = "2.70.0.4"
 extension_status_event = "ExtensionUpgrade"
 
 # DSC-specific Operation
@@ -173,12 +173,12 @@ def enable():
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             if exit_code != 0:
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
-            extension_status_event = "ExtensionUpgrade"    
+            extension_status_event = "ExtensionRegistration"    
         else:
             file_path = download_file()
             if mode == Mode.pull:
                 current_config = apply_dsc_meta_configuration(file_path)
-                extension_status_event = "ExtensionUpgrade"
+                extension_status_event = "ExtensionRegistration"
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
             else:
@@ -208,7 +208,7 @@ def enable():
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
         
-        send_heart_beat_msg_to_agent_service()
+        send_heart_beat_msg_to_agent_service(extension_status_event)
         
         agent_id = get_nodeid(nodeid_path)
         vm_uuid = get_vmuuid()
@@ -223,7 +223,7 @@ def enable():
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
 
-def send_heart_beat_msg_to_agent_service():
+def send_heart_beat_msg_to_agent_service(status_event_type):
     response = None
     try:
         retry_count = 0
@@ -241,7 +241,7 @@ def send_heart_beat_msg_to_agent_service():
                 node_extended_properties_url = registration_url + "/Nodes(AgentId='" + agent_id + "')/ExtendedProperties"
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Url is " + node_extended_properties_url)
                 headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
-                data = construct_node_extension_properties(output)
+                data = construct_node_extension_properties(output, status_event_type)
                 
                 http_client_factory = httpclientfactory.HttpClientFactory("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
                 http_client = http_client_factory.create_http_client(sys.version_info)
@@ -267,7 +267,7 @@ def get_lcm_config_setting(setting_name, lcmconfig):
     
     return value
     
-def construct_node_extension_properties(lcmconfig):
+def construct_node_extension_properties(lcmconfig, status_event_type):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
     distro_info = platform.dist()
@@ -293,7 +293,7 @@ def construct_node_extension_properties(lcmconfig):
       "OMSCloudId": OMSCLOUD_ID,      
        "TimeStamp": time.strftime(date_time_format, time.gmtime()),
       "VMResourceId":"",
-        "ExtensionStatusEvent": extension_status_event,
+        "ExtensionStatusEvent": status_event_type,
         "ExtensionInformation":{
               "Name":"Microsoft.OSTCExtensions.DSCForLinux",
               "Version": extension_handler_version
@@ -321,7 +321,7 @@ def uninstall():
     hutil.do_parse_context('Uninstall')
     try:
         extension_status_event = "ExtensionUninstall"
-        send_heart_beat_msg_to_agent_service()
+        send_heart_beat_msg_to_agent_service(extension_status_event)
         hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded')
     except Exception as e:
         hutil.error('Failed to uninstall the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -333,6 +333,8 @@ def disable():
 
 def update():
     hutil.do_parse_context('Update')
+    extension_status_event = "ExtensionUpgrade"
+    send_heart_beat_msg_to_agent_service(extension_status_event)
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 def run_cmd(cmd):
