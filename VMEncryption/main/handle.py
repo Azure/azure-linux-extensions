@@ -481,7 +481,7 @@ def enable():
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
-        if encryption_operation == CommonVariables.EnableEncryption or encryption_operation == CommonVariables.EnableEncryptionFormat:
+        if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
             logger.log("Installing pre-requisites")
@@ -641,7 +641,7 @@ def enable_encryption():
                                   code=str(CommonVariables.volue_type_not_support),
                                   message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
 
-                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat]:
+                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
