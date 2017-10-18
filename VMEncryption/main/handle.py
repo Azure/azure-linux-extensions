@@ -1267,7 +1267,6 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     In case of success return None, otherwise return the device item which failed.
     """
     logger.log(msg="executing the enable_encryption_all_format command")
-    device_items = disk_util.get_device_items(None)
 
     device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
@@ -1277,7 +1276,7 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message=msg)
-    return encrypt_format_device_items(passphrase_file, device_items, disk_util)
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
 
 def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
     """
@@ -1295,7 +1294,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
         Converts a single device_item into an dictionary than will be later "json-stringified"
         """
         format_query_element = {}
-        format_query_element["dev_path"] = os.path.join("/dev/", device_item.name)
+        format_query_element["dev_path"] = os.path.join("/dev/disk/by-uuid", device_item.uuid)
         format_query_element["name"] = str(device_item.mount_point)
         format_query_element["file_system"] = str(device_item.file_system)
         return format_query_element
