@@ -1,0 +1,171 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="MonitoringManagement">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Imports">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Import">
+                <xs:complexType>
+                  <xs:attribute name="file" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Accounts">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="Account">
+                <xs:complexType>
+                  <xs:attribute name="moniker" type="xs:string" use="required" />
+                  <xs:attribute name="isDefault" type="xs:boolean" use="optional" />
+                  <xs:attribute name="autoKey" type="xs:boolean" use="optional" />
+                  <xs:attribute name="name" type="xs:string" use="optional" />
+                </xs:complexType>
+              </xs:element>
+              <xs:element maxOccurs="unbounded" name="SharedAccessSignature">
+                <xs:complexType>
+                  <xs:attribute name="moniker" type="xs:string" use="required" />
+                  <xs:attribute name="key" type="xs:string" use="required" />
+                  <xs:attribute name="account" type="xs:string" use="optional" />
+                  <xs:attribute name="certificateStore" type="xs:string" use="optional" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Management">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Identity">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element maxOccurs="unbounded" name="IdentityComponent">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:string">
+                            <xs:attribute name="name" type="xs:string" use="required" />
+                            <xs:attribute name="envariable" type="xs:string" use="optional" />
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="AgentResourceUsage">
+                <xs:complexType>
+                  <xs:attribute name="diskQuotaInMB" type="xs:unsignedShort" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="eventVolume" type="xs:string" use="required" />
+            <xs:attribute name="defaultRetentionInDays" type="xs:unsignedByte" use="required" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Schemas">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="Schema">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element maxOccurs="unbounded" name="Column">
+                      <xs:complexType>
+                        <xs:attribute name="name" type="xs:string" use="required" />
+                        <xs:attribute name="type" type="xs:string" use="required" />
+                        <xs:attribute name="mdstype" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Sources">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="Source">
+                <xs:complexType>
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                  <xs:attribute name="schema" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Events">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="HeartBeats">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="HeartBeat">
+                      <xs:complexType>
+                        <xs:attribute name="eventName" type="xs:string" use="required" />
+                        <xs:attribute name="storeType" type="xs:string" use="required" />
+                        <xs:attribute name="duration" type="xs:duration" use="required" />
+                        <xs:attribute name="sampleRateInSeconds" type="xs:unsignedByte" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="OMI">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element maxOccurs="unbounded" name="OMIQuery">
+                      <xs:complexType>
+                        <xs:attribute name="eventName" type="xs:string" use="required" />
+                        <xs:attribute name="sampleRateInSeconds" type="xs:unsignedShort" use="required" />
+                        <xs:attribute name="eventSas" type="xs:string" use="required" />
+                        <xs:attribute name="omiNamespace" type="xs:string" use="required" />
+                        <xs:attribute name="cqlQuery" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="MdsdEvents">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="MdsdEventSource">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element maxOccurs="unbounded" name="RouteEvent">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element maxOccurs="unbounded" name="Filter">
+                                  <xs:complexType>
+                                    <xs:attribute name="name" type="xs:string" use="required" />
+                                    <xs:attribute name="op" type="xs:string" use="required" />
+                                    <xs:attribute name="value" type="xs:unsignedByte" use="required" />
+                                  </xs:complexType>
+                                </xs:element>
+                              </xs:sequence>
+                              <xs:attribute name="eventName" type="xs:string" use="required" />
+                              <xs:attribute name="priority" type="xs:string" use="optional" />
+                              <xs:attribute name="account" type="xs:string" use="optional" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                        <xs:attribute name="source" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:decimal" use="required" />
+      <xs:attribute name="namespace" type="xs:string" use="required" />
+      <xs:attribute name="eventVersion" type="xs:unsignedByte" use="required" />
+      <xs:attribute name="timestamp" type="xs:dateTime" use="required" />
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

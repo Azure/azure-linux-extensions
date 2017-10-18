@@ -1,0 +1,9 @@
+Package: PACKAGE
+Version: VERSION
+Section: admin
+Priority: optional
+Architecture: ARCH
+Depends: libc6, scx (>=1.6.2.169), omi, omsagent
+Maintainer: Azure Linux Team <azlinux@microsoft.com>
+Description: MDS monitoring agent daemon for Linux Azure Diagnostic extension
+ MDS monitoring daemon for Linux Azure Diagnostic extension

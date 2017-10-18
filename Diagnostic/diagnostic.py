@@ -193,7 +193,8 @@ def create_core_components_configs():
     try:
         config_valid, config_invalid_reason = configurator.generate_all_configs()
     except Exception as e:
-        config_invalid_reason = 'Unknown exception occurred from generate_all_configs(). Msg: {0}'.format(e)
+        config_invalid_reason =\
+            'Exception while generating configs: {0}. Traceback: {1}'.format(e, traceback.format_exc())
         hutil.error(config_invalid_reason)
         config_valid = False
 
@@ -290,7 +291,9 @@ def main(command):
                     stop_mdsd()
                     start_daemon()
             hutil.set_inused_config_seq(hutil.get_seq_no())
-            hutil.do_status_report(g_ext_op_type, "success", '0', "Enable succeeded")
+            hutil.do_status_report(g_ext_op_type, "success", '0', "Enable succeeded, extension daemon started")
+            # If the -daemon detects a problem, e.g. bad configuration, it will overwrite this status with a more
+            # informative one. If it succeeds, all is well.
 
         elif g_ext_op_type is "Daemon":
             configurator = create_core_components_configs()
@@ -309,19 +312,14 @@ def main(command):
 
 def start_daemon():
     """
-    Start diagnostic.py as a daemon for long running mdsd and its monitoring
+    Start diagnostic.py as a daemon for scheduled tasks and to monitor mdsd daemon. If Popen() has a problem it will
+    raise an exception (often OSError)
     :return: None
     """
     args = ['python', g_diagnostic_py_filepath, "-daemon"]
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil.log('start daemon ' + str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
-    wait_n = 20
-    while len(get_lad_pids()) == 0 and wait_n > 0:
-        time.sleep(5)
-        wait_n -= 1
-    if wait_n <= 0:
-        hutil.error("wait daemon start time out")
 
 
 def start_watcher_thread():
@@ -478,7 +476,7 @@ def start_mdsd(configurator):
             hutil.error("MDSD crashed:" + mdsd_crash_msg)
 
         # mdsd all 3 allowed quick/consecutive crashes exhausted
-        hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped:" + mdsd_crash_msg)
+        hutil.do_status_report(waagent_ext_event_type, "error", '1', "mdsd stopped: " + mdsd_crash_msg)
         # Need to tear down omsagent setup for LAD before returning/exiting if it was set up earlier
         oms.tear_down_omsagent_for_lad(RunGetOutput, False)
         try:
@@ -493,14 +491,14 @@ def start_mdsd(configurator):
     except Exception as e:
         if mdsd_stdout_stream:
             hutil.error("Error :" + tail(mdsd_stdout_redirect_path))
-        hutil.error(("Failed to launch mdsd with error:{0},"
-                     "stacktrace:{1}").format(e, traceback.format_exc()))
-        hutil.do_status_report(waagent_ext_event_type, 'error', '1', 'Launch script failed:{0}'.format(e))
+        errmsg = "Failed to launch mdsd with error: {0}, traceback: {1}".format(e, traceback.format_exc())
+        hutil.error(errmsg)
+        hutil.do_status_report(waagent_ext_event_type, 'error', '1', errmsg)
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=waagent_ext_event_type,
                                   isSuccess=False,
                                   version=hutil.get_extension_version(),
-                                  message="Launch script failed:" + str(e))
+                                  message=errmsg)
     finally:
         if mdsd_stdout_stream:
             mdsd_stdout_stream.close()

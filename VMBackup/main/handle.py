@@ -103,6 +103,7 @@ def timedelta_total_seconds(delta):
 def status_report_to_file(file_report_msg):
     global backup_logger,hutil
     hutil.write_to_status_file(file_report_msg)
+    backup_logger.log("file status report message:",True)
     backup_logger.log(file_report_msg,True)
 
 def status_report_to_blob(blob_report_msg):
@@ -117,7 +118,7 @@ def status_report_to_blob(blob_report_msg):
             else:
                 backup_logger.log("blob_report_msg is none",True)
     except Exception as e:
-        err_msg='cannot write status to the status blob'
+        err_msg='cannot write status to the status blob'+traceback.format_exc()
         backup_logger.log(err_msg, True, 'Warning')
 
 def get_status_to_report(status, status_code, message, snapshot_info = None):
@@ -214,15 +215,11 @@ def set_value_to_configfile(key, value):
             if config.has_section('SnapshotThread'):
                 if config.has_option('SnapshotThread', key):
                     config.remove_option('SnapshotThread', key)
-                    config.set('SnapshotThread', key, value)
-                else:
-                    config.set('SnapshotThread', key, value)
             else:
                 config.add_section('SnapshotThread')
-                config.set('SnapshotThread', key, value)
         else:
             config.add_section('SnapshotThread')
-            config.set('SnapshotThread', key, value)
+        config.set('SnapshotThread', key, value)
         with open(configfile, 'wb') as config_file:
             config.write(config_file)
     except Exception as e:

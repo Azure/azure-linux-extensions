@@ -116,6 +116,13 @@ class SplitRootPartitionState(OSEncryptionState):
         disk.commit()
         
         self.command_executor.Execute("partprobe", False)
+
+        retry_counter = 0
+        while not os.path.exists(self.bootfs_block_device) and retry_counter < 10:
+            sleep(5)
+            self.command_executor.Execute("partprobe", False)
+            retry_counter += 1
+
         self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
         
         boot_partition_uuid = self._get_uuid(self.bootfs_block_device)

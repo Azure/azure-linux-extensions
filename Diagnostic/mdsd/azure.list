@@ -1,0 +1,1 @@
+deb [arch=amd64] https://packages.microsoft.com/repos/azurecore/ trusty main

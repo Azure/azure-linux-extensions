@@ -1487,6 +1487,7 @@ def daemon_encrypt():
                                                          encryption_environment=encryption_environment)
         elif ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'redhat' and distro_version == '7.3') or
+            (distro_name == 'redhat' and distro_version == '7.4') or
             (distro_name == 'centos' and distro_version == '7.3.1611') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
@@ -1500,7 +1501,7 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif distro_name == 'centos' and distro_version == '6.8':
+        elif distro_name == 'centos' and (distro_version == '6.8' or distro_version == '6.9'):
             from oscrypto.centos_68 import CentOS68EncryptionStateMachine
             os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
                                                            distro_patcher=DistroPatcher,
@@ -1634,31 +1635,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
-
-            for tmpvol in filter(lambda x: 'resource-part' in x.azure_name, disk_util.get_device_items(None)):
-                if not tmpvol.mount_point:
-                    continue
-
-                proc_comm = ProcessCommunicator()
-                executor = CommandExecutor(logger)
-                command = 'find {0} -type f -print | grep -v swapfile | grep -v DATALOSS_WARNING_README.txt | wc -l'.format(tmpvol.mount_point)
-                executor.ExecuteInBash(command, communicator=proc_comm)
-
-                if int(proc_comm.stdout) != 0:
-                    logger.log("Resource disk mounted at {0} is not empty".format(tmpvol.mount_point))
-                    continue
-
-                disk_format_query = '{"dev_path":"/dev/DEVNAME","name":"MOUNTPOINT","file_system":"FILESYSTEM"}'
-                disk_format_query = disk_format_query.replace('DEVNAME', tmpvol.name)
-                disk_format_query = disk_format_query.replace('MOUNTPOINT', tmpvol.mount_point)
-                disk_format_query = disk_format_query.replace('FILESYSTEM', tmpvol.file_system)
-
-                logger.log("Encrypting resource disk {0}".format(tmpvol.azure_name))
-
-                failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
-                                                       disk_format_query=disk_format_query,
-                                                       disk_util=disk_util,
-                                                       force=True)
 
             if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)
