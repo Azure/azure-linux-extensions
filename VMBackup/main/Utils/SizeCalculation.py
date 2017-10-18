@@ -73,8 +73,19 @@ class SizeCalculation(object):
             if len(self.file_systems_info) == 0 :
                 self.file_systems_info = disk_util.get_mount_file_systems()
 
-            for line in output[1:]:
-                device, size, used, available, percent, mountpoint = line.split()
+            output_length = len(output)
+            index = 1
+            while index < output_length:
+                if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
+                    index = index+1
+                    if(index < output_length and len(output[index-1].split()) + len(output[index].split()) == 6):
+                        output[index] = output[index-1] + output[index]
+                    else:
+                        self.logger.log("Output of df command is not in desired format",True)
+                        total_used = 0
+                        size_calc_failed = True
+                        break
+                device, size, used, available, percent, mountpoint = output[index].split()
                 fstype = ''
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
@@ -105,6 +116,8 @@ class SizeCalculation(object):
                 else:
                     self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
                     total_used = total_used + int(used) #return in KB
+
+                index = index + 1
 
             if not len(network_fs_types) == 0:
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
