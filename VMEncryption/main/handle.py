@@ -747,10 +747,6 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                     disk_util.umount(device_item.mount_point)
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
-                if device_item.uuid is not None and device_item.uuid != "" and not force:
-                    device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
-                else:
-                    device_to_encrypt_uuid_path = dev_path_in_query
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
@@ -758,7 +754,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         se_linux_status = encryption_environment.get_se_linux()
                         if se_linux_status.lower() == 'enforcing':
                             encryption_environment.disable_se_linux()
-                    encrypt_result = disk_util.encrypt_disk(dev_path = device_to_encrypt_uuid_path, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
+                    encrypt_result = disk_util.encrypt_disk(dev_path = dev_path_in_query, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
                 finally:
                     if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
                         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
@@ -777,7 +773,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
-                    crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
+                    crypt_item_to_update.dev_path = dev_path_in_query
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
                     crypt_item_to_update.uses_cleartext_key = False
@@ -787,6 +783,10 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
                     else:
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
+
+                    #allow override through the new full_mount_point field
+                    if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
+                        crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
                     logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                     disk_util.remove_mount_info(crypt_item_to_update.mount_point)
@@ -1289,13 +1289,17 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
     Otherwise returns the device item which failed.
     """
     
+    #use the new udev names for formatting and later on for cryptmounting
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+
     def single_device_item_to_format_query_dict(device_item):
         """
         Converts a single device_item into an dictionary than will be later "json-stringified"
         """
         format_query_element = {}
-        format_query_element["dev_path"] = os.path.join("/dev/disk/by-uuid", device_item.uuid)
-        format_query_element["name"] = str(device_item.mount_point)
+        format_query_element["dev_path"] = dev_path_reference_table[os.path.join('/dev/', device_item.name)]
+        # introduce a new "full_mount_point" field below to avoid the /mnt/ prefix that automatically gets appended
+        format_query_element["full_mount_point"] = str(device_item.mount_point) 
         format_query_element["file_system"] = str(device_item.file_system)
         return format_query_element
 
