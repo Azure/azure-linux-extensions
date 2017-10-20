@@ -17,14 +17,13 @@
 # limitations under the License.
 
 import datetime
-import httplib
 import os
 import string
 import time
 import traceback
-import urlparse
 from blobwriter import BlobWriter
 from Utils.WAAgentUtil import waagent
+import sys
 
 class Backuplogger(object):
     def __init__(self, hutil):
@@ -39,8 +38,11 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
-        log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
-        self.log_to_con(log_msg)
+        if sys.version_info > (3,):
+            self.log_to_con_py3(msg, level)
+        else:
+            log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
+            self.log_to_con(log_msg)
         if self.enforced_local_flag_value != None:
             local = self.enforced_local_flag_value
         if(local):
@@ -54,6 +56,19 @@ class Backuplogger(object):
                 message = filter(lambda x : x in string.printable, msg)
                 C.write(message.encode('ascii','ignore'))
         except IOError as e:
+            pass
+    
+    def log_to_con_py3(self, msg, level='Info'):
+        if type(msg) is not str:
+            msg = str(msg, errors="backslashreplace")
+        time = datetime.datetime.now().strftime(u'%Y/%m/%d %H:%M:%S.%f')
+        log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
+        log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
+                        encoding="ascii")
+        try:
+            with open(self.con_path, "w") as C :
+                C.write(log_msg)
+        except IOError:
             pass
 
     def commit(self, logbloburi):
@@ -92,7 +107,7 @@ class Backuplogger(object):
                     seek_len_abs = length
                 file.seek(0 - seek_len_abs, os.SEEK_END)
                 tail_wala_log = file.read()
-                log_to_blob = self.hutil.fetch_log_message() + "Tail of previous logs:" + self.prev_log + "Tail of WALA Log:" + tail_wala_log + "Tail of shell script log:" + self.hutil.get_shell_script_log()
+                log_to_blob = str(self.hutil.fetch_log_message()) + "Tail of previous logs:" + str(self.prev_log) + "Tail of WALA Log:" + str(tail_wala_log) + "Tail of shell script log:" + str(self.hutil.get_shell_script_log())
         except Exception as e:
             errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.hutil.log(errMsg)

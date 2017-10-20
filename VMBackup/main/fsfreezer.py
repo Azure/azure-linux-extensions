@@ -77,7 +77,7 @@ class FreezeHandler(object):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
             else:
-                break;
+                break
         self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
         return self.sig_handle
 
@@ -129,12 +129,16 @@ class FsFreezer:
             self.logger.log("arg : " + str(args),True)
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
-            self.logger.enforce_local_flag(False)
+            self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
                     while True:
                         line=self.freeze_handler.child.stdout.readline()
+                        if sys.version_info > (3,):
+                            line = str(line,encoding='utf-8', errors="backslashreplace")
+                        else:
+                            line = str(line)
                         if(line != ''):
                             self.logger.log(line.rstrip(), True)
                         else:
@@ -151,7 +155,11 @@ class FsFreezer:
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
-        if(self.freeze_handler.child.poll() is None):
+        if(self.freeze_handler.child is None):
+            self.logger.log("child already completed", True)
+            error_msg = 'snapshot result inconsistent'
+            thaw_result.errors.append(error_msg)
+        elif(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
             for i in range(0,30):
@@ -159,10 +167,15 @@ class FsFreezer:
                     self.logger.log("child still running sigusr1 sent")
                     time.sleep(1)
                 else:
-                    break;
+                    break
+            self.logger.enforce_local_flag(True)
             self.logger.log("Binary output after process end: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:
@@ -180,8 +193,13 @@ class FsFreezer:
             else:
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
+            self.logger.enforce_local_flag(True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:

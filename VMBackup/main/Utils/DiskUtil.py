@@ -26,7 +26,7 @@ import shutil
 import uuid
 import glob
 from common import DeviceItem
-import HandlerUtil
+import Utils.HandlerUtil
 import traceback
 
 class DiskUtil(object):
@@ -39,6 +39,7 @@ class DiskUtil(object):
         get_property_cmd_args = shlex.split(get_property_cmd)
         get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         output,err = get_property_cmd_p.communicate()
+        output= str(output)
         lines = output.splitlines()
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
@@ -60,6 +61,7 @@ class DiskUtil(object):
         get_device_cmd_args = shlex.split(get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
+        out_lsblk_output = str(out_lsblk_output)
         lines = out_lsblk_output.splitlines()
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
@@ -101,6 +103,10 @@ class DiskUtil(object):
         get_device_cmd_args = shlex.split(get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
+        if sys.version_info > (3,):
+            out_lsblk_output =str(out_lsblk_output, encoding='utf-8', errors="backslashreplace")
+        else:
+            out_lsblk_output =str(out_lsblk_output)
         lines = out_lsblk_output.splitlines()
         device_items_temp = []
         for i in range(0,len(lines)):
@@ -139,7 +145,10 @@ class DiskUtil(object):
             is_lsblk_path_wrong = True
         if is_lsblk_path_wrong == False :
             out_lsblk_output, err = p.communicate()
-            out_lsblk_output = str(out_lsblk_output)    
+            if sys.version_info > (3,):
+                out_lsblk_output = str(out_lsblk_output, encoding='utf-8', errors="backslashreplace")
+            else:
+                out_lsblk_output = str(out_lsblk_output)    
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
                 self.logger.log(str(err), True)
@@ -152,7 +161,10 @@ class DiskUtil(object):
         try:
             p = Popen(['which', str(program_to_locate)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out_which_output, err = p.communicate()
-            out_which_output = str(out_which_output)
+            if sys.version_info > (3,):
+                out_which_output = str(out_which_output, encoding='utf-8', errors="backslashreplace")
+            else:
+                out_which_output = str(out_which_output)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
                 self.logger.log(str(err), True)
@@ -246,7 +258,11 @@ class DiskUtil(object):
             is_mount_path_wrong = True
         if is_mount_path_wrong == False :
             out_mount_output, err = p.communicate()
-            out_mount_output = str(out_mount_output)
+            if sys.version_info > (3,):
+                out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
+            else:
+                out_mount_output = str(out_mount_output)
+            self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
                 self.logger.log(str(err), True)
@@ -283,7 +299,7 @@ class DiskUtil(object):
                                 mount_points.append(mount_point)
         for fstype in fs_types:
             if ("fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower()):
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
                 break
         return mount_points, fs_types
 
@@ -293,6 +309,7 @@ class DiskUtil(object):
         if (out_mount_output is not None):
             lines = out_mount_output.splitlines()
             for line in lines:
+                self.logger.log("print line by line :" + line , True)
                 line = line.strip()
                 if(line != ""):
                     file_system = line.split()[0]
