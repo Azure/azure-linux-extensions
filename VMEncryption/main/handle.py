@@ -1276,7 +1276,11 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message=msg)
-    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
+
+    # Don't encrypt partitions that are not even mounted
+    mounted_device_items = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items_to_encrypt)
+
+    return encrypt_format_device_items(passphrase_file, mounted_device_items, disk_util, True)
 
 def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
     """
@@ -1303,8 +1307,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
         format_query_element["file_system"] = str(device_item.file_system)
         return format_query_element
 
-    disk_format_query = json.dumps(
-        [single_device_item_to_format_query_dict(device_item) for device_item in device_items])
+    disk_format_query = json.dumps(map(single_device_item_to_format_query_dict, device_items))
 
     return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
 
