@@ -54,6 +54,7 @@ Example Status Report:
 import os
 import os.path
 import sys
+import re
 import imp
 import base64
 import json
@@ -62,14 +63,13 @@ import time
 from os.path import join
 import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
 import logging
 import logging.handlers
 from common import CommonVariables
 import platform
 import subprocess
 import datetime
-import Status
+import Utils.Status
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -94,6 +94,7 @@ class HandlerUtility:
         self.patching = None
         self.storageDetailsObj = None
         self.partitioncount = 0
+        self.logging_file = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -134,9 +135,26 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message,level='Info'):
-        self._log(self._get_log_prefix() + message)
+        if sys.version_info > (3,):
+            if self.logging_file is not None:
+                self.log_py3(message)
+            else:
+                pass
+            #self.log_to_file() 
+        else:
+            self._log(self._get_log_prefix() + message)
         message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
         self.log_message = self.log_message + message
+
+    def log_py3(self, msg):
+        if type(msg) is not str:
+            msg = str(msg, errors="backslashreplace")
+        msg = str(datetime.datetime.now()) + " " + str(self._get_log_prefix()) + msg + "\n"
+        try:
+            with open(self.logging_file, "a+") as C :
+                C.write(msg)
+        except IOError:
+            pass
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
@@ -150,13 +168,12 @@ class HandlerUtility:
             config = json.loads(ctxt)
         except:
             self.error('JSON exception decoding ' + ctxt)
-
         if config == None:
             self.error("JSON error processing settings file:" + ctxt)
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
-            if handlerSettings.has_key('protectedSettings') and \
-                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+            if 'protectedSettings' in handlerSettings and \
+                    "protectedSettingsCertThumbprint" in handlerSettings and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 protectedSettings = handlerSettings['protectedSettings']
@@ -215,12 +232,12 @@ class HandlerUtility:
             return None
         if type(handler_env) == list:
             handler_env = handler_env[0]
-
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+        self.logging_file=self._context._log_file
         self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
         self._change_log_file()
         self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
@@ -244,13 +261,12 @@ class HandlerUtility:
             if(self.operation is not None and self.operation.lower() == "enable"):
                 # we should keep the current status file
                 self.backup_settings_status_file(self._context._seq_no)
-
         self._context._config = self._parse_config(ctxt)
         return self._context
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
-        LoggerInit(self._context._log_file,'/dev/stdout')
+        waagent.LoggerInit(self._context._log_file,'/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 
@@ -348,7 +364,7 @@ class HandlerUtility:
 
     def get_storage_details(self,total_size,failure_flag):
         if(self.storageDetailsObj == None):
-            self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+            self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
@@ -359,9 +375,9 @@ class HandlerUtility:
 
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
-        formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(total_size,failure_flag), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
-        top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
+        formattedMessage = Utils.Status.FormattedMessage("en-US",message)
+        stat_obj = Utils.Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(total_size,failure_flag), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        top_stat_obj = Utils.Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
 
@@ -406,6 +422,7 @@ class HandlerUtility:
                 time.sleep(1)
                 process_wait_time -= 1
             out = p.stdout.read()
+            out = str(out)
             out =  out.split(" ")
             waagent = out[0]
             waagent_version = waagent.split("-")[-1] #getting only version number
@@ -436,7 +453,7 @@ class HandlerUtility:
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
-        sub_status_obj = Status.SubstatusObj(code,name,status,formattedmessage)
+        sub_status_obj = Utils.Status.SubstatusObj(code,name,status,formattedmessage)
         sub_status.append(sub_status_obj)
         return sub_status
 
@@ -471,7 +488,7 @@ class HandlerUtility:
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
+        vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
         self.convert_telemetery_data_to_bcm_serializable_format()
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
@@ -479,7 +496,7 @@ class HandlerUtility:
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+        stat_rept = "[" + json.dumps(stat_rept, cls = Utils.Status.ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
         
         # Add Status as sub-status for Status to be written on Status-File
@@ -487,7 +504,7 @@ class HandlerUtility:
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
-        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Utils.Status.ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
