@@ -38,8 +38,9 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
+        log_msg = ""
         if sys.version_info > (3,):
-            self.log_to_con_py3(msg, level)
+            log_msg = self.log_to_con_py3(msg, level)
         else:
             log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
             self.log_to_con(log_msg)
@@ -70,6 +71,7 @@ class Backuplogger(object):
                 C.write(log_msg)
         except IOError:
             pass
+        return log_msg
 
     def commit(self, logbloburi):
         #commit to local file system first, then commit to the network.

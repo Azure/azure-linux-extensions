@@ -147,6 +147,7 @@ class FsFreezer:
                 freeze_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         except Exception as e:
+            self.logger.enforce_local_flag(True)
             error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
