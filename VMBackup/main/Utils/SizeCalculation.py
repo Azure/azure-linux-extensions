@@ -34,6 +34,7 @@ class SizeCalculation(object):
 
     def get_total_used_size(self):
         try:
+            size_calc_failed = False
             df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
@@ -141,10 +142,11 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
-            return total_used * 1024,False #Converting into Bytes
+            return total_used * 1024, size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
-            return 0,True
+            size_calc_failed = True
+            return 0,size_calc_failed
 
 
