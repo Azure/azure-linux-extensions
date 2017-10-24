@@ -34,6 +34,7 @@ class SizeCalculation(object):
 
     def get_total_used_size(self):
         try:
+            size_calc_failed = False
             df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
@@ -82,8 +83,19 @@ class SizeCalculation(object):
             if len(self.file_systems_info) == 0 :
                 self.file_systems_info = disk_util.get_mount_file_systems()
 
-            for line in output[1:]:
-                device, size, used, available, percent, mountpoint = line.split()
+            output_length = len(output)
+            index = 1
+            while index < output_length:
+                if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
+                    index = index+1
+                    if(index < output_length and len(output[index-1].split()) + len(output[index].split()) == 6):
+                        output[index] = output[index-1] + output[index]
+                    else:
+                        self.logger.log("Output of df command is not in desired format",True)
+                        total_used = 0
+                        size_calc_failed = True
+                        break
+                device, size, used, available, percent, mountpoint = output[index].split()
                 fstype = ''
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
@@ -115,6 +127,8 @@ class SizeCalculation(object):
                     self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
                     total_used = total_used + int(used) #return in KB
 
+                index = index + 1
+
             if not len(network_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
@@ -128,10 +142,11 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
-            return total_used * 1024,False #Converting into Bytes
+            return total_used * 1024, size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
-            return 0,True
+            size_calc_failed = True
+            return 0,size_calc_failed
 
 
