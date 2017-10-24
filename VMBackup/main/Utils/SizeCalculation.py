@@ -6,8 +6,8 @@ import base64
 import json
 import tempfile
 import time
-from DiskUtil import DiskUtil
-import HandlerUtil
+from Utils.DiskUtil import DiskUtil
+import Utils.HandlerUtil
 import traceback
 import subprocess
 
@@ -20,6 +20,7 @@ class SizeCalculation(object):
         
 
     def get_loop_devices(self):
+        global disk_util
         disk_util = DiskUtil(patching = self.patching,logger = self.logger)
         if len(self.file_systems_info) == 0 :
             self.file_systems_info = disk_util.get_mount_file_systems()
@@ -53,15 +54,23 @@ class SizeCalculation(object):
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
-        
-            process_wait_time = 30
-            while(process_wait_time >0 and df.poll() is None):
+            output = ""
+            process_wait_time = 300
+            while(df is not None and process_wait_time >0 and df.poll() is None):
                 time.sleep(1)
                 process_wait_time -= 1
-
-            disk_loop_devices_file_systems = self.get_loop_devices()
-            output = df.stdout.read()
+            self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
+            if(df is not None and df.poll() is not None):
+                self.logger.log("df return code"+str(df.returncode), True)
+                output = df.stdout.read()
+            if sys.version_info > (3,):
+                output = str(output, encoding='utf-8', errors="backslashreplace")
+            else:
+                output = str(output)
+            self.logger.log("df output is ::"+ str(output),True)
             output = output.strip().split("\n")
+            disk_loop_devices_file_systems = self.get_loop_devices()
+            self.logger.log("outside loop device", True)
             total_used = 0
             total_used_network_shares = 0
             total_used_gluster = 0
@@ -120,17 +129,17 @@ class SizeCalculation(object):
                 index = index + 1
 
             if not len(network_fs_types) == 0:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
                 self.logger.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024),True)
             if total_used_gluster !=0 :
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
             if total_used_temporary_disks !=0:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("tempDisksSize",str(total_used_temporary_disks))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("tempDisksSize",str(total_used_temporary_disks))
             if total_used_ram_disks != 0:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("ramDisksSize",str(total_used_ram_disks))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("ramDisksSize",str(total_used_ram_disks))
             if total_used_loop_device != 0 :
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
             return total_used * 1024,False #Converting into Bytes
         except Exception as e:

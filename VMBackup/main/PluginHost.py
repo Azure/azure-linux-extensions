@@ -2,7 +2,10 @@ import time
 import sys
 import os
 import threading
-import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 from common import CommonVariables
 from pwd import getpwuid
 from stat import *
@@ -105,7 +108,7 @@ class PluginHost(object):
 
         try:
             self.logger.log('config file: '+str(self.configLocation),True,'Info')
-            config = ConfigParser.ConfigParser()
+            config = ConfigParsers.ConfigParser()
             config.read(self.configLocation)
             if (config.has_option('pre_post', 'timeoutInSeconds')):
                 self.timeoutInSeconds = min(int(config.get('pre_post','timeoutInSeconds')),self.timeoutInSeconds)

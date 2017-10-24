@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 pwdcommand=`pwd`
 pwdstr="$pwdcommand"
 output=`cat $pwdstr'/HandlerEnvironment.json'`
