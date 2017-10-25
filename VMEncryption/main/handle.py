@@ -1268,7 +1268,10 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     """
     logger.log(msg="executing the enable_encryption_all_format command")
 
-    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    device_items = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    # Don't encrypt partitions that are not even mounted
+    device_items_to_encrypt = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items)
+
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
@@ -1277,10 +1280,7 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
                            status_code=str(CommonVariables.success),
                            message=msg)
 
-    # Don't encrypt partitions that are not even mounted
-    mounted_device_items = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items_to_encrypt)
-
-    return encrypt_format_device_items(passphrase_file, mounted_device_items, disk_util, True)
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
 
 def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
     """
