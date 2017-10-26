@@ -1275,7 +1275,7 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
-    hutil.do_status_report(operation='EnableEncryptionAllFormat',
+    hutil.do_status_report(operation='EnableEncryptionFormatAll',
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message=msg)
@@ -1286,7 +1286,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
     """
     Formats the block devices represented by the supplied device_item.
 
-    This is done by contstructing a disk format query based on the supplied device items
+    This is done by constructing a disk format query based on the supplied device items
     and passing it on to the enable_encryption_format method.
 
     Returns None if all items are successfully format-encrypted
@@ -1333,7 +1333,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
     """
     if return None for the success case, or return the device item which failed.
     """
-    logger.log(msg="executing the enableencryption_all_inplace command.")
+    logger.log(msg="executing the enable_encryption_all_in_place command.")
 
     device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
