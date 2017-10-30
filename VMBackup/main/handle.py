@@ -244,7 +244,6 @@ def freeze_snapshot(timeout):
         all_failed= False
         is_inconsistent =  False
         backup_logger.log('T:S freeze result ' + str(freeze_result))
-        freeze_result = None #temp
         if(freeze_result is not None and len(freeze_result.errors) > 0):
             run_result = CommonVariables.FailedFsFreezeFailed
             run_status = 'error'
