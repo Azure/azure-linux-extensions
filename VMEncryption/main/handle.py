@@ -1272,6 +1272,9 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     # Don't encrypt partitions that are not even mounted
     device_items_to_encrypt = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items)
 
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+    device_items_to_encrypt = filter(lambda di: os.path.join('/dev/', di.name) in dev_path_reference_table, device_items_to_encrypt)
+
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
@@ -1301,7 +1304,12 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
         Converts a single device_item into an dictionary than will be later "json-stringified"
         """
         format_query_element = {}
-        format_query_element["dev_path"] = dev_path_reference_table[os.path.join('/dev/', device_item.name)]
+        dev_path = os.path.join('/dev/', device_item.name)
+        if dev_path in dev_path_reference_table:
+            format_query_element["dev_path"] = dev_path_reference_table[dev_path]
+        else:
+            format_query_element["dev_path"] = dev_path
+
         # introduce a new "full_mount_point" field below to avoid the /mnt/ prefix that automatically gets appended
         format_query_element["full_mount_point"] = str(device_item.mount_point) 
         format_query_element["file_system"] = str(device_item.file_system)
