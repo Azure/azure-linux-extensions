@@ -363,8 +363,7 @@ class HandlerUtility:
             return 0,True
 
     def get_storage_details(self,total_size,failure_flag):
-        if(self.storageDetailsObj == None):
-            self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+        self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
