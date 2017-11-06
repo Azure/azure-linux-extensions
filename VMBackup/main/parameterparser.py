@@ -31,6 +31,7 @@ class ParameterParser(object):
         self.public_config_obj = None
         self.private_config_obj = None
         self.blobs = None
+        self.takeSnapshotFrom = CommonVariables.onlyGuest
         """
         get the public configuration
         """
@@ -72,4 +73,6 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
+            if('takeSnapshotFrom' in self.private_config_obj.keys()):
+                self.takeSnapshotFrom = self.private_config_obj['takeSnapshotFrom']
 

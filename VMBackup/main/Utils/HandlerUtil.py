@@ -65,6 +65,10 @@ import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
 import logging
 import logging.handlers
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 from common import CommonVariables
 import platform
 import subprocess
@@ -277,6 +281,48 @@ class HandlerUtility:
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
 
+
+    def get_value_from_configfile(self, key):
+        global backup_logger
+        value = None
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('SnapshotThread',key):
+                    value = config.get('SnapshotThread',key)
+                else:
+                    self.log("Config File doesn't have the key :" + key, 'Info')
+        except Exception as e:
+            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
+ 
+    def set_value_to_configfile(self, key, value):
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            self.log('setting doseq flag in config file', 'Info')
+            if not os.path.exists(os.path.dirname(configfile)):
+                os.makedirs(os.path.dirname(configfile))
+            config = ConfigParsers.RawConfigParser()
+            if os.path.exists(configfile):
+                config.read(configfile)
+                if config.has_section('SnapshotThread'):
+                    if config.has_option('SnapshotThread', key):
+                        config.remove_option('SnapshotThread', key)
+                else:
+                    config.add_section('SnapshotThread')
+            else:
+                config.add_section('SnapshotThread')
+            config.set('SnapshotThread', key, value)
+            with open(configfile, 'w') as config_file:
+                config.write(config_file)
+        except Exception as e:
+            errorMsg = " Unable to set config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
+
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
         machine_id = ""
@@ -363,8 +409,7 @@ class HandlerUtility:
             return 0,True
 
     def get_storage_details(self,total_size,failure_flag):
-        if(self.storageDetailsObj == None):
-            self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+        self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
