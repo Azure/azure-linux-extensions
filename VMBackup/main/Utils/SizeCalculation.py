@@ -68,7 +68,6 @@ class SizeCalculation(object):
                 output = str(output, encoding='utf-8', errors="backslashreplace")
             else:
                 output = str(output)
-            self.logger.log("df output is ::"+ str(output),True)
             output = output.strip().split("\n")
             disk_loop_devices_file_systems = self.get_loop_devices()
             self.logger.log("outside loop device", True)
