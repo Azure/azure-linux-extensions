@@ -934,12 +934,16 @@ class DiskUtil(object):
         lvm_items = filter(lambda item: item.vg_name == "rootvg", self.get_lvm_items())
 
         current_lv_names = set([item.lv_name for item in lvm_items])
-        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
 
+        DiskUtil.os_disk_lvm = False
+
+        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
         if expected_lv_names == current_lv_names:
             DiskUtil.os_disk_lvm = True
-        else:
-            DiskUtil.os_disk_lvm = False
+
+        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'tmplv', 'usrlv', 'varlv'])
+        if expected_lv_names == current_lv_names:
+            DiskUtil.os_disk_lvm = True
 
         return DiskUtil.os_disk_lvm
 
