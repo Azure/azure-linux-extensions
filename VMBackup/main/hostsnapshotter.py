@@ -33,6 +33,7 @@ import json
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status
+from Utils import HostSnapshotObjects
 from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 
@@ -41,7 +42,7 @@ class HostSnapshotter(object):
     def __init__(self, logger):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
-        self.snapshoturi = ''
+        self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot'
 
     def snapshotall(self, paras, freezer):
         result = None
@@ -61,19 +62,21 @@ class HostSnapshotter(object):
                 self.logger.log("Failed to parse the snapshoturi",False,'Error')
                 snapshot_call_failed = True
             else:
+                diskIds = []
                 body_content = ''
                 headers = {}
-                headers["Content-Length"] = '0'
+                headers['Backup'] = 'true'
                 if(meta_data is not None):
                     for meta in meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                        meta['Key'] = "x-ms-meta-" + meta['Key']
+                hostRequestBodyObj = HostSnapshotObjects.HostRequestBody(paras.taskId, diskIds, meta_data)
+                body_content = '{' + json.dumps(hostRequestBodyObj, cls = HandlerUtil.ComplexEncoder) + '}'
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', snapshoturi_obj, body_content, headers = headers)
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers)
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     responseResult, responseBody = self.get_responsebody(httpResp)
@@ -135,6 +138,7 @@ class HostSnapshotter(object):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
                     snapshotinfo_array.append(Status.SnapshotInfoObj(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage']))
+                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     if (snapshot_info_array[blob_index].isSuccessful == True):
                         all_failed = False
         except Exception as e:

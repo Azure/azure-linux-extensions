@@ -541,7 +541,7 @@ class HandlerUtility:
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        stat_rept = "[" + json.dumps(stat_rept, cls = Utils.Status.ComplexEncoder) + "]"
+        stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
         
         # Add Status as sub-status for Status to be written on Status-File
@@ -549,7 +549,7 @@ class HandlerUtility:
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
-        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Utils.Status.ComplexEncoder) + "]"
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
@@ -649,3 +649,11 @@ class HandlerUtility:
         except Exception as e:
             self.log("Can't receive shell log file: " + str(e))
             return lines
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj,'convertToDictionary'):
+            return obj.convertToDictionary()
+        else:
+            return obj.__dict__
+

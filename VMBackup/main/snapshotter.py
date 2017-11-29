@@ -112,13 +112,13 @@ class Snapshotter(object):
         try:
             run_result, run_status = self.freeze()
             if(run_result == CommonVariables.success):
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTakenFrom", "Guest")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
                 snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer)
                 time_after_snapshot = datetime.datetime.now()
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
                 if(self.hutil.get_value_from_configfile('doseq') == '2'):
                     self.hutil.set_value_to_configfile('doseq', '0')
@@ -170,13 +170,13 @@ class Snapshotter(object):
         try:
             run_result, run_status = self.freeze()
             if(run_result == CommonVariables.success):
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTakenFrom", "Guest")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
                 snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer)
                 time_after_snapshot = datetime.datetime.now()
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
                 if(self.hutil.get_value_from_configfile('doseq') == '2'):
                     self.hutil.set_value_to_configfile('doseq', '0')
@@ -216,11 +216,11 @@ class Snapshotter(object):
             run_result = CommonVariables.error
             run_status = 'error'
 
-        all_failed= False
-        is_inconsistent =  False
-        snapshot_info_array = None
-        if(run_result != CommonVariables.success):
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTakenFrom", "Host")
+        if(run_result != CommonVariables.success and all_failed):
+            all_failed= False
+            is_inconsistent =  False
+            snapshot_info_array = None
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
             run_result, run_status = self.freeze()
             if(run_result == CommonVariables.success):
                 snap_shotter = HostSnapshotter(self.logger)
@@ -228,7 +228,7 @@ class Snapshotter(object):
                 time_before_snapshot = datetime.datetime.now()
                 snapshot_call_failed,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer)
                 time_after_snapshot = datetime.datetime.now()
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
                 if( not (snapshot_call_failed or self.check_snapshot_array_fail(snapshot_info_array))):
                     run_result = CommonVariables.success
