@@ -90,11 +90,10 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
 
             extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
-            self.command_executor.Execute('cp -ax' +
+            self.command_executor.Execute('/bin/cp -ax' +
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
-                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
-                                          True)
-            self.command_executor.ExecuteInBash('cp -ax' +
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
+            self.command_executor.ExecuteInBash('/bin/cp -ax' +
                                                 ' /var/lib/azure_disk_encryption_config/os_encryption_markers/*' +
                                                 ' /oldroot/var/lib/azure_disk_encryption_config/os_encryption_markers/',
                                                 True)
