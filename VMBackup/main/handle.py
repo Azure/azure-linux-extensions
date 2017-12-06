@@ -234,29 +234,31 @@ def freeze_snapshot(timeout):
             set_value_to_configfile('doseq', '1')
         if(get_value_from_configfile('doseq') != '1'):
             set_value_to_configfile('doseq', '2')
-        snap_shotter = Snapshotter(backup_logger)
-        time_before_freeze = datetime.datetime.now()
-        freeze_result = freezer.freeze_safe(timeout) 
-        time_after_freeze = datetime.datetime.now()
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
         run_result = CommonVariables.success
         run_status = 'success'
         all_failed= False
         is_inconsistent =  False
-        backup_logger.log('T:S freeze result ' + str(freeze_result))
-        if(freeze_result is not None and len(freeze_result.errors) > 0):
-            run_result = CommonVariables.FailedFsFreezeFailed
-            run_status = 'error'
-            error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
-            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-            backup_logger.log(error_msg, True, 'Warning')
-            if(get_value_from_configfile('doseq') == '2'):
-                set_value_to_configfile('doseq', '0')
-        else:
+        if g_fsfreeze_on :
+            backup_logger.log('doing freeze now...', True)
+            time_before_freeze = datetime.datetime.now()
+            freeze_result = freezer.freeze_safe(timeout) 
+            time_after_freeze = datetime.datetime.now()
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
+            backup_logger.log('T:S freeze result ' + str(freeze_result))
+            if(freeze_result is not None and len(freeze_result.errors) > 0):
+                run_result = CommonVariables.FailedFsFreezeFailed
+                run_status = 'error'
+                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                backup_logger.log(error_msg, True, 'Warning')
+                if(get_value_from_configfile('doseq') == '2'):
+                    set_value_to_configfile('doseq', '0')
+        if run_result == CommonVariables.success :
+            snap_shotter = Snapshotter(backup_logger)
             backup_logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
+            snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer, g_fsfreeze_on)
             time_after_snapshot = datetime.datetime.now()
             HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
             backup_logger.log('T:S snapshotall ends...', True)
@@ -396,7 +398,6 @@ def daemon():
                 if(hutil.is_status_file_exists()):
                     status_report_to_file(file_report_msg)
                 status_report_to_blob(blob_report_msg)
-                backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
@@ -407,21 +408,23 @@ def daemon():
                 PluginHostObj = PluginHost(logger=backup_logger)
                 PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
+                appconsistentBackup = False
 
                 if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigPermissionError):
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
                     backup_logger.log('App Consistent Consistent Backup Enabled', True)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                    appconsistentBackup = True
 
                 if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
                     backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
                     doFsConsistentbackup = True
 
                 if not doFsConsistentbackup:
+                    backup_logger.enforce_local_flag(False)
                     preResult = PluginHostObj.pre_script()
                     dobackup = preResult.continueBackup
 
@@ -430,10 +433,10 @@ def daemon():
 
                 if dobackup:
                     freeze_snapshot(thread_timeout)
-                    backup_logger.log('unfreeze ends...')
 
                 if not doFsConsistentbackup:
                     postResult = PluginHostObj.post_script()
+                    backup_logger.enforce_local_flag(True)
                     if not postResult.continueBackup:
                         dobackup = False
                 
@@ -452,7 +455,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -464,7 +467,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         post_plugin_errors = postResult.errors
                         for error in post_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -472,6 +475,18 @@ def daemon():
                                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                                 backup_logger.log(error_msg, True)
                                 break
+
+                if appconsistentBackup:
+                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                        hutil.SetExtErrorCode(PluginHostErrorCode)
+                    pre_plugin_errors = preResult.errors
+                    for error in pre_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
+                    post_plugin_errors = postResult.errors
+                    for error in post_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
 
                 if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
                     run_status = 'success'

@@ -230,7 +230,7 @@ class ScriptRunner(object):
         result.noOfRetries = cnt
         if not flag_timeout:
             result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success and result.errorCode != CommonVariables.PrePost_ScriptStatus_Warning :
+            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
                 self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
                 result.continueBackup = self.continueBackupOnFailure
                 result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
@@ -287,7 +287,7 @@ class ScriptRunner(object):
         result.noOfRetries = cnt
         if not flag_timeout:
             result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success and result.errorCode != CommonVariables.PrePost_ScriptStatus_Warning :
+            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
                 self.logger.log('Postscript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
                 result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
                 result.continueBackup = self.continueBackupOnFailure
