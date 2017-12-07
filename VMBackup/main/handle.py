@@ -424,7 +424,6 @@ def daemon():
                     doFsConsistentbackup = True
 
                 if not doFsConsistentbackup:
-                    backup_logger.enforce_local_flag(False)
                     preResult = PluginHostObj.pre_script()
                     dobackup = preResult.continueBackup
 
@@ -436,7 +435,6 @@ def daemon():
 
                 if not doFsConsistentbackup:
                     postResult = PluginHostObj.post_script()
-                    backup_logger.enforce_local_flag(True)
                     if not postResult.continueBackup:
                         dobackup = False
                 
