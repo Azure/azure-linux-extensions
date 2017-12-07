@@ -77,8 +77,7 @@ class PatchBootSystemState(OSEncryptionState):
             extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
             self.command_executor.Execute('cp -ax' +
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
-                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
-                                          True)
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('systemctl restart waagent')
