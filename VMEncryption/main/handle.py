@@ -41,6 +41,7 @@ from Utils import HandlerUtil
 from Common import *
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
+from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
@@ -1442,12 +1443,17 @@ def daemon_encrypt():
     if (volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower()) and \
         is_not_in_stripped_os:
         try:
+            # encrypt data volumes 
             while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
                                                   encryption_config=encryption_config,
                                                   disk_util=disk_util,
                                                   bek_util=bek_util,
                                                   bek_passphrase_file=bek_passphrase_file):
                 logger.log("Calling daemon_encrypt_data_volumes again")
+            
+            # encrypt and mount resource volume
+            resource_disk_util = ResourceDiskUtil(hutil,logger,distro_patcher)
+            resource_disk_util.automount()            
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
