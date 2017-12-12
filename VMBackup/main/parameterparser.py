@@ -19,6 +19,7 @@
 from common import CommonVariables
 import base64
 import json
+import sys
 
 class ParameterParser(object):
     def __init__(self, protected_settings, public_settings):
@@ -43,7 +44,11 @@ class ParameterParser(object):
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
-            decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
+            if sys.version_info > (3,):
+                decoded_public_obj_string = base64.b64decode(self.publicObjectStr)
+                decoded_public_obj_string = decoded_public_obj_string.decode('ascii')
+            else:
+                decoded_public_obj_string = base64.standard_b64decode(self.publicObjectStr)
             decoded_public_obj_string = decoded_public_obj_string.strip()
             decoded_public_obj_string = decoded_public_obj_string.strip('\'')
             self.public_config_obj = json.loads(decoded_public_obj_string)
@@ -58,7 +63,11 @@ class ParameterParser(object):
         """
         self.privateObjectStr = protected_settings.get(CommonVariables.object_str)
         if(self.privateObjectStr is not None and self.privateObjectStr != ""):
-            decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
+            if sys.version_info > (3,):
+                decoded_private_obj_string = base64.b64decode(self.privateObjectStr)
+                decoded_private_obj_string = decoded_private_obj_string.decode('ascii')
+            else:
+                decoded_private_obj_string = base64.standard_b64decode(self.privateObjectStr)
             decoded_private_obj_string = decoded_private_obj_string.strip()
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)

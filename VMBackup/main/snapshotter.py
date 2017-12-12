@@ -17,11 +17,16 @@
 # limitations under the License.
 
 import os
-import urlparse
-import httplib
+try:
+    import urlparse as urlparser
+except ImportError:
+    import urllib.parse as urlparser
 import traceback
 import datetime
-import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 import multiprocessing as mp
 import datetime
 from common import CommonVariables
@@ -72,7 +77,7 @@ class Snapshotter(object):
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         try:
-            sasuri_obj = urlparse.urlparse(sasuri)
+            sasuri_obj = urlparser.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
                 error_logger = error_logger + str(datetime.datetime.now()) + " Failed to parse the sasuri "
                 snapshot_error.errorcode = CommonVariables.error
@@ -89,7 +94,7 @@ class Snapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
-                sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
@@ -126,7 +131,7 @@ class Snapshotter(object):
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
         try:
-            sasuri_obj = urlparse.urlparse(sasuri)
+            sasuri_obj = urlparser.urlparse(sasuri)
             if(sasuri_obj is None or sasuri_obj.hostname is None):
                 self.logger.log("Failed to parse the sasuri",False,'Error')
                 snapshot_error.errorcode = CommonVariables.error
@@ -142,7 +147,7 @@ class Snapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
-                sasuri_obj = urlparse.urlparse(sasuri + '&comp=snapshot')
+                sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
@@ -294,7 +299,7 @@ class Snapshotter(object):
         configfile = '/etc/azure/vmbackup.conf'
         try :
             if os.path.exists(configfile):
-                config = ConfigParser.ConfigParser()
+                config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
