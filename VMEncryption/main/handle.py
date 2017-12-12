@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -375,7 +375,15 @@ def toggle_se_linux_for_centos7(disable):
     return False
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
-    #make sure the azure disk config path exists.
+
+    # mount the resource disk
+    volume_type = encryption_config.get_volume_type().lower()
+    if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util.automount()
+        logger.log("mounted encrypted resource disk")
+
+    # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
@@ -1443,17 +1451,12 @@ def daemon_encrypt():
     if (volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower()) and \
         is_not_in_stripped_os:
         try:
-            # encrypt data volumes 
             while not daemon_encrypt_data_volumes(encryption_marker=encryption_marker,
                                                   encryption_config=encryption_config,
                                                   disk_util=disk_util,
                                                   bek_util=bek_util,
                                                   bek_passphrase_file=bek_passphrase_file):
                 logger.log("Calling daemon_encrypt_data_volumes again")
-            
-            # encrypt and mount resource volume
-            resource_disk_util = ResourceDiskUtil(hutil,logger,distro_patcher)
-            resource_disk_util.automount()            
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)

@@ -196,8 +196,9 @@ class ResourceDiskUtil(object):
 
         if self.resource_disk_exists() and self.resource_disk_partition_exists() and self.is_luks_device() and self.is_valid_key():
             # store the currently associated path and name
-            self.mapper_name = self.get_rd_device_mapper()
-            if self.mapper_name:
+            current_mapper_name = self.get_rd_device_mapper()
+            if current_mapper_name:
+                self.mapper_name = current_mapper_name
                 self.mapper_path = self.DM_PREFIX + self.mapper_name
                 if not self.is_luks_device_opened:
                     # attempt to open
