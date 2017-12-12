@@ -54,7 +54,6 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
-test_manifest = "testmanifest.xml"
 manifest = "manifest.xml"
 prod_manifest = "prodmanifest.xml"
 
@@ -175,7 +174,6 @@ final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
-copy(test_manifest,final_folder_path)
 copy(manifest,final_folder_path)
 copy(prod_manifest,final_folder_path)
 copy(main_entry,final_plugin_conf_path)

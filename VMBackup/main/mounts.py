@@ -24,8 +24,6 @@ import subprocess
 import types
 from Utils.DiskUtil import DiskUtil
 
-from StringIO import StringIO
-
 class Error(Exception):
     pass
 
@@ -44,7 +42,7 @@ class Mounts:
         # Get mount points 
         mount_points, fs_types = disk_util.get_mount_points() 
         # Get lsblk devices 
-        device_items = disk_util.get_device_items(None);
+        device_items = disk_util.get_device_items(None)
         lsblk_mounts = [] 
         lsblk_mount_points = [] 
         lsblk_fs_types = []

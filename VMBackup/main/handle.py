@@ -29,10 +29,12 @@ import imp
 import time
 import shlex
 import traceback
-import httplib
 import xml.parsers.expat
 import datetime
-import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 from threading import Thread
 from time import sleep
 from os.path import join
@@ -45,7 +47,6 @@ from parameterparser import ParameterParser
 from Utils import HandlerUtil
 from Utils import SizeCalculation
 from Utils import Status
-from urlparse import urlparse
 from snapshotter import Snapshotter
 from backuplogger import Backuplogger
 from blobwriter import BlobWriter
@@ -64,15 +65,14 @@ def main():
         error_msg = ''
         freeze_result = None
         snapshot_info_array = None
-        total_used_size = -1
+        total_used_size = 0
         size_calculation_failed = False
-        HandlerUtil.LoggerInit('/dev/console','/dev/stdout')
-        HandlerUtil.waagent.Log("%s started to handle." % (CommonVariables.extension_name)) 
+        HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
+##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
-        MyPatching = GetMyPatching(logger = backup_logger)
+        MyPatching = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
-    
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -192,7 +192,7 @@ def get_value_from_configfile(key):
     configfile = '/etc/azure/vmbackup.conf'
     try :
         if os.path.exists(configfile):
-            config = ConfigParser.ConfigParser()
+            config = ConfigParsers.ConfigParser()
             config.read(configfile)
             if config.has_option('SnapshotThread',key):
                 value = config.get('SnapshotThread',key)
@@ -209,7 +209,7 @@ def set_value_to_configfile(key, value):
         backup_logger.log('setting doseq flag in config file', True, 'Info')
         if not os.path.exists(os.path.dirname(configfile)):
             os.makedirs(os.path.dirname(configfile))
-        config = ConfigParser.RawConfigParser()
+        config = ConfigParsers.RawConfigParser()
         if os.path.exists(configfile):
             config.read(configfile)
             if config.has_section('SnapshotThread'):
@@ -220,7 +220,7 @@ def set_value_to_configfile(key, value):
         else:
             config.add_section('SnapshotThread')
         config.set('SnapshotThread', key, value)
-        with open(configfile, 'wb') as config_file:
+        with open(configfile, 'w') as config_file:
             config.write(config_file)
     except Exception as e:
         errorMsg = " Unable to set config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
@@ -318,7 +318,7 @@ def check_snapshot_array_fail():
     return snapshot_array_fail
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
     freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
@@ -341,7 +341,7 @@ def daemon():
         if(freezer.mounts is not None):
             hutil.partitioncount = len(freezer.mounts.mounts)
         backup_logger.log(" configfile " + str(configfile), True)
-        config = ConfigParser.ConfigParser()
+        config = ConfigParsers.ConfigParser()
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
@@ -509,6 +509,7 @@ def daemon():
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
+        total_used_size = -1
         blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
         if(hutil.is_status_file_exists()):
             status_report_to_file(file_report_msg)
@@ -541,7 +542,6 @@ def enable():
     hutil.do_parse_context('Enable')
     try:
         backup_logger.log('starting to enable', True)
-
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
@@ -554,7 +554,6 @@ def enable():
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
-
         hutil.exit_if_same_seq()
 
         """
@@ -574,7 +573,7 @@ def enable():
             exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = long(para_parser.commandStartTimeUTCTicks)
+            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
             backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
             commandStartTime = convert_time(utcTicksLong)
             utcNow = datetime.datetime.utcnow()

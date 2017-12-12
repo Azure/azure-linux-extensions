@@ -490,7 +490,7 @@ def enable():
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
-        if encryption_operation == CommonVariables.EnableEncryption or encryption_operation == CommonVariables.EnableEncryptionFormat:
+        if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
             logger.log("Installing pre-requisites")
@@ -650,7 +650,7 @@ def enable_encryption():
                                   code=str(CommonVariables.volue_type_not_support),
                                   message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
 
-                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat]:
+                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
@@ -756,10 +756,6 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                     disk_util.umount(device_item.mount_point)
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
-                if device_item.uuid is not None and device_item.uuid != "" and not force:
-                    device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
-                else:
-                    device_to_encrypt_uuid_path = dev_path_in_query
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
@@ -767,7 +763,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         se_linux_status = encryption_environment.get_se_linux()
                         if se_linux_status.lower() == 'enforcing':
                             encryption_environment.disable_se_linux()
-                    encrypt_result = disk_util.encrypt_disk(dev_path = device_to_encrypt_uuid_path, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
+                    encrypt_result = disk_util.encrypt_disk(dev_path = dev_path_in_query, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
                 finally:
                     if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
                         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
@@ -786,7 +782,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
-                    crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
+                    crypt_item_to_update.dev_path = dev_path_in_query
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
                     crypt_item_to_update.uses_cleartext_key = False
@@ -796,6 +792,10 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
                     else:
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
+
+                    #allow override through the new full_mount_point field
+                    if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
+                        crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
                     logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                     disk_util.remove_mount_info(crypt_item_to_update.mount_point)
@@ -1270,15 +1270,68 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      status_prefix,
                                      ongoing_item_config)
 
-def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+
+def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, bek_util):
     """
-    if return None for the success case, or return the device item which failed.
+    In case of success return None, otherwise return the device item which failed.
     """
-    logger.log(msg="executing the enableencryption_all_inplace command.")
+    logger.log(msg="executing the enable_encryption_all_format command")
+
+    device_items = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    # Don't encrypt partitions that are not even mounted
+    device_items_to_encrypt = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items)
+
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+    device_items_to_encrypt = filter(lambda di: os.path.join('/dev/', di.name) in dev_path_reference_table, device_items_to_encrypt)
+
+    msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
+    logger.log(msg);
+
+    hutil.do_status_report(operation='EnableEncryptionFormatAll',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message=msg)
+
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
+
+def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
+    """
+    Formats the block devices represented by the supplied device_item.
+
+    This is done by constructing a disk format query based on the supplied device items
+    and passing it on to the enable_encryption_format method.
+
+    Returns None if all items are successfully format-encrypted
+    Otherwise returns the device item which failed.
+    """
+    
+    #use the new udev names for formatting and later on for cryptmounting
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+
+    def single_device_item_to_format_query_dict(device_item):
+        """
+        Converts a single device_item into an dictionary than will be later "json-stringified"
+        """
+        format_query_element = {}
+        dev_path = os.path.join('/dev/', device_item.name)
+        if dev_path in dev_path_reference_table:
+            format_query_element["dev_path"] = dev_path_reference_table[dev_path]
+        else:
+            format_query_element["dev_path"] = dev_path
+
+        # introduce a new "full_mount_point" field below to avoid the /mnt/ prefix that automatically gets appended
+        format_query_element["full_mount_point"] = str(device_item.mount_point) 
+        format_query_element["file_system"] = str(device_item.file_system)
+        return format_query_element
+
+    disk_format_query = json.dumps(map(single_device_item_to_format_query_dict, device_items))
+
+    return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
+
+
+def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     device_items = disk_util.get_device_items(None)
     device_items_to_encrypt = []
-    encrypted_items = []
-    error_message = ""
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
@@ -1287,13 +1340,19 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
             if device_item.name == bek_util.passphrase_device:
                 logger.log("skip for the passphrase disk ".format(device_item))
                 should_skip = True
-            if device_item.uuid in encrypted_items:
-                logger.log("already did a operation {0} so skip it".format(device_item))
-                should_skip = True
         if not should_skip and \
            not any(di.name == device_item.name for di in device_items_to_encrypt):
             device_items_to_encrypt.append(device_item)
+    return device_items_to_encrypt
 
+
+def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+    """
+    if return None for the success case, or return the device item which failed.
+    """
+    logger.log(msg="executing the enable_encryption_all_in_place command.")
+
+    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
@@ -1309,7 +1368,6 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         if umount_status_code != CommonVariables.success:
             logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
         else:
-            encrypted_items.append(device_item.uuid)
             logger.log(msg=("encrypting: {0}".format(device_item)))
             no_header_file_support = not_support_header_option_distro(DistroPatcher)
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
@@ -1362,7 +1420,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
-            sdx_device_name = "/dev/" + device_item.name
+            sdx_device_name = os.path.join("/dev/", device_item.name)
             if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
                 return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
             else:
@@ -1496,6 +1554,7 @@ def daemon_encrypt():
                                                          encryption_environment=encryption_environment)
         elif ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'redhat' and distro_version == '7.3') or
+            (distro_name == 'redhat' and distro_version == '7.4') or
             (distro_name == 'centos' and distro_version == '7.3.1611') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
@@ -1639,35 +1698,15 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
                                                        disk_format_query=disk_format_query,
                                                        disk_util=disk_util)
+            elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
+                failed_item = enable_encryption_all_format(passphrase_file=bek_passphrase_file,
+                                                           encryption_marker=encryption_marker,
+                                                           disk_util=disk_util,
+                                                           bek_util=bek_util)
             else:
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
                 raise Exception(message)
-
-            for tmpvol in filter(lambda x: 'resource-part' in x.azure_name, disk_util.get_device_items(None)):
-                if not tmpvol.mount_point:
-                    continue
-
-                proc_comm = ProcessCommunicator()
-                executor = CommandExecutor(logger)
-                command = 'find {0} -type f -print | grep -v swapfile | grep -v DATALOSS_WARNING_README.txt | wc -l'.format(tmpvol.mount_point)
-                executor.ExecuteInBash(command, communicator=proc_comm)
-
-                if int(proc_comm.stdout) != 0:
-                    logger.log("Resource disk mounted at {0} is not empty".format(tmpvol.mount_point))
-                    continue
-
-                disk_format_query = '{"dev_path":"/dev/DEVNAME","name":"MOUNTPOINT","file_system":"FILESYSTEM"}'
-                disk_format_query = disk_format_query.replace('DEVNAME', tmpvol.name)
-                disk_format_query = disk_format_query.replace('MOUNTPOINT', tmpvol.mount_point)
-                disk_format_query = disk_format_query.replace('FILESYSTEM', tmpvol.file_system)
-
-                logger.log("Encrypting resource disk {0}".format(tmpvol.azure_name))
-
-                failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
-                                                       disk_format_query=disk_format_query,
-                                                       disk_util=disk_util,
-                                                       force=True)
 
             if failed_item:
                 message = 'Encryption failed for {0}'.format(failed_item)

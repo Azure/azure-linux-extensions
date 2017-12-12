@@ -156,9 +156,14 @@ class ExtensionParameter(object):
             self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False
 
+    def _is_encrypt_command(command):
+        return command in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]
+
     def config_changed(self):
         if (self.command or self.get_command()) and \
-           (self.command != self.get_command()):
+           (self.command != self.get_command() and \
+           # Even if the commands are not exactly the same, if they're both encrypt commands, don't consider this a change
+           not (_is_encrypt_command(self.command) and _is_encrypt_command(self.get_command()))):
             self.logger.log('Current config command {0} differs from effective config command {1}'.format(self.command, self.get_command()))
             return True
 
@@ -191,11 +196,6 @@ class ExtensionParameter(object):
         if (self.KeyEncryptionAlgorithm or self.get_kek_algorithm()) and \
            (self.KeyEncryptionAlgorithm != self.get_kek_algorithm()):
             self.logger.log('Current config KeyEncryptionAlgorithm {0} differs from effective config KeyEncryptionAlgorithm {1}'.format(self.KeyEncryptionAlgorithm, self.get_kek_algorithm()))
-            return True
-
-        if (self.DiskFormatQuery or self.get_disk_format_query()) and \
-           (self.DiskFormatQuery != self.get_disk_format_query()):
-            self.logger.log('Current config DiskFormatQuery {0} differs from effective config DiskFormatQuery {1}'.format(self.DiskFormatQuery, self.get_disk_format_query()))
             return True
 
         bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
