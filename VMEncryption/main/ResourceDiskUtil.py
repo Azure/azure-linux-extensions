@@ -20,6 +20,8 @@
 
 import uuid
 import time
+import json
+import types
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables
@@ -44,6 +46,21 @@ class ResourceDiskUtil(object):
         self.disk_util = DiskUtil(hutil=self.hutil, patching=distro_patcher, logger=self.logger, encryption_environment=None)
         self.mapper_name = str(uuid.uuid4())
         self.mapper_path = self.DM_PREFIX + self.mapper_name
+
+    def is_encrypt_format_all(self):
+        """ return true if current encryption operation is EncryptFormatAll """
+        try:                
+            public_settings_str = self.hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+            if isinstance(public_settings_str, basestring):
+                public_settings = json.loads(public_settings_str)
+            else:
+                public_settings = public_settings_str
+            encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+            if encryption_operation in [CommonVariables.EnableEncryptionFormatAll]:
+                return True
+        except:
+            self.logger.log("unable to identify current encryption operation")
+        return False
 
     def is_luks_device(self):
         """ checks if the device is set up with a luks header """
@@ -229,5 +246,9 @@ class ResourceDiskUtil(object):
         if self.try_remount():
             return True
 
-        # unencrypted or unusable, so tear down, re-encrypt, re-format, and mount
-        return self.prepare() and self.encrypt() and self.make() and self.mount()
+        # unencrypted or unusable
+        if self.is_encrypt_format_all():
+            return self.prepare() and self.encrypt() and self.make() and self.mount()
+        else:
+            self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
+             

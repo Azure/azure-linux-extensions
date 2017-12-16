@@ -376,7 +376,7 @@ def toggle_se_linux_for_centos7(disable):
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
 
-    # mount the resource disk
+    # mount encrypted resource disk
     volume_type = encryption_config.get_volume_type().lower()
     if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
         resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
