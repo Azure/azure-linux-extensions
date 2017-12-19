@@ -25,6 +25,7 @@ except ImportError:
     import http.client as httplibs
 import shlex
 import subprocess
+import sys
 from common import CommonVariables
 from subprocess import *
 from Utils.WAAgentUtil import waagent
