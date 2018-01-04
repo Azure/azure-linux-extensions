@@ -312,6 +312,27 @@ class CentosActions(RedhatActions):
         return self.install_extra_packages(('policycoreutils-python',), True)
 
 
+class Redhat7Actions(RedhatActions):
+    def __init__(self, logger):
+        RedhatActions.__init__(self, logger)
+
+    def use_systemd(self):
+        return True
+
+
+class Centos7Actions(Redhat7Actions):
+    def __init__(self, logger):
+        Redhat7Actions.__init__(self, logger)
+
+    def install_extra_packages(self, packages, with_timeout=False):
+        install_cmd = 'rpm -qi PACKAGE; if [ ! $? == 0 ]; then yum install -y PACKAGE; fi'
+        return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
+
+    def install_required_packages(self):
+        # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
+        return self.install_extra_packages(('policycoreutils-python',), True)
+
+
 DistroMap = {
     'debian': CredativActions,  # Credative Debian Linux took the 'debian' platform name with the curl deficiency,
                                 # when all other Debian-based distros have curl, so is this strange mapping...
@@ -319,6 +340,7 @@ DistroMap = {
     'Ubuntu': DebianActions, 'Ubuntu:15.10': Ubuntu1510OrHigherActions,
     'Ubuntu:16.04': Ubuntu1510OrHigherActions, 'Ubuntu:16.10': Ubuntu1510OrHigherActions,
     'redhat': RedhatActions, 'centos': CentosActions, 'oracle': RedhatActions,
+    'redhat:7': Redhat7Actions, 'centos:7': Centos7Actions, 'oracle:7': Redhat7Actions,
     'SuSE:11': Suse11Actions, 'SuSE:12': Suse12Actions, 'SuSE': Suse12Actions
 }
 
