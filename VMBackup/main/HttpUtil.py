@@ -81,9 +81,8 @@ class HttpUtil(object):
                 self.logger.log("Http connection response is None")
 
             self.logger.log(" resp status: " + str(resp.status))
-            responseBody = resp.read()
             if(responseBody is not None):
-                self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
+                self.logger.log("responseBody: " + responseBody)
 
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
