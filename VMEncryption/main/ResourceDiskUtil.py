@@ -22,6 +22,7 @@ import uuid
 import time
 import json
 import types
+import os
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables
@@ -38,6 +39,8 @@ class ResourceDiskUtil(object):
     # todo: consolidate this and other key file path references
     # (BekUtil.py, ExtensionParameter.py, and dracut patches)
     RD_KEY_FILE = '/mnt/azure_bek_disk/LinuxPassPhraseFileName'
+    RD_KEY_FILE_MOUNT_POINT = '/mnt/azure_bek_disk'
+    RD_KEY_VOLUME_LABEL = 'BEK VOLUME'
 
     def __init__(self, hutil, logger, distro_patcher):
         self.hutil = hutil
@@ -104,6 +107,7 @@ class ResourceDiskUtil(object):
 
     def encrypt(self):
         """ use disk util with the appropriate device mapper """
+        self.mount_key_volume()
         return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH, passphrase_file=self.RD_KEY_FILE, mapper_name=self.mapper_name, header_file=None)) == 0
 
     def make(self):
@@ -115,6 +119,14 @@ class ResourceDiskUtil(object):
         # todo - drop DATALOSS_WARNING_README.txt file to disk
         return True
 
+    def mount_key_volume(self):
+        """ attempt to mount the key volume and verify existence of key file"""
+        if not os.path.exists(self.RD_KEY_FILE):
+            self.disk_util.make_sure_path_exists(self.RD_KEY_FILE_MOUNT_POINT)
+            key_volume_device_name = os.popen('blkid -L "' + self.RD_KEY_VOLUME_LABEL + '"').read().strip()
+            self.disk_util.mount_filesystem(key_volume_device_name, self.RD_KEY_FILE_MOUNT_POINT)
+        return os.path.exists(self.RD_KEY_FILE)
+        
     def mount(self):
         """ mount the file system previously made on top of the crypt layer """
         #ensure that resource disk mount point directory has been created
@@ -143,13 +155,21 @@ class ResourceDiskUtil(object):
         # todo: restart waagent if necessary to ensure changes are picked up?
         return True
 
-    def is_mounted(self):
+    def configure_fstab(self):
+        """ remove resource disk from /etc/fstab if present """
+        cmd = "sed -i.bak '/azure_resource-part1/d' /etc/fstab"        
+        if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
+            self.logger.log(msg="Failed to configure resource disk entry of /etc/fstab", level=CommonVariables.WarningLevel)
+            return False        
+        return True
+
+    def unmount_resource_disk(self):
         """ return true if mount point is mounted regardless of crypt status """
-        mount_items = self.disk_util.get_mount_items()
-        for mount_item in mount_items:
-            if mount_item["dest"] == self.RD_MOUNT_POINT:
-                return True
-        return False
+        # after service healing multiple unmounts of key file mount point may be required
+        self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
+        self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
+        self.disk_util.umount(self.RD_MOUNT_POINT)
+        self.disk_util.umount('/mnt')
 
     def is_crypt_mounted(self):
         """ return true if mount point is already on a crypt layer """
@@ -231,10 +251,10 @@ class ResourceDiskUtil(object):
     def prepare(self):
         """ prepare a non-encrypted resource disk to be encrypted """
         self.configure_waagent()
+        self.configure_fstab()
         if self.resource_disk_partition_exists():
             self.disk_util.swapoff()
-            if self.is_mounted():
-                self.disk_util.umount(self.RD_MOUNT_POINT)
+            self.unmount_resource_disk()
             self.remove_device_mapper()
             self.clear_luks_header()
         self.prepare_partition()
