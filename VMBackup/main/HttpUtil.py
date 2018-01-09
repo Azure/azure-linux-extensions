@@ -74,7 +74,7 @@ class HttpUtil(object):
 
     def Call(self, method, sasuri_obj, data, headers, fallback_to_curl = False):
         try:
-            result, resp, errorMsg = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
+            result, resp, errorMsg, responseBody = self.HttpCallGetResponse(method, sasuri_obj, data, headers)
             self.logger.log("HttpUtil Call : result: " + str(result) + ", errorMsg: " + str(errorMsg))
             if(result == CommonVariables.success and resp != None):
                 self.logger.log("resp-header: " + str(resp.getheaders()))
@@ -82,9 +82,8 @@ class HttpUtil(object):
                 self.logger.log("Http connection response is None")
 
             self.logger.log(" resp status: " + str(resp.status))
-            responseBody = resp.read()
             if(responseBody is not None):
-                self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
+                self.logger.log("responseBody: " + responseBody)
 
             if(resp.status == 200 or resp.status == 201):
                 return CommonVariables.success
@@ -102,6 +101,7 @@ class HttpUtil(object):
         result = CommonVariables.error_http_failure
         resp = None
         errorMsg = None
+        responseBody = None
         try:
             resp = None
             if(self.proxyHost == None or self.proxyPort == None):
@@ -109,6 +109,7 @@ class HttpUtil(object):
                 self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path) + " query: " + str(sasuri_obj.query))
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
                 resp = connection.getresponse()
+                responseBody = resp.read().decode('utf-8')
                 connection.close()
             else:
                 connection = httplibs.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
@@ -124,4 +125,4 @@ class HttpUtil(object):
             self.logger.log(errorMsg)
             if sys.version[0] == 2 and sys.version[1] == 6:
                 self.CallUsingCurl(method,sasuri_obj,data,headers)
-        return result, resp, errorMsg
+        return result, resp, errorMsg, responseBody
