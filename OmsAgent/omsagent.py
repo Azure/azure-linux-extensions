@@ -435,8 +435,7 @@ def is_vm_supported_for_extension():
                        'red hat' : ('5', '6', '7'), # Oracle, RHEL
                        'oracle' : ('5', '6', '7'), # Oracle
                        'debian' : ('6', '7', '8'), # Debian
-                       'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
-                                   '16.04', '16.10'), # Ubuntu
+                       'ubuntu' : ('12.04', '14.04', '16.04', '16.10'), # Ubuntu
                        'suse' : ('11', '12') #SLES
     }
 
@@ -477,7 +476,21 @@ def is_vm_supported_for_extension():
 
         if vm_supported:
             break
-
+    # Find this VM has one of supported (version 0.98 or 1.0) SSL packages installed.
+    if vm_supported:
+        cmd_ssl = "openssl version | awk '{print $2}'"
+        exit_code_ssl, output_ssl = run_command_and_log(cmd_ssl)
+        cmd_ssl_098 = "echo {0} | grep -Eq '^0.9.8'".format(output_ssl)
+        cmd_ssl_100 = "echo {0} | grep -Eq '^1.0.'".format(output_ssl)
+        exit_code_ssl, output_ssl_098 = run_command_and_log(cmd_ssl_098)
+        exit_code_ssl, output_ssl_100 = run_command_and_log(cmd_ssl_100)
+        if output_ssl_098.strip():
+            hutil_log_info('VM has SSL version 0.9.8 installed')
+        elif output_ssl_100.strip():
+            hutil_log_info('VM has SSL version 1.0.0 installed')
+        else:
+            vm_supported = False
+            hutil_log_info('SSL version {0} is not supported by the extension'.format(output_ssl))			
     return vm_supported, vm_dist, vm_ver
 
 
