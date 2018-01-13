@@ -47,6 +47,7 @@ from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
+from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
@@ -472,6 +473,17 @@ def enable():
     while True:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
+
+        # run prechecks and log any failures detected
+        try:
+            cutil = check_util.CheckUtil(logger)
+            if cutil.is_precheck_failure():
+                logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
+            else:
+                logger.log("PRECHECK: Prechecks successful")
+        except Exception:
+            logger.log("PRECHECK: Exception thrown during precheck, incompatible environment suspected")
+            logger.log(traceback.format_exc())
 
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
