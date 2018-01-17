@@ -18,10 +18,19 @@
 
 import os
 import string
+import json
+
+class HandlerContext:
+    def __init__(self, name):
+        self._name = name
+        self._version = '0.0'
+        return
 
 class ConsoleLogger(object):
     def __init__(self):
         self.current_process_id = os.getpid()
+        self._context = HandlerContext("test")
+        self._context._config = json.loads('{"runtimeSettings": [{"handlerSettings": {"publicSettings": {"EncryptionOperation": "EnableEncryptionFormatAll"}}}]}')
 
     def log(self, msg, level='Info'):
         """ simple logging mechanism to print to stdout """
