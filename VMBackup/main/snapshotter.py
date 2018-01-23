@@ -97,8 +97,7 @@ class Snapshotter(object):
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                self.logger.log('Response Body : ' + str(responseBody))
+                result, httpResp, errMsg  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
@@ -151,8 +150,7 @@ class Snapshotter(object):
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
-                self.logger.log('Response Body : ' + str(responseBody))
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
