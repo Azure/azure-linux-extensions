@@ -4,8 +4,8 @@
 
 cat <<EOF > ./restart_lad_cse.json
 {
-    "fileUris": [ "https://raw.githubusercontent.com/Azure/azure-linux-extensions/lad-2.3/Diagnostic/restart_lad/restart_lad_on_all_vms.sh" ],
-    "commandToExecute": "./restart_lad_on_all_vms.sh"
+    "fileUris": [ "https://raw.githubusercontent.com/Azure/azure-linux-extensions/lad-2.3/Diagnostic/restart_lad/restart_lad.sh" ],
+    "commandToExecute": "./restart_lad.sh"
 }
 EOF
 
