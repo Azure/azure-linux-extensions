@@ -16,6 +16,6 @@ for sub in $subs; do
     az account set -s $sub
     az vm list --query "[?storageProfile.osDisk.osType=='Linux'].[resourceGroup,name]" -o tsv | while read -r rg name; do
         echo "=== Recycling LAD on VM name: $name in resource group: $rg"
-        az vm extension set --resource-group $rg --vm-name $name --name CustomScript --publisher Microsoft.Azure.Extensions --version 1.4 --settings ./restart_lad_cse.json
+        az vm extension set --resource-group $rg --vm-name $name --name CustomScript --publisher Microsoft.Azure.Extensions --settings ./restart_lad_cse.json
     done
 done
