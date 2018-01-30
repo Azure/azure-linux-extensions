@@ -627,7 +627,7 @@ def enable_encryption():
                     'operation': 'EnableEncryption',
                     'status': CommonVariables.extension_success_status,
                     'status_code': str(CommonVariables.success),
-                    'message': encryption_config.get_secret_id()
+                    'message': ""
                 }
 
             hutil.exit_if_same_seq(exit_status)
@@ -1847,7 +1847,7 @@ def start_daemon(operation):
                       operation=operation,
                       status=CommonVariables.extension_success_status,
                       code=str(CommonVariables.success),
-                      message=encryption_config.get_secret_id())
+                      message="")
     else:
         hutil.do_exit(exit_code=0,
                       operation=operation,
