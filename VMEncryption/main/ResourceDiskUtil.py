@@ -70,7 +70,7 @@ class ResourceDiskUtil(object):
         if not self.resource_disk_partition_exists():
             return False
         cmd = 'cryptsetup isLuks ' + self.RD_DEV_PATH
-        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == 0
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def is_luks_device_opened(self):
         """ check for presence of luks uuid to see if device was already opened """
@@ -78,7 +78,7 @@ class ResourceDiskUtil(object):
         if not self.resource_disk_partition_exists():
             return False
         cmd = 'test -b /dev/disk/by-uuid/$(cryptsetup luksUUID ' + self.RD_DEV_PATH + ')'
-        return (int)(self.executor.ExecuteInBash(cmd, suppress_logging=True)) == 0
+        return (int)(self.executor.ExecuteInBash(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def is_valid_key(self):
         """ test if current key can be used to open current partition """
@@ -86,29 +86,29 @@ class ResourceDiskUtil(object):
         if not self.resource_disk_partition_exists():
             return False
         cmd = 'cryptsetup luksOpen ' + self.RD_DEV_PATH + ' --test-passphrase --key-file ' + self.RD_KEY_FILE
-        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == 0
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def resource_disk_exists(self):
-        """ true if the udev name for resourced disk exists """
+        """ true if the udev name for resource disk exists """
         cmd = 'test -b ' + self.RD_BASE_DEV_PATH
-        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == 0
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def resource_disk_partition_exists(self):
         """ true if udev name for resource disk partition exists """
         cmd = 'test -b ' + self.RD_DEV_PATH
-        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == 0
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def format_luks(self):
         """ set up resource disk crypt device layer using disk util """
         if not self.resource_disk_partition_exists():
             self.logger.log('LUKS format operation requested, but resource disk partition does not exist')
             return False
-        return (int)(self.disk_util.luks_format(passphrase_file=self.RD_KEY_FILE, dev_path=self.RD_DEV_PATH, header_file=None)) == 0
+        return (int)(self.disk_util.luks_format(passphrase_file=self.RD_KEY_FILE, dev_path=self.RD_DEV_PATH, header_file=None)) == CommonVariables.process_success
 
     def encrypt(self):
         """ use disk util with the appropriate device mapper """
         self.mount_key_volume()
-        return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH, passphrase_file=self.RD_KEY_FILE, mapper_name=self.mapper_name, header_file=None)) == 0
+        return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH, passphrase_file=self.RD_KEY_FILE, mapper_name=self.mapper_name, header_file=None)) == CommonVariables.process_success
 
     def make(self):
         """ make a default file system on top of the crypt layer """
@@ -143,12 +143,11 @@ class ResourceDiskUtil(object):
         return True
 
     def configure_waagent(self):
-        """ turn off waagent.conf resource disk management  """ 
-        # set ResourceDisk.MountPoint to standard /mnt mount point
-        cmd = "sed -i.bak 's|ResourceDisk.MountPoint=.*|ResourceDisk.MountPoint=/mnt|' /etc/waagent.conf"
-
+        """ turn off waagent.conf resource disk management  """
+        # set ResourceDisk.MountPoint to standard mount point
+        cmd = "sed -i.rdbak1 's|ResourceDisk.MountPoint=.*|ResourceDisk.MountPoint=" + self.RD_MOUNT_POINT + "|' /etc/waagent.conf"
         # set ResourceDiskFormat=n to ensure waagent does not attempt a simultaneous format
-        cmd = "sed -i.bak 's|ResourceDisk.Format=y|ResourceDisk.Format=n|' /etc/waagent.conf"
+        cmd = "sed -i.rdbak2 's|ResourceDisk.Format=y|ResourceDisk.Format=n|' /etc/waagent.conf"
         if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
             self.logger.log(msg="Failed to set ResourceDiskFormat in /etc/waagent.conf", level=CommonVariables.WarningLevel)
             return False
@@ -157,14 +156,14 @@ class ResourceDiskUtil(object):
 
     def configure_fstab(self):
         """ remove resource disk from /etc/fstab if present """
-        cmd = "sed -i.bak '/azure_resource-part1/d' /etc/fstab"        
+        cmd = "sed -i.bak '/azure_resource-part1/d' /etc/fstab"
         if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
             self.logger.log(msg="Failed to configure resource disk entry of /etc/fstab", level=CommonVariables.WarningLevel)
             return False        
         return True
 
     def unmount_resource_disk(self):
-        """ return true if mount point is mounted regardless of crypt status """
+        """ unmount resource disk """
         # after service healing multiple unmounts of key file mount point may be required
         self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
         self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
@@ -193,7 +192,7 @@ class ResourceDiskUtil(object):
         dm_name = self.get_rd_device_mapper()
         if dm_name:
             cmd = 'dmsetup remove ' + self.DM_PREFIX + dm_name
-            if self.executor.Execute(cmd) == 0:
+            if self.executor.Execute(cmd) == CommonVariables.process_success:
                 return True
             else:
                 self.logger.log('failed to remove ' + dm_name)
