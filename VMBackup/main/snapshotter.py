@@ -97,7 +97,7 @@ class Snapshotter(object):
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                result, httpResp, errMsg  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
@@ -168,7 +168,7 @@ class Snapshotter(object):
             snapshot_error.sasuri = sasuri
         return snapshot_error, snapshot_info_indexer
 
-    def snapshotall_parallel(self, paras, freezer, thaw_done):
+    def snapshotall_parallel(self, paras, freezer, thaw_done, g_fsfreeze_on):
         self.logger.log("doing snapshotall now in parallel...")
         snapshot_result = SnapshotResult()
         snapshot_info_array = []
@@ -207,17 +207,17 @@ class Snapshotter(object):
                 for job in mp_jobs:
                     job.join()
                 thaw_result = None
-                if thaw_done_local == False:
+                if g_fsfreeze_on and thaw_done_local == False:
                     time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
                     time_after_thaw = datetime.datetime.now()
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
-                self.logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
-                    is_inconsistent = True
-                    snapshot_result.errors.append(thaw_result.errors)
-                    return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
+                    self.logger.log('T:S thaw result ' + str(thaw_result))
+                    if(thaw_result is not None and len(thaw_result.errors) > 0):
+                        is_inconsistent = True
+                        snapshot_result.errors.append(thaw_result.errors)
+                        return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
                 self.logger.log('end of snapshot process')
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
@@ -248,7 +248,7 @@ class Snapshotter(object):
             return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
 
 
-    def snapshotall_seq(self, paras, freezer, thaw_done):
+    def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on):
         exceptOccurred = False
         self.logger.log("doing snapshotall now in sequence...")
         snapshot_result = SnapshotResult()
@@ -274,16 +274,16 @@ class Snapshotter(object):
                         all_failed = False
                     blob_index = blob_index + 1
                 thaw_result= None
-                if thaw_done_local== False:
+                if g_fsfreeze_on and thaw_done_local== False:
                     time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
                     time_after_thaw = datetime.datetime.now()
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
-                self.logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
-                    snapshot_result.errors.append(thaw_result.errors)
-                    is_inconsistent= True
+                    self.logger.log('T:S thaw result ' + str(thaw_result))
+                    if(thaw_result is not None and len(thaw_result.errors) > 0):
+                        snapshot_result.errors.append(thaw_result.errors)
+                        is_inconsistent= True
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
             else:
                 self.logger.log("the blobs are None")
@@ -310,14 +310,14 @@ class Snapshotter(object):
             self.logger.log(errorMsg)
         return value
 
-    def snapshotall(self, paras, freezer):
+    def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
         if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) <= 4):
-            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
+            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
-            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done)
+            snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
             if exceptOccurred and thaw_done == False:
-                snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done)
+                snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
