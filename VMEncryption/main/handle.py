@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -41,11 +41,13 @@ from Utils import HandlerUtil
 from Common import *
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
+from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
+from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
@@ -374,7 +376,15 @@ def toggle_se_linux_for_centos7(disable):
     return False
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
-    #make sure the azure disk config path exists.
+
+    # mount encrypted resource disk
+    volume_type = encryption_config.get_volume_type().lower()
+    if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util.automount()
+        logger.log("mounted encrypted resource disk")
+
+    # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
@@ -463,6 +473,17 @@ def enable():
     while True:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
+
+        # run prechecks and log any failures detected
+        try:
+            cutil = check_util.CheckUtil(logger)
+            if cutil.is_precheck_failure():
+                logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
+            else:
+                logger.log("PRECHECK: Prechecks successful")
+        except Exception:
+            logger.log("PRECHECK: Exception thrown during precheck, incompatible environment suspected")
+            logger.log(traceback.format_exc())
 
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
