@@ -94,6 +94,10 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
+# vmResourceId Metadata Service
+VMResourceIDMetadataHost = '169.254.169.254'
+VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-08-01'.format(VMResourceIDMetadataHost)
+
 # Change permission of log path - if we fail, that is not an exit case
 try:
     ext_log_path = '/var/log/azure/'
@@ -294,8 +298,12 @@ def enable():
 
     vmResourceId = protected_settings.get('vmResourceId')
     vmResourceIdParam = ''
-    if vmResourceId is not None:
+    if vmResourceId is not None and vmResourceId:
         vmResourceIdParam = '-a {0}'.format(vmResourceId)
+    else:
+        vmResourceId = get_vmresourceid_from_metadata()
+        if vmResourceId is not None:
+            vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
     optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
@@ -334,6 +342,22 @@ def enable():
 
     return exit_code
 
+def get_vmresourceid_from_metadata():
+    req = urllib2.Request(VMResourceIDMetadataEndpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib2.urlopen(req).read())
+        return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+    except urllib2.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
 
 def retrieve_managed_workspace(protected_settings):
     """
