@@ -119,12 +119,13 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception("Could not parse ATTR{partition} from udevadm info")
         partition = matches[0]
         sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
+        self.command_executor.Execute('cp {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
         self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
         self._append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
                                       '/etc/crypttab')
-                                      
-        self.command_executor.Execute('cp {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
         #self.command_executor.Execute('mv /lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig /lib/dracut/modules.d/90crypt/cryptroot-ask.sh', False)
         #self.command_executor.Execute('mv /lib/dracut/modules.d/90crypt/module-setup.sh.orig /lib/dracut/modules.d/90crypt/module-setup.sh', False)
         #self.command_executor.Execute('mv /lib/dracut/modules.d/90crypt/parse-crypt.sh.orig /lib/dracut/modules.d/90crypt/parse-crypt.sh', False)
