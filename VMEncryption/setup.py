@@ -48,6 +48,7 @@ packages_array.append(patch_folder)
 oscrypto_folder = main_folder + '/oscrypto'
 packages_array.append(oscrypto_folder)
 
+packages_array.append(oscrypto_folder + '/91ade')
 packages_array.append(oscrypto_folder + '/rhel_72_lvm')
 packages_array.append(oscrypto_folder + '/rhel_72_lvm/encryptstates')
 packages_array.append(oscrypto_folder + '/rhel_72')

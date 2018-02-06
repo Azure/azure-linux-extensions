@@ -39,6 +39,10 @@
     <Content Include="main\oscrypto\ubuntu_1404\encryptpatches\ubuntu_1404_initramfs.patch" />
     <Content Include="main\oscrypto\ubuntu_1404\encryptscripts\azure_crypt_key.sh" />
     <Content Include="main\oscrypto\ubuntu_1404\encryptscripts\inject_luks_header.sh" />
+    <Content Include="main\oscrypto\91ade\50-udev-ade.rules" />
+    <Content Include="main\oscrypto\91ade\ade-hook.sh" />
+    <Content Include="main\oscrypto\91ade\module-setup.sh" />
+    <Content Include="main\oscrypto\91ade\parse-crypt-ade.sh" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="main\BekUtil.py">
@@ -155,6 +159,7 @@
   <ItemGroup>
     <Folder Include="main\" />
     <Folder Include="main\oscrypto\" />
+    <Folder Include="main\oscrypto\91ade" />
     <Folder Include="main\oscrypto\rhel_72_lvm\" />
     <Folder Include="main\oscrypto\rhel_72_lvm\encryptstates\" />
     <Folder Include="main\oscrypto\rhel_72_lvm\encryptpatches\" />
