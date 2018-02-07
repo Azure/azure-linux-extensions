@@ -54,6 +54,7 @@ from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
+from PluginHost import PluginHostResult
 
 #Main function is the only entrence to this extension handler
 
@@ -422,6 +423,9 @@ def daemon():
                 if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
                     backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
                     doFsConsistentbackup = True
+
+                preResult = PluginHostResult()
+                postResult = PluginHostResult()
 
                 if not doFsConsistentbackup:
                     preResult = PluginHostObj.pre_script()
