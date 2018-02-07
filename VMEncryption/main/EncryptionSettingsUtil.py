@@ -102,7 +102,7 @@ class EncryptionSettingsUtil(object):
             raise Exception('\n' + message + '\nActual: ' + test_id + '\nExpected: ' + expected + "\n")
         return
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm):
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, disk_util):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
@@ -143,8 +143,31 @@ class EncryptionSettingsUtil(object):
                         })
             return array
 
+        # Get disk data from disk_util
+        # We get a list of tuples i.e. [(scsi_controller_id, lun_number),.]
+        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers()
+
+        def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
+            return {
+                    "ControllerType": "SCSI",
+                    "ControllerId": scsi_controller,
+                    "SlotId": lun_number,
+                    "Volumes": [{
+                            "VolumeType": "DataVolume",
+                            "ProtectorFileName": protector_name,
+                            "SecretTags": dict_to_name_value_array({
+                                "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number),
+                                "DiskEncryptionKeyEncryptionKeyURL": kek_url,
+                                "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
+                                "MachineName": machine_name})
+                        }]
+                }
+
+        data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+                                    for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
+
         data = {
-            "DiskEncryptionDataVersion": "2.0",
+            "DiskEncryptionDataVersion": "3.0",
             "DiskEncryptionOperation": "EnableEncryption",
             "KeyVaultUrl": kv_url,
             "KeyVaultResourceId": kv_id,
@@ -168,7 +191,7 @@ class EncryptionSettingsUtil(object):
                         }
                     ]
                 }
-            ]
+            ] + data_disks_settings_data
         }
         return data
 

@@ -727,6 +727,33 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
+    def get_azure_data_disk_controller_and_lun_numbers(self):
+        list_devices = []
+        azure_links_dir = '/dev/disk/azure'
+
+        if not os.path.exists(azure_links_dir):
+            return list_devices
+
+        for top_level_item in os.listdir(azure_links_dir):
+            top_level_item_full_path = os.path.join(azure_links_dir, top_level_item)
+            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith("scsi"):
+                # this works because apparently all data disks go int a scsi[x] where x is one of [1,2,3,4]
+                try:
+                    controller_id = int(top_level_item[4:]) # strip the first 4 letters of the folder
+                except ValueError:
+                    # if its not an integer, probably just best to skip it
+                    continue
+
+                for symlink in os.listdir(top_level_item_full_path):
+                    if symlink.startswith("lun"):
+                        try:
+                            lun_number = int(symlink[3:])
+                        except ValueError:
+                            # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
+                            continue # so just ignore it
+                        list_devices.append((controller_id, lun_number))
+        return list_devices
+
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))

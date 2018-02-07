@@ -276,7 +276,8 @@ def update_encryption_settings():
                 kv_id=extension_parameter.KeyVaultResourceId,
                 kek_url=extension_parameter.KeyEncryptionKeyURL,
                 kek_kv_id=extension_parameter.KekVaultResourceId,
-                kek_algorithm=extension_parameter.KeyEncryptionAlgorithm)
+                kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
+                disk_util=disk_util)
             settings.write_settings_file(data)
             settings.post_to_wireserver()
             settings.remove_protector_file(new_protector_name)
@@ -695,7 +696,8 @@ def enable_encryption():
                         kv_id=extension_parameter.KeyVaultResourceId,
                         kek_url=extension_parameter.KeyEncryptionKeyURL,
                         kek_kv_id=extension_parameter.KekVaultResourceId,
-                        kek_algorithm=extension_parameter.KeyEncryptionAlgorithm)
+                        kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
+                        disk_util=disk_util)
                     settings.write_settings_file(data)
                     settings.post_to_wireserver()
                     settings.remove_protector_file(new_protector_name)
@@ -1361,26 +1363,18 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
             logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
         else:
             logger.log(msg=("encrypting: {0}".format(device_item)))
-            no_header_file_support = not_support_header_option_distro(DistroPatcher)
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
                                                                     len(device_items_to_encrypt))
 
             #TODO check the file system before encrypting it.
-            if no_header_file_support:
-                logger.log(msg="this is the centos 6 or redhat 6 or sles 11 series, need to resize data drive",
-                           level=CommonVariables.WarningLevel)
+            logger.log(msg="For VMSS we only do inplace headers",
+                       level=CommonVariables.WarningLevel)
 
-                encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file=passphrase_file,
-                                                                                       device_item=device_item,
-                                                                                       disk_util=disk_util,
-                                                                                       bek_util=bek_util,
-                                                                                       status_prefix=status_prefix)
-            else:
-                encryption_result_phase = encrypt_inplace_with_seperate_header_file(passphrase_file=passphrase_file,
-                                                                                    device_item=device_item,
-                                                                                    disk_util=disk_util,
-                                                                                    bek_util=bek_util,
-                                                                                    status_prefix=status_prefix)
+            encryption_result_phase = encrypt_inplace_without_seperate_header_file(passphrase_file=passphrase_file,
+                                                                                   device_item=device_item,
+                                                                                   disk_util=disk_util,
+                                                                                   bek_util=bek_util,
+                                                                                   status_prefix=status_prefix)
                 
             if encryption_result_phase == CommonVariables.EncryptionPhaseDone:
                 continue
