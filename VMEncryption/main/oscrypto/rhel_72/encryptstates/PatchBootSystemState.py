@@ -111,6 +111,8 @@ class PatchBootSystemState(OSEncryptionState):
         #    self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
         proc_comm = ProcessCommunicator()
+        self.command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
         udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
         self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
 
@@ -119,10 +121,11 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception("Could not parse ATTR{partition} from udevadm info")
         partition = matches[0]
         sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
-        self.command_executor.Execute('cp {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
 
         self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
+                                      '/etc/default/grub') 
         self._append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
                                       '/etc/crypttab')
 
