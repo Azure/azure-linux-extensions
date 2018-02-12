@@ -56,6 +56,7 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import *
 from __builtin__ import int
+from MetadataUtil import MetadataUtil
 
 
 def install():
@@ -645,9 +646,16 @@ def enable_encryption():
             else:
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
 
+                # get supported volume types
+                instance = MetadataUtil.MetadataUtil(logger)
+                if instance.is_vmss():
+                    supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
+                else:
+                    supported_volume_types = CommonVariables.SupportedVolumeTypes
+                
                 # validate parameters
                 if(extension_parameter.VolumeType is None or
-                   not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in CommonVariables.SupportedVolumeTypes])):
+                   not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in supported_volume_types])):
                     if encryption_config.config_file_exists():
                         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
                         

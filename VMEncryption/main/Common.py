@@ -83,6 +83,7 @@ class CommonVariables:
     VolumeTypeData = 'Data'
     VolumeTypeAll = 'All'
     SupportedVolumeTypes = [VolumeTypeOS, VolumeTypeData, VolumeTypeAll]
+    SupportedVolumeTypesVMSS = [VolumeTypeData]
     """
     command types
     """
