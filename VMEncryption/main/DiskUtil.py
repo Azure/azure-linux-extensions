@@ -93,7 +93,104 @@ class DiskUtil(object):
         self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
         return self.command_executor.Execute(mkdir_cmd)
 
+    def parse_azure_crypt_mount_line(self, line):
+
+        crypt_item = CryptItem()
+
+        crypt_mount_item_properties = line.strip().split()
+
+        crypt_item.mapper_name = crypt_mount_item_properties[0]
+        crypt_item.dev_path = crypt_mount_item_properties[1]
+        crypt_item.luks_header_path = crypt_mount_item_properties[2] if crypt_mount_item_properties[2] and crypt_mount_item_properties[2] != "None" else None
+        crypt_item.mount_point = crypt_mount_item_properties[3]
+        crypt_item.file_system = crypt_mount_item_properties[4]
+        crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
+        crypt_item.current_luks_slot = int(crypt_mount_item_properties[6]) if crypt_mount_item_properties.length > 6 else -1
+
+        return crypt_item
+
+    def consolidate_azure_crypt_mount(self, passphrase_file):
+        device_items = self.get_device_items(None)
+        crypt_items = self.get_crypt_items()
+        azure_name_table = self.get_block_device_to_azure_udev_table()
+
+        for device_item in device_items:
+            if device_item.file_system == "crypto_LUKS" :
+                # Found an encrypted device, let's check if it is in the azure_crypt_mount file
+                # Check this by comparing the dev paths
+                found_in_crypt_mount = False
+                device_item_path = self.get_device_path(device_item.name)
+                device_item_real_path = os.path.realpath(device_item_path)
+                for crypt_item in crypt_items:
+                    if rootfs_crypt_item_found.path.realpath(crypt_item.dev_path) == device_item_real_path:
+                        found_in_crypt_mount = True
+                        break
+                if found_in_crypt_mount:
+                    # Its already in crypt_mount so nothing to do yet
+                    continue
+                # Otherwise, unlock and mount it at a test spot and extract mount info
+
+                crypt_item = CryptItem()
+                crypt_item.dev_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
+                # dev_path will always start with "/" so we strip that out and generate a temporary mapper name from the rest
+                # e.g. /dev/disk/azure/scsi1/lun1 --> dev-disk-azure-scsi1-lun1-unlocked  | /dev/mapper/lv0 --> dev-mapper-lv0-unlocked
+                crypt_item.mapper_name = crypt_item.dev_path[5:].replace("/","-") + "-unlocked"
+                crypt_item.uses_cleartext_key = False # might need to be changed later
+                crypt_item.current_luks_slot = -1
+
+                temp_mount_point = os.path.join("/mnt/", crypt_item.mapper_name)
+                azure_crypt_mount_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/azure_crypt_mount_line")
+
+                # try to open to the temp mapper name generated above
+                return_code = self.luks_open(passphrase_file=passphrase_file,
+                                                  dev_path=device_item_real_path,
+                                                  mapper_name=crypt_item.mapper_name,
+                                                  header_file=None,
+                                                  uses_cleartext_key=False)
+                if return_code != CommonVariables.process_success:
+                    self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+                    continue
+
+                return_code = self.mount_filesystem(os.path.join("/dev/mapper/", crypt_item.mapper_name), temp_mount_point)
+                if return_code != CommonVariables.process_success:
+                    self.logger.log(msg=('Mount failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+                    # this can happen with disks without file systems (lvm, raid or simply empty disks)
+                    # in this case just add an entry to the azure_crypt_mount without a mount point (for lvm/raid scenarios)
+                    self.add_crypt_item(crypt_item)
+                    self.luks_close(crypt_item.mapper_name)
+                    continue
+
+                if not os.path.exists(azure_crypt_mount_backup_location):
+                    self.logger.log(msg=("MountPoint info not found for {0}", device_item_real_path), level=CommonVariables.ErrorLevel)
+                    # Not sure when this happens..
+                    # in this case also, just add an entry to the azure_crypt_mount without a mount point.
+                    self.add_crypt_item(crypt_item)
+                    self.umount(temp_mount_point)
+                    self.luks_close(crypt_item.mapper_name)
+                    continue
+
+                with open(azure_crypt_mount_backup_location,'r') as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        # copy the crypt_item from the backup to the central os location
+                        crypt_item = parse_azure_crypt_mount_line(line)
+                        self.add_crypt_item(crypt_item)
+
+                # close the file and then unmount and close
+                self.umount(temp_mount_point)
+                self.luks_close(crypt_item.mapper_name)
+
+
     def get_crypt_items(self):
+        """
+        Reads the central azure_crypt_mount file and parses it into an array of CryptItem()s
+        If the root partition is encrypted but not present in the file it generates a CryptItem() for the root partition and appends it to the list.
+
+        At boot time, it might be required to run the consolidate_azure_crypt_mount method to capture any encrypted volumes not in
+        the central file and add it to the central file
+        """
+
         crypt_items = []
         rootfs_crypt_item_found = False
 
@@ -105,29 +202,10 @@ class DiskUtil(object):
                     if not line.strip():
                         continue
 
-                    crypt_mount_item_properties = line.strip().split()
-
-                    crypt_item = CryptItem()
-                    crypt_item.mapper_name = crypt_mount_item_properties[0]
-                    crypt_item.dev_path = crypt_mount_item_properties[1]
-
-                    header_file_path = None
-                    if crypt_mount_item_properties[2] and crypt_mount_item_properties[2] != "None":
-                        header_file_path = crypt_mount_item_properties[2]
-
-                    crypt_item.luks_header_path = header_file_path
-                    crypt_item.mount_point = crypt_mount_item_properties[3]
+                    crypt_item = parse_azure_crypt_mount_line(line)
 
                     if crypt_item.mount_point == "/":
                         rootfs_crypt_item_found = True
-
-                    crypt_item.file_system = crypt_mount_item_properties[4]
-                    crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
-
-                    try:
-                        crypt_item.current_luks_slot = int(crypt_mount_item_properties[6])
-                    except IndexError:
-                        crypt_item.current_luks_slot = -1
 
                     crypt_items.append(crypt_item)
 
@@ -172,7 +250,7 @@ class DiskUtil(object):
 
         return crypt_items
 
-    def add_crypt_item(self, crypt_item):
+    def add_crypt_item(self, crypt_item, backup_folder=None):
         """
         TODO we should judge that the second time.
         format is like this:
@@ -188,52 +266,50 @@ class DiskUtil(object):
                                   crypt_item.mount_point + " " +
                                   crypt_item.file_system + " " +
                                   str(crypt_item.uses_cleartext_key) + " " +
-                                  str(crypt_item.current_luks_slot))
+                                  str(crypt_item.current_luks_slot)) + "\n"
 
-            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-                with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
-                    existing_content = f.read()
-                    if existing_content is not None and existing_content.strip() != "":
-                        new_mount_content = existing_content + "\n" + mount_content_item
-                    else:
-                        new_mount_content = mount_content_item
-            else:
-                new_mount_content = mount_content_item
-
-            with open(self.encryption_environment.azure_crypt_mount_config_path,'w') as wf:
-                wf.write('\n')
+            with open(self.encryption_environment.azure_crypt_mount_config_path,'a') as wf:
                 wf.write(new_mount_content)
-                wf.write('\n')
+
+            if backup_folder is not None:
+                backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
+                self.make_sure_path_exists(backup_folder)
+                with open(backup_file, "w") as wf:
+                    wf.write(new_mount_content)
+
             return True
         except Exception as e:
             return False
 
-    def remove_crypt_item(self, crypt_item):
-        if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-            return False
-
+    def remove_crypt_item(self, crypt_item, backup_folder=None):
         try:
-            mount_lines = []
+            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+                disk_util.consolidate_azure_crypt_mount(passphrase_file)
+                mount_lines = []
 
-            with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-                mount_lines = f.readlines()
+                with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
+                    mount_lines = f.readlines()
 
-            filtered_mount_lines = filter(lambda line: not crypt_item.mapper_name in line, mount_lines)
+                filtered_mount_lines = filter(lambda line: self.parse_azure_crypt_mount_line(line).mapper_name == crypt_item.mapper_name, mount_lines)
 
-            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
-                wf.write('\n')
-                wf.write('\n'.join(filtered_mount_lines))
-                wf.write('\n')
+                with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+                    wf.write(''.join(filtered_mount_lines))
+
+            if backup_folder is not None:
+                backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
+                if os.path.exists(backup_file):
+                    os.remove(backup_file)
+                    os.rmdir(backup_folder)
 
             return True
 
         except Exception as e:
             return False
 
-    def update_crypt_item(self, crypt_item):
+    def update_crypt_item(self, crypt_item, backup_folder=None):
         self.logger.log("Updating entry for crypt item {0}".format(crypt_item))
-        self.remove_crypt_item(crypt_item)
-        self.add_crypt_item(crypt_item)
+        self.remove_crypt_item(crypt_item, backup_folder)
+        self.add_crypt_item(crypt_item, backup_folder)
 
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name

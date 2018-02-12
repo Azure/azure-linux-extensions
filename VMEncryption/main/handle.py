@@ -130,6 +130,7 @@ def disable_encryption():
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        disk_util.consolidate_azure_crypt_mount(bek_passphrase_file)
         crypt_items = disk_util.get_crypt_items()
 
         logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
@@ -222,6 +223,7 @@ def update_encryption_settings():
             temp_keyfile.write(extension_parameter.passphrase)
             temp_keyfile.close()
             
+            disk_util.consolidate_azure_crypt_mount(existing_passphrase_file)
             for crypt_item in disk_util.get_crypt_items():
                 if not crypt_item:
                     continue
@@ -576,6 +578,7 @@ def enable_encryption():
     if encryption_config.config_file_exists():
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
+            disk_util.consolidate_azure_crypt_mount(existing_passphrase_file)
             mount_encrypted_disks(disk_util=disk_util,
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
@@ -791,16 +794,18 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
                     if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
                         crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
+                    disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
+                    mount_result = disk_util.mount_filesystem(dev_path=encrypted_device_path, mount_point=crypt_item_to_update.mount_point)
+                    logger.log(msg=("mount result is {0}".format(mount_result)))
+
                     logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                     disk_util.remove_mount_info(crypt_item_to_update.mount_point)
 
-                    disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
-                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+                    backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, backup_folder)
                     if not update_crypt_item_result:
                         logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
-                    mount_result = disk_util.mount_filesystem(dev_path=encrypted_device_path, mount_point=crypt_item_to_update.mount_point)
-                    logger.log(msg=("mount result is {0}".format(mount_result)))
                 else:
                     logger.log(msg="encryption failed with code {0}".format(encrypt_result), level=CommonVariables.ErrorLevel)
             else:
@@ -968,7 +973,15 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                     crypt_item_to_update.mount_point = "None"
                 else:
                     crypt_item_to_update.mount_point = mount_point
-                update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+
+                if crypt_item_to_update.mount_point != "None":
+                    disk_util.mount_filesystem(device_mapper_path, ongoing_item_config.get_mount_point())
+                    backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, backup_folder)
+                else:
+                    logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+
                 if not update_crypt_item_result:
                     logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
@@ -987,11 +1000,6 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                 ongoing_item_config.phase = current_phase
                 ongoing_item_config.commit()
                 expand_fs_result = disk_util.expand_fs(dev_path=device_mapper_path)
-
-                if crypt_item_to_update.mount_point != "None":
-                    disk_util.mount_filesystem(device_mapper_path, ongoing_item_config.get_mount_point())
-                else:
-                    logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
 
                 ongoing_item_config.clear_config()
                 if expand_fs_result != CommonVariables.process_success:
@@ -1125,13 +1133,17 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                         crypt_item_to_update.mount_point = "None"
                     else:
                         crypt_item_to_update.mount_point = mount_point
-                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
-                    if not update_crypt_item_result:
-                        logger.log(msg="update crypt item failed", level = CommonVariables.ErrorLevel)
+
                     if crypt_item_to_update.mount_point != "None":
                         disk_util.mount_filesystem(device_mapper_path, mount_point)
+                        backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
+                        update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, backup_folder)
                     else:
                         logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
+                        update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+
+                    if not update_crypt_item_result:
+                        logger.log(msg="update crypt item failed", level = CommonVariables.ErrorLevel)
 
                     if mount_point:
                         logger.log(msg="removing entry for unencrypted drive from fstab",
@@ -1392,6 +1404,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     logger.log(msg="executing disable_encryption_all_in_place")
 
     device_items = disk_util.get_device_items(None)
+    disk_util.consolidate_azure_crypt_mount(passphrase_file)
     crypt_items = disk_util.get_crypt_items()
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
@@ -1448,8 +1461,9 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         
         if decryption_result_phase == CommonVariables.DecryptionPhaseDone:
             disk_util.luks_close(crypt_item.mapper_name)
-            disk_util.remove_crypt_item(crypt_item)
             disk_util.mount_all()
+            backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/") if crypt_item.mount_point else None
+            disk_util.remove_crypt_item(crypt_item, backup_folder)
 
             continue
         else:
