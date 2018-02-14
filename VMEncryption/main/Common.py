@@ -1,8 +1,8 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
-# VM Backup extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,11 +20,33 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999309'
+    extension_version = '1.1.0.0'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
-    extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
+    extension_label = 'Azure Disk Encryption For Linux VMSS'
     extension_description = extension_label
+
+    """
+    wire protocol message format
+    """
+    encryption_key_file_name = 'LinuxPassPhraseFileName'
+    encryption_key_mount_point = '/mnt/azure_bek_disk'
+    encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
+    default_encryption_algorithm = 'RSA-OAEP'
+    encryption_settings_file_name_pattern = 'settings_{}.json'
+    encryption_settings_counter_file = 'counter.txt'
+    encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
+
+    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    wireprotocol_msg_headers = {
+        "Content-Type": "text/xml",
+        "x-ms-version": "2015-04-05"
+    }
+    wireprotocol_msg_template_v2 = """<?xml version="1.0"?>
+    <DiskEncryptionData version="2.0">
+        <DiskEncryptionSettingsFile>{settings_file_name}</DiskEncryptionSettingsFile>
+    </DiskEncryptionData>
+    """
 
     """
     disk/file system related
@@ -33,7 +55,6 @@ class CommonVariables:
     luks_header_size = 4096 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
-    #TODO for the sles 11, we should use the ext3
     default_file_system = 'ext4'
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
@@ -46,26 +67,22 @@ class CommonVariables:
     PassphraseFileNameKey = 'BekFileName'
     KeyEncryptionKeyURLKey = 'KeyEncryptionKeyURL'
     KeyVaultURLKey = 'KeyVaultURL'
-    AADClientIDKey = 'AADClientID'
-    AADClientCertThumbprintKey = 'AADClientCertThumbprint'
+    KeyVaultResourceIdKey = 'KeyVaultResourceId'
+    KekVaultResourceIdKey = 'KekVaultResourceId'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
 
     """
-    value for VolumeType could be OS or Data
+    value for VolumeType could be Data
     """
     VolumeTypeKey = 'VolumeType'
-    AADClientSecretKey = 'AADClientSecret'
     SecretUriKey = 'SecretUri'
     SecretSeqNum = 'SecretSeqNum'
-
     VolumeTypeOS = 'OS'
     VolumeTypeData = 'Data'
     VolumeTypeAll = 'All'
-
-    SupportedVolumeTypes = [ VolumeTypeOS, VolumeTypeData, VolumeTypeAll ]
-
+    SupportedVolumeTypes = [VolumeTypeData]
     """
     command types
     """
@@ -176,13 +193,12 @@ class DeviceItem(object):
         self.size = None
         self.majmin = None
         self.device_id = None
-        self.azure_name = None
     def __str__(self):
         return ("name:" + str(self.name) + " type:" + str(self.type) +
                 " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
                 " label:" + str(self.label) + " model:" + str(self.model) +
                 " size:" + str(self.size) + " majmin:" + str(self.majmin) +
-                " device_id:" + str(self.device_id)) + " azure_name:" + str(self.azure_name) 
+                " device_id:" + str(self.device_id))
 
 class LvmItem(object):
     def __init__(self):

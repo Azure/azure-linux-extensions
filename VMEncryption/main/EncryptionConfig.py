@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VM Backup extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,7 +41,9 @@ class EncryptionConfig(object):
         return self.encryption_config.config_file_exists()
 
     def get_bek_filename(self):
-        return self.encryption_config.get_config(CommonVariables.PassphraseFileNameKey)
+        bek_filename = self.encryption_config.get_config(CommonVariables.PassphraseFileNameKey)
+
+        return bek_filename if bek_filename else self.encryption_environment.default_bek_filename
 
     def get_volume_type(self):
         return self.encryption_config.get_config(CommonVariables.VolumeTypeKey)

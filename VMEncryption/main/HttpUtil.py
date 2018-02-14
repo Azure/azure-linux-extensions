@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VM Backup extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2014 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,25 +46,31 @@ class HttpUtil(object):
     snapshot also called this. so we should not write the file/read the file in this method.
     """
 
-    def Call(self, method, http_uri, data, headers):
+    def Call(self, method, http_uri, data, headers, use_https=True):
         try:
             uri_obj = urlparse.urlparse(http_uri)
             #parse the uri str here
             if self.proxyHost is None or self.proxyPort is None:
-                self.connection = httplib.HTTPSConnection(uri_obj.hostname, timeout = 10)
-                if uri_obj.query is not None:
-                    self.connection.request(method = method, url=(uri_obj.path +'?'+ uri_obj.query), body = data, headers = headers)
+                if use_https:
+                    self.connection = httplib.HTTPSConnection(uri_obj.hostname, timeout=10)
                 else:
-                    self.connection.request(method = method, url=(uri_obj.path), body = data, headers = headers)
+                    self.connection = httplib.HTTPConnection(uri_obj.hostname, timeout=10)
+                if uri_obj.query is not None:
+                    self.connection.request(method=method, url=(uri_obj.path +'?'+ uri_obj.query), body=data, headers=headers)
+                else:
+                    self.connection.request(method=method, url=(uri_obj.path), body=data, headers=headers)
                 resp = self.connection.getresponse()
             else:
                 self.logger.log("proxyHost is not empty, so use the proxy to call the http.")
-                self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout = 10)
+                if use_https:
+                    self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=10)
+                else:
+                    self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=10)
                 if uri_obj.scheme.lower() == "https":
                     self.connection.set_tunnel(uri_obj.hostname, 443)
                 else:
                     self.connection.set_tunnel(uri_obj.hostname, 80)
-                self.connection.request(method = method, url = (http_uri), body = data, headers = headers)
+                self.connection.request(method=method, url=(http_uri), body=data, headers=headers)
                 resp = self.connection.getresponse()
             return resp
         except Exception as e:

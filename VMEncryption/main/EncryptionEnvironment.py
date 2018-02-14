@@ -1,8 +1,8 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
-# VMEncryption extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ class EncryptionEnvironment(object):
         self.patching = patching
         self.logger = logger
         self.encryption_config_path = '/var/lib/azure_disk_encryption_config/'
-        # Lock file for daemon.
         self.daemon_lock_file_path = os.path.join(self.encryption_config_path, 'daemon_lock_file.lck')
         self.encryption_config_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_config.ini')
         self.extension_parameter_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_params.ini')
@@ -42,6 +41,7 @@ class EncryptionEnvironment(object):
         self.copy_slice_item_backup_file = os.path.join(self.encryption_config_path, 'copy_slice_item.bak')
         self.os_encryption_markers_path = os.path.join(self.encryption_config_path, 'os_encryption_markers')
         self.bek_backup_path = os.path.join(self.encryption_config_path, 'bek_backup')
+        self.default_bek_filename = "LinuxPassPhraseFileName"
 
     def get_se_linux(self):
         proc = Popen([self.patching.getenforce_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)

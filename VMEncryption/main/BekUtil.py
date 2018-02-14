@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VM Backup extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,9 +43,38 @@ class BekUtil(object):
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated
 
-    #
-    # Returns the LinuxPassPhraseFileName path
-    #
+    def store_bek_passphrase(self, encryption_config, passphrase):
+        bek_filename = encryption_config.get_bek_filename()
+
+        if TestHooks.search_not_only_ide:
+            self.logger.log("TESTHOOK: search not only ide set")
+            azure_devices = self.disk_util.get_device_items(None)
+        else:
+            azure_devices = self.disk_util.get_azure_devices()
+
+        for azure_device in azure_devices:
+            fstype = str(azure_device.file_system).lower()
+            label = str(azure_device.label).lower()
+            # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
+            # the second word gets truncated
+            if fstype in ['vfat', 'ntfs'] and label == 'bek':
+                try:
+                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
+                                                    self.bek_filesystem_mount_point,
+                                                    fstype)
+
+                    with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "w") as f:
+                        f.write(passphrase)
+                except Exception as e:
+                    message = "Failed to store BEK in {0} with error: {1}".format(azure_device, e)
+                    self.logger.log(message)
+                else:
+                    self.logger.log("Stored BEK in {0}".format(azure_device))
+                    return
+
+        raise Exception("Did not find BEK volume to store passphrase in")
+
     def get_bek_passphrase_file(self, encryption_config):
         bek_filename = encryption_config.get_bek_filename()
 
@@ -57,7 +86,10 @@ class BekUtil(object):
 
         for azure_device in azure_devices:
             fstype = str(azure_device.file_system).lower()
-            if fstype in ['vfat', 'ntfs']:
+            label = str(azure_device.label).lower()
+            # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
+            # the second word gets truncated
+            if fstype in ['vfat', 'ntfs'] and label == 'bek':
                 try:
                     self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
                     self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),

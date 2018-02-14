@@ -39,7 +39,6 @@ from Common import *
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
-    device_id_cache = {}
 
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
@@ -674,16 +673,11 @@ class DiskUtil(object):
         return device_path
 
     def get_device_id(self, dev_path):
-        if (dev_path) in DiskUtil.device_id_cache:
-            return DiskUtil.device_id_cache[dev_path]
-
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
         match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
-        DiskUtil.device_id_cache[dev_path] = match[0] if match else ""
-
-        return DiskUtil.device_id_cache[dev_path]
+        return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
         if (dev_name, property_name) in DiskUtil.sles_cache:
@@ -733,18 +727,6 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
-    def get_azure_symlinks(self):
-        azure_udev_links = {}
-
-        if os.path.exists('/dev/disk/azure'):
-            wdbackup = os.getcwd()
-            os.chdir('/dev/disk/azure')
-            for symlink in os.listdir('/dev/disk/azure'):
-                azure_udev_links[os.path.basename(symlink)] = os.path.realpath(symlink)
-            os.chdir(wdbackup)
-
-        return azure_udev_links
-
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
@@ -774,11 +756,6 @@ class DiskUtil(object):
             device_item.uuid = self.get_device_items_property(dev_name=device_item.name, property_name='UUID')
             device_item.majmin = self.get_device_items_property(dev_name=device_item.name, property_name='MAJ:MIN')
             device_item.device_id = self.get_device_items_property(dev_name=device_item.name, property_name='DEVICE_ID')
-
-            device_item.azure_name = ''
-            for symlink, target in self.get_azure_symlinks().items():
-                if device_item.name in target:
-                    device_item.azure_name = symlink
 
             # get the type of device
             model_file_path = '/sys/block/' + device_item.name + '/device/model'
@@ -874,11 +851,6 @@ class DiskUtil(object):
 
                             if majmin == device_item.majmin:
                                 device_item.name = lvm_item.vg_name + '/' + lvm_item.lv_name
-
-                    device_item.azure_name = ''
-                    for symlink, target in self.get_azure_symlinks().items():
-                        if device_item.name in target:
-                            device_item.azure_name = symlink
 
                     device_items.append(device_item)
 

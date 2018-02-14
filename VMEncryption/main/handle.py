@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VMEncryption extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
 from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
-from KeyVaultUtil import KeyVaultUtil
+from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
@@ -81,6 +81,7 @@ def disable_encryption():
     logger.log('Disabling encryption')
 
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
+    executor = CommandExecutor(logger)
 
     if decryption_marker.config_file_exists():
         logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
@@ -157,11 +158,12 @@ def disable_encryption():
         decryption_marker.volume_type = extension_parameter.VolumeType
         decryption_marker.commit()
 
-        hutil.do_exit(exit_code=0,
-                      operation='DisableEncryption',
-                      status=CommonVariables.extension_success_status,
-                      code=str(CommonVariables.success),
-                      message='Decryption started')
+        settings_util = EncryptionSettingsUtil(logger)
+        settings_util.clear_encryption_settings()
+
+        bek_util.store_bek_passphrase(encryption_config, '')
+
+        executor.Execute("reboot")
 
     except Exception as e:
         message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -215,8 +217,6 @@ def update_encryption_settings():
 
             logger.log('Recreating secret to store in the KeyVault')
 
-            keyVaultUtil = KeyVaultUtil(logger)
-
             temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
             temp_keyfile.write(extension_parameter.passphrase)
             temp_keyfile.close()
@@ -258,35 +258,36 @@ def update_encryption_settings():
 
             os.unlink(temp_keyfile.name)
 
-            kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
-                                                                   KeyVaultURL=extension_parameter.KeyVaultURL,
-                                                                   KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
-                                                                   AADClientID=extension_parameter.AADClientID,
-                                                                   AADClientCertThumbprint=extension_parameter.AADClientCertThumbprint,
-                                                                   KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
-                                                                   AADClientSecret=extension_parameter.AADClientSecret,
-                                                                   DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
+            # backup old disk encryption key file
+            shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
+            logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
 
-            if kek_secret_id_created is None:
-                hutil.do_exit(exit_code=0,
-                                operation='UpdateEncryptionSettings',
-                                status=CommonVariables.extension_error_status,
-                                code=str(CommonVariables.create_encryption_secret_failed),
-                                message='UpdateEncryptionSettings failed.')
-            else:
-                encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-                encryption_config.secret_id = kek_secret_id_created
-                encryption_config.secret_seq_num = hutil.get_current_seq()
-                encryption_config.commit()
+            # store new passphrase and overwrite old encryption key file
+            bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-                shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
-                logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
+            # post new encryption settings via wire server protocol
+            settings = EncryptionSettingsUtil(logger)
+            new_protector_name = settings.get_new_protector_name()
+            settings.create_protector_file(new_protector_name)
+            data = settings.get_settings_data(
+                protector_name=new_protector_name,
+                kv_url=extension_parameter.KeyVaultURL,
+                kv_id=extension_parameter.KeyVaultResourceId,
+                kek_url=extension_parameter.KeyEncryptionKeyURL,
+                kek_kv_id=extension_parameter.KekVaultResourceId,
+                kek_algorithm=extension_parameter.KeyEncryptionAlgorithm)
+            settings.write_settings_file(data)
+            settings.post_to_wireserver()
+            settings.remove_protector_file(new_protector_name)
 
-                hutil.do_exit(exit_code=0,
-                              operation='UpdateEncryptionSettings',
-                              status=CommonVariables.extension_success_status,
-                              code=str(CommonVariables.success),
-                              message=str(kek_secret_id_created))
+            # commit local encryption config
+            encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+            encryption_config.secret_id = new_protector_name
+            encryption_config.secret_seq_num = hutil.get_current_seq()
+            encryption_config.commit()
+
+            # reboot into new key
+            executor.Execute("reboot")
         else:
             logger.log('Secret has already been updated')
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
@@ -411,6 +412,9 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
         else:
             logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+
+    if bek_util:
+        bek_util.umount_azure_passhprase(encryption_config)
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
@@ -557,6 +561,7 @@ def enable_encryption():
     """
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
+    executor = CommandExecutor(logger)
     
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -638,15 +643,9 @@ def enable_encryption():
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
                 start_daemon('EnableEncryption')
             else:
-                """
-                creating the secret, the secret would be transferred to a bek volume after the updatevm called in powershell.
-                """
-                #store the luks passphrase in the secret.
-                keyVaultUtil = KeyVaultUtil(logger)
+                # prepare to create secret, place on key volume, and request key vault update via wire protocol
 
-                """
-                validate the parameters
-                """
+                # validate parameters
                 if(extension_parameter.VolumeType is None or
                    not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in CommonVariables.SupportedVolumeTypes])):
                     if encryption_config.config_file_exists():
@@ -669,60 +668,42 @@ def enable_encryption():
                                   code=str(CommonVariables.command_not_support),
                                   message='Command "{0}" is not supported'.format(extension_parameter.command))
 
-                """
-                this is the fresh call case
-                """
-                #handle the passphrase related
+                # generate passphrase and passphrase file if needed
                 if existing_passphrase_file is None:
                     if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
-                    kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
-                                                                           KeyVaultURL=extension_parameter.KeyVaultURL,
-                                                                           KeyEncryptionKeyURL=extension_parameter.KeyEncryptionKeyURL,
-                                                                           AADClientID=extension_parameter.AADClientID,
-                                                                           AADClientCertThumbprint=extension_parameter.AADClientCertThumbprint,
-                                                                           KeyEncryptionAlgorithm=extension_parameter.KeyEncryptionAlgorithm,
-                                                                           AADClientSecret=extension_parameter.AADClientSecret,
-                                                                           DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
+                    bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
+                    settings = EncryptionSettingsUtil(logger)
+                    new_protector_name = settings.get_new_protector_name()
+                    settings.create_protector_file(new_protector_name)
 
-                    if kek_secret_id_created is None:
-                        encryption_config.clear_config()
-                        hutil.do_exit(exit_code=0,
-                                      operation='EnableEncryption',
-                                      status=CommonVariables.extension_error_status,
-                                      code=str(CommonVariables.create_encryption_secret_failed),
-                                      message='Enable failed.')
-                    else:
-                        encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-                        encryption_config.volume_type = extension_parameter.VolumeType
-                        encryption_config.secret_id = kek_secret_id_created
-                        encryption_config.secret_seq_num = hutil.get_current_seq()
-                        encryption_config.commit()
+                    # enable encryption settings with new passphrase file
+                    data = settings.get_settings_data(
+                        protector_name=new_protector_name,
+                        kv_url=extension_parameter.KeyVaultURL,
+                        kv_id=extension_parameter.KeyVaultResourceId,
+                        kek_url=extension_parameter.KeyEncryptionKeyURL,
+                        kek_kv_id=extension_parameter.KekVaultResourceId,
+                        kek_algorithm=extension_parameter.KeyEncryptionAlgorithm)
+                    settings.write_settings_file(data)
+                    settings.post_to_wireserver()
+                    settings.remove_protector_file(new_protector_name)
 
-                        extension_parameter.commit()
+                    encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+                    encryption_config.volume_type = extension_parameter.VolumeType
+                    encryption_config.secret_id = new_protector_name
+                    encryption_config.secret_seq_num = hutil.get_current_seq()
+                    encryption_config.commit()
+
+                    extension_parameter.commit()
    
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
 
-                if kek_secret_id_created:
-                    hutil.do_exit(exit_code=0,
-                                  operation='EnableEncryption',
-                                  status=CommonVariables.extension_success_status,
-                                  code=str(CommonVariables.success),
-                                  message=str(kek_secret_id_created))
-                else:
-                    """
-                    the enabling called again. the passphrase would be re-used.
-                    """
-                    hutil.do_exit(exit_code=0,
-                                  operation='EnableEncryption',
-                                  status=CommonVariables.extension_success_status,
-                                  code=str(CommonVariables.encrypttion_already_enabled),
-                                  message=str(kek_secret_id_created))
     except Exception as e:
         message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
@@ -736,14 +717,18 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
     logger.log('enable_encryption_format')
     logger.log('disk format query is {0}'.format(disk_format_query))
 
-    json_parsed = json.loads(disk_format_query)
+    try:
+        json_parsed = json.loads(disk_format_query)
 
-    if type(json_parsed) is dict:
-        encryption_format_items = [json_parsed,]
-    elif type(json_parsed) is list:
-        encryption_format_items = json_parsed
-    else:
-        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+        if type(json_parsed) is dict:
+            encryption_format_items = [json_parsed,]
+        elif type(json_parsed) is list:
+            encryption_format_items = json_parsed
+        else:
+            raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+    except Exception:
+        encryption_marker.clear_config()
+        raise
 
     for encryption_item in encryption_format_items:
         dev_path_in_query = None

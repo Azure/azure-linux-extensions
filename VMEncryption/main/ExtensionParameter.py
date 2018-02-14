@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VMEncryption extension
+# Azure Disk Encryption For Linux extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2016 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,8 +48,8 @@ class ExtensionParameter(object):
         self.command = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         self.KeyEncryptionKeyURL = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         self.KeyVaultURL = public_settings.get(CommonVariables.KeyVaultURLKey)
-        self.AADClientID = public_settings.get(CommonVariables.AADClientIDKey)
-        self.AADClientCertThumbprint = public_settings.get(CommonVariables.AADClientCertThumbprintKey)
+        self.KeyVaultResourceId = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
+        self.KekVaultResourceId = public_settings.get(CommonVariables.KekVaultResourceIdKey)
 
         keyEncryptionAlgorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
         if keyEncryptionAlgorithm is not None and keyEncryptionAlgorithm !="":
@@ -59,18 +59,15 @@ class ExtensionParameter(object):
 
         self.VolumeType = public_settings.get(CommonVariables.VolumeTypeKey)
         self.DiskFormatQuery = public_settings.get(CommonVariables.DiskFormatQuerykey)
-
         """
         private settings
         """
-        self.AADClientSecret = protected_settings.get(CommonVariables.AADClientSecretKey)
+        if protected_settings is not None:
+            self.passphrase = protected_settings.get(CommonVariables.PassphraseKey)
+        else:
+            self.passphrase = ""
 
-        if self.AADClientSecret is None:
-            self.AADClientSecret = ''
-
-        self.passphrase = protected_settings.get(CommonVariables.PassphraseKey)
-
-        self.DiskEncryptionKeyFileName = "LinuxPassPhraseFileName"
+        self.DiskEncryptionKeyFileName = encryption_environment.default_bek_filename
         # parse the query from the array
 
         self.params_config = ConfigUtil(encryption_environment.extension_parameter_file_path,
@@ -89,14 +86,11 @@ class ExtensionParameter(object):
     def get_keyvault_url(self):
         return self.params_config.get_config(CommonVariables.KeyVaultURLKey)
 
-    def get_aad_client_id(self):
-        return self.params_config.get_config(CommonVariables.AADClientIDKey)
+    def get_keyvault_resource_id(self):
+        return self.params_config.get_config(CommonVariables.KeyVaultResourceIdKey)
 
-    def get_aad_client_secret(self):
-        return self.params_config.get_config(CommonVariables.AADClientSecretKey)
-
-    def get_aad_client_cert(self):
-        return self.params_config.get_config(CommonVariables.AADClientCertThumbprintKey)
+    def get_kek_vault_resource_id(self):
+        return self.params_config.get_config(CommonVariables.KekVaultResourceIdKey)
 
     def get_kek_algorithm(self):
         return self.params_config.get_config(CommonVariables.KeyEncryptionAlgorithmKey)
@@ -119,17 +113,14 @@ class ExtensionParameter(object):
         KeyEncryptionKeyURL = ConfigKeyValuePair(CommonVariables.KeyEncryptionKeyURLKey, self.KeyEncryptionKeyURL)
         key_value_pairs.append(KeyEncryptionKeyURL)
 
+        KeyVaultResourceId = ConfigKeyValuePair(CommonVariables.KeyVaultResourceIdKey, self.KeyVaultResourceId)
+        key_value_pairs.append(KeyVaultResourceId)
+
+        KekVaultResourceId = ConfigKeyValuePair(CommonVariables.KekVaultResourceIdKey, self.KekVaultResourceId)
+        key_value_pairs.append(KekVaultResourceId)
+
         KeyVaultURL = ConfigKeyValuePair(CommonVariables.KeyVaultURLKey, self.KeyVaultURL)
         key_value_pairs.append(KeyVaultURL)
-
-        AADClientID = ConfigKeyValuePair(CommonVariables.AADClientIDKey, self.AADClientID)
-        key_value_pairs.append(AADClientID)
-
-        AADClientSecret = ConfigKeyValuePair(CommonVariables.AADClientSecretKey, hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest())
-        key_value_pairs.append(AADClientSecret)
-
-        AADClientCertThumbprint = ConfigKeyValuePair(CommonVariables.AADClientCertThumbprintKey, self.AADClientCertThumbprint)
-        key_value_pairs.append(AADClientCertThumbprint)
 
         KeyEncryptionAlgorithm = ConfigKeyValuePair(CommonVariables.KeyEncryptionAlgorithmKey, self.KeyEncryptionAlgorithm)
         key_value_pairs.append(KeyEncryptionAlgorithm)
@@ -177,20 +168,14 @@ class ExtensionParameter(object):
             self.logger.log('Current config KeyVaultURL {0} differs from effective config KeyVaultURL {1}'.format(self.KeyVaultURL, self.get_keyvault_url()))
             return True
 
-        if (self.AADClientID or self.get_aad_client_id()) and \
-           (self.AADClientID != self.get_aad_client_id()):
-            self.logger.log('Current config AADClientID {0} differs from effective config AADClientID {1}'.format(self.AADClientID, self.get_aad_client_id()))
+        if (self.KeyVaultResourceId or self.get_keyvault_resource_id()) and \
+           (self.KeyVaultResourceId != self.get_keyvault_resource_id()):
+            self.logger.log('Current config KeyVaultResourceId {0} differs from effective config KeyVaultResourceId {1}'.format(self.KeyVaultResourceId, self.get_keyvault_resource_id()))
             return True
 
-        if (self.AADClientSecret or self.get_aad_client_secret()) and \
-           (hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest() != self.get_aad_client_secret()):
-            self.logger.log('Current config AADClientSecret {0} differs from effective config AADClientSecret {1}'.format(hashlib.sha256(self.AADClientSecret.encode("utf-8")).hexdigest(),
-                                                                                                                          self.get_aad_client_secret()))
-            return True
-
-        if (self.AADClientCertThumbprint or self.get_aad_client_cert()) and \
-           (self.AADClientCertThumbprint != self.get_aad_client_cert()):
-            self.logger.log('Current config AADClientCertThumbprint {0} differs from effective config AADClientCertThumbprint {1}'.format(self.AADClientCertThumbprint, self.get_aad_client_cert()))
+        if (self.KekVaultResourceId or self.get_kek_vault_resource_id()) and \
+           (self.KekVaultResourceId != self.get_kek_vault_resource_id()):
+            self.logger.log('Current config KekVaultResourceId {0} differs from effective config KekVaultResourceId {1}'.format(self.KekVaultResourceId, self.get_keyvault_url()))
             return True
 
         if (self.KeyEncryptionAlgorithm or self.get_kek_algorithm()) and \
