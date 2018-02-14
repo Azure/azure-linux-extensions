@@ -147,14 +147,14 @@ class ExtensionParameter(object):
             self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False
 
-    def _is_encrypt_command(command):
+    def _is_encrypt_command(self, command):
         return command in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]
 
     def config_changed(self):
         if (self.command or self.get_command()) and \
            (self.command != self.get_command() and \
            # Even if the commands are not exactly the same, if they're both encrypt commands, don't consider this a change
-           not (_is_encrypt_command(self.command) and _is_encrypt_command(self.get_command()))):
+           not (self._is_encrypt_command(self.command) and self._is_encrypt_command(self.get_command()))):
             self.logger.log('Current config command {0} differs from effective config command {1}'.format(self.command, self.get_command()))
             return True
 
