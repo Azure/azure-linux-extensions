@@ -105,7 +105,7 @@ class DiskUtil(object):
         crypt_item.mount_point = crypt_mount_item_properties[3]
         crypt_item.file_system = crypt_mount_item_properties[4]
         crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
-        crypt_item.current_luks_slot = int(crypt_mount_item_properties[6]) if crypt_mount_item_properties.length > 6 else -1
+        crypt_item.current_luks_slot = int(crypt_mount_item_properties[6]) if len(crypt_mount_item_properties) > 6 else -1
 
         return crypt_item
 
@@ -174,8 +174,8 @@ class DiskUtil(object):
                         if not line.strip():
                             continue
                         # copy the crypt_item from the backup to the central os location
-                        crypt_item = parse_azure_crypt_mount_line(line)
-                        self.add_crypt_item(crypt_item)
+                        parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
+                        self.add_crypt_item(parsed_crypt_item)
 
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
@@ -202,7 +202,7 @@ class DiskUtil(object):
                     if not line.strip():
                         continue
 
-                    crypt_item = parse_azure_crypt_mount_line(line)
+                    crypt_item = self.parse_azure_crypt_mount_line(line)
 
                     if crypt_item.mount_point == "/":
                         rootfs_crypt_item_found = True
@@ -269,13 +269,13 @@ class DiskUtil(object):
                                   str(crypt_item.current_luks_slot)) + "\n"
 
             with open(self.encryption_environment.azure_crypt_mount_config_path,'a') as wf:
-                wf.write(new_mount_content)
+                wf.write(mount_content_item)
 
             if backup_folder is not None:
                 backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
                 self.make_sure_path_exists(backup_folder)
                 with open(backup_file, "w") as wf:
-                    wf.write(new_mount_content)
+                    wf.write(mount_content_item)
 
             return True
         except Exception as e:
