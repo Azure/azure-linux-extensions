@@ -647,7 +647,7 @@ def enable_encryption():
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
 
                 # get supported volume types
-                instance = MetadataUtil.MetadataUtil(logger)
+                instance = MetadataUtil(logger)
                 if instance.is_vmss():
                     supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
                 else:
