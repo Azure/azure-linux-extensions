@@ -98,6 +98,11 @@ class BekUtil(object):
 
                     if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
                         return os.path.join(self.bek_filesystem_mount_point, bek_filename)
+
+                    for file in os.listdir(self.bek_filesystem_mount_point):
+                        if bek_filename in file:
+                            return os.path.join(self.bek_filesystem_mount_point, file)
+
                 except Exception as e:
                     message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
                     self.logger.log(message)

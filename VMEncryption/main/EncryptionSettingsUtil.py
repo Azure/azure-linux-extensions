@@ -149,18 +149,18 @@ class EncryptionSettingsUtil(object):
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
             return {
-                    "ControllerType": "SCSI",
-                    "ControllerId": scsi_controller,
-                    "SlotId": lun_number,
-                    "Volumes": [{
-                            "VolumeType": "DataVolume",
-                            "ProtectorFileName": protector_name,
-                            "SecretTags": dict_to_name_value_array({
-                                "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number),
-                                "DiskEncryptionKeyEncryptionKeyURL": kek_url,
-                                "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
-                                "MachineName": machine_name})
-                        }]
+                "ControllerType": "SCSI",
+                "ControllerId": scsi_controller,
+                "SlotId": lun_number,
+                "Volumes": [{
+                    "VolumeType": "DataVolume",
+                    "ProtectorFileName": protector_name,
+                    "SecretTags": dict_to_name_value_array({
+                        "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number),
+                        "DiskEncryptionKeyEncryptionKeyURL": kek_url,
+                        "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
+                        "MachineName": machine_name})
+                    }]
                 }
 
         data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
@@ -174,24 +174,7 @@ class EncryptionSettingsUtil(object):
             "KekUrl": kek_url,
             "KekVaultResourceId": kek_kv_id,
             "KekAlgorithm": kek_algorithm,
-            "Disks": [
-                {
-                    "ControllerType": "IDE",
-                    "ControllerId": 0,
-                    "SlotId": 0,
-                    "Volumes": [
-                        {
-                            "VolumeType": "OsVolume",
-                            "ProtectorFileName": protector_name,
-                            "SecretTags": dict_to_name_value_array({
-                                "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name,
-                                "DiskEncryptionKeyEncryptionKeyURL": kek_url,
-                                "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
-                                "MachineName": machine_name})
-                        }
-                    ]
-                }
-            ] + data_disks_settings_data
+            "Disks": data_disks_settings_data
         }
         return data
 

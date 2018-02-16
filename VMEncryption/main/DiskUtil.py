@@ -122,7 +122,7 @@ class DiskUtil(object):
                 device_item_path = self.get_device_path(device_item.name)
                 device_item_real_path = os.path.realpath(device_item_path)
                 for crypt_item in crypt_items:
-                    if rootfs_crypt_item_found.path.realpath(crypt_item.dev_path) == device_item_real_path:
+                    if os.path.realpath(crypt_item.dev_path) == device_item_real_path:
                         found_in_crypt_mount = True
                         break
                 if found_in_crypt_mount:
