@@ -1679,8 +1679,8 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                              disk_util=disk_util,
                                                              bek_util=bek_util)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat:
-                disk_format_query = encryption_marker.get_encryption_disk_format_query()
                 try:
+                    disk_format_query = encryption_marker.get_encryption_disk_format_query()
                     json_parsed = json.loads(disk_format_query)
 
                     if type(json_parsed) is dict:
