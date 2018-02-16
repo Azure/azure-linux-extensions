@@ -132,6 +132,17 @@ class EncryptionSettingsUtil(object):
         if re.match('^[\w-]+$', machine_name) is None:
             machine_name = ''
 
+        def dict_to_name_value_array(values):
+            array = []
+            for key in values:
+                value = values[key]
+                if value is not None:
+                   array.append({
+                        "Name": key,
+                        "Value": value
+                        })
+            return array
+
         data = {
             "DiskEncryptionDataVersion": "2.0",
             "DiskEncryptionOperation": "EnableEncryption",
@@ -149,24 +160,11 @@ class EncryptionSettingsUtil(object):
                         {
                             "VolumeType": "OsVolume",
                             "ProtectorFileName": protector_name,
-                            "SecretTags": [
-                                {
-                                    "Name": "DiskEncryptionKeyFileName",
-                                    "Value": CommonVariables.encryption_key_file_name
-                                },
-                                {
-                                    "Name": "DiskEncryptionKeyEncryptionKeyURL",
-                                    "Value": kek_url
-                                },
-                                {
-                                    "Name": "DiskEncryptionKeyEncryptionAlgorithm",
-                                    "Value": kek_algorithm
-                                },
-                                {
-                                    "Name": "MachineName",
-                                    "Value": machine_name
-                                }
-                            ]
+                            "SecretTags": dict_to_name_value_array({
+                                "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name,
+                                "DiskEncryptionKeyEncryptionKeyURL": kek_url,
+                                "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
+                                "MachineName": machine_name})
                         }
                     ]
                 }

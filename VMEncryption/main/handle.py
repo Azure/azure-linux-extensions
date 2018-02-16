@@ -480,7 +480,7 @@ def enable():
 
         # run prechecks and log any failures detected
         try:
-            cutil = check_util.CheckUtil(logger)
+            cutil = CheckUtil(logger)
             if cutil.is_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
@@ -713,22 +713,9 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
-def enable_encryption_format(passphrase, disk_format_query, disk_util, force=False):
+def enable_encryption_format(passphrase, encryption_format_items, disk_util, force=False):
     logger.log('enable_encryption_format')
-    logger.log('disk format query is {0}'.format(disk_format_query))
-
-    try:
-        json_parsed = json.loads(disk_format_query)
-
-        if type(json_parsed) is dict:
-            encryption_format_items = [json_parsed,]
-        elif type(json_parsed) is list:
-            encryption_format_items = json_parsed
-        else:
-            raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
-    except Exception:
-        encryption_marker.clear_config()
-        raise
+    logger.log('disk format query is {0}'.format(json.dumps(encryption_format_items)))
 
     for encryption_item in encryption_format_items:
         dev_path_in_query = None
@@ -1305,25 +1292,25 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
     #use the new udev names for formatting and later on for cryptmounting
     dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
 
-    def single_device_item_to_format_query_dict(device_item):
+    def device_item_to_encryption_format_item(device_item):
         """
-        Converts a single device_item into an dictionary than will be later "json-stringified"
+        Converts a single device_item into an encryption format item (a.k.a. a disk format query element)
         """
-        format_query_element = {}
+        encryption_format_item = {}
         dev_path = os.path.join('/dev/', device_item.name)
         if dev_path in dev_path_reference_table:
-            format_query_element["dev_path"] = dev_path_reference_table[dev_path]
+            encryption_format_item["dev_path"] = dev_path_reference_table[dev_path]
         else:
-            format_query_element["dev_path"] = dev_path
+            encryption_format_item["dev_path"] = dev_path
 
         # introduce a new "full_mount_point" field below to avoid the /mnt/ prefix that automatically gets appended
-        format_query_element["full_mount_point"] = str(device_item.mount_point) 
-        format_query_element["file_system"] = str(device_item.file_system)
-        return format_query_element
+        encryption_format_item["full_mount_point"] = str(device_item.mount_point)
+        encryption_format_item["file_system"] = str(device_item.file_system)
+        return encryption_format_item
 
-    disk_format_query = json.dumps(map(single_device_item_to_format_query_dict, device_items))
+    encryption_format_items = map(device_item_to_encryption_format_item, device_items)
 
-    return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
+    return enable_encryption_format(passphrase, encryption_format_items, disk_util, force)
 
 
 def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
@@ -1693,8 +1680,21 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                              bek_util=bek_util)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat:
                 disk_format_query = encryption_marker.get_encryption_disk_format_query()
+                try:
+                    json_parsed = json.loads(disk_format_query)
+
+                    if type(json_parsed) is dict:
+                        encryption_format_items = [json_parsed,]
+                    elif type(json_parsed) is list:
+                        encryption_format_items = json_parsed
+                    else:
+                        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+                except Exception:
+                    encryption_marker.clear_config()
+                    raise
+
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
-                                                       disk_format_query=disk_format_query,
+                                                       encryption_format_items=encryption_format_items,
                                                        disk_util=disk_util)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
                 failed_item = enable_encryption_all_format(passphrase_file=bek_passphrase_file,

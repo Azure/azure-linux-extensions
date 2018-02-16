@@ -400,7 +400,7 @@ class DiskUtil(object):
         """
         returns the exit code for cryptsetup process.
         """
-        self.hutil.log("dev mapper name to cryptsetup luksOpen " + (mapper_name))
+        self.hutil.log("dev mapper name to cryptsetup luksClose " + (mapper_name))
         cryptsetup_cmd = "{0} luksClose {1} -q".format(self.distro_patcher.cryptsetup_path, mapper_name)
 
         return self.command_executor.Execute(cryptsetup_cmd)
