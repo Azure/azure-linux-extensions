@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '1.1.0.0'
+    extension_version = '1.1.0.5'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
@@ -82,7 +82,8 @@ class CommonVariables:
     VolumeTypeOS = 'OS'
     VolumeTypeData = 'Data'
     VolumeTypeAll = 'All'
-    SupportedVolumeTypes = [VolumeTypeData]
+    SupportedVolumeTypes = [VolumeTypeOS, VolumeTypeData, VolumeTypeAll]
+    SupportedVolumeTypesVMSS = [VolumeTypeData]
     """
     command types
     """

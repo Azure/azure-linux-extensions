@@ -48,8 +48,8 @@ class EncryptionConfig(object):
     def get_volume_type(self):
         return self.encryption_config.get_config(CommonVariables.VolumeTypeKey)
 
-    def get_secret_id(self):
-        return self.encryption_config.get_config(CommonVariables.SecretUriKey)
+#    def get_secret_id(self):
+#        return self.encryption_config.get_config(CommonVariables.SecretUriKey)
 
     def get_secret_seq_num(self):
         return self.encryption_config.get_config(CommonVariables.SecretSeqNum)
@@ -60,8 +60,6 @@ class EncryptionConfig(object):
         key_value_pairs.append(command)
         volume_type = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.volume_type)
         key_value_pairs.append(volume_type)
-        parameters = ConfigKeyValuePair(CommonVariables.SecretUriKey, self.secret_id)
-        key_value_pairs.append(parameters)
         parameters = ConfigKeyValuePair(CommonVariables.SecretSeqNum, self.secret_seq_num)
         key_value_pairs.append(parameters)
         self.encryption_config.save_configs(key_value_pairs)
