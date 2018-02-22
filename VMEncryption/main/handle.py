@@ -165,7 +165,7 @@ def disable_encryption():
                       message=message)
 
 
-def stamp_disks_with_settings(new_device_items_about_to_get_encrypted):
+def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, encryption_config):
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -187,6 +187,13 @@ def stamp_disks_with_settings(new_device_items_about_to_get_encrypted):
     settings.write_settings_file(data)
     settings.post_to_wireserver()
     settings.remove_protector_file(new_protector_name)
+
+    encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+    encryption_config.volume_type = extension_parameter.VolumeType
+    encryption_config.secret_id = new_protector_name
+    encryption_config.secret_seq_num = hutil.get_current_seq()
+    encryption_config.commit()
+
 
 
 def get_public_settings():
@@ -282,13 +289,13 @@ def update_encryption_settings():
             # store new passphrase and overwrite old encryption key file
             bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-            stamp_disks_with_settings(new_device_items_about_to_get_encrypted=[])
+            stamp_disks_with_settings(new_device_items_about_to_get_encrypted=[], encryption_config=encryption_config)
 
             # commit local encryption config
-            encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-            encryption_config.secret_id = new_protector_name
-            encryption_config.secret_seq_num = hutil.get_current_seq()
-            encryption_config.commit()
+            # encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
+            # encryption_config.secret_id = new_protector_name
+            # encryption_config.secret_seq_num = hutil.get_current_seq()
+            # encryption_config.commit()
 
             # reboot into new key
             executor.Execute("reboot")
@@ -665,12 +672,6 @@ def enable_encryption():
 
                     # stamp_disks_with_settings()
 
-                    encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-                    encryption_config.volume_type = extension_parameter.VolumeType
-                    encryption_config.secret_id = new_protector_name
-                    encryption_config.secret_seq_num = hutil.get_current_seq()
-                    encryption_config.commit()
-
                     extension_parameter.commit()
    
                 encryption_marker = mark_encryption(command=extension_parameter.command,
@@ -715,7 +716,9 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
         else:
             logger.log(msg=("the item fstype is not empty {0}".format(device_item.file_system)))
 
-    stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt)
+    if len(device_items_to_encrypt) > 0:
+        encryption_config = EncryptionConfig(encryption_environment, logger)
+        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt, encryption_config=encryption_config)
 
     for device_item, encryption_item, dev_path_in_query in zip(device_items_to_encrypt, encrypt_format_items_to_encrypt, query_dev_paths_to_encrypt):
         if device_item.mount_point:
@@ -1332,7 +1335,9 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
     device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
 
-    stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt)
+    if len(device_items_to_encrypt) > 0:
+        encryption_config = EncryptionConfig(encryption_environment, logger)
+        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt, encryption_config=encryption_config)
 
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
