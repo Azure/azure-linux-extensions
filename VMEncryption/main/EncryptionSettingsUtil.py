@@ -63,11 +63,10 @@ class EncryptionSettingsUtil(object):
         # that contains only 0-9, a-z, A-Z, and - (the dash symbol).
         return str(uuid.uuid4())
 
-    def create_protector_file(self, protector_name):
+    def create_protector_file(self, existing_passphrase_file, protector_name):
         """create temporary protector file corresponding to protector name"""
-        src = CommonVariables.encryption_key_mount_point + '/' + CommonVariables.encryption_key_file_name
         dst = CommonVariables.encryption_key_mount_point + '/' + protector_name
-        copyfile(src, dst)
+        copyfile(existing_passphrase_file, dst)
         import ctypes
         libc = ctypes.CDLL("libc.so.6")
         libc.sync()
@@ -102,10 +101,7 @@ class EncryptionSettingsUtil(object):
             raise Exception('\n' + message + '\nActual: ' + test_id + '\nExpected: ' + expected + "\n")
         return
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, disk_util):
-        """ returns encryption settings object in format required by wire server """
-
-        # validate key vault parameters prior to creating the encryption settings object
+    def validate_key_vault_params(self, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm):
         self.check_url(kv_url, "Key Vault URL is required, but was missing or invalid")
         self.check_id(kv_id, "Key Vault ID is required, but was missing or invalid")
         if kek_url:
@@ -124,14 +120,47 @@ class EncryptionSettingsUtil(object):
                 raise Exception(
                     "The KEK KeyVault ID was specified but the KEK URL was missing")
 
-        #create encryption settings object
+    def get_disk_items_from_crypt_items(self, crypt_items, disk_util):
+        crypt_dev_items = []
+        for crypt_item in crypt_items:
+            dev_items = disk_util.get_device_items(crypt_item.dev_path)
+            crypt_item_real_path = os.path.realpath(crypt_item.dev_path)
+            for dev_item in dev_items:
+                if os.path.realpath(disk_util.get_device_path(dev_item.name)) == crypt_item_real_path:
+                    crypt_dev_items.append(dev_item)
+                    break
+        return crypt_dev_items
+
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util):
+        """ returns encryption settings object in format required by wire server """
+
+        # validate key vault parameters prior to creating the encryption settings object
+        self.validate_key_vault_params(kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm)
+
+        # create encryption settings object
         self.logger.log("Creating encryption settings object")
 
-        #validate machine name string or use empty string
+        # validate machine name string or use empty string
         machine_name = socket.gethostname()
         if re.match('^[\w-]+$', machine_name) is None:
             machine_name = ''
 
+        # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
+        existing_crypt_items = disk_util.get_crypt_items()
+        existing_crypt_dev_items = self.get_disk_items_from_crypt_items(existing_crypt_items)
+
+        all_device_items = existing_crypt_dev_items + extra_device_items
+
+        # Now we use the lsblk tree to reduce each dev_item to its azure vhd level dev_item
+        azure_vhd_dev_items = disk_util.get_azure_vhd_dev_items(all_device_items)
+
+        root_vhd_needs_stamping = False
+        for dev_item in azure_vhd_dev_items:
+            if os.path.realpath(disk_util.get_device_path(dev_item.name)) == os.path.realpath("/dev/disk/azure/root"):
+                root_vhd_needs_stamping = True
+                break
+
+        # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
         def dict_to_name_value_array(values):
             array = []
             for key in values:
@@ -145,7 +174,7 @@ class EncryptionSettingsUtil(object):
 
         # Get disk data from disk_util
         # We get a list of tuples i.e. [(scsi_controller_id, lun_number),.]
-        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers()
+        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(azure_vhd_dev_items)
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
             return {
@@ -165,6 +194,22 @@ class EncryptionSettingsUtil(object):
 
         data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
+
+        if root_vhd_needs_stamping:
+            data_disks_settings_data.append({
+                "ControllerType": "IDE",
+                "ControllerId": 0,
+                "SlotId": 0,
+                "Volumes": [{
+                    "VolumeType": "OsVolume",
+                    "ProtectorFileName": protector_name,
+                    "SecretTags": dict_to_name_value_array({
+                        "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name,
+                        "DiskEncryptionKeyEncryptionKeyURL": kek_url,
+                        "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
+                        "MachineName": machine_name})
+                    }]
+                })
 
         data = {
             "DiskEncryptionDataVersion": "3.0",

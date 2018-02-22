@@ -64,6 +64,7 @@
     <Compile Include="main\patch\debianPatching.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\ResourceDiskUtil.py" />
     <Compile Include="main\TransactionalCopyTask.py">
       <SubType>Code</SubType>
     </Compile>

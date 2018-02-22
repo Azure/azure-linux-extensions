@@ -109,7 +109,110 @@ class DiskUtil(object):
 
         return crypt_item
 
+    def get_azure_vhd_dev_items(self, device_items):
+        """
+        Returns all the underlying azure-vhd level device items for given device items (that may be "children" of the vhds)
+
+        Gets a list of dev_items say ("/dev/sdd","/dev/sdc1","/dev/mapper/vg0-lv0")
+        And figures out which Azure VHDs are covered by these device items and returns their dev_items (in the below example: [/dev/sdb, /dev/sdc, /dev/sdd])
+
+        In order to do this we use the lsblk output in JSON format to clearly see who is who's "child".
+
+        See sample LSBLK output:
+            without JSON: lsblk -p -o NAME,FSTYPE,MOUNTPOINT
+                NAME                       FSTYPE      MOUNTPOINT
+                /dev/sdd                   LVM2_member
+                  /dev/mapper/vg0-lv0      crypto_LUKS
+                    /dev/mapper/unlocked
+                /dev/sdb
+                  /dev/sdb1                LVM2_member
+                    /dev/mapper/vg0-lv0    crypto_LUKS
+                      /dev/mapper/unlocked
+                /dev/sdc
+                  /dev/sdc1                vfat        /mnt/azure_bek_disk
+                /dev/sda
+                  /dev/sda1                ext4        /
+            with JSON: lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json
+                {
+                   "blockdevices": [
+                      {"name": "/dev/sdd", "fstype": "LVM2_member", "mountpoint": null,
+                         "children": [
+                            {"name": "/dev/mapper/vg0-lv0", "fstype": "crypto_LUKS", "mountpoint": null,
+                               "children": [
+                                  {"name": "/dev/mapper/unlocked", "fstype": null, "mountpoint": null}
+                               ]
+                            }
+                         ]
+                      },
+                      {"name": "/dev/sdb", "fstype": null, "mountpoint": null,
+                         "children": [
+                            {"name": "/dev/sdb1", "fstype": "LVM2_member", "mountpoint": null,
+                               "children": [
+                                  {"name": "/dev/mapper/vg0-lv0", "fstype": "crypto_LUKS", "mountpoint": null,
+                                     "children": [
+                                        {"name": "/dev/mapper/unlocked", "fstype": null, "mountpoint": null}
+                                     ]
+                                  }
+                               ]
+                            }
+                         ]
+                      },
+                      {"name": "/dev/sdc", "fstype": null, "mountpoint": null,
+                         "children": [
+                            {"name": "/dev/sdc1", "fstype": "vfat", "mountpoint": "/mnt/azure_bek_disk"}
+                         ]
+                      },
+                      {"name": "/dev/sda", "fstype": null, "mountpoint": null,
+                         "children": [
+                            {"name": "/dev/sda1", "fstype": "ext4", "mountpoint": "/"}
+                         ]
+                      }
+                   ]
+                }
+        """
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+
+        lsblk_tree = json.loads(proc_comm.stdout)["blockdevices"]
+
+        # Let's set up a set of realpaths of each dev_items's real_path
+        real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in device_items])
+
+        def check_device(device_dict):
+            """
+            Recursively check a device to see if any of the children's realpaths matches that in the set
+            """
+
+            if os.path.realpath(device_dict["name"]) in real_paths:
+                return True
+            if "children" in device_dict:
+                for child in device_dict["children"]:
+                    if check_device(child):
+                        return True
+            return False
+
+        azure_vhd_real_dev_paths = set()
+
+        for root_dev in lsblk_tree:
+            if check_device(root_dev):
+                azure_vhd_real_dev_paths.add(root_dev["name"])
+
+        azure_vhd_dev_items = []
+        for real_dev_path in azure_vhd_real_dev_paths:
+            devices = self.get_device_items(real_dev_path)
+            # its probably just device[0] but doesn't hurt to check
+            for device in devices:
+                if self.get_device_path(device.name) == real_dev_path :
+                    azure_vhd_dev_items.append(device)
+                    break
+        return azure_vhd_dev_items
+
     def consolidate_azure_crypt_mount(self, passphrase_file):
+        """
+        Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
+        """
+        self.logger.log("Consolidating azure_crypt_mount")
+
         device_items = self.get_device_items(None)
         crypt_items = self.get_crypt_items()
         azure_name_table = self.get_block_device_to_azure_udev_table()
@@ -118,6 +221,7 @@ class DiskUtil(object):
             if device_item.file_system == "crypto_LUKS" :
                 # Found an encrypted device, let's check if it is in the azure_crypt_mount file
                 # Check this by comparing the dev paths
+                self.logger.log("Found an encrypted device at {0}".format(device_item.name))
                 found_in_crypt_mount = False
                 device_item_path = self.get_device_path(device_item.name)
                 device_item_real_path = os.path.realpath(device_item_path)
@@ -127,6 +231,7 @@ class DiskUtil(object):
                         break
                 if found_in_crypt_mount:
                     # Its already in crypt_mount so nothing to do yet
+                    self.logger.log("{0} is already in the azure_crypt_mount file".format(device_item.name))
                     continue
                 # Otherwise, unlock and mount it at a test spot and extract mount info
 
@@ -271,11 +376,14 @@ class DiskUtil(object):
             with open(self.encryption_environment.azure_crypt_mount_config_path,'a') as wf:
                 wf.write(mount_content_item)
 
+            self.logger.log("Added crypt item {0} to azure_crypt_mount".format(crypt_item.mapper_name))
+
             if backup_folder is not None:
                 backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
                 self.make_sure_path_exists(backup_folder)
                 with open(backup_file, "w") as wf:
                     wf.write(mount_content_item)
+                self.logger.log("Added crypt item {0} to {1}".format(crypt_item.mapper_name, backup_file))
 
             return True
         except Exception as e:
@@ -803,10 +911,14 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
-    def get_azure_data_disk_controller_and_lun_numbers(self):
+    def get_azure_data_disk_controller_and_lun_numbers(self, vhd_dev_items):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the vhd_dev_items
+        """
         list_devices = []
         azure_links_dir = '/dev/disk/azure'
 
+        vhd_dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in vhd_dev_items])
         if not os.path.exists(azure_links_dir):
             return list_devices
 
@@ -821,6 +933,9 @@ class DiskUtil(object):
                     continue
 
                 for symlink in os.listdir(top_level_item_full_path):
+                    full_path = os.path.join(top_level_item_full_path, symlink)
+                    if os.path.realpath(full_path) not in vhd_dev_real_paths:
+                        continue
                     if symlink.startswith("lun"):
                         try:
                             lun_number = int(symlink[3:])
