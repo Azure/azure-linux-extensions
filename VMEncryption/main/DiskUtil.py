@@ -171,6 +171,7 @@ class DiskUtil(object):
                 }
         """
         proc_comm = ProcessCommunicator()
+        lsblk_command = "lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json"
         self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
 
         lsblk_tree = json.loads(proc_comm.stdout)["blockdevices"]

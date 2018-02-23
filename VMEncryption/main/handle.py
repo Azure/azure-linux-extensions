@@ -390,11 +390,16 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    volume_type = encryption_config.get_volume_type().lower()
-    if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
-        resource_disk_util.automount()
-        logger.log("mounted encrypted resource disk")
+    resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+    if encryption_config.config_file_exists():
+        volume_type = encryption_config.get_volume_type().lower()
+        if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+            resource_disk_util.automount()
+            logger.log("mounted encrypted resource disk")
+    else:
+        # Probably a re-image scenario: Just do a best effort
+        if resource_disk_util.try_remount():
+            logger.log("mounted encrypted resource disk")
 
     # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
@@ -569,15 +574,16 @@ def enable_encryption():
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
 
-    if encryption_config.config_file_exists():
-        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        if existing_passphrase_file is not None:
-            disk_util.consolidate_azure_crypt_mount(existing_passphrase_file)
-            mount_encrypted_disks(disk_util=disk_util,
-                                  bek_util=bek_util,
-                                  encryption_config=encryption_config,
-                                  passphrase_file=existing_passphrase_file)
-        else:
+    # If the BEK is present try to remount everything
+    existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    if existing_passphrase_file is not None:
+        disk_util.consolidate_azure_crypt_mount(existing_passphrase_file)
+        mount_encrypted_disks(disk_util=disk_util,
+                              bek_util=bek_util,
+                              encryption_config=encryption_config,
+                              passphrase_file=existing_passphrase_file)
+    else:
+        if encryption_config.config_file_exists():
             logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
                        level=CommonVariables.WarningLevel)
             hutil.redo_last_status()
@@ -709,8 +715,9 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
         if len(devices) != 1:
             logger.log(msg=("the device with this path {0} have more than one sub device. so skip it.".format(dev_path_in_query)), level=CommonVariables.WarningLevel)
             continue
+        device_item = devices[0]
         if device_item.file_system is None or device_item.file_system == "" or force:
-            device_items_to_encrypt.append(devices[0])
+            device_items_to_encrypt.append(device_item)
             encrypt_format_items_to_encrypt.append(encryption_item)
             query_dev_paths_to_encrypt.append(dev_path_in_query)
         else:
@@ -931,7 +938,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
                 original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                crypt_item_to_update.dev_path = disk_util.get_block_device_to_azure_udev_table()[original_dev_name_path]
+                crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
@@ -1090,7 +1097,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                    crypt_item_to_update.dev_path = disk_util.get_block_device_to_azure_udev_table()[original_dev_name_path]
+                    crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                     crypt_item_to_update.uses_cleartext_key = False
@@ -1253,7 +1260,7 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     """
     logger.log(msg="executing the enable_encryption_all_format command")
 
-    device_items = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
 
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
@@ -1319,7 +1326,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
-            if os.path.join('/dev/', di.name) not in dev_path_reference_table:
+            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table:
                 # Only format device_items that have an azure udev name
                 continue
         device_items_to_encrypt.append(device_item)
