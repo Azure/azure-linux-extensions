@@ -46,6 +46,7 @@ SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRe
 SCOMPort = 1270
 PostOnboardingSleepSeconds = 5
 InitialRetrySleepSeconds = 30
+CleanupWorkspaceConfiguration = False
 
 # Paths
 OMSAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
@@ -53,6 +54,7 @@ OMSAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
 OMIConfigEditorPath = '/opt/omi/bin/omiconfigeditor'
 OMIServerConfPath = '/etc/opt/omi/conf/omiserver.conf'
 EtcOMSAgentPath = '/etc/opt/microsoft/omsagent/'
+VarOMSAgentPath = '/var/opt/microsoft/omsagent/'
 SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 
 # Commands
@@ -130,6 +132,7 @@ def main():
             operation = 'Enable'
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
+            CleanupWorkspaceConfiguration = True
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -235,6 +238,11 @@ def uninstall():
     exit_code = run_command_with_retries(cmd, retries = 5,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
+
+    if CleanupWorkspaceConfiguration:
+        CleanupWorkspaceConfiguration = False
+        remove_workspace_configuration()
+
     return exit_code
 
 
@@ -342,6 +350,30 @@ def enable():
         run_command_and_log(RestartOMSAgentServiceCommand)
 
     return exit_code
+
+
+def remove_workspace_configuration():
+    """
+    This is needed to distinguish between extension removal vs extension upgrade.
+    Its a workaround for waagent upgrade routine calling 'remove' on an old version 
+    before calling 'upgrade' on new extension version issue. 
+    In upgrade case, we need workspace configuration to persist when in 
+    remove case we need all the files be removed.
+
+    This method will remove all the files/folders from the workspace path in Etc and Var.
+    """
+    workspaceId = public_settings.get('workspaceId')
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
+    var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
+
+    for main_dir in [etc_remove_path, var_remove_path]:
+        for root, dirs, files in os.walk(main_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+    os.rmdir(os.path.join(main_dir))
+    hutil_log_info('Removed Workspace Configuration')
 
 def get_vmresourceid_from_metadata():
     req = urllib2.Request(VMResourceIDMetadataEndpoint)
