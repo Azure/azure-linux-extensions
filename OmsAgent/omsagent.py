@@ -263,6 +263,17 @@ def enable():
         raise ParameterMissingException('Private configuration must be ' \
                                         'provided')
 
+    vmResourceId = protected_settings.get('vmResourceId')
+
+    # If vmResourceId is not provided in private settings, get it from metadata API
+    if vmResourceId is None or not vmResourceId:
+        vmResourceId = get_vmresourceid_from_metadata()
+        hutil_log_info('vmResourceId from Metadata API is {0}'.format(vmResourceId))
+
+    if vmResourceId is None:
+        raise MetadataAPIException('Failed to get vmResourceId from ' \
+                                   'Metadata API')
+
     enableAutomaticManagement = public_settings.get('enableAutomaticManagement')
 
     if (enableAutomaticManagement is not None
@@ -271,7 +282,7 @@ def enable():
                        'workspace ID and key will be determined by the OMS ' \
                        'service.')
 
-        workspaceInfo = retrieve_managed_workspace(protected_settings)
+        workspaceInfo = retrieve_managed_workspace(vmResourceId)
         if (workspaceInfo is None or 'WorkspaceId' not in workspaceInfo
                 or 'WorkspaceKey' not in workspaceInfo):
             raise OneClickException('Workspace info was not determined')
@@ -298,19 +309,12 @@ def enable():
                      'OMSAgent onboarding script {0} does not exist. Enable ' \
                      'cannot be called before install.'.format(OMSAdminPath))
 
+    vmResourceIdParam = '-a {0}'.format(vmResourceId)
+
     proxy = protected_settings.get('proxy')
     proxyParam = ''
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
-
-    vmResourceId = protected_settings.get('vmResourceId')
-    vmResourceIdParam = ''
-    if vmResourceId is not None and vmResourceId:
-        vmResourceIdParam = '-a {0}'.format(vmResourceId)
-    else:
-        vmResourceId = get_vmresourceid_from_metadata()
-        if vmResourceId is not None:
-            vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
     optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
@@ -389,7 +393,7 @@ def get_vmresourceid_from_metadata():
         hutil_log_error('Unexpected error from Metadata service')
         return None
 
-def retrieve_managed_workspace(protected_settings):
+def retrieve_managed_workspace(vm_resource_id):
     """
     EnableAutomaticManagement has been set to true; the
     ManagedIdentity extension and the VM Resource ID are also
@@ -400,13 +404,6 @@ def retrieve_managed_workspace(protected_settings):
     # Check for OneClick scenario requirements:
     if not os.path.exists(ManagedIdentityExtListeningURLPath):
         raise ManagedIdentityExtMissingException
-
-    vm_resource_id = protected_settings.get('vmResourceId')
-    if vm_resource_id is None:
-        raise ParameterMissingException('VM Resource ID must be provided ' \
-                  'for Automatic Management to be enabled. Please set ' \
-                  'EnableAutomaticManagement to false in public settings or ' \
-                  'provide the value for vmResourceId in protected settings.')
 
     # Determine the Tenant ID using the Metadata API
     tenant_id = get_tenant_id_from_metadata_api(vm_resource_id)
@@ -1372,7 +1369,8 @@ def retry_get_workspace_info_from_oms(oms_response):
         hutil_log_error('Unable to get HTTP code from OMS repsonse')
         return False
 
-    if oms_response_http_code is 202 or oms_response_http_code is 204:
+    if (oms_response_http_code is 202 or oms_response_http_code is 204
+                                      or oms_response_http_code is 404):
         hutil_log_info('Retrying ValidateMachineIdentity OMS request ' \
                        'because workspace is still being provisioned; HTTP ' \
                        'code from OMS is {0}'.format(oms_response_http_code))
