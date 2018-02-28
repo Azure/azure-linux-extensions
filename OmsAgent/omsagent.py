@@ -351,7 +351,13 @@ def enable():
 
 def remove_workspace_configuration():
     """
-    Remove all the files/folders from the workspace path in Etc and Var after uninstalling.
+    This is needed to distinguish between extension removal vs extension upgrade.
+    Its a workaround for waagent upgrade routine calling 'remove' on an old version 
+    before calling 'upgrade' on new extension version issue. 
+    In upgrade case, we need workspace configuration to persist when in 
+    remove case we need all the files be removed.
+
+    This method will remove all the files/folders from the workspace path in Etc and Var.
     """
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
