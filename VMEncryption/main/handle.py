@@ -184,8 +184,13 @@ def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, encryptio
         kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
         extra_device_items=new_device_items_about_to_get_encrypted,
         disk_util=disk_util)
-    settings.write_settings_file(data)
-    settings.post_to_wireserver()
+    try:
+        settings.post_to_wireserver(data)
+    except:
+        # if host does not support 3.0 protocol version, retry with 2.0
+        data["DiskEncryptionDataVersion"] = "2.0"
+        settings.post_to_wireserver(data)
+
     settings.remove_protector_file(new_protector_name)
 
     encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName

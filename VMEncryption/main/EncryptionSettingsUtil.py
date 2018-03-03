@@ -231,8 +231,9 @@ class EncryptionSettingsUtil(object):
             os.fsync(outfile)
         return
 
-    def post_to_wireserver(self):
+    def post_to_wireserver(self, data):        
         """ Request EnableEncryption operation on settings file via wire server """
+        self.write_settings_file(data)
         if not os.path.isfile(self.get_settings_file_path()):
             raise Exception(
                 'Disk encryption settings file not found: ' + self.get_settings_file_path())
@@ -268,6 +269,5 @@ class EncryptionSettingsUtil(object):
                 "KekVaultResourceId": "",
                 "KeyVaultResourceId": "",
                 "KeyVaultUrl": ""}
-        self.write_settings_file(data)
-        self.post_to_wireserver()
+        self.post_to_wireserver(data)
         return
