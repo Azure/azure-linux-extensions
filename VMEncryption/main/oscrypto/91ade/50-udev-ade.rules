@@ -1,0 +1,8 @@
+ACTION=="add|change", SUBSYSTEM=="block", ATTRS{device_id}=="?00000000-0000-*", ATTR{partition}=="ENCRYPTED_DISK_PARTITION" GOTO="process_disk"
+GOTO="disk_end"
+
+LABEL="process_disk"
+ATTR{partition}=="ENCRYPTED_DISK_PARTITION", ENV{ID_FS_UUID}="osencrypt-locked"
+ATTR{partition}=="ENCRYPTED_DISK_PARTITION", ENV{ID_FS_UUID_ENC}="osencrypt-locked"
+ATTR{partition}=="ENCRYPTED_DISK_PARTITION", ENV{ID_FS_USAGE}="crypto"
+LABEL="disk_end"

@@ -121,7 +121,8 @@ class centosPatching(redhatPatching):
                     'pyparted',
                     'libffi-devel',
                     'openssl-devel',
-                    'python-devel']
+                    'python-devel',
+                    'nmap-ncat']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')
