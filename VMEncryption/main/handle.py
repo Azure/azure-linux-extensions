@@ -476,13 +476,13 @@ def enable():
 
         # run prechecks and log any failures detected
         try:
-            cutil = check_util.CheckUtil(logger)
+            cutil = CheckUtil(logger)
             if cutil.is_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
         except Exception:
-            logger.log("PRECHECK: Exception thrown during precheck, incompatible environment suspected")
+            logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
