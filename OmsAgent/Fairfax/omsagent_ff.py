@@ -70,11 +70,11 @@ DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 # Error codes
 DPKGLockedErrorCode = 12
 InstallErrorCurlNotInstalled = 64
-EnableCalledBeforeSuccessfulInstall = 20
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
+EnableCalledBeforeSuccessfulInstall = 9
 UnsupportedOpenSSL = 60
 # OneClick error codes
 OneClickErrorCode = 40
