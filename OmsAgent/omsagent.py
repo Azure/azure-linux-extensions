@@ -82,6 +82,9 @@ ManagedIdentityExtMissingErrorCode = 41
 ManagedIdentityExtErrorCode = 42
 MetadataAPIErrorCode = 43
 OMSServiceOneClickErrorCode = 44
+MissingorInvalidParameterErrorCode = 11
+UnwantedMultipleConnectionsErrorCode = 10
+CannotConnectToOMSErrorCode = 55
 
 # Configuration
 HUtilObject = None
@@ -489,7 +492,7 @@ def is_vm_supported_for_extension():
                        'centos' : ('5', '6', '7'), # CentOS
                        'red hat' : ('5', '6', '7'), # Oracle, RHEL
                        'oracle' : ('5', '6', '7'), # Oracle
-                       'debian' : ('6', '7', '8'), # Debian
+                       'debian' : ('6', '7', '8', '9'), # Debian
                        'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
                                    '16.04', '16.10'), # Ubuntu
                        'suse' : ('11', '12') #SLES
@@ -1484,7 +1487,7 @@ class ParameterMissingException(OmsAgentForLinuxException):
     """
     There is a missing parameter for the OmsAgentForLinux Extension
     """
-    error_code = 11
+    error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to a missing parameter: {1}'.format(operation,
                                                                    self)
@@ -1495,7 +1498,7 @@ class InvalidParameterError(OmsAgentForLinuxException):
     There is an invalid parameter for the OmsAgentForLinux Extension
     ex. Workspace ID does not match GUID regex
     """
-    error_code = 11
+    error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to an invalid parameter: {1}'.format(operation,
                                                                     self)
@@ -1506,7 +1509,7 @@ class UnwantedMultipleConnectionsException(OmsAgentForLinuxException):
     This VM is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
     """
-    error_code = 10
+    error_code = UnwantedMultipleConnectionsErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to multiple connections: {1}'.format(operation,
                                                                     self)
@@ -1516,7 +1519,7 @@ class CannotConnectToOMSException(OmsAgentForLinuxException):
     """
     The OMSAgent cannot connect to the OMS service
     """
-    error_code = 55 # error code to indicate no internet access
+    error_code = CannotConnectToOMSErrorCode # error code to indicate no internet access
     def get_error_message(self, operation):
         return 'The agent could not connect to the Microsoft Operations ' \
                'Management Suite service. Please check that the system ' \
