@@ -36,99 +36,65 @@ from Utils import Status
 from Utils import HostSnapshotObjects
 from Utils import HandlerUtil
 from fsfreezer import FsFreezer
+import sys
 
 class HostSnapshotter(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
-        self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot'
+        self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
 
     def snapshotall(self, paras, freezer):
         result = None
-        snapshot_error = SnapshotError()
         snapshot_info_array = []
         all_failed = True
         is_inconsistent = False
         unable_to_sleep = False
-        snapshot_call_failed = False
         meta_data = paras.backup_metadata
         if(self.snapshoturi is None):
             self.logger.log("Failed to do the snapshot because snapshoturi is none",False,'Error')
-            snapshot_call_failed = True
+            all_failed = True
         try:
             snapshoturi_obj = urlparser.urlparse(self.snapshoturi)
             if(snapshoturi_obj is None or snapshoturi_obj.hostname is None):
                 self.logger.log("Failed to parse the snapshoturi",False,'Error')
-                snapshot_call_failed = True
+                all_failed = True
             else:
                 diskIds = []
                 body_content = ''
                 headers = {}
                 headers['Backup'] = 'true'
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        meta['Key'] = "x-ms-meta-" + meta['Key']
-                hostRequestBodyObj = HostSnapshotObjects.HostRequestBody(paras.taskId, diskIds, meta_data)
-                body_content = '{' + json.dumps(hostRequestBodyObj, cls = HandlerUtil.ComplexEncoder) + '}'
-                self.logger.log(str(headers))
+                headers['Content-type'] = 'application/json'
+                hostRequestBodyObj = HostSnapshotObjects.HostRequestBody(paras.taskId, diskIds, paras.snapshotTaskToken, meta_data)
+                body_content = json.dumps(hostRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
+                self.logger.log('Headers : ' + str(headers))
+                self.logger.log('Host Request body : ' + str(body_content))
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers)
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
-                if(result == CommonVariables.success and httpResp != None):
-                    # retrieve snapshot information from http response
-                    responseResult, responseBody = self.get_responsebody(httpResp)
-                    if(responseResult == CommonVariables.success):
-                        #deserializing response body for snapshot info
-                        snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
-                        #performing thaw
-                        time_before_thaw = datetime.datetime.now()
-                        thaw_result, unable_to_sleep = freezer.thaw_safe()
-                        time_after_thaw = datetime.datetime.now()
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
-                        self.logger.log('T:S thaw result ' + str(thaw_result))
-                        if(thaw_result is not None and len(thaw_result.errors) > 0):
-                            is_inconsistent= True
-                    else: 
-                        self.logger.log(" snapshot HttpCallGetResponse failed ")
-                        self.logger.log(str(errMsg))
-                        snapshot_call_failed = True
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                self.logger.log("responseBody: " + responseBody)
+                if(httpResp != None):
+                    snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
+                #performing thaw
+                time_before_thaw = datetime.datetime.now()
+                thaw_result, unable_to_sleep = freezer.thaw_safe()
+                time_after_thaw = datetime.datetime.now()
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
+                self.logger.log('T:S thaw result ' + str(thaw_result))
+                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                    is_inconsistent = True
                 else:
                     # HttpCall failed
                     self.logger.log(" snapshot HttpCallGetResponse failed ")
                     self.logger.log(str(errMsg))
         except Exception as e:
-            errorMsg = "Failed to do the snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
-            snapshot_error.errorcode = CommonVariables.error
-            snapshot_error.sasuri = sasuri
-            snapshot_call_failed = True
-        return snapshot_call_failed, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
-
-    def get_responsebody(self, resp):
-        result = CommonVariables.error_http_failure
-        responseBody = ""
-        if(resp != None):
-            self.logger.log(str(datetime.datetime.now()) + " snapshot resp status: " + str(resp.status))
-            resp_headers = resp.getheaders()
-            self.logger.log(str(datetime.datetime.now()) + " snapshot resp-header: " + str(resp_headers))
-
-            if(resp.status == 200 or resp.status == 201):
-                result = CommonVariables.success
-            else:
-                result = resp.status
-
-            responseBody = resp.read()
-            if(responseBody is not None):
-                self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
-                responseBody = (responseBody).decode('utf-8-sig')
-        else:
-            self.logger.log(datetime.datetime.now() + " snapshot Http connection response is None")
-
-        self.logger.log(str(datetime.datetime.now()) + ' snapshot api returned: {0} '.format(result))
-        return result, responseBody
+            all_failed = True
+        return snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
     def get_snapshot_info(self, responseBody):
         snapshotinfo_array = []
@@ -139,7 +105,7 @@ class HostSnapshotter(object):
                 for snapshot_info in json_reponseBody['snapshotInfo']:
                     snapshotinfo_array.append(Status.SnapshotInfoObj(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage']))
                     self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
-                    if (snapshot_info_array[blob_index].isSuccessful == True):
+                    if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
         except Exception as e:
             errorMsg = " deserialization of response body failed with error: %s, stack trace: %s" % (str(e), traceback.format_exc())

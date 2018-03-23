@@ -31,7 +31,9 @@ class ParameterParser(object):
         self.public_config_obj = None
         self.private_config_obj = None
         self.blobs = None
-        self.takeSnapshotFrom = CommonVariables.onlyGuest
+        self.customSettings = None
+        self.snapshotTaskToken = ''
+
         """
         get the public configuration
         """
@@ -42,6 +44,11 @@ class ParameterParser(object):
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
         self.vmType = public_settings.get(CommonVariables.vmType)
+        if(CommonVariables.customSettings in protected_settings.keys()):
+            self.customSettings = protected_settings.get(CommonVariables.customSettings)
+        if(CommonVariables.snapshotTaskToken in protected_settings.keys()):
+            self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
+
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -73,6 +80,4 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
-            if('takeSnapshotFrom' in self.private_config_obj.keys()):
-                self.takeSnapshotFrom = self.private_config_obj['takeSnapshotFrom']
 

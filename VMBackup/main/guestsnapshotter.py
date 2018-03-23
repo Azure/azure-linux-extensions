@@ -97,7 +97,8 @@ class GuestSnapshotter(object):
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
+                temp_logger = temp_logger + str("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
@@ -150,7 +151,8 @@ class GuestSnapshotter(object):
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
+                self.logger.log("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
                     snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
@@ -214,7 +216,7 @@ class GuestSnapshotter(object):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
                 self.logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                if(thaw_result is not None and len(thaw_result.errors) > 0  and (snapshot_result is None or len(snapshot_result.errors) == 0)):
                     is_inconsistent = True
                     snapshot_result.errors.append(thaw_result.errors)
                     return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
@@ -281,7 +283,7 @@ class GuestSnapshotter(object):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
                 self.logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
+                if(thaw_result is not None and len(thaw_result.errors) > 0 and (snapshot_result is None or len(snapshot_result.errors) == 0)):
                     snapshot_result.errors.append(thaw_result.errors)
                     is_inconsistent= True
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
