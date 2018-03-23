@@ -39,14 +39,14 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.4.1-123.universal.x64.sh'
+BundleFileName = 'omsagent-1.4.4-210.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
 SCOMPort = 1270
 PostOnboardingSleepSeconds = 5
 InitialRetrySleepSeconds = 30
-CleanupWorkspaceConfiguration = False
+IsUpgrade = False
 
 # Paths
 OMSAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
@@ -120,6 +120,7 @@ def main():
     """
     init_waagent_logger()
     waagent_log_info('OmsAgentForLinux started to handle.')
+    global IsUpgrade
 
     # Determine the operation being executed
     operation = None
@@ -135,7 +136,7 @@ def main():
             operation = 'Enable'
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
-            CleanupWorkspaceConfiguration = True
+            IsUpgrade = True
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -232,6 +233,7 @@ def uninstall():
     """
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
+    global IsUpgrade
 
     os.chmod(bundle_path, 100)
     cmd = UninstallCommandTemplate.format(bundle_path)
@@ -242,8 +244,9 @@ def uninstall():
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
 
-    if CleanupWorkspaceConfiguration:
-        CleanupWorkspaceConfiguration = False
+    if IsUpgrade:
+        IsUpgrade = False
+    else:
         remove_workspace_configuration()
 
     return exit_code
@@ -369,6 +372,7 @@ def remove_workspace_configuration():
 
     This method will remove all the files/folders from the workspace path in Etc and Var.
     """
+    public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
@@ -379,7 +383,7 @@ def remove_workspace_configuration():
                 os.remove(os.path.join(root, name))
             for name in dirs:
                 os.rmdir(os.path.join(root, name))
-    os.rmdir(os.path.join(main_dir))
+        os.rmdir(os.path.join(main_dir))
     hutil_log_info('Removed Workspace Configuration')
 
 def get_vmresourceid_from_metadata():
