@@ -55,3 +55,6 @@ class AbstractPatching(object):
 
     def install_extras(self):
         pass
+
+    def update_prereq(self):
+        pass
