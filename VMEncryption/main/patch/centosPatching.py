@@ -18,6 +18,7 @@
 
 
 import os
+import os.path
 import sys
 import imp
 import base64
@@ -135,3 +136,11 @@ class centosPatching(redhatPatching):
         if self.command_executor.Execute("pip show adal"):
             self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")
+
+    def update_prereq(self):
+        if ((self.distro_info[1] in ["7.3.1611", "7.2.1511"]) or (distro_info[1].startswith('7.4'))):
+            # Execute unpatching commands only if all the three patch files are present.
+            if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
+                if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
+                    if os.path.exists("/lib/dracut/modules.d/90crypt/parse-crypt.sh.orig"):
+                        redhatPatching.create_autounlock_initramfs(self.logger, self.command_executor)

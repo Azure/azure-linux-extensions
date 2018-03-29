@@ -18,6 +18,7 @@
 
 
 import os
+import os.path
 import sys
 import imp
 import base64
@@ -29,6 +30,7 @@ import time
 import traceback
 import datetime
 import subprocess
+import inspect
 
 from AbstractPatching import AbstractPatching
 from Common import *
@@ -140,3 +142,61 @@ class redhatPatching(AbstractPatching):
         if self.command_executor.Execute("pip show adal"):
             self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")
+
+    def update_prereq(self):
+        if self.distro_info[1] in ["7.2", "7.3", "7.4"]:
+             # Execute unpatching commands only if all the three patch files are present.
+            if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
+                if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
+                    if os.path.exists("/lib/dracut/modules.d/90crypt/parse-crypt.sh.orig"):
+                        redhatPatching.create_autounlock_initramfs(self.logger, self.command_executor)
+
+    @staticmethod
+    def append_contents_to_file(contents, path):
+        with open(path, 'a') as f:
+            f.write(contents)
+
+    @staticmethod
+    def create_autounlock_initramfs(logger, command_executor):
+        logger.log("Removing patches and recreating initrd image")
+
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        ademoduledir = os.path.join(scriptdir, '../oscrypto/91ade')
+        dracutmodulesdir = '/lib/dracut/modules.d'
+        udevaderulepath = os.path.join(dracutmodulesdir, '91ade/50-udev-ade.rules')
+
+        proc_comm = ProcessCommunicator()
+
+        command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
+        crypt_cmd = "cryptsetup status osencrypt | grep device:"
+        command_executor.ExecuteInBash(crypt_cmd, communicator=proc_comm, suppress_logging=True)
+        matches = re.findall(r'device:(.*)', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not find device in cryptsetup output")
+        root_device = matches[0].strip()
+
+        udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(root_device)
+        command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
+        if not matches:
+            raise Exception("Could not parse ATTR{partition} from udevadm info")
+        partition = matches[0]
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
+        command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+
+        command_executor.Execute('mv /lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig /lib/dracut/modules.d/90crypt/cryptroot-ask.sh', False)
+        command_executor.Execute('mv /lib/dracut/modules.d/90crypt/module-setup.sh.orig /lib/dracut/modules.d/90crypt/module-setup.sh', False)
+        command_executor.Execute('mv /lib/dracut/modules.d/90crypt/parse-crypt.sh.orig /lib/dracut/modules.d/90crypt/parse-crypt.sh', False)
+        
+        sed_grub_cmd = "sed -i.bak '/rd.luks.uuid=osencrypt/d' /etc/default/grub"
+        command_executor.Execute(sed_grub_cmd)
+    
+        redhatPatching.append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
+                                               '/etc/default/grub')
+
+        redhatPatching.append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
+                                               '/etc/crypttab')
+
+        command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+        command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
