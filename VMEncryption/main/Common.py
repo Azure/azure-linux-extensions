@@ -148,7 +148,7 @@ class CommonVariables:
     error codes
     """
     extension_transitioning_status = 'transitioning'
-	extension_success_status = 'success'
+    extension_success_status = 'success'
     extension_error_status = 'error'
     process_success = 0
     success = 0
