@@ -138,7 +138,7 @@ class centosPatching(redhatPatching):
             self.command_executor.Execute("pip install adal")
 
     def update_prereq(self):
-        if ((self.distro_info[1] in ["7.3.1611", "7.2.1511"]) or (distro_info[1].startswith('7.4'))):
+        if ((self.distro_info[1] in ["7.3.1611", "7.2.1511"]) or (self.distro_info[1].startswith('7.4'))):
             # Execute unpatching commands only if all the three patch files are present.
             if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
                 if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
