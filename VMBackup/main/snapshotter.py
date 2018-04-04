@@ -49,21 +49,26 @@ class Snapshotter(object):
         self.para_parser = para_parser
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
+        self.isManaged = False
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
                 self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
+                if(customSettings['isManagedVm'] == 'true'):
+                    self.isManaged = True
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
+            self.isManaged = True
+
+        if(self.isManaged):
+            self.takeSnapshotFrom = CommonVariables.onlyGuest
 
 
     def doSnapshot(self):
         run_result = CommonVariables.success
         run_status = 'success'
-
-        self.takeSnapshotFrom = CommonVariables.firstGuestThenHost #test
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
             run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromGuest()
