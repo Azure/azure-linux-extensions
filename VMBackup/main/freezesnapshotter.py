@@ -39,7 +39,7 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 import ExtensionErrorCodeHelper
 
-class Snapshotter(object):
+class FreezeSnapshotter(object):
     """description of class"""
     def __init__(self, logger, hutil , freezer, para_parser):
         self.logger = logger
@@ -66,7 +66,7 @@ class Snapshotter(object):
             self.takeSnapshotFrom = CommonVariables.onlyGuest
 
 
-    def doSnapshot(self):
+    def doFreezeSnapshot(self):
         run_result = CommonVariables.success
         run_status = 'success'
 
@@ -194,6 +194,8 @@ class Snapshotter(object):
 
         run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromGuest()
 
+        time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
+
         if(run_result != CommonVariables.success and all_failed):
             run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
 
@@ -212,6 +214,8 @@ class Snapshotter(object):
         snapshot_info_array = None
 
         run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+
+        time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
 
         if(run_result != CommonVariables.success and all_failed):
             run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyGuest()

@@ -47,7 +47,7 @@ from parameterparser import ParameterParser
 from Utils import HandlerUtil
 from Utils import SizeCalculation
 from Utils import Status
-from snapshotter import Snapshotter
+from freezesnapshotter import FreezeSnapshotter
 from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
@@ -193,9 +193,9 @@ def freeze_snapshot(timeout):
             hutil.set_value_to_configfile('doseq', '1')
         if(hutil.get_value_from_configfile('doseq') != '1'):
             hutil.set_value_to_configfile('doseq', '2')
-        snap_shotter = Snapshotter(backup_logger, hutil, freezer, para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, para_parser)
         backup_logger.log("Calling do snapshot method", True, 'Info')
-        run_result, run_status, snapshot_info_array = snap_shotter.doSnapshot()
+        run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
     except Exception as e:
         if(hutil.get_value_from_configfile('doseq') == '2'):
             hutil.set_value_to_configfile('doseq', '0')
