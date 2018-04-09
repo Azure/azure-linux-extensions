@@ -189,7 +189,7 @@ def get_fluentd_syslog_src_port():
     :rtype: int
     :return: A successfully bound (& closed) TCP/UDP port number. -1 if all failed.
     """
-    for port in range(25224, 25424):
+    for port in range(25229, 25424):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.bind(('', port))

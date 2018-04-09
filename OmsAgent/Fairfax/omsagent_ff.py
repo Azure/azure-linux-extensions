@@ -39,13 +39,14 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.4.1-123.universal.x64.sh'
+BundleFileName = 'omsagent-1.4.4-210.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
 SCOMPort = 1270
 PostOnboardingSleepSeconds = 5
 InitialRetrySleepSeconds = 30
+IsUpgrade = False
 
 # Paths
 OMSAdminPath = '/opt/microsoft/omsagent/bin/omsadmin.sh'
@@ -53,6 +54,7 @@ OMSAgentServiceScript = '/opt/microsoft/omsagent/bin/service_control'
 OMIConfigEditorPath = '/opt/omi/bin/omiconfigeditor'
 OMIServerConfPath = '/etc/opt/omi/conf/omiserver.conf'
 EtcOMSAgentPath = '/etc/opt/microsoft/omsagent/'
+VarOMSAgentPath = '/var/opt/microsoft/omsagent/'
 SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 
 # Commands
@@ -68,11 +70,11 @@ DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 # Error codes
 DPKGLockedErrorCode = 12
 InstallErrorCurlNotInstalled = 64
-EnableCalledBeforeSuccessfulInstall = 20
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
+EnableCalledBeforeSuccessfulInstall = 9
 UnsupportedOpenSSL = 60
 # OneClick error codes
 OneClickErrorCode = 40
@@ -80,6 +82,9 @@ ManagedIdentityExtMissingErrorCode = 41
 ManagedIdentityExtErrorCode = 42
 MetadataAPIErrorCode = 43
 OMSServiceOneClickErrorCode = 44
+MissingorInvalidParameterErrorCode = 11
+UnwantedMultipleConnectionsErrorCode = 10
+CannotConnectToOMSErrorCode = 55
 
 # Configuration
 HUtilObject = None
@@ -94,6 +99,10 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 # TODO these values may change for the Fairfax scenario
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
+
+# vmResourceId Metadata Service
+VMResourceIDMetadataHost = '169.254.169.254'
+VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-08-01'.format(VMResourceIDMetadataHost)
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -111,6 +120,7 @@ def main():
     """
     init_waagent_logger()
     waagent_log_info('OmsAgentForLinux started to handle.')
+    global IsUpgrade
 
     # Determine the operation being executed
     operation = None
@@ -126,6 +136,7 @@ def main():
             operation = 'Enable'
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
+            IsUpgrade = True
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -222,6 +233,7 @@ def uninstall():
     """
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
+    global IsUpgrade
 
     os.chmod(bundle_path, 100)
     cmd = UninstallCommandTemplate.format(bundle_path)
@@ -231,6 +243,12 @@ def uninstall():
     exit_code = run_command_with_retries(cmd, retries = 5,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
+
+    if IsUpgrade:
+        IsUpgrade = False
+    else:
+        remove_workspace_configuration()
+
     return exit_code
 
 
@@ -253,6 +271,17 @@ def enable():
         raise ParameterMissingException('Private configuration must be ' \
                                         'provided')
 
+    vmResourceId = protected_settings.get('vmResourceId')
+
+    # If vmResourceId is not provided in private settings, get it from metadata API
+    if vmResourceId is None or not vmResourceId:
+        vmResourceId = get_vmresourceid_from_metadata()
+        hutil_log_info('vmResourceId from Metadata API is {0}'.format(vmResourceId))
+
+    if vmResourceId is None:
+        raise MetadataAPIException('Failed to get vmResourceId from ' \
+                                   'Metadata API')
+
     enableAutomaticManagement = public_settings.get('enableAutomaticManagement')
 
     if (enableAutomaticManagement is not None
@@ -261,7 +290,7 @@ def enable():
                        'workspace ID and key will be determined by the OMS ' \
                        'service.')
 
-        workspaceInfo = retrieve_managed_workspace(protected_settings)
+        workspaceInfo = retrieve_managed_workspace(vmResourceId)
         if (workspaceInfo is None or 'WorkspaceId' not in workspaceInfo
                 or 'WorkspaceKey' not in workspaceInfo):
             raise OneClickException('Workspace info was not determined')
@@ -288,15 +317,12 @@ def enable():
                      'OMSAgent onboarding script {0} does not exist. Enable ' \
                      'cannot be called before install.'.format(OMSAdminPath))
 
+    vmResourceIdParam = '-a {0}'.format(vmResourceId)
+
     proxy = protected_settings.get('proxy')
     proxyParam = ''
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
-
-    vmResourceId = protected_settings.get('vmResourceId')
-    vmResourceIdParam = ''
-    if vmResourceId is not None:
-        vmResourceIdParam = '-a {0}'.format(vmResourceId)
 
     optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
@@ -336,7 +362,48 @@ def enable():
     return exit_code
 
 
-def retrieve_managed_workspace(protected_settings):
+def remove_workspace_configuration():
+    """
+    This is needed to distinguish between extension removal vs extension upgrade.
+    Its a workaround for waagent upgrade routine calling 'remove' on an old version
+    before calling 'upgrade' on new extension version issue.
+    In upgrade case, we need workspace configuration to persist when in
+    remove case we need all the files be removed.
+
+    This method will remove all the files/folders from the workspace path in Etc and Var.
+    """
+    public_settings, _ = get_settings()
+    workspaceId = public_settings.get('workspaceId')
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
+    var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
+
+    for main_dir in [etc_remove_path, var_remove_path]:
+        for root, dirs, files in os.walk(main_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(os.path.join(main_dir))
+    hutil_log_info('Removed Workspace Configuration')
+
+def get_vmresourceid_from_metadata():
+    req = urllib2.Request(VMResourceIDMetadataEndpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib2.urlopen(req).read())
+        return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+    except urllib2.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+def retrieve_managed_workspace(vm_resource_id):
     """
     EnableAutomaticManagement has been set to true; the
     ManagedIdentity extension and the VM Resource ID are also
@@ -347,13 +414,6 @@ def retrieve_managed_workspace(protected_settings):
     # Check for OneClick scenario requirements:
     if not os.path.exists(ManagedIdentityExtListeningURLPath):
         raise ManagedIdentityExtMissingException
-
-    vm_resource_id = protected_settings.get('vmResourceId')
-    if vm_resource_id is None:
-        raise ParameterMissingException('VM Resource ID must be provided ' \
-                  'for Automatic Management to be enabled. Please set ' \
-                  'EnableAutomaticManagement to false in public settings or ' \
-                  'provide the value for vmResourceId in protected settings.')
 
     # Determine the Tenant ID using the Metadata API
     tenant_id = get_tenant_id_from_metadata_api(vm_resource_id)
@@ -435,7 +495,7 @@ def is_vm_supported_for_extension():
                        'centos' : ('5', '6', '7'), # CentOS
                        'red hat' : ('5', '6', '7'), # Oracle, RHEL
                        'oracle' : ('5', '6', '7'), # Oracle
-                       'debian' : ('6', '7', '8'), # Debian
+                       'debian' : ('6', '7', '8', '9'), # Debian
                        'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
                                    '16.04', '16.10'), # Ubuntu
                        'suse' : ('11', '12') #SLES
@@ -804,7 +864,7 @@ def run_command_with_retries(cmd, retries, retry_check, final_check = None,
 
 def is_dpkg_locked(exit_code, output):
     """
-    If dpkg is locked, the output will contain a message similar to 'dpkg 
+    If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
     """
     if exit_code is not 0:
@@ -1072,7 +1132,7 @@ def get_latest_seq_no():
         except:
             pass
         if latest_seq_no < 0:
-            latest_seq_no = 0    
+            latest_seq_no = 0
         SettingsSequenceNumber = latest_seq_no
 
     return SettingsSequenceNumber
@@ -1319,7 +1379,8 @@ def retry_get_workspace_info_from_oms(oms_response):
         hutil_log_error('Unable to get HTTP code from OMS repsonse')
         return False
 
-    if oms_response_http_code is 202 or oms_response_http_code is 204:
+    if (oms_response_http_code is 202 or oms_response_http_code is 204
+                                      or oms_response_http_code is 404):
         hutil_log_info('Retrying ValidateMachineIdentity OMS request ' \
                        'because workspace is still being provisioned; HTTP ' \
                        'code from OMS is {0}'.format(oms_response_http_code))
@@ -1429,7 +1490,7 @@ class ParameterMissingException(OmsAgentForLinuxException):
     """
     There is a missing parameter for the OmsAgentForLinux Extension
     """
-    error_code = 11
+    error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to a missing parameter: {1}'.format(operation,
                                                                    self)
@@ -1440,7 +1501,7 @@ class InvalidParameterError(OmsAgentForLinuxException):
     There is an invalid parameter for the OmsAgentForLinux Extension
     ex. Workspace ID does not match GUID regex
     """
-    error_code = 11
+    error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to an invalid parameter: {1}'.format(operation,
                                                                     self)
@@ -1451,7 +1512,7 @@ class UnwantedMultipleConnectionsException(OmsAgentForLinuxException):
     This VM is already connected to a different Log Analytics workspace
     and stopOnMultipleConnections is set to true
     """
-    error_code = 10
+    error_code = UnwantedMultipleConnectionsErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to multiple connections: {1}'.format(operation,
                                                                     self)
@@ -1461,7 +1522,7 @@ class CannotConnectToOMSException(OmsAgentForLinuxException):
     """
     The OMSAgent cannot connect to the OMS service
     """
-    error_code = 55 # error code to indicate no internet access
+    error_code = CannotConnectToOMSErrorCode # error code to indicate no internet access
     def get_error_message(self, operation):
         return 'The agent could not connect to the Microsoft Operations ' \
                'Management Suite service. Please check that the system ' \
