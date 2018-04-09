@@ -282,17 +282,10 @@ class GuestSnapshotter(object):
                     time_after_thaw = datetime.datetime.now()
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
-<<<<<<< HEAD:VMBackup/main/guestsnapshotter.py
                 self.logger.log('T:S thaw result ' + str(thaw_result))
                 if(thaw_result is not None and len(thaw_result.errors) > 0 and (snapshot_result is None or len(snapshot_result.errors) == 0)):
                     snapshot_result.errors.append(thaw_result.errors)
                     is_inconsistent= True
-=======
-                    self.logger.log('T:S thaw result ' + str(thaw_result))
-                    if(thaw_result is not None and len(thaw_result.errors) > 0):
-                        snapshot_result.errors.append(thaw_result.errors)
-                        is_inconsistent= True
->>>>>>> 712608b7f862563b7c0fe14f6fd9a0ca1c416908:VMBackup/main/snapshotter.py
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep
             else:
                 self.logger.log("the blobs are None")
