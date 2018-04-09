@@ -54,6 +54,7 @@ from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
+from PluginHost import PluginHostResult
 
 #Main function is the only entrence to this extension handler
 
@@ -297,7 +298,6 @@ def daemon():
                 if(hutil.is_status_file_exists()):
                     status_report_to_file(file_report_msg)
                 status_report_to_blob(blob_report_msg)
-                backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
@@ -308,19 +308,23 @@ def daemon():
                 PluginHostObj = PluginHost(logger=backup_logger)
                 PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
+                appconsistentBackup = False
 
                 if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigPermissionError):
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
                     backup_logger.log('App Consistent Consistent Backup Enabled', True)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                    appconsistentBackup = True
 
                 if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
                     backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
                     doFsConsistentbackup = True
+
+                preResult = PluginHostResult()
+                postResult = PluginHostResult()
 
                 if not doFsConsistentbackup:
                     preResult = PluginHostObj.pre_script()
@@ -331,7 +335,6 @@ def daemon():
 
                 if dobackup:
                     freeze_snapshot(thread_timeout)
-                    backup_logger.log('unfreeze ends...')
 
                 if not doFsConsistentbackup:
                     postResult = PluginHostObj.post_script()
@@ -353,7 +356,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -365,7 +368,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         post_plugin_errors = postResult.errors
                         for error in post_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -373,6 +376,18 @@ def daemon():
                                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                                 backup_logger.log(error_msg, True)
                                 break
+
+                if appconsistentBackup:
+                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                        hutil.SetExtErrorCode(PluginHostErrorCode)
+                    pre_plugin_errors = preResult.errors
+                    for error in pre_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
+                    post_plugin_errors = postResult.errors
+                    for error in post_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
 
                 if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
                     run_status = 'success'

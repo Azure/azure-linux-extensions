@@ -25,6 +25,7 @@ except ImportError:
     import http.client as httplibs
 import shlex
 import subprocess
+import sys
 from common import CommonVariables
 from subprocess import *
 from Utils.WAAgentUtil import waagent
@@ -81,8 +82,8 @@ class HttpUtil(object):
             else:
                 self.logger.log("Http connection response is None")
 
-            self.logger.log(" resp status: " + str(resp.status))
             responseBody = resp.read()
+            self.logger.log(" resp status: " + str(resp.status))
             if(responseBody is not None):
                 self.logger.log("responseBody: " + (responseBody).decode('utf-8-sig'))
 
@@ -103,6 +104,7 @@ class HttpUtil(object):
         resp = None
         responeBody = ""
         errorMsg = None
+        responseBody = None
         try:
             resp = None
             if(self.proxyHost == None or self.proxyPort == None):

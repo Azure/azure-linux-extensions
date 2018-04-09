@@ -199,7 +199,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,(self.timeoutInSeconds)/5):
+        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -209,15 +209,22 @@ class PluginHost(object):
 
 
         continueBackup = True
-        for j in range(0,self.noOfPlugins):
+        #Plugin timed out
+        if not flag:
             ecode = CommonVariables.FailedPrepostPluginhostPreTimeout
-            continueBackup = continueBackup & self.preScriptResult[j].continueBackup
-            if self.preScriptCompleted[j]:
-                ecode = self.preScriptResult[j].errorCode
-            if ecode != CommonVariables.PrePost_PluginStatus_Success:
-                result.anyScriptFailed = True
+            result.anyScriptFailed = True
             presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
+        else:
+            for j in range(0,self.noOfPlugins):
+                ecode = CommonVariables.FailedPrepostPluginhostPreTimeout
+                continueBackup = continueBackup & self.preScriptResult[j].continueBackup
+                if self.preScriptCompleted[j]:
+                    ecode = self.preScriptResult[j].errorCode
+                if ecode != CommonVariables.PrePost_PluginStatus_Success:
+                    result.anyScriptFailed = True
+                presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
+                result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished prescript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')
         return result
@@ -239,7 +246,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,(self.timeoutInSeconds)/5):
+        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -248,15 +255,23 @@ class PluginHost(object):
                 break
 
         continueBackup = True
-        for j in range(0,self.noOfPlugins):
+
+        #Plugin timed out
+        if not flag:
             ecode = CommonVariables.FailedPrepostPluginhostPostTimeout
-            continueBackup = continueBackup & self.postScriptResult[j].continueBackup
-            if self.postScriptCompleted[j]:
-                ecode = self.postScriptResult[j].errorCode
-            if ecode != CommonVariables.PrePost_PluginStatus_Success:
-                result.anyScriptFailed = True
+            result.anyScriptFailed = True
             presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
+        else:
+            for j in range(0,self.noOfPlugins):
+                ecode = CommonVariables.FailedPrepostPluginhostPostTimeout
+                continueBackup = continueBackup & self.postScriptResult[j].continueBackup
+                if self.postScriptCompleted[j]:
+                    ecode = self.postScriptResult[j].errorCode
+                if ecode != CommonVariables.PrePost_PluginStatus_Success:
+                    result.anyScriptFailed = True
+                presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
+                result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished postscript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')
         return result
