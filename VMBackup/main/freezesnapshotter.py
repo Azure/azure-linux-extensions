@@ -41,11 +41,12 @@ import ExtensionErrorCodeHelper
 
 class FreezeSnapshotter(object):
     """description of class"""
-    def __init__(self, logger, hutil , freezer, para_parser):
+    def __init__(self, logger, hutil , freezer, g_fsfreeze_on, para_parser):
         self.logger = logger
         self.configfile = '/etc/azure/vmbackup.conf'
         self.hutil = hutil
         self.freezer = freezer
+        self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
@@ -134,13 +135,14 @@ class FreezeSnapshotter(object):
         is_inconsistent =  False
         snapshot_info_array = None
         try:
-            run_result, run_status = self.freeze()
+            if self.g_fsfreeze_on :
+                run_result, run_status = self.freeze()
             if(run_result == CommonVariables.success):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer)
+                snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
@@ -233,12 +235,13 @@ class FreezeSnapshotter(object):
         snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
         HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
-        run_result, run_status = self.freeze()
+        if self.g_fsfreeze_on :
+            run_result, run_status = self.freeze()
         if(run_result == CommonVariables.success):
             snap_shotter = HostSnapshotter(self.logger)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
-            snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer)
+            snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
             time_after_snapshot = datetime.datetime.now()
             HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
             self.logger.log('T:S snapshotall ends...', True)

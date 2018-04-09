@@ -45,7 +45,7 @@ class HostSnapshotter(object):
         self.configfile='/etc/azure/vmbackup.conf'
         self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
 
-    def snapshotall(self, paras, freezer):
+    def snapshotall(self, paras, freezer, g_fsfreeze_on):
         result = None
         snapshot_info_array = []
         all_failed = True
@@ -78,18 +78,19 @@ class HostSnapshotter(object):
                 if(httpResp != None):
                     snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
-                #performing thaw
-                time_before_thaw = datetime.datetime.now()
-                thaw_result, unable_to_sleep = freezer.thaw_safe()
-                time_after_thaw = datetime.datetime.now()
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
-                self.logger.log('T:S thaw result ' + str(thaw_result))
-                if(thaw_result is not None and len(thaw_result.errors) > 0):
-                    is_inconsistent = True
                 else:
                     # HttpCall failed
                     self.logger.log(" snapshot HttpCallGetResponse failed ")
                     self.logger.log(str(errMsg))
+                #performing thaw
+                if g_fsfreeze_on :
+                    time_before_thaw = datetime.datetime.now()
+                    thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    time_after_thaw = datetime.datetime.now()
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
+                    self.logger.log('T:S thaw result ' + str(thaw_result))
+                    if(thaw_result is not None and len(thaw_result.errors) > 0):
+                        is_inconsistent = True
         except Exception as e:
             errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')

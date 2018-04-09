@@ -194,7 +194,7 @@ def freeze_snapshot(timeout):
             hutil.set_value_to_configfile('doseq', '1')
         if(hutil.get_value_from_configfile('doseq') != '1'):
             hutil.set_value_to_configfile('doseq', '2')
-        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
     except Exception as e:
