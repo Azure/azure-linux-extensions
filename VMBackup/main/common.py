@@ -38,6 +38,13 @@ class CommonVariables:
     vmType = 'vmType'
     VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
     VmTypeV2 = 'microsoft.compute/virtualmachines'
+    customSettings = 'customSettings'
+    snapshotTaskToken = 'snapshotTaskToken'
+    
+    onlyGuest = 'onlyGuest'
+    firstGuestThenHost = 'firstGuestThenHost'
+    firstHostThenGuest = 'firstHostThenGuest'
+    onlyHost = 'onlyHost'
 
 
     status_transitioning = 'transitioning'

@@ -65,6 +65,10 @@ import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
 import logging
 import logging.handlers
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 from common import CommonVariables
 import platform
 import subprocess
@@ -276,6 +280,48 @@ class HandlerUtility:
 
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
+
+
+    def get_value_from_configfile(self, key):
+        global backup_logger
+        value = None
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('SnapshotThread',key):
+                    value = config.get('SnapshotThread',key)
+                else:
+                    self.log("Config File doesn't have the key :" + key, 'Info')
+        except Exception as e:
+            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
+ 
+    def set_value_to_configfile(self, key, value):
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            self.log('setting doseq flag in config file', 'Info')
+            if not os.path.exists(os.path.dirname(configfile)):
+                os.makedirs(os.path.dirname(configfile))
+            config = ConfigParsers.RawConfigParser()
+            if os.path.exists(configfile):
+                config.read(configfile)
+                if config.has_section('SnapshotThread'):
+                    if config.has_option('SnapshotThread', key):
+                        config.remove_option('SnapshotThread', key)
+                else:
+                    config.add_section('SnapshotThread')
+            else:
+                config.add_section('SnapshotThread')
+            config.set('SnapshotThread', key, value)
+            with open(configfile, 'w') as config_file:
+                config.write(config_file)
+        except Exception as e:
+            errorMsg = " Unable to set config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
 
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
@@ -495,7 +541,7 @@ class HandlerUtility:
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        stat_rept = "[" + json.dumps(stat_rept, cls = Utils.Status.ComplexEncoder) + "]"
+        stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
         
         # Add Status as sub-status for Status to be written on Status-File
@@ -503,7 +549,7 @@ class HandlerUtility:
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
-        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Utils.Status.ComplexEncoder) + "]"
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
@@ -603,3 +649,11 @@ class HandlerUtility:
         except Exception as e:
             self.log("Can't receive shell log file: " + str(e))
             return lines
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj,'convertToDictionary'):
+            return obj.convertToDictionary()
+        else:
+            return obj.__dict__
+

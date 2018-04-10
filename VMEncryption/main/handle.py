@@ -361,6 +361,9 @@ def update_encryption_settings():
 
 def update():
     hutil.do_parse_context('Upadate')
+    logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
+    DistroPatcher.update_prereq()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():
@@ -507,7 +510,7 @@ def enable():
             else:
                 logger.log("PRECHECK: Prechecks successful")
         except Exception:
-            logger.log("PRECHECK: Exception thrown during precheck, incompatible environment suspected")
+            logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
         public_settings = get_public_settings()
