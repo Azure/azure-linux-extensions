@@ -25,13 +25,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="MANIFEST.in" />
-<<<<<<< HEAD
-    <Content Include="main\oscrypto\rhel_72_lvm\encryptpatches\rhel_72_lvm_dracut.patch" />
-    <Content Include="main\oscrypto\rhel_72\encryptpatches\rhel_72_dracut.patch" />
-=======
     <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
->>>>>>> master
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
