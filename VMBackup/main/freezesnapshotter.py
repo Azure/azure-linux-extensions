@@ -123,7 +123,7 @@ class FreezeSnapshotter(object):
                     backup_logger.log('T:S  snapshot failed at index ' + str(snapshot_index), True)
                     snapshot_array_fail = True
                     break
-	else:
+       else:
             snapshot_array_fail = True
         return snapshot_array_fail
 
