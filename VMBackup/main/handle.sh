@@ -10,6 +10,11 @@ resultstrlen=`expr ${#postsubstr} - 1 - ${#postsubstr1}`
 logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
 
+if [ "$1" == "install" ]
+then
+    rm -f /var/lib/waagent/Prod.*.agentsManifest
+fi
+
 rc=3
 if [ -f "/usr/bin/python2.7" ]
 then

@@ -1,6 +1,6 @@
 include HandlerManifest.json manifest.xml
-recursive-include main/oscrypto/rhel_72_lvm/encryptpatches *.patch
-recursive-include main/oscrypto/rhel_72/encryptpatches *.patch
+recursive-include main/oscrypto/91ade *.sh
+recursive-include main/oscrypto/91ade *.rules
 recursive-include main/oscrypto/rhel_68/encryptpatches *.patch
 recursive-include main/oscrypto/centos_68/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1604/encryptpatches *.patch

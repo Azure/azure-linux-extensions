@@ -71,3 +71,6 @@ class UbuntuPatching(AbstractPatching):
         
         cmd = " ".join(['pip', 'install', 'adal'])
         self.command_executor.Execute(cmd)
+
+    def update_prereq(self):
+        pass
