@@ -161,6 +161,7 @@ def enable():
                                           message="(03001)Argument error, invalid ExtensionAction/mode.")
                 hutil.do_exit(51, 'Enable', 'error', '51', 'Enable failed, unknown ExtensionAction/mode: ' + mode)
         if mode == Mode.remove:
+            extension_status_event = "ExtensionModuleRemove"
             remove_module()
         elif mode == Mode.register:
             registration_key = get_config('RegistrationKey')
@@ -181,8 +182,10 @@ def enable():
                 extension_status_event = "ExtensionUpgrade"
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
+                extension_status_event = "ExtensionUpgrade"
             else:
                 install_module(file_path)
+                extension_status_event = "ExtensionModuleInstall"
         if mode == Mode.push or mode == Mode.pull:
             if check_dsc_configuration(current_config):
                 if mode == Mode.push:
