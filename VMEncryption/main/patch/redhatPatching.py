@@ -145,11 +145,30 @@ class redhatPatching(AbstractPatching):
 
     def update_prereq(self):
         if self.distro_info[1] in ["7.2", "7.3", "7.4"]:
-             # Execute unpatching commands only if all the three patch files are present.
+            dracut_repack_needed = False
+
+            # Execute unpatching commands only if all the three patch files are present.
             if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
                 if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
                     if os.path.exists("/lib/dracut/modules.d/90crypt/parse-crypt.sh.orig"):
                         redhatPatching.create_autounlock_initramfs(self.logger, self.command_executor)
+                        dracut_repack_needed = True
+
+            if self.command_executor.Execute("rpm -q nmap-ncat"):
+                # This means nmap-ncat is not installed
+                self.command_executor.Execute("yum install -y nmap-ncat", True)
+                dracut_repack_needed = True
+
+            if os.path.exists("/lib/dracut/modules.d/91lvm/"):
+                # If 90lvm already exists 91lvm will cause problems, so remove it.
+                if os.path.exists("/lib/dracut/modules.d/90lvm/"):
+                    shutil.rmtree("/lib/dracut/modules.d/91lvm/")
+                else:
+                    os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
+                dracut_repack_needed = True
+
+            if dracut_repack_needed:
+                command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
 
     @staticmethod
     def append_contents_to_file(contents, path):
@@ -198,5 +217,4 @@ class redhatPatching(AbstractPatching):
         redhatPatching.append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
                                                '/etc/crypttab')
 
-        command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
