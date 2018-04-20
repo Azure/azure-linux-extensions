@@ -56,6 +56,10 @@ class PrereqState(OSEncryptionState):
                                                                                             distro_info[1]))
 
         self.context.distro_patcher.install_extras()
+        if self.command_executor.Execute("rpm -q nmap-ncat"):
+            # This means nmap-ncat is not installed, let's try again
+            # and fail if it doesn't install
+            self.command_executor.Execute("yum install -y nmap-ncat", True)
 
         self._patch_waagent()
         self.command_executor.Execute('systemctl daemon-reload', True)
