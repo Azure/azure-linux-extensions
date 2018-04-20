@@ -255,6 +255,9 @@ def update_encryption_settings():
 
             if DistroPatcher.distro_info[0] == "Ubuntu":
                 executor.Execute("update-initramfs -u -k all", True)
+            elif DistroPatcher.distro_info[0] in ["redhat", "centos"]:
+                executor.Execute("dracut -I ntfs-3g -f -v", True)
+
 
             os.unlink(temp_keyfile.name)
 

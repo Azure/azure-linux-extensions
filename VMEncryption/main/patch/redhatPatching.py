@@ -149,7 +149,7 @@ class redhatPatching(AbstractPatching):
             # This means nmap-ncat is not installed
             self.command_executor.Execute("yum install -y nmap-ncat")
 
-        while i in range(10):
+        for i in range(10):
             # this stuff should noop if ncat is already installed
             if self.command_executor.Execute("rpm -q nmap-ncat"):
                 # This means nmap-ncat is not installed
