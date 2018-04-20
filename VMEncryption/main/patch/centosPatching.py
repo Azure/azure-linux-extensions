@@ -172,7 +172,7 @@ class centosPatching(redhatPatching):
                     shutil.rmtree("/lib/dracut/modules.d/91lvm/")
                 else:
                     os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
-                command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+                self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
 
             self.try_install_ncat()
 
@@ -186,4 +186,4 @@ class centosPatching(redhatPatching):
                 dracut_repack_needed = True
 
             if dracut_repack_needed:
-                command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+                self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
