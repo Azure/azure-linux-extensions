@@ -118,9 +118,6 @@ class PatchBootSystemState(OSEncryptionState):
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
                                       '/etc/default/grub')
 
-        self._append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
-                                      '/etc/crypttab')
-
         self._append_contents_to_file('\nadd_drivers+=" fuse vfat nls_cp437 nls_iso8859-1"\n',
                                       '/etc/dracut.conf')
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
