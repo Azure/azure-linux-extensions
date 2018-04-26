@@ -34,6 +34,8 @@ else
     device="$1"
 fi
 
+numtries=${3:-10}
+
 #
 # Open LUKS device
 #
@@ -52,6 +54,17 @@ if [ -n "$luksfile" -a "$luksfile" != "none" -a -e "$luksfile" ]; then
     if cryptsetup --key-file "$luksfile" $cryptsetupopts luksOpen "$device" "$luksname"; then
         ask_passphrase=0
     fi
+else
+	if [ $numtries -eq 0 ]; then
+		warn "No key found for $device.  Fallback to passphrase mode."
+	else
+		sleep 1
+		info "No key found for $device.  Will try $numtries time(s) more later."
+		initqueue --unique --onetime --settled \
+			--name cryptroot-ask-$luksname \
+			$(command -v cryptroot-ask) "$device" "$luksname" "$(($numtries-1))"
+		exit 0
+	fi
 fi
 
 if [ $ask_passphrase -ne 0 ]; then

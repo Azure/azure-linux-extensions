@@ -208,6 +208,8 @@ class redhatPatching(AbstractPatching):
         partition = matches[0]
         sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
         command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
+        sed_grub_cmd = "sed -i.bak '/osencrypt-locked/d' /etc/crypttab"
+        command_executor.Execute(command_to_execute=sed_grub_cmd, raise_exception_on_failure=True)
 
 
     @staticmethod
