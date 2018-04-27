@@ -166,7 +166,7 @@ class redhatPatching(AbstractPatching):
             dracut_repack_needed = True
 
             if dracut_repack_needed:
-                self.command_executor.Execute("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
 
     @staticmethod
     def is_old_patching_system():
