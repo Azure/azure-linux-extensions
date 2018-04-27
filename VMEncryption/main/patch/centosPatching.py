@@ -137,27 +137,28 @@ class centosPatching(redhatPatching):
             self.command_executor.Execute("pip install adal")
 
     def update_prereq(self):
-        if ((self.distro_info[1] in ["7.3.1611", "7.2.1511"]) or (self.distro_info[1].startswith('7.4'))):
-            dracut_repack_needed = False
+        dracut_repack_needed = False
 
-            if os.path.exists("/lib/dracut/modules.d/91lvm/"):
-                # If 90lvm already exists 91lvm will cause problems, so remove it.
-                if os.path.exists("/lib/dracut/modules.d/90lvm/"):
-                    shutil.rmtree("/lib/dracut/modules.d/91lvm/")
-                else:
-                    os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
-                dracut_repack_needed = True
+        if os.path.exists("/lib/dracut/modules.d/91lvm/"):
+            # If 90lvm already exists 91lvm will cause problems, so remove it.
+            if os.path.exists("/lib/dracut/modules.d/90lvm/"):
+                shutil.rmtree("/lib/dracut/modules.d/91lvm/")
+            else:
+                os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
+            dracut_repack_needed = True
 
-            if redhatPatching.is_old_patching_system():
-                redhatPatching.remove_old_patching_system(self.logger, self.command_executor)
-                dracut_repack_needed = True
+        if redhatPatching.is_old_patching_system():
+            redhatPatching.remove_old_patching_system(self.logger, self.command_executor)
+            dracut_repack_needed = True
 
-            if os.path.exists("/lib/dracut/modules.d/91ade/"):
-                shutil.rmtree("/lib/dracut/modules.d/91ade/")
+        if os.path.exists("/lib/dracut/modules.d/91ade/"):
+            shutil.rmtree("/lib/dracut/modules.d/91ade/")
+            dracut_repack_needed = True
 
+        if os.path.exists("/dev/mapper/osencrypt"):
             #TODO: only do this if needed (if code and existing module are different)
             redhatPatching.add_91_ade_dracut_module(self.command_executor)
             dracut_repack_needed = True
 
-            if dracut_repack_needed:
-                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+        if dracut_repack_needed:
+            self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
