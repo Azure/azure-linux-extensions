@@ -122,8 +122,7 @@ class centosPatching(redhatPatching):
                     'pyparted',
                     'libffi-devel',
                     'openssl-devel',
-                    'python-devel',
-                    'nmap-ncat']
+                    'python-devel']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')
@@ -137,33 +136,8 @@ class centosPatching(redhatPatching):
             self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")
 
-    def try_install_ncat(self):
-        # try once
-        if self.command_executor.Execute("rpm -q nmap-ncat"):
-            # This means nmap-ncat is not installed
-            self.command_executor.Execute("yum install -y nmap-ncat")
-
-        for i in range(10):
-            # this stuff should noop if ncat is already installed
-            if self.command_executor.Execute("rpm -q nmap-ncat"):
-                # This means nmap-ncat is not installed
-                self.command_executor.Execute("yum install -y nmap-ncat")
-                time.sleep(10)
-
-        if self.command_executor.Execute("rpm -q nmap-ncat"):
-            # throw an exception
-            raise Exception("Failed to install ncat repeatedly. Aborting")
-
-    def is_old_patching_system(self):
-        # Execute unpatching commands only if all the three patch files are present.
-        if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
-            if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
-                if os.path.exists("/lib/dracut/modules.d/90crypt/parse-crypt.sh.orig"):
-                    return True
-        return False
-
     def update_prereq(self):
-        if ((self.distro_info[1] in ["7.3.1611", "7.2.1511"]) or (self.distro_info[1].startswith('7.4'))):
+        if (self.distro_info[1].startswith('7.')):
             dracut_repack_needed = False
 
             if os.path.exists("/lib/dracut/modules.d/91lvm/"):
@@ -172,18 +146,20 @@ class centosPatching(redhatPatching):
                     shutil.rmtree("/lib/dracut/modules.d/91lvm/")
                 else:
                     os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
-                self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
-
-            self.try_install_ncat()
-
-            if self.command_executor.ExecuteInBash("lsinitrd | grep bin/ncat"):
-                # ncat is not present in the initramfs but it is installed in the system
-                # so let's repack
                 dracut_repack_needed = True
 
-            if self.is_old_patching_system():
-                redhatPatching.create_autounlock_initramfs(self.logger, self.command_executor)
+            if redhatPatching.is_old_patching_system():
+                redhatPatching.remove_old_patching_system(self.logger, self.command_executor)
+                dracut_repack_needed = True
+
+            if os.path.exists("/lib/dracut/modules.d/91ade/"):
+                shutil.rmtree("/lib/dracut/modules.d/91ade/")
+                dracut_repack_needed = True
+
+            if os.path.exists("/dev/mapper/osencrypt"):
+                #TODO: only do this if needed (if code and existing module are different)
+                redhatPatching.add_91_ade_dracut_module(self.command_executor)
                 dracut_repack_needed = True
 
             if dracut_repack_needed:
-                self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
