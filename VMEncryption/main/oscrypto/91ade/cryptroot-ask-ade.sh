@@ -14,7 +14,7 @@ NEWROOT=${NEWROOT:-"/sysroot"}
 [ -b /dev/mapper/$2 ] && exit 0
 
 # we already asked for this device
-[ -f /tmp/cryptroot-asked-$2 ] && exit 0
+[ -f /tmp/cryptroot-ade-asked-$2 ] && exit 0
 
 # load dm_crypt if it is not already loaded
 [ -d /sys/module/dm_crypt ] || modprobe dm_crypt
@@ -61,8 +61,8 @@ else
 		sleep 1
 		info "No key found for $device.  Will try $numtries time(s) more later."
 		initqueue --unique --onetime --settled \
-			--name cryptroot-ask-$luksname \
-			$(command -v cryptroot-ask) "$device" "$luksname" "$(($numtries-1))"
+			--name cryptroot-ask-ade-$luksname \
+			$(command -v cryptroot-ask-ade) "$device" "$luksname" "$(($numtries-1))"
 		exit 0
 	fi
 fi
@@ -82,7 +82,7 @@ umount /mnt/azure_bek_disk
 unset device luksname luksfile
 
 # mark device as asked
->> /tmp/cryptroot-asked-$2
+>> /tmp/cryptroot-ade-asked-$2
 
 need_shutdown
 udevsettle
