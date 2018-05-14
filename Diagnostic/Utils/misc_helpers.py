@@ -276,7 +276,7 @@ def get_deployment_id_from_hosting_env_cfg(waagent_dir, logger_log, logger_error
     env_cfg_path = os.path.join(waagent_dir, "HostingEnvironmentConfig.xml")
     if not os.path.exists(env_cfg_path):
         logger_log("No Deployment ID (not running in a hosted environment")
-        return None
+        return identity
 
     try:
         with open(env_cfg_path, 'r') as env_cfg_file:
