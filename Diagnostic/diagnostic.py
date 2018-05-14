@@ -109,7 +109,7 @@ def init_globals():
     global g_diagnostic_py_filepath, g_lad_log_helper
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-    waagent.Log("LinuxAzureDiagnostic started to handle.")
+    waagent.Log("LinuxDiagnostic started to handle.")
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     init_extension_settings()
     init_distro_specific_actions()
