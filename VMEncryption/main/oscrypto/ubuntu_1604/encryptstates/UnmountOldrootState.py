@@ -88,6 +88,9 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists("/mnt/azure_bek_disk"):
             self.command_executor.Execute('umount /mnt/azure_bek_disk')
 
+        if os.path.exists("/boot/efi"):
+            self.command_executor.Execute('umount /boot/efi')
+
         proc_comm = ProcessCommunicator()
 
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
