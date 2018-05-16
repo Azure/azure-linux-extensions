@@ -109,6 +109,65 @@ class DiskUtil(object):
 
         return crypt_item
 
+    def get_lsblk_tree(self):
+        """
+        Parse lsblk output, link child items to parents, and return constructed tree
+            
+        Note: using dumps() on the output of this method will create a JSON string
+        in the same format as versions of lsblk including the --json output option
+        (eg., lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json)
+        """
+        def add_child(items, child):
+            if not 'pkname' in child:
+                items.append(child)
+            else:
+                for item in items:
+                    if item['name'] == child['pkname']:
+                        child.pop('pkname')
+                        if not 'children' in item:
+                            item['children'] = []
+                        item['children'].append(child)
+                        break
+                    elif 'children' in item:
+                        # recurse until parent identified
+                        item['children'] = add_child(item['children'], child)
+            return items
+
+        def get_child(line):
+                if line:
+                    child = {}
+                    for kvpstr in line.split():
+                        kvp = kvpstr.split('=')
+                        if kvp[0]:
+                            key = kvp[0].lower()
+                        if kvp[1] and kvp[1].strip('"'):
+                            value = kvp[1].strip('"')
+                        else:
+                            value = None
+
+                        # add pkname element only if nonempty
+                        if key == 'pkname':
+                            if value:
+                                child[key] = value
+                        else:
+                            child[key] = value
+                    return child
+                else:
+                    return None
+
+        proc_comm = ProcessCommunicator()
+        lsblk_command = "lsblk -p -P -o PKNAME,NAME,FSTYPE,MOUNTPOINT"
+        self.command_executor.Execute(
+            lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+        lsblk_out = proc_comm.stdout
+
+        items = []
+        for line in lsblk_out.splitlines():
+                child = get_child(line)
+                items = add_child(items, child)
+        return items
+
+
     def get_azure_vhd_dev_items(self, device_items):
         """
         Returns all the underlying azure-vhd level device items for given device items (that may be "children" of the vhds)
@@ -116,65 +175,9 @@ class DiskUtil(object):
         Gets a list of dev_items say ("/dev/sdd","/dev/sdc1","/dev/mapper/vg0-lv0")
         And figures out which Azure VHDs are covered by these device items and returns their dev_items (in the below example: [/dev/sdb, /dev/sdc, /dev/sdd])
 
-        In order to do this we use the lsblk output in JSON format to clearly see who is who's "child".
-
-        See sample LSBLK output:
-            without JSON: lsblk -p -o NAME,FSTYPE,MOUNTPOINT
-                NAME                       FSTYPE      MOUNTPOINT
-                /dev/sdd                   LVM2_member
-                  /dev/mapper/vg0-lv0      crypto_LUKS
-                    /dev/mapper/unlocked
-                /dev/sdb
-                  /dev/sdb1                LVM2_member
-                    /dev/mapper/vg0-lv0    crypto_LUKS
-                      /dev/mapper/unlocked
-                /dev/sdc
-                  /dev/sdc1                vfat        /mnt/azure_bek_disk
-                /dev/sda
-                  /dev/sda1                ext4        /
-            with JSON: lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json
-                {
-                   "blockdevices": [
-                      {"name": "/dev/sdd", "fstype": "LVM2_member", "mountpoint": null,
-                         "children": [
-                            {"name": "/dev/mapper/vg0-lv0", "fstype": "crypto_LUKS", "mountpoint": null,
-                               "children": [
-                                  {"name": "/dev/mapper/unlocked", "fstype": null, "mountpoint": null}
-                               ]
-                            }
-                         ]
-                      },
-                      {"name": "/dev/sdb", "fstype": null, "mountpoint": null,
-                         "children": [
-                            {"name": "/dev/sdb1", "fstype": "LVM2_member", "mountpoint": null,
-                               "children": [
-                                  {"name": "/dev/mapper/vg0-lv0", "fstype": "crypto_LUKS", "mountpoint": null,
-                                     "children": [
-                                        {"name": "/dev/mapper/unlocked", "fstype": null, "mountpoint": null}
-                                     ]
-                                  }
-                               ]
-                            }
-                         ]
-                      },
-                      {"name": "/dev/sdc", "fstype": null, "mountpoint": null,
-                         "children": [
-                            {"name": "/dev/sdc1", "fstype": "vfat", "mountpoint": "/mnt/azure_bek_disk"}
-                         ]
-                      },
-                      {"name": "/dev/sda", "fstype": null, "mountpoint": null,
-                         "children": [
-                            {"name": "/dev/sda1", "fstype": "ext4", "mountpoint": "/"}
-                         ]
-                      }
-                   ]
-                }
+        In order to do this we construct an lsblk tree object using get_lsblk_tree method to identify who is who's "child".
         """
-        proc_comm = ProcessCommunicator()
-        lsblk_command = "lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json"
-        self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-
-        lsblk_tree = json.loads(proc_comm.stdout)["blockdevices"]
+        lsblk_tree = self.get_lsblk_tree()
 
         # Let's set up a set of realpaths of each dev_items's real_path
         real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in device_items])
