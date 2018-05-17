@@ -78,3 +78,6 @@ class oraclePatching(redhatPatching):
         common_extras = ['cryptsetup','lsscsi']
         for extra in common_extras:
             self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+
+    def update_prereq(self):
+        pass
