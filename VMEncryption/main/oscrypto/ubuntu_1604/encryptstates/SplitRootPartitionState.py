@@ -104,7 +104,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         self.context.logger.log("Root filesystem resized successfully")
 
-        root_partition = disk.partitions[0]
+        root_partition = disk.getPartitionByPath(self.rootfs_sdx_path)
 
         original_root_partition_start = root_partition.geometry.start
         original_root_partition_end = root_partition.geometry.end
@@ -129,9 +129,12 @@ class SplitRootPartitionState(OSEncryptionState):
                                   start=desired_root_partition_start,
                                   end=desired_root_partition_end)
 
-        desired_boot_partition_start = disk.getFreeSpaceRegions()[1].start
-        desired_boot_partition_end = disk.getFreeSpaceRegions()[1].end
-        desired_boot_partition_size = disk.getFreeSpaceRegions()[1].length
+        for free_space_region in disk.getFreeSpaceRegions():
+            if free_space_region.start == desired_root_partition_end + 1 :
+                desired_boot_partition_start = free_space_region.start
+                desired_boot_partition_end = free_space_region.end
+                desired_boot_partition_size = free_space_region.length
+                break
 
         self.context.logger.log("Desired boot partition start (sectors): {0}".format(desired_boot_partition_start))
         self.context.logger.log("Desired boot partition end (sectors): {0}".format(desired_boot_partition_end))
@@ -148,18 +151,21 @@ class SplitRootPartitionState(OSEncryptionState):
 
         disk.commit()
 
-        probed_root_fs = parted.probeFileSystem(disk.partitions[0].geometry)
+        root_partition = disk.getPartitionByPath(self.rootfs_sdx_path)
+        probed_root_fs = parted.probeFileSystem(root_partition.geometry)
         if not probed_root_fs == 'ext4':
             raise Exception("Probed root fs is not ext4")
 
-        disk.partitions[1].setFlag(parted.PARTITION_BOOT)
+        boot_partition = root_partition.nextPartition()
+        if root_partition.getFlag(parted.PARTITION_BOOT):
+            boot_partition.setFlag(parted.PARTITION_BOOT)
 
         disk.commit()
         
         self.command_executor.Execute("partprobe", True)
-        self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
+        self.command_executor.Execute("mkfs.ext2 {0}".format(boot_partition.path), True)
         
-        boot_partition_uuid = self._get_uuid(self.bootfs_block_device)
+        boot_partition_uuid = self._get_uuid(boot_partition.path)
 
         # Move stuff from /oldroot/boot to new partition, make new partition mountable at the same spot
         self.command_executor.Execute("mount {0} /oldroot".format(self.rootfs_block_device), True)
