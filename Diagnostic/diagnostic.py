@@ -29,6 +29,10 @@ import time
 import traceback
 import xml.etree.ElementTree as ET
 
+#https://github.com/Azure/azure-linux-extensions/issues/542 
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
 # by setting PYTHONPATH env var to the azure-linux-extensions/Common/WALinuxAgent-2.0.16,
@@ -109,7 +113,7 @@ def init_globals():
     global g_diagnostic_py_filepath, g_lad_log_helper
 
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
-    waagent.Log("LinuxAzureDiagnostic started to handle.")
+    waagent.Log("LinuxDiagnostic started to handle.")
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     init_extension_settings()
     init_distro_specific_actions()

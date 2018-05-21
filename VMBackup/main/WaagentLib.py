@@ -3222,8 +3222,7 @@ class ExtensionsConfig(object):
     # kiG9w0DBwQITgu0Nu3iFPuAGD6/QzKdtrnCI5425fIUy7LtpXJGmpWDUA==","publicSettings":{"port":"3000"}}}]}</RuntimeSettings>
     #  </Plugin>
     # </PluginSettings>
-    # <StatusUploadBlob>https://ostcextensions.blob.core.test-cint.azure-test.net/vhds/eg-plugin7-vm.eg-plugin7-vm.eg-plugin7-vm.status?sr=b&amp;sp=rw&amp;
-    # se=9999-01-01&amp;sk=key1&amp;sv=2012-02-12&amp;sig=wRUIDN1x2GC06FWaetBP9sjjifOWvRzS2y2XBB4qoBU%3D</StatusUploadBlob></Extensions>
+ 
 
     def __init__(self):
         self.reinitialize()

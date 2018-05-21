@@ -345,7 +345,6 @@ def update_encryption_settings():
 def update():
     hutil.do_parse_context('Upadate')
     logger.log("Installing pre-requisites")
-    DistroPatcher.install_extras()
     DistroPatcher.update_prereq()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
