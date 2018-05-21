@@ -56,14 +56,14 @@ class FreezeSnapshotter(object):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
                 self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
-                if(customSettings['isManagedVm'] == 'true'):
-                    self.isManaged = True
+                self.isManaged = customSettings['isManagedVm']
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             self.isManaged = True
 
         if(self.isManaged):
+            self.logger.log('Changing takeSnapshotFrom to onlyGuest as it is managed VM')
             self.takeSnapshotFrom = CommonVariables.onlyGuest
 
 
@@ -137,6 +137,11 @@ class FreezeSnapshotter(object):
         try:
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
+            if( self.para_parser.blobs == None or len(self.para_parser.blobs) == 0) :
+                        run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                        run_status = 'error'
+                        error_msg = 'T:S taking snapshot failed as blobs are empty or none'
+                        self.logger.log(error_msg, True, 'Error')
             if(run_result == CommonVariables.success):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
                 snap_shotter = GuestSnapshotter(self.logger)
