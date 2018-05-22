@@ -19,8 +19,10 @@
 import time
 import datetime
 import traceback
-import urlparse
-import httplib
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
 from common import CommonVariables
 from HttpUtil import HttpUtil
 

@@ -18,6 +18,7 @@
 
 
 import os
+import os.path
 import sys
 import imp
 import base64
@@ -39,7 +40,7 @@ class centosPatching(redhatPatching):
         super(centosPatching, self).__init__(logger, distro_info)
         self.logger = logger
         self.command_executor = CommandExecutor(logger)
-        if distro_info[1] == "6.8" or distro_info[1] == "6.7" or distro_info[1] == "6.6" or distro_info[1] == "6.5":
+        if distro_info[1] in ["6.9", "6.8", "6.7", "6.6", "6.5"]:
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
             self.blkid_path = '/sbin/blkid'
@@ -123,9 +124,42 @@ class centosPatching(redhatPatching):
                     'openssl-devel',
                     'python-devel']
 
+        if self.distro_info[1].startswith("6."):
+            packages.remove('cryptsetup')
+            packages.remove('procps-ng')
+            packages.remove('util-linux')
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
         if self.command_executor.Execute("pip show adal"):
             self.command_executor.Execute("pip install --upgrade six")
             self.command_executor.Execute("pip install adal")
+
+    def update_prereq(self):
+        if (self.distro_info[1].startswith('7.')):
+            dracut_repack_needed = False
+
+            if os.path.exists("/lib/dracut/modules.d/91lvm/"):
+                # If 90lvm already exists 91lvm will cause problems, so remove it.
+                if os.path.exists("/lib/dracut/modules.d/90lvm/"):
+                    shutil.rmtree("/lib/dracut/modules.d/91lvm/")
+                else:
+                    os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
+                dracut_repack_needed = True
+
+            if redhatPatching.is_old_patching_system():
+                redhatPatching.remove_old_patching_system(self.logger, self.command_executor)
+                dracut_repack_needed = True
+
+            if os.path.exists("/lib/dracut/modules.d/91ade/"):
+                shutil.rmtree("/lib/dracut/modules.d/91ade/")
+                dracut_repack_needed = True
+
+            if os.path.exists("/dev/mapper/osencrypt"):
+                #TODO: only do this if needed (if code and existing module are different)
+                redhatPatching.add_91_ade_dracut_module(self.command_executor)
+                dracut_repack_needed = True
+
+            if dracut_repack_needed:
+                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)

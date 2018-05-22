@@ -54,23 +54,29 @@ Example Status Report:
 import os
 import os.path
 import sys
+import re
 import imp
 import base64
 import json
 import tempfile
 import time
 from os.path import join
+import Utils.WAAgentUtil
 from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
 import logging
 import logging.handlers
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 from common import CommonVariables
 import platform
 import subprocess
 import datetime
-import Status
+import Utils.Status
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
+import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -81,15 +87,18 @@ class HandlerContext:
         return
 
 class HandlerUtility:
-    telemetry_data = []
+    telemetry_data = {} 
+    serializable_telemetry_data = []
     ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
+        self.log_message = ""
         self._short_name = short_name
         self.patching = None
         self.storageDetailsObj = None
         self.partitioncount = 0
+        self.logging_file = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -129,11 +138,33 @@ class HandlerUtility:
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             sys.exit(0)
 
-    def log(self, message):
-        self._log(self._get_log_prefix() + message)
+    def log(self, message,level='Info'):
+        if sys.version_info > (3,):
+            if self.logging_file is not None:
+                self.log_py3(message)
+            else:
+                pass
+            #self.log_to_file() 
+        else:
+            self._log(self._get_log_prefix() + message)
+        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
+
+    def log_py3(self, msg):
+        if type(msg) is not str:
+            msg = str(msg, errors="backslashreplace")
+        msg = str(datetime.datetime.now()) + " " + str(self._get_log_prefix()) + msg + "\n"
+        try:
+            with open(self.logging_file, "a+") as C :
+                C.write(msg)
+        except IOError:
+            pass
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
+
+    def fetch_log_message(self):
+        return self.log_message
 
     def _parse_config(self, ctxt):
         config = None
@@ -141,13 +172,12 @@ class HandlerUtility:
             config = json.loads(ctxt)
         except:
             self.error('JSON exception decoding ' + ctxt)
-
         if config == None:
             self.error("JSON error processing settings file:" + ctxt)
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
-            if handlerSettings.has_key('protectedSettings') and \
-                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+            if 'protectedSettings' in handlerSettings and \
+                    "protectedSettingsCertThumbprint" in handlerSettings and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 protectedSettings = handlerSettings['protectedSettings']
@@ -159,10 +189,7 @@ class HandlerUtility:
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
-                jctxt = ''
+                jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
@@ -174,6 +201,11 @@ class HandlerUtility:
     def do_parse_context(self, operation):
         self.operation = operation
         _context = self.try_parse_context()
+        getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
+        if(getWaagentPathUsed == 0):
+            self.log("waagent old path is used")
+        else:
+            self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
             sys.exit(0)
@@ -204,12 +236,13 @@ class HandlerUtility:
             return None
         if type(handler_env) == list:
             handler_env = handler_env[0]
-
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+        self.logging_file=self._context._log_file
+        self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
         self._change_log_file()
         self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
         self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
@@ -232,13 +265,12 @@ class HandlerUtility:
             if(self.operation is not None and self.operation.lower() == "enable"):
                 # we should keep the current status file
                 self.backup_settings_status_file(self._context._seq_no)
-
         self._context._config = self._parse_config(ctxt)
         return self._context
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
-        LoggerInit(self._context._log_file,'/dev/stdout')
+        waagent.LoggerInit(self._context._log_file,'/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 
@@ -248,6 +280,48 @@ class HandlerUtility:
 
     def set_last_seq(self,seq):
         waagent.SetFileContents('mrseq', str(seq))
+
+
+    def get_value_from_configfile(self, key):
+        global backup_logger
+        value = None
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('SnapshotThread',key):
+                    value = config.get('SnapshotThread',key)
+                else:
+                    self.log("Config File doesn't have the key :" + key, 'Info')
+        except Exception as e:
+            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
+ 
+    def set_value_to_configfile(self, key, value):
+        configfile = '/etc/azure/vmbackup.conf'
+        try :
+            self.log('setting doseq flag in config file', 'Info')
+            if not os.path.exists(os.path.dirname(configfile)):
+                os.makedirs(os.path.dirname(configfile))
+            config = ConfigParsers.RawConfigParser()
+            if os.path.exists(configfile):
+                config.read(configfile)
+                if config.has_section('SnapshotThread'):
+                    if config.has_option('SnapshotThread', key):
+                        config.remove_option('SnapshotThread', key)
+                else:
+                    config.add_section('SnapshotThread')
+            else:
+                config.add_section('SnapshotThread')
+            config.set('SnapshotThread', key, value)
+            with open(configfile, 'w') as config_file:
+                config.write(config_file)
+        except Exception as e:
+            errorMsg = " Unable to set config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
+        return value
 
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
@@ -266,7 +340,7 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "w")
                 file_pointer.write(machine_id)
                 file_pointer.close()
-        except:
+        except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, False, 'Error')
  
@@ -275,21 +349,24 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
-            Filesystem     1K-blocks    Used Available Use% Mounted on
-            udev             1756684      12   1756672   1% /dev
-            tmpfs             352312     420    351892   1% /run
-            /dev/sda1       30202916 2598292  26338592   9% /
-            none                   4       0         4   0% /sys/fs/cgroup
-            none                5120       0      5120   0% /run/lock
-            none             1761552       0   1761552   0% /run/shm
-            none              102400       0    102400   0% /run/user
-            none                  64       0        64   0% /etc/network/interfaces.dynamic.d
-            tmpfs                  4       4         0 100% /etc/ruxitagentproc
-            /dev/sdb1        7092664   16120   6693216   1% /mnt
+            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
+            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
+            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
+            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
+            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
+            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
+            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
+            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
+            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
+            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
+            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
+            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
+            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
             process_wait_time = 30
@@ -300,21 +377,39 @@ class HandlerUtility:
             output = df.stdout.read()
             output = output.split("\n")
             total_used = 0
+            total_used_network_shares = 0
+            total_used_gluster = 0
+            network_fs_types = []
             for i in range(1,len(output)-1):
-                device, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} used space in KB : {1}".format(device,used))
-                total_used = total_used + int(used) #return in KB
+                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
+                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
+                    if fstype not in network_fs_types :
+                        network_fs_types.append(fstype)
+                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
+                    total_used_network_shares = total_used_network_shares + int(used)
+                elif (mountpoint.startswith('/run/gluster/snaps/')):
+                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used_gluster = total_used_gluster + int(used)
+                else:
+                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
+                    total_used = total_used + int(used) #return in KB
 
+            if not len(network_fs_types) == 0:
+                HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
+                HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
+                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
+            if total_used_gluster !=0 :
+                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
             self.log("Total used space in Bytes : {0}".format(total_used * 1024))
             return total_used * 1024,False #Converting into Bytes
-        except:
-            self.log("Unable to fetch total used space")
+        except Exception as e:
+            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
             return 0,True
 
-    def get_storage_details(self):
-        if(self.storageDetailsObj == None):
-            total_size,failure_flag = self.get_total_used_size()
-            self.storageDetailsObj = Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
+    def get_storage_details(self,total_size,failure_flag):
+        self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
 
         self.log("partition count : {0}, total used size : {1}, is storage space present : {2}, is size computation failed : {3}".format(self.storageDetailsObj.partitionCount, self.storageDetailsObj.totalUsedSizeInBytes, self.storageDetailsObj.isStoragespacePresent, self.storageDetailsObj.isSizeComputationFailed))
         return self.storageDetailsObj
@@ -323,11 +418,11 @@ class HandlerUtility:
         if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
             self.ExtErrorCode = extErrorCode
 
-    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj):
+    def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
-        formattedMessage = Status.FormattedMessage("en-US",message)
-        stat_obj = Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
-        top_stat_obj = Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
+        formattedMessage = Utils.Status.FormattedMessage("en-US",message)
+        stat_obj = Utils.Status.StatusObj(self._context._name, operation, status, sub_status, status_code, formattedMessage, telemetrydata, self.get_storage_details(total_size,failure_flag), self.get_machine_id(), taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        top_stat_obj = Utils.Status.TopLevelStatus(self._context._version, tstamp, stat_obj)
 
         return top_stat_obj
 
@@ -372,6 +467,7 @@ class HandlerUtility:
                 time.sleep(1)
                 process_wait_time -= 1
             out = p.stdout.read()
+            out = str(out)
             out =  out.split(" ")
             waagent = out[0]
             waagent_version = waagent.split("-")[-1] #getting only version number
@@ -402,7 +498,7 @@ class HandlerUtility:
             return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
-        sub_status_obj = Status.SubstatusObj(code,name,status,formattedmessage)
+        sub_status_obj = Utils.Status.SubstatusObj(code,name,status,formattedmessage)
         sub_status.append(sub_status_obj)
         return sub_status
 
@@ -414,11 +510,7 @@ class HandlerUtility:
 
     @staticmethod
     def add_to_telemetery_data(key,value):
-        temp_dict = {}
-        temp_dict["Value"] = value
-        temp_dict["Key"] = key
-        if(temp_dict not in HandlerUtility.telemetry_data):
-            HandlerUtility.telemetry_data.append(temp_dict)
+        HandlerUtility.telemetry_data[key]=value
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
@@ -426,39 +518,63 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
-
-    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None):
+    
+    def convert_telemetery_data_to_bcm_serializable_format(self):
+        HandlerUtility.serializable_telemetry_data = []
+        for k,v in HandlerUtility.telemetry_data.items():
+            each_telemetry_data = {}
+            each_telemetry_data["Value"] = v
+            each_telemetry_data["Key"] = k
+            HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
+ 
+    def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
 
-        vm_health_obj = Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(status_code))
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj)
+        vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
+        self.convert_telemetery_data_to_bcm_serializable_format()
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        stat_rept = "[" + json.dumps(stat_rept, cls = Status.ComplexEncoder) + "]"
+        stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
         
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
-        if self.get_public_settings()[CommonVariables.vmType] == CommonVariables.VmTypeV2 and CommonVariables.isTerminalStatus(status) :
+        if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None)
-        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = Status.ComplexEncoder) + "]"
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
+        stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong
         # status file.
         # because the wala choose the status file with the highest sequence
         # number to report.
-        if self._context._status_file:
-            with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept_file)
+        return stat_rept, stat_rept_file
 
-        return stat_rept
+    def write_to_status_file(self, stat_rept_file):
+        try:
+            if self._context._status_file:
+                with open(self._context._status_file,'w+') as f:
+                    f.write(stat_rept_file)
+        except Exception as e:
+            errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.log(errMsg)
+
+    def is_status_file_exists(self):
+        try:
+            if os.path.exists(self._context._status_file):
+                return True
+            else:
+                return False
+        except Exception as e:
+            self.log("exception is getting status file" + traceback.format_exc())
+            return False
 
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
@@ -498,22 +614,46 @@ class HandlerUtility:
         return self.get_handler_settings().get('publicSettings')
 
     def is_prev_in_transition(self):
-        last_seq = self.get_last_seq()
-        self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
-        status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
-        if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
-            searchfile = open(status_file_prev, "r")
-            for line in searchfile:
-                if "transition" in line: 
-                    return True
-            searchfile.close()
+        curr_seq = self.get_last_seq()
+        last_seq = curr_seq - 1
+        if last_seq >= 0:
+            self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
+            status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+            if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
+                searchfile = open(status_file_prev, "r")
+                for line in searchfile:
+                    if "Transition" in line: 
+                        self.log("transitioning found in the previous status file")
+                        searchfile.close()
+                        return True
+                searchfile.close()
         return False
 
     def get_prev_log(self):
         with open(self._context._log_file, "r") as f:
             lines = f.readlines()
-        if(len(lines) > 100):
-            lines = lines[-100:]
+        if(len(lines) > 300):
+            lines = lines[-300:]
             return ''.join(str(x) for x in lines)
         else:
             return ''.join(str(x) for x in lines)
+    
+    def get_shell_script_log(self):
+        lines = "" 
+        try:
+            with open(self._context._shell_log_file, "r") as f:
+                lines = f.readlines()
+            if(len(lines) > 10):
+                lines = lines[-10:]
+            return ''.join(str(x) for x in lines)
+        except Exception as e:
+            self.log("Can't receive shell log file: " + str(e))
+            return lines
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj,'convertToDictionary'):
+            return obj.convertToDictionary()
+        else:
+            return obj.__dict__
+

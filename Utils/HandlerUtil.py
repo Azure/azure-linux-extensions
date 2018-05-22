@@ -155,7 +155,7 @@ class HandlerUtility:
         except:
             self.error('JSON exception decoding ' + ctxt)
 
-        if config == None:
+        if config is None:
             self.error("JSON error processing settings file:" + ctxt)
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
@@ -170,9 +170,9 @@ class HandlerUtility:
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
                 openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
                 cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
-                if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb )
-                    self.do_exit(1,"Enable",'error','1', 'Failed decrypting protectedSettings')
+                if cleartxt is None:
+                    self.error("OpenSSL decode error using  thumbprint " + thumb )
+                    self.do_exit(1,"Enable",'error','1', 'Failed to decrypt protectedSettings')
                 jctxt=''
                 try:
                     jctxt=json.loads(cleartxt)

@@ -24,7 +24,15 @@ import os
 import time
 import sys
 import signal
-from DiskUtil import DiskUtil 
+import traceback
+import threading
+
+def thread_for_binary(self,args):
+    self.logger.log("Thread for binary is called",True)
+    time.sleep(5)
+    self.logger.log("Waited in thread for 5 seconds",True)
+    self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+    self.logger.log("Binary subprocess Created",True)
 
 class FreezeError(object):
     def __init__(self):
@@ -56,18 +64,24 @@ class FreezeHandler(object):
 
     def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
-        if(self.child.poll() is not None):
+        if(self.child is not None and self.child.poll() is not None):
             self.logger.log("binary child terminated",True)
             self.sig_handle=2
 
+    def reset_signals(self):
+        self.sig_handle = 0
+        self.child= None
+
+
     def startproc(self,args):
-        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-        for i in range(0,30):
+        binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+        binary_thread.start()
+        for i in range(0,33):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
             else:
-                break;
+                break
         self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
         return self.sig_handle
 
@@ -84,7 +98,7 @@ class FsFreezer:
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
-            errMsg="Failed to retrieve mount points"
+            errMsg='Failed to retrieve mount points, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
             self.logger.log(str(e), True)
             self.mounts = None
@@ -117,22 +131,29 @@ class FsFreezer:
             if(self.root_seen):
                 args.append('/')
             self.logger.log("arg : " + str(args),True)
+            self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
-            self.logger.enforce_local_flag(False)
+            self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
             if(sig_handle != 1):
-                while True:
-                    line=self.freeze_handler.child.stdout.readline()
-                    if(line != ''):
-                        self.logger.log(line.rstrip(), True)
-                    else:
-                        break
+                if (self.freeze_handler.child is not None):
+                    while True:
+                        line=self.freeze_handler.child.stdout.readline()
+                        if sys.version_info > (3,):
+                            line = str(line,encoding='utf-8', errors="backslashreplace")
+                        else:
+                            line = str(line)
+                        if(line != ''):
+                            self.logger.log(line.rstrip(), True)
+                        else:
+                            break
                 error_msg="freeze failed for some mount"
                 freeze_result.errors.append(error_msg)
                 self.logger.log(error_msg, True, 'Error')
         except Exception as e:
-            error_msg="freeze failed for some mount with exception " + str(e)
+            self.logger.enforce_local_flag(True)
+            error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
         return freeze_result
@@ -140,7 +161,11 @@ class FsFreezer:
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
-        if(self.freeze_handler.child.poll() is None):
+        if(self.freeze_handler.child is None):
+            self.logger.log("child already completed", True)
+            error_msg = 'snapshot result inconsistent'
+            thaw_result.errors.append(error_msg)
+        elif(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
             for i in range(0,30):
@@ -148,10 +173,15 @@ class FsFreezer:
                     self.logger.log("child still running sigusr1 sent")
                     time.sleep(1)
                 else:
-                    break;
+                    break
+            self.logger.enforce_local_flag(True)
             self.logger.log("Binary output after process end: ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:
@@ -169,8 +199,13 @@ class FsFreezer:
             else:
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
+            self.logger.enforce_local_flag(True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
                 if(line != ''):
                     self.logger.log(line.rstrip(), True)
                 else:

@@ -77,8 +77,7 @@ class PatchBootSystemState(OSEncryptionState):
             extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
             self.command_executor.Execute('cp -ax' +
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
-                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
-                                          True)
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
             self.command_executor.Execute('systemctl restart waagent')
@@ -98,17 +97,14 @@ class PatchBootSystemState(OSEncryptionState):
         self.context.logger.log("Pivoted into oldroot successfully")
 
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        patchesdir = os.path.join(scriptdir, '../encryptpatches')
-        patchpath = os.path.join(patchesdir, 'rhel_72_dracut.patch')
-
-        if not os.path.exists(patchpath):
-            message = "Patch not found at path: {0}".format(patchpath)
-            self.context.logger.log(message)
-            raise Exception(message)
-        else:
-            self.context.logger.log("Patch found at path: {0}".format(patchpath))
+        ademoduledir = os.path.join(scriptdir, '../../91ade')
+        dracutmodulesdir = '/lib/dracut/modules.d'
+        udevaderulepath = os.path.join(dracutmodulesdir, '91ade/50-udev-ade.rules')
 
         proc_comm = ProcessCommunicator()
+
+        self.command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
         udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
         self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
 
@@ -116,19 +112,17 @@ class PatchBootSystemState(OSEncryptionState):
         if not matches:
             raise Exception("Could not parse ATTR{partition} from udevadm info")
         partition = matches[0]
-        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, patchpath)
+        sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
         self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
-        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug rd.luks.uuid=osencrypt"\n',
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
                                       '/etc/default/grub')
-
-        self.command_executor.ExecuteInBash('patch -b -d /usr/lib/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
 
         self._append_contents_to_file('\nadd_drivers+=" fuse vfat nls_cp437 nls_iso8859-1"\n',
                                       '/etc/dracut.conf')
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                       '/etc/dracut.conf')
 
-        self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+        self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
         self.command_executor.Execute('grub2-install --recheck --force {0}'.format(self.rootfs_disk), True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)

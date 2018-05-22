@@ -19,8 +19,8 @@
 
 class CommonVariables:
     utils_path_name = 'Utils'
-    extension_name = 'AzureDiskEncryptionForLinuxTest'
-    extension_version = '0.1.0.999286'
+    extension_name = 'AzureDiskEncryptionForLinux'
+    extension_version = '0.1.0.999321'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -71,6 +71,7 @@ class CommonVariables:
     """
     EnableEncryption = 'EnableEncryption'
     EnableEncryptionFormat = 'EnableEncryptionFormat'
+    EnableEncryptionFormatAll = 'EnableEncryptionFormatAll'
     UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
@@ -174,11 +175,14 @@ class DeviceItem(object):
         self.model = None
         self.size = None
         self.majmin = None
+        self.device_id = None
+        self.azure_name = None
     def __str__(self):
         return ("name:" + str(self.name) + " type:" + str(self.type) +
                 " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
                 " label:" + str(self.label) + " model:" + str(self.model) +
-                " size:" + str(self.size)) + " majmin:" + str(self.majmin)
+                " size:" + str(self.size) + " majmin:" + str(self.majmin) +
+                " device_id:" + str(self.device_id)) + " azure_name:" + str(self.azure_name) 
 
 class LvmItem(object):
     def __init__(self):

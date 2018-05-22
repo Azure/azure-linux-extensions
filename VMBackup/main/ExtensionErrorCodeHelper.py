@@ -9,7 +9,8 @@ class ExtensionErrorCodeEnum():
     error_wrong_time = 13
     error_same_taskid = 14
     error_http_failure = 15
-    error_upload_status_blob = 16
+    FailedHandlerGuestAgentCertificateNotFound = 16
+    #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
@@ -35,6 +36,7 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
+    SuccessAlreadyProcessedInput = 3
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -43,9 +45,11 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
+            ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : Status.ExtVmHealthStateEnum.yellow,
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : Status.ExtVmHealthStateEnum.yellow,
@@ -79,9 +83,11 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.ExtensionTempTerminalState : "ExtensionTempTerminalState",
             ExtensionErrorCodeEnum.error : "error",
             ExtensionErrorCodeEnum.error_12 : "error_12",
+            ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : "SuccessAlreadyProcessedInput",
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
+            ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",

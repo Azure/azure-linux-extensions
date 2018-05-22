@@ -1,0 +1,124 @@
+{
+  "runtimeSettings": [
+    {
+      "handlerSettings": {
+        "protectedSettings": {
+          "storageAccountEndPoint": "https://core.windows.net/",
+          "storageAccountSasToken": "?NOT_A_REAL_TOKEN",
+          "storageAccountName": "ladunittestfakeaccount",
+          "sinksConfig": {
+            "sink": [
+              {
+                "sasURL": "https://fake&sas%url;1",
+                "type": "EventHub",
+                "name": "LinuxMemoryEventHub"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "SyslogJsonBlob"
+              },
+              {
+                "sasURL": "https://fake&sas%url;2",
+                "type": "EventHub",
+                "name": "ProcessorInfoEventHub"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "ProcessorInfoJsonBlob"
+              },
+              {
+                "type": "JsonBlob",
+                "name": "FileSystemJsonBlob"
+              }
+            ]
+          }
+        },
+        "protectedSettingsCertThumbprint": "B175B535DFE9F93659E5AFD893BF99BBF9DF28A5",
+        "publicSettings": {
+          "ladCfg": {
+            "diagnosticMonitorConfiguration": {
+              "eventVolume": "Large",
+              "metrics": {
+                "resourceId": "ladtest_resource_id",
+                "metricAggregation": [
+                  {
+                    "scheduledTransferPeriod": "PT1H"
+                  },
+                  {
+                    "scheduledTransferPeriod": "PT1M"
+                  }
+                ]
+              },
+              "performanceCounters": {
+                "performanceCounterConfiguration": [
+                  {
+                    "class": "Processor",
+                    "condition": "IsAggregate=TRUE",
+                    "annotation": [
+                      {
+                        "displayName": "Aggregate CPU %utilization",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/processor/PercentProcessorTime",
+                    "counter": "percentprocessorTime",
+                    "type": "builtin",
+                    "unit": "Percent"
+                  },
+                  {
+                    "class": "Filesystem",
+                    "condition": "Name=\"/\"",
+                    "annotation": [
+                      {
+                        "displayName": "Used disk space on /",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/filesystem/usedspace",
+                    "counter": "UsedSpace",
+                    "type": "builtin",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "class": "Filesystem",
+                    "condition": "Name='/'",
+                    "annotation": [
+                      {
+                        "displayName": "Free disk space on /mnt",
+                        "locale": "en-us"
+                      }
+                    ],
+                    "counterSpecifier": "/builtin/filesystem/freespace(/mnt)",
+                    "counter": "FreeSpace",
+                    "type": "builtin",
+                    "unit": "Bytes"
+                  }
+
+                ]
+              }
+            }
+          },
+          "perfCfg": [
+            {
+              "query": "SELECT PercentAvailableMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation",
+              "table": "LinuxMemory",
+              "sinks": "LinuxMemoryEventHub"
+            },
+            {
+              "query": "SELECT PercentProcessorTime FROM SCX_ProcessorStatisticalInformation",
+              "sinks": "ProcessorInfoJsonBlob,ProcessorInfoEventHub",
+              "frequency": 60
+            },
+            {
+              "query": "SELECT FreeMegabytes FROM SCX_FileSystemStatisticalInformation",
+              "table": "LinuxFileSystem",
+              "sinks": "FileSystemJsonBlob"
+            }
+          ],
+          "sampleRateInSeconds": 15,
+          "StorageAccount": "ladtest"
+        }
+      }
+    }
+  ]
+}

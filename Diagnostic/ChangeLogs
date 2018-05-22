@@ -1,3 +1,24 @@
+2017-09-05: LAD-3.0.111
+    - Ensure SAS storage token is supplied
+    - Explicitly reject deprecated use of LAD 2.3's storageAccountKey
+
+2017-08-11: LAD-3.0.109
+    - Fix waagent-related issue on Debian distros
+    - Add additional unit tests
+    - Replace multiple uses of "local" with "locale"
+    - Improve error reporting when catching an exception
+    - Fix #398, #399, #340
+
+2017-05-16: LAD-3.0.107
+    - Move resourceId field generation for JSON events from LAD to mdsd
+
+2017-05-10: LAD-3.0.103
+    - Allow '*' in syslog spec, add more fields in syslog records for
+      EventHubs
+
+2017-05-08: LAD-3.0.101
+    - New release of LAD 3.0. Refer to README.md
+
 2017-01-13: LAD-2.3.9021
     - Fix rsyslogd core dump issue when re-enabling the extension
     - Take latest mdsd binary that fixes other issues like missing perf

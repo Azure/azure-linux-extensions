@@ -36,13 +36,14 @@ import json
 import sys
 import subprocess
 import shutil
+import time
 from subprocess import call
 from zipfile import ZipFile
 from main.common import CommonVariables
 
 packages_array = []
 main_folder = 'main'
-main_entry = main_folder + '/handle.py'
+main_entry = main_folder + '/handle.sh'
 binary_entry = main_folder + '/safefreeze'
 packages_array.append(main_folder)
 
@@ -52,6 +53,9 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
+
+manifest = "manifest.xml"
+prod_manifest = "prodmanifest.xml"
 
 """
 copy the dependency to the local
@@ -76,11 +80,11 @@ manifest_obj = [{
   "name": CommonVariables.extension_name,
   "version": CommonVariables.extension_version,
   "handlerManifest": {
-    "installCommand": main_entry + " -install",
-    "uninstallCommand": main_entry + " -uninstall",
-    "updateCommand": main_entry + " -update",
-    "enableCommand": main_entry + " -enable",
-    "disableCommand": main_entry + " -disable",
+    "installCommand": main_entry + " install",
+    "uninstallCommand": main_entry + " uninstall",
+    "updateCommand": main_entry + " update",
+    "enableCommand": main_entry + " enable",
+    "disableCommand": main_entry + " disable",
     "rebootAfterInstall": False,
     "reportHeartbeat": False
   }
@@ -91,35 +95,25 @@ manifest_file = open("HandlerManifest.json", "w")
 manifest_file.write(manifest_str)
 manifest_file.close()
 
-
 """
-generate the extension xml file
+generate the safe freeze binary
 """
-extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.OSTCExtensions</ProviderNameSpace>
-<Type>%s</Type>
-<Version>%s</Version>
-<Label>%s</Label>
-<HostingResources>VmRole</HostingResources>
-<MediaLink>%s</MediaLink>
-<Description>%s</Description>
-<IsInternalExtension>true</IsInternalExtension>
-<Eula>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</Eula>
-<PrivacyUri>https://github.com/Azure/azure-linux-extensions/blob/1.0/LICENSE-2_0.txt</PrivacyUri>
-<HomepageUri>https://github.com/Azure/azure-linux-extensions</HomepageUri>
-<IsJsonExtension>true</IsJsonExtension>
-<CompanyName>Microsoft Open Source Technology Center</CompanyName>
-</ExtensionImage>""" % (CommonVariables.extension_type,CommonVariables.extension_version,CommonVariables.extension_label,CommonVariables.extension_media_link,CommonVariables.extension_description)
+cur_dir = os.getcwd()
+os.chdir("./main/safefreeze")
+chil = subprocess.Popen(["make"], stdout=subprocess.PIPE)
+process_wait_time = 5
+while(process_wait_time >0 and chil.poll() is None):
+    time.sleep(1)
+    process_wait_time -= 1
 
-extension_xml_file = open(CommonVariables.extension_name + '-' + str(CommonVariables.extension_version) + '.xml', 'w')
-extension_xml_file.write(extension_xml_file_content)
-extension_xml_file.close()
+os.chdir(cur_dir)
+
 
 """
 setup script, to package the files up
 """
 setup(name = CommonVariables.extension_name,
-      version = CommonVariables.extension_version,
+      version = CommonVariables.extension_zip_version,
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
@@ -138,8 +132,11 @@ setup(name = CommonVariables.extension_name,
 """
 unzip the package files and re-package it.
 """
+
+
+
 target_zip_file_location = './dist/'
-target_folder_name = CommonVariables.extension_name + '-' + str(CommonVariables.extension_version)
+target_folder_name = CommonVariables.extension_name  + '-' + CommonVariables.extension_zip_version
 target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 
 target_zip_file = ZipFile(target_zip_file_path)
@@ -177,5 +174,8 @@ final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
+copy(manifest,final_folder_path)
+copy(prod_manifest,final_folder_path)
+copy(main_entry,final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
 

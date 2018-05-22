@@ -1,27 +1,41 @@
+# :warning: IMPORTANT :warning:
+**The OSPatching extension for Linux is deprecated.**
+
+OSPatchingForLinux is deprecated and will be retired February 2018.
+
+Your Linux distro has well supported and maintained ways to enable automatic updates
+for your VMs to include VMs you use in Production environments. It is recommended
+that you consult your distro's best practices for automatic updates.
+
+## Linux Distributions
+- Ubuntu
+  - See the [unattended-upgrades](https://help.ubuntu.com/lts/serverguide/automatic-updates.html) package documentation
+- CentOS and RHEL
+  - See the manpage of `yum-cron` for the auto-update mechanism documentation
+
+
 # OSPatching Extension
-Allow the owner of the Azure VM to configure the Linux VM patching schedule
-cycle. And the actual patching operation is automated based on the
-pre-configured schedule.
+Allows the owner of the Azure VM to configure a Linux VM patching schedule cycle
+or perform OS patching on-demand as a one-time task. The actual patching operation
+is scheduled as a cron job.
 
-Lastest version is 2.0.
+Lastest version is 2.3.
 
-You can read the User Guide below.
-* [Automate Linux VM OS Updates Using OSPatching Extension (outdated, needs to update)](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/)
+You can read the User Guide, [Automate Linux VM OS Updates Using OSPatching Extension (outdated, needs to update)](http://azure.microsoft.com/blog/2014/10/23/automate-linux-vm-os-updates-using-ospatching-extension/).
 
 OSPatching Extension can:
 * Patch the OS automatically as a scheduled task
-* Patch the OS automatically as a one-off
-* it can be stopped before the actual patching operation
-* the status of VM can be checked by user-defined scripts,
-which can be stored locally, in github or Azure Storage
+* Patch the OS as a one-time task
+* The patching can be stopped before the actual patching operation begins
+* The status of VM can be checked by user-defined scripts stored locally, in GitHub, or in Azure Storage
 
 # User Guide
 
 ## 1. Configuration schema
+All settings are set in the protected configuration. No settings are available in the public configuration and it can be omitted.
 
-### 1.1. Public configuration
-
-Schema for the public configuration file looks like this:
+### 1.1. Protected configuration
+Schema for the protected configuration file.
 
 | Name | Description | Value Type | Default Value |
 |:---|:---|:---|:---|
@@ -40,7 +54,11 @@ Schema for the public configuration file looks like this:
 | local | Flag to assign the location of user-defined scripts | optional, boolean | false |
 | idleTestScript | If `local` is true, it is the contents of the idle test script. Otherwise, it is the uri of the idle test script. | optional, string | |
 | healthyTestScript | If `local` is true, it is the contents of the healthy test script. Otherwise, it is the uri of the healthy test script. | optional, string | |
+| storageAccountName | The name of the storage account | optional, string | |
+| storageAccountKey | The access key of the storage account | optional, string | |
   
+If the vmStatusTest scripts are stored in the private Azure Storage, you must provide
+`storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
  
 ```json
 {
@@ -58,26 +76,11 @@ Schema for the public configuration file looks like this:
     "local": false,
     "idleTestScript": "<path_to_idletestscript>",
     "healthyTestScript": "<path_to_healthytestscript>"
-  }
-}
-```
-
-### 1.2. Protected configuration
-
-Schema for the protected configuration file looks like this:
-
-* `storageAccountName`: (optional, string) the name of storage account
-* `storageAccountKey`: (optional, string) the access key of storage account
-
-```json
-{
+  },
   "storageAccountName": "<storage-account-name>",
   "storageAccountKey": "<storage-account-key>"
 }
 ```
-
-If the vmStatusTest scripts are stored in the private Azure Storage, you should provide
-`storageAccountName` and `storageAccountKey`. You can get these two values from Azure Portal.
 
 ## 2. Deploying the Extension to a VM
 
@@ -88,8 +91,7 @@ In diffrent models, the deploying commands have different syntaxes. Please selec
 one in section 2.1 and 2.2 below.
  
 ### 2.1. Using [**Azure CLI**][azure-cli]
-Before deploying OSPatching Extension, you should configure your `public.json` and `protected.json`
-(in section 1.1 and 1.2 above).
+Before deploying OSPatching Extension, you should configure your `protected.json` (in section 1.1 above).
 
 #### 2.1.1 Classic
 The Classic mode is also called Azure Service Management mode. You can change to it by running:
@@ -101,17 +103,15 @@ You can deploying OSPatching Extension by running:
 ```
 $ azure vm extension set <vm-name> \
 OSPatchingForLinux Microsoft.OSTCExtensions <version> \
---public-config-path public.json  \
 --private-config-path protected.json
 ```
 
 In the command above, you can change version with `"*"` to use latest
-version available, or `"1.*"` to get newest version that does not introduce non-
-breaking schema changes. To learn the latest version available, run:
+version available, or `"2.*"` to get newest version that does not introduce non-
+breaking schema changes. To find the latest version available, run:
 ```
 $ azure vm extension list
 ```
-You can also omit `--private-config-path` if you do not want to configure those settings.
 
 #### 2.1.2 Resource Manager
 You can change to Azure Resource Manager mode by running:
@@ -119,11 +119,10 @@ You can change to Azure Resource Manager mode by running:
 $ azure config mode arm
 ```
 
-You can deploying OSPatching Extension by running:
+You can deploy OSPatching Extension by running:
 ```
 $ azure vm extension set <resource-group> <vm-name> \
 OSPatchingForLinux Microsoft.OSTCExtensions <version> \
---public-config-path public.json  \
 --private-config-path protected.json
 ```
 
@@ -153,7 +152,7 @@ $Version = '<version>'
 $idleTestScriptUri = '<path_to_idletestscript>'
 $healthyTestScriptUri = '<path_to_healthytestscript>'
 
-$PublicConfig = ConvertTo-Json -InputObject @{
+$PrivateConfig = ConvertTo-Json -InputObject @{
     "disabled" = $false;
     "stop" = $true|$false;
     "rebootAfterPatch" = "RebootIfNeed|Required|NotRequired|Auto";
@@ -167,19 +166,14 @@ $PublicConfig = ConvertTo-Json -InputObject @{
         "local" = $false;
         "idleTestScript" = $idleTestScriptUri;
         "healthyTestScript" = $healthyTestScriptUri
-    })
-}
-
-# Optional
-# If you use azure storage, you have to offer the key
-$PrivateConfig = ConvertTo-Json -InputObject @{
+    });
     "storageAccountName" = "<storage_account_name>";
     "storageAccountKey" = "<storage_account_key>"
 }
 
 Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
   -Publisher $Publisher -Version $Version `
-  -PrivateConfiguration $PrivateConfig -PublicConfiguration $PublicConfig |
+  -PrivateConfiguration $PrivateConfig |
   Update-AzureVM
 ```
 
@@ -204,7 +198,7 @@ $ExtensionName = 'OSPatchingForLinux'
 $Publisher = 'Microsoft.OSTCExtensions'
 $Version = '<version>'
 
-$PublicConf = ConvertTo-Json -InputObject @{
+$PrivateConf = ConvertTo-Json -InputObject @{
     "disabled" = $false;
     "stop" = $true|$false;
     "rebootAfterPatch" = "RebootIfNeed|Required|NotRequired|Auto";
@@ -218,19 +212,14 @@ $PublicConf = ConvertTo-Json -InputObject @{
         "local" = $false;
         "idleTestScript" = $idleTestScriptUri;
         "healthyTestScript" = $healthyTestScriptUri
-    })
-}
-
-# Optional
-# If you use azure storage, you have to offer the key
-$PrivateConf = ConvertTo-Json -InputObject @{
+    });
     "storageAccountName" = "<storage_account_name>";
     "storageAccountKey" = "<storage_account_key>"
 }
 
 Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
   -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
-  -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
+  -TypeHandlerVersion $Version -ProtectedSettingString $PrivateConf
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
@@ -248,7 +237,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
     "publisher": "Microsoft.OSTCExtensions",
     "type": "OSPatchingForLinux",
     "typeHandlerVersion": "2.0",
-    "settings": {
+    "protectedSettings": {
       "disabled": false,
       "stop": false,
       "rebootAfterPatch": "RebootIfNeed|Required|NotRequired|Auto",
@@ -262,9 +251,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
         "local": false,
         "idleTestScript": "<path_to_idletestscript>",
         "healthyTestScript": "<path_to_healthytestscript>"
-      }
-    },
-    "protectedSettings": {
+      },
       "storageAccountName": "<storage-account-name>",
       "storageAccountKey": "<storage-account-key>"
     }
@@ -278,9 +265,8 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 
 ## 3. Scenarios
 
-### 3.1 Setting up scheduled patching
-For regular recurring patching, you can configure the schedule as the following. And you can modify existing patching configurations and re-enable it.
-* Public Settings
+### 3.1 Setting up regularly scheduled patching
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -293,11 +279,9 @@ For regular recurring patching, you can configure the schedule as the following.
   "installDuration": "00:30"
 }
 ```
-No need to provide protected settings.
 
 ### 3.2 Setting up one-off patching
-
-* Public Settings
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -308,11 +292,11 @@ No need to provide protected settings.
   "installDuration": "00:30"
 }
 ```
-No need to provide protected settings.
 
 ### 3.3 Stop the running patching
-You can stop the OS updates for debugging. Once the “stop” parameter is set to “true”, the OS update will stop after the current update is finished.
-* Public Settings
+You can stop the OS updates to debug issues. Once the `stop` parameter is set to `true`, the OS update will stop after the current update is finished.
+
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -321,7 +305,9 @@ You can stop the OS updates for debugging. Once the “stop” parameter is set 
 ```
 
 ### 3.4 Test the idle before patching and the health after patching
-* Public Settings
+If the `vmStatusTest` scripts are stored in Azure Storage private containers, you have to provide the `storageAccountName` and `storageAccountKey`.
+
+**Protected Settings**
 ```json
 {
   "disabled": false,
@@ -337,46 +323,33 @@ You can stop the OS updates for debugging. Once the “stop” parameter is set 
     "local": false,
     "idleTestScript": "<path_to_idletestscript>",
     "healthyTestScript": "<path_to_healthytestscript>"
-  }
-}
-```
-If the `vmStatusTest` scripts are stored in Azure Storage private containers, you have to provide the `storageAccountName` and `storageAccountKey`.
-* Protected Settings
-```json
-{
+  },
   "storageAccountName": "MyAccount",
   "storageAccountKey": "Mykey"
 }
 ```
 
-### 3.5 Enable the extension repeatly
-Enabling the extension with the exactly same configurations is unaccepted in current design.
-If you need to run scripts repeatly, you can add a timestamp.
+### 3.5 Enable the extension repeatedly
+Enabling the OSPatching Extension with the exact same configuration is unsupported and will result in
+a no-op (nothing will happen). If you need to run scripts repeatedly, you can add a timestamp.
 
 ```json
 "timestamp": 123456789
 ```
 
 ### 3.6 Disable the extension
-If you want to switch to manual OS update temporarily, you can set the `disable` parameter to `true` which won't uninstall the OSPatching extension.
+If you want to switch to manual OS update temporarily, you can set the `disable` parameter to `true` instead of uninstalling the OSPatching Extension.
 
-## Supported Linux Distributions
-- Ubuntu 12.04 and higher
-- CentOS 6.5 and higher
-- Oracle Linux 6.4.0.0.0 and higher
-- openSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 11 SP3 and higher
-
-## Debug
-
-* The status of the extension is reported back to Azure so that user can
-see the status on Azure Portal
+## Debugging
 * The operation log of the extension is `/var/log/azure/<extension-name>/<version>/extension.log` file.
+* The installation status of the extension is reported back to Azure so that the user can see the status on Azure Portal.
+  This does not mean the OSPatching Extension successfully applied the current configuration to the VM.
+* Attempting to enable the OSPatching Extension 2 or more times with the same configuration will result in nothing happening.
+  See [Enable the extension repeatedly](#3.5 Enable the extension repeatedly) section above for more details.
 
 # Known Issues
-* If the scheduled task can not run on some redhat distro, there may be
-a selinux-policy problem. Please refer to
-[https://bugzilla.redhat.com/show_bug.cgi?id=657104](https://bugzilla.redhat.com/show_bug.cgi?id=657104)
+* If the scheduled task does not run on some RedHat distros, there may be a selinux-policy problem. Please refer to
+[https://bugzilla.redhat.com/show\_bug.cgi?id=657104](https://bugzilla.redhat.com/show_bug.cgi?id=657104)
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/

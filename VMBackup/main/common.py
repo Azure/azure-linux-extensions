@@ -19,8 +19,9 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    extension_name = 'VMBackupForLinuxExtension'
-    extension_version = "1.0.9111.1"
+    extension_name = 'MyBackupTestLinuxInt'
+    extension_version = "1.0.9120.0"
+    extension_zip_version = "1"
     extension_type = extension_name
     extension_media_link = 'https://sopattna.blob.core.windows.net/extensions/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMBackup Extension for Linux IaaS'
@@ -37,6 +38,13 @@ class CommonVariables:
     vmType = 'vmType'
     VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
     VmTypeV2 = 'microsoft.compute/virtualmachines'
+    customSettings = 'customSettings'
+    snapshotTaskToken = 'snapshotTaskToken'
+    
+    onlyGuest = 'onlyGuest'
+    firstGuestThenHost = 'firstGuestThenHost'
+    firstHostThenGuest = 'firstHostThenGuest'
+    onlyHost = 'onlyHost'
 
 
     status_transitioning = 'transitioning'
@@ -55,9 +63,12 @@ class CommonVariables:
     error_wrong_time = 13
     error_same_taskid = 14
     error_http_failure = 15
-    error_upload_status_blob = 16
+    FailedHandlerGuestAgentCertificateNotFound = 16
+    #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork=76
+    FailedFsFreezeFailed = 121
+    SuccessAlreadyProcessedInput = 3
 
     """
     Pre-Post Plugin error code definitions

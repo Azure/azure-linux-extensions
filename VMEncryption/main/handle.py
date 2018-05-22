@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -41,11 +41,13 @@ from Utils import HandlerUtil
 from Common import *
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
+from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
+from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
@@ -59,6 +61,7 @@ from __builtin__ import int
 def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
+    hutil.do_status_report(operation='Install', status=CommonVariables.extension_success_status, status_code=str(CommonVariables.success), message='Installing pre-requisites')
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
@@ -116,6 +119,12 @@ def disable_encryption():
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+
+        encryption_status = json.loads(disk_util.get_encryption_status())
+
+        if encryption_status["os"] != "NotEncrypted":
+            raise Exception("Disabling encryption is not supported when OS volume is encrypted")
+
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -155,14 +164,14 @@ def disable_encryption():
                       message='Decryption started')
 
     except Exception as e:
-        logger.log(msg="Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()),
-                   level=CommonVariables.ErrorLevel)
+        message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
 
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
         hutil.do_exit(exit_code=0,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
-                      message='Decryption failed.')
+                      message=message)
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
@@ -335,6 +344,8 @@ def update_encryption_settings():
 
 def update():
     hutil.do_parse_context('Upadate')
+    logger.log("Installing pre-requisites")
+    DistroPatcher.update_prereq()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():
@@ -367,7 +378,15 @@ def toggle_se_linux_for_centos7(disable):
     return False
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
-    #make sure the azure disk config path exists.
+
+    # mount encrypted resource disk
+    volume_type = encryption_config.get_volume_type().lower()
+    if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util.automount()
+        logger.log("mounted encrypted resource disk")
+
+    # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
@@ -394,9 +413,6 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
         else:
             logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
-
-    if bek_util:
-        bek_util.umount_azure_passhprase(encryption_config)
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
@@ -460,6 +476,17 @@ def enable():
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
+        # run prechecks and log any failures detected
+        try:
+            cutil = CheckUtil(logger)
+            if cutil.is_precheck_failure():
+                logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
+            else:
+                logger.log("PRECHECK: Prechecks successful")
+        except Exception:
+            logger.log("PRECHECK: Exception thrown during precheck")
+            logger.log(traceback.format_exc())
+
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
@@ -477,7 +504,7 @@ def enable():
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
-        if encryption_operation == CommonVariables.EnableEncryption or encryption_operation == CommonVariables.EnableEncryptionFormat:
+        if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
             logger.log("Installing pre-requisites")
@@ -637,7 +664,7 @@ def enable_encryption():
                                   code=str(CommonVariables.volue_type_not_support),
                                   message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
 
-                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat]:
+                if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
                     hutil.do_exit(exit_code=0,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
@@ -707,23 +734,18 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
-def enable_encryption_format(passphrase, encryption_marker, disk_util):
+def enable_encryption_format(passphrase, disk_format_query, disk_util, force=False):
     logger.log('enable_encryption_format')
-    encryption_parameters = encryption_marker.get_encryption_disk_format_query()
-    logger.log('disk format query is {0}'.format(encryption_parameters))
+    logger.log('disk format query is {0}'.format(disk_format_query))
 
-    try:
-        json_parsed = json.loads(encryption_parameters)
+    json_parsed = json.loads(disk_format_query)
 
-        if type(json_parsed) is dict:
-            encryption_format_items = [json_parsed,]
-        elif type(json_parsed) is list:
-            encryption_format_items = json_parsed
-        else:
-            raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
-    except Exception:
-        encryption_marker.clear_config()
-        raise
+    if type(json_parsed) is dict:
+        encryption_format_items = [json_parsed,]
+    elif type(json_parsed) is list:
+        encryption_format_items = json_parsed
+    else:
+        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
 
     for encryption_item in encryption_format_items:
         dev_path_in_query = None
@@ -742,13 +764,12 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
             continue
         else:
             device_item = devices[0]
-            if device_item.file_system is None or device_item.file_system == "":
+            if device_item.file_system is None or device_item.file_system == "" or force:
+                if device_item.mount_point:
+                    disk_util.swapoff()
+                    disk_util.umount(device_item.mount_point)
                 mapper_name = str(uuid.uuid4())
                 logger.log("encrypting " + str(device_item))
-                if device_item.uuid is not None and device_item.uuid != "":
-                    device_to_encrypt_uuid_path = os.path.join("/dev/disk/by-uuid", device_item.uuid)
-                else:
-                    device_to_encrypt_uuid_path = dev_path_in_query
                 encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 try:
                     se_linux_status = None
@@ -756,7 +777,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         se_linux_status = encryption_environment.get_se_linux()
                         if se_linux_status.lower() == 'enforcing':
                             encryption_environment.disable_se_linux()
-                    encrypt_result = disk_util.encrypt_disk(dev_path = device_to_encrypt_uuid_path, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
+                    encrypt_result = disk_util.encrypt_disk(dev_path = dev_path_in_query, passphrase_file = passphrase, mapper_name = mapper_name, header_file=None)
                 finally:
                     if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
                         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
@@ -775,7 +796,7 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
-                    crypt_item_to_update.dev_path = device_to_encrypt_uuid_path
+                    crypt_item_to_update.dev_path = dev_path_in_query
                     crypt_item_to_update.luks_header_path = "None"
                     crypt_item_to_update.file_system = file_system
                     crypt_item_to_update.uses_cleartext_key = False
@@ -785,6 +806,10 @@ def enable_encryption_format(passphrase, encryption_marker, disk_util):
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
                     else:
                         crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
+
+                    #allow override through the new full_mount_point field
+                    if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
+                        crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
                     logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                     disk_util.remove_mount_info(crypt_item_to_update.mount_point)
@@ -1259,30 +1284,89 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      status_prefix,
                                      ongoing_item_config)
 
-def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+
+def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, bek_util):
     """
-    if return None for the success case, or return the device item which failed.
+    In case of success return None, otherwise return the device item which failed.
     """
-    logger.log(msg="executing the enableencryption_all_inplace command.")
+    logger.log(msg="executing the enable_encryption_all_format command")
+
+    device_items = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
+    # Don't encrypt partitions that are not even mounted
+    device_items_to_encrypt = filter(lambda di: di.mount_point is not None and di.mount_point != "", device_items)
+
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+    device_items_to_encrypt = filter(lambda di: os.path.join('/dev/', di.name) in dev_path_reference_table, device_items_to_encrypt)
+
+    msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
+    logger.log(msg);
+
+    hutil.do_status_report(operation='EnableEncryptionFormatAll',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message=msg)
+
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
+
+def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
+    """
+    Formats the block devices represented by the supplied device_item.
+
+    This is done by constructing a disk format query based on the supplied device items
+    and passing it on to the enable_encryption_format method.
+
+    Returns None if all items are successfully format-encrypted
+    Otherwise returns the device item which failed.
+    """
+    
+    #use the new udev names for formatting and later on for cryptmounting
+    dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
+
+    def single_device_item_to_format_query_dict(device_item):
+        """
+        Converts a single device_item into an dictionary than will be later "json-stringified"
+        """
+        format_query_element = {}
+        dev_path = os.path.join('/dev/', device_item.name)
+        if dev_path in dev_path_reference_table:
+            format_query_element["dev_path"] = dev_path_reference_table[dev_path]
+        else:
+            format_query_element["dev_path"] = dev_path
+
+        # introduce a new "full_mount_point" field below to avoid the /mnt/ prefix that automatically gets appended
+        format_query_element["full_mount_point"] = str(device_item.mount_point) 
+        format_query_element["file_system"] = str(device_item.file_system)
+        return format_query_element
+
+    disk_format_query = json.dumps(map(single_device_item_to_format_query_dict, device_items))
+
+    return enable_encryption_format(passphrase, disk_format_query, disk_util, force)
+
+
+def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     device_items = disk_util.get_device_items(None)
     device_items_to_encrypt = []
-    encrypted_items = []
-    error_message = ""
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
-        should_skip = disk_util.should_skip_for_inplace_encryption(device_item)
+        should_skip = disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type())
         if not should_skip:
             if device_item.name == bek_util.passphrase_device:
                 logger.log("skip for the passphrase disk ".format(device_item))
                 should_skip = True
-            if device_item.uuid in encrypted_items:
-                logger.log("already did a operation {0} so skip it".format(device_item))
-                should_skip = True
         if not should_skip and \
            not any(di.name == device_item.name for di in device_items_to_encrypt):
             device_items_to_encrypt.append(device_item)
+    return device_items_to_encrypt
 
+
+def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+    """
+    if return None for the success case, or return the device item which failed.
+    """
+    logger.log(msg="executing the enable_encryption_all_in_place command.")
+
+    device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg);
 
@@ -1298,7 +1382,6 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         if umount_status_code != CommonVariables.success:
             logger.log("error occured when do the umount for: {0} with code: {1}".format(device_item.mount_point, umount_status_code))
         else:
-            encrypted_items.append(device_item.uuid)
             logger.log(msg=("encrypting: {0}".format(device_item)))
             no_header_file_support = not_support_header_option_distro(DistroPatcher)
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
@@ -1351,7 +1434,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         logger.log("processing crypt_item: " + str(crypt_item))
 
         def raw_device_item_match(device_item):
-            sdx_device_name = "/dev/" + device_item.name
+            sdx_device_name = os.path.join("/dev/", device_item.name)
             if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
                 return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
             else:
@@ -1469,8 +1552,9 @@ def daemon_encrypt():
 
         os_encryption = None
 
-        if ((distro_name == 'redhat' and distro_version == '7.2') and
-              (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
+        if (((distro_name == 'redhat' and distro_version == '7.3') or
+             (distro_name == 'redhat' and distro_version == '7.4')) and
+            (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
@@ -1485,6 +1569,8 @@ def daemon_encrypt():
                                                          encryption_environment=encryption_environment)
         elif ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'redhat' and distro_version == '7.3') or
+            (distro_name == 'redhat' and distro_version == '7.4') or
+            (distro_name == 'centos' and distro_version == '7.3.1611') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
             os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
@@ -1497,7 +1583,7 @@ def daemon_encrypt():
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif distro_name == 'centos' and distro_version == '6.8':
+        elif distro_name == 'centos' and (distro_version == '6.8' or distro_version == '6.9'):
             from oscrypto.centos_68 import CentOS68EncryptionStateMachine
             os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
                                                            distro_patcher=DistroPatcher,
@@ -1623,9 +1709,15 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                                                              disk_util=disk_util,
                                                              bek_util=bek_util)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat:
+                disk_format_query = encryption_marker.get_encryption_disk_format_query()
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
-                                                       encryption_marker=encryption_marker,
+                                                       disk_format_query=disk_format_query,
                                                        disk_util=disk_util)
+            elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
+                failed_item = enable_encryption_all_format(passphrase_file=bek_passphrase_file,
+                                                           encryption_marker=encryption_marker,
+                                                           disk_util=disk_util,
+                                                           bek_util=bek_util)
             else:
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)

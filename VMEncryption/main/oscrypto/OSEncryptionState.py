@@ -58,17 +58,17 @@ class OSEncryptionState(object):
         if self._is_in_memfs_root():
             rootfs_mountpoint = '/oldroot'
 
-        rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
+        self.rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
 
-        if rootfs_sdx_path == "none":
-            self.context.logger.log("rootfs_sdx_path is none, parsing UUID from fstab")
-            rootfs_sdx_path = self._parse_uuid_from_fstab('/')
-            self.context.logger.log("rootfs_uuid: {0}".format(rootfs_sdx_path))
+        if self.rootfs_sdx_path == "none":
+            self.context.logger.log("self.rootfs_sdx_path is none, parsing UUID from fstab")
+            self.rootfs_sdx_path = self._parse_uuid_from_fstab('/')
+            self.context.logger.log("rootfs_uuid: {0}".format(self.rootfs_sdx_path))
 
-        if rootfs_sdx_path and (rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(rootfs_sdx_path)):
-            rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(rootfs_sdx_path)
+        if self.rootfs_sdx_path and (self.rootfs_sdx_path.startswith("/dev/disk/by-uuid/") or self._is_uuid(self.rootfs_sdx_path)):
+            self.rootfs_sdx_path = self.disk_util.query_dev_sdx_path_by_uuid(self.rootfs_sdx_path)
 
-        self.context.logger.log("rootfs_sdx_path: {0}".format(rootfs_sdx_path))
+        self.context.logger.log("self.rootfs_sdx_path: {0}".format(self.rootfs_sdx_path))
 
         self.rootfs_disk = None
         self.rootfs_block_device = None
@@ -83,17 +83,17 @@ class OSEncryptionState(object):
                     self.rootfs_block_device = line.strip().split()[0]
                     self.rootfs_disk = self.rootfs_block_device[:-1]
                     self.bootfs_block_device = self.rootfs_disk + '2'
-        elif not rootfs_sdx_path:
+        elif not self.rootfs_sdx_path:
             self.rootfs_disk = '/dev/sda'
             self.rootfs_block_device = '/dev/sda2'
             self.bootfs_block_device = '/dev/sda1'
-        elif rootfs_sdx_path == '/dev/mapper/osencrypt' or rootfs_sdx_path.startswith('/dev/dm-'):
+        elif self.rootfs_sdx_path == '/dev/mapper/osencrypt' or self.rootfs_sdx_path.startswith('/dev/dm-'):
             self.rootfs_block_device = '/dev/mapper/osencrypt'
             bootfs_uuid = self._parse_uuid_from_fstab('/boot')
             self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
             self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
         else:
-            self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(rootfs_sdx_path)
+            self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(self.rootfs_sdx_path)
             if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
                 self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
                 raise Exception("Could not find rootfs block device")

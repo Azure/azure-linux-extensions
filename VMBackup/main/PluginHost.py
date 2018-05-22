@@ -2,7 +2,10 @@ import time
 import sys
 import os
 import threading
-import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 from common import CommonVariables
 from pwd import getpwuid
 from stat import *
@@ -76,12 +79,12 @@ class PluginHost(object):
         fsFreeze_on = True
 
         if not os.path.isfile(self.configLocation):
-            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
+            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
             self.configLocation = './main/VMSnapshotPluginHost.conf'
         
         permissions = self.get_permissions(self.configLocation)
         if not os.path.isfile(self.configLocation):
-            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True, 'Error')
+            self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
             errorCode =CommonVariables.FailedPrepostPluginhostConfigNotFound
         elif  not (int(permissions[1]) == 0 or int(permissions[1]) == 4) or not (int(permissions[2]) == 0 or int(permissions[2]) == 4):
             self.logger.log('Plugin host Config file does not have desired permissions', True, 'Error')
@@ -105,7 +108,7 @@ class PluginHost(object):
 
         try:
             self.logger.log('config file: '+str(self.configLocation),True,'Info')
-            config = ConfigParser.ConfigParser()
+            config = ConfigParsers.ConfigParser()
             config.read(self.configLocation)
             if (config.has_option('pre_post', 'timeoutInSeconds')):
                 self.timeoutInSeconds = min(int(config.get('pre_post','timeoutInSeconds')),self.timeoutInSeconds)
@@ -196,7 +199,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,(self.timeoutInSeconds)/5):
+        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -206,15 +209,22 @@ class PluginHost(object):
 
 
         continueBackup = True
-        for j in range(0,self.noOfPlugins):
+        #Plugin timed out
+        if not flag:
             ecode = CommonVariables.FailedPrepostPluginhostPreTimeout
-            continueBackup = continueBackup & self.preScriptResult[j].continueBackup
-            if self.preScriptCompleted[j]:
-                ecode = self.preScriptResult[j].errorCode
-            if ecode != CommonVariables.PrePost_PluginStatus_Success:
-                result.anyScriptFailed = True
+            result.anyScriptFailed = True
             presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
+        else:
+            for j in range(0,self.noOfPlugins):
+                ecode = CommonVariables.FailedPrepostPluginhostPreTimeout
+                continueBackup = continueBackup & self.preScriptResult[j].continueBackup
+                if self.preScriptCompleted[j]:
+                    ecode = self.preScriptResult[j].errorCode
+                if ecode != CommonVariables.PrePost_PluginStatus_Success:
+                    result.anyScriptFailed = True
+                presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
+                result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished prescript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')
         return result
@@ -236,7 +246,7 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,(self.timeoutInSeconds)/5):
+        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
             time.sleep(5)
             flag = True
             for j in range(0,self.noOfPlugins):
@@ -245,15 +255,23 @@ class PluginHost(object):
                 break
 
         continueBackup = True
-        for j in range(0,self.noOfPlugins):
+
+        #Plugin timed out
+        if not flag:
             ecode = CommonVariables.FailedPrepostPluginhostPostTimeout
-            continueBackup = continueBackup & self.postScriptResult[j].continueBackup
-            if self.postScriptCompleted[j]:
-                ecode = self.postScriptResult[j].errorCode
-            if ecode != CommonVariables.PrePost_PluginStatus_Success:
-                result.anyScriptFailed = True
+            result.anyScriptFailed = True
             presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
             result.errors.append(presult)
+        else:
+            for j in range(0,self.noOfPlugins):
+                ecode = CommonVariables.FailedPrepostPluginhostPostTimeout
+                continueBackup = continueBackup & self.postScriptResult[j].continueBackup
+                if self.postScriptCompleted[j]:
+                    ecode = self.postScriptResult[j].errorCode
+                if ecode != CommonVariables.PrePost_PluginStatus_Success:
+                    result.anyScriptFailed = True
+                presult = PluginHostError(errorCode = ecode, pluginName = self.pluginName[j])
+                result.errors.append(presult)
         result.continueBackup = continueBackup
         self.logger.log('Finished postscript execution from PluginHost side. Continue Backup: '+str(continueBackup),True,'Info')
         return result

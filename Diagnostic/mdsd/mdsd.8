@@ -1,0 +1,108 @@
+.\"Created with GNOME Manpages Editor Wizard
+.\"http://sourceforge.net/projects/gmanedit2
+.TH mdsd 8 "August 28, 2017" "" "Azure MDS Daemon"
+
+.SH NAME
+mdsd \- azure MDS daemon
+
+.SH SYNOPSIS
+.B mdsd
+.RI  "[-AbCDdjvV] [-c path] [-e path] [-o path] [-p port] [-P proxy_setting] [-r role_name/path] [-T flags] [-w path]"
+.br
+
+.SH DESCRIPTION
+.PP
+\fBmdsd\fP is the mandated logging infrastructure for Azure services. It delivers event
+data (logs, collected metrics, etc) to Azure storage for consumption by various
+downstream users.
+
+.SH OPTIONS
+.TP
+.BI "\-b"
+Don't forward events to storage (blackhole them instead)
+.TP
+.BI "\-c " "config file"
+Specifies the path to the configuration XML file (default /etc/mdsd.d/mdsd.xml)
+.TP
+.BI "\-C"
+Don't suppress core dump when dying due to fatal signals
+.TP
+.BI "\-D"
+Disable logging to files. All log output will instead go to STDERR (fd 2).
+.TP
+.BI "\-d"
+Run mdsd as a daemon
+.TP
+.BI "\-e " "log path"
+Specifies the path to which mdsd error logs are dumped
+.TP
+.BI "\-j"
+Dump all JSON events to stdout as they're received
+.TP
+.BI "\-o " "log path"  
+Specifies the path to which received object strings are dumped
+.TP
+.BI "\-P " "proxy_setting"
+Specifies the http proxy which the daemon should use for all outbound http/https connections.
+An example proxy_setting is something like "http://username:password@proxy_host_name:proxy_port_number".
+The same can be specified using one of the "MDSD_http_proxy" or "https_proxy" or "http_proxy"
+environment variables (searched in that order and the first hit is used), and this option (using -P)
+will override the environment variable (when -P is specified). DO NOT a password on the command line.
+If a password needs to be given, specify as one of the environment variables mentioned earlier.
+.TP
+.BI "\-p " "port"
+Specifies the port on which the daemon listens for stream connections (0 can be passed
+as port, in which case a randomly available port will be picked). The port will only be
+bound to 127.0.0.1 (loopback).
+If the specified non-zero port is in use, and '-R' is specified, then mdsd will try to bind
+to a randomly available port instead. Either way, the bound port number will be written to a
+file whose path is derived from -r info or default (/var/run/mdsd/default.pidport).
+.TP
+.BI "\-R "
+Try binding to a random port if binding to the default/specified port fails.
+.TP
+.BI "\-r " "role_name/path"
+Specifies the role name or file prefix that mdsd will use to construct the paths to the
+pidport and unix domain socket files. If the argument starts with '/', the value is
+used as the file prefix; otherwise, the value is used as the role name and the file
+prefix is '/var/run/mdsd/' + role name. For example, if role name is 'test', then the
+prefix is '/var/run/mdsd/test'. The pidport file path is 'prefix' + '.pidport'. The
+unix domain socket files paths are 'prefix' + '_' + 'protocol' + '.socket', where the
+protocol is 'bond', 'djson', and 'json'.
+The default paths are:
+/var/run/mdsd/default.pidport
+/var/run/mdsd/default_bond.socket
+/var/run/mdsd/default_djson.socket
+/var/run/mdsd/default_json.socket
+.TP
+.BI "\-S " "directory"
+Specifies directory to save Event Hub events. syslog user needs to have rwx
+access to it. If the directory does not exist, mdsd will try to create it.
+.TP
+.BI "\-T" 
+Enable tracing for modules selected by flags.
+.TP
+.BI "\-v"
+Validate configuration file and exit
+.TP
+.BI "\-V"
+Print version and exit
+.TP
+.BI "\-w " "log path"
+Specifies the path to which mdsd warning logs are dumped
+
+.SH ENVIRONMENT
+.TP
+.BI "MDSD_CONFIG_DIR"
+If set, overrides the default value of "/etc/mdsd.d".
+.TP
+.BI "MDSD_RUN_DIR"
+If set, overrides the default value of "/var/run/mdsd"
+.TP
+.BI "MDSD_LOG_DIR"
+If set, overrides the default value of "/var/log"
+
+.SH "SEE ALSO"
+.BR logger (1),
+.BR syslog (2),
+.BR syslog (3)

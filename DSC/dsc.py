@@ -550,6 +550,10 @@ def download_azure_blob(account_name, account_key, file_uri, download_dir):
         (blob_name, container_name) = parse_blob_uri(file_uri)
         host_base = get_host_base_from_uri(file_uri)
         
+        blob_parent_path = os.path.join(download_dir, os.path.dirname(blob_name))
+        if not os.path.exists(blob_parent_path):
+            os.makedirs(blob_parent_path)
+
         download_path = os.path.join(download_dir, blob_name)
         blob_service = BlobService(account_name, account_key, host_base=host_base)
     except Exception as e:
