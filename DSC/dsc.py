@@ -39,6 +39,7 @@ import Utils.HandlerUtil as Util
 
 # Define global variables
 
+ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
@@ -55,8 +56,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.5"
-extension_status_event = "ExtensionUpgrade"
+extension_handler_version = "2.70.0.7"
 
 # DSC-specific Operation
 class Operation:
@@ -173,12 +173,16 @@ def enable():
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             if exit_code != 0:
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
-            extension_status_event = "ExtensionRegistration"    
+            
+            extension_status_event = "ExtensionRegistration"
+            send_heart_beat_msg_to_agent_service(extension_status_event)
+            status_file, agent_id, vm_uuid = get_status_message_details()
+            update_statusfile(status_file, agent_id, vm_uuid)
+            sys.exit(0)
         else:
             file_path = download_file()
             if mode == Mode.pull:
                 current_config = apply_dsc_meta_configuration(file_path)
-                extension_status_event = "ExtensionRegistration"
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
             else:
@@ -195,6 +199,11 @@ def enable():
                                               op=Operation.ApplyMetaMof,
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
+                    extension_status_event = "ExtensionRegistration"
+                    send_heart_beat_msg_to_agent_service(extension_status_event)
+                    status_file, agent_id, vm_uuid = get_status_message_details()
+                    update_statusfile(status_file, agent_id, vm_uuid)
+                    sys.exit(0)        
             else:
                 if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -207,15 +216,6 @@ def enable():
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
-        
-        send_heart_beat_msg_to_agent_service(extension_status_event)
-        
-        agent_id = get_nodeid(nodeid_path)
-        vm_uuid = get_vmuuid()
-        if vm_uuid is not None and agent_id is not None:
-            status_filepath = get_statusfile_path()
-            update_statusfile(status_filepath, agent_id, vm_uuid)
-            sys.exit(0)
               
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
@@ -696,6 +696,15 @@ def get_statusfile_path():
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="status file path: " + status_file)
     return status_file
 
+def get_status_message_details():
+    agent_id = get_nodeid(nodeid_path)
+    vm_uuid = get_vmuuid()
+    status_filepath = None
+    if vm_uuid is not None and agent_id is not None:
+        status_filepath = get_statusfile_path()
+    
+    return status_file_path, agent_id, vm_uuid
+    
 def update_statusfile(status_filepath, node_id, vmuuid):
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
     if status_filepath is None:
@@ -721,6 +730,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
             }]
         json.dump(status_file_content, fp)
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
+    waagent.AddExtensionEvent(name=ExtensionName, op="Enable", isSuccess=True, message="successfully executed enable functionality")
 
 def get_nodeid(file_path):
     id = None
