@@ -176,8 +176,8 @@ def enable():
             
             extension_status_event = "ExtensionRegistration"
             send_heart_beat_msg_to_agent_service(extension_status_event)
-            status_file, agent_id, vm_uuid = get_status_message_details()
-            update_statusfile(status_file, agent_id, vm_uuid)
+            status_file_path, agent_id, vm_uuid = get_status_message_details()
+            update_statusfile(status_filei_path, agent_id, vm_uuid)
             sys.exit(0)
         else:
             file_path = download_file()
@@ -201,8 +201,8 @@ def enable():
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
                     extension_status_event = "ExtensionRegistration"
                     send_heart_beat_msg_to_agent_service(extension_status_event)
-                    status_file, agent_id, vm_uuid = get_status_message_details()
-                    update_statusfile(status_file, agent_id, vm_uuid)
+                    status_file_path, agent_id, vm_uuid = get_status_message_details()
+                    update_statusfile(status_file_path, agent_id, vm_uuid)
                     sys.exit(0)        
             else:
                 if mode == Mode.push:
@@ -699,9 +699,9 @@ def get_statusfile_path():
 def get_status_message_details():
     agent_id = get_nodeid(nodeid_path)
     vm_uuid = get_vmuuid()
-    status_filepath = None
+    status_file_path = None
     if vm_uuid is not None and agent_id is not None:
-        status_filepath = get_statusfile_path()
+        status_file_path = get_statusfile_path()
     
     return status_file_path, agent_id, vm_uuid
     
