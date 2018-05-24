@@ -214,8 +214,8 @@ def check_for_supported_waagent_and_distro_version():
     :return: True iff so.
     """
     for notsupport in ('WALinuxAgent-2.0.5', 'WALinuxAgent-2.0.4', 'WALinuxAgent-1'):
-        code, str_ret = waagent.RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent",
-                                             chk_err=False)
+        code, str_ret = RunGetOutput("grep 'GuestAgentVersion.*" + notsupport + "' /usr/sbin/waagent",
+                                             should_log=False)
         if code == 0 and str_ret.find(notsupport) > -1:
             hutil.log("cannot run this extension on  " + notsupport)
             hutil.do_status_report(g_ext_op_type, "error", '1', "cannot run this extension on  " + notsupport)
@@ -575,7 +575,7 @@ def get_lad_pids():
 
     with open(g_lad_pids_filepath, "r") as f:
         for pid in f.readlines():
-            is_still_alive = waagent.RunGetOutput("cat /proc/" + pid.strip() + "/cmdline", chk_err=False)[1]
+            is_still_alive = RunGetOutput("cat /proc/" + pid.strip() + "/cmdline", should_log=False)[1]
             if is_still_alive.find('/waagent/') > 0:
                 lad_pids.append(pid.strip())
             else:
