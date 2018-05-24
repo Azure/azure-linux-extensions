@@ -240,8 +240,8 @@ class GuestSnapshotter(object):
                             all_failed = False
                         self.logger.log("index: " + str(snapshot_info_indexer.index) + " blobSnapshotUri: " + str(snapshot_info_array[snapshot_info_indexer.index].snapshotUri))
 
-                    self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
                     all_snapshots_failed = all_failed
+                    self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
 
                 return snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
             else:
@@ -281,8 +281,9 @@ class GuestSnapshotter(object):
                         all_failed = False
                     blob_index = blob_index + 1
 
-                self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
                 all_snapshots_failed = all_failed
+                self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
+
                 thaw_result= None
                 if g_fsfreeze_on and thaw_done_local== False:
                     time_before_thaw = datetime.datetime.now()
@@ -326,7 +327,9 @@ class GuestSnapshotter(object):
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
-            if exceptOccurred and thaw_done == False:
+            self.logger.log("exceptOccurred : " + str(exceptOccurred) + " thaw_done : " + str(thaw_done) + " all_snapshots_failed : " + str(all_snapshots_failed))
+            if exceptOccurred and thaw_done == False and all_snapshots_failed:
+                self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
                 snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
