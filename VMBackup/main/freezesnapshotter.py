@@ -62,6 +62,8 @@ class FreezeSnapshotter(object):
             self.logger.log(errMsg, True, 'Error')
             self.isManaged = True
 
+        self.logger.log('[FreezeSnapshotter] isManaged flag : ' + str(self.isManaged))
+
         if(self.isManaged):
             self.logger.log('Changing takeSnapshotFrom to onlyGuest as it is managed VM')
             self.takeSnapshotFrom = CommonVariables.onlyGuest
@@ -72,7 +74,7 @@ class FreezeSnapshotter(object):
         run_status = 'success'
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
-            run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromGuest()
+            run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed = self.takeSnapshotFromGuest()
         elif(self.takeSnapshotFrom == CommonVariables.firstGuestThenHost):
             run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromFirstGuestThenHost()
         elif(self.takeSnapshotFrom == CommonVariables.firstHostThenGuest):
@@ -134,6 +136,7 @@ class FreezeSnapshotter(object):
         all_failed= False
         is_inconsistent =  False
         snapshot_info_array = None
+        all_snapshots_failed = False
         try:
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
@@ -147,7 +150,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
@@ -189,7 +192,7 @@ class FreezeSnapshotter(object):
             run_result = CommonVariables.error
             run_status = 'error'
 
-        return run_result, run_status, snapshot_info_array, all_failed
+        return run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed
 
     def takeSnapshotFromFirstGuestThenHost(self):
         run_result = CommonVariables.success
@@ -198,12 +201,13 @@ class FreezeSnapshotter(object):
         all_failed= False
         is_inconsistent =  False
         snapshot_info_array = None
+        all_snapshots_failed = False
 
-        run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromGuest()
+        run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
 
         time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
 
-        if(run_result != CommonVariables.success and all_failed):
+        if(run_result != CommonVariables.success and all_snapshots_failed):
             run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
 
         if all_failed and run_result != CommonVariables.success:
