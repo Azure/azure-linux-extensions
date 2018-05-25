@@ -177,7 +177,7 @@ def enable():
             extension_status_event = "ExtensionRegistration"
             send_heart_beat_msg_to_agent_service(extension_status_event)
             status_file_path, agent_id, vm_uuid = get_status_message_details()
-            update_statusfile(status_filei_path, agent_id, vm_uuid)
+            update_statusfile(status_file_path, agent_id, vm_uuid)
             sys.exit(0)
         else:
             file_path = download_file()
