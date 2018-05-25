@@ -39,8 +39,8 @@ class TestStatusUpdate(unittest.TestCase):
             metasubstatus = None
             if 'metadata' in  substatusArray[0].viewvalues():
                 metasubstatus = substatusArray[0]
-            self.assertTrue('formatedMessage' in metasubstatus, "formatedMessage doesn't exists")
-            formatedMessage = metasubstatus['formatedMessage']
+            self.assertTrue('formattedMessage' in metasubstatus, "formattedMessage doesn't exists")
+            formatedMessage = metasubstatus['formattedMessage']
             self.assertTrue('message' in formatedMessage, "message doesn't exists")
             self.assertTrue('AgentID' in formatedMessage['message'], "AgentID doesn't exists")
             

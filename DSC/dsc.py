@@ -39,6 +39,7 @@ import Utils.HandlerUtil as Util
 
 # Define global variables
 
+ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
@@ -55,8 +56,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.3"
-extension_status_event = "ExtensionUpgrade"
+extension_handler_version = "2.70.0.7"
 
 # DSC-specific Operation
 class Operation:
@@ -119,7 +119,7 @@ def get_distro_category():
     distro_info = platform.dist()
     distro_name = distro_info[0].lower()
     distro_version = distro_info[1]
-    if distro_name == 'ubuntu' or (distro_name == 'debian' and distro_version != '9.0'):
+    if distro_name == 'ubuntu' or (distro_name == 'debian' and distro_version > '9.0'):
         return DistroCategory.debian
     elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
         return DistroCategory.redhat
@@ -173,12 +173,16 @@ def enable():
             exit_code, err_msg = register_automation(registration_key, registation_url, node_configuration_name, refresh_freq, configuration_mode_freq, configuration_mode.lower())
             if exit_code != 0:
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
-            extension_status_event = "ExtensionUpgrade"    
+            
+            extension_status_event = "ExtensionRegistration"
+            send_heart_beat_msg_to_agent_service(extension_status_event)
+            status_file_path, agent_id, vm_uuid = get_status_message_details()
+            update_statusfile(status_file_path, agent_id, vm_uuid)
+            sys.exit(0)
         else:
             file_path = download_file()
             if mode == Mode.pull:
                 current_config = apply_dsc_meta_configuration(file_path)
-                extension_status_event = "ExtensionUpgrade"
             elif mode == Mode.push:
                 current_config = apply_dsc_configuration(file_path)
             else:
@@ -195,6 +199,11 @@ def enable():
                                               op=Operation.ApplyMetaMof,
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
+                    extension_status_event = "ExtensionRegistration"
+                    send_heart_beat_msg_to_agent_service(extension_status_event)
+                    status_file_path, agent_id, vm_uuid = get_status_message_details()
+                    update_statusfile(status_file_path, agent_id, vm_uuid)
+                    sys.exit(0)        
             else:
                 if mode == Mode.push:
                     waagent.AddExtensionEvent(name=ExtensionShortName,
@@ -207,15 +216,6 @@ def enable():
                                               isSuccess=False,
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
-        
-        send_heart_beat_msg_to_agent_service()
-        
-        agent_id = get_nodeid(nodeid_path)
-        vm_uuid = get_vmuuid()
-        if vm_uuid is not None and agent_id is not None:
-            status_filepath = get_statusfile_path()
-            update_statusfile(status_filepath, agent_id, vm_uuid)
-            sys.exit(0)
               
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
@@ -223,7 +223,7 @@ def enable():
         hutil.error('Failed to enable the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed: {0}'.format(e))
 
-def send_heart_beat_msg_to_agent_service():
+def send_heart_beat_msg_to_agent_service(status_event_type):
     response = None
     try:
         retry_count = 0
@@ -241,7 +241,7 @@ def send_heart_beat_msg_to_agent_service():
                 node_extended_properties_url = registration_url + "/Nodes(AgentId='" + agent_id + "')/ExtendedProperties"
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Url is " + node_extended_properties_url)
                 headers = {'Content-Type': "application/json; charset=utf-8", 'Accept': "application/json", "ProtocolVersion" : "2.0"}
-                data = construct_node_extension_properties(output)
+                data = construct_node_extension_properties(output, status_event_type)
                 
                 http_client_factory = httpclientfactory.HttpClientFactory("/etc/opt/omi/ssl/oaas.crt", "/etc/opt/omi/ssl/oaas.key")
                 http_client = http_client_factory.create_http_client(sys.version_info)
@@ -267,7 +267,7 @@ def get_lcm_config_setting(setting_name, lcmconfig):
     
     return value
     
-def construct_node_extension_properties(lcmconfig):
+def construct_node_extension_properties(lcmconfig, status_event_type):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True, message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
     distro_info = platform.dist()
@@ -293,7 +293,7 @@ def construct_node_extension_properties(lcmconfig):
       "OMSCloudId": OMSCLOUD_ID,      
        "TimeStamp": time.strftime(date_time_format, time.gmtime()),
       "VMResourceId":"",
-        "ExtensionStatusEvent": extension_status_event,
+        "ExtensionStatusEvent": status_event_type,
         "ExtensionInformation":{
               "Name":"Microsoft.OSTCExtensions.DSCForLinux",
               "Version": extension_handler_version
@@ -321,7 +321,7 @@ def uninstall():
     hutil.do_parse_context('Uninstall')
     try:
         extension_status_event = "ExtensionUninstall"
-        send_heart_beat_msg_to_agent_service()
+        send_heart_beat_msg_to_agent_service(extension_status_event)
         hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall Succeeded')
     except Exception as e:
         hutil.error('Failed to uninstall the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
@@ -333,6 +333,8 @@ def disable():
 
 def update():
     hutil.do_parse_context('Update')
+    extension_status_event = "ExtensionUpgrade"
+    send_heart_beat_msg_to_agent_service(extension_status_event)
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 def run_cmd(cmd):
@@ -506,7 +508,7 @@ def get_openssl_version():
     else:
         error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*'
         hutil.error(error_msg)
-        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + package)
+        waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + openssl_version)
         hutil.do_exit(51, 'Install', 'error', '51', openssl_version + 'is not supported.')
         
 def start_omiservice():
@@ -694,6 +696,15 @@ def get_statusfile_path():
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="status file path: " + status_file)
     return status_file
 
+def get_status_message_details():
+    agent_id = get_nodeid(nodeid_path)
+    vm_uuid = get_vmuuid()
+    status_file_path = None
+    if vm_uuid is not None and agent_id is not None:
+        status_file_path = get_statusfile_path()
+    
+    return status_file_path, agent_id, vm_uuid
+    
 def update_statusfile(status_filepath, node_id, vmuuid):
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
     if status_filepath is None:
@@ -719,6 +730,7 @@ def update_statusfile(status_filepath, node_id, vmuuid):
             }]
         json.dump(status_file_content, fp)
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="successfully written nodeid and vmuuid")
+    waagent.AddExtensionEvent(name=ExtensionName, op="Enable", isSuccess=True, message="successfully executed enable functionality")
 
 def get_nodeid(file_path):
     id = None

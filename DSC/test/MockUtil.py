@@ -32,6 +32,9 @@ class MockUtil:
     def get_seq_no(self):
         return "0"
     
+    def do_parse_context(self, operation):
+        return "0"
+
     def do_status_report(self, operation, status, status_code, message):
         self.test.assertNotEqual(None, message)
 
