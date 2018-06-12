@@ -3222,7 +3222,7 @@ class ExtensionsConfig(object):
     # kiG9w0DBwQITgu0Nu3iFPuAGD6/QzKdtrnCI5425fIUy7LtpXJGmpWDUA==","publicSettings":{"port":"3000"}}}]}</RuntimeSettings>
     #  </Plugin>
     # </PluginSettings>
- 
+
 
     def __init__(self):
         self.reinitialize()

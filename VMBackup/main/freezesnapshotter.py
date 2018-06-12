@@ -51,12 +51,17 @@ class FreezeSnapshotter(object):
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
+        self.taskId = None
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
                 self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
                 self.isManaged = customSettings['isManagedVm']
+                if( "backupTaskId" in customSettings.keys()):
+                    this.taskId = customSettings["backupTaskId"]
+                else :
+                    this.taskId = self.para_parser.taskId
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
@@ -223,12 +228,12 @@ class FreezeSnapshotter(object):
         all_failed= False
         is_inconsistent =  False
         snapshot_info_array = None
+        snap_shotter = HostSnapshotter(self.logger)
+        pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, this.taskId)
 
-        run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
-
-        time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
-
-        if(run_result != CommonVariables.success and all_failed):
+        if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
+            run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+        else:
             run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyGuest()
 
         if all_failed and run_result != CommonVariables.success:
@@ -250,7 +255,7 @@ class FreezeSnapshotter(object):
             snap_shotter = HostSnapshotter(self.logger)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
-            snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+            snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, this.taskId)
             time_after_snapshot = datetime.datetime.now()
             HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
             self.logger.log('T:S snapshotall ends...', True)

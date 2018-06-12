@@ -44,8 +44,9 @@ class HostSnapshotter(object):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
         self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
+        self.presnapshoturi = 'http://168.63.129.16/metadata/recsvc/presnapshot/dosnapshot?api-version=2017-12-01'
 
-    def snapshotall(self, paras, freezer, g_fsfreeze_on):
+    def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
         snapshot_info_array = []
         all_failed = True
@@ -66,20 +67,24 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                hostRequestBodyObj = HostSnapshotObjects.HostRequestBody(paras.taskId, diskIds, paras.snapshotTaskToken, meta_data)
-                body_content = json.dumps(hostRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
+                hostRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken, meta_data)
+                body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
-                self.logger.log("responseBody: " + responseBody)
+                self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
-                    snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
+                    if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
+                        snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
+                    if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(556))
                 else:
                     # HttpCall failed
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(555))
                     self.logger.log(" snapshot HttpCallGetResponse failed ")
                     self.logger.log(str(errMsg))
                 #performing thaw
@@ -96,6 +101,42 @@ class HostSnapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             all_failed = True
         return snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
+
+    def pre_snapshot(self, paras, backupTaskId):
+        statusCode = 555
+        if(self.presnapshoturi is None):
+            self.logger.log("Failed to do the snapshot because presnapshoturi is none",False,'Error')
+            all_failed = True
+        try:
+            presnapshoturi_obj = urlparser.urlparse(self.presnapshoturi)
+            if(presnapshoturi_obj is None or presnapshoturi_obj.hostname is None):
+                self.logger.log("Failed to parse the presnapshoturi",False,'Error')
+                all_failed = True
+            else:
+                headers = {}
+                headers['Backup'] = 'true'
+                headers['Content-type'] = 'application/json'
+                hostRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken)
+                body_content = json.dumps(hostPreSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
+                self.logger.log('Headers : ' + str(headers))
+                self.logger.log('Host Request body : ' + str(body_content))
+                http_util = HttpUtil(self.logger)
+                self.logger.log("start calling the snapshot rest api")
+                # initiate http call for blob-snapshot and get http response
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                self.logger.log("presnapshot responseBody: " + responseBody)
+                if(httpResp != None):
+                    statusCode = httpResp.status
+                    if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
+                        statusCode = 556
+                else:
+                    # HttpCall failed
+                    statuscode = 555
+                    self.logger.log(" presnapshot HttpCallGetResponse failed ")
+        except Exception as e:
+            errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, False, 'Error')
+        return statuscode
 
     def get_snapshot_info(self, responseBody):
         snapshotinfo_array = []

@@ -46,8 +46,6 @@ class ParameterParser(object):
         self.vmType = public_settings.get(CommonVariables.vmType)
         if(CommonVariables.customSettings in protected_settings.keys()):
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
-        if(CommonVariables.snapshotTaskToken in protected_settings.keys()):
-            self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
 
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
@@ -65,6 +63,10 @@ class ParameterParser(object):
             self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
         if(self.statusBlobUri is None or self.statusBlobUri == ""):
             self.statusBlobUri = protected_settings.get(CommonVariables.status_blob_uri)
+        if(CommonVariables.snapshotTaskToken in self.public_config_obj.keys()):
+            self.snapshotTaskToken = self.public_config_obj[CommonVariables.snapshotTaskToken]
+        elif(CommonVariables.snapshotTaskToken in protected_settings.keys()):
+            self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
 
         """
         first get the protected configuration
