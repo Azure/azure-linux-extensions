@@ -165,7 +165,11 @@ def disable_encryption():
                       message=message)
 
 
-def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, encryption_config):
+def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, os_item_to_stamp, encryption_config):
+    items_to_encrypt = []
+    items_to_encrypt.extend(os_item_to_stamp)
+    items_to_encrypt.extend(new_device_items_about_to_get_encrypted)
+
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -182,7 +186,7 @@ def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, encryptio
         kek_url=extension_parameter.KeyEncryptionKeyURL,
         kek_kv_id=extension_parameter.KekVaultResourceId,
         kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
-        extra_device_items=new_device_items_about_to_get_encrypted,
+        extra_device_items=items_to_encrypt,
         disk_util=disk_util)
     try:
         settings.post_to_wireserver(data)
@@ -190,6 +194,14 @@ def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, encryptio
         # if host does not support 3.0 protocol version, retry with 2.0
         data["DiskEncryptionDataVersion"] = "2.0"
         settings.post_to_wireserver(data)
+
+    # exit transitioning state by issuing a status report indicating
+    # that the necessary encryption settings are stamped successfully
+    hutil.set_stamped_flag()
+    hutil.do_status_report(operation='StartEncryption',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message='Encryption settings stamped')
 
     settings.remove_protector_file(new_protector_name)
 
@@ -294,7 +306,9 @@ def update_encryption_settings():
             # store new passphrase and overwrite old encryption key file
             bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-            stamp_disks_with_settings(new_device_items_about_to_get_encrypted=[], encryption_config=encryption_config)
+            stamp_disks_with_settings(new_device_items_about_to_get_encrypted=[],
+                                      os_item_to_stamp=[],
+                                      encryption_config=encryption_config)
 
             # commit local encryption config
             # encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
@@ -360,7 +374,7 @@ def update_encryption_settings():
                       message=message)
 
 def update():
-    hutil.do_parse_context('Upadate')
+    hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()
     DistroPatcher.update_prereq()
@@ -683,9 +697,6 @@ def enable_encryption():
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
-
-                    # stamp_disks_with_settings()
-
                     extension_parameter.commit()
    
                 encryption_marker = mark_encryption(command=extension_parameter.command,
@@ -701,7 +712,7 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
-def enable_encryption_format(passphrase, encryption_format_items, disk_util, force=False):
+def enable_encryption_format(passphrase, encryption_format_items, disk_util, force=False, os_item_to_stamp=[]):
     logger.log('enable_encryption_format')
     logger.log('disk format query is {0}'.format(json.dumps(encryption_format_items)))
 
@@ -733,7 +744,9 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
 
     if len(device_items_to_encrypt) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
-        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt, encryption_config=encryption_config)
+        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt,
+                                  os_item_to_stamp=os_item_to_stamp,
+                                  encryption_config=encryption_config)
 
     for device_item, encryption_item, dev_path_in_query in zip(device_items_to_encrypt, encrypt_format_items_to_encrypt, query_dev_paths_to_encrypt):
         if device_item.mount_point:
@@ -1262,7 +1275,7 @@ def decrypt_inplace_with_separate_header_file(passphrase_file,
                                      ongoing_item_config)
 
 
-def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, bek_util):
+def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, bek_util, os_item_to_stamp):
     """
     In case of success return None, otherwise return the device item which failed.
     """
@@ -1271,16 +1284,17 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
 
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='EnableEncryptionFormatAll',
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message=msg)
 
-    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True)
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, True, os_item_to_stamp)
 
-def encrypt_format_device_items(passphrase, device_items, disk_util, force=False):
+
+def encrypt_format_device_items(passphrase, device_items, disk_util, force=False, os_item_to_stamp=[]):
     """
     Formats the block devices represented by the supplied device_item.
 
@@ -1342,7 +1356,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     return device_items_to_encrypt
 
 
-def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util):
+def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util, bek_util, os_item_to_stamp):
     """
     if return None for the success case, or return the device item which failed.
     """
@@ -1352,10 +1366,12 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
     if len(device_items_to_encrypt) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
-        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt, encryption_config=encryption_config)
+        stamp_disks_with_settings(new_device_items_about_to_get_encrypted=device_items_to_encrypt,
+                                  os_item_to_stamp=os_item_to_stamp,
+                                  encryption_config=encryption_config)
 
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='EnableEncryption',
                            status=CommonVariables.extension_success_status,
@@ -1403,7 +1419,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     crypt_items = disk_util.get_crypt_items()
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='DisableEncryption',
                            status=CommonVariables.extension_success_status,
@@ -1501,6 +1517,15 @@ def daemon_encrypt():
     is_not_in_stripped_os = bool(executor.Execute("mountpoint /oldroot"))
     volume_type = encryption_config.get_volume_type().lower()
 
+    # identify os item to stamp when os volume is selected for encryption
+    os_item_to_stamp = []
+    if (volume_type == CommonVariables.VolumeTypeAll.lower() or volume_type == CommonVariables.VolumeTypeOS.lower()) and \
+            not hutil.is_stamped() and is_not_in_stripped_os:
+        device_items = disk_util.get_device_items(None)
+        for device_item in device_items:
+            if device_item.mount_point == "/":
+                os_item_to_stamp.append(device_item)
+
     if (volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower()) and \
         is_not_in_stripped_os:
         try:
@@ -1508,7 +1533,8 @@ def daemon_encrypt():
                                                   encryption_config=encryption_config,
                                                   disk_util=disk_util,
                                                   bek_util=bek_util,
-                                                  bek_passphrase_file=bek_passphrase_file):
+                                                  bek_passphrase_file=bek_passphrase_file,
+                                                  os_item_to_stamp=os_item_to_stamp):
                 logger.log("Calling daemon_encrypt_data_volumes again")
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -1593,6 +1619,9 @@ def daemon_encrypt():
                           message=message)
 
         try:
+            if os_encryption.state == 'uninitialized' and not hutil.is_stamped():
+                stamp_disks_with_settings([], os_item_to_stamp, encryption_config)
+
             os_encryption.start_encryption()
 
             if not os_encryption.state == 'completed':
@@ -1624,7 +1653,7 @@ def daemon_encrypt():
                                message=message)
 
 
-def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util, bek_util, bek_passphrase_file):
+def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util, bek_util, bek_passphrase_file, os_item_to_stamp):
     try:
         """
         check whether there's a scheduled encryption task
@@ -1688,7 +1717,8 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 failed_item = enable_encryption_all_in_place(passphrase_file=bek_passphrase_file,
                                                              encryption_marker=encryption_marker,
                                                              disk_util=disk_util,
-                                                             bek_util=bek_util)
+                                                             bek_util=bek_util,
+                                                             os_item_to_stamp=os_item_to_stamp)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormat:
                 try:
                     disk_format_query = encryption_marker.get_encryption_disk_format_query()
@@ -1706,12 +1736,14 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
 
                 failed_item = enable_encryption_format(passphrase=bek_passphrase_file,
                                                        encryption_format_items=encryption_format_items,
-                                                       disk_util=disk_util)
+                                                       disk_util=disk_util,
+                                                       os_item_to_stamp=os_item_to_stamp)
             elif encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
                 failed_item = enable_encryption_all_format(passphrase_file=bek_passphrase_file,
                                                            encryption_marker=encryption_marker,
                                                            disk_util=disk_util,
-                                                           bek_util=bek_util)
+                                                           bek_util=bek_util,
+                                                           os_item_to_stamp=os_item_to_stamp)
             else:
                 message = "Command {0} not supported.".format(encryption_marker.get_current_command())
                 logger.log(msg=message, level=CommonVariables.ErrorLevel)
@@ -1854,11 +1886,18 @@ def start_daemon(operation):
     
     encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():
-        hutil.do_exit(exit_code=0,
-                      operation=operation,
-                      status=CommonVariables.extension_transitioning_status,
-                      code=str(CommonVariables.success),
-                      message="")
+        if hutil.is_stamped():
+            hutil.do_exit(exit_code=0,
+                          operation=operation,
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message="")
+        else:
+            hutil.do_exit(exit_code=0,
+                          operation=operation,
+                          status=CommonVariables.extension_transitioning_status,
+                          code=str(CommonVariables.success),
+                          message="")
     else:
         hutil.do_exit(exit_code=0,
                       operation=operation,
