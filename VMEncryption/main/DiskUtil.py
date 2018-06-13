@@ -109,6 +109,73 @@ class DiskUtil(object):
 
         return crypt_item
 
+    def get_children(self, parent):
+        command = 'lsblk -P -o NAME /dev/' + parent
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(
+            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+        output = proc_comm.stdout
+        matches = re.findall(r'\"(.+?)\"', output)
+        matches.remove(parent)
+        return matches
+
+    def get_device_names(self):
+        command = 'lsblk -P -o NAME'
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(
+            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+        output = proc_comm.stdout
+        matches = re.findall(r'\"(.+?)\"', output)
+        return matches
+
+    def get_topology(self):
+        # iteratively build a list of device names and closest parent
+        t = {}
+        devices = self.get_device_names()
+        for device in devices:
+            t[device] = ''
+        for parent in devices:
+            children = self.get_children(parent)
+            for child in children:
+                t[child] = parent
+        return t
+
+    def get_simulated_pkname_output(self):
+        # return a string simulating the output of lsblk with PKNAME
+        # as a fall back mechanism on older versions of lsblk 
+
+        command = 'lsblk -P -o NAME,FSTYPE,MOUNTPOINT'
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(
+            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+        output = proc_comm.stdout
+
+        t = self.get_topology()
+        pk_output = ''
+        for line in output.splitlines():
+            pkname = ''
+            match = re.search('NAME=\"(.+?)\"', line)
+            if match:
+                name = match.group(1)
+                pkname = t[name]
+            line = 'PKNAME="' + pkname + '" ' + line + '\n'
+            pk_output += line
+        return pk_output
+
+    def get_lsblk_output(self):
+        try:                 
+            lsblk_command = "lsblk -p -P -o PKNAME,NAME,FSTYPE,MOUNTPOINT"
+            proc_comm = ProcessCommunicator()
+            self.command_executor.Execute(
+                lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
+            lsblk_out = proc_comm.stdout
+        except:
+            # derive parent structure programmatically if lsblk version doesnt have -p
+            lsblk_out = self.get_simulated_pkname_output()
+        
+        return lsblk_out
+
+
     def get_lsblk_tree(self):
         """
         Parse lsblk output, link child items to parents, and return constructed tree
@@ -155,11 +222,7 @@ class DiskUtil(object):
                 else:
                     return None
 
-        proc_comm = ProcessCommunicator()
-        lsblk_command = "lsblk -p -P -o PKNAME,NAME,FSTYPE,MOUNTPOINT"
-        self.command_executor.Execute(
-            lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        lsblk_out = proc_comm.stdout
+        lsblk_out = self.get_lsblk_output()
 
         items = []
         for line in lsblk_out.splitlines():
