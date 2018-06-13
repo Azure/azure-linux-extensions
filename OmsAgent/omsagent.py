@@ -68,7 +68,7 @@ RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
 # Error codes
-DPKGLockedErrorCode = 12
+DPKGLockedErrorCode = 56
 InstallErrorCurlNotInstalled = 64
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
