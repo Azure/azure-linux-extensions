@@ -90,9 +90,6 @@ class SuSEPatching(AbstractPatching):
         
             cmd = " ".join(['pip', 'install', 'jwt'])
             self.command_executor.Execute(cmd)
-        
-            cmd = " ".join(['pip', 'install', 'adal'])
-            self.command_executor.Execute(cmd)
 
     def update_prereq(self):
         pass
