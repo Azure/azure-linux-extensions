@@ -110,14 +110,15 @@ class DiskUtil(object):
         return crypt_item
 
     def get_children(self, parent):
-        command = 'lsblk -P -o NAME /dev/' + parent
+        command = 'lsblk -P -o NAME ' + parent
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(
             command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
         output = proc_comm.stdout
         matches = re.findall(r'\"(.+?)\"', output)
-        matches.remove(parent)
-        return matches
+        children = ["/dev/"+m for m in matches]
+        children.remove(parent)
+        return children
 
     def get_device_names(self):
         command = 'lsblk -P -o NAME'
@@ -126,7 +127,8 @@ class DiskUtil(object):
             command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
         output = proc_comm.stdout
         matches = re.findall(r'\"(.+?)\"', output)
-        return matches
+        names = ["/dev/"+m for m in matches]
+        return names
 
     def get_topology(self):
         # iteratively build a list of device names and closest parent
@@ -142,7 +144,7 @@ class DiskUtil(object):
 
     def get_simulated_pkname_output(self):
         # return a string simulating the output of lsblk with PKNAME
-        # as a fall back mechanism on older versions of lsblk 
+        # as a fall back mechanism on older versions of lsblk
 
         command = 'lsblk -P -o NAME,FSTYPE,MOUNTPOINT'
         proc_comm = ProcessCommunicator()
@@ -154,11 +156,25 @@ class DiskUtil(object):
         pk_output = ''
         for line in output.splitlines():
             pkname = ''
+            name = ''
+            fstype = ''
+            mp = ''
+            
             match = re.search('NAME=\"(.+?)\"', line)
             if match:
-                name = match.group(1)
+                name = "/dev/"+match.group(1)
                 pkname = t[name]
-            line = 'PKNAME="' + pkname + '" ' + line + '\n'
+            
+            match = re.search('FSTYPE=\"(.+?)\"', line)
+            if match:
+                fstype = match.group(1)
+            
+            match = re.search('MOUNTPOINT=\"(.+?)\"', line)
+            if match:
+                mp = match.group(1)
+            
+            line = 'PKNAME="' + pkname + '" NAME="' + name + \
+                '" FSTYPE="' + fstype + '" MOUNTPOINT="' + mp + '"\n'
             pk_output += line
         return pk_output
 
