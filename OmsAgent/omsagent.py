@@ -494,7 +494,7 @@ def is_vm_supported_for_extension():
                        'oracle' : ('5', '6', '7'), # Oracle
                        'debian' : ('6', '7', '8', '9'), # Debian
                        'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
-                                   '16.04', '16.10'), # Ubuntu
+                                   '16.04', '16.10', '18.04'), # Ubuntu
                        'suse' : ('11', '12') #SLES
     }
 
