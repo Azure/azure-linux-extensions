@@ -139,12 +139,8 @@ class redhatPatching(AbstractPatching):
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
-        if self.command_executor.Execute("pip show adal"):
-            self.command_executor.Execute("pip install --upgrade six")
-            self.command_executor.Execute("pip install adal")
-
     def update_prereq(self):
-        if self.distro_info[1] in ["7.2", "7.3", "7.4"]:
+        if self.distro_info[1] in ["7.2", "7.3", "7.4", "7.5"]:
              # Execute unpatching commands only if all the three patch files are present.
             if os.path.exists("/lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig"):
                 if os.path.exists("/lib/dracut/modules.d/90crypt/module-setup.sh.orig"):
