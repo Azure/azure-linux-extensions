@@ -481,7 +481,7 @@ class DiskUtil(object):
                 with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                     mount_lines = f.readlines()
 
-                filtered_mount_lines = filter(lambda line: self.parse_azure_crypt_mount_line(line).mapper_name == crypt_item.mapper_name, mount_lines)
+                filtered_mount_lines = filter(lambda line: self.parse_azure_crypt_mount_line(line).mapper_name != crypt_item.mapper_name, mount_lines)
 
                 with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
                     wf.write(''.join(filtered_mount_lines))
