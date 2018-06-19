@@ -1415,7 +1415,6 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     logger.log(msg="executing disable_encryption_all_in_place")
 
     device_items = disk_util.get_device_items(None)
-    disk_util.consolidate_azure_crypt_mount(passphrase_file)
     crypt_items = disk_util.get_crypt_items()
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
@@ -1431,10 +1430,8 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         def raw_device_item_match(device_item):
             sdx_device_name = os.path.join("/dev/", device_item.name)
-            if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
-                return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
-            else:
-                return crypt_item.dev_path == sdx_device_name
+            return os.path.realpath(sdx_device_name) == os.path.realpath(crypt_item.dev_path) 
+
         def mapped_device_item_match(device_item):
             return crypt_item.mapper_name == device_item.name
 
@@ -1473,7 +1470,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         if decryption_result_phase == CommonVariables.DecryptionPhaseDone:
             disk_util.luks_close(crypt_item.mapper_name)
             disk_util.mount_all()
-            backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/") if crypt_item.mount_point else None
+            backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/") if crypt_item.mount_point else None
             disk_util.remove_crypt_item(crypt_item, backup_folder)
 
             continue

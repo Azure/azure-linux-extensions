@@ -9,10 +9,10 @@ set -x
 } > /etc/udev/rules.d/70-luks-ade.rules.new
 
 {
-    printf -- 'ATTRS{device_id}=="?00000000-0000-*", ENV{ID_FS_UUID}="osencrypt-locked",'
+    printf -- 'ATTRS{device_id}=="?00000000-0000-*", ENV{ID_FS_UUID}=="osencrypt-locked",'
     printf -- 'RUN+="%s --settled --unique --onetime ' $(command -v initqueue)
-    printf -- '--name systemd-cryptsetup-%%k %s start ' $(command -v systemctl)
-    printf -- 'systemd-cryptsetup@osencrypt.service"\n'
+    printf -- '--name cryptroot-ask-ade-%%k %s ' $(command -v cryptroot-ask-ade)
+    printf -- '$env{DEVNAME} osencrypt"\n'
 } >> /etc/udev/rules.d/70-luks-ade.rules.new
 
 echo 'LABEL="luks_ade_end"' >> /etc/udev/rules.d/70-luks-ade.rules.new
