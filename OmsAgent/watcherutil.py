@@ -22,7 +22,7 @@ import datetime
 import time
 import string
 import traceback
-
+import shutil
 
 class Watcher:
     """
@@ -40,8 +40,6 @@ class Watcher:
         self._hutil_log = hutil_log
         self._log_to_console = log_to_console
 
-        self._imds_logger = None
-
     def _do_log_to_console_if_enabled(self, message):
         """
         Write 'message' to console. Stolen from waagent LogToCon().
@@ -53,7 +51,17 @@ class Watcher:
                     console.write(message.encode('ascii', 'ignore') + '\n')
             except IOError as e:
                 self._hutil_error('Error writing to console. Exception={0}'.format(e))
+    
+    def write_waagent_event(event):
+        offset = ustr(int(time.time() * 1000000))
+        fn = '/var/lib/waagent/events/{}.tld'.format(offset)
 
+        with open(fn + '.tmp') as fh:
+            fh.write(event)
+        shutil.move(fn + '.tmp', fn)    
+
+    def upload_telemetry(self):
+        pass         
 
     def watch(self):
         """
@@ -64,9 +72,12 @@ class Watcher:
         """
         self._hutil_log('started watcher thread')
         while True:
-	    self._hutil_log('watcher thread waking')
-
-	    # Sleep 5 minutes
-	    self._hutil_log('watcher thread sleeping')
+            self._hutil_log('watcher thread waking')
+            
+            self.upload_telemetry()
+	        
+            # Sleep 5 minutes
+            self._hutil_log('watcher thread sleeping')
             time.sleep(60 * 5)
+        
         pass
