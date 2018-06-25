@@ -59,7 +59,42 @@ class Watcher:
         with open(fn + '.tmp') as fh:
             fh.write(event)
         shutil.move(fn + '.tmp', fn)    
-
+    
+    def create_telemetry_event(self):
+        template = 
+	""" {
+    		"eventId": 1,
+    		"providerId": "69B669B9-4AF8-4C50-BDC4-6006FA76E975",
+    		"parameters": [
+        		{
+            			"name": "Name",
+            			"value": "Microsoft.EnterpriseCloud.Monitoring.OmsLinuxAgent"
+        		},
+        		{
+            			"name": "Version",
+            			"value": "1.6"
+        		},
+        		{
+            			"name": "Operation",
+            			"value": "{}"
+        		},
+        		{
+            			"name": "OperationSuccess",
+            			"value": {}
+        		},
+        		{
+            			"name": "Message",
+            			"value": "{}"
+        		},
+        		{
+            			"name": "Duration",
+            			"value": {}
+        		}
+    		]
+	    }"""
+	
+	return template.format("ODSIngestion","true","Success","300000")
+	
     def upload_telemetry(self):
         pass         
 
