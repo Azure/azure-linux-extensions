@@ -29,6 +29,7 @@ import base64
 import inspect
 import urllib
 import urllib2
+import watcherutil
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -39,7 +40,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.4.4-210.universal.x64.sh'
+BundleFileName = 'omsagent-1.6.0-42.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -136,6 +137,8 @@ def main():
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
             IsUpgrade = True
+        elif re.match('^([-/]*)(telemetry)', option):
+            operation = 'Telemetry'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -179,6 +182,41 @@ def main():
     # Finish up and log messages
     log_and_exit(operation, exit_code, message)
 
+
+def stop_telemetry_process():
+    pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
+    
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                kill_cmd = "kill " + pids
+                run_command_and_log(kill_cmd)
+                run_command_and_log("rm "+pids_filepath)
+    
+def start_telemetry_process():
+    """
+    Start telemetry process that performs periodic monitoring activities
+    :return: None
+    
+    """
+    stop_telemetry_process()
+
+    #start telemetry watcher
+    omsagent_filepath = os.path.join(os.getcwd(),'omsagent.py')
+    args = ['python', omsagent_filepath, '-telemetry']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def telemetry():
+    pids_filepath = os.path.join(os.getcwd(), 'omstelemetry.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
+    watcher.watch()
 
 def dummy_command():
     """
@@ -356,6 +394,9 @@ def enable():
         # to resolve any issues with auto-started processes from --upgrade
         time.sleep(PostOnboardingSleepSeconds)
         run_command_and_log(RestartOMSAgentServiceCommand)
+        
+        #start telemetry process if enable is successful
+        start_telemetry_process()
 
     return exit_code
 
@@ -435,6 +476,9 @@ def disable():
     Disable all OMS workspace processes on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+    #stop the telemetry process
+    stop_telemetry_process()
+
     # Check if the service control script is available
     if not os.path.exists(OMSAgentServiceScript):
         log_and_exit('Disable', 1, 'OMSAgent service control script {0} does' \
@@ -454,7 +498,8 @@ operations = {'Disable' : disable,
               # Upgrade is noop since omsagent.py->install() will be called
               # everytime upgrade is done due to upgradeMode =
               # "UpgradeWithInstall" set in HandlerManifest
-              'Update' : dummy_command
+              'Update' : dummy_command,
+              'Telemetry' : telemetry
 }
 
 
