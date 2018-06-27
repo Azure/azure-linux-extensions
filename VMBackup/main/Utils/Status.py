@@ -58,13 +58,14 @@ class StorageDetails:
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class SnapshotInfoObj:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
+        self.statusCode = statusCode
 
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage)
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, statusCode = self.statusCode)
 
 class FormattedMessage:
     def __init__(self, lang, message):

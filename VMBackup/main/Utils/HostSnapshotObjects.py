@@ -11,7 +11,7 @@ class HostDoSnapshotRequestBody:
         return dict(taskId = self.taskId, diskIds = self.diskIds, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata)
 
 class HostPreSnapshotRequestBody:
-    def __init__(self, taskId, diskIds, snapshotTaskToken, snapshotMetadata):
+    def __init__(self, taskId, snapshotTaskToken):
         self.taskId = taskId
         self.snapshotTaskToken = snapshotTaskToken
 

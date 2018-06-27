@@ -57,7 +57,10 @@ class CommonVariables:
     """
     success_appconsistent = 0
     success = 1
+    error = 2
+    SuccessAlreadyProcessedInput = 3
     ExtensionTempTerminalState = 4
+
     error_parameter = 11
     error_12 = 12
     error_wrong_time = 13
@@ -65,10 +68,9 @@ class CommonVariables:
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
-    error = 2
-    FailedRetryableSnapshotFailedNoNetwork=76
+    FailedRetryableSnapshotFailedNoNetwork = 76
+    FailedSnapshotLimitReached = 85
     FailedFsFreezeFailed = 121
-    SuccessAlreadyProcessedInput = 3
 
     """
     Pre-Post Plugin error code definitions

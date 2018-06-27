@@ -41,8 +41,9 @@ class SnapshotInfoIndexerObj():
         self.isSuccessful = isSuccessful
         self.snapshotTs = snapshotTs
         self.errorMessage = errorMessage
+        self.statusCode = 500
     def __str__(self):
-        return 'index: ' + str(self.index) + ' isSuccessful: ' + str(self.isSuccessful) + ' snapshotTs: ' + str(self.snapshotTs) + ' errorMessage: ' + str(self.errorMessage)
+        return 'index: ' + str(self.index) + ' isSuccessful: ' + str(self.isSuccessful) + ' snapshotTs: ' + str(self.snapshotTs) + ' errorMessage: ' + str(self.errorMessage + ' statusCode: ' + str(self.statusCode))
 
 class SnapshotError(object):
     def __init__(self):
@@ -101,7 +102,7 @@ class GuestSnapshotter(object):
                 temp_logger = temp_logger + str("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
-                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri, responseBody)
                     temp_logger = temp_logger + str(datetime.datetime.now()) + ' httpresponse_get_snapshot_info message: ' + str(message)
                 else:
                     # HttpCall failed
@@ -155,7 +156,7 @@ class GuestSnapshotter(object):
                 self.logger.log("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
-                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri)
+                    snapshot_info_indexer, snapshot_error, message = self.httpresponse_get_snapshot_info(httpResp, sasuri_index, sasuri, responseBody)
                     self.logger.log(' httpresponse_get_snapshot_info message: ' + str(message))
                 else:
                     # HttpCall failed
@@ -195,7 +196,7 @@ class GuestSnapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None, 500))
                     mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     blob_index = blob_index + 1
 
@@ -271,7 +272,7 @@ class GuestSnapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None))
+                    snapshot_info_array.append(Status.SnapshotInfoObj(False, blobUri, None, 500))
                     snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
@@ -333,7 +334,7 @@ class GuestSnapshotter(object):
                 snapshot_result, snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         return snapshot_result, snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
-    def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri):
+    def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri, responseBody):
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
         result = CommonVariables.error_http_failure
@@ -349,7 +350,8 @@ class GuestSnapshotter(object):
                 snapshot_info_indexer.snapshotTs = resp.getheader('x-ms-snapshot')
             else:
                 result = resp.status
-                snapshot_info_indexer.errorMessage = resp.status
+            snapshot_info_indexer.errorMessage = responseBody
+            snapshot_info_indexer.statusCode = resp.status
         else:
             message = message + str(datetime.datetime.now()) + " snapshot Http connection response is None" + " "
 
@@ -369,6 +371,7 @@ class GuestSnapshotter(object):
             else:
                 snapshot_info.snapshotUri = None
             snapshot_info.errorMessage = snapshot_info_indexer.errorMessage
+            snapshot_info.statusCode = snapshot_info_indexer.statusCode
         else:
             snapshot_info.isSuccessful = False
             snapshot_info.snapshotUri = None

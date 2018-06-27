@@ -52,6 +52,7 @@ class FreezeSnapshotter(object):
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
         self.taskId = None
+        self.taskId = self.para_parser.taskId
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
@@ -59,20 +60,13 @@ class FreezeSnapshotter(object):
                 self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
-                    this.taskId = customSettings["backupTaskId"]
-                else :
-                    this.taskId = self.para_parser.taskId
+                    self.taskId = customSettings["backupTaskId"]
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             self.isManaged = True
 
         self.logger.log('[FreezeSnapshotter] isManaged flag : ' + str(self.isManaged))
-
-        if(self.isManaged):
-            self.logger.log('Changing takeSnapshotFrom to onlyGuest as it is managed VM')
-            self.takeSnapshotFrom = CommonVariables.onlyGuest
-
 
     def doFreezeSnapshot(self):
         run_result = CommonVariables.success
@@ -183,6 +177,20 @@ class FreezeSnapshotter(object):
                             self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
                             error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
                         run_status = 'error'
+
+                        #making retryble error incase of intermittent internal failure in snapshot
+                        #making FailedSnapshotLimitReached error incase of "snapshot blob calls is exceeded"
+                        for snapshot_info in snapshot_info_array:
+                            if "The rate of snapshot blob calls is exceeded" in snapshot_info.errorMessage :
+                                run_result = CommonVariables.FailedSnapshotLimitReached
+                                run_status = 'FailedSnapshotLimitReached'
+                                error_msg = 'T:S Enable failed with FailedSnapshotLimitReachede errror'
+                                break
+                            elif snapshot_info.statusCode == 500 :
+                                run_result = CommonVariables.error
+                                run_status = 'error'
+                                error_msg = 'T:S Enable failed with error in transient error from xstore'
+
                         self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(snapshot_info_array) == True:
                     run_result = CommonVariables.error
@@ -240,6 +248,13 @@ class FreezeSnapshotter(object):
             self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
         elif run_result != CommonVariables.success :
             self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+
+        # When pre-snapshot through host succeded and snapshot through host failed, going for retry flow
+        if(("snapshotCreator" in HandlerUtil.HandlerUtility.telemetry_data.Keys()) and (HandlerUtil.HandlerUtility.telemetry_data["snapshotCreator"] == "backupHostService") and all_failed and run_result != CommonVariables.success):
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'T:S Enable failed with error in transient error from xstore'
+            self.logger.log("Marking retryble error when presnapshot succeeds but dosnapshot fails through host", True, 'Warning')
 
         return run_result, run_status, snapshot_info_array, all_failed
 

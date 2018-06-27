@@ -77,14 +77,14 @@ class HostSnapshotter(object):
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
                 self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(httpResp.status))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(httpResp.status))
                     if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
                         snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(556))
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(556))
                 else:
                     # HttpCall failed
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusCodeFromHost", str(555))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(555))
                     self.logger.log(" snapshot HttpCallGetResponse failed ")
                     self.logger.log(str(errMsg))
                 #performing thaw
@@ -116,7 +116,7 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                hostRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken)
+                hostRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
                 body_content = json.dumps(hostPreSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
@@ -127,12 +127,15 @@ class HostSnapshotter(object):
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
                     if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
                         statusCode = 556
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
                 else:
                     # HttpCall failed
                     statuscode = 555
                     self.logger.log(" presnapshot HttpCallGetResponse failed ")
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
         except Exception as e:
             errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
@@ -145,7 +148,7 @@ class HostSnapshotter(object):
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
-                    snapshotinfo_array.append(Status.SnapshotInfoObj(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage']))
+                    snapshotinfo_array.append(Status.SnapshotInfoObj(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
