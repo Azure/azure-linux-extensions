@@ -56,12 +56,20 @@ class Watcher:
 
     def write_waagent_event(self, event):
         offset = str(int(time.time() * 1000000))
-        fn = '/var/lib/waagent/events/{}.tld'.format(offset)
-        self._hutil_log(fn)
 
-        with open(fn + '.tmp','w+') as fh:
+        temp_fn = '/var/lib/waagent/events/'+str(uuid.uuid4())
+        with open(temp_fn,'w+') as fh:
             fh.write(event)
-        shutil.move(fn + '.tmp', fn)
+
+        fn_template = '/var/lib/waagent/events/{}.tld'
+        fn = fn_template.format(offset)
+        while os.path.isfile(fn):
+            offset += 1
+            fn = fn_template.format(offset)
+
+        shutil.move(temp_fn, fn)
+
+        self._hutil_log(fn)
 
     def create_telemetry_event(self, operation, operation_success, message, duration):
         template = """ {{
