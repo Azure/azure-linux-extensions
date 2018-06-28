@@ -56,7 +56,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.7"
+extension_handler_version = "2.70.0.8"
 
 # DSC-specific Operation
 class Operation:
@@ -119,7 +119,7 @@ def get_distro_category():
     distro_info = platform.dist()
     distro_name = distro_info[0].lower()
     distro_version = distro_info[1]
-    if distro_name == 'ubuntu' or (distro_name == 'debian' and distro_version > '9.0'):
+    if distro_name == 'ubuntu' or (distro_name == 'debian'):
         return DistroCategory.debian
     elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
         return DistroCategory.redhat
