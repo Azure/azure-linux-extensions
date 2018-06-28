@@ -110,7 +110,10 @@ class Watcher:
         status_files = [
                 "/var/opt/microsoft/omsagent/log/ODSIngestion.status",
                 "/var/opt/microsoft/omsagent/log/ODSIngestionBlob.status",
-                "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status"
+                "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status",
+                "/var/opt/microsoft/omsconfig/status/dscperformrequiredconfigurationchecks",
+                "/var/opt/microsoft/omsconfig/status/dscperforminventory",
+                "/var/opt/microsoft/omsconfig/status/dscsetdsclocalconfigurationmanager"
             ]
         for sf in status_files:
             if os.path.isfile(sf):
