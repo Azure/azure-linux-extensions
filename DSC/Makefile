@@ -14,6 +14,7 @@ SOURCES = \
 	azure \
 	packages \
 	../Utils \
+        ../Common/WALinuxAgent-2.0.16/waagent \
 
 clean:
 	rm -rf output
@@ -21,8 +22,8 @@ clean:
 package: $(SOURCES) 
 	mkdir -p output
 	cp -t output -r $(SOURCES)
-
+         
 	cd output && zip -r ../DSC.zip * > /dev/null
-
+        
 .PHONY: all clean package
 
