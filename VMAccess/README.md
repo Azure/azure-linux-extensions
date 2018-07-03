@@ -240,10 +240,20 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ## 3. Scenarios
 
 ### 3.1 Resetting the password
+
+in the Public Settings
+```json
+{
+  "check_disk": "false"
+}
+```
+
+in the Protectect Settings
 ```json
 {
   "username": "currentusername",
-  "password": "newpassword"
+  "password": "newpassword",
+  "reset_ssh": "false"
 }
 ```
 
