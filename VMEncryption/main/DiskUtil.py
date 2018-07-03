@@ -109,143 +109,6 @@ class DiskUtil(object):
 
         return crypt_item
 
-    def get_children(self, parent):
-        command = 'lsblk -P -o NAME ' + parent
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-        matches = re.findall(r'\"(.+?)\"', output)
-        children = ["/dev/"+m for m in matches]
-        children.remove(parent)
-        return children
-
-    def get_device_names(self):
-        command = 'lsblk -P -o NAME'
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-        matches = re.findall(r'\"(.+?)\"', output)
-        names = ["/dev/"+m for m in matches]
-        return names
-
-    def get_topology(self):
-        # iteratively build a list of device names and closest parent
-        t = {}
-        devices = self.get_device_names()
-        for device in devices:
-            t[device] = ''
-        for parent in devices:
-            children = self.get_children(parent)
-            for child in children:
-                t[child] = parent
-        return t
-
-    def get_simulated_pkname_output(self):
-        # return a string simulating the output of lsblk with PKNAME
-        # as a fall back mechanism on older versions of lsblk
-
-        command = 'lsblk -P -o NAME,FSTYPE,MOUNTPOINT'
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-
-        t = self.get_topology()
-        pk_output = ''
-        for line in output.splitlines():
-            pkname = ''
-            name = ''
-            fstype = ''
-            mp = ''
-            
-            match = re.search('NAME=\"(.+?)\"', line)
-            if match:
-                name = "/dev/"+match.group(1)
-                pkname = t[name]
-            
-            match = re.search('FSTYPE=\"(.+?)\"', line)
-            if match:
-                fstype = match.group(1)
-            
-            match = re.search('MOUNTPOINT=\"(.+?)\"', line)
-            if match:
-                mp = match.group(1)
-            
-            line = 'PKNAME="' + pkname + '" NAME="' + name + \
-                '" FSTYPE="' + fstype + '" MOUNTPOINT="' + mp + '"\n'
-            pk_output += line
-        return pk_output
-
-    def get_lsblk_output(self):
-        try:                 
-            lsblk_command = "lsblk -p -P -o PKNAME,NAME,FSTYPE,MOUNTPOINT"
-            proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(
-                lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            lsblk_out = proc_comm.stdout
-        except:
-            # derive parent structure programmatically if lsblk version doesnt have -p
-            lsblk_out = self.get_simulated_pkname_output()
-        
-        return lsblk_out
-
-
-    def get_lsblk_tree(self):
-        """
-        Parse lsblk output, link child items to parents, and return constructed tree
-            
-        Note: using dumps() on the output of this method will create a JSON string
-        in the same format as versions of lsblk including the --json output option
-        (eg., lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json)
-        """
-        def add_child(items, child):
-            if not 'pkname' in child:
-                items.append(child)
-            else:
-                for item in items:
-                    if item['name'] == child['pkname']:
-                        child.pop('pkname')
-                        if not 'children' in item:
-                            item['children'] = []
-                        item['children'].append(child)
-                        break
-                    elif 'children' in item:
-                        # recurse until parent identified
-                        item['children'] = add_child(item['children'], child)
-            return items
-
-        def get_child(line):
-                if line:
-                    child = {}
-                    for kvpstr in line.split():
-                        kvp = kvpstr.split('=')
-                        if kvp[0]:
-                            key = kvp[0].lower()
-                        if kvp[1] and kvp[1].strip('"'):
-                            value = kvp[1].strip('"')
-                        else:
-                            value = None
-
-                        # add pkname element only if nonempty
-                        if key == 'pkname':
-                            if value:
-                                child[key] = value
-                        else:
-                            child[key] = value
-                    return child
-                else:
-                    return None
-
-        lsblk_out = self.get_lsblk_output()
-
-        items = []
-        for line in lsblk_out.splitlines():
-                child = get_child(line)
-                items = add_child(items, child)
-        return items
-
     def consolidate_azure_crypt_mount(self, passphrase_file):
         """
         Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
@@ -324,7 +187,6 @@ class DiskUtil(object):
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
                 self.luks_close(crypt_item.mapper_name)
-
 
     def get_crypt_items(self):
         """
@@ -858,32 +720,6 @@ class DiskUtil(object):
                 return disk_by_id_path
 
         return sdx_path
-
-    def query_dev_uuid_path_by_sdx_path(self, sdx_path):
-        """
-        the behaviour is if we could get the uuid, then return, if not, just return the sdx.
-        """
-        self.logger.log("querying the sdx path of:{0}".format(sdx_path))
-        #blkid path
-        p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        identity, err = p.communicate()
-        identity = identity.lower()
-        self.logger.log("blkid output is: \n" + identity)
-        uuid_pattern = 'uuid="'
-        index_of_uuid = identity.find(uuid_pattern)
-        identity = identity[index_of_uuid + len(uuid_pattern):]
-        index_of_quote = identity.find('"')
-        uuid = identity[0:index_of_quote]
-        if uuid.strip() == "":
-            #TODO this is strange?  BUGBUG
-            return sdx_path
-        return os.path.join("/dev/disk/by-uuid/", uuid)
-
-    def query_dev_uuid_path_by_scsi_number(self, scsi_number):
-        # find the scsi using the filter
-        # TODO figure out why the disk formated using fdisk do not have uuid
-        sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
-        return self.query_dev_uuid_path_by_sdx_path(sdx_path)
 
     def get_device_path(self, dev_name):
         device_path = None
