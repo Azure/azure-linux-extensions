@@ -79,7 +79,7 @@ class Watcher:
     		"parameters": [
                         {{
             			"name": "Name",
-            			"value": "Microsoft.EnterpriseCloud.Monitoring.OmsLinuxAgent"
+            			"value": "Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux"
         		}},
                         {{
             			"name": "Version",
