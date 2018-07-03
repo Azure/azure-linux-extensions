@@ -950,7 +950,7 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
-    def is_not_parent_of_any(self, parent_dev_path, children_dev_path_set):
+    def is_parent_of_any(self, parent_dev_path, children_dev_path_set):
         """
         check if the device whose path is parent_dev_path is actually a parent of any of the children in children_dev_path_set
         All the paths need to be "realpaths" (not symlinks)
@@ -958,7 +958,7 @@ class DiskUtil(object):
         actual_children_dev_items = self.get_device_items(parent_dev_path)
         actual_children_dev_path_set = set([os.path.realpath(self.get_device_path(di.name)) for di in actual_children_dev_items])
         # the sets being disjoint would mean the candidate parent is not parent of any of the candidate children. So we return the opposite of that
-        return actual_children_dev_path_set.isdisjoint(children_dev_path_set)
+        return not actual_children_dev_path_set.isdisjoint(children_dev_path_set)
 
     def get_azure_data_disk_controller_and_lun_numbers(self, dev_items):
         """
@@ -989,8 +989,7 @@ class DiskUtil(object):
                         except ValueError:
                             # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
                             continue # so just ignore it
-                    if self.is_not_parent_of_any(os.path.realpath(full_path), dev_real_paths):
-                        continue
+                    if self.is_parent_of_any(os.path.realpath(full_path), dev_real_paths):
                         list_devices.append((controller_id, lun_number))
         return list_devices
 

@@ -151,8 +151,8 @@ class EncryptionSettingsUtil(object):
 
         all_device_items = existing_crypt_dev_items + extra_device_items
 
-        root_vhd_needs_stamping = not disk_util.is_not_parent_of_any(os.path.realpath("/dev/disk/azure/root"),
-                                                                     set([disk_util.get_device_path(di.name) for di in all_device_items]))
+        root_vhd_needs_stamping = disk_util.is_parent_of_any(os.path.realpath("/dev/disk/azure/root"),
+                                                             set([disk_util.get_device_path(di.name) for di in all_device_items]))
 
         # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
         def dict_to_name_value_array(values):
