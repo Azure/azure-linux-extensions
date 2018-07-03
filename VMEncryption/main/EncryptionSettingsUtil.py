@@ -151,14 +151,8 @@ class EncryptionSettingsUtil(object):
 
         all_device_items = existing_crypt_dev_items + extra_device_items
 
-        # Now we use the lsblk tree to reduce each dev_item to its azure vhd level dev_item
-        azure_vhd_dev_items = disk_util.get_azure_vhd_dev_items(all_device_items)
-
-        root_vhd_needs_stamping = False
-        for dev_item in azure_vhd_dev_items:
-            if os.path.realpath(disk_util.get_device_path(dev_item.name)) == os.path.realpath("/dev/disk/azure/root"):
-                root_vhd_needs_stamping = True
-                break
+        root_vhd_needs_stamping = not disk_util.is_not_parent_of_any(os.path.realpath("/dev/disk/azure/root"),
+                                                                     set([disk_util.get_device_path(di.name) for di in all_device_items]))
 
         # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
         def dict_to_name_value_array(values):
@@ -174,7 +168,7 @@ class EncryptionSettingsUtil(object):
 
         # Get disk data from disk_util
         # We get a list of tuples i.e. [(scsi_controller_id, lun_number),.]
-        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(azure_vhd_dev_items)
+        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(all_device_items)
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
             return {

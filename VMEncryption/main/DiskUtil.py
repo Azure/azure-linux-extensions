@@ -246,50 +246,6 @@ class DiskUtil(object):
                 items = add_child(items, child)
         return items
 
-
-    def get_azure_vhd_dev_items(self, device_items):
-        """
-        Returns all the underlying azure-vhd level device items for given device items (that may be "children" of the vhds)
-
-        Gets a list of dev_items say ("/dev/sdd","/dev/sdc1","/dev/mapper/vg0-lv0")
-        And figures out which Azure VHDs are covered by these device items and returns their dev_items (in the below example: [/dev/sdb, /dev/sdc, /dev/sdd])
-
-        In order to do this we construct an lsblk tree object using get_lsblk_tree method to identify who is who's "child".
-        """
-        lsblk_tree = self.get_lsblk_tree()
-
-        # Let's set up a set of realpaths of each dev_items's real_path
-        real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in device_items])
-
-        def check_device(device_dict):
-            """
-            Recursively check a device to see if any of the children's realpaths matches that in the set
-            """
-
-            if os.path.realpath(device_dict["name"]) in real_paths:
-                return True
-            if "children" in device_dict:
-                for child in device_dict["children"]:
-                    if check_device(child):
-                        return True
-            return False
-
-        azure_vhd_real_dev_paths = set()
-
-        for root_dev in lsblk_tree:
-            if check_device(root_dev):
-                azure_vhd_real_dev_paths.add(root_dev["name"])
-
-        azure_vhd_dev_items = []
-        for real_dev_path in azure_vhd_real_dev_paths:
-            devices = self.get_device_items(real_dev_path)
-            # its probably just device[0] but doesn't hurt to check
-            for device in devices:
-                if self.get_device_path(device.name) == real_dev_path :
-                    azure_vhd_dev_items.append(device)
-                    break
-        return azure_vhd_dev_items
-
     def consolidate_azure_crypt_mount(self, passphrase_file):
         """
         Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
@@ -994,14 +950,24 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
-    def get_azure_data_disk_controller_and_lun_numbers(self, vhd_dev_items):
+    def is_not_parent_of_any(self, parent_dev_path, children_dev_path_set):
         """
-        Return the controller ids and lun numbers for data disks that show up in the vhd_dev_items
+        check if the device whose path is parent_dev_path is actually a parent of any of the children in children_dev_path_set
+        All the paths need to be "realpaths" (not symlinks)
+        """
+        actual_children_dev_items = self.get_device_items(parent_dev_path)
+        actual_children_dev_path_set = set([os.path.realpath(self.get_device_path(di.name)) for di in actual_children_dev_items])
+        # the sets being disjoint would mean the candidate parent is not parent of any of the candidate children. So we return the opposite of that
+        return actual_children_dev_path_set.isdisjoint(children_dev_path_set)
+
+    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
         list_devices = []
         azure_links_dir = '/dev/disk/azure'
 
-        vhd_dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in vhd_dev_items])
+        dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in dev_items])
         if not os.path.exists(azure_links_dir):
             return list_devices
 
@@ -1017,14 +983,14 @@ class DiskUtil(object):
 
                 for symlink in os.listdir(top_level_item_full_path):
                     full_path = os.path.join(top_level_item_full_path, symlink)
-                    if os.path.realpath(full_path) not in vhd_dev_real_paths:
-                        continue
                     if symlink.startswith("lun"):
                         try:
                             lun_number = int(symlink[3:])
                         except ValueError:
                             # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
                             continue # so just ignore it
+                    if self.is_not_parent_of_any(os.path.realpath(full_path), dev_real_paths):
+                        continue
                         list_devices.append((controller_id, lun_number))
         return list_devices
 
