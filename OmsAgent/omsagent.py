@@ -86,6 +86,7 @@ OMSServiceOneClickErrorCode = 44
 MissingorInvalidParameterErrorCode = 11
 UnwantedMultipleConnectionsErrorCode = 10
 CannotConnectToOMSErrorCode = 55
+UnsupportedOperatingSystem = 51
 
 # Configuration
 HUtilObject = None
@@ -591,7 +592,7 @@ def exit_if_vm_not_supported(operation):
     """
     vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
     if not vm_supported:
-        log_and_exit(operation, 51, 'Unsupported operation system: ' \
+        log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
 
