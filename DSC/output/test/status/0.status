@@ -1,0 +1,38 @@
+[{
+    "version": 1.0,
+    "timestampUTC": "<current utc time>",
+    "status" : {
+        "name": "<Handler workload name>",
+        "operation": "<name of the operation being performed>",
+        "configurationAppliedTime": "<UTC time indicating when the configuration was last successfully applied>",
+        "status": "<transitioning | error | success | warning>",
+        "code": 0,
+        "message": {
+            "id": "id of the localized resource",
+            "params": [
+                "MyParam0",
+                "MyParam1"
+            ]
+        },
+        "formattedMessage": {
+            "lang": "Lang[-locale]",
+            "message": "formatted user message"
+        },
+        "substatus": [{
+            "name": "<Handler workload subcomponent name>",
+            "status": "<transitioning | error | success | warning>",
+            "code": 0,
+            "Message": {
+            		"id": "id of the localized resource",
+            		"params": [
+                		"MyParam0",
+                		"MyParam1"
+            		]
+        	},
+      	  	"FormattedMessage": {
+            		"Lang": "Lang[-locale]",
+            		"Message": "formatted user message"
+        	}        
+        }]
+    }
+}]

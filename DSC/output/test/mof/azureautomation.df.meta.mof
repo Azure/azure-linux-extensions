@@ -1,0 +1,57 @@
+
+	instance of MSFT_WebDownloadManager as $MSFT_WebDownloadManager1ref
+	{
+	ResourceID = "[ConfigurationRepositoryWeb]AzureAutomationDSC";
+	 SourceInfo = "C:\\OaaS-RegistrationMetaConfig2.ps1::20::9::ConfigurationRepositoryWeb";
+	 RegistrationKey = "TsyfxalOa7P4lNWIqAVrEWhdiRNGx+2A2WYZEE1wR+lXH5snJojB9pONu79iWZVeviC/sPylSGZQlVsmCUPGOQ=="; 
+	 ServerURL = "https://oaasagentsvcdf.test.azure-automation.net/accounts/a654020d-4757-41cd-bbf2-528ef2fefacb";
+	};
+
+	instance of MSFT_WebResourceManager as $MSFT_WebResourceManager1ref
+	{
+	 SourceInfo = "C:\\OaaS-RegistrationMetaConfig2.ps1::27::9::ResourceRepositoryWeb";
+	 ServerURL = "https://oaasagentsvcdf.test.azure-automation.net/accounts/a654020d-4757-41cd-bbf2-528ef2fefacb";
+	 ResourceID = "[ResourceRepositoryWeb]AzureAutomationDSC";
+	 RegistrationKey = "TsyfxalOa7P4lNWIqAVrEWhdiRNGx+2A2WYZEE1wR+lXH5snJojB9pONu79iWZVeviC/sPylSGZQlVsmCUPGOQ=="; 
+	};
+
+	instance of MSFT_WebReportManager as $MSFT_WebReportManager1ref
+	{
+	 SourceInfo = "C:\\OaaS-RegistrationMetaConfig2.ps1::34::9::ReportServerWeb";
+	 ServerURL = "https://oaasagentsvcdf.test.azure-automation.net/accounts/a654020d-4757-41cd-bbf2-528ef2fefacb";
+	 ResourceID = "[ReportServerWeb]AzureAutomationDSC";
+	 RegistrationKey = "TsyfxalOa7P4lNWIqAVrEWhdiRNGx+2A2WYZEE1wR+lXH5snJojB9pONu79iWZVeviC/sPylSGZQlVsmCUPGOQ=="; 
+	};
+
+	instance of MSFT_DSCMetaConfiguration as $MSFT_DSCMetaConfiguration1ref
+	{
+	 RefreshMode = "Pull";
+	 AllowModuleOverwrite = False;
+	 ActionAfterReboot = "ContinueConfiguration";
+	 RefreshFrequencyMins = 30;
+	 RebootNodeIfNeeded = False;
+	 ConfigurationModeFrequencyMins = 15;
+	 ConfigurationMode = "ApplyAndMonitor";
+
+	  ResourceModuleManagers = {
+	  $MSFT_WebResourceManager1ref  
+	};
+	  ReportManagers = {
+	  $MSFT_WebReportManager1ref  
+	 };
+	  ConfigurationDownloadManagers = {
+	  $MSFT_WebDownloadManager1ref  
+	 };
+	};
+
+	instance of OMI_ConfigurationDocument
+	{
+	 Version="2.0.0";
+	 MinimumCompatibleVersion = "2.0.0";
+	 CompatibleVersionAdditionalProperties= { "MSFT_DSCMetaConfiguration:StatusRetentionTimeInDays" };
+	 Author="azureautomation";
+	 GenerationDate="04/17/2015 11:41:09";
+	 GenerationHost="azureautomation-01";
+	 Name="RegistrationMetaConfig";
+	};
+	
