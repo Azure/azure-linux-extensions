@@ -56,7 +56,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.9"
+extension_handler_version = "2.70.0.10"
 
 # DSC-specific Operation
 class Operation:
@@ -341,7 +341,7 @@ def update():
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='UpdateInProgress', isSuccess=False, message='Failed to update the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
         hutil.error('Failed to update the extension with error: %s, stack trace: %s' %(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Uninstall', 'error', '1', 'Uninstall failed: {0}'.format(e))
+        hutil.do_exit(1, 'Update', 'error', '1', 'Update failed: {0}'.format(e))
 
 def run_cmd(cmd):
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
