@@ -44,11 +44,11 @@ class HostSnapshotter(object):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
         self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
-        self.presnapshoturi = 'http://168.63.129.16/metadata/recsvc/presnapshot/dosnapshot?api-version=2017-12-01'
+        self.presnapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
-        snapshot_info_array = []
+        blob_snapshot_info_array = []
         all_failed = True
         is_inconsistent = False
         unable_to_sleep = False
@@ -79,14 +79,13 @@ class HostSnapshotter(object):
                 if(httpResp != None):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(httpResp.status))
                     if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
-                        snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
-                    if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(556))
+                        blob_snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
+                    if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(556))
                 else:
                     # HttpCall failed
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(555))
-                    self.logger.log(" snapshot HttpCallGetResponse failed ")
-                    self.logger.log(str(errMsg))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(555))
+                    self.logger.log("presnapshot Hitting wrong WireServer IP")
                 #performing thaw
                 if g_fsfreeze_on :
                     time_before_thaw = datetime.datetime.now()
@@ -100,7 +99,7 @@ class HostSnapshotter(object):
             errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
             all_failed = True
-        return snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
+        return blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
     def pre_snapshot(self, paras, backupTaskId):
         statusCode = 555
@@ -121,20 +120,21 @@ class HostSnapshotter(object):
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
                 http_util = HttpUtil(self.logger)
-                self.logger.log("start calling the snapshot rest api")
+                self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
-                    if(httpResp.status == 500 and responseBody.startswith("{ \"error\"")):
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
+                    if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
+                        self.logger.log("BHS is not runnning on host machine")
                         statusCode = 556
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
                 else:
                     # HttpCall failed
                     statuscode = 555
-                    self.logger.log(" presnapshot HttpCallGetResponse failed ")
+                    self.logger.log("presnapshot Hitting wrong WireServer IP")
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
         except Exception as e:
             errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
@@ -142,13 +142,13 @@ class HostSnapshotter(object):
         return statuscode
 
     def get_snapshot_info(self, responseBody):
-        snapshotinfo_array = []
+        blobsnapshotinfo_array = []
         all_failed = True
         try:
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
-                    snapshotinfo_array.append(Status.SnapshotInfoObj(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
@@ -156,4 +156,4 @@ class HostSnapshotter(object):
             errorMsg = " deserialization of response body failed with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
 
-        return snapshotinfo_array, all_failed
+        return blobsnapshotinfo_array, all_failed

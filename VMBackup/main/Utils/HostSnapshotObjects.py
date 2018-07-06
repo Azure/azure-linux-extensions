@@ -17,3 +17,13 @@ class HostPreSnapshotRequestBody:
 
     def convertToDictionary(self):
         return dict(taskId = self.taskId, snapshotTaskToken = self.snapshotTaskToken)
+
+class BlobSnapshotInfo:
+        def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode):
+            self.isSuccessful = isSuccessful
+            self.snapshotUri = snapshotUri
+            self.errorMessage = errorMessage
+            self.statusCode = statusCode
+
+        def convertToDictionary(self):
+            return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, statusCode = self.statusCode)

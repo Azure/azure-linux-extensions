@@ -37,6 +37,7 @@ from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
+from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
 
 class FreezeSnapshotter(object):
@@ -51,7 +52,6 @@ class FreezeSnapshotter(object):
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
-        self.taskId = None
         self.taskId = self.para_parser.taskId
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
@@ -73,16 +73,27 @@ class FreezeSnapshotter(object):
         run_status = 'success'
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
-            run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed = self.takeSnapshotFromGuest()
+            run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed = self.takeSnapshotFromGuest()
         elif(self.takeSnapshotFrom == CommonVariables.firstGuestThenHost):
-            run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromFirstGuestThenHost()
+            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromFirstGuestThenHost()
         elif(self.takeSnapshotFrom == CommonVariables.firstHostThenGuest):
-            run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromFirstHostThenGuest()
+            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
-            run_result, run_status, snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
+
+        snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
 
         return run_result, run_status, snapshot_info_array
     
+    def update_snapshotinfoarray(self, blob_snapshot_info_array):
+        snapshot_info_array = []
+
+        self.logger.log('updating snapshot info array from blob snapshot info')
+        for blob_snapshot_info in blob_snapshot_info_array:
+            snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
+
+        return snapshot_info_array
+
     def freeze(self):
         try:
             timeout = self.hutil.get_value_from_configfile('timeout')
@@ -134,7 +145,7 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
-        snapshot_info_array = None
+        blob_snapshot_info_array = None
         all_snapshots_failed = False
         try:
             if self.g_fsfreeze_on :
@@ -149,7 +160,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
@@ -180,19 +191,20 @@ class FreezeSnapshotter(object):
 
                         #making retryble error incase of intermittent internal failure in snapshot
                         #making FailedSnapshotLimitReached error incase of "snapshot blob calls is exceeded"
-                        for snapshot_info in snapshot_info_array:
-                            if "The rate of snapshot blob calls is exceeded" in snapshot_info.errorMessage :
-                                run_result = CommonVariables.FailedSnapshotLimitReached
-                                run_status = 'FailedSnapshotLimitReached'
-                                error_msg = 'T:S Enable failed with FailedSnapshotLimitReachede errror'
-                                break
-                            elif snapshot_info.statusCode == 500 :
-                                run_result = CommonVariables.error
-                                run_status = 'error'
-                                error_msg = 'T:S Enable failed with error in transient error from xstore'
+                        if blob_snapshot_info_array != None:
+                            for blob_snapshot_info in blob_snapshot_info_array:
+                                if "The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage:
+                                    run_result = CommonVariables.FailedSnapshotLimitReached
+                                    run_status = 'FailedSnapshotLimitReached'
+                                    error_msg = 'T:S Enable failed with FailedSnapshotLimitReachede errror'
+                                    break
+                                elif blob_snapshot_info.statusCode == 500 :
+                                    run_result = CommonVariables.error
+                                    run_status = 'error'
+                                    error_msg = 'T:S Enable failed with transient error(Internal Server Error) from xstore'
 
                         self.logger.log(error_msg, True, 'Error')
-                elif self.check_snapshot_array_fail(snapshot_info_array) == True:
+                elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
@@ -205,7 +217,7 @@ class FreezeSnapshotter(object):
             run_result = CommonVariables.error
             run_status = 'error'
 
-        return run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed
 
     def takeSnapshotFromFirstGuestThenHost(self):
         run_result = CommonVariables.success
@@ -213,20 +225,20 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
-        snapshot_info_array = None
+        blob_snapshot_info_array = None
         all_snapshots_failed = False
 
-        run_result, run_status, snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
+        run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
 
         time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
 
         if(run_result != CommonVariables.success and all_snapshots_failed):
-            run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
 
         if all_failed and run_result != CommonVariables.success:
             self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
 
-        return run_result, run_status, snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed
 
     def takeSnapshotFromFirstHostThenGuest(self):
 
@@ -235,33 +247,31 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
-        snapshot_info_array = None
+        blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger)
         pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, this.taskId)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
-            run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+            if(all_failed and run_result != CommonVariables.success):
+                run_result = CommonVariables.error
+                run_status = 'error'
+                error_msg = 'T:S Enable failed with error in transient error from xstore'
+                self.logger.log("Marking retryble error when presnapshot succeeds but dosnapshot fails through host", True, 'Warning')
         else:
-            run_result, run_status, snapshot_info_array,all_failed = self.takeSnapshotFromOnlyGuest()
+            run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyGuest()
 
-        if all_failed and run_result != CommonVariables.success:
-            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-        elif run_result != CommonVariables.success :
-            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+            if all_failed and run_result != CommonVariables.success:
+                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+            elif run_result != CommonVariables.success :
+                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
 
-        # When pre-snapshot through host succeded and snapshot through host failed, going for retry flow
-        if(("snapshotCreator" in HandlerUtil.HandlerUtility.telemetry_data.Keys()) and (HandlerUtil.HandlerUtility.telemetry_data["snapshotCreator"] == "backupHostService") and all_failed and run_result != CommonVariables.success):
-            run_result = CommonVariables.error
-            run_status = 'error'
-            error_msg = 'T:S Enable failed with error in transient error from xstore'
-            self.logger.log("Marking retryble error when presnapshot succeeds but dosnapshot fails through host", True, 'Warning')
-
-        return run_result, run_status, snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed
 
     def takeSnapshotFromOnlyHost(self):
         all_failed= False
         is_inconsistent =  False
-        snapshot_info_array = None
+        blob_snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
         HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
         if self.g_fsfreeze_on :
@@ -270,11 +280,11 @@ class FreezeSnapshotter(object):
             snap_shotter = HostSnapshotter(self.logger)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
-            snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, this.taskId)
+            blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, this.taskId)
             time_after_snapshot = datetime.datetime.now()
             HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
             self.logger.log('T:S snapshotall ends...', True)
-            if(all_failed or self.check_snapshot_array_fail(snapshot_info_array)):
+            if(all_failed or self.check_snapshot_array_fail(blob_snapshot_info_array)):
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 run_status = 'error'
                 if self.takeSnapshotFrom == CommonVariables.onlyHost:
@@ -283,4 +293,4 @@ class FreezeSnapshotter(object):
                 error_msg = 'Enable failed in taking snapshot through host'
                 self.logger.log("T:S " + error_msg, True)
 
-        return run_result, run_status, snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed
