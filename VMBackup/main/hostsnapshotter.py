@@ -67,7 +67,7 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                hostRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken, meta_data)
+                hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
@@ -101,7 +101,7 @@ class HostSnapshotter(object):
             all_failed = True
         return blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
-    def pre_snapshot(self, paras, backupTaskId):
+    def pre_snapshot(self, paras, taskId):
         statusCode = 555
         if(self.presnapshoturi is None):
             self.logger.log("Failed to do the snapshot because presnapshoturi is none",False,'Error')
@@ -115,14 +115,14 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                hostRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
+                hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
                 body_content = json.dumps(hostPreSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
@@ -133,13 +133,13 @@ class HostSnapshotter(object):
                         HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
                 else:
                     # HttpCall failed
-                    statuscode = 555
+                    statusCode = 555
                     self.logger.log("presnapshot Hitting wrong WireServer IP")
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
         except Exception as e:
             errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
-        return statuscode
+        return statusCode
 
     def get_snapshot_info(self, responseBody):
         blobsnapshotinfo_array = []
