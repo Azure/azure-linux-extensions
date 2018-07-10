@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
+  <ProviderNameSpace>Microsoft.EnterpriseCloud.Monitoring</ProviderNameSpace>
+  <Type>OmsAgentForLinux</Type>
+  <Version>1.7.0.2</Version>
+  <Label>Microsoft Operations Management Suite Agent for Linux</Label>
+  <HostingResources>VmRole</HostingResources>
+  <MediaLink></MediaLink>
+  <Description>Microsoft Operations Management Suite Agent for Linux</Description>
+  <IsInternalExtension>true</IsInternalExtension>
+  <Eula>https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/LICENSE</Eula>
+  <PrivacyUri>http://www.microsoft.com/privacystatement/en-us/OnlineServices/Default.aspx</PrivacyUri>
+  <HomepageUri>https://github.com/Microsoft/OMS-Agent-for-Linux</HomepageUri>
+  <IsJsonExtension>true</IsJsonExtension>
+  <SupportedOS>Linux</SupportedOS>
+  <CompanyName>Microsoft</CompanyName>
+  <!--%REGIONS%-->
+</ExtensionImage>
