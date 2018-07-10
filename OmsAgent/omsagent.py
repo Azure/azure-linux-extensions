@@ -69,14 +69,14 @@ RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
 # Error codes
-DPKGLockedErrorCode = 56
-InstallErrorCurlNotInstalled = 64
+DPKGLockedErrorCode = 55 #56, temporary as it excludes from SLA
+InstallErrorCurlNotInstalled = 55 #64, temporary as it excludes from SLA
 EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
 EnableCalledBeforeSuccessfulInstall = 9
-UnsupportedOpenSSL = 60
+UnsupportedOpenSSL = 55 #60, temporary as it excludes from SLA
 # OneClick error codes
 OneClickErrorCode = 40
 ManagedIdentityExtMissingErrorCode = 41
