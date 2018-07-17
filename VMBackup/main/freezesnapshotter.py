@@ -89,8 +89,10 @@ class FreezeSnapshotter(object):
         snapshot_info_array = []
 
         self.logger.log('updating snapshot info array from blob snapshot info')
-        for blob_snapshot_info in blob_snapshot_info_array:
-            snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
+        if blob_snapshot_info_array != None and blob_snapshot_info_array !=[]:
+            for blob_snapshot_info in blob_snapshot_info_array:
+                if blob_snapshot_info != None:
+                    snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
 
         return snapshot_info_array
 
@@ -193,15 +195,16 @@ class FreezeSnapshotter(object):
                         #making FailedSnapshotLimitReached error incase of "snapshot blob calls is exceeded"
                         if blob_snapshot_info_array != None:
                             for blob_snapshot_info in blob_snapshot_info_array:
-                                if "The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage:
-                                    run_result = CommonVariables.FailedSnapshotLimitReached
-                                    run_status = 'FailedSnapshotLimitReached'
-                                    error_msg = 'T:S Enable failed with FailedSnapshotLimitReachede errror'
-                                    break
-                                elif blob_snapshot_info.statusCode == 500 :
-                                    run_result = CommonVariables.error
-                                    run_status = 'error'
-                                    error_msg = 'T:S Enable failed with transient error(Internal Server Error) from xstore'
+                                if blob_snapshot_info != None:
+                                    if blob_snapshot_info.errorMessage != None and ("The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage):
+                                        run_result = CommonVariables.FailedSnapshotLimitReached
+                                        run_status = 'FailedSnapshotLimitReached'
+                                        error_msg = 'T:S Enable failed with FailedSnapshotLimitReachede errror'
+                                        break
+                                    elif blob_snapshot_info.statusCode == 500 :
+                                        run_result = CommonVariables.error
+                                        run_status = 'error'
+                                        error_msg = 'T:S Enable failed with transient error(Internal Server Error) from xstore'
 
                         self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:

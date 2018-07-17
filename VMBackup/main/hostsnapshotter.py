@@ -77,7 +77,7 @@ class HostSnapshotter(object):
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
                 self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodeDoSnapshot", str(httpResp.status))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(httpResp.status))
                     if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
                         blob_snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
@@ -135,7 +135,7 @@ class HostSnapshotter(object):
                     # HttpCall failed
                     statusCode = 555
                     self.logger.log("presnapshot Hitting wrong WireServer IP")
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hotStatusCodePreSnapshot", str(statusCode))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
         except Exception as e:
             errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')

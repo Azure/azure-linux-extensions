@@ -112,7 +112,7 @@ class HttpUtil(object):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 10) # making call with port 80 to make it http call
                 else:
                     connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
-                self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path) + " query: " + str(sasuri_obj.query))
+                self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path))
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
                 resp = connection.getresponse()
                 if(responseBodyRequired):
