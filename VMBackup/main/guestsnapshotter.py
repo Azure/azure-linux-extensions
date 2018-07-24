@@ -44,7 +44,7 @@ class SnapshotInfoIndexerObj():
         self.errorMessage = errorMessage
         self.statusCode = 500
     def __str__(self):
-        return 'index: ' + str(self.index) + ' isSuccessful: ' + str(self.isSuccessful) + ' snapshotTs: ' + str(self.snapshotTs) + ' errorMessage: ' + str(self.errorMessage + ' statusCode: ' + str(self.statusCode))
+        return 'index: ' + str(self.index) + ' isSuccessful: ' + str(self.isSuccessful) + ' snapshotTs: ' + str(self.snapshotTs) + ' errorMessage: ' + str(self.errorMessage) + ' statusCode: ' + str(self.statusCode)
 
 class SnapshotError(object):
     def __init__(self):
