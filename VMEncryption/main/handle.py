@@ -188,12 +188,8 @@ def stamp_disks_with_settings(new_device_items_about_to_get_encrypted, os_item_t
         kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
         extra_device_items=items_to_encrypt,
         disk_util=disk_util)
-    try:
-        settings.post_to_wireserver(data)
-    except:
-        # if host does not support 3.0 protocol version, retry with 2.0
-        data["DiskEncryptionDataVersion"] = "2.0"
-        settings.post_to_wireserver(data)
+
+    settings.post_to_wireserver(data)
 
     # exit transitioning state by issuing a status report indicating
     # that the necessary encryption settings are stamped successfully

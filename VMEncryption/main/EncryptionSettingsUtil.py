@@ -53,7 +53,8 @@ class EncryptionSettingsUtil(object):
         # https://linux.die.net/man/2/fsync
         with open(CommonVariables.encryption_settings_counter_path, "w", 0) as outfile:
             outfile.write(str(index + 1) + "\n")
-            os.fsync(outfile)
+            outfile.flush()
+            os.fsync(outfile.fileno())
         return
 
     def get_new_protector_name(self):
@@ -222,7 +223,9 @@ class EncryptionSettingsUtil(object):
         self.increment_index()
         with open(self.get_settings_file_path(), 'w', 0) as outfile:
             json.dump(data, outfile)
-            os.fsync(outfile)
+            outfile.flush()
+            os.fsync(outfile.fileno())
+
         return
 
     def post_to_wireserver(self, data):        
