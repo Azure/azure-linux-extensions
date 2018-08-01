@@ -530,18 +530,16 @@ def is_vm_supported_for_extension():
     Returns for platform.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match
-    The supported distros of the OMSAgent-for-Linux, as well as Ubuntu 16.10,
-    are allowed to utilize this VM extension. All other distros will get
-    error code 51
+    The supported distros of the OMSAgent-for-Linux are allowed to utilize
+    this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ('5', '6', '7'), # CentOS
-                       'centos' : ('5', '6', '7'), # CentOS
-                       'red hat' : ('5', '6', '7'), # Oracle, RHEL
-                       'oracle' : ('5', '6', '7'), # Oracle
-                       'debian' : ('6', '7', '8', '9'), # Debian
-                       'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
-                                   '16.04', '16.10', '18.04'), # Ubuntu
-                       'suse' : ('11', '12') #SLES
+    supported_dists = {'redhat' : ('6', '7'), # CentOS
+                       'centos' : ('6', '7'), # CentOS
+                       'red hat' : ('6', '7'), # Oracle, RHEL
+                       'oracle' : ('6', '7'), # Oracle
+                       'debian' : ('8', '9'), # Debian
+                       'ubuntu' : ('14.04', '16.04', '18.04'), # Ubuntu
+                       'suse' : ('12') #SLES
     }
 
     try:
