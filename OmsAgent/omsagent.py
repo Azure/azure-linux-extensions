@@ -103,7 +103,7 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 
 # vmResourceId Metadata Service
 VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-08-01'.format(VMResourceIDMetadataHost)
+VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -431,7 +431,11 @@ def get_vmresourceid_from_metadata():
 
     try:
         response = json.loads(urllib2.urlopen(req).read())
-        return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+        if response['compute']['vmScaleSetName']:
+            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'])
+        else: 
+            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+
     except urllib2.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
