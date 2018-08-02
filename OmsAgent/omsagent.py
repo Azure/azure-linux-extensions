@@ -30,6 +30,7 @@ import inspect
 import urllib
 import urllib2
 import watcherutil
+from threading import Thread
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -217,7 +218,15 @@ def telemetry():
         f.write(str(py_pid) + '\n')
 
     watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
-    watcher.watch()
+
+    watcher_thread = Thread(target = watcher.watch)
+    self_mon_thread = Thread(target = watcher.monitor_health)
+
+    watcher_thread.start()
+    self_mon_thread.start()
+
+    watcher_thread.join()
+    self_mon_thread.join()
 
 def dummy_command():
     """
