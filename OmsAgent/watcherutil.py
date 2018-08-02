@@ -382,16 +382,20 @@ class Watcher:
         # fluentd logs timestamp format : 2018-08-02 19:27:34 +0000
         # for python 2.7 or earlier there is no good way to convert it into seconds.
         # so we parse upto seconds, and parse utc specific offset seperately.
+        try:
+            date_time_format = '%Y-%m-%d %H:%M:%S'
+            epoch = datetime(1970, 1, 1)        
 
-        date_time_format = '%Y-%m-%d %H:%M:%S'
-        epoch = datetime(1970, 1, 1)        
-
-        # get hours and minute delta for utc offset.
-        hours_delta_utc = int(datetime_string[21:23])
-        minutes_delta_utc= int(datetime_string[23:])        
+            # get hours and minute delta for utc offset.
+            hours_delta_utc = int(datetime_string[21:23])
+            minutes_delta_utc= int(datetime_string[23:])        
         
-        log_time = datetime.strptime(datetime_string[:19], date_time_format) + ((timedelta(hours=hours_delta_utc, minutes=minutes_delta_utc)) * (-1 if datetime_string[20] == "+" else 1))                
-        return (log_time - epoch).total_seconds()
+            log_time = datetime.strptime(datetime_string[:19], date_time_format) + ((timedelta(hours=hours_delta_utc, minutes=minutes_delta_utc)) * (-1 if datetime_string[20] == "+" else 1))                
+            return (log_time - epoch).total_seconds()
+        except Exception as e:
+            self._hutil_error('Error converting timestamp string to seconds. Exception={0}'.format(e))
+        
+        return 0
 
     def check_for_fatal_oms_logs(self, log_file_marker):                
         """
