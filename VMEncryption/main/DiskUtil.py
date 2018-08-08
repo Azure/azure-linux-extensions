@@ -215,7 +215,7 @@ class DiskUtil(object):
 
                     crypt_items.append(crypt_item)
 
-            encryption_status = json.loads(self.get_encryption_status())
+        encryption_status = json.loads(self.get_encryption_status())
 
         if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
             crypt_item = CryptItem()
