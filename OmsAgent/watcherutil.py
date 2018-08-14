@@ -194,8 +194,11 @@ class Watcher:
                 }}
             ]
             }}"""
+        
+        operation_success_as_string = str(operation_success).lower()
+        formatted_message = message.replace("\n", "\\n").replace("\t", "\\t").replace('"', '\"')
 
-        return template.format(operation, operation_success, message, duration)
+        return template.format(operation, operation_success_as_string, formatted_message, duration)
 
     def upload_telemetry(self):
         status_files = [
