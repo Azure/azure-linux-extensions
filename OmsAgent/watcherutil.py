@@ -200,9 +200,9 @@ class Watcher:
                 "/var/opt/microsoft/omsagent/log/ODSIngestion.status",
                 "/var/opt/microsoft/omsagent/log/ODSIngestionBlob.status",
                 "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status",
-                "/var/opt/microsoft/omsconfig/status/dscperformrequiredconfigurationchecks",
+                "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
                 "/var/opt/microsoft/omsconfig/status/dscperforminventory",
-                "/var/opt/microsoft/omsconfig/status/dscsetdsclocalconfigurationmanager"
+                "/var/opt/microsoft/omsconfig/status/dscsetlcm"
             ]            
         for sf in status_files:
             if os.path.isfile(sf):
@@ -256,20 +256,10 @@ class Watcher:
             of new heartbeat file every 5 minutes. We will check if it is updated
             If not, we will look into omsagent logs and look for specific error logs
             which indicate we are in non recoverable state.             
-        """
-        heartbeat_file = '/var/opt/microsoft/omsagent/log/heartbeat'
-        curr_time = int(time.time()) 
-        
-        if (os.path.isfile(heartbeat_file)):
-            file_update_time = os.path.getmtime(heartbeat_file)
-            self._hutil_log("File update time={0}, current time={1}".format(file_update_time, curr_time))
-        else:
-            self._hutil_log("Heartbeat file is not present on the disk.")
-            file_update_time = curr_time - 1000    
-        
+        """ 
         take_action = False
         
-        if (file_update_time + 360 < curr_time):
+        if (not self.received_heartbeat_recently()):
             """
                 We haven't seen heartbeat in more than past 300 seconds
             """
@@ -303,6 +293,40 @@ class Watcher:
             self_mon_info.reset_error_info()   
             self._consecutive_restarts_due_to_error = 0       
 
+    def received_heartbeat_recently(self):
+        heartbeat_file = '/var/opt/microsoft/omsagent/log/ODSIngestions.status'
+        curr_time = int(time.time()) 
+        return_val = True
+        file_update_time = curr_time
+
+        if (os.path.isfile(heartbeat_file)):
+            file_update_time = os.path.getmtime(heartbeat_file)
+            self._hutil_log("File update time={0}, current time={1}".format(file_update_time, curr_time))
+        else:
+            self._hutil_log("Heartbeat file is not present on the disk.")            
+            file_update_time = curr_time - 1000
+
+        if (file_update_time + 360 < curr_time):
+            return_val = False
+        else:        
+            try:
+                with open(heartbeat_file) as json_file:
+                    status_data = json.load(json_file)
+                    operation_success = status_data["success"]           
+                    if (operation_success.lower() == "true"):
+                        self._hutil_log("Found success message from ODS Ingestion.")
+                        return_val = True
+                    else:
+                        self._hutil_log("Did not find success message in heart beat file. {0}".format(operation_success))
+                        return_val = False
+            except Exception as e:
+                self._hutil_log("Error parsing ODS Ingestion status file: "+sf)                
+            
+                # Return True in case we failed to parse the file. We do not want to go into recycle loop in this scenario. 
+                return_val = True
+        
+        return return_val
+                
     def monitor_resource(self, self_mon_info):
         """
             Monitor resource utilization of omsagent.
