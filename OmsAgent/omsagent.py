@@ -187,7 +187,7 @@ def main():
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
-    
+
     # kill existing telemetry watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
@@ -195,12 +195,12 @@ def stop_telemetry_process():
                 kill_cmd = "kill " + pids
                 run_command_and_log(kill_cmd)
                 run_command_and_log("rm "+pids_filepath)
-    
+
 def start_telemetry_process():
     """
     Start telemetry process that performs periodic monitoring activities
     :return: None
-    
+
     """
     stop_telemetry_process()
 
@@ -404,7 +404,7 @@ def enable():
         # to resolve any issues with auto-started processes from --upgrade
         time.sleep(PostOnboardingSleepSeconds)
         run_command_and_log(RestartOMSAgentServiceCommand)
-        
+
         #start telemetry process if enable is successful
         start_telemetry_process()
 
@@ -442,7 +442,7 @@ def get_vmresourceid_from_metadata():
         response = json.loads(urllib2.urlopen(req).read())
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'])
-        else: 
+        else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
     except urllib2.HTTPError as e:
@@ -546,13 +546,13 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ('6', '7'), # CentOS
-                       'centos' : ('6', '7'), # CentOS
-                       'red hat' : ('6', '7'), # Oracle, RHEL
-                       'oracle' : ('6', '7'), # Oracle
-                       'debian' : ('8', '9'), # Debian
-                       'ubuntu' : ('14.04', '16.04', '18.04'), # Ubuntu
-                       'suse' : ('12') #SLES
+    supported_dists = {'redhat' : ['6', '7'], # CentOS
+                       'centos' : ['6', '7'], # CentOS
+                       'red hat' : ['6', '7'], # Oracle, RHEL
+                       'oracle' : ['6', '7'], # Oracle
+                       'debian' : ['8', '9'], # Debian
+                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+                       'suse' : ['12'] #SLES
     }
 
     try:

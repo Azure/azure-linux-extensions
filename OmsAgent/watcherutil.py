@@ -171,9 +171,11 @@ class Watcher:
                         "value": "Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux"
                 }},
                         {{
-                        "name": "Version",
-                        "value": "1.6"
-                }},
+
+            			"name": "Version",
+            			"value": "1.7.3"
+             		}},
+
                         {{
                         "name": "Operation",
                         "value": "{}"
