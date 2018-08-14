@@ -637,7 +637,7 @@ class DiskUtil(object):
 
         os_drive_encrypted = False
         data_drives_found = False
-        data_drives_encrypted = True
+        all_data_drives_encrypted = True
         for mount_item in mount_items:
             if mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
                 not "/mnt" == mount_item["dest"] and \
@@ -652,7 +652,7 @@ class DiskUtil(object):
 
                 if not "/dev/mapper" in mount_item["src"]:
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
-                    data_drives_encrypted = False
+                    all_data_drives_encrypted = False
 
             if self.is_os_disk_lvm():
                 grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
@@ -667,7 +667,7 @@ class DiskUtil(object):
     
         if not data_drives_found:
             encryption_status["data"] = "NotMounted"
-        elif data_drives_encrypted:
+        elif all_data_drives_encrypted:
             encryption_status["data"] = "Encrypted"
         if os_drive_encrypted:
             encryption_status["os"] = "Encrypted"
@@ -682,11 +682,13 @@ class DiskUtil(object):
 
             if volume_type == CommonVariables.VolumeTypeData.lower() or \
                 volume_type == CommonVariables.VolumeTypeAll.lower():
-                encryption_status["data"] = "EncryptionInProgress"
+                if data_drives_found and not all_data_drives_encrypted:
+                    encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                 volume_type == CommonVariables.VolumeTypeAll.lower():
-                encryption_status["os"] = "EncryptionInProgress"
+                 if not os_drive_encrypted:
+                    encryption_status["os"] = "EncryptionInProgress"
         elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
