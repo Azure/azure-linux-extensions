@@ -775,6 +775,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             format_disk_result = disk_util.format_disk(dev_path = encrypted_device_path, file_system = file_system)
             if format_disk_result != CommonVariables.process_success:
                 logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
+                return device_item
             crypt_item_to_update = CryptItem()
             crypt_item_to_update.mapper_name = mapper_name
             crypt_item_to_update.dev_path = dev_path_in_query
@@ -805,6 +806,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
         else:
             logger.log(msg="encryption failed with code {0}".format(encrypt_result), level=CommonVariables.ErrorLevel)
+            return device_item
 
 def encrypt_inplace_without_separate_header_file(passphrase_file,
                                                  device_item,
