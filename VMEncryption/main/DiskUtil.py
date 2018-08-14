@@ -802,14 +802,13 @@ class DiskUtil(object):
         # the sets being disjoint would mean the candidate parent is not parent of any of the candidate children. So we return the opposite of that
         return not actual_children_dev_path_set.isdisjoint(children_dev_path_set)
 
-    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items):
+    def get_all_azure_data_disk_controller_and_lun_numbers(self):
         """
         Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
         list_devices = []
         azure_links_dir = '/dev/disk/azure'
 
-        dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in dev_items])
         if not os.path.exists(azure_links_dir):
             return list_devices
 
@@ -831,8 +830,26 @@ class DiskUtil(object):
                         except ValueError:
                             # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
                             continue # so just ignore it
-                    if self.is_parent_of_any(os.path.realpath(full_path), dev_real_paths):
                         list_devices.append((controller_id, lun_number))
+        return list_devices
+
+    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
+        """
+
+        all_controller_and_lun_numbers = self.get_all_azure_data_disk_controller_and_lun_numbers()
+        dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in dev_items])
+
+        list_devices = []
+        azure_links_dir = '/dev/disk/azure'
+
+        for controller_id, lun_number in all_controller_and_lun_numbers:
+            scsi_dir = os.path.join(azure_links_dir, 'scsi' + str(controller_id))
+            symlink = os.path.join(scsi_dir, 'lun' + str(lun_number))
+            if self.is_parent_of_any(os.path.realpath(symlink), dev_real_paths):
+                list_devices.append((controller_id, lun_number))
+
         return list_devices
 
     def get_device_items_sles(self, dev_path):

@@ -132,6 +132,18 @@ class EncryptionSettingsUtil(object):
                     break
         return crypt_dev_items
 
+    # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
+    def _dict_to_name_value_array(values):
+        array = []
+        for key in values:
+            value = values[key]
+            if value is not None:
+               array.append({
+                    "Name": key,
+                    "Value": value
+                    })
+        return array
+
     def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util):
         """ returns encryption settings object in format required by wire server """
 
@@ -155,18 +167,6 @@ class EncryptionSettingsUtil(object):
         root_vhd_needs_stamping = disk_util.is_parent_of_any(os.path.realpath("/dev/disk/azure/root"),
                                                              set([disk_util.get_device_path(di.name) for di in all_device_items]))
 
-        # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
-        def dict_to_name_value_array(values):
-            array = []
-            for key in values:
-                value = values[key]
-                if value is not None:
-                   array.append({
-                        "Name": key,
-                        "Value": value
-                        })
-            return array
-
         # Get disk data from disk_util
         # We get a list of tuples i.e. [(scsi_controller_id, lun_number),.]
         data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(all_device_items)
@@ -179,7 +179,7 @@ class EncryptionSettingsUtil(object):
                 "Volumes": [{
                     "VolumeType": "DataVolume",
                     "ProtectorFileName": protector_name,
-                    "SecretTags": dict_to_name_value_array({
+                    "SecretTags": self._dict_to_name_value_array({
                         "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number),
                         "DiskEncryptionKeyEncryptionKeyURL": kek_url,
                         "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
@@ -198,7 +198,7 @@ class EncryptionSettingsUtil(object):
                 "Volumes": [{
                     "VolumeType": "OsVolume",
                     "ProtectorFileName": protector_name,
-                    "SecretTags": dict_to_name_value_array({
+                    "SecretTags": self._dict_to_name_value_array({
                         "DiskEncryptionKeyFileName": CommonVariables.encryption_key_file_name,
                         "DiskEncryptionKeyEncryptionKeyURL": kek_url,
                         "DiskEncryptionKeyEncryptionAlgorithm": kek_algorithm,
@@ -256,11 +256,42 @@ class EncryptionSettingsUtil(object):
         else:
             raise Exception("no response from encryption settings update request")
 
-    def clear_encryption_settings(self):
-        """ Clear settings by calling DisableEncryption operation via wire server"""
-        data = {"DiskEncryptionDataVersion": "2.0",
+    def clear_encryption_settings(self, disk_util):
+        """ 
+        Clear settings by calling DisableEncryption operation via wire server
+
+        finds all azure data disks and clears their encryption settings
+        """
+
+        self.logger.log("Clearing encryption settings for all data drives")
+
+        data_disk_controller_ids_and_luns = disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
+
+        # validate machine name string or use empty string
+        machine_name = socket.gethostname()
+        if re.match('^[\w-]+$', machine_name) is None:
+            machine_name = ''
+
+        def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
+            return {
+                "ControllerType": "SCSI",
+                "ControllerId": scsi_controller,
+                "SlotId": lun_number,
+                "Volumes": [{
+                    "VolumeType": "DataVolume",
+                    "ProtectorFileName": "nullProtector.bek",
+                    "SecretTags": self._dict_to_name_value_array({
+                        "DiskEncryptionKeyFileName": "nullProtector.bek",
+                        "MachineName": machine_name})
+                    }]
+                }
+
+        data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+                                    for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
+
+        data = {"DiskEncryptionDataVersion": "3.0",
                 "DiskEncryptionOperation": "DisableEncryption",
-                "Disks": "",
+                "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",
                 "KekUrl": "",
                 "KekVaultResourceId": "",

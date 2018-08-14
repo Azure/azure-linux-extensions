@@ -148,7 +148,12 @@ def disable_encryption():
         decryption_marker.commit()
 
         settings_util = EncryptionSettingsUtil(logger)
-        settings_util.clear_encryption_settings()
+        settings_util.clear_encryption_settings(disk_util)
+
+        hutil.do_status_report(operation='DisableEncryption',
+                               status=CommonVariables.extension_success_status,
+                               status_code=str(CommonVariables.success),
+                               message='Encryption settings cleared')
 
         bek_util.store_bek_passphrase(encryption_config, '')
 
