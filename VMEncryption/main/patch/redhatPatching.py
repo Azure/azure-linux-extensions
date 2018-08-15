@@ -92,7 +92,6 @@ class redhatPatching(AbstractPatching):
                     'patch',
                     'procps-ng',
                     'util-linux',
-                    'gcc',
                     'libffi-devel',
                     'openssl-devel',
                     'python-devel']

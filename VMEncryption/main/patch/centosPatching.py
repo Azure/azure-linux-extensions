@@ -84,7 +84,6 @@ class centosPatching(redhatPatching):
                     'patch',
                     'procps-ng',
                     'util-linux',
-                    'gcc',
                     'python-six',
                     'pyparted',
                     'libffi-devel',
