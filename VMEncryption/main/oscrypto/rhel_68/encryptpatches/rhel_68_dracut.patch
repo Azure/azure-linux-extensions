@@ -14,7 +14,6 @@ diff -Naur 90crypt.orig/cryptroot-ask.sh 90crypt/cryptroot-ask.sh
 +for SFS in /dev/sd*; do
 +	echo "> Trying device:$SFS..." >&2
 +	mount ${SFS}1 $MountPoint -t vfat -r >&2
-+	ntfs-3g -o ro ${SFS}1 $MountPoint >&2
 +	if [ -f $MountPoint/$KeyFileName ]; then
 +		echo "> keyfile got..." >&2
 +		cp $MountPoint/$KeyFileName /tmp-keyfile

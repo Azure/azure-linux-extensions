@@ -126,6 +126,6 @@ class PatchBootSystemState(OSEncryptionState):
         self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                       '/etc/dracut.conf')
 
-        self.command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
         self.command_executor.Execute('grub2-install --recheck --force {0}'.format(self.rootfs_disk), True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
