@@ -154,9 +154,13 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message):
+        # write message to stderr for inclusion in QOS telemetry
+        sys.stderr.write(message)
         self._log(self._get_log_prefix() + ': ' + message)
 
     def error(self, message):
+        # write message to stderr for inclusion in QOS telemetry
+        sys.stderr.write(message)
         self._error(self._get_log_prefix() + ': ' + message)
 
     def _parse_config(self, ctxt):
