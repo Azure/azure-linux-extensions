@@ -25,10 +25,11 @@ OutputSize = 4 * 1024
 def tail(log_file, output_size = OutputSize):
     pos = min(output_size, os.path.getsize(log_file))
     with open(log_file, "r") as log:
-        log.seek(-pos, 2)
+        log.seek(0, os.SEEK_END)
+        log.seek(log.tell() - pos, os.SEEK_SET)
         buf = log.read(output_size)
-        buf = filter(lambda x: x in string.printable, buf)
-        return buf.decode("ascii", "ignore")
+        buf = list(filter(lambda x: x in string.printable, buf))
+        return ''.join(buf) # needs review
 
 
 def get_formatted_log(summary, stdout, stderr):

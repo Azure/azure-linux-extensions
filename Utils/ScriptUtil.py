@@ -23,8 +23,8 @@ import traceback
 import string
 import shlex
 
-import LogUtil
-from WAAgentUtil import waagent
+from Utils import LogUtil
+from Utils.WAAgentUtil import waagent
 
 DefaultStdoutFile = "stdout"
 DefaultErroutFile = "errout"
@@ -88,7 +88,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                   version=version,
                                   message="(01101)"+error_msg)
         exit_code = 1                                  
-        msg = 'Lanch command failed: {0}'.format(e)
+        msg = 'Launch command failed: {0}'.format(e)
         
         log_or_exit(hutil, exit_after_run, exit_code, operation, msg)
     finally:        
@@ -109,8 +109,8 @@ def log_or_exit(hutil, exit_after_run, exit_code, operation, msg):
 
 
 def parse_args(cmd):
-    cmd = filter(lambda x : x in string.printable, cmd)
-    cmd = cmd.decode("ascii", "ignore")
+    cmd = list(filter(lambda x : x in string.printable, cmd))
+    cmd = ''.join(cmd) # need review
     args = shlex.split(cmd)
     # From python 2.6 to python 2.7.2, shlex.split output UCS-4 result like
     # '\x00\x00a'. Temp workaround is to replace \x00
