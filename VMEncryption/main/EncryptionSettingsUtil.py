@@ -133,7 +133,7 @@ class EncryptionSettingsUtil(object):
         return crypt_dev_items
 
     # Helper function to make sure that we don't send secret tags with Null values (this causes HostAgent to error)
-    def _dict_to_name_value_array(values):
+    def _dict_to_name_value_array(self, values):
         array = []
         for key in values:
             value = values[key]

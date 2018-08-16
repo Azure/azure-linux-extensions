@@ -635,7 +635,7 @@ def enable_encryption():
             if encryption_config.config_file_exists():
                 exit_status = {
                     'operation': 'EnableEncryption',
-                    'status': CommonVariables.extension_transitioning_status,
+                    'status': CommonVariables.extension_success_status,
                     'status_code': str(CommonVariables.success),
                     'message': ""
                 }
