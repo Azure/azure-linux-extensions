@@ -740,7 +740,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
 
     # If anything needs to be stamped, do the stamping here
     device_items_to_stamp = device_items_to_encrypt + os_items_to_stamp
-    if (device_items_to_stamp) > 0:
+    if len(device_items_to_stamp) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
         stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
                                   encryption_config=encryption_config)
@@ -1365,7 +1365,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
     # If anything needs to be stamped, do the stamping here
     device_items_to_stamp = device_items_to_encrypt + os_items_to_stamp
-    if (device_items_to_stamp) > 0:
+    if len(device_items_to_stamp) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
         stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
                                   encryption_config=encryption_config)
