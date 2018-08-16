@@ -22,7 +22,7 @@ import json
 import sys
 
 class ParameterParser(object):
-    def __init__(self, protected_settings, public_settings):
+    def __init__(self, protected_settings, public_settings, backup_logger):
         """
         TODO: we should validate the parameter first
         """
@@ -44,9 +44,14 @@ class ParameterParser(object):
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
         self.vmType = public_settings.get(CommonVariables.vmType)
-        if(CommonVariables.customSettings in protected_settings.keys()):
-            self.customSettings = protected_settings.get(CommonVariables.customSettings)
 
+        if(CommonVariables.customSettings in public_settings.keys() and public_settings.get(CommonVariables.customSettings) is not None and public_settings.get(CommonVariables.customSettings) != ""):
+            backup_logger.log("Reading customSettings from public_settings", True)
+            self.customSettings = public_settings.get(CommonVariables.customSettings)
+        elif(CommonVariables.customSettings in protected_settings.keys()):
+            backup_logger.log("Reading customSettings from protected_settings", True)
+            self.customSettings = protected_settings.get(CommonVariables.customSettings)
+            
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -81,5 +86,14 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip()
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
-            self.blobs = self.private_config_obj['blobSASUri']
+
+            if ('diskInfoList' in self.private_config_obj.keys() and self.private_config_obj['diskInfoList'] is not None and len(self.private_config_obj['diskInfoList']) > 0):
+                self.blobs = []
+                backup_logger.log("Blob Sas uri from private_config_obj['diskInfoList']", True)
+
+                for diskInfo in self.private_config_obj['diskInfoList']:
+                    self.blobs.append(diskInfo['blobSASUri'])
+            else:
+                backup_logger.log("Blob Sas uri from private_config_obj['blobSASUri']", True)
+                self.blobs = self.private_config_obj['blobSASUri']
 
