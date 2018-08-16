@@ -34,7 +34,7 @@ import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
 
 if sys.version_info[0] == 3:
-    import urllib as urllib
+    import urllib.request as urllib
     from urllib.parse import urlparse
 
 elif sys.version_info[0] == 2:
@@ -405,7 +405,7 @@ def to_process(file_path, extensions=['.sh', ".py"]):
             return True
     with open(file_path, 'rb') as f:
         contents = f.read(64)
-    if '#!' in contents:
+    if b'#!' in contents:
         return True
     return False
 
@@ -415,7 +415,7 @@ def dos2unix(file_path):
         contents = f.read()
     temp_file_path = file_path + ".tmp"
     with open(temp_file_path, 'wb') as f_temp:
-        f_temp.write(contents)
+        f_temp.write(contents.encode())
     shutil.move(temp_file_path, file_path)
 
 
@@ -451,7 +451,7 @@ def get_container_name_from_uri(uri, hutil):
 
 
 def get_host_base_from_uri(blob_uri):
-    uri = urlparse.urlparse(blob_uri)
+    uri = urlparse(blob_uri)
     netloc = uri.netloc
     if netloc is None:
         return None
@@ -473,7 +473,7 @@ def get_properties_from_uri(uri, hutil):
 
 
 def get_path_from_uri(uriStr):
-    uri = urlparse.urlparse(uriStr)
+    uri = urlparse(uriStr)
     return uri.path
 
 
