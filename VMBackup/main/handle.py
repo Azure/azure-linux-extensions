@@ -47,13 +47,14 @@ from parameterparser import ParameterParser
 from Utils import HandlerUtil
 from Utils import SizeCalculation
 from Utils import Status
-from snapshotter import Snapshotter
+from freezesnapshotter import FreezeSnapshotter
 from backuplogger import Backuplogger
 from blobwriter import BlobWriter
 from taskidentity import TaskIdentity
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
+from PluginHost import PluginHostResult
 
 #Main function is the only entrence to this extension handler
 
@@ -186,118 +187,19 @@ def exit_if_same_taskId(taskId):
 def convert_time(utcTicks):
     return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
-def get_value_from_configfile(key):
-    global backup_logger
-    value = None
-    configfile = '/etc/azure/vmbackup.conf'
-    try :
-        if os.path.exists(configfile):
-            config = ConfigParsers.ConfigParser()
-            config.read(configfile)
-            if config.has_option('SnapshotThread',key):
-                value = config.get('SnapshotThread',key)
-            else:
-                backup_logger.log("Config File doesn't have the key :" + key, True, 'Info')
-    except Exception as e:
-        errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-        backup_logger.log(errorMsg, True, 'Warning')
-    return value
-
-def set_value_to_configfile(key, value):
-    configfile = '/etc/azure/vmbackup.conf'
-    try :
-        backup_logger.log('setting doseq flag in config file', True, 'Info')
-        if not os.path.exists(os.path.dirname(configfile)):
-            os.makedirs(os.path.dirname(configfile))
-        config = ConfigParsers.RawConfigParser()
-        if os.path.exists(configfile):
-            config.read(configfile)
-            if config.has_section('SnapshotThread'):
-                if config.has_option('SnapshotThread', key):
-                    config.remove_option('SnapshotThread', key)
-            else:
-                config.add_section('SnapshotThread')
-        else:
-            config.add_section('SnapshotThread')
-        config.set('SnapshotThread', key, value)
-        with open(configfile, 'w') as config_file:
-            config.write(config_file)
-    except Exception as e:
-        errorMsg = " Unable to set config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-        backup_logger.log(errorMsg, True, 'Warning')
-    return value
-
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(get_value_from_configfile('doseq') == '2'):
-            set_value_to_configfile('doseq', '1')
-        if(get_value_from_configfile('doseq') != '1'):
-            set_value_to_configfile('doseq', '2')
-        snap_shotter = Snapshotter(backup_logger)
-        time_before_freeze = datetime.datetime.now()
-        freeze_result = freezer.freeze_safe(timeout) 
-        time_after_freeze = datetime.datetime.now()
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
-        run_result = CommonVariables.success
-        run_status = 'success'
-        all_failed= False
-        is_inconsistent =  False
-        backup_logger.log('T:S freeze result ' + str(freeze_result))
-        if(freeze_result is not None and len(freeze_result.errors) > 0):
-            run_result = CommonVariables.FailedFsFreezeFailed
-            run_status = 'error'
-            error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
-            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-            backup_logger.log(error_msg, True, 'Warning')
-            if(get_value_from_configfile('doseq') == '2'):
-                set_value_to_configfile('doseq', '0')
-        else:
-            backup_logger.log('T:S doing snapshot now...')
-            time_before_snapshot = datetime.datetime.now()
-            snapshot_result,snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(para_parser, freezer)
-            time_after_snapshot = datetime.datetime.now()
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("SnapshotTime", str(time_after_snapshot-time_before_snapshot))
-            backup_logger.log('T:S snapshotall ends...', True)
-            if(get_value_from_configfile('doseq') == '2'):
-                set_value_to_configfile('doseq', '0')
-            if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                if unable_to_sleep:
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
-                    backup_logger.log(error_msg, True, 'Warning')
-                elif is_inconsistent == True :
-                    set_value_to_configfile('doseq', '1') 
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
-                    backup_logger.log(error_msg, True, 'Warning')
-                else:
-                    error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                    run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                    if all_failed:
-                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                    else:
-                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
-                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                    run_status = 'error'
-                    backup_logger.log(error_msg, True, 'Error')
-            elif check_snapshot_array_fail() == True:
-                run_result = CommonVariables.error
-                run_status = 'error'
-                error_msg = 'T:S Enable failed with error in snapshot_array index'
-                backup_logger.log(error_msg, True, 'Error')
-            else:
-                run_result = CommonVariables.success
-                run_status = 'success'
-                error_msg = 'Enable Succeeded'
-                backup_logger.log("T:S " + error_msg, True)
+        if(hutil.get_value_from_configfile('doseq') == '2'):
+            hutil.set_value_to_configfile('doseq', '1')
+        if(hutil.get_value_from_configfile('doseq') != '1'):
+            hutil.set_value_to_configfile('doseq', '2')
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
+        backup_logger.log("Calling do snapshot method", True, 'Info')
+        run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
     except Exception as e:
-        if(get_value_from_configfile('doseq') == '2'):
-            set_value_to_configfile('doseq', '0')
+        if(hutil.get_value_from_configfile('doseq') == '2'):
+            hutil.set_value_to_configfile('doseq', '0')
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         run_result = CommonVariables.error
@@ -366,7 +268,7 @@ def daemon():
 
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
@@ -396,7 +298,6 @@ def daemon():
                 if(hutil.is_status_file_exists()):
                     status_report_to_file(file_report_msg)
                 status_report_to_blob(blob_report_msg)
-                backup_logger.log('doing freeze now...', True)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
@@ -407,19 +308,23 @@ def daemon():
                 PluginHostObj = PluginHost(logger=backup_logger)
                 PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
+                appconsistentBackup = False
 
                 if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
                         PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigPermissionError):
+                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
                     backup_logger.log('App Consistent Consistent Backup Enabled', True)
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                    appconsistentBackup = True
 
                 if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
                     backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
                     doFsConsistentbackup = True
+
+                preResult = PluginHostResult()
+                postResult = PluginHostResult()
 
                 if not doFsConsistentbackup:
                     preResult = PluginHostObj.pre_script()
@@ -430,7 +335,6 @@ def daemon():
 
                 if dobackup:
                     freeze_snapshot(thread_timeout)
-                    backup_logger.log('unfreeze ends...')
 
                 if not doFsConsistentbackup:
                     postResult = PluginHostObj.post_script()
@@ -452,7 +356,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -464,7 +368,7 @@ def daemon():
                     if run_result == CommonVariables.success:
                         post_plugin_errors = postResult.errors
                         for error in post_plugin_errors:
-                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success and error.errorCode != CommonVariables.PrePost_ScriptStatus_Warning:
+                            if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                                 run_status = 'error'
                                 run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
@@ -472,6 +376,18 @@ def daemon():
                                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                                 backup_logger.log(error_msg, True)
                                 break
+
+                if appconsistentBackup:
+                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                        hutil.SetExtErrorCode(PluginHostErrorCode)
+                    pre_plugin_errors = preResult.errors
+                    for error in pre_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
+                    post_plugin_errors = postResult.errors
+                    for error in post_plugin_errors:
+                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            hutil.SetExtErrorCode(error.errorCode)
 
                 if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
                     run_status = 'success'
@@ -563,7 +479,7 @@ def enable():
         """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
             error_msg = "unable to load certificate"

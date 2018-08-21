@@ -1,4 +1,4 @@
-# Linux extensions for Microsoft Azure IaaS
+[# Linux extensions for Microsoft Azure IaaS
 
 This project provides the source code of Linux extensions for Microsoft Azure IaaS.
 
@@ -11,11 +11,12 @@ You can read the document [about virtual machine extensions and features](https:
 | Name | Lastest Version | Description |
 |:---|:---|:---|
 | [Custom Script](./CustomScript) | 1.5 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
-| [DSC](./DSC) | 2.0 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
+| [DSC](./DSC) | 2.70 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
 | [OS Patching](./OSPatching) | 2.0 | Allow the owner of the Azure VM to configure the Linux VM patching schedule cycle |
 | [VM Access](./VMAccess) | 1.3 | Provide several ways to allow owner of the VM to get the SSH access back |
 | [OMS Agent](./OmsAgent) | 1.0 | Allow the owner of the Azure VM to install the omsagent and attach it to an OMS workspace |
 | [Diagnostic](./Diagnostic) | 2.3 | Allow the owner of the Azure Virtual Machines to obtain diagnostic data for a Linux virtual machine |
+| [Backup](./VMBackup) | 1.0.9124.0 | Provide application consistent backup of the virtual machine(Needs to be used in conjunction with [Azure Backup](https://azure.microsoft.com/services/backup/)) |
 
 # Contributing
 

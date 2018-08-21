@@ -230,7 +230,7 @@ class ScriptRunner(object):
         result.noOfRetries = cnt
         if not flag_timeout:
             result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success and result.errorCode != CommonVariables.PrePost_ScriptStatus_Warning :
+            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
                 self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
                 result.continueBackup = self.continueBackupOnFailure
                 result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
@@ -251,9 +251,6 @@ class ScriptRunner(object):
             # -- postScriptResult is an array and it stores the result at pluginIndex
 
         result = ScriptRunnerResult()
-
-        if not self.PreScriptCompletedSuccessfully:
-            self.logger.log('PreScript execution did not complete for ' + self.pluginName + '.Post Script is not triggered', True, 'Info')
 
         result.requiredNoOfRetries = self.postScriptNoOfRetries
 
@@ -287,7 +284,7 @@ class ScriptRunner(object):
         result.noOfRetries = cnt
         if not flag_timeout:
             result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success and result.errorCode != CommonVariables.PrePost_ScriptStatus_Warning :
+            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
                 self.logger.log('Postscript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
                 result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
                 result.continueBackup = self.continueBackupOnFailure

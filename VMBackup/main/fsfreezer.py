@@ -68,6 +68,10 @@ class FreezeHandler(object):
             self.logger.log("binary child terminated",True)
             self.sig_handle=2
 
+    def reset_signals(self):
+        self.sig_handle = 0
+        self.child= None
+
 
     def startproc(self,args):
         binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
@@ -127,6 +131,7 @@ class FsFreezer:
             if(self.root_seen):
                 args.append('/')
             self.logger.log("arg : " + str(args),True)
+            self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
             self.logger.enforce_local_flag(False) 

@@ -29,6 +29,9 @@ class CommonActions:
     def __init__(self, logger):
         self.logger = logger
 
+    def filterNonAsciiCharacters(self, output_msg):
+        return output_msg.encode('utf-8').decode('ascii','ignore')
+        
     def log_run_get_output(self, cmd, should_log=True):
         """
         Execute a command in a subshell
@@ -42,7 +45,7 @@ class CommonActions:
         error, msg = waagent.RunGetOutput(cmd, chk_err=should_log)
         if should_log:
             self.logger("Return " + str(error) + ":" + msg)
-        return int(error), msg
+        return int(error), self.filterNonAsciiCharacters(msg)
 
     def log_run_ignore_output(self, cmd, should_log=True):
         """

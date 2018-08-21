@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # VMEncryption extension
 #
@@ -41,11 +41,13 @@ from Utils import HandlerUtil
 from Common import *
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
+from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from KeyVaultUtil import KeyVaultUtil
 from EncryptionConfig import *
 from patch import *
 from BekUtil import *
+from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
@@ -341,7 +343,9 @@ def update_encryption_settings():
                       message=message)
 
 def update():
-    hutil.do_parse_context('Upadate')
+    hutil.do_parse_context('Update')
+    logger.log("Installing pre-requisites")
+    DistroPatcher.update_prereq()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():
@@ -374,7 +378,15 @@ def toggle_se_linux_for_centos7(disable):
     return False
 
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
-    #make sure the azure disk config path exists.
+
+    # mount encrypted resource disk
+    volume_type = encryption_config.get_volume_type().lower()
+    if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util.automount()
+        logger.log("mounted encrypted resource disk")
+
+    # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
@@ -463,6 +475,17 @@ def enable():
     while True:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
+
+        # run prechecks and log any failures detected
+        try:
+            cutil = CheckUtil(logger)
+            if cutil.is_precheck_failure():
+                logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
+            else:
+                logger.log("PRECHECK: Prechecks successful")
+        except Exception:
+            logger.log("PRECHECK: Exception thrown during precheck")
+            logger.log(traceback.format_exc())
 
         protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -1530,14 +1553,16 @@ def daemon_encrypt():
         os_encryption = None
 
         if (((distro_name == 'redhat' and distro_version == '7.3') or
-             (distro_name == 'redhat' and distro_version == '7.4')) and
+             (distro_name == 'redhat' and distro_version == '7.4') or
+             (distro_name == 'redhat' and distro_version == '7.5')) and
             (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
-        elif ((distro_name == 'centos' and distro_version == '7.3.1611') and
+        elif (((distro_name == 'centos' and distro_version == '7.3.1611') or
+              (distro_name == 'centos' and distro_version.startswith('7.4'))) and 
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1547,6 +1572,8 @@ def daemon_encrypt():
         elif ((distro_name == 'redhat' and distro_version == '7.2') or
             (distro_name == 'redhat' and distro_version == '7.3') or
             (distro_name == 'redhat' and distro_version == '7.4') or
+            (distro_name == 'redhat' and distro_version == '7.5') or
+            (distro_name == 'centos' and distro_version.startswith('7.4')) or
             (distro_name == 'centos' and distro_version == '7.3.1611') or
             (distro_name == 'centos' and distro_version == '7.2.1511')):
             from oscrypto.rhel_72 import RHEL72EncryptionStateMachine

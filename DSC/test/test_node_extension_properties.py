@@ -35,7 +35,7 @@ class TestNodeExtensionProperties(unittest.TestCase):
         config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.mof')
         self.assertTrue('ReturnValue=0' in config)
         
-        content = dsc.construct_node_extension_properties(config)
+        content = dsc.construct_node_extension_properties(config, "upgrade")
         data = json.dumps(content)
         self.assertTrue('OMSCloudId' in data, "OMSCLoudID doesn't exist")
         
@@ -52,7 +52,7 @@ class TestNodeExtensionProperties(unittest.TestCase):
         config = dsc.apply_dsc_meta_configuration('mof/azureautomation.df.meta.mof')
         self.assertTrue('ReturnValue=0' in config)
         
-        response  = dsc.send_heart_beat_msg_to_agent_service()
+        response  = dsc.send_heart_beat_msg_to_agent_service("install")
         self.assertEqual(response.status_code, 200)
   
     def test_push_request_properties(self):
@@ -63,8 +63,15 @@ class TestNodeExtensionProperties(unittest.TestCase):
         config = dsc.apply_dsc_meta_configuration('mof/dscnode.nxFile.meta.push.mof')
         self.assertTrue('ReturnValue=0' in config)
         
-        response  = dsc.send_heart_beat_msg_to_agent_service()
+        response  = dsc.send_heart_beat_msg_to_agent_service("install")
         self.assertIsNone(response)
        
+    def test_update_node_properties(self):
+        dsc.distro_category = dsc.get_distro_category()
+        dsc.hutil = MockUtil(self)
+        
+        response  = dsc.update()
+        self.assertIsNone(response)
+
 if __name__ == '__main__':
     unittest.main()

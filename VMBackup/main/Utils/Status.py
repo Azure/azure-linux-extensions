@@ -71,13 +71,6 @@ class FormattedMessage:
         self.lang = lang
         self.message = message
 
-class ComplexEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if hasattr(obj,'convertToDictionary'):
-            return obj.convertToDictionary()
-        else:
-            return obj.__dict__
-
 class ExtVmHealthStateEnum():
     green = 0
     yellow = 128

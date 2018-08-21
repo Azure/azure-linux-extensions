@@ -240,10 +240,22 @@ For more details about ARM template, please visit [Authoring Azure Resource Mana
 ## 3. Scenarios
 
 ### 3.1 Resetting the password
+
+in the Public Settings
+```json
+{
+  "check_disk": "false"
+}
+```
+
+> VMAccessForLinux resets and restarts the SSH server if a password is specified. This is necessary if the VM was deployed with public key authentication because the SSH server is not configured to accept passwords.  For this reason, the SSH server's configuration is reset to allow password authentication, and restarted to accept this new configuration.  This behavior can be disabled by setting the reset_ssh value to false.
+
+in the Protectect Settings
 ```json
 {
   "username": "currentusername",
-  "password": "newpassword"
+  "password": "newpassword",
+  "reset_ssh": "false"
 }
 ```
 

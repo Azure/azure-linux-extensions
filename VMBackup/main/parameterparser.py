@@ -22,7 +22,7 @@ import json
 import sys
 
 class ParameterParser(object):
-    def __init__(self, protected_settings, public_settings):
+    def __init__(self, protected_settings, public_settings, backup_logger):
         """
         TODO: we should validate the parameter first
         """
@@ -31,6 +31,9 @@ class ParameterParser(object):
         self.public_config_obj = None
         self.private_config_obj = None
         self.blobs = None
+        self.customSettings = None
+        self.snapshotTaskToken = ''
+
         """
         get the public configuration
         """
@@ -41,6 +44,14 @@ class ParameterParser(object):
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
         self.vmType = public_settings.get(CommonVariables.vmType)
+
+        if(CommonVariables.customSettings in public_settings.keys() and public_settings.get(CommonVariables.customSettings) is not None and public_settings.get(CommonVariables.customSettings) != ""):
+            backup_logger.log("Reading customSettings from public_settings", True)
+            self.customSettings = public_settings.get(CommonVariables.customSettings)
+        elif(CommonVariables.customSettings in protected_settings.keys()):
+            backup_logger.log("Reading customSettings from protected_settings", True)
+            self.customSettings = protected_settings.get(CommonVariables.customSettings)
+            
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -57,6 +68,10 @@ class ParameterParser(object):
             self.logsBlobUri = protected_settings.get(CommonVariables.logs_blob_uri)
         if(self.statusBlobUri is None or self.statusBlobUri == ""):
             self.statusBlobUri = protected_settings.get(CommonVariables.status_blob_uri)
+        if(CommonVariables.snapshotTaskToken in self.public_config_obj.keys()):
+            self.snapshotTaskToken = self.public_config_obj[CommonVariables.snapshotTaskToken]
+        elif(CommonVariables.snapshotTaskToken in protected_settings.keys()):
+            self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
 
         """
         first get the protected configuration
@@ -71,5 +86,14 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip()
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
-            self.blobs = self.private_config_obj['blobSASUri']
+
+            if ('diskInfoList' in self.private_config_obj.keys() and self.private_config_obj['diskInfoList'] is not None and len(self.private_config_obj['diskInfoList']) > 0):
+                self.blobs = []
+                backup_logger.log("Blob Sas uri from private_config_obj['diskInfoList']", True)
+
+                for diskInfo in self.private_config_obj['diskInfoList']:
+                    self.blobs.append(diskInfo['blobSASUri'])
+            else:
+                backup_logger.log("Blob Sas uri from private_config_obj['blobSASUri']", True)
+                self.blobs = self.private_config_obj['blobSASUri']
 
