@@ -208,7 +208,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
     encryption_config.secret_seq_num = hutil.get_current_seq()
     encryption_config.commit()
 
-def is_stamped_with_current_config(encryption_config):
+def are_disks_stamped_with_current_config(encryption_config):
     return encryption_config.get_secret_seq_num() == hutil.get_current_seq()
 
 def get_public_settings():
@@ -1517,7 +1517,7 @@ def daemon_encrypt():
     # identify os item to stamp when os volume is selected for encryption
     os_items_to_stamp = []
     if (volume_type == CommonVariables.VolumeTypeAll.lower() or volume_type == CommonVariables.VolumeTypeOS.lower()) and \
-            not is_stamped_with_current_config(encryption_config) and is_not_in_stripped_os:
+            not are_disks_stamped_with_current_config(encryption_config) and is_not_in_stripped_os:
         device_items = disk_util.get_device_items(None)
         for device_item in device_items:
             if device_item.mount_point == "/":
@@ -1620,7 +1620,7 @@ def daemon_encrypt():
                           message=message)
 
         try:
-            if os_encryption.state == 'uninitialized' and not is_stamped_with_current_config(encryption_config):
+            if os_encryption.state == 'uninitialized' and not are_disks_stamped_with_current_config(encryption_config):
                 stamp_disks_with_settings(os_items_to_stamp, encryption_config)
 
             os_encryption.start_encryption()
@@ -1887,7 +1887,7 @@ def start_daemon(operation):
     
     encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():
-        if is_stamped_with_current_config(encryption_config):
+        if are_disks_stamped_with_current_config(encryption_config):
             hutil.do_exit(exit_code=0,
                           operation=operation,
                           status=CommonVariables.extension_success_status,
