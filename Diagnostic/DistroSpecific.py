@@ -244,9 +244,8 @@ class RedhatActions(CommonActions):
         return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
 
     def install_required_packages(self):
-        # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy).
-        # tar is really missing on Oracle Linux 7!
-        return self.install_extra_packages(('policycoreutils-python', 'tar'), True)
+        # policycoreutils-python is missing on RedHat (still needed to manipulate SELinux policy)
+        return self.install_extra_packages(('policycoreutils-python',), True)
 
     def is_package_handler(self, package_manager):
         return package_manager == "rpm"
@@ -259,6 +258,18 @@ class RedhatActions(CommonActions):
 
     def remove_lad_mdsd(self):
         return self.log_run_get_output('rpm -e lad-mdsd')
+
+
+class CentosActions(RedhatActions):
+    def install_extra_packages(self, packages, with_timeout=False):
+        install_cmd = 'rpm -qi PACKAGE; if [ ! $? == 0 ]; then yum install -y PACKAGE; fi'
+        return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
+
+
+class OracleActions(RedhatActions):
+    def install_required_packages(self):
+        # policycoreutils-python and tar are missing on Oracle Linux (still needed to manipulate SELinux policy)
+        return self.install_extra_packages(('policycoreutils-python', 'tar'), True)
 
 
 class Suse11Actions(RedhatActions):
@@ -302,17 +313,21 @@ class Suse12Actions(RedhatActions):
         env.update({"SSL_CERT_DIR": "/var/lib/ca-certificates/openssl", "SSL_CERT_FILE": "/etc/ssl/cert.pem"})
 
 
-class CentosActions(RedhatActions):
-    def __init__(self, logger):
-        RedhatActions.__init__(self, logger)
+class Redhat7Actions(RedhatActions):
+    def use_systemd(self):
+        return True
 
+
+class Oracle7Actions(Redhat7Actions):
+    def install_required_packages(self):
+        # policycoreutils-python and tar are missing on Oracle Linux (still needed to manipulate SELinux policy)
+        return self.install_extra_packages(('policycoreutils-python', 'tar'), True)
+
+
+class Centos7Actions(Redhat7Actions):
     def install_extra_packages(self, packages, with_timeout=False):
         install_cmd = 'rpm -qi PACKAGE; if [ ! $? == 0 ]; then yum install -y PACKAGE; fi'
         return self.log_run_multiple_cmds([install_cmd.replace("PACKAGE", p) for p in packages], with_timeout)
-
-    def install_required_packages(self):
-        # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
-        return self.install_extra_packages(('policycoreutils-python',), True)
 
 
 DistroMap = {
@@ -321,7 +336,8 @@ DistroMap = {
     'Kali': DebianActions,
     'Ubuntu': DebianActions, 'Ubuntu:15.10': Ubuntu1510OrHigherActions,
     'Ubuntu:16.04': Ubuntu1510OrHigherActions, 'Ubuntu:16.10': Ubuntu1510OrHigherActions,
-    'redhat': RedhatActions, 'centos': CentosActions, 'oracle': RedhatActions,
+    'redhat': RedhatActions, 'centos': CentosActions, 'oracle': OracleActions,
+    'redhat:7': Redhat7Actions, 'centos:7': Centos7Actions, 'oracle:7': Oracle7Actions,
     'SuSE:11': Suse11Actions, 'SuSE:12': Suse12Actions, 'SuSE': Suse12Actions
 }
 
