@@ -609,7 +609,7 @@ def enable_encryption():
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
-    if re.search(r"dd.*of=/dev/mapper/osencrypt", ps_stdout):
+    if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
         exit_without_status_report()
@@ -833,8 +833,8 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
             ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
             ongoing_item_config.original_dev_path = os.path.join('/dev/', device_item.name)
         else:
-            ongoing_item_config.original_dev_name_path = os.path.join('/dev/mapper/', device_item.name)
-            ongoing_item_config.original_dev_path = os.path.join('/dev/mapper/', device_item.name)
+            ongoing_item_config.original_dev_name_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
+            ongoing_item_config.original_dev_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
         ongoing_item_config.phase = CommonVariables.EncryptionPhaseBackupHeader
         ongoing_item_config.commit()
     else:
@@ -1033,7 +1033,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
         if os.path.exists(os.path.join('/dev/', device_item.name)):
             ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
         else:
-            ongoing_item_config.original_dev_name_path = os.path.join('/dev/mapper/', device_item.name)
+            ongoing_item_config.original_dev_name_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
         ongoing_item_config.original_dev_path = os.path.join('/dev/disk/by-uuid', device_item.uuid)
         luks_header_file_path = disk_util.create_luks_header(mapper_name=mapper_name)
         if luks_header_file_path is None:
@@ -1080,7 +1080,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                 original_dev_path = ongoing_item_config.get_original_dev_path()
                 luks_header_file_path = ongoing_item_config.get_header_file_path()
                 disabled = toggle_se_linux_for_centos7(True)
-                device_mapper_path = os.path.join("/dev/mapper", mapper_name)
+                device_mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 if not os.path.exists(device_mapper_path):
                     open_result = disk_util.luks_open(passphrase_file=passphrase_file,
                                                       dev_path=original_dev_path,

@@ -50,6 +50,12 @@ class DiskUtil(object):
 
         self.command_executor = CommandExecutor(self.logger)
 
+        self._LUN_PREFIX = "lun"
+        self._SCSI_PREFIX = "scsi"
+
+    def get_osmapper_path(self):
+        return os.path.join(CommonVariables.dev_mapper_root, CommonVariables.osmapper_name)
+
     def copy(self, ongoing_item_config, status_prefix=''):
         copy_task = TransactionalCopyTask(logger=self.logger,
                                           disk_util=self,
@@ -158,7 +164,7 @@ class DiskUtil(object):
                     self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     continue
 
-                return_code = self.mount_filesystem(os.path.join("/dev/mapper/", crypt_item.mapper_name), temp_mount_point)
+                return_code = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), temp_mount_point)
                 if return_code != CommonVariables.process_success:
                     self.logger.log(msg=('Mount failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     # this can happen with disks without file systems (lvm, raid or simply empty disks)
@@ -210,7 +216,7 @@ class DiskUtil(object):
 
                     crypt_item = self.parse_azure_crypt_mount_line(line)
 
-                    if crypt_item.mount_point == "/":
+                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name :
                         rootfs_crypt_item_found = True
 
                     crypt_items.append(crypt_item)
@@ -218,11 +224,13 @@ class DiskUtil(object):
         encryption_status = json.loads(self.get_encryption_status())
 
         if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+            # If the OS partition looks encrypted but we didn't find an OS partition in the crypt_mount_file
+            # So we will create a CryptItem on the fly and add it to the output
             crypt_item = CryptItem()
-            crypt_item.mapper_name = "osencrypt"
+            crypt_item.mapper_name = CommonVariables.osmapper_name
 
             proc_comm = ProcessCommunicator()
-            grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
 
             if grep_result == 0:
                 crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
@@ -231,7 +239,7 @@ class DiskUtil(object):
                 self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
                 for line in proc_comm.stdout.splitlines():
-                    if 'osencrypt' in line:
+                    if CommonVariables.osmapper_name in line:
                         majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
                         src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
                         crypt_item.dev_path = '/dev/' + src_device.name
@@ -594,7 +602,7 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
+        mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
         self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
     def swapoff(self):
@@ -650,17 +658,18 @@ class DiskUtil(object):
 
                 data_drives_found = True
 
-                if not "/dev/mapper" in mount_item["src"]:
+                if not CommonVariables.dev_mapper_root in mount_item["src"]:
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     all_data_drives_encrypted = False
 
             if self.is_os_disk_lvm():
-                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
+                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep {0}'.format(self.get_osmapper_path()),
+                                                                  suppress_logging=True)
                 if grep_result == 0 and not os.path.exists('/volumes.lvm'):
                     self.logger.log("OS PV is encrypted")
                     os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
-                "/dev/mapper" in mount_item["src"] or \
+                CommonVariables.dev_mapper_root in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
@@ -689,7 +698,7 @@ class DiskUtil(object):
                 volume_type == CommonVariables.VolumeTypeAll.lower():
                  if not os_drive_encrypted:
                     encryption_status["os"] = "EncryptionInProgress"
-        elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
+        elif os.path.exists(self.get_osmapper_path()) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
         return json.dumps(encryption_status)
@@ -734,8 +743,8 @@ class DiskUtil(object):
 
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
-        elif os.path.exists("/dev/mapper/" + dev_name):
-            device_path = "/dev/mapper/" + dev_name
+        elif os.path.exists(os.path.join(CommonVariables.dev_mapper_root, dev_name)):
+            device_path = os.path.join(CommonVariables.dev_mapper_root, dev_name)
 
         return device_path
 
@@ -778,7 +787,7 @@ class DiskUtil(object):
 
     def get_block_device_to_azure_udev_table(self):
         table = {}
-        azure_links_dir = '/dev/disk/azure'
+        azure_links_dir = CommonVariables.azure_symlinks_dir
         
         if not os.path.exists(azure_links_dir):
             return table
@@ -809,14 +818,14 @@ class DiskUtil(object):
         Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
         list_devices = []
-        azure_links_dir = '/dev/disk/azure'
+        azure_links_dir = CommonVariables.azure_symlinks_dir
 
         if not os.path.exists(azure_links_dir):
             return list_devices
 
         for top_level_item in os.listdir(azure_links_dir):
             top_level_item_full_path = os.path.join(azure_links_dir, top_level_item)
-            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith("scsi"):
+            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith(self._SCSI_PREFIX):
                 # this works because apparently all data disks go int a scsi[x] where x is one of [1,2,3,4]
                 try:
                     controller_id = int(top_level_item[4:]) # strip the first 4 letters of the folder
@@ -826,7 +835,7 @@ class DiskUtil(object):
 
                 for symlink in os.listdir(top_level_item_full_path):
                     full_path = os.path.join(top_level_item_full_path, symlink)
-                    if symlink.startswith("lun"):
+                    if symlink.startswith(self._LUN_PREFIX):
                         try:
                             lun_number = int(symlink[3:])
                         except ValueError:
@@ -844,11 +853,11 @@ class DiskUtil(object):
         dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in dev_items])
 
         list_devices = []
-        azure_links_dir = '/dev/disk/azure'
+        azure_links_dir = CommonVariables.azure_symlinks_dir
 
         for controller_id, lun_number in all_controller_and_lun_numbers:
-            scsi_dir = os.path.join(azure_links_dir, 'scsi' + str(controller_id))
-            symlink = os.path.join(scsi_dir, 'lun' + str(lun_number))
+            scsi_dir = os.path.join(azure_links_dir, self._SCSI_PREFIX + str(controller_id))
+            symlink = os.path.join(scsi_dir, self._LUN_PREFIX + str(lun_number))
             if self.is_parent_of_any(os.path.realpath(symlink), dev_real_paths):
                 list_devices.append((controller_id, lun_number))
 

@@ -30,6 +30,7 @@ class EncryptionSettingsUtil(object):
 
     def __init__(self, logger):
         self.logger = logger
+        self._CURRENT_DISK_ENCRYPTION_DATA_VERSION = "3.0"
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -164,7 +165,8 @@ class EncryptionSettingsUtil(object):
 
         all_device_items = existing_crypt_dev_items + extra_device_items
 
-        root_vhd_needs_stamping = disk_util.is_parent_of_any(os.path.realpath("/dev/disk/azure/root"),
+        root_device_path = os.path.realpath(os.path.join(CommonVariables.azure_symlinks_dir, "root"))
+        root_vhd_needs_stamping = disk_util.is_parent_of_any(root_device_path,
                                                              set([disk_util.get_device_path(di.name) for di in all_device_items]))
 
         # Get disk data from disk_util
@@ -207,7 +209,7 @@ class EncryptionSettingsUtil(object):
                 })
 
         data = {
-            "DiskEncryptionDataVersion": "3.0",
+            "DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
             "DiskEncryptionOperation": "EnableEncryption",
             "KeyVaultUrl": kv_url,
             "KeyVaultResourceId": kv_id,
@@ -289,7 +291,7 @@ class EncryptionSettingsUtil(object):
         data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
-        data = {"DiskEncryptionDataVersion": "3.0",
+        data = {"DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",
