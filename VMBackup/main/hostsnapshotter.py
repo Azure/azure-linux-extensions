@@ -36,24 +36,27 @@ from Utils import Status
 from Utils import HostSnapshotObjects
 from Utils import HandlerUtil
 from fsfreezer import FsFreezer
+from dhcpHandler import DhcpHandler
 import sys
+
 
 class HostSnapshotter(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
-        self.dhcpHandlerObj = DhcpHandler(self.logger)
-        dhcp = DhcpHandler()
+        self.dhcpHandlerObj = None
+        self.hostIp = '168.63.129.16'
         try:
-            self.hostIp = dhcp.getHostEndoint()
+            self.dhcpHandlerObj = DhcpHandler(self.logger)
+            self.hostIp = self.dhcpHandlerObj.getHostEndoint()
         except Exception as e:
             errorMsg = "Failed to get hostIp from DHCP with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
             self.hostIp = '168.63.129.16'
-        self.logger.log( "hostIp : " + hostIp)
-        self.snapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
-        self.presnapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
+        self.logger.log( "hostIp : " + self.hostIp)
+        self.snapshoturi = 'http://' + self.hostIp + '/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
+        self.presnapshoturi = 'http://' + self.hostIp + '/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
