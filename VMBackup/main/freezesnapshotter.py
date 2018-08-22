@@ -63,7 +63,7 @@ class FreezeSnapshotter(object):
             self.hostIp = self.dhcpHandlerObj.getHostEndoint()
         except Exception as e:
             errorMsg = "Failed to get hostIp from DHCP with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(errorMsg, False, 'Error')
+            self.logger.log(errorMsg, True, 'Error')
             self.hostIp = '168.63.129.16'
         self.logger.log( "hostIp : " + self.hostIp)
 
