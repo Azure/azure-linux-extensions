@@ -24,7 +24,6 @@ import crypt
 import random
 import array
 import base64
-import httplib
 import os
 import os.path
 import platform
@@ -32,7 +31,6 @@ import pwd
 import re
 import shutil
 import socket
-import SocketServer
 import struct
 import string
 import subprocess
@@ -50,6 +48,15 @@ import json
 import datetime
 import xml.sax.saxutils
 from distutils.version import LooseVersion
+
+if sys.version_info[0] == 3:
+    import http.client as httpclient
+    from urllib.parse import urlparse
+
+elif sys.version_info[0] == 2:
+    import httplib as httpclient
+    from urlparse import urlparse
+
 
 if not hasattr(subprocess,'check_output'):
     def check_output(*popenargs, **kwargs):
@@ -148,7 +155,7 @@ For additional details to please refer to the MSDN documentation at : http://msd
 # BEGIN DISTRO CLASS DEFS
 ############################################################
 ############################################################    
-#	AbstractDistro
+#   AbstractDistro
 ############################################################    
 class AbstractDistro(object):
     """
@@ -186,7 +193,7 @@ class AbstractDistro(object):
         self.mount_dvd_cmd = 'mount'
         self.sudoers_dir_base = '/etc'
         self.waagent_conf_file = WaagentConf
-        self.shadow_file_mode=0600
+        self.shadow_file_mode=0o600
         self.shadow_file_path="/etc/shadow"
         self.dhcp_enabled = False
 
@@ -507,7 +514,7 @@ class AbstractDistro(object):
             mountpoint = Config.get("ResourceDisk.MountPoint")
             if mountpoint == None:
                 mountpoint = "/mnt/resource"
-            CreateDir(mountpoint, "root", 0755)
+            CreateDir(mountpoint, "root", 0o755)
             fs = Config.get("ResourceDisk.Filesystem")
             if fs == None:
                 fs = "ext3"
@@ -722,7 +729,7 @@ class AbstractDistro(object):
         pass
 
 ############################################################
-#	GentooDistro
+#   GentooDistro
 ############################################################
 gentoo_init_file = """\
 #!/sbin/runscript
@@ -735,9 +742,9 @@ name="Azure Linux Agent"
 
 depend()
 {
-	need localmount
-	use logger network
-	after bootmisc modules
+    need localmount
+    use logger network
+    after bootmisc modules
 }
 
 """
@@ -753,7 +760,7 @@ class gentooDistro(AbstractDistro):
         self.ssh_service_name='sshd'
         self.hostname_file_path='/etc/conf.d/hostname'
         self.dhcp_client_name='dhcpcd'
-        self.shadow_file_mode=0640
+        self.shadow_file_mode=0o640
         self.init_file=gentoo_init_file
         
     def publishHostname(self,name):
@@ -767,7 +774,7 @@ class gentooDistro(AbstractDistro):
         
     def installAgentServiceScriptFiles(self):
         SetFileContents(self.init_script_file, self.init_file)
-        os.chmod(self.init_script_file, 0755)
+        os.chmod(self.init_script_file, 0o755)
 
     def registerAgentService(self):
         self.installAgentServiceScriptFiles()
@@ -796,7 +803,7 @@ class gentooDistro(AbstractDistro):
         Run("/etc/init.d/net." + iface + " restart")
 
 ############################################################    
-#	SuSEDistro
+#   SuSEDistro
 ############################################################    
 suse_init_file = """\
 #! /bin/sh
@@ -962,7 +969,7 @@ class SuSEDistro(AbstractDistro):
     def installAgentServiceScriptFiles(self):
         try:
             SetFileContents(self.init_script_file, self.init_file)
-            os.chmod(self.init_script_file, 0744)
+            os.chmod(self.init_script_file, 0o744)
         except:
             pass
 
@@ -1103,7 +1110,7 @@ class SuSEDistro(AbstractDistro):
             Log("nd_driver_version is " + str(nd_driver_version) + " package_version is " + str(package_version))
             if(nd_driver_version is not None):
                 r = re.match("^[0-9]+[.](%s).+" % nd_driver_version, package_version)# NdDriverVersion should be at the end of package version
-                if not r :	#host ND version is the same as the package version, do an update
+                if not r :  #host ND version is the same as the package version, do an update
                     return RdmaConfig.OutOfDate
                 else:
                     return RdmaConfig.UpToDate
@@ -1114,7 +1121,7 @@ class SuSEDistro(AbstractDistro):
         RunGetOutput(self.reboot_path)
 
 ############################################################    
-#	redhatDistro
+#   redhatDistro
 ############################################################    
 
 redhat_init_file= """\
@@ -1205,7 +1212,7 @@ class redhatDistro(AbstractDistro):
 
     def installAgentServiceScriptFiles(self):
         SetFileContents(self.init_script_file, self.init_file)
-        os.chmod(self.init_script_file, 0744)
+        os.chmod(self.init_script_file, 0o744)
         return 0
 
     def registerAgentService(self):
@@ -1248,10 +1255,10 @@ class redhatDistro(AbstractDistro):
             if Run("which " + a + " > /dev/null 2>&1",chk_err=False):
                 Error("Missing required dependency: " + a)
                 return 1
-        return 0	
+        return 0    
 
 ############################################################    
-#	centosDistro
+#   centosDistro
 ############################################################    
 
 class centosDistro(redhatDistro):
@@ -1269,7 +1276,7 @@ class centosDistro(redhatDistro):
         pass
 
 ############################################################    
-#	oracleDistro
+#   oracleDistro
 ############################################################    
 
 class oracleDistro(redhatDistro):
@@ -1281,7 +1288,7 @@ class oracleDistro(redhatDistro):
         super(oracleDistro, self).__init__()
 
 ############################################################    
-#	asianuxDistro
+#   asianuxDistro
 ############################################################    
 
 class asianuxDistro(redhatDistro):
@@ -1311,7 +1318,7 @@ class CoreOSDistro(AbstractDistro):
         self.fileBlackList.append("/etc/machine-id")
         self.dhcp_client_name='systemd-networkd'
         self.getpidcmd='pidof '
-        self.shadow_file_mode=0640
+        self.shadow_file_mode=0o640
         self.waagent_path='/usr/share/oem/bin'
         self.python_path='/usr/share/oem/python/bin'
         self.dhcp_enabled=True
@@ -1406,20 +1413,20 @@ class CoreOSDistro(AbstractDistro):
                 SetFileContents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 SetFileContents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
-            os.chmod("/etc/sudoers.d/waagent", 0440)
+            os.chmod("/etc/sudoers.d/waagent", 0o440)
         except:
             Error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = MyDistro.GetHome()
         if thumbprint != None:
             dir = home + "/" + user + "/.ssh"
-            CreateDir(dir, user, 0700)
+            CreateDir(dir, user, 0o700)
             pub = dir + "/id_rsa.pub"
             prv = dir + "/id_rsa"
             Run("ssh-keygen -y -f " + thumbprint + ".prv > " + pub)
             SetFileContents(prv, GetFileContents(thumbprint + ".prv"))
             for f in [pub, prv]:
-                os.chmod(f, 0600)
+                os.chmod(f, 0o600)
                 ChangeOwner(f, user)
             SetFileContents(dir + "/authorized_keys", GetFileContents(pub))
             ChangeOwner(dir + "/authorized_keys", user)
@@ -1439,7 +1446,7 @@ class CoreOSDistro(AbstractDistro):
         return "/usr/share/oem/waagent.conf"
 
 ############################################################    
-#	debianDistro
+#   debianDistro
 ############################################################    
 debian_init_file = """\
 #!/bin/sh
@@ -1511,7 +1518,7 @@ class debianDistro(AbstractDistro):
         self.agent_package_name='walinuxagent'
         self.dhcp_client_name='dhclient'
         self.getpidcmd='pidof '
-        self.shadow_file_mode=0640
+        self.shadow_file_mode=0o640
 
     def checkPackageInstalled(self,p):
         """
@@ -1555,8 +1562,8 @@ class debianDistro(AbstractDistro):
             return 0
         try:
             SetFileContents(self.init_script_file, self.init_file)
-            os.chmod(self.init_script_file, 0744)
-        except OSError, e:
+            os.chmod(self.init_script_file, 0o744)
+        except OSError as e:
             ErrorWithPrefix('installAgentServiceScriptFiles','Exception: '+str(e)+' occured creating ' + self.init_script_file)
             return 1
         return 0
@@ -1584,7 +1591,7 @@ class debianDistro(AbstractDistro):
             return 0
 
 ############################################################    
-#	KaliDistro - WIP
+#   KaliDistro - WIP
 #       Functioning on Kali 1.1.0a so far
 ############################################################ 
 class KaliDistro(debianDistro):
@@ -1596,7 +1603,7 @@ class KaliDistro(debianDistro):
         super(KaliDistro,self).__init__()
 
 ############################################################    
-#	UbuntuDistro
+#   UbuntuDistro
 ############################################################    
 ubuntu_upstart_file = """\
 #walinuxagent - start Azure agent
@@ -1608,7 +1615,7 @@ start on (filesystem and started rsyslog)
 
 pre-start script
 
-	WALINUXAGENT_ENABLED=1
+    WALINUXAGENT_ENABLED=1
     [ -r /etc/default/walinuxagent ] && . /etc/default/walinuxagent
 
     if [ "$WALINUXAGENT_ENABLED" != "1" ]; then
@@ -1705,7 +1712,7 @@ class UbuntuDistro(debianDistro):
         return False
 
 ############################################################    
-#	LinuxMintDistro
+#   LinuxMintDistro
 ############################################################    
 
 class LinuxMintDistro(UbuntuDistro):
@@ -1717,7 +1724,7 @@ class LinuxMintDistro(UbuntuDistro):
         super(LinuxMintDistro,self).__init__()
 
 ############################################################    
-#	fedoraDistro
+#   fedoraDistro
 ############################################################    
 fedora_systemd_service = """\
 [Unit]
@@ -1760,7 +1767,7 @@ class fedoraDistro(redhatDistro):
 
     def installAgentServiceScriptFiles(self):
         SetFileContents(self.init_script_file, self.init_file)
-        os.chmod(self.init_script_file, 0644)
+        os.chmod(self.init_script_file, 0o644)
         return Run(self.service_cmd + ' daemon-reload')
 
     def registerAgentService(self):
@@ -1842,7 +1849,7 @@ class fedoraDistro(redhatDistro):
         super(fedoraDistro, self).DeleteAccount(user)
 
 ############################################################    
-#	FreeBSD
+#   FreeBSD
 ############################################################    
 FreeBSDWaagentConf = """\
 #
@@ -1921,7 +1928,7 @@ for entry in RunGetOutput("mount")[1].split():
 mountpoint = Config.get("ResourceDisk.MountPoint")
 if mountpoint == None:
     mountpoint = "/mnt/resource"
-waagent.CreateDir(mountpoint, "root", 0755)
+waagent.CreateDir(mountpoint, "root", 0o755)
 fs = Config.get("ResourceDisk.Filesystem")
 if waagent.FreeBSDDistro().mediaHasFilesystem(device) == False :
     Run("newfs " + device + "s1")
@@ -1977,7 +1984,7 @@ class FreeBSDDistro(AbstractDistro):
 
     def installAgentServiceScriptFiles(self):
         SetFileContents(self.init_script_file, self.init_file)
-        os.chmod(self.init_script_file, 0777)
+        os.chmod(self.init_script_file, 0o777)
         AppendFileContents("/etc/rc.conf","waagent_enable='YES'\n")
         return 0
 
@@ -2152,20 +2159,20 @@ class FreeBSDDistro(AbstractDistro):
                 SetFileContents(MyDistro.sudoers_dir_base+"/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 SetFileContents(MyDistro.sudoers_dir_base+"/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
-            os.chmod(MyDistro.sudoers_dir_base+"/sudoers.d/waagent", 0440)
+            os.chmod(MyDistro.sudoers_dir_base+"/sudoers.d/waagent", 0o440)
         except:
             Error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = MyDistro.GetHome()
         if thumbprint != None:
             dir = home + "/" + user + "/.ssh"
-            CreateDir(dir, user, 0700)
+            CreateDir(dir, user, 0o700)
             pub = dir + "/id_rsa.pub"
             prv = dir + "/id_rsa"
             Run("ssh-keygen -y -f " + thumbprint + ".prv > " + pub)
             SetFileContents(prv, GetFileContents(thumbprint + ".prv"))
             for f in [pub, prv]:
-                os.chmod(f, 0600)
+                os.chmod(f, 0o600)
                 ChangeOwner(f, user)
             SetFileContents(dir + "/authorized_keys", GetFileContents(pub))
             ChangeOwner(dir + "/authorized_keys", user)
@@ -2232,7 +2239,7 @@ class FreeBSDDistro(AbstractDistro):
         """
         if MyDistro.checkDependencies():
             return 1
-        os.chmod(sys.argv[0], 0755)
+        os.chmod(sys.argv[0], 0o755)
         SwitchCwd()
         for a in RulesFiles:
             if os.path.isfile(a):
@@ -2351,7 +2358,7 @@ def GetFileContents(filepath,asbin=False):
     try:
         with open(filepath, mode) as F :
             c=F.read()
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('GetFileContents','Reading from file ' + filepath + ' Exception is ' + str(e))
         return None        
     return c
@@ -2365,7 +2372,7 @@ def SetFileContents(filepath, contents):
     try:
         with open(filepath, "wb+") as F :
             F.write(contents)
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('SetFileContents','Writing to file ' + filepath + ' Exception is ' + str(e))
         return None
     return 0
@@ -2379,7 +2386,7 @@ def AppendFileContents(filepath, contents):
     try: 
         with open(filepath, "a+") as F :
             F.write(contents)
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('AppendFileContents','Appending to file ' + filepath + ' Exception is ' + str(e))
         return None
     return 0
@@ -2393,7 +2400,7 @@ def ReplaceFileContentsAtomic(filepath, contents):
         contents=contents.encode('latin-1')
     try:
         os.write(handle, contents)
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('ReplaceFileContentsAtomic','Writing to file ' + filepath + ' Exception is ' + str(e))
         return None
     finally:
@@ -2401,15 +2408,15 @@ def ReplaceFileContentsAtomic(filepath, contents):
     try:
         os.rename(temp, filepath)
         return None
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('ReplaceFileContentsAtomic','Renaming ' + temp+ ' to ' + filepath + ' Exception is ' + str(e))
     try:
         os.remove(filepath)
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('ReplaceFileContentsAtomic','Removing '+ filepath + ' Exception is ' + str(e))
     try:
         os.rename(temp,filepath)
-    except IOError, e:
+    except IOError as e:
         ErrorWithPrefix('ReplaceFileContentsAtomic','Removing '+ filepath + ' Exception is ' + str(e))
         return 1
     return 0
@@ -2442,7 +2449,7 @@ def RunGetOutput(cmd, chk_err=True, log_cmd=True):
         LogIfVerbose(cmd)
     try:
         output=subprocess.check_output(cmd,stderr=subprocess.STDOUT,shell=True)
-    except subprocess.CalledProcessError,e :
+    except subprocess.CalledProcessError as e :
         if chk_err and log_cmd:
             Error('CalledProcessError.  Error Code is ' + str(e.returncode)  )
             Error('CalledProcessError.  Command string was ' + e.cmd  )
@@ -2458,11 +2465,11 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
     Reports exceptions to Error if chk_err parameter is True
     """
     if log_cmd:
-        LogIfVerbose(cmd+input)
+        LogIfVerbose(str(cmd) + str(input))
     try:                                     
         me=subprocess.Popen([cmd], shell=True, stdin=subprocess.PIPE,stderr=subprocess.STDOUT,stdout=subprocess.PIPE)
         output=me.communicate(input)
-    except OSError , e :
+    except OSError as e :
         if chk_err and log_cmd:
             Error('CalledProcessError.  Error Code is ' + str(me.returncode)  )
             Error('CalledProcessError.  Command string was ' + cmd  )
@@ -2562,20 +2569,20 @@ def CreateAccount(user, password, expiration, thumbprint):
             SetFileContents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
         else:
             SetFileContents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
-        os.chmod("/etc/sudoers.d/waagent", 0440)
+        os.chmod("/etc/sudoers.d/waagent", 0o440)
     except:
         Error("CreateAccount: Failed to configure sudo access for user.")
         return "Failed to configure sudo privileges (0x08)."
     home = MyDistro.GetHome()
     if thumbprint != None:
         dir = home + "/" + user + "/.ssh"
-        CreateDir(dir, user, 0700)
+        CreateDir(dir, user, 0o700)
         pub = dir + "/id_rsa.pub"
         prv = dir + "/id_rsa"
         Run("ssh-keygen -y -f " + thumbprint + ".prv > " + pub)
         SetFileContents(prv, GetFileContents(thumbprint + ".prv"))
         for f in [pub, prv]:
-            os.chmod(f, 0600)
+            os.chmod(f, 0o600)
             ChangeOwner(f, user)
         SetFileContents(dir + "/authorized_keys", GetFileContents(pub))
         ChangeOwner(dir + "/authorized_keys", user)
@@ -2703,11 +2710,10 @@ class Logger(object):
         """
         if self.file_path:
             try:
-                with open(self.file_path, "a") as F :
-                    message = filter(lambda x : x in string.printable, message)
-                    F.write(message.encode('ascii','ignore') + "\n")
-            except IOError, e:
-                print e
+                with open(self.file_path, "a") as F :    
+                    message = list(filter(lambda x : x in string.printable, message))
+                    F.write(str(''.join(message)) + "\n") # needs review
+            except IOError as e:
                 pass
 
     def LogToCon(self,message):
@@ -2719,9 +2725,9 @@ class Logger(object):
         if self.con_path:
             try:
                 with open(self.con_path, "w") as C :
-                    message = filter(lambda x : x in string.printable, message)
-                    C.write(message.encode('ascii','ignore') + "\n")
-            except IOError, e:
+                    message = list(filter(lambda x : x in string.printable, message))
+                    C.write(str(''.join(message)) + "\n") # needs review
+            except IOError as e:
                 pass
 
     def Log(self,message):
@@ -2924,7 +2930,7 @@ def DoInstallRHUIRPM():
         Error(scriptFilePath + " does not exist, now quit RHUI RPM installation.");
         return
     #chmod a+x script file
-    os.chmod(scriptFilePath, 0100)
+    os.chmod(scriptFilePath, 0o100)
     Log("begin to run " + scriptFilePath)
 
     #execute the downloaded script file
@@ -2997,28 +3003,28 @@ class Util(object):
             if secure:
                 port = 443 if port is None else port
                 if proxyHost is not None and proxyPort is not None:
-                    conn = httplib.HTTPSConnection(proxyHost, proxyPort, timeout=10)
+                    conn = httpclient.HTTPSConnection(proxyHost, proxyPort, timeout=10)
                     conn.set_tunnel(host, port)
                     #If proxy is used, full url is needed.
                     path = "https://{0}:{1}{2}".format(host, port, path)
                 else:
-                    conn = httplib.HTTPSConnection(host, port, timeout=10)
+                    conn = httpclient.HTTPSConnection(host, port, timeout=10)
             else:
                 port = 80 if port is None else port
                 if proxyHost is not None and proxyPort is not None:
-                    conn = httplib.HTTPConnection(proxyHost, proxyPort, timeout=10)
+                    conn = httpclient.HTTPConnection(proxyHost, proxyPort, timeout=10)
                     #If proxy is used, full url is needed.
                     path = "http://{0}:{1}{2}".format(host, port, path)
                 else:
-                    conn = httplib.HTTPConnection(host, port, timeout=10)
+                    conn = httpclient.HTTPConnection(host, port, timeout=10)
             if headers == None:
                 conn.request(method, path, data)
             else:
                 conn.request(method, path, data, headers)
             resp = conn.getresponse()
-        except httplib.HTTPException, e:
+        except httpclient.HTTPException as e:
             Error('HTTPException {0}, args:{1}'.format(e, repr(e.args)))
-        except IOError, e:
+        except IOError as e:
             Error('Socket IOError {0}, args:{1}'.format(e, repr(e.args)))
         return resp
 
@@ -3034,7 +3040,7 @@ class Util(object):
         LogIfVerbose("HTTP Req: Header={0}".format(headers))
         try:
             host, port, secure, path = self._ParseUrl(url)
-        except ValueError, e:
+        except ValueError as e:
             Error("Failed to parse url:{0}".format(url))
             return None
 
@@ -3043,18 +3049,18 @@ class Util(object):
         if chkProxy:
             proxyHost, proxyPort = self.GetHttpProxy(secure)
 
-        #If httplib module is not built with ssl support. Fallback to http
-        if secure and not hasattr(httplib, "HTTPSConnection"):
-            Warn("httplib is not built with ssl support")
+        #If httplib/httpclient module is not built with ssl support. Fallback to http
+        if secure and not hasattr(httpclient, "HTTPSConnection"):
+            Warn("httplib/httpclient is not built with ssl support")
             secure = False
             proxyHost, proxyPort = self.GetHttpProxy(secure)
         
-        #If httplib module doesn't support https tunnelling. Fallback to http
+        #If httplib/httpclient module doesn't support https tunnelling. Fallback to http
         if secure and \
                 proxyHost is not None and \
                 proxyPort is not None and \
-                not hasattr(httplib.HTTPSConnection, "set_tunnel"):
-            Warn("httplib doesn't support https tunnelling(new in python 2.7)")
+                not hasattr(httpclient.HTTPSConnection, "set_tunnel"):
+            Warn("httplib/httpclient doesn't support https tunnelling(new in python 2.7)")
             secure = False
             proxyHost, proxyPort = self.GetHttpProxy(secure)
 
@@ -3063,12 +3069,12 @@ class Util(object):
                                  proxyHost=proxyHost, proxyPort=proxyPort)
         for retry in range(0, maxRetry):
             if resp is not None and \
-                   (resp.status == httplib.OK or \
-                    resp.status == httplib.CREATED or \
-                    resp.status == httplib.ACCEPTED):
+                   (resp.status == httpclient.OK or \
+                    resp.status == httpclient.CREATED or \
+                    resp.status == httpclient.ACCEPTED):
                 return resp;
 
-            if resp is not None and resp.status == httplib.GONE:
+            if resp is not None and resp.status == httpclient.GONE:
                 raise HttpResourceGoneError("Http resource gone.")
 
             Error("Retry={0}".format(retry))
@@ -3250,7 +3256,7 @@ def UploadStatusBlob(url, data):
         Error("Unknown blob type: {0}".format(blobType))
         return -1
 
-class TCPHandler(SocketServer.BaseRequestHandler):
+class TCPHandler():
     """
     Callback object for LoadBalancerProbeServer.
     Recv and send LB probe messages.
@@ -3286,23 +3292,13 @@ class LoadBalancerProbeServer(object):
     the load balancing server, or this node may be shut-down.
     """
     def __init__(self, port):
-        self.ProbeCounter = 0
-        self.server = SocketServer.TCPServer((self.get_ip(), port), TCPHandler)
-        self.server_thread = threading.Thread(target = self.server.serve_forever)
-        self.server_thread.setDaemon(True)
-        self.server_thread.start()
+        pass
         
     def shutdown(self):
-        self.server.shutdown()
+        pass
 
     def get_ip(self):
-        for retry in range(1,6):
-            ip = MyDistro.GetIpv4Address()
-            if ip == None :
-                Log("LoadBalancerProbeServer: GetIpv4Address() returned None, sleeping 10 before retry " + str(retry+1) )
-                time.sleep(10)
-            else:
-                return ip
+        return None
 
 class ConfigurationProvider(object):
     """
@@ -3496,7 +3492,7 @@ class Certificates(object):
             pubkey=RunGetOutput(Openssl + " x509 -in " + filename + " -pubkey -noout")[1]
             keys[pubkey] = thumbprint
             os.rename(filename, thumbprint + ".crt")
-            os.chmod(thumbprint + ".crt", 0600)
+            os.chmod(thumbprint + ".crt", 0o600)
             MyDistro.setSelinuxContext(thumbprint + '.crt','unconfined_u:object_r:ssh_home_t:s0')
             index += 1
             filename = str(index) + ".crt"
@@ -3505,7 +3501,7 @@ class Certificates(object):
         while os.path.isfile(filename):
             pubkey = RunGetOutput(Openssl + " rsa -in " + filename + " -pubout 2> /dev/null ")[1]
             os.rename(filename, keys[pubkey] + ".prv")
-            os.chmod(keys[pubkey] + ".prv", 0600)
+            os.chmod(keys[pubkey] + ".prv", 0o600)
             MyDistro.setSelinuxContext( keys[pubkey] + '.prv','unconfined_u:object_r:ssh_home_t:s0')
             index += 1
             filename = str(index) + ".prv"
@@ -3608,7 +3604,7 @@ class SharedConfig(object):
         if program != None:
             try:
                 Children.append(subprocess.Popen([program, LibDir + "/SharedConfig.xml"]))
-            except OSError, e :
+            except OSError as e :
                 ErrorWithPrefix('Agent.Run','Exception: '+ str(e) +' occured launching ' + program )
 
     def Process(self):
@@ -3716,7 +3712,7 @@ class RdmaHandler(object):
         try:
             with open(self.dev, "w") as c:
                 c.write(self.data)
-        except IOError, e:
+        except IOError as e:
             raise RdmaError("Error writing {0}, {1}".format(self.dev, e))
 
     def wait_rdma_dev(self):
@@ -3812,7 +3808,7 @@ class ExtensionsConfig(object):
                 self.Plugins = []
             incarnation=self.Extensions[0].getAttribute("goalStateIncarnation")
             SetFileContents('ExtensionsConfig.'+incarnation+'.xml', xmlText)
-        except Exception, e:
+        except Exception as e:
             Error('ERROR:  Error parsing ExtensionsConfig: {0}.'.format(e))
             return None
         for p in self.Plugins:
@@ -4549,7 +4545,7 @@ class HostingEnvironmentConfig(object):
         if program != None:
             try:
                 Children.append(subprocess.Popen([program, LibDir + "/HostingEnvironmentConfig.xml"]))
-            except OSError, e :
+            except OSError as e :
                 ErrorWithPrefix('HostingEnvironmentConfig.Process','Exception: '+ str(e) +' occured launching ' + program )
 
 class GoalState(Util):
@@ -4816,7 +4812,7 @@ class OvfEnv(object):
                     Log('Wrote ' + LibDir + '/CustomData')
                 else :
                     Error('<CustomData> contains no data!')
-        except Exception, e:
+        except Exception as e:
             Error( str(e)+' occured creating ' + LibDir + '/CustomData')
         disableSshPass = section.getElementsByTagNameNS(self.WaNs, "DisableSshPasswordAuthentication")
         if len(disableSshPass) != 0:
@@ -4859,7 +4855,7 @@ class OvfEnv(object):
             return None
         dir = path.rsplit('/', 1)[0]
         if dir != "":
-            CreateDir(dir, "root", 0700)
+            CreateDir(dir, "root", 0o700)
             if path.startswith(os.path.normpath(home + "/" + self.UserName + "/")):
                 ChangeOwner(dir, self.UserName)
         return path
@@ -4909,7 +4905,7 @@ class OvfEnv(object):
             keydata += struct.pack('>I',len(self.NumberToBytes(n)) + 1)
             keydata += "\0"
             keydata += self.NumberToBytes(n)
-        except Exception, e:
+        except Exception as e:
             print("OpensslToSsh: Exception " + str(e))
             return None
         return "ssh-rsa " + base64.b64encode(keydata) + "\n"
@@ -4971,7 +4967,7 @@ class OvfEnv(object):
                 error = "Invalid path for key pair (0x05)."
                 continue
             SetFileContents(path, GetFileContents(keyp[0] + ".prv"))
-            os.chmod(path, 0600)
+            os.chmod(path, 0o600)
             Run("ssh-keygen -y -f " + keyp[0] + ".prv > " + path + ".pub")
             MyDistro.setSelinuxContext(path,'unconfined_u:object_r:ssh_home_t:s0')
             MyDistro.setSelinuxContext(path + '.pub','unconfined_u:object_r:ssh_home_t:s0')
@@ -5023,11 +5019,11 @@ class WALAEvent(object):
                 strEventsData+=strRecordFormat.format(attName,attValue,strMtUInt64)
                 continue
             if type(attValue) is str:
-                attValue = xml.sax.saxutils.quoteattr(attValue)			                
+                attValue = xml.sax.saxutils.quoteattr(attValue)                         
                 strEventsData+=strRecordNoQuoteFormat.format(attName,attValue,strMtStr)
                 continue
             if str(type(attValue)).count("'unicode'") >0 :
-                attValue = xml.sax.saxutils.quoteattr(attValue)			 
+                attValue = xml.sax.saxutils.quoteattr(attValue)          
                 strEventsData+=strRecordNoQuoteFormat.format(attName,attValue,strMtStr)
                 continue
             if type(attValue) is bool:
@@ -5045,7 +5041,7 @@ class WALAEvent(object):
         eventfolder = LibDir+"/events"
         if not os.path.exists(eventfolder):
             os.mkdir(eventfolder)
-            os.chmod(eventfolder,0700)
+            os.chmod(eventfolder,0o700)
         if len(os.listdir(eventfolder)) > 1000:
             raise Exception("WriteToFolder:Too many file under "+eventfolder+" exit")
 
@@ -5542,7 +5538,7 @@ class Agent(Util):
                 sleepDuration = [sleepDurations[retry % len(sleepDurations)], 1][ShortSleep]
                 LogIfVerbose("DoDhcpWork: sleep=" + str(sleepDuration))
                 time.sleep(sleepDuration)
-            except Exception, e:
+            except Exception as e:
                 ErrorWithPrefix(prefix, str(e))
                 ErrorWithPrefix(prefix, traceback.format_exc())
             finally:
@@ -5739,7 +5735,7 @@ class Agent(Util):
         """
         self.TryLoadAtapiix()
         if os.path.exists('/mnt/cdrom/secure') == False:
-            CreateDir("/mnt/cdrom/secure", "root", 0700)
+            CreateDir("/mnt/cdrom/secure", "root", 0o700)
         mounted=False
         for dvds in [re.match(r'(sr[0-9]|hd[c-z]|cdrom[0-9]|cd[0-9]?)',x) for x in os.listdir('/dev/')]:
             if dvds == None:
@@ -5819,7 +5815,7 @@ class Agent(Util):
                 Log("Waiting for DVD - sleeping 1 - "+str(i+1)+" try...")
                 time.sleep(1)
         if os.path.exists('/mnt/cdrom/secure') == False:
-            CreateDir("/mnt/cdrom/secure", "root", 0700)
+            CreateDir("/mnt/cdrom/secure", "root", 0o700)
         #begin mount loop - 5 tries - 5 sec wait between
         for retry in range(1,6):
             location='/mnt/cdrom/secure'
@@ -6022,7 +6018,7 @@ class Agent(Util):
                             if self.LoadBalancerProbeServer == None :
                                 lbProbeResponder = False
                                 Log("Unable to create LBProbeResponder.")
-                    except Exception, e:
+                    except Exception as e:
                         Error("Failed to launch LBProbeResponder: {0}".format(e))
                         currentPort = None
 
@@ -6039,7 +6035,7 @@ class Agent(Util):
             if program != None and DiskActivated == True:
                 try:
                     Children.append(subprocess.Popen([program, "Ready"]))
-                except OSError, e :
+                except OSError as e :
                     ErrorWithPrefix('SharedConfig.Parse','Exception: '+ str(e) +' occured launching ' + program )
                 program = None
 
@@ -6110,7 +6106,7 @@ def FindInLinuxKernelCmdline(option):
     matchs=r'^.*?'+MyDistro.grubKernelBootOptionsLine+r'.*?'+option+r'.*$'
     try:
         m=FindStringInFile(MyDistro.grubKernelBootOptionsFile,matchs)
-    except IOError, e:
+    except IOError as e:
         Error('FindInLinuxKernelCmdline: Exception opening ' + MyDistro.grubKernelBootOptionsFile + 'Exception:' + str(e))
         
     return m
@@ -6124,7 +6120,7 @@ def AppendToLinuxKernelCmdline(option):
         rep=r'\1\2 '+ option + r'\3'
         try:
             ReplaceStringInFile(MyDistro.grubKernelBootOptionsFile,src,rep)
-        except IOError, e :
+        except IOError as e :
             Error('AppendToLinuxKernelCmdline: Exception opening ' + MyDistro.grubKernelBootOptionsFile + 'Exception:' + str(e))
             return 1
         Run("update-grub",chk_err=False)    
@@ -6139,7 +6135,7 @@ def RemoveFromLinuxKernelCmdline(option):
         rep=r'\1\3\4'
         try:
             ReplaceStringInFile(MyDistro.grubKernelBootOptionsFile,src,rep)
-        except IOError, e :
+        except IOError as e :
             Error('RemoveFromLinuxKernelCmdline: Exception opening ' + MyDistro.grubKernelBootOptionsFile + 'Exception:' + str(e))
             return 1
         Run("update-grub",chk_err=False)    
@@ -6215,7 +6211,7 @@ def Install():
     """
     if MyDistro.checkDependencies():
         return 1
-    os.chmod(sys.argv[0], 0755)
+    os.chmod(sys.argv[0], 0o755)
     SwitchCwd()
     for a in RulesFiles:
         if os.path.isfile(a):
@@ -6261,7 +6257,7 @@ def GetMyDistro(dist_class_name=''):
     else:
         Distro=dist_class_name
     if not globals().has_key(dist_class_name):
-        print Distro+' is not a supported distribution.'
+        print(Distro + ' is not a supported distribution.')
         return None
     return globals()[dist_class_name]() # the distro class inside this module.
 
@@ -6370,7 +6366,7 @@ def SwitchCwd():
     Switch to cwd to /var/lib/waagent.
     Create if not present.
     """
-    CreateDir(LibDir, "root", 0700)
+    CreateDir(LibDir, "root", 0o700)
     os.chdir(LibDir)
 
 def Usage():
@@ -6467,7 +6463,7 @@ def main():
             global WaAgent
             WaAgent = Agent()
             WaAgent.Run()
-        except Exception, e:
+        except Exception as e:
             Error(traceback.format_exc())
             Error("Exception: " + str(e))
             Log("Restart agent in 15 seconds")

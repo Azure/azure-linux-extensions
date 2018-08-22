@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #CustomScript extension
 #
@@ -24,16 +24,22 @@ import subprocess
 import sys
 import time
 import traceback
-import urllib2
-import urlparse
 
 from azure.storage import BlobService
 from codecs import *
-from distutils.util import strtobool
+# from distutils.util import strtobool # will need to be fixed
 from Utils.WAAgentUtil import waagent
 
 import Utils.HandlerUtil as Util
 import Utils.ScriptUtil as ScriptUtil
+
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    from urllib.parse import urlparse
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    from urlparse import urlparse
 
 ExtensionShortName = 'CustomScriptForLinux'
 
@@ -54,6 +60,7 @@ def main():
     #Global Variables definition
     waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
     waagent.Log("%s started to handle." %(ExtensionShortName))
+    hutil = None
 
     try:
         for a in sys.argv[1:]:
@@ -74,9 +81,11 @@ def main():
     except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
         waagent.Error(err_msg)
-        hutil.error(err_msg)
-        hutil.do_exit(1, 'Enable','failed','0',
-                      'Enable failed: {0}'.format(err_msg))
+
+        if hutil is not None:
+            hutil.error(err_msg)
+            hutil.do_exit(1, 'Enable','failed','0',
+                          'Enable failed: {0}'.format(err_msg))
 
 
 def dummy_command(operation, status, msg):
@@ -263,7 +272,7 @@ def daemon(hutil):
         if 'wait' in public_settings:
             wait = public_settings.get('wait')
         if 'enableInternalDNSCheck' in public_settings:
-            enable_idns_check = strtobool(public_settings.get('enableInternalDNSCheck'))
+            enable_idns_check = False #strtobool(public_settings.get('enableInternalDNSCheck'))
 
     prepare_download_dir(hutil.get_seq_no())
     retry_count = download_files_with_retry(hutil, retry_count, wait)
@@ -367,7 +376,7 @@ def download_external_file(uri, command, hutil):
 
 
 def download_and_save_file(uri, file_path, timeout=30, buf_size=1024):
-    src = urllib2.urlopen(uri, timeout=timeout)
+    src = urllib.urlopen(uri, timeout=timeout)
     with open(file_path, 'wb') as dest:
         buf = src.read(buf_size)
         while(buf):
@@ -396,7 +405,7 @@ def to_process(file_path, extensions=['.sh', ".py"]):
             return True
     with open(file_path, 'rb') as f:
         contents = f.read(64)
-    if '#!' in contents:
+    if b'#!' in contents:
         return True
     return False
 
@@ -406,7 +415,7 @@ def dos2unix(file_path):
         contents = f.read()
     temp_file_path = file_path + ".tmp"
     with open(temp_file_path, 'wb') as f_temp:
-        f_temp.write(contents)
+        f_temp.write(contents.encode())
     shutil.move(temp_file_path, file_path)
 
 
@@ -442,7 +451,7 @@ def get_container_name_from_uri(uri, hutil):
 
 
 def get_host_base_from_uri(blob_uri):
-    uri = urlparse.urlparse(blob_uri)
+    uri = urlparse(blob_uri)
     netloc = uri.netloc
     if netloc is None:
         return None
@@ -464,7 +473,7 @@ def get_properties_from_uri(uri, hutil):
 
 
 def get_path_from_uri(uriStr):
-    uri = urlparse.urlparse(uriStr)
+    uri = urlparse(uriStr)
     return uri.path
 
 
