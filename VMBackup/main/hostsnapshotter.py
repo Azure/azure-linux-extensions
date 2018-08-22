@@ -38,13 +38,14 @@ from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 import sys
 
+
 class HostSnapshotter(object):
     """description of class"""
-    def __init__(self, logger):
+    def __init__(self, logger, hostIp):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
-        self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
-        self.presnapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
+        self.snapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
+        self.presnapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
