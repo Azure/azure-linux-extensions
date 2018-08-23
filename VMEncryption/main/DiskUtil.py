@@ -844,13 +844,12 @@ class DiskUtil(object):
                         list_devices.append((controller_id, lun_number))
         return list_devices
 
-    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items):
+    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items_real_paths):
         """
         Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
 
         all_controller_and_lun_numbers = self.get_all_azure_data_disk_controller_and_lun_numbers()
-        dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in dev_items])
 
         list_devices = []
         azure_links_dir = CommonVariables.azure_symlinks_dir
@@ -858,7 +857,7 @@ class DiskUtil(object):
         for controller_id, lun_number in all_controller_and_lun_numbers:
             scsi_dir = os.path.join(azure_links_dir, self._SCSI_PREFIX + str(controller_id))
             symlink = os.path.join(scsi_dir, self._LUN_PREFIX + str(lun_number))
-            if self.is_parent_of_any(os.path.realpath(symlink), dev_real_paths):
+            if self.is_parent_of_any(os.path.realpath(symlink), dev_items_real_paths):
                 list_devices.append((controller_id, lun_number))
 
         return list_devices

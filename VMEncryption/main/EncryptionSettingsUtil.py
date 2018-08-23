@@ -165,13 +165,16 @@ class EncryptionSettingsUtil(object):
 
         all_device_items = existing_crypt_dev_items + extra_device_items
 
+        all_dev_items_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in all_device_items])
+
+        self.logger.log("device items which will be used to find vhds to stamp: {}".format(all_dev_items_real_paths))
+
         root_device_path = os.path.realpath(os.path.join(CommonVariables.azure_symlinks_dir, "root"))
-        root_vhd_needs_stamping = disk_util.is_parent_of_any(root_device_path,
-                                                             set([disk_util.get_device_path(di.name) for di in all_device_items]))
+        root_vhd_needs_stamping = disk_util.is_parent_of_any(root_device_path, all_dev_items_real_paths)
 
         # Get disk data from disk_util
         # We get a list of tuples i.e. [(scsi_controller_id, lun_number),.]
-        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(all_device_items)
+        data_disk_controller_ids_and_luns = disk_util.get_azure_data_disk_controller_and_lun_numbers(all_dev_items_real_paths)
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
             return {
