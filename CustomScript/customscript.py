@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#CustomScript extension
+# CustomScript extension
 #
 # Copyright 2014 Microsoft Corporation
 #
@@ -272,7 +272,14 @@ def daemon(hutil):
         if 'wait' in public_settings:
             wait = public_settings.get('wait')
         if 'enableInternalDNSCheck' in public_settings:
-            enable_idns_check = False #strtobool(public_settings.get('enableInternalDNSCheck'))
+            # removed strtobool/distutils dependency, implementation is based on strtobool specification
+            enable_idns_check_setting = public_settings.get('enableInternalDNSCheck')
+            enable_idns_check = True if ((enable_idns_check_setting.lower() == "yes") |
+                                 (enable_idns_check_setting.lower() == "y") |
+                                 (enable_idns_check_setting.lower() == "true") |
+                                 (enable_idns_check_setting.lower() == "t") |
+                                 (enable_idns_check_setting.lower() == "on") |
+                                 (enable_idns_check_setting.lower() == "1")) else False
 
     prepare_download_dir(hutil.get_seq_no())
     retry_count = download_files_with_retry(hutil, retry_count, wait)

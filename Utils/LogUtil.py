@@ -18,6 +18,7 @@
 import os
 import os.path
 import string
+import sys
 
 OutputSize = 4 * 1024
 
@@ -28,8 +29,16 @@ def tail(log_file, output_size = OutputSize):
         log.seek(0, os.SEEK_END)
         log.seek(log.tell() - pos, os.SEEK_SET)
         buf = log.read(output_size)
-        buf = list(filter(lambda x: x in string.printable, buf))
-        return ''.join(buf) # needs review
+        buf = filter(lambda x: x in string.printable, buf)
+
+        # encoding works different for between interpreter version, we are keeping separate implementation to ensure
+        # backward compatibility
+        if sys.version_info[0] == 3:
+            buf = ''.join(list(buf)).encode('ascii', 'ignore').decode("ascii", "ignore")
+        elif sys.version_info[0] == 2:
+            buf = buf.decode("ascii", "ignore")
+
+        return buf
 
 
 def get_formatted_log(summary, stdout, stderr):

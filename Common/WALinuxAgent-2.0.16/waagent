@@ -2711,12 +2711,20 @@ class Logger(object):
         if self.file_path:
             try:
                 with open(self.file_path, "a") as F :    
-                    message = list(filter(lambda x : x in string.printable, message))
-                    F.write(str(''.join(message)) + "\n") # needs review
+                    message = filter(lambda x : x in string.printable, message)
+
+                    # encoding works different for between interpreter version, we are keeping separate implementation
+                    # to ensure backward compatibility
+                    if sys.version_info[0] == 3:
+                        message = ''.join(list(message)).encode('ascii', 'ignore').decode("ascii", "ignore")
+                    elif sys.version_info[0] == 2:
+                        message = message.encode('ascii', 'ignore')
+
+                    F.write(message + "\n")
             except IOError as e:
                 pass
 
-    def LogToCon(self,message):
+    def LogToCon(self, message):
         """
         Write 'message' to /dev/console.
         This supports serial port logging if the /dev/console
@@ -2724,9 +2732,17 @@ class Logger(object):
         """
         if self.con_path:
             try:
-                with open(self.con_path, "w") as C :
-                    message = list(filter(lambda x : x in string.printable, message))
-                    C.write(str(''.join(message)) + "\n") # needs review
+                with open(self.con_path, "w") as C:
+                    message = filter(lambda x: x in string.printable, message)
+
+                    # encoding works different for between interpreter version, we are keeping separate implementation
+                    # to ensure backward compatibility
+                    if sys.version_info[0] == 3:
+                        message = ''.join(list(message)).encode('ascii', 'ignore').decode("ascii", "ignore")
+                    elif sys.version_info[0] == 2:
+                        message = message.encode('ascii', 'ignore')
+
+                    C.write(message + "\n")
             except IOError as e:
                 pass
 
