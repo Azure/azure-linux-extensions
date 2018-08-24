@@ -25,6 +25,7 @@ import uuid
 from Common import CommonVariables
 from HttpUtil import HttpUtil
 
+
 class EncryptionSettingsUtil(object):
     """ Provides capability to update encryption settings via wire server """
 
@@ -139,7 +140,7 @@ class EncryptionSettingsUtil(object):
         for key in values:
             value = values[key]
             if value is not None:
-               array.append({
+                array.append({
                     "Name": key,
                     "Value": value
                     })
@@ -165,7 +166,7 @@ class EncryptionSettingsUtil(object):
 
         all_device_items = existing_crypt_dev_items + extra_device_items
 
-        all_dev_items_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in all_device_items])
+        all_dev_items_real_paths = set([os.path.realpath(disk_util.get_device_path(di.name)) for di in all_device_items])
 
         self.logger.log("device items which will be used to find vhds to stamp: {}".format(all_dev_items_real_paths))
 
@@ -192,7 +193,7 @@ class EncryptionSettingsUtil(object):
                     }]
                 }
 
-        data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+        data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
         if root_vhd_needs_stamping:
@@ -233,7 +234,7 @@ class EncryptionSettingsUtil(object):
 
         return
 
-    def post_to_wireserver(self, data):        
+    def post_to_wireserver(self, data):
         """ Request EnableEncryption operation on settings file via wire server """
         self.write_settings_file(data)
         if not os.path.isfile(self.get_settings_file_path()):
@@ -262,7 +263,7 @@ class EncryptionSettingsUtil(object):
             raise Exception("no response from encryption settings update request")
 
     def clear_encryption_settings(self, disk_util):
-        """ 
+        """
         Clear settings by calling DisableEncryption operation via wire server
 
         finds all azure data disks and clears their encryption settings
@@ -291,7 +292,7 @@ class EncryptionSettingsUtil(object):
                     }]
                 }
 
-        data_disks_settings_data = [ controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+        data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
         data = {"DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
