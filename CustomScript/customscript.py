@@ -27,7 +27,6 @@ import traceback
 
 from azure.storage import BlobService
 from codecs import *
-# from distutils.util import strtobool # will need to be fixed
 from Utils.WAAgentUtil import waagent
 
 import Utils.HandlerUtil as Util
