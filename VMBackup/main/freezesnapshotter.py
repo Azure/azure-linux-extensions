@@ -210,7 +210,7 @@ class FreezeSnapshotter(object):
                             for blob_snapshot_info in blob_snapshot_info_array:
                                 if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None and ("The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage):
                                     run_result = CommonVariables.FailedSnapshotLimitReached
-                                    run_status = 'FailedSnapshotLimitReached'
+                                    run_status = 'error'
                                     error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
 
                         self.logger.log(error_msg, True, 'Error')
