@@ -212,6 +212,8 @@ class FreezeSnapshotter(object):
                                     run_result = CommonVariables.FailedSnapshotLimitReached
                                     run_status = 'error'
                                     error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
+                                    self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
 
                         self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
