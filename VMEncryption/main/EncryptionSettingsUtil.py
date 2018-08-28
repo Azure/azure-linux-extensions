@@ -19,6 +19,7 @@ import json
 import os
 import socket
 import re
+import time
 
 from shutil import copyfile
 import uuid
@@ -242,25 +243,36 @@ class EncryptionSettingsUtil(object):
                 'Disk encryption settings file not found: ' + self.get_settings_file_path())
 
         http_util = HttpUtil(self.logger)
-        result = http_util.Call(method='POST',
-                                http_uri=CommonVariables.wireserver_endpoint,
-                                headers=CommonVariables.wireprotocol_msg_headers,
-                                data=CommonVariables.wireprotocol_msg_template_v2.format(
-                                    settings_file_name=self.get_settings_file_name()),
-                                use_https=False)
 
-        if result is not None:
-            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
+        retry_count_max = 3
+        retry_count = 0
+        while retry_count < retry_count_max:
+            try:
+                result = http_util.Call(method='POST',
+                                        http_uri=CommonVariables.wireserver_endpoint,
+                                        headers=CommonVariables.wireprotocol_msg_headers,
+                                        data=CommonVariables.wireprotocol_msg_template_v2.format(
+                                            settings_file_name=self.get_settings_file_name()),
+                                        use_https=False)
 
-            result_content = result.read()
-            self.logger.log("result_content is {0}".format(result_content))
+                if result is not None:
+                    self.logger.log("{0} {1}".format(result.status, result.getheaders()))
 
-            http_util.connection.close()
-            if result.status != httplib.OK and result.status != httplib.ACCEPTED:
-                raise Exception("encryption settings update request was not accepted")
-            return
-        else:
-            raise Exception("no response from encryption settings update request")
+                    result_content = result.read()
+                    self.logger.log("result_content is {0}".format(result_content))
+
+                    http_util.connection.close()
+                    if result.status != httplib.OK and result.status != httplib.ACCEPTED:
+                        raise Exception("encryption settings update request was not accepted")
+                    return
+                else:
+                    raise Exception("no response from encryption settings update request")
+            except Exception as e:
+                if retry_count < retry_count_max:
+                    retry_count += 1
+                    time.sleep(5) # sleep for 5 seconds before retrying.
+                else:
+                    raise e
 
     def clear_encryption_settings(self, disk_util):
         """
