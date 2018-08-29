@@ -415,6 +415,9 @@ def daemon():
             if(hasattr(global_error_result,'errno') and global_error_result.errno == 2):
                 run_result = CommonVariables.error_12
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_12)
+            elif(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter] in str(global_error_result)):
+                run_result = CommonVariables.error_parameter
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
             elif(para_parser is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
@@ -523,7 +526,7 @@ def enable():
             log_upload_thread.join(60)
         file_status_upload_thread.join(30)
         blob_status_upload_thread.join(60)
-        start_daemon();
+        start_daemon()
         sys.exit(0)
     except Exception as e:
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
@@ -531,7 +534,13 @@ def enable():
         global_error_result = e
         temp_status= 'error'
         temp_result=CommonVariables.error
-        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
+        temp_errorCode=ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error
+
+        if(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter] in str(global_error_result)):
+            temp_result = CommonVariables.error_parameter
+            temp_errorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter
+        
+        hutil.SetExtErrorCode(temp_errorCode)
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
