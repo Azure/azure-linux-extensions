@@ -62,6 +62,7 @@ class ParameterParser(object):
         
         if(self.customSettings != None and self.customSettings != ''):
             try:
+                backup_logger.log("customSettings: " + str(self.customSettings), True,)
                 self.customSettingsObj = json.loads(self.customSettings)
                 if ('diskLunList' in self.customSettingsObj.keys() and self.customSettingsObj['diskLunList'] != None):
                     self.includeLunList = self.customSettingsObj['diskLunList']
