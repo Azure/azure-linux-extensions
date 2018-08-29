@@ -39,6 +39,7 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
+from dhcpHandler import DhcpHandler
 
 class FreezeSnapshotter(object):
     """description of class"""
@@ -53,6 +54,18 @@ class FreezeSnapshotter(object):
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
         self.taskId = self.para_parser.taskId
+        self.hostIp = '168.63.129.16'
+
+        # fetching wireserver IP from DHCP
+        self.dhcpHandlerObj = None
+        try:
+            self.dhcpHandlerObj = DhcpHandler(self.logger)
+            self.hostIp = self.dhcpHandlerObj.getHostEndoint()
+        except Exception as e:
+            errorMsg = "Failed to get hostIp from DHCP with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, True, 'Error')
+            self.hostIp = '168.63.129.16'
+        self.logger.log( "hostIp : " + self.hostIp)
 
         self.takeSnapshotFrom = para_parser.customSettingsObj['takeSnapshotFrom']
         self.isManaged = para_parser.customSettingsObj['isManagedVm']
@@ -245,7 +258,7 @@ class FreezeSnapshotter(object):
         all_failed= False
         is_inconsistent =  False
         blob_snapshot_info_array = None
-        snap_shotter = HostSnapshotter(self.logger)
+        snap_shotter = HostSnapshotter(self.logger, self.hostIp)
         pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
@@ -271,10 +284,11 @@ class FreezeSnapshotter(object):
         blob_snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
         HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
+
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()
         if(run_result == CommonVariables.success):
-            snap_shotter = HostSnapshotter(self.logger)
+            snap_shotter = HostSnapshotter(self.logger, self.hostIp)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
             blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, self.taskId)
