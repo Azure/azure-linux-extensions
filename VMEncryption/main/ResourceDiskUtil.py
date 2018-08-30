@@ -33,9 +33,9 @@ class ResourceDiskUtil(object):
 
     RD_KEY_FILE = CommonVariables.PassphraseFileNameKey
     RD_MOUNT_POINT = '/mnt/resource'
-    RD_BASE_DEV_PATH = '/dev/disk/azure/resource'
-    RD_DEV_PATH = '/dev/disk/azure/resource-part1'
-    DM_PREFIX = '/dev/mapper/'
+    RD_BASE_DEV_PATH = os.path.join(CommonVariables.azure_symlinks_dir, 'resource')
+    RD_DEV_PATH = os.path.join(CommonVariables.azure_symlinks_dir, 'resource-part1')
+    DM_PREFIX = CommonVariables.dev_mapper_root
     # todo: consolidate this and other key file path references
     # (BekUtil.py, ExtensionParameter.py, and dracut patches)
     RD_KEY_FILE = '/mnt/azure_bek_disk/LinuxPassPhraseFileName'
@@ -48,7 +48,7 @@ class ResourceDiskUtil(object):
         self.executor = CommandExecutor(self.logger)
         self.disk_util = DiskUtil(hutil=self.hutil, patching=distro_patcher, logger=self.logger, encryption_environment=None)
         self.mapper_name = str(uuid.uuid4())
-        self.mapper_path = self.DM_PREFIX + self.mapper_name
+        self.mapper_path = os.path.join(self.DM_PREFIX, self.mapper_name)
 
     def is_encrypt_format_all(self):
         """ return true if current encryption operation is EncryptFormatAll """

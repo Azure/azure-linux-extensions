@@ -50,6 +50,12 @@ class DiskUtil(object):
 
         self.command_executor = CommandExecutor(self.logger)
 
+        self._LUN_PREFIX = "lun"
+        self._SCSI_PREFIX = "scsi"
+
+    def get_osmapper_path(self):
+        return os.path.join(CommonVariables.dev_mapper_root, CommonVariables.osmapper_name)
+
     def copy(self, ongoing_item_config, status_prefix=''):
         copy_task = TransactionalCopyTask(logger=self.logger,
                                           disk_util=self,
@@ -109,187 +115,6 @@ class DiskUtil(object):
 
         return crypt_item
 
-    def get_children(self, parent):
-        command = 'lsblk -P -o NAME ' + parent
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-        matches = re.findall(r'\"(.+?)\"', output)
-        children = ["/dev/"+m for m in matches]
-        children.remove(parent)
-        return children
-
-    def get_device_names(self):
-        command = 'lsblk -P -o NAME'
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-        matches = re.findall(r'\"(.+?)\"', output)
-        names = ["/dev/"+m for m in matches]
-        return names
-
-    def get_topology(self):
-        # iteratively build a list of device names and closest parent
-        t = {}
-        devices = self.get_device_names()
-        for device in devices:
-            t[device] = ''
-        for parent in devices:
-            children = self.get_children(parent)
-            for child in children:
-                t[child] = parent
-        return t
-
-    def get_simulated_pkname_output(self):
-        # return a string simulating the output of lsblk with PKNAME
-        # as a fall back mechanism on older versions of lsblk
-
-        command = 'lsblk -P -o NAME,FSTYPE,MOUNTPOINT'
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(
-            command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-        output = proc_comm.stdout
-
-        t = self.get_topology()
-        pk_output = ''
-        for line in output.splitlines():
-            pkname = ''
-            name = ''
-            fstype = ''
-            mp = ''
-            
-            match = re.search('NAME=\"(.+?)\"', line)
-            if match:
-                name = "/dev/"+match.group(1)
-                pkname = t[name]
-            
-            match = re.search('FSTYPE=\"(.+?)\"', line)
-            if match:
-                fstype = match.group(1)
-            
-            match = re.search('MOUNTPOINT=\"(.+?)\"', line)
-            if match:
-                mp = match.group(1)
-            
-            line = 'PKNAME="' + pkname + '" NAME="' + name + \
-                '" FSTYPE="' + fstype + '" MOUNTPOINT="' + mp + '"\n'
-            pk_output += line
-        return pk_output
-
-    def get_lsblk_output(self):
-        try:                 
-            lsblk_command = "lsblk -p -P -o PKNAME,NAME,FSTYPE,MOUNTPOINT"
-            proc_comm = ProcessCommunicator()
-            self.command_executor.Execute(
-                lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            lsblk_out = proc_comm.stdout
-        except:
-            # derive parent structure programmatically if lsblk version doesnt have -p
-            lsblk_out = self.get_simulated_pkname_output()
-        
-        return lsblk_out
-
-
-    def get_lsblk_tree(self):
-        """
-        Parse lsblk output, link child items to parents, and return constructed tree
-            
-        Note: using dumps() on the output of this method will create a JSON string
-        in the same format as versions of lsblk including the --json output option
-        (eg., lsblk -p -o NAME,FSTYPE,MOUNTPOINT --json)
-        """
-        def add_child(items, child):
-            if not 'pkname' in child:
-                items.append(child)
-            else:
-                for item in items:
-                    if item['name'] == child['pkname']:
-                        child.pop('pkname')
-                        if not 'children' in item:
-                            item['children'] = []
-                        item['children'].append(child)
-                        break
-                    elif 'children' in item:
-                        # recurse until parent identified
-                        item['children'] = add_child(item['children'], child)
-            return items
-
-        def get_child(line):
-                if line:
-                    child = {}
-                    for kvpstr in line.split():
-                        kvp = kvpstr.split('=')
-                        if kvp[0]:
-                            key = kvp[0].lower()
-                        if kvp[1] and kvp[1].strip('"'):
-                            value = kvp[1].strip('"')
-                        else:
-                            value = None
-
-                        # add pkname element only if nonempty
-                        if key == 'pkname':
-                            if value:
-                                child[key] = value
-                        else:
-                            child[key] = value
-                    return child
-                else:
-                    return None
-
-        lsblk_out = self.get_lsblk_output()
-
-        items = []
-        for line in lsblk_out.splitlines():
-                child = get_child(line)
-                items = add_child(items, child)
-        return items
-
-
-    def get_azure_vhd_dev_items(self, device_items):
-        """
-        Returns all the underlying azure-vhd level device items for given device items (that may be "children" of the vhds)
-
-        Gets a list of dev_items say ("/dev/sdd","/dev/sdc1","/dev/mapper/vg0-lv0")
-        And figures out which Azure VHDs are covered by these device items and returns their dev_items (in the below example: [/dev/sdb, /dev/sdc, /dev/sdd])
-
-        In order to do this we construct an lsblk tree object using get_lsblk_tree method to identify who is who's "child".
-        """
-        lsblk_tree = self.get_lsblk_tree()
-
-        # Let's set up a set of realpaths of each dev_items's real_path
-        real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in device_items])
-
-        def check_device(device_dict):
-            """
-            Recursively check a device to see if any of the children's realpaths matches that in the set
-            """
-
-            if os.path.realpath(device_dict["name"]) in real_paths:
-                return True
-            if "children" in device_dict:
-                for child in device_dict["children"]:
-                    if check_device(child):
-                        return True
-            return False
-
-        azure_vhd_real_dev_paths = set()
-
-        for root_dev in lsblk_tree:
-            if check_device(root_dev):
-                azure_vhd_real_dev_paths.add(root_dev["name"])
-
-        azure_vhd_dev_items = []
-        for real_dev_path in azure_vhd_real_dev_paths:
-            devices = self.get_device_items(real_dev_path)
-            # its probably just device[0] but doesn't hurt to check
-            for device in devices:
-                if self.get_device_path(device.name) == real_dev_path :
-                    azure_vhd_dev_items.append(device)
-                    break
-        return azure_vhd_dev_items
-
     def consolidate_azure_crypt_mount(self, passphrase_file):
         """
         Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
@@ -339,7 +164,7 @@ class DiskUtil(object):
                     self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     continue
 
-                return_code = self.mount_filesystem(os.path.join("/dev/mapper/", crypt_item.mapper_name), temp_mount_point)
+                return_code = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), temp_mount_point)
                 if return_code != CommonVariables.process_success:
                     self.logger.log(msg=('Mount failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     # this can happen with disks without file systems (lvm, raid or simply empty disks)
@@ -369,7 +194,6 @@ class DiskUtil(object):
                 self.umount(temp_mount_point)
                 self.luks_close(crypt_item.mapper_name)
 
-
     def get_crypt_items(self):
         """
         Reads the central azure_crypt_mount file and parses it into an array of CryptItem()s
@@ -392,49 +216,51 @@ class DiskUtil(object):
 
                     crypt_item = self.parse_azure_crypt_mount_line(line)
 
-                    if crypt_item.mount_point == "/":
+                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name :
                         rootfs_crypt_item_found = True
 
                     crypt_items.append(crypt_item)
 
-            encryption_status = json.loads(self.get_encryption_status())
+        encryption_status = json.loads(self.get_encryption_status())
 
-            if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
-                crypt_item = CryptItem()
-                crypt_item.mapper_name = "osencrypt"
+        if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+            # If the OS partition looks encrypted but we didn't find an OS partition in the crypt_mount_file
+            # So we will create a CryptItem on the fly and add it to the output
+            crypt_item = CryptItem()
+            crypt_item.mapper_name = CommonVariables.osmapper_name
 
+            proc_comm = ProcessCommunicator()
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
+
+            if grep_result == 0:
+                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+            else:
                 proc_comm = ProcessCommunicator()
-                grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+                self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
-                if grep_result == 0:
-                    crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
-                else:
-                    proc_comm = ProcessCommunicator()
-                    self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
+                for line in proc_comm.stdout.splitlines():
+                    if CommonVariables.osmapper_name in line:
+                        majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
+                        src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
+                        crypt_item.dev_path = '/dev/' + src_device.name
+                        break
 
-                    for line in proc_comm.stdout.splitlines():
-                        if 'osencrypt' in line:
-                            majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                            src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
-                            crypt_item.dev_path = '/dev/' + src_device.name
-                            break
+            rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
+            crypt_item.file_system = rootfs_dev["fs"]
 
-                rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
-                crypt_item.file_system = rootfs_dev["fs"]
+            if not crypt_item.dev_path:
+                raise Exception("Could not locate block device for rootfs")
 
-                if not crypt_item.dev_path:
-                    raise Exception("Could not locate block device for rootfs")
+            crypt_item.luks_header_path = "/boot/luks/osluksheader"
 
-                crypt_item.luks_header_path = "/boot/luks/osluksheader"
+            if not os.path.exists(crypt_item.luks_header_path):
+                crypt_item.luks_header_path = crypt_item.dev_path
 
-                if not os.path.exists(crypt_item.luks_header_path):
-                    crypt_item.luks_header_path = crypt_item.dev_path
+            crypt_item.mount_point = "/"
+            crypt_item.uses_cleartext_key = False
+            crypt_item.current_luks_slot = -1
 
-                crypt_item.mount_point = "/"
-                crypt_item.uses_cleartext_key = False
-                crypt_item.current_luks_slot = -1
-
-                crypt_items.append(crypt_item)
+            crypt_items.append(crypt_item)
 
         return crypt_items
 
@@ -475,13 +301,19 @@ class DiskUtil(object):
     def remove_crypt_item(self, crypt_item, backup_folder=None):
         try:
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-                disk_util.consolidate_azure_crypt_mount(passphrase_file)
-                mount_lines = []
+                filtered_mount_lines = []
 
                 with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-                    mount_lines = f.readlines()
+                    for line in f:
+                        if not line.strip():
+                            continue
 
-                filtered_mount_lines = filter(lambda line: self.parse_azure_crypt_mount_line(line).mapper_name != crypt_item.mapper_name, mount_lines)
+                        parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
+                        if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
+                            self.logger.log("Removing crypt mount entry: {0}".format(line))
+                            continue
+
+                        filtered_mount_lines.append(line)
 
                 with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
                     wf.write(''.join(filtered_mount_lines))
@@ -770,7 +602,7 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
+        mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
         self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
 
     def swapoff(self):
@@ -813,7 +645,7 @@ class DiskUtil(object):
 
         os_drive_encrypted = False
         data_drives_found = False
-        data_drives_encrypted = True
+        all_data_drives_encrypted = True
         for mount_item in mount_items:
             if mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
                 not "/mnt" == mount_item["dest"] and \
@@ -826,24 +658,25 @@ class DiskUtil(object):
 
                 data_drives_found = True
 
-                if not "/dev/mapper" in mount_item["src"]:
+                if not CommonVariables.dev_mapper_root in mount_item["src"]:
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
-                    data_drives_encrypted = False
+                    all_data_drives_encrypted = False
 
             if self.is_os_disk_lvm():
-                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
+                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep {0}'.format(self.get_osmapper_path()),
+                                                                  suppress_logging=True)
                 if grep_result == 0 and not os.path.exists('/volumes.lvm'):
                     self.logger.log("OS PV is encrypted")
                     os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
-                "/dev/mapper" in mount_item["src"] or \
+                CommonVariables.dev_mapper_root in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
     
         if not data_drives_found:
             encryption_status["data"] = "NotMounted"
-        elif data_drives_encrypted:
+        elif all_data_drives_encrypted:
             encryption_status["data"] = "Encrypted"
         if os_drive_encrypted:
             encryption_status["os"] = "Encrypted"
@@ -858,12 +691,14 @@ class DiskUtil(object):
 
             if volume_type == CommonVariables.VolumeTypeData.lower() or \
                 volume_type == CommonVariables.VolumeTypeAll.lower():
-                encryption_status["data"] = "EncryptionInProgress"
+                if data_drives_found and not all_data_drives_encrypted:
+                    encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                 volume_type == CommonVariables.VolumeTypeAll.lower():
-                encryption_status["os"] = "EncryptionInProgress"
-        elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
+                 if not os_drive_encrypted:
+                    encryption_status["os"] = "EncryptionInProgress"
+        elif os.path.exists(self.get_osmapper_path()) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
         return json.dumps(encryption_status)
@@ -903,39 +738,13 @@ class DiskUtil(object):
 
         return sdx_path
 
-    def query_dev_uuid_path_by_sdx_path(self, sdx_path):
-        """
-        the behaviour is if we could get the uuid, then return, if not, just return the sdx.
-        """
-        self.logger.log("querying the sdx path of:{0}".format(sdx_path))
-        #blkid path
-        p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        identity, err = p.communicate()
-        identity = identity.lower()
-        self.logger.log("blkid output is: \n" + identity)
-        uuid_pattern = 'uuid="'
-        index_of_uuid = identity.find(uuid_pattern)
-        identity = identity[index_of_uuid + len(uuid_pattern):]
-        index_of_quote = identity.find('"')
-        uuid = identity[0:index_of_quote]
-        if uuid.strip() == "":
-            #TODO this is strange?  BUGBUG
-            return sdx_path
-        return os.path.join("/dev/disk/by-uuid/", uuid)
-
-    def query_dev_uuid_path_by_scsi_number(self, scsi_number):
-        # find the scsi using the filter
-        # TODO figure out why the disk formated using fdisk do not have uuid
-        sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
-        return self.query_dev_uuid_path_by_sdx_path(sdx_path)
-
     def get_device_path(self, dev_name):
         device_path = None
 
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
-        elif os.path.exists("/dev/mapper/" + dev_name):
-            device_path = "/dev/mapper/" + dev_name
+        elif os.path.exists(os.path.join(CommonVariables.dev_mapper_root, dev_name)):
+            device_path = os.path.join(CommonVariables.dev_mapper_root, dev_name)
 
         return device_path
 
@@ -978,7 +787,7 @@ class DiskUtil(object):
 
     def get_block_device_to_azure_udev_table(self):
         table = {}
-        azure_links_dir = '/dev/disk/azure'
+        azure_links_dir = CommonVariables.azure_symlinks_dir
         
         if not os.path.exists(azure_links_dir):
             return table
@@ -994,20 +803,29 @@ class DiskUtil(object):
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
 
-    def get_azure_data_disk_controller_and_lun_numbers(self, vhd_dev_items):
+    def is_parent_of_any(self, parent_dev_path, children_dev_path_set):
         """
-        Return the controller ids and lun numbers for data disks that show up in the vhd_dev_items
+        check if the device whose path is parent_dev_path is actually a parent of any of the children in children_dev_path_set
+        All the paths need to be "realpaths" (not symlinks)
+        """
+        actual_children_dev_items = self.get_device_items(parent_dev_path)
+        actual_children_dev_path_set = set([os.path.realpath(self.get_device_path(di.name)) for di in actual_children_dev_items])
+        # the sets being disjoint would mean the candidate parent is not parent of any of the candidate children. So we return the opposite of that
+        return not actual_children_dev_path_set.isdisjoint(children_dev_path_set)
+
+    def get_all_azure_data_disk_controller_and_lun_numbers(self):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
         list_devices = []
-        azure_links_dir = '/dev/disk/azure'
+        azure_links_dir = CommonVariables.azure_symlinks_dir
 
-        vhd_dev_real_paths = set([os.path.realpath(self.get_device_path(di.name)) for di in vhd_dev_items])
         if not os.path.exists(azure_links_dir):
             return list_devices
 
         for top_level_item in os.listdir(azure_links_dir):
             top_level_item_full_path = os.path.join(azure_links_dir, top_level_item)
-            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith("scsi"):
+            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith(self._SCSI_PREFIX):
                 # this works because apparently all data disks go int a scsi[x] where x is one of [1,2,3,4]
                 try:
                     controller_id = int(top_level_item[4:]) # strip the first 4 letters of the folder
@@ -1017,15 +835,31 @@ class DiskUtil(object):
 
                 for symlink in os.listdir(top_level_item_full_path):
                     full_path = os.path.join(top_level_item_full_path, symlink)
-                    if os.path.realpath(full_path) not in vhd_dev_real_paths:
-                        continue
-                    if symlink.startswith("lun"):
+                    if symlink.startswith(self._LUN_PREFIX):
                         try:
                             lun_number = int(symlink[3:])
                         except ValueError:
                             # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
                             continue # so just ignore it
                         list_devices.append((controller_id, lun_number))
+        return list_devices
+
+    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items_real_paths):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
+        """
+
+        all_controller_and_lun_numbers = self.get_all_azure_data_disk_controller_and_lun_numbers()
+
+        list_devices = []
+        azure_links_dir = CommonVariables.azure_symlinks_dir
+
+        for controller_id, lun_number in all_controller_and_lun_numbers:
+            scsi_dir = os.path.join(azure_links_dir, self._SCSI_PREFIX + str(controller_id))
+            symlink = os.path.join(scsi_dir, self._LUN_PREFIX + str(lun_number))
+            if self.is_parent_of_any(os.path.realpath(symlink), dev_items_real_paths):
+                list_devices.append((controller_id, lun_number))
+
         return list_devices
 
     def get_device_items_sles(self, dev_path):
