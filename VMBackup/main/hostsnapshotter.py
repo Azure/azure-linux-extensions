@@ -79,10 +79,15 @@ class HostSnapshotter(object):
                 self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(httpResp.status))
-                    if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
+                    if(int(httpResp.status) == 200 or int(httpResp.status) == 201) and (responseBody == None or responseBody == "") :
+                        self.logger.log("responseBody is empty but http status code is success")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(557))
+                        all_failed = True
+                    elif(int(httpResp.status) == 200 or int(httpResp.status) == 201):
                         blob_snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
                         HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(556))
+                        all_failed = True
                 else:
                     # HttpCall failed
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(555))
@@ -128,7 +133,11 @@ class HostSnapshotter(object):
                 if(httpResp != None):
                     statusCode = httpResp.status
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
-                    if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
+                    if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
+                        self.logger.log("responseBody is empty but http status code is success")
+                        statusCode = 557
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
+                    elif(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
                         self.logger.log("BHS is not runnning on host machine")
                         statusCode = 556
                         HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
