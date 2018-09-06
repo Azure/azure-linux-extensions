@@ -82,4 +82,3 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
-

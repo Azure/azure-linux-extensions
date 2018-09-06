@@ -541,6 +541,9 @@ class HandlerUtility:
         if "hostStatusCodeDoSnapshot" in HandlerUtility.telemetry_data.keys():
             snapshotCreatorInfo = "{0}{1}={2}, ".format(snapshotCreatorInfo , "hostStatusCodeDoSnapshot" , HandlerUtility.telemetry_data["hostStatusCodeDoSnapshot"])
 
+        if "statusBlobUploadError" in HandlerUtility.telemetry_data.keys():
+            message = "{0} {1}={2}, ".format(message , "statusBlobUploadError" , HandlerUtility.telemetry_data["statusBlobUploadError"])
+
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
         self.convert_telemetery_data_to_bcm_serializable_format()
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message + snapshotCreatorInfo, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
