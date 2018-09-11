@@ -338,7 +338,7 @@ class AbstractDistro(object):
         return 0
     
     def changePass(self,user,password):
-        return RunSendStdin("chpasswd",(user + ":" + password + "\n"))
+        return RunSendStdin("chpasswd",(user + ":" + password + "\n"),use_shell=False)
     
     def load_ata_piix(self):
         return WaAgent.TryLoadAtapiix()
@@ -2181,7 +2181,7 @@ def RunGetOutput(cmd,chk_err=True):
         return e.returncode,e.output.decode('latin-1')
     return 0,output.decode('latin-1')
 
-def RunSendStdin(cmd,input,chk_err=True):
+def RunSendStdin(cmd,input,chk_err=True,use_shell=True):
     """
     Wrapper for subprocess.Popen.
     Execute 'cmd', sending 'input' to STDIN of 'cmd'.
@@ -2190,7 +2190,7 @@ def RunSendStdin(cmd,input,chk_err=True):
     """
     LogIfVerbose(cmd+input)
     try:                                     
-        me=subprocess.Popen([cmd], shell=True, stdin=subprocess.PIPE,stderr=subprocess.STDOUT,stdout=subprocess.PIPE)
+        me=subprocess.Popen([cmd], shell=use_shell, stdin=subprocess.PIPE,stderr=subprocess.STDOUT,stdout=subprocess.PIPE)
         output=me.communicate(input)
     except OSError , e :
         if chk_err :

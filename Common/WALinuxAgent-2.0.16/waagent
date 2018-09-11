@@ -2075,7 +2075,7 @@ class FreeBSDDistro(AbstractDistro):
         return 0
 
     def changePass(self, user, password):
-        return RunSendStdin("pw usermod " + user + " -h 0 ", password, log_cmd=False)
+        return RunSendStdin("pw usermod " + user + " -h 0 ", password, log_cmd=False, use_shell=False)
 
     def load_ata_piix(self):
         return 0
@@ -2533,7 +2533,7 @@ def RunGetOutput(cmd, chk_err=True, log_cmd=True):
     return 0, output.decode('latin-1')
 
 
-def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
+def RunSendStdin(cmd, input, chk_err=True, log_cmd=True, use_shell=True):
     """
     Wrapper for subprocess.Popen.
     Execute 'cmd', sending 'input' to STDIN of 'cmd'.
@@ -2543,7 +2543,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
     if log_cmd:
         LogIfVerbose(str(cmd) + str(input))
     try:
-        me = subprocess.Popen([cmd], shell=True, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,
+        me = subprocess.Popen([cmd], shell=use_shell, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,
                               stdout=subprocess.PIPE)
         output = me.communicate(input)
     except OSError as e:

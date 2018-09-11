@@ -101,6 +101,13 @@ def enable():
             hutil.log("Succeeded in reset sshd_config.")
 
         if remove_user:
+            if re.match("^[a-z][-a-z0-9_]*$", remove_user) is None:
+                waagent.AddExtensionEvent(name=hutil.get_name(),
+                                          op=waagent.WALAEventOperation.Enable,
+                                          isSuccess=False,
+                                          message="(03002)Argument error, invalid remove_user")
+                raise Exception("invalid remove_user")
+
             waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="remove-user")
             _remove_user_account(remove_user, hutil)
 
@@ -184,6 +191,13 @@ def _set_user_account_pub_key(protect_settings, hutil):
         return
 
     user_name = protect_settings['username']
+    if re.match("^[a-z][-a-z0-9_]*$", user_name) is None:
+        waagent.AddExtensionEvent(name=hutil.get_name(),
+                                  op=waagent.WALAEventOperation.Enable,
+                                  isSuccess=False,
+                                  message="(03002)Argument error, invalid username")
+        raise Exception("invalid username")
+
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
     expiration = protect_settings.get('expiration')
