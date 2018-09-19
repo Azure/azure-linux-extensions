@@ -49,7 +49,7 @@ class CheckUtil(object):
         minsize = 7000000
         memtotal = int(os.popen("grep MemTotal /proc/meminfo | grep -o -E [0-9]+").read())
         if memtotal < minsize:
-            self.logger.log('WARNING: total memory [' + memtotal + 'kb] is less than 7GB')
+            self.logger.log('WARNING: total memory [' + str(memtotal) + 'kb] is less than 7GB')
             return True
         return False
 
