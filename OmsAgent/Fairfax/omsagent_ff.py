@@ -514,7 +514,7 @@ def parse_context(operation):
             and 'Utils.HandlerUtil' in sys.modules):
         try:
             isTelemetry = False
-            if operation == 'Telemetry'
+            if (operation == 'Telemetry'):
                 isTelemetry = True
 
             hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, fromTelemetry=isTelemetry)

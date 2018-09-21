@@ -219,7 +219,7 @@ class HandlerUtility:
         self._context._log_dir= handler_env['handlerEnvironment']['logFolder']
         
         logFileName = 'extension.log'
-        if (self._isTelemetry == True)
+        if (self._isTelemetry == True):
             logFileName = 'watcher.log'
 
         self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],logFileName)

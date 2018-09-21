@@ -528,7 +528,7 @@ def parse_context(operation):
         try:
             
             isTelemetry = False
-            if operation == 'Telemetry'
+            if (operation == 'Telemetry'):
                 isTelemetry = True
 
             hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, fromTelemetry=isTelemetry)
