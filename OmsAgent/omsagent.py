@@ -182,7 +182,7 @@ def main():
                                            traceback.format_exc())
 
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)do_parse_context
+    log_and_exit(operation, exit_code, message)
 
 
 def stop_telemetry_process():
@@ -332,7 +332,7 @@ def enable():
 
     if (enableAutomaticManagement is not None
            and enableAutomaticManagement is True):
-        hutil_log_info('enableAutomaticManagement is set to do_parse_contexttrue; the ' \
+        hutil_log_info('enableAutomaticManagement is set to true; the ' \
                        'workspace ID and key will be determined by the OMS ' \
                        'service.')
 
@@ -1343,7 +1343,7 @@ def get_access_token(tenant_id, resource):
 
     if (oauth_response_json is not None
             and 'access_token' in oauth_response_json):
-        return oauth_response_json['access_token']HUtilObject.log
+        return oauth_response_json['access_token']
     else:
         raise ManagedIdentityExtException('Could not retrieve access token ' \
                                           'in the listening URL response')
