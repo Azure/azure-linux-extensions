@@ -526,7 +526,12 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error)
+            
+            isTelemetry = False
+            if operation == 'Telemetry'
+                isTelemetry = True
+
+            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, fromTelemetry=isTelemetry)
             hutil.do_parse_context(operation)
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
