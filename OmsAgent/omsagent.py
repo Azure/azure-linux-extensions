@@ -182,7 +182,7 @@ def main():
                                            traceback.format_exc())
 
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)
+    log_and_exit(operation, exit_code, message)do_parse_context
 
 
 def stop_telemetry_process():
@@ -332,7 +332,7 @@ def enable():
 
     if (enableAutomaticManagement is not None
            and enableAutomaticManagement is True):
-        hutil_log_info('enableAutomaticManagement is set to true; the ' \
+        hutil_log_info('enableAutomaticManagement is set to do_parse_contexttrue; the ' \
                        'workspace ID and key will be determined by the OMS ' \
                        'service.')
 
@@ -526,7 +526,12 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error)
+            
+            isTelemetry = False
+            if operation == 'Telemetry'
+                isTelemetry = True
+
+            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, fromTelemetry=isTelemetry)
             hutil.do_parse_context(operation)
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
@@ -1338,7 +1343,7 @@ def get_access_token(tenant_id, resource):
 
     if (oauth_response_json is not None
             and 'access_token' in oauth_response_json):
-        return oauth_response_json['access_token']
+        return oauth_response_json['access_token']HUtilObject.log
     else:
         raise ManagedIdentityExtException('Could not retrieve access token ' \
                                           'in the listening URL response')
