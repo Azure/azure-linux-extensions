@@ -9,30 +9,16 @@ PYTHON=""
 ARG="$@"
 
 function find_python(){
-    local python_version=$1
+    local python_exec_command=$1
 
     # Check if there is python defined.
-    which python > /dev/null 2>&1
-    return_code=`echo $?`
-
-    if [[ ${return_code} == 0 ]]
-    then
-        eval ${python_version}="python"
+    if command -v python >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python"
     else
         # Python was not found. Searching for Python3 now.
-        which python3 > /dev/null 2>&1
-        return_code=`echo $?`
-
-        if [[ ${return_code} == 0 ]]
-        then
-            eval ${python_version}="python3"
+        if command -v python >/dev/null 2>&1 ; then
+            eval ${python_exec_command}="python3"
         fi
-    fi
-
-    if [ -z ${python_version} ]
-    then
-        echo "No Python interpreter found on the box" >&2
-        exit 51 # Not Supported
     fi
 }
 

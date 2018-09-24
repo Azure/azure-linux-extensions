@@ -2,11 +2,11 @@
   {
     "version": 1.0,
     "handlerManifest": {
-      "disableCommand": "./shim.sh -disable",
-      "enableCommand": "./shim.sh -enable",
-      "installCommand": "./shim.sh -install",
-      "uninstallCommand": "./shim.sh -uninstall",
-      "updateCommand": "./shim.sh -update",
+      "disableCommand": "shim.sh -disable",
+      "enableCommand": "shim.sh -enable",
+      "installCommand": "shim.sh -install",
+      "uninstallCommand": "shim.sh -uninstall",
+      "updateCommand": "shim.sh -update",
       "rebootAfterInstall": false,
       "reportHeartbeat": false
     }
