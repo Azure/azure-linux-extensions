@@ -81,14 +81,14 @@ class HandlerContext:
         self._seq_no = -1
         self._status_file = None
         self._settings_file = None
-        self._config = None        
+        self._config = None 
         return
 
 class HandlerUtility:
-    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, fromTelemetry = False):
+    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName = 'extension.log'):
         self._log = log
-        self._error = error
-        self._isTelemetry = fromTelemetry
+        self._error = error        
+        self._logFileName = logFileName
         if s_name is None or l_name is None or extension_version is None:
             (l_name, s_name, extension_version) = self._get_extension_info()
 
@@ -218,11 +218,7 @@ class HandlerUtility:
         self._context._config_dir=handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir= handler_env['handlerEnvironment']['logFolder']
         
-        logFileName = 'extension.log'
-        if (self._isTelemetry == True):
-            logFileName = 'watcher.log'
-
-        self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],logFileName)
+        self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],self._logFileName)
         self._change_log_file()
         self._context._status_dir=handler_env['handlerEnvironment']['statusFolder']
         self._context._heartbeat_file=handler_env['handlerEnvironment']['heartbeatFile']

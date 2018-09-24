@@ -527,11 +527,11 @@ def parse_context(operation):
             and 'Utils.HandlerUtil' in sys.modules):
         try:
             
-            isTelemetry = False
+            logFileName = 'extension.log'
             if (operation == 'Telemetry'):
-                isTelemetry = True
+                logFileName = 'watcher.log'
 
-            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, fromTelemetry=isTelemetry)
+            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, logFileName=logFileName)
             hutil.do_parse_context(operation)
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
