@@ -236,14 +236,14 @@ def download_files(hutil):
 def start_daemon(hutil):
     cmd = get_command_to_execute(hutil)
     if cmd:
-        args = [os.path.join(os.getcwd(), __file__), "-daemon"]
+        args = [os.path.join(os.getcwd(), "shim.sh"), "-daemon"]
 
         # This process will start a new background process by calling
-        #     customscript.py -daemon
-        # to run the script and will exit itself immediatelly.
+        #     shim.sh -daemon
+        # to run the script and will exit itself immediately.
 
         # Redirect stdout and stderr to /dev/null. Otherwise daemon process
-        # will throw Broke pipe exeception when parent process exit.
+        # will throw Broke pipe exception when parent process exit.
         devnull = open(os.devnull, 'w')
         subprocess.Popen(args, stdout=devnull, stderr=devnull)
         hutil.do_exit(0, 'Enable', 'transitioning', '0',
