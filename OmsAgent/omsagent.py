@@ -30,6 +30,9 @@ import inspect
 import urllib
 import urllib2
 import watcherutil
+import shutil
+
+from threading import Thread
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -40,7 +43,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.6.0-155.universal.x64.sh'
+BundleFileName = 'omsagent-1.6.1-3.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -57,6 +60,7 @@ OMIServerConfPath = '/etc/opt/omi/conf/omiserver.conf'
 EtcOMSAgentPath = '/etc/opt/microsoft/omsagent/'
 VarOMSAgentPath = '/var/opt/microsoft/omsagent/'
 SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
+ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or
@@ -103,7 +107,7 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 
 # vmResourceId Metadata Service
 VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-08-01'.format(VMResourceIDMetadataHost)
+VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -186,7 +190,7 @@ def main():
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
-    
+
     # kill existing telemetry watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
@@ -194,12 +198,12 @@ def stop_telemetry_process():
                 kill_cmd = "kill " + pids
                 run_command_and_log(kill_cmd)
                 run_command_and_log("rm "+pids_filepath)
-    
+
 def start_telemetry_process():
     """
     Start telemetry process that performs periodic monitoring activities
     :return: None
-    
+
     """
     stop_telemetry_process()
 
@@ -217,14 +221,45 @@ def telemetry():
         f.write(str(py_pid) + '\n')
 
     watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
-    watcher.watch()
 
-def dummy_command():
+    watcher_thread = Thread(target = watcher.watch)
+    self_mon_thread = Thread(target = watcher.monitor_health)
+
+    watcher_thread.start()
+    self_mon_thread.start()
+
+    watcher_thread.join()
+    self_mon_thread.join()
+
+def prepare_update():
     """
-    Do nothing and return 0
+    Copy / move configuration directory to the backup
     """
+
+    # First check if backup directory was previously created for given workspace. 
+    # If it is created with all the files , we need not move the files again. 
+
+    public_settings, _ = get_settings()
+    workspaceId = public_settings.get('workspaceId')
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)        
+    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)        
+    if (not os.path.isdir(etc_move_path)):
+        shutil.move(etc_remove_path, etc_move_path)
+
     return 0
 
+def restore_state(workspaceId):
+    """
+    Copy / move state from backup to the expected location.
+    """
+    try:
+        etc_backup_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
+        etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
+        if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
+            shutil.move(etc_backup_path, etc_final_path)
+    except Exception as e:
+        hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
+       
 
 def install():
     """
@@ -241,6 +276,9 @@ def install():
                                         'provided')
     workspaceId = public_settings.get('workspaceId')
     check_workspace_id(workspaceId)
+
+    # Take the backup of the state for given workspace. 
+    restore_state(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
     # create conflicts by installing the OMSAgent packages
@@ -260,8 +298,8 @@ def install():
     exit_code = run_command_with_retries(cmd, retries = 15,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
+    
     return exit_code
-
 
 def uninstall():
     """
@@ -395,7 +433,7 @@ def enable():
         # to resolve any issues with auto-started processes from --upgrade
         time.sleep(PostOnboardingSleepSeconds)
         run_command_and_log(RestartOMSAgentServiceCommand)
-        
+
         #start telemetry process if enable is successful
         start_telemetry_process()
 
@@ -408,22 +446,17 @@ def remove_workspace_configuration():
     before calling 'upgrade' on new extension version issue.
     In upgrade case, we need workspace configuration to persist when in
     remove case we need all the files be removed.
-
     This method will remove all the files/folders from the workspace path in Etc and Var.
     """
+
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
-
-    for main_dir in [etc_remove_path, var_remove_path]:
-        for root, dirs, files in os.walk(main_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(os.path.join(main_dir))
-    hutil_log_info('Removed Workspace Configuration')
+    
+    shutil.rmtree(etc_remove_path, True)
+    shutil.rmtree(var_remove_path, True)
+    hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
     req = urllib2.Request(VMResourceIDMetadataEndpoint)
@@ -431,7 +464,11 @@ def get_vmresourceid_from_metadata():
 
     try:
         response = json.loads(urllib2.urlopen(req).read())
-        return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+        if response['compute']['vmScaleSetName']:
+            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
+        else:
+            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
+
     except urllib2.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
@@ -496,10 +533,11 @@ operations = {'Disable' : disable,
               'Uninstall' : uninstall,
               'Install' : install,
               'Enable' : enable,
-              # Upgrade is noop since omsagent.py->install() will be called
+              # For update call we will only prepare the update by taking some backup of the state
+              #  since omsagent.py->install() will be called
               # everytime upgrade is done due to upgradeMode =
               # "UpgradeWithInstall" set in HandlerManifest
-              'Update' : dummy_command,
+              'Update' : prepare_update,
               'Telemetry' : telemetry
 }
 
@@ -513,7 +551,12 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error)
+            
+            logFileName = 'extension.log'
+            if (operation == 'Telemetry'):
+                logFileName = 'watcher.log'
+
+            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, logFileName=logFileName)
             hutil.do_parse_context(operation)
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
@@ -530,18 +573,16 @@ def is_vm_supported_for_extension():
     Returns for platform.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match
-    The supported distros of the OMSAgent-for-Linux, as well as Ubuntu 16.10,
-    are allowed to utilize this VM extension. All other distros will get
-    error code 51
+    The supported distros of the OMSAgent-for-Linux are allowed to utilize
+    this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ('5', '6', '7'), # CentOS
-                       'centos' : ('5', '6', '7'), # CentOS
-                       'red hat' : ('5', '6', '7'), # Oracle, RHEL
-                       'oracle' : ('5', '6', '7'), # Oracle
-                       'debian' : ('6', '7', '8', '9'), # Debian
-                       'ubuntu' : ('12.04', '14.04', '15.04', '15.10',
-                                   '16.04', '16.10', '18.04'), # Ubuntu
-                       'suse' : ('11', '12') #SLES
+    supported_dists = {'redhat' : ['6', '7'], # CentOS
+                       'centos' : ['6', '7'], # CentOS
+                       'red hat' : ['6', '7'], # Oracle, RHEL
+                       'oracle' : ['6', '7'], # Oracle
+                       'debian' : ['8', '9'], # Debian
+                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+                       'suse' : ['12'] #SLES
     }
 
     try:

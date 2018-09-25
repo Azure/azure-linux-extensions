@@ -56,7 +56,7 @@ dsc_release = 294
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.70.0.10"
+extension_handler_version = "2.70.0.11"
 
 # DSC-specific Operation
 class Operation:
@@ -175,9 +175,9 @@ def enable():
                 hutil.do_exit(exit_code, 'Enable', 'error', str(exit_code), err_msg)
             
             extension_status_event = "ExtensionRegistration"
-            send_heart_beat_msg_to_agent_service(extension_status_event)
+            response = send_heart_beat_msg_to_agent_service(extension_status_event)
             status_file_path, agent_id, vm_uuid = get_status_message_details()
-            update_statusfile(status_file_path, agent_id, vm_uuid)
+            update_statusfile(status_file_path, agent_id, vm_uuid, response)
             sys.exit(0)
         else:
             file_path = download_file()
@@ -200,9 +200,9 @@ def enable():
                                               isSuccess=True,
                                               message="(03106)Succeeded to apply meta MOF configuration through Pull Mode")
                     extension_status_event = "ExtensionRegistration"
-                    send_heart_beat_msg_to_agent_service(extension_status_event)
+                    response = send_heart_beat_msg_to_agent_service(extension_status_event)
                     status_file_path, agent_id, vm_uuid = get_status_message_details()
-                    update_statusfile(status_file_path, agent_id, vm_uuid)
+                    update_statusfile(status_file_path, agent_id, vm_uuid, response)
                     sys.exit(0)        
             else:
                 if mode == Mode.push:
@@ -711,7 +711,7 @@ def get_status_message_details():
     
     return status_file_path, agent_id, vm_uuid
     
-def update_statusfile(status_filepath, node_id, vmuuid):
+def update_statusfile(status_filepath, node_id, vmuuid, response):
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="updating the status file " + '[statusfile={0}][vmuuid={1}][node_id={2}]'.format(status_filepath, vmuuid, node_id))
     if status_filepath is None:
         error_msg = "Unable to locate a status file"
@@ -724,8 +724,12 @@ def update_statusfile(status_filepath, node_id, vmuuid):
         jsonData = open(status_filepath)
         status_data = json.load(jsonData)
         jsonData.close()
-
-    metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formattedMessage": {"lang": "en-US", "message": "AgentID=" + node_id + ";VMUUID=" + vmuuid}}]
+    
+    accountName = response.deserialized_data["AccountName"]
+    rgName = response.deserialized_data["ResourceGroupName"]
+    subId = response.deserialized_data["SubscriptionId"]
+    
+    metadatastatus = [{"status" : "success", "code": "0", "name": "metadata", "formattedMessage": {"lang": "en-US", "message": "AgentID=" + node_id + ";VMUUID=" + vmuuid +";AutomationAccountName=" + accountName + ";ResourceGroupName=" + rgName + ";Subscription=" + subId}}]
     with open(status_filepath, "w") as fp:
         status_file_content = [{"status": 
             {"status": "success", "formattedMessage": {"lang": "en-US", "message": "Enable Succeeded"}, 

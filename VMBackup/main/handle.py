@@ -268,7 +268,7 @@ def daemon():
 
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
@@ -479,7 +479,7 @@ def enable():
         """
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
             error_msg = "unable to load certificate"
