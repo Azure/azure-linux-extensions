@@ -172,7 +172,7 @@ class FreezeSnapshotter(object):
                         error_msg = 'T:S taking snapshot failed as blobs are empty or none'
                         self.logger.log(error_msg, True, 'Error')
             if(run_result == CommonVariables.success):
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
@@ -285,7 +285,7 @@ class FreezeSnapshotter(object):
         is_inconsistent =  False
         blob_snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
+        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.backupHostService)
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()

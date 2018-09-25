@@ -39,8 +39,15 @@ class CommonVariables:
     VmTypeV1 = 'microsoft.classiccompute/virtualmachines'
     VmTypeV2 = 'microsoft.compute/virtualmachines'
     customSettings = 'customSettings'
+    statusBlobUploadError = 'statusBlobUploadError'
+
     snapshotTaskToken = 'snapshotTaskToken'
-    
+    snapshotCreator = 'snapshotCreator'
+    hostStatusCodePreSnapshot = 'hostStatusCodePreSnapshot'
+    hostStatusCodeDoSnapshot = 'hostStatusCodeDoSnapshot'
+    guestExtension = 'guestExtension'
+    backupHostService = 'backupHostService'
+
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'
     firstHostThenGuest = 'firstHostThenGuest'

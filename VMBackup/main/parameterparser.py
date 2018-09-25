@@ -44,14 +44,13 @@ class ParameterParser(object):
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
         self.vmType = public_settings.get(CommonVariables.vmType)
-
         if(CommonVariables.customSettings in public_settings.keys() and public_settings.get(CommonVariables.customSettings) is not None and public_settings.get(CommonVariables.customSettings) != ""):
             backup_logger.log("Reading customSettings from public_settings", True)
             self.customSettings = public_settings.get(CommonVariables.customSettings)
         elif(CommonVariables.customSettings in protected_settings.keys()):
             backup_logger.log("Reading customSettings from protected_settings", True)
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
-            
+
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):

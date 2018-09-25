@@ -73,16 +73,15 @@ class BlobWriter(object):
                     if(result == CommonVariables.success):
                         self.hutil.log("blob written succesfully")
                         retry_times = 0
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "false")
                     else:
                         self.hutil.log("blob failed to write")
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "true")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 else:
                     self.hutil.log("bloburi is None")
                     retry_times = 0
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "true")
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
             except Exception as e:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "true")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
@@ -150,12 +149,11 @@ class BlobWriter(object):
                     if(result == CommonVariables.success):
                         self.hutil.log("WritePageBlob: page-blob written succesfully")
                         retry_times = 0
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "false")
                     else:
                         self.hutil.log("WritePageBlob: page-blob failed to write")
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "true")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 except Exception as e:
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("statusBlobUploadError", "true")
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                     self.hutil.log("WritePageBlob: Failed to write to page-blob with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
                 self.hutil.log("WritePageBlob: retry times is " + str(retry_times))
                 retry_times = retry_times - 1
