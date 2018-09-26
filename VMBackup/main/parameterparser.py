@@ -20,18 +20,23 @@ from common import CommonVariables
 import base64
 import json
 import sys
+import ExtensionErrorCodeHelper
+import traceback
 
 class ParameterParser(object):
     def __init__(self, protected_settings, public_settings, backup_logger):
         """
         TODO: we should validate the parameter first
         """
-        self.blobs = []
+        self.blobs = []     #allBlobs
+        self.includeBlobs = []
+        self.excludeBlobs = []
+        self.includeLunList = []
         self.backup_metadata = None
         self.public_config_obj = None
         self.private_config_obj = None
-        self.blobs = None
         self.customSettings = None
+        self.customSettingsObj = None
         self.snapshotTaskToken = ''
 
         """
@@ -48,10 +53,27 @@ class ParameterParser(object):
         if(CommonVariables.customSettings in public_settings.keys() and public_settings.get(CommonVariables.customSettings) is not None and public_settings.get(CommonVariables.customSettings) != ""):
             backup_logger.log("Reading customSettings from public_settings", True)
             self.customSettings = public_settings.get(CommonVariables.customSettings)
-        elif(CommonVariables.customSettings in protected_settings.keys()):
+        elif(CommonVariables.customSettings in protected_settings.keys() and protected_settings.get(CommonVariables.customSettings) is not None and protected_settings.get(CommonVariables.customSettings) != ""):
             backup_logger.log("Reading customSettings from protected_settings", True)
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
-            
+        else:
+            backup_logger.log("CustomeSettings not found", True)
+            raise Exception(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter])
+        
+        if(self.customSettings != None and self.customSettings != ''):
+            try:
+                backup_logger.log("customSettings: " + str(self.customSettings), True)
+                self.customSettingsObj = json.loads(self.customSettings)
+                if ('diskLunList' in self.customSettingsObj.keys() and self.customSettingsObj['diskLunList'] != None):
+                    self.includeLunList = self.customSettingsObj['diskLunList']
+                    backup_logger.log("includeLunList-" + str(len(self.includeLunList)), True)
+            except Exception as e:
+                errMsg = 'Failed to de-serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+                backup_logger.log(errMsg, True, 'Error')
+                raise Exception(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter])
+        else:
+            backup_logger.log("customSettings is None or empty", True)
+            raise Exception(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter])
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -93,7 +115,32 @@ class ParameterParser(object):
 
                 for diskInfo in self.private_config_obj['diskInfoList']:
                     self.blobs.append(diskInfo['blobSASUri'])
+
+                if (len(self.includeLunList) == 0):
+                    backup_logger.log("Taking snapshot of all blobs", True)
+                    self.includeBlobs = self.blobs
+                else:
+                    #For exclude disk case always take snapshot from Guest only
+                    self.customSettingsObj['takeSnapshotFrom'] = CommonVariables.onlyGuest
+
+                    for diskInfo in self.private_config_obj['diskInfoList']:
+                        match = False
+                        if (diskInfo['lun'] is None):    #special handling for OS disk
+                            diskInfo['lun'] = -1
+                        
+                        for diskLun in self.includeLunList:
+                            if diskLun == diskInfo['lun']:
+                                self.includeBlobs.append(diskInfo['blobSASUri'])
+                                match = True
+                                break
+                        
+                        if match == False:
+                            self.excludeBlobs.append(diskInfo['blobSASUri'])                            
             else:
                 backup_logger.log("Blob Sas uri from private_config_obj['blobSASUri']", True)
                 self.blobs = self.private_config_obj['blobSASUri']
+                self.includeBlobs = self.blobs
+            
+            if (len(self.includeBlobs) + len(self.excludeBlobs) != len(self.blobs)):
+                backup_logger.log("includeBlobs + excludeBlobs != blobs", True)
 

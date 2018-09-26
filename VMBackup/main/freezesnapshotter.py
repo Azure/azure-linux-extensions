@@ -67,18 +67,10 @@ class FreezeSnapshotter(object):
             self.hostIp = '168.63.129.16'
         self.logger.log( "hostIp : " + self.hostIp)
 
-        try:
-            if(para_parser.customSettings != None and para_parser.customSettings != ''):
-                self.logger.log('customSettings : ' + str(para_parser.customSettings))
-                customSettings = json.loads(para_parser.customSettings)
-                self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
-                self.isManaged = customSettings['isManagedVm']
-                if( "backupTaskId" in customSettings.keys()):
-                    self.taskId = customSettings["backupTaskId"]
-        except Exception as e:
-            errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.logger.log(errMsg, True, 'Error')
-            self.isManaged = True
+        self.takeSnapshotFrom = para_parser.customSettingsObj['takeSnapshotFrom']
+        self.isManaged = para_parser.customSettingsObj['isManagedVm']
+        if( "backupTaskId" in para_parser.customSettingsObj.keys()):
+            self.taskId = para_parser.customSettingsObj["backupTaskId"]
 
         self.logger.log('[FreezeSnapshotter] isManaged flag : ' + str(self.isManaged))
 
@@ -96,6 +88,14 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
+
+        #Add Fake snapshots
+        for excludeBlob in self.para_parser.excludeBlobs:
+            blobUri = excludeBlob.split("?")[0]
+            fakSnapshotUri = blobUri + "?snapshot=" + str(datetime.datetime.utcnow().isoformat("T")) + "Z"
+            snapshot_info_array.append(Status.SnapshotInfoObj(True, fakSnapshotUri, "FakeSnapshot"))
+
+            self.logger.log('FakeSnapshot: ' + fakSnapshotUri)
 
         return run_result, run_status, snapshot_info_array
     
@@ -166,7 +166,7 @@ class FreezeSnapshotter(object):
         try:
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
-            if( self.para_parser.blobs == None or len(self.para_parser.blobs) == 0) :
+            if( self.para_parser.includeBlobs == None or len(self.para_parser.includeBlobs) == 0) :
                         run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                         run_status = 'error'
                         error_msg = 'T:S taking snapshot failed as blobs are empty or none'

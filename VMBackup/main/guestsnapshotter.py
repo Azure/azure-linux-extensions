@@ -189,7 +189,7 @@ class GuestSnapshotter(object):
             snapshot_result_error = mp.Queue()
             snapshot_info_indexer_queue = mp.Queue()
             time_before_snapshot_start = datetime.datetime.now()
-            blobs = paras.blobs
+            blobs = paras.includeBlobs
             if blobs is not None:
                 # initialize blob_snapshot_info_array
                 mp_jobs = []
@@ -267,7 +267,7 @@ class GuestSnapshotter(object):
         unable_to_sleep = False
         all_snapshots_failed = False
         try:
-            blobs = paras.blobs
+            blobs = paras.includeBlobs
             if blobs is not None:
                 blob_index = 0
                 for blob in blobs:
@@ -325,7 +325,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) <= 4):
+        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.includeBlobs) <= 4):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
