@@ -30,6 +30,8 @@ import inspect
 import urllib
 import urllib2
 import watcherutil
+import shutil
+
 from threading import Thread
 
 try:
@@ -58,6 +60,7 @@ OMIServerConfPath = '/etc/opt/omi/conf/omiserver.conf'
 EtcOMSAgentPath = '/etc/opt/microsoft/omsagent/'
 VarOMSAgentPath = '/var/opt/microsoft/omsagent/'
 SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
+ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or
@@ -228,12 +231,35 @@ def telemetry():
     watcher_thread.join()
     self_mon_thread.join()
 
-def dummy_command():
+def prepare_update():
     """
-    Do nothing and return 0
+    Copy / move configuration directory to the backup
     """
+
+    # First check if backup directory was previously created for given workspace. 
+    # If it is created with all the files , we need not move the files again. 
+
+    public_settings, _ = get_settings()
+    workspaceId = public_settings.get('workspaceId')
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)        
+    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)        
+    if (not os.path.isdir(etc_move_path)):
+        shutil.move(etc_remove_path, etc_move_path)
+
     return 0
 
+def restore_state(workspaceId):
+    """
+    Copy / move state from backup to the expected location.
+    """
+    try:
+        etc_backup_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
+        etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
+        if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
+            shutil.move(etc_backup_path, etc_final_path)
+    except Exception as e:
+        hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
+       
 
 def install():
     """
@@ -250,6 +276,9 @@ def install():
                                         'provided')
     workspaceId = public_settings.get('workspaceId')
     check_workspace_id(workspaceId)
+
+    # Take the backup of the state for given workspace. 
+    restore_state(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
     # create conflicts by installing the OMSAgent packages
@@ -269,8 +298,8 @@ def install():
     exit_code = run_command_with_retries(cmd, retries = 15,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
+    
     return exit_code
-
 
 def uninstall():
     """
@@ -417,22 +446,17 @@ def remove_workspace_configuration():
     before calling 'upgrade' on new extension version issue.
     In upgrade case, we need workspace configuration to persist when in
     remove case we need all the files be removed.
-
     This method will remove all the files/folders from the workspace path in Etc and Var.
     """
+
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
-
-    for main_dir in [etc_remove_path, var_remove_path]:
-        for root, dirs, files in os.walk(main_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(os.path.join(main_dir))
-    hutil_log_info('Removed Workspace Configuration')
+    
+    shutil.rmtree(etc_remove_path, True)
+    shutil.rmtree(var_remove_path, True)
+    hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
     req = urllib2.Request(VMResourceIDMetadataEndpoint)
@@ -441,7 +465,7 @@ def get_vmresourceid_from_metadata():
     try:
         response = json.loads(urllib2.urlopen(req).read())
         if response['compute']['vmScaleSetName']:
-            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'])
+            return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
         else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
@@ -509,10 +533,11 @@ operations = {'Disable' : disable,
               'Uninstall' : uninstall,
               'Install' : install,
               'Enable' : enable,
-              # Upgrade is noop since omsagent.py->install() will be called
+              # For update call we will only prepare the update by taking some backup of the state
+              #  since omsagent.py->install() will be called
               # everytime upgrade is done due to upgradeMode =
               # "UpgradeWithInstall" set in HandlerManifest
-              'Update' : dummy_command,
+              'Update' : prepare_update,
               'Telemetry' : telemetry
 }
 
@@ -526,7 +551,12 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error)
+            
+            logFileName = 'extension.log'
+            if (operation == 'Telemetry'):
+                logFileName = 'watcher.log'
+
+            hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, logFileName=logFileName)
             hutil.do_parse_context(operation)
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings

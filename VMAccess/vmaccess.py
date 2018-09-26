@@ -79,12 +79,11 @@ def enable():
             remove_user = protect_settings.get('remove_user')
 
         if remove_user and _is_sshd_config_modified(protect_settings):
-            hutil.error("Cannot reset sshd_config and remove a user in one operation.")
             waagent.AddExtensionEvent(name=hutil.get_name(),
                                       op=waagent.WALAEventOperation.Enable,
                                       isSuccess=False,
                                       message="(03002)Argument error, conflicting operations")
-            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+            raise Exception("Cannot reset sshd_config and remove a user in one operation.")
 
         # check port each time the VM boots up
         if reset_ssh:
@@ -114,7 +113,7 @@ def enable():
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
             "stack trace: {1}").format(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+        hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(str(e)))
 
 
 def _forcibly_reset_chap(hutil):
@@ -180,7 +179,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     ovf_env = waagent.OvfEnv().Parse(ovf_xml)
 
     # user name must be provided if set ssh key or password
-    if not protect_settings or not protect_settings.has_key('username'):
+    if not protect_settings or 'username' not in protect_settings:
         return
 
     user_name = protect_settings['username']
@@ -271,13 +270,13 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                       message="(02100)Failed to reset ssh key.")
 
 
-def _get_other_sudoers(userName):
-    sudoersFile = '/etc/sudoers.d/waagent'
-    if not os.path.isfile(sudoersFile):
+def _get_other_sudoers(user_name):
+    sudoers_file = '/etc/sudoers.d/waagent'
+    if not os.path.isfile(sudoers_file):
         return None
-    sudoers = waagent.GetFileContents(sudoersFile).split("\n")
-    pattern = '^{0}\s'.format(userName)
-    sudoers = filter(lambda x : re.match(pattern, x) is None, sudoers)
+    sudoers = waagent.GetFileContents(sudoers_file).split("\n")
+    pattern = '^{0}\s'.format(user_name)
+    sudoers = list(filter(lambda x: re.match(pattern, x) is None, sudoers))
     return sudoers
 
 
