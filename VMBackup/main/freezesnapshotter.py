@@ -172,7 +172,7 @@ class FreezeSnapshotter(object):
                         error_msg = 'T:S taking snapshot failed as blobs are empty or none'
                         self.logger.log(error_msg, True, 'Error')
             if(run_result == CommonVariables.success):
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "guestExtension")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
@@ -200,7 +200,7 @@ class FreezeSnapshotter(object):
                         if all_failed and self.takeSnapshotFrom == CommonVariables.onlyGuest:
                            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
-                        elif self.takeSnapshotFrom == CommonVariables.onlyGuest:
+                        else:
                             self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
                             error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
                         run_status = 'error'
@@ -210,8 +210,10 @@ class FreezeSnapshotter(object):
                             for blob_snapshot_info in blob_snapshot_info_array:
                                 if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None and ("The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage):
                                     run_result = CommonVariables.FailedSnapshotLimitReached
-                                    run_status = 'FailedSnapshotLimitReached'
+                                    run_status = 'error'
                                     error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
+                                    self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached)
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
 
                         self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
@@ -283,7 +285,7 @@ class FreezeSnapshotter(object):
         is_inconsistent =  False
         blob_snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotCreator", "backupHostService")
+        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.backupHostService)
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()

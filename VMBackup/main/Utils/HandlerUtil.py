@@ -532,10 +532,21 @@ class HandlerUtility:
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
+        snapshotTelemetry = ""
+
+        if CommonVariables.snapshotCreator in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.snapshotCreator , HandlerUtility.telemetry_data[CommonVariables.snapshotCreator])
+        if CommonVariables.hostStatusCodePreSnapshot in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.hostStatusCodePreSnapshot , HandlerUtility.telemetry_data[CommonVariables.hostStatusCodePreSnapshot])
+        if CommonVariables.hostStatusCodeDoSnapshot in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.hostStatusCodeDoSnapshot , HandlerUtility.telemetry_data[CommonVariables.hostStatusCodeDoSnapshot])
+
+        if CommonVariables.statusBlobUploadError in HandlerUtility.telemetry_data.keys():
+            message = "{0} {1}={2}, ".format(message , CommonVariables.statusBlobUploadError , HandlerUtility.telemetry_data[CommonVariables.statusBlobUploadError])
 
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
         self.convert_telemetery_data_to_bcm_serializable_format()
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message + snapshotTelemetry, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -548,7 +559,7 @@ class HandlerUtility:
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message + snapshotTelemetry, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong

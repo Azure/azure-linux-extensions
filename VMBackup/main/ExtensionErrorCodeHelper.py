@@ -13,6 +13,7 @@ class ExtensionErrorCodeEnum():
     #error_upload_status_blob = 16
     error = 2
     FailedRetryableSnapshotFailedNoNetwork = 76
+    FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
 
     FailedRetryableFsFreezeFailed = 201
@@ -74,7 +75,8 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.error_http_failure : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
-            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red
+            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red,
+            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red
             }
 
     ExtensionErrorCodeNameDict = {
@@ -111,7 +113,8 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.error_http_failure : "error_http_failure",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",
-            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork"
+            ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork",
+            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : "FailedSnapshotLimitReached"
             }
     
     @staticmethod
