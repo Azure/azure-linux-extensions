@@ -457,9 +457,3 @@ class HandlerUtility:
                     self.log("Copying {0} to {1}".format(src, dest))
 
                     shutil.copy2(src, dest)
-
-    def set_stamped_flag(self):
-        os.close(os.open('stamped', os.O_RDWR | os.O_CREAT))
-
-    def is_stamped(self):
-        return os.path.isfile('stamped')
