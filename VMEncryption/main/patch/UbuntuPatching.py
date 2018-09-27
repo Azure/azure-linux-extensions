@@ -64,7 +64,16 @@ class UbuntuPatching(AbstractPatching):
         cmd = " ".join(['apt-get', 'update'])
         self.command_executor.Execute(cmd)
 
-        packages = ['at', 'cryptsetup-bin', 'lsscsi', 'python-six', 'python-parted', 'procps', 'psmisc', 'libssl-dev', 'libffi-dev', 'python-dev']
+        packages = ['at',
+					'cryptsetup-bin',
+					'lsscsi',
+					'python-six',
+					'python-parted',
+					'procps',
+					'psmisc',
+					'libssl-dev',
+					'libffi-dev',
+					'python-dev']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
         self.command_executor.Execute(cmd)
