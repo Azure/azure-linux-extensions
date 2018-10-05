@@ -2,6 +2,7 @@ import unittest
 import mock
 import main
 from main import check_util
+from main import Common
 from StringIO import StringIO
 import console_logger
 
@@ -34,11 +35,49 @@ class TestCheckUtil(unittest.TestCase):
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertTrue(self.cutil.is_insufficient_memory())
 
+    def test_is_kv_id(self):
+        self.cutil.check_kv_id("/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
+        self.cutil.check_kv_id("/subscriptions/759532d8-9991-4d04-878f-49f0f4804906/resourceGroups/adenszqtrrg/providers/Microsoft.KeyVault/vaults/adenszqtrkv", "")
+        self.assertRaises(Exception, self.cutil.check_kv_id, "////", "")
+        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/", "")
+        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault////////", "")
+        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
+
     def test_is_kv_url(self):
         self.cutil.check_kv_url("https://testkv.vault.azure.net/", "")
+        self.cutil.check_kv_url("https://test-kv2.vault.azure.net/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "http://testkv.vault.azure.net/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://https://testkv.vault.azure.net/", "")
+        self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.testkv.vault.azure.net/", "")
+        self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.vault.azure.com/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://", "")
+
+    def test_validate_volume_type(self):
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "DATA"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "ALL"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "all"})
+        for vt in Common.CommonVariables.SupportedVolumeTypes:
+            self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: vt})
+
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "NON-OS"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: ""})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "123"})
+
+    def test_fatal_checks(self):
+        self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname"
+            })
+        self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname"
+            })
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
 
     def test_mount_scheme(self):
         proc_mounts_output = """

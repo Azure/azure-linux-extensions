@@ -90,40 +90,6 @@ class EncryptionSettingsUtil(object):
         padded_index = str(self.get_index()).zfill(2)
         return CommonVariables.encryption_settings_file_name_pattern.format(padded_index)
 
-    def check_url(self, test_url, message):
-        """basic sanity check of the key vault url"""
-        expected = "https://{keyvault-name}.{vault-endpoint}/{object-type}/{object-name}/{object-version}"
-        if not (test_url and test_url.startswith('https://')):
-            raise Exception('\n' + message + '\nActual: ' + test_url + '\nExpected: ' + expected + "\n")
-        return
-
-    def check_id(self, test_id, message):
-        """basic sanity check of the key vault id"""
-        # more strict checking would validate the full key vault id format
-        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
-        if not (test_id and test_id.startswith('/subscriptions/')):
-            raise Exception('\n' + message + '\nActual: ' + test_id + '\nExpected: ' + expected + "\n")
-        return
-
-    def validate_key_vault_params(self, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm):
-        self.check_url(kv_url, "Key Vault URL is required, but was missing or invalid")
-        self.check_id(kv_id, "Key Vault ID is required, but was missing or invalid")
-        if kek_url:
-            self.check_url(kek_url, "A KEK URL was specified, but was invalid")
-            self.check_id(kek_kv_id, "A KEK URL was specified, but its KeyVault ID was invalid")
-            if kek_algorithm not in CommonVariables.encryption_algorithms:
-                if kek_algorithm:
-                    raise Exception(
-                        "The KEK encryption algorithm requested was not recognized")
-                else:
-                    kek_algorithm = CommonVariables.default_encryption_algorithm
-                    self.logger.log(
-                        "No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
-        else:
-            if kek_kv_id:
-                raise Exception(
-                    "The KEK KeyVault ID was specified but the KEK URL was missing")
-
     def get_disk_items_from_crypt_items(self, crypt_items, disk_util):
         crypt_dev_items = []
         for crypt_item in crypt_items:
@@ -151,7 +117,7 @@ class EncryptionSettingsUtil(object):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
-        self.validate_key_vault_params(kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm)
+        # self.validate_key_vault_params(kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm)
 
         # create encryption settings object
         self.logger.log("Creating encryption settings object")

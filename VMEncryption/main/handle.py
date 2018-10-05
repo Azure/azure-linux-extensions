@@ -509,10 +509,28 @@ def enable():
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
+        public_settings = get_public_settings()
+        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
+        cutil = CheckUtil(logger)
+
+        # run fatal prechecks, report error if exceptions are caught
+        try:
+            cutil.precheck_for_fatal_failures(public_settings)
+        except Exception as e:
+            logger.log("PRECHECK: Fatal Exception thrown during precheck")
+            logger.log(traceback.format_exc())
+            msg = e.message
+            hutil.do_exit(exit_code=0,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.unknown_error),
+                          message=msg)
+
+        hutil.disk_util.log_lsblk_output()
+
         # run prechecks and log any failures detected
         try:
-            cutil = CheckUtil(logger)
-            if cutil.is_precheck_failure():
+            if cutil.is_non_fatal_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
@@ -520,8 +538,6 @@ def enable():
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
-        public_settings = get_public_settings()
-        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
