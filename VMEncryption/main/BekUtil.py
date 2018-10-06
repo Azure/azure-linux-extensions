@@ -57,7 +57,7 @@ class BekUtil(object):
             label = str(azure_device.label).lower()
             # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
             # the second word gets truncated
-            if fstype in ['vfat', 'ntfs'] and label == 'bek':
+            if fstype in ['vfat'] and label == 'bek':
                 try:
                     self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
                     self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
@@ -89,7 +89,7 @@ class BekUtil(object):
             label = str(azure_device.label).lower()
             # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
             # the second word gets truncated
-            if fstype in ['vfat', 'ntfs'] and label == 'bek':
+            if fstype in ['vfat'] and label == 'bek':
                 try:
                     self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
                     self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),

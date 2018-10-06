@@ -82,39 +82,6 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_extras(self):
-        epel_packages_installed = False
-        attempt = 0
-
-        while not epel_packages_installed:
-            attempt += 1
-            self.logger.log("Attempt #{0} to locate EPEL packages".format(attempt))
-            if self.distro_info[1].startswith("6."):
-                if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y ntfs-3g python-pip")
-
-                    if not self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-            else:
-                if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
-
-                    if not self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
@@ -125,7 +92,6 @@ class redhatPatching(AbstractPatching):
                     'patch',
                     'procps-ng',
                     'util-linux',
-                    'gcc',
                     'libffi-devel',
                     'openssl-devel',
                     'python-devel']
@@ -164,7 +130,7 @@ class redhatPatching(AbstractPatching):
                 dracut_repack_needed = True
 
             if dracut_repack_needed:
-                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
 
     @staticmethod
     def is_old_patching_system():
@@ -227,5 +193,5 @@ class redhatPatching(AbstractPatching):
         redhatPatching.append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
                                                '/etc/crypttab')
 
-        command_executor.Execute('/usr/sbin/dracut -I ntfs-3g -f -v', True)
+        command_executor.Execute('/usr/sbin/dracut -f -v', True)
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)

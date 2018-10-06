@@ -84,11 +84,8 @@ class SuSEPatching(AbstractPatching):
         self.command_executor.Execute(cmd)
         
         if not self.distro_info[1] == "11":
-            packages = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
+            packages = ['libffi-devel', 'openssl-devel', 'python-devel']
             cmd = " ".join(['zypper', 'install', '-l', '-y'] + packages)
-            self.command_executor.Execute(cmd)
-        
-            cmd = " ".join(['pip', 'install', 'jwt'])
             self.command_executor.Execute(cmd)
 
     def update_prereq(self):
