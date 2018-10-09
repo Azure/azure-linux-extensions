@@ -302,7 +302,7 @@ class HandlerUtility:
     def set_value_to_configfile(self, key, value):
         configfile = '/etc/azure/vmbackup.conf'
         try :
-            self.log('setting doseq flag in config file', 'Info')
+            self.log('setting ' + str(key)  + 'in config file to ' + str(value) , 'Info')
             if not os.path.exists(os.path.dirname(configfile)):
                 os.makedirs(os.path.dirname(configfile))
             config = ConfigParsers.RawConfigParser()

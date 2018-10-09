@@ -53,6 +53,8 @@ class CommonVariables:
     firstHostThenGuest = 'firstHostThenGuest'
     onlyHost = 'onlyHost'
 
+    SnapshotMethod = 'SnapshotMethod'
+    IsAnySnapshotFailed = 'IsAnySnapshotFailed'
 
     status_transitioning = 'transitioning'
     status_warning = 'warning'
