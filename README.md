@@ -1,4 +1,4 @@
-[# Linux extensions for Microsoft Azure IaaS
+# Linux extensions for Microsoft Azure IaaS
 
 This project provides the source code of Linux extensions for Microsoft Azure IaaS.
 
