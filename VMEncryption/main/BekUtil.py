@@ -57,7 +57,7 @@ class BekUtil(object):
 
         for azure_device in azure_devices:
             fstype = str(azure_device.file_system).lower()
-            if fstype in ['vfat', 'ntfs']:
+            if fstype in ['vfat']:
                 try:
                     self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
                     self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),

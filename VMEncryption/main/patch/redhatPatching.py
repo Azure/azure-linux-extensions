@@ -89,28 +89,28 @@ class redhatPatching(AbstractPatching):
             attempt += 1
             self.logger.log("Attempt #{0} to locate EPEL packages".format(attempt))
             if self.distro_info[1].startswith("6."):
-                if self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                if self.command_executor.Execute("rpm -q python-pip"):
                     epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
 
                     if self.command_executor.Execute("rpm -q epel-release"):
                         self.command_executor.Execute(epel_cmd)
 
-                    self.command_executor.Execute("yum install -y ntfs-3g python-pip")
+                    self.command_executor.Execute("yum install -y python-pip")
 
-                    if not self.command_executor.Execute("rpm -q ntfs-3g python-pip"):
+                    if not self.command_executor.Execute("rpm -q python-pip"):
                         epel_packages_installed = True
                 else:
                     epel_packages_installed = True
             else:
-                if self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                if self.command_executor.Execute("rpm -q python2-pip"):
                     epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 
                     if self.command_executor.Execute("rpm -q epel-release"):
                         self.command_executor.Execute(epel_cmd)
 
-                    self.command_executor.Execute("yum install -y ntfs-3g python2-pip")
+                    self.command_executor.Execute("yum install -y python2-pip")
 
-                    if not self.command_executor.Execute("rpm -q ntfs-3g python2-pip"):
+                    if not self.command_executor.Execute("rpm -q python2-pip"):
                         epel_packages_installed = True
                 else:
                     epel_packages_installed = True
@@ -168,7 +168,7 @@ class redhatPatching(AbstractPatching):
                 dracut_repack_needed = True
 
             if dracut_repack_needed:
-                self.command_executor.ExecuteInBash("/usr/sbin/dracut -I ntfs-3g -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
 
     @staticmethod
     def is_old_patching_system():
