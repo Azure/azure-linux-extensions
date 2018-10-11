@@ -527,9 +527,6 @@ def enable():
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
-            logger.log("Installing pre-requisites")
-            DistroPatcher.install_extras()
-
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
 
             if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
@@ -542,10 +539,6 @@ def enable():
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
-
-            logger.log("Installing pre-requisites")
-            DistroPatcher.install_extras()
-
             disable_encryption()
 
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
@@ -1825,6 +1818,10 @@ def daemon():
     logger.log("waiting for 1 minute before continuing the daemon")
     time.sleep(60)
 
+    logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
+
+    # try decrypt, if decryption marker exists
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     if decryption_marker.config_file_exists():
         try:
@@ -1847,6 +1844,7 @@ def daemon():
                 
             return
 
+    # try encrypt, in absence of decryption marker
     try:
         daemon_encrypt()
     except Exception as e:
