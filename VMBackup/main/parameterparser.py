@@ -33,6 +33,8 @@ class ParameterParser(object):
         self.blobs = None
         self.customSettings = None
         self.snapshotTaskToken = ''
+        self.includedDisks = None
+        self.includeLunList = []    #To be shared with HP
 
         """
         get the public configuration
@@ -71,6 +73,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = self.public_config_obj[CommonVariables.snapshotTaskToken]
         elif(CommonVariables.snapshotTaskToken in protected_settings.keys()):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
+        if(CommonVariables.includedDisks in self.public_config_obj.keys()):
+            self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
 
         """
         first get the protected configuration
@@ -85,12 +89,11 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip()
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
-            if ('diskInfoList' in self.private_config_obj.keys() and self.private_config_obj['diskInfoList'] is not None and len(self.private_config_obj['diskInfoList']) > 0):
-                self.blobs = []
-                backup_logger.log("Blob Sas uri from private_config_obj['diskInfoList']", True)
+            self.blobs = self.private_config_obj['blobSASUri']
+        
+        if(self.includedDisks != None):
+            if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
+                self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
+                if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
+                    self.includedDisks.append(-1)
 
-                for diskInfo in self.private_config_obj['diskInfoList']:
-                    self.blobs.append(diskInfo['blobSASUri'])
-            else:
-                backup_logger.log("Blob Sas uri from private_config_obj['blobSASUri']", True)
-                self.blobs = self.private_config_obj['blobSASUri']
