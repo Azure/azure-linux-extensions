@@ -17,7 +17,7 @@ class SizeCalculation(object):
         self.patching=patching
         self.logger=logger
         self.file_systems_info = []
-        
+        self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
 
     def get_loop_devices(self):
         global disk_util
@@ -96,19 +96,27 @@ class SizeCalculation(object):
                         break
                 device, size, used, available, percent, mountpoint = output[index].split()
                 fstype = ''
+                isNetworkFs = False
+
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
                         fstype = file_system_info[1]
                 self.logger.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint),True)
-                if device == '/dev/sdb1' :
-                    self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
-                    total_used_temporary_disks = total_used_temporary_disks + int(used) 
 
-                elif "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
+                for nonPhysicaFsType in self.non_physical_file_systems:
+                    if nonPhysicaFsType in fstype.lower():
+                        isNetworkFs = True
+                        break
+
+                if isNetworkFs :
                     if fstype not in network_fs_types :
                         network_fs_types.append(fstype)
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
+
+                elif device == '/dev/sdb1' :
+                    self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    total_used_temporary_disks = total_used_temporary_disks + int(used)
 
                 elif "tmpfs" in fstype.lower() or "devtmpfs" in fstype.lower() or "ramdiskfs" in fstype.lower():
                     self.logger.log("Not Adding RAM disks, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
@@ -120,7 +128,11 @@ class SizeCalculation(object):
 
                 elif (mountpoint.startswith('/run/gluster/snaps/')):
                     self.logger.log("Not Adding Gluster Device , Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
-                    total_used_gluster = total_used_gluster + int(used)   
+                    total_used_gluster = total_used_gluster + int(used)
+
+                elif device.startswith( '\\' ) or device.startswith( '//' ):
+                    self.logger.log("Not Adding network-drive as it starts with slahes, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    total_used_network_shares = total_used_network_shares + int(used)
 
                 else:
                     self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)

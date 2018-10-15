@@ -213,6 +213,7 @@ class FreezeSnapshotter(object):
                                         error_msg = 'Retrying when snapshot failed with SnapshotRateExceeded'
                                         self.logger.log(error_msg, True, 'Error')
                                         self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'True')
+                                        time.sleep(600)
                                         break
                                     elif 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage or 'The snapshot count against this blob has been exceeded' in blob_snapshot_info.errorMessage:
                                         run_result = CommonVariables.FailedSnapshotLimitReached
