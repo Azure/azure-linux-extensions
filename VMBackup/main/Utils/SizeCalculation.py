@@ -130,7 +130,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding Gluster Device , Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
                     total_used_gluster = total_used_gluster + int(used)
 
-                elif device.startswith( '\\' ) or device.startswith( '//' ):
+                elif device.startswith( '\\\\' ) or device.startswith( '//' ):
                     self.logger.log("Not Adding network-drive as it starts with slahes, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
