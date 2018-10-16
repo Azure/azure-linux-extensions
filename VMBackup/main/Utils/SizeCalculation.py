@@ -18,7 +18,7 @@ class SizeCalculation(object):
         self.logger=logger
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
-        self.known_fs = ['ext', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
+        self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
 
     def get_loop_devices(self):
         global disk_util
