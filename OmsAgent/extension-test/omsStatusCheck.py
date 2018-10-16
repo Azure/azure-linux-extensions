@@ -5,7 +5,29 @@ import subprocess
 import re
 import sys
 
+if "check_output" not in dir( subprocess ): # duck punch it in!
+        def check_output(*popenargs, **kwargs):
+            r"""Run command with arguments and return its output as a byte string.
+            Backported from Python 2.7 as it's implemented as pure python on stdlib.
+            >>> check_output(['/usr/bin/python', '--version'])
+            Python 2.6.2
+            """
+            process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+            output, unused_err = process.communicate()
+            retcode = process.poll()
+            if retcode:
+                cmd = kwargs.get("args")
+                if cmd is None:
+                    cmd = popenargs[0]
+                error = subprocess.CalledProcessError(retcode, cmd)
+                error.output = output
+                raise error
+            return output
+
+        subprocess.check_output = check_output
+
 operation = None
+
 outFile = '/tmp/omsresults.out'
 openFile = open(outFile, 'w+')
 
@@ -55,9 +77,6 @@ def is_vm_supported_for_extension():
         for supported_ver in supported_dists[supported_dist]:
             supported_ver_split = supported_ver.split('.')
 
-            # If vm_ver is at least as precise (at least as many digits) as
-            # supported_ver and matches all the supported_ver digits, then
-            # this VM is guaranteed to be supported
             vm_ver_match = True
             for idx, supported_ver_num in enumerate(supported_ver_split):
                 try:
@@ -101,24 +120,26 @@ def linux_detect_installer():
 def install_additional_packages():
     #Add additional packages command here
     if INSTALLER == 'APT':
-        os.system('apt-get -y install wget apache2 \
-                && service apache2 start \
-                && echo "mysql-server mysql-server/root_password password password" | debconf-set-selections \
-                && echo "mysql-server mysql-server/root_password_again password password" | debconf-set-selections \
-                && apt-get install -y mysql-server \
-                && service mysql start')
+        os.system('apt-get -y install wget apache2 git \
+                && service apache2 start')
+                # && echo "mysql-server mysql-server/root_password password password" | debconf-set-selections \
+                # && echo "mysql-server mysql-server/root_password_again password password" | debconf-set-selections \
+                # && apt-get install -y mysql-server \
+                # && service mysql start')
     elif INSTALLER == 'YUM':
-        os.system('yum install -y wget httpd \
-                && service httpd start\
-                && wget http://repo.mysql.com/mysql-community-release-el6-5.noarch.rpm \
-                && yum localinstall -y mysql-community-release-el6-5.noarch.rpm \
-                && yum install -y mysql-community-server \
-                && service mysqld start')
+        os.system('yum install -y wget httpd git \
+                && service httpd start')
+                # && wget http://repo.mysql.com/mysql-community-release-el6-5.noarch.rpm \
+                # && yum localinstall -y mysql-community-release-el6-5.noarch.rpm \
+                # && yum install -y mysql-community-server \
+                # && service mysqld start')
     elif INSTALLER == 'ZYPPER':
-        os.system('zypper install -y wget httpd \
-                && service apache2 start \
-                && zypper install mysql-server mysql-devel mysql \
-                && service mysql start')
+        os.system('zypper install -y wget httpd git \
+                && service apache2 start')
+                # && zypper install mysql-server mysql-devel mysql \
+                # && service mysql start')
+    #installing required common packages
+    os.system('curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && python /tmp/get-pip.py')
 
 def disable_dsc():
     os.system('/opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py --disable')
@@ -159,9 +180,22 @@ def apache_mysql_conf():
         # replace_items(mysql_conf_dir, mysql_error_path_string, '/var/log/mysql/mysqld.log')
         # replace_items(mysql_conf_dir, mysql_slowquery_path_string, '/var/log/mysql/mysqld.log')
 
+def generate_data():
+    os.system('git clone https://github.com/kiritbasu/Fake-Apache-Log-Generator /tmp/apachefake \
+            && pip install -r /tmp/apachefake/requirements.txt \
+            && python /tmp/apachefake/apache-fake-log-gen.py -n 100 -o LOG')
+    if INSTALLER == 'APT':
+        os.system('mv access_log_*.log /var/log/apache2/access.log')
+    elif INSTALLER == 'YUM':
+        os.system('mv access_log_*.log /var/log/httpd/access_log')
+    elif INSTALLER == 'ZYPPER':
+        os.system('mv access_log_*.log /var/log/apache2/access_log')
+
 def copy_config_files():
-    os.system('cp /etc/opt/microsoft/omsagent/sysconf/omsagent.d/apache_logs.conf /etc/opt/microsoft/omsagent/conf/omsagent.d/apache_logs.conf')
-    #os.system('cp /etc/opt/microsoft/omsagent/sysconf/omsagent.d/mysql_logs.conf /etc/opt/microsoft/omsagent/conf/omsagent.d/mysql_logs.conf')
+    os.system('cp /etc/opt/microsoft/omsagent/sysconf/omsagent.d/apache_logs.conf /etc/opt/microsoft/omsagent/conf/omsagent.d/apache_logs.conf \
+            && sudo chown omsagent:omiusers /etc/opt/microsoft/omsagent/conf/omsagent.d/apache_logs.conf')
+    # os.system('cp /etc/opt/microsoft/omsagent/sysconf/omsagent.d/mysql_logs.conf /etc/opt/microsoft/omsagent/conf/omsagent.d/mysql_logs.conf \
+    #         && sudo chown omsagent:omiusers /etc/opt/microsoft/omsagent/conf/omsagent.d/mysql_logs.conf')
     apache_mysql_conf()
 
 def restart_services():
@@ -201,70 +235,204 @@ def writeLogCommand(cmd):
     return
 
 def result_commands():
+    global waagentOut, onboardStatus, omiRunStatus, omiInstallOut, omsagentInstallOut, omsconfigInstallOut, scxInstallOut, omiInstallStatus, omsagentInstallStatus, omsconfigInstallStatus, scxInstallStatus, psefomsagent, omsagentRestart, omiRestart
     cmd='waagent --version'
-    out=execCommand(cmd)
+    waagentOut=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(waagentOut)
     cmd='/opt/microsoft/omsagent/bin/omsadmin.sh -l'
-    out=execCommand(cmd)
+    onboardStatus=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(onboardStatus)
     cmd='scxadmin -status'
-    out=execCommand(cmd)
+    omiRunStatus=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(omiRunStatus)
     if INSTALLER == 'APT':
-        dpkg_commands()
+        cmd='dpkg -s omi'
+        omiInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omiInstallStatus='Install Ok'
+        else:
+            omiInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omiInstallOut)
+        cmd='dpkg -s omsagent'
+        omsagentInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omsagentInstallStatus='Install Ok'
+        else:
+            omsagentInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omsagentInstallOut)
+        cmd='dpkg -s omsconfig'
+        omsconfigInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omsconfigInstallStatus='Install Ok'
+        else:
+            omsagentInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omsconfigInstallOut)
+        cmd='dpkg -s scx'
+        scxInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            scxInstallStatus='Install Ok'
+        else:
+            scxInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(scxInstallOut)
     elif INSTALLER == 'YUM' or INSTALLER == 'ZYPPER':
-        rpm_commands()
+        cmd='rpm -qR omi'
+        omiInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omiInstallStatus='Install Ok'
+        else:
+            omiInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omiInstallOut)
+        cmd='rpm -qR omsagent'
+        omsagentInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omsagentInstallStatus='Install Ok'
+        else:
+            omsagentInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omsagentInstallOut)
+        cmd='rpm -qR omsconfig'
+        omsconfigInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            omsconfigInstallStatus='Install Ok'
+        else:
+            omsconfigInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(omsconfigInstallOut)
+        cmd='rpm -qR scx'
+        scxInstallOut=execCommand(cmd)
+        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+            scxInstallStatus='Install Ok'
+        else:
+            scxInstallStatus='Not Installed'
+        writeLogCommand(cmd)
+        writeLogOutput(scxInstallOut)
     cmd='ps -ef | egrep "omsagent|omi"'
-    out=execCommand(cmd)
+    psefomsagent=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(psefomsagent)
     cmd='/opt/microsoft/omsagent/bin/service_control restart'
-    out=execCommand(cmd)
+    omsagentRestart=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(omsagentRestart)
     cmd='/opt/omi/bin/service_control restart'
-    out=execCommand(cmd)
+    omiRestart=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(omiRestart)
 
-def dpkg_commands():
-    cmd='dpkg -s omi'
-    out=execCommand(cmd)
+def service_control_commands():
+    global serviceStop, serviceDisable, serviceEnable, serviceStart
+    cmd='/opt/microsoft/omsagent/bin/service_control stop'
+    serviceStop=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='dpkg -s omsagent'
-    out=execCommand(cmd)
+    writeLogOutput(serviceStop)
+    cmd='/opt/microsoft/omsagent/bin/service_control disable'
+    serviceDisable=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='dpkg -s omsconfig'
-    out=execCommand(cmd)
+    writeLogOutput(serviceDisable)
+    cmd='/opt/microsoft/omsagent/bin/service_control enable'
+    serviceEnable=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='dpkg -s scx'
-    out=execCommand(cmd)
+    writeLogOutput(serviceEnable)
+    cmd='/opt/microsoft/omsagent/bin/service_control start'
+    serviceStart=execCommand(cmd)
     writeLogCommand(cmd)
-    writeLogOutput(out)
+    writeLogOutput(serviceStart)
 
-def rpm_commands():
-    cmd='rpm -qR omi'
-    out=execCommand(cmd)
-    writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='rpm -qR omsagent'
-    out=execCommand(cmd)
-    writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='rpm -qR omsconfig'
-    out=execCommand(cmd)
-    writeLogCommand(cmd)
-    writeLogOutput(out)
-    cmd='rpm -qR scx'
-    out=execCommand(cmd)
-    writeLogCommand(cmd)
-    writeLogOutput(out)
+def write_html():
+    os.system('rm /tmp/omsresults.html')
+    htmlFile = '/tmp/omsresults.html'
+    f = open(htmlFile, 'w+')
+    message="""
+<h2>OMS Install Results</h2>
+
+<table>
+  <tr>
+    <th>Package</th>
+    <th>Status</th>
+    <th>Output</th>
+  </tr>
+  <tr>
+    <td>OMI</td>
+    <td>{}</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>OMSAgent</td>
+    <td>{}</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>OMSConfig</td>
+    <td>{}</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>SCX</td>
+    <td>{}</td>
+    <td>{}</td>
+  </tr>
+</table>
+
+<h2>OMS Command Outputs</h2>
+
+<table>
+  <tr>
+    <th>Command</th>
+    <th>Output</th>
+  </tr>
+  <tr>
+    <td>waagent --version</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/omsadmin.sh -l</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>scxadmin -status</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>ps -ef | egrep "omsagent|omi"</td>
+    <td>{}</td>
+  </tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/service_control restart</td>
+    <td>{}</td>
+  <tr>
+  <tr>
+    <td>/opt/omi/bin/service_control restart</td>
+    <td>{}</td>
+  <tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/service_control stop</td>
+    <td>{}</td>
+  <tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/service_control disable</td>
+    <td>{}</td>
+  <tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/service_control enable</td>
+    <td>{}</td>
+  <tr>
+  <tr>
+    <td>/opt/microsoft/omsagent/bin/service_control stop</td>
+    <td>{}</td>
+  <tr>
+</table>
+""".format(omiInstallStatus, omiInstallOut, omsagentInstallStatus, omsagentInstallOut, omsconfigInstallStatus, omsconfigInstallOut, scxInstallStatus, scxInstallOut, waagentOut, onboardStatus, omiRunStatus, psefomsagent, omsagentRestart, omiRestart, serviceStop, serviceDisable, serviceEnable, serviceStart)
+
+    f.write(message)
+    f.close()
 
 def run_operation():
     vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
@@ -280,8 +448,12 @@ def run_operation():
             restart_services()
             writeLogOutput('PostInstall Status:')
             result_commands()
+            service_control_commands()
+            write_html()
         elif operation == 'status':
             result_commands()
+            service_control_commands()
+            write_html()
 
 
 if __name__ == '__main__' :
