@@ -424,6 +424,7 @@ def daemon():
             run_status = 'error'
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
+        hutil.SetExtErrorCode(run_result) #setting extension errorcode at the end if missed somewhere
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         total_used_size = -1
         blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
