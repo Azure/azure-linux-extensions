@@ -18,6 +18,7 @@ class SizeCalculation(object):
         self.logger=logger
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
+        self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs']
 
     def get_loop_devices(self):
         global disk_util
@@ -76,8 +77,10 @@ class SizeCalculation(object):
             total_used_gluster = 0
             total_used_loop_device=0
             total_used_temporary_disks = 0 
-            total_used_ram_disks = 0 
+            total_used_ram_disks = 0
+            total_used_unknown_fs = 0
             network_fs_types = []
+            unknown_fs_types = []
       
             if len(self.file_systems_info) == 0 :
                 self.file_systems_info = disk_util.get_mount_file_systems()
@@ -97,6 +100,8 @@ class SizeCalculation(object):
                 device, size, used, available, percent, mountpoint = output[index].split()
                 fstype = ''
                 isNetworkFs = False
+                isKnownFs = False
+
 
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
@@ -107,6 +112,14 @@ class SizeCalculation(object):
                     if nonPhysicaFsType in fstype.lower():
                         isNetworkFs = True
                         break
+
+                for knownFs in self.known_fs:
+                    if knownFs in fstype.lower():
+                        isKnownFs = True
+                        break
+
+                if not (isKnownFs or fstype == '' or fstype == None):
+                    unknown_fs_types.append(fstype)
 
                 if isNetworkFs :
                     if fstype not in network_fs_types :
@@ -135,10 +148,17 @@ class SizeCalculation(object):
                     total_used_network_shares = total_used_network_shares + int(used)
 
                 else:
-                    self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint),True)
+                    self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                     total_used = total_used + int(used) #return in KB
+                    if not (isKnownFs or fstype == '' or fstype == None):
+                        total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
+
+            if not len(unknown_fs_types) == 0:
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
+                self.logger.log("Total used space in Bytes of unknown FSTypes : {0}".format(total_used_unknown_fs * 1024),True)
 
             if not len(network_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
