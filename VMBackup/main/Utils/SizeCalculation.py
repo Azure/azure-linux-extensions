@@ -147,14 +147,11 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive as it starts with slahes, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif not (isKnownFs or fstype == '' or fstype == None) :
-                    self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                    total_used = total_used + int(used) #return in KB
-                    total_used_unknown_fs = total_used_unknown_fs + int(used)
-
                 else:
                     self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                     total_used = total_used + int(used) #return in KB
+                    if not (isKnownFs or fstype == '' or fstype == None):
+                        total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
 
