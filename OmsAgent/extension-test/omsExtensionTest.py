@@ -63,6 +63,7 @@ def create_vm_and_install_extensions():
     appendFile('omsresults.html', htmlOpen)
 
 def verify_data():
+    os.system('rm e2eresults.json')
     cmd='python -u VMRunScript.py -verifydata'
     out=execCommand(cmd)
     writeLogCommand(cmd)
