@@ -1,9 +1,12 @@
-from omsData import *
 import os
 import os.path
 import re
+import rstr
 import sys
+import xeger
 
+from omsData import *
+from verify_e2e import check_e2e
 
 operation = None
 
@@ -18,6 +21,8 @@ def main():
             operation = 'Add Extension'
         elif re.match('^([-/]*)(vmandext)', option):
             operation = 'Create VM and Add Extension'
+        elif re.match('^([-/]*)(verifydata)', option):
+            operation = 'Verify Data'
         elif re.match('^([-/]*)(removeext)', option):
             operation = 'Remove Extension'
         elif re.match('^([-/]*)(deletevm)', option):
@@ -25,7 +30,7 @@ def main():
     except:
         if operation is None:
             print "No operation specified. run with 'preinstall' or 'postinstall'"
-    
+
     run_operation()
 
 
@@ -54,7 +59,9 @@ def delete_vm(resourcegroup, vmname):
 def run_operation():
     for vmname, image in images.iteritems():
         print "\n{} - {}: {} \n".format(operation, vmname, image)
-        dnsname = vmname.lower()+username #to make the dnsname unique
+        uid = rstr.xeger(r'[0-9a-fA-F]{8}')
+        vmname = vmname.lower() + '-' + uid
+        dnsname = vmname
         if operation == 'Create VM and Add Extension':
             create_vm(rGroup, vmname, image, username, password, location, dnsname, size, nsg)
             remove_extension(extension, vmname, rGroup)
@@ -69,6 +76,8 @@ def run_operation():
             add_extension(extension, publisher, vmname, rGroup, private_settings, public_settings)
             run_command(rGroup, vmname, 'RunShellScript', 'python /tmp/omsStatusCheck.py -status')
             copy_from_vm(dnsname, username, password, location)
+        elif operation == 'Verify Data':
+            check_e2e(vmname)
         elif operation == 'Remove Extension':
             remove_extension(extension, vmname, rGroup)
             run_command(rGroup, vmname, 'RunShellScript', 'python /tmp/omsStatusCheck.py -status')

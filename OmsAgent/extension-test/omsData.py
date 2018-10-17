@@ -27,5 +27,5 @@ nsg = "/subscriptions/<subscription-id>/resourceGroups/<nsg-resource-group>/prov
 extension = "OmsAgentForLinux"
 publisher = "Microsoft.EnterpriseCloud.Monitoring"
 size = "Standard_B1ms"
-public_settings = "<private-settings>" #{ "workspaceId": "<workspace-id>" }
-private_settings = "<public_settings>" #{ "workspaceKey": "<workspace-key>" }
+public_settings = "<public_settings>" #{ "workspaceId": "<workspace-id>" }
+private_settings = "<private-settings>" #{ "workspaceKey": "<workspace-key>" }
