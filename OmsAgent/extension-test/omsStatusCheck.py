@@ -45,11 +45,11 @@ def main():
     except:
         if operation is None:
             print "No operation specified. run with 'preinstall' or 'postinstall'"
-    
+
     run_operation()
 
 def is_vm_supported_for_extension():
-    
+
     global vm_supported, vm_dist, vm_ver
     supported_dists = {'redhat' : ['6', '7'], # CentOS
                        'centos' : ['6', '7'], # CentOS
@@ -251,7 +251,7 @@ def result_commands():
     if INSTALLER == 'APT':
         cmd='dpkg -s omi'
         omiInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omiInstallStatus='Install Ok'
         else:
             omiInstallStatus='Not Installed'
@@ -259,7 +259,7 @@ def result_commands():
         writeLogOutput(omiInstallOut)
         cmd='dpkg -s omsagent'
         omsagentInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omsagentInstallStatus='Install Ok'
         else:
             omsagentInstallStatus='Not Installed'
@@ -267,7 +267,7 @@ def result_commands():
         writeLogOutput(omsagentInstallOut)
         cmd='dpkg -s omsconfig'
         omsconfigInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omsconfigInstallStatus='Install Ok'
         else:
             omsagentInstallStatus='Not Installed'
@@ -275,7 +275,7 @@ def result_commands():
         writeLogOutput(omsconfigInstallOut)
         cmd='dpkg -s scx'
         scxInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             scxInstallStatus='Install Ok'
         else:
             scxInstallStatus='Not Installed'
@@ -284,7 +284,7 @@ def result_commands():
     elif INSTALLER == 'YUM' or INSTALLER == 'ZYPPER':
         cmd='rpm -qR omi'
         omiInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omiInstallStatus='Install Ok'
         else:
             omiInstallStatus='Not Installed'
@@ -292,7 +292,7 @@ def result_commands():
         writeLogOutput(omiInstallOut)
         cmd='rpm -qR omsagent'
         omsagentInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omsagentInstallStatus='Install Ok'
         else:
             omsagentInstallStatus='Not Installed'
@@ -300,7 +300,7 @@ def result_commands():
         writeLogOutput(omsagentInstallOut)
         cmd='rpm -qR omsconfig'
         omsconfigInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             omsconfigInstallStatus='Install Ok'
         else:
             omsconfigInstallStatus='Not Installed'
@@ -308,7 +308,7 @@ def result_commands():
         writeLogOutput(omsconfigInstallOut)
         cmd='rpm -qR scx'
         scxInstallOut=execCommand(cmd)
-        if os.system('{} > /dev/null 2>&1'.format(cmd)) == 0:
+        if os.system('{0} > /dev/null 2>&1'.format(cmd)) == 0:
             scxInstallStatus='Install Ok'
         else:
             scxInstallStatus='Not Installed'
@@ -361,23 +361,23 @@ def write_html():
   </tr>
   <tr>
     <td>OMI</td>
-    <td>{}</td>
-    <td>{}</td>
+    <td>{0}</td>
+    <td>{1}</td>
   </tr>
   <tr>
     <td>OMSAgent</td>
-    <td>{}</td>
-    <td>{}</td>
+    <td>{2}</td>
+    <td>{3}</td>
   </tr>
   <tr>
     <td>OMSConfig</td>
-    <td>{}</td>
-    <td>{}</td>
+    <td>{4}</td>
+    <td>{5}</td>
   </tr>
   <tr>
     <td>SCX</td>
-    <td>{}</td>
-    <td>{}</td>
+    <td>{6}</td>
+    <td>{7}</td>
   </tr>
 </table>
 
@@ -390,43 +390,43 @@ def write_html():
   </tr>
   <tr>
     <td>waagent --version</td>
-    <td>{}</td>
+    <td>{8}</td>
   </tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/omsadmin.sh -l</td>
-    <td>{}</td>
+    <td>{9}</td>
   </tr>
   <tr>
     <td>scxadmin -status</td>
-    <td>{}</td>
+    <td>{10}</td>
   </tr>
   <tr>
     <td>ps -ef | egrep "omsagent|omi"</td>
-    <td>{}</td>
+    <td>{11}</td>
   </tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/service_control restart</td>
-    <td>{}</td>
+    <td>{12}</td>
   <tr>
   <tr>
     <td>/opt/omi/bin/service_control restart</td>
-    <td>{}</td>
+    <td>{13}</td>
   <tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/service_control stop</td>
-    <td>{}</td>
+    <td>{14}</td>
   <tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/service_control disable</td>
-    <td>{}</td>
+    <td>{15}</td>
   <tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/service_control enable</td>
-    <td>{}</td>
+    <td>{16}</td>
   <tr>
   <tr>
     <td>/opt/microsoft/omsagent/bin/service_control stop</td>
-    <td>{}</td>
+    <td>{17}</td>
   <tr>
 </table>
 """.format(omiInstallStatus, omiInstallOut, omsagentInstallStatus, omsagentInstallOut, omsconfigInstallStatus, omsconfigInstallOut, scxInstallStatus, scxInstallOut, waagentOut, onboardStatus, omiRunStatus, psefomsagent, omsagentRestart, omiRestart, serviceStop, serviceDisable, serviceEnable, serviceStart)

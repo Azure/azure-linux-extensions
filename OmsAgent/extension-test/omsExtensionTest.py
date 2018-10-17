@@ -1,12 +1,16 @@
-from omsData import *
-from VMRunScript import *
-
+import json
 import os
 import os.path
 import subprocess
 import re
 import sys
 import time
+
+from collections import OrderedDict
+
+from omsData import *
+from VMRunScript import *
+from json2html import *
 
 outFile = 'az-cli-run.log'
 outOpen = open(outFile, 'a+')
@@ -58,6 +62,22 @@ def create_vm_and_install_extensions():
     appendFile('omsresults.out', outOpen)
     appendFile('omsresults.html', htmlOpen)
 
+def verify_data():
+    cmd='python -u VMRunScript.py -verifydata'
+    out=execCommand(cmd)
+    writeLogCommand(cmd)
+    writeLogOutput(out)
+    writeLogCommand('Status After Verifying Data')
+    with open('e2eresults.json', 'r') as infile:
+        data = json.load(infile)
+    appendFile('e2eresults.json', outOpen)
+    distros = data.keys()
+    results = [v[0] for v in  data.values()]
+    # prepend distro column to each results row before generating the table
+    data = [OrderedDict([('Distro', distros[i])] + results[i].items()) for i in range(len(distros))]
+    out = json2html.convert(json=data)
+    htmlOpen.write(out)
+
 def remove_extension():
     cmd='python -u VMRunScript.py -removeext'
     out=execCommand(cmd)
@@ -97,6 +117,10 @@ table {
     width: 100%;
 }
 
+table:not(th) {
+    font-weight: lighter;
+}
+
 td, th {
     border: 1px solid #dddddd;
     text-align: left;
@@ -110,17 +134,19 @@ tr:nth-child(even) {
 </head>
 <body>
 """
+
 htmlOpen.write(htmlstart)
 htmlOpen.write('<h1> Create VM and Install Extension <h1>')
 create_vm_and_install_extensions()
-time.sleep(120)
-htmlOpen.write('<h1> Verfiy Data from OMS workspace <h1>')
-#kusto verification code here
+time.sleep(600)
+htmlOpen.write('<h1> Verify Data from OMS Workspace <h1>')
+verify_data()
 htmlOpen.write('<h1> Remove Extension <h1>')
 remove_extension()
 time.sleep(60)
 htmlOpen.write('<h1> Reinstall Extension <h1>')
 install_extension()
+
 htmlend="""
 </body>
 </html>
