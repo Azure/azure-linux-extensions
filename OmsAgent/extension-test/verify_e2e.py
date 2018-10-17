@@ -5,7 +5,7 @@ import requests
 import adal
 
 def check_e2e(hostname):
-    with open('{}/_parameters.json'.format(os.getcwd()), 'r') as f:
+    with open('{}/parameters.json'.format(os.getcwd()), 'r') as f:
         parameters = f.read()
     parameters = json.loads(parameters)
 
