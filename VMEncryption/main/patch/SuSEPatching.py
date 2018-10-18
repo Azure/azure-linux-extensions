@@ -78,21 +78,19 @@ class SuSEPatching(AbstractPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
 
+    def install_adal(self):
+        if self.distro_info[1] == "11":
+            # SLES 11 images do not support install of python-pip, fail early if adal is missing 
+            self.command_executor.ExecuteInBash('pip list | grep -F adal', raise_exception_on_failure=True)
+        else:
+            self.command_executor.Execute('zypper -l -y install python-pip')
+            self.command_executor.Execute('python -m pip install --upgrade pip')
+            self.command_executor.Execute('python -m pip install adal')
+
     def install_extras(self):
         packages = ['cryptsetup', 'lsscsi']
         cmd = " ".join((['zypper', 'install', '-l', '-y'] + packages))
         self.command_executor.Execute(cmd)
-        
-        if not self.distro_info[1] == "11":
-            packages = ['python-pip', 'gcc', 'libffi-devel', 'openssl-devel', 'python-devel']
-            cmd = " ".join(['zypper', 'install', '-l', '-y'] + packages)
-            self.command_executor.Execute(cmd)
-        
-            cmd = " ".join(['pip', 'install', 'jwt'])
-            self.command_executor.Execute(cmd)
-        
-            cmd = " ".join(['pip', 'install', 'adal'])
-            self.command_executor.Execute(cmd)
 
     def update_prereq(self):
         pass
