@@ -102,7 +102,17 @@ class TestCheckUtil(unittest.TestCase):
         with mock.patch("__builtin__.open", mock.mock_open(read_data=proc_mounts_output)) as mock_open:
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
 
+    @mock.patch("os.system", return_value=0)
+    def test_lvm_os_lvm_present(self, os_system):
+        # if there is LVM
+        self.assertFalse(self.cutil.is_invalid_lvm_os())
+
     @mock.patch("os.system", return_value=-1)
-    def test_lvm_os(self, os_system):
+    def test_lvm_os_lvm_absent(self, os_system):
         # if there is no LVM
         self.assertFalse(self.cutil.is_invalid_lvm_os())
+
+    @mock.patch("os.system", side_effect=[0, -1, 0, 0, 0, 0, 0, 0])
+    def test_lvm_os_lvm_faulty(self, os_system):
+        # if there is faulty LVM
+        self.assertTrue(self.cutil.is_invalid_lvm_os())
