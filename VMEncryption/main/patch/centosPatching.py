@@ -73,6 +73,16 @@ class centosPatching(redhatPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
 
+    def install_cryptsetup(self):
+        packages = ['cryptsetup',
+                    'cryptsetup-reencrypt']
+
+        if self.distro_info[1].startswith("6."):
+            packages.remove('cryptsetup')
+
+        if self.command_executor.Execute("rpm -q " + " ".join(packages)):
+            self.command_executor.Execute("yum install -y " + " ".join(packages))        
+
     def install_extras(self):
         packages = ['cryptsetup',
                     'lsscsi',
@@ -84,11 +94,7 @@ class centosPatching(redhatPatching):
                     'patch',
                     'procps-ng',
                     'util-linux',
-                    'python-six',
-                    'pyparted',
-                    'libffi-devel',
-                    'openssl-devel',
-                    'python-devel']
+                    'pyparted']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')

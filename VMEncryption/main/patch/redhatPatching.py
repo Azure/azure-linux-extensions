@@ -81,6 +81,16 @@ class redhatPatching(AbstractPatching):
             self.touch_path = '/usr/bin/touch'
             self.umount_path = '/usr/bin/umount'
 
+    def install_cryptsetup(self):
+         packages = ['cryptsetup',
+                    'cryptsetup-reencrypt']
+
+        if self.distro_info[1].startswith("6."):
+            packages.remove('cryptsetup')
+            
+        if self.command_executor.Execute("rpm -q " + " ".join(packages)):
+            self.command_executor.Execute("yum install -y " + " ".join(packages))
+
     def install_extras(self):
         packages = ['cryptsetup',
                     'lsscsi',
@@ -91,10 +101,7 @@ class redhatPatching(AbstractPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux',
-                    'libffi-devel',
-                    'openssl-devel',
-                    'python-devel']
+                    'util-linux']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')

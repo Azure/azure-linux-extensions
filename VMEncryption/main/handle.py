@@ -59,7 +59,7 @@ from __builtin__ import int
 from MetadataUtil import MetadataUtil
 
 
-def install():
+def install():    
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
@@ -225,8 +225,10 @@ def get_protected_settings():
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
-
     logger.log('Updating encryption settings')
+
+    # ensure cryptsetup package is still available in case it was for some reason removed after enable
+    DistroPatcher.install_cryptsetup()
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
@@ -462,7 +464,7 @@ def main():
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
 
-    if DistroPatcher is None:
+    if ((not re.match("^([-/]*)(install)", a)) and (DistroPatcher is None)):
         hutil.do_exit(exit_code=0,
                       operation='Enable',
                       status=CommonVariables.extension_error_status,

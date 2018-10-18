@@ -57,6 +57,14 @@ class UbuntuPatching(AbstractPatching):
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
 
+    def install_cryptsetup(self):
+        cmd = " ".join(['apt-get', 'update'])
+        self.command_executor.Execute(cmd)
+        
+        packages = ['cryptsetup-bin']
+        cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+        self.command_executor.Execute(cmd)
+
     def install_extras(self):
         """
         install the sg_dd because the default dd do not support the sparse write
@@ -67,13 +75,9 @@ class UbuntuPatching(AbstractPatching):
         packages = ['at',
 					'cryptsetup-bin',
 					'lsscsi',
-					'python-six',
 					'python-parted',
 					'procps',
-					'psmisc',
-					'libssl-dev',
-					'libffi-dev',
-					'python-dev']
+					'psmisc']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
         self.command_executor.Execute(cmd)
