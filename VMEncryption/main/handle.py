@@ -59,7 +59,23 @@ from __builtin__ import int
 
 
 def install():
+    if DistroPatcher is None:
+        hutil.do_exit(exit_code=0,
+                      operation='Install',
+                      status=CommonVariables.extension_error_status,
+                      code=(CommonVariables.os_not_supported),
+                      message='Install failed: OS distribution is not supported')
+
     hutil.do_parse_context('Install')
+    try:
+        DistroPatcher.install_adal()
+    except:
+        hutil.do_exit(exit_code=0,
+                operation='Install',
+                status=CommonVariables.extension_error_status,
+                code=(CommonVariables.missing_dependency),
+                message='Install failed: OS environment is missing dependencies')
+
     hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
@@ -173,8 +189,10 @@ def get_protected_settings():
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
-
     logger.log('Updating encryption settings')
+
+    # re-install extra packages like cryptsetup if no longer on system from earlier enable
+    DistroPatcher.install_extras()
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()

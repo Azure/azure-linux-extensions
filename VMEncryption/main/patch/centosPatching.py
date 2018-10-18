@@ -72,41 +72,16 @@ class centosPatching(redhatPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
+    
+    def install_adal(self):
+        # epel-release and python-pip >= version 8.1 are adal prerequisites
+        # https://github.com/AzureAD/azure-activedirectory-library-for-python/
+        self.command_executor.Execute("yum install -y epel-release")
+        self.command_executor.Execute("yum install -y python-pip")
+        self.command_executor.Execute("python -m pip install --upgrade pip")
+        self.command_executor.Execute("python -m pip install adal")
 
     def install_extras(self):
-        epel_packages_installed = False
-        attempt = 0
-
-        while not epel_packages_installed:
-            attempt += 1
-            self.logger.log("Attempt #{0} to locate EPEL packages".format(attempt))
-            if self.distro_info[1].startswith("6."):
-                if self.command_executor.Execute("rpm -q python-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y python-pip")
-
-                    if not self.command_executor.Execute("rpm -q python-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-            else:
-                if self.command_executor.Execute("rpm -q python2-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y python2-pip")
-
-                    if not self.command_executor.Execute("rpm -q python2-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
@@ -117,12 +92,7 @@ class centosPatching(redhatPatching):
                     'patch',
                     'procps-ng',
                     'util-linux',
-                    'gcc',
-                    'python-six',
-                    'pyparted',
-                    'libffi-devel',
-                    'openssl-devel',
-                    'python-devel']
+                    'pyparted']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')
@@ -131,10 +101,6 @@ class centosPatching(redhatPatching):
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
-
-        if self.command_executor.Execute("pip show adal"):
-            self.command_executor.Execute("pip install --upgrade six")
-            self.command_executor.Execute("pip install adal")
 
     def update_prereq(self):
         if (self.distro_info[1].startswith('7.')):
