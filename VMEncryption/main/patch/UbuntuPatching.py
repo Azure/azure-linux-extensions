@@ -58,10 +58,9 @@ class UbuntuPatching(AbstractPatching):
         self.touch_path = '/usr/bin/touch'
 
     def install_adal(self):
-        if not self.distro_info[1] == "11":
-            self.command_executor.Execute('zypper -l -y install python-pip')
-            self.command_executor.Execute('python -m pip install --upgrade pip')
-            self.command_executor.Execute('python -m pip install adal')
+        self.command_executor.Execute('apt-get install -y python-pip')
+        self.command_executor.Execute('python -m pip install --upgrade pip')
+        self.command_executor.Execute('python -m pip install adal')
 
     def install_extras(self):
         """
