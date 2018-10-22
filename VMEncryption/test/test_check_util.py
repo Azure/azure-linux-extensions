@@ -46,6 +46,8 @@ class TestCheckUtil(unittest.TestCase):
     def test_is_kv_url(self):
         self.cutil.check_kv_url("https://testkv.vault.azure.net/", "")
         self.cutil.check_kv_url("https://test-kv2.vault.azure.net/", "")
+        self.cutil.check_kv_url("https://test-kv2.vault.azure.net:443/", "")
+        self.cutil.check_kv_url("https://test-kv2.vault.azure.net:443/keys/kekname/kekversion", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "http://testkv.vault.azure.net/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://https://testkv.vault.azure.net/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.testkv.vault.azure.net/", "")

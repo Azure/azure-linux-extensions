@@ -106,7 +106,7 @@ class CheckUtil(object):
             raise Exception(message + '\nMalformed URL: ' + test_url)
 
         if not (parse_result.scheme.lower() == "https" and \
-                re.match('[a-zA-Z0-9\-]+\.vault\.azure\.net$', parse_result.netloc)):
+                re.match('[a-zA-Z0-9\-]+\.vault\.azure\.net(:443)?$', parse_result.netloc)):
             raise Exception('\n' + message + '\nActual: ' + test_url + '\nExpected: ' + expected + "\n")
         return
 
