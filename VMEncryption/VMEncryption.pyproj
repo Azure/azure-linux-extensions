@@ -151,6 +151,12 @@
     <Compile Include="main\Utils\__init__.py" />
     <Compile Include="main\__init__.py" />
     <Compile Include="setup.py" />
+    <Compile Include="test\console_logger.py" />
+    <Compile Include="test\test_check_util.py" />
+    <Compile Include="test\test_DiskUtil.py" />
+    <Compile Include="test\test_MetadataUtil.py" />
+    <Compile Include="test\test_ResourceDiskUtil.py" />
+    <Compile Include="test\__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
@@ -176,6 +182,7 @@
     <Folder Include="main\oscrypto\ubuntu_1404\encryptscripts\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
+    <Folder Include="test\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>

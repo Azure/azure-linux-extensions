@@ -522,7 +522,7 @@ def enable():
             msg = e.message
             hutil.do_exit(exit_code=0,
                           operation='Enable',
-                          status=CommonVariables.extension_error_status,
+                          status=CommonVariables.configuration_error,
                           code=(CommonVariables.unknown_error),
                           message=msg)
 

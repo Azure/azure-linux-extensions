@@ -33,7 +33,7 @@ class CommonVariables:
     encryption_key_mount_point = '/mnt/azure_bek_disk'
     encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
     default_encryption_algorithm = 'RSA-OAEP'
-    encryption_settings_file_name_pattern = 'settings_{}.json'
+    encryption_settings_file_name_pattern = 'settings_{0}.json'
     encryption_settings_counter_file = 'counter.txt'
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
@@ -154,7 +154,9 @@ class CommonVariables:
     extension_error_status = 'error'
     process_success = 0
     success = 0
-    os_not_supported = 1
+    os_not_supported = 51
+    missing_dependancy = 52
+    configuration_error = 53
     luks_format_error = 2
     scsi_number_not_found = 3
     device_not_blank = 4

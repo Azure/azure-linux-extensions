@@ -58,6 +58,10 @@ class TestCheckUtil(unittest.TestCase):
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "DATA"})
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "ALL"})
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "all"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "Os"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "os"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "Data"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "data"})
         for vt in Common.CommonVariables.SupportedVolumeTypes:
             self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: vt})
 

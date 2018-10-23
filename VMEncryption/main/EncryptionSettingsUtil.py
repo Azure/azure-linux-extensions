@@ -135,7 +135,7 @@ class EncryptionSettingsUtil(object):
 
         all_dev_items_real_paths = set([os.path.realpath(disk_util.get_device_path(di.name)) for di in all_device_items])
 
-        self.logger.log("device items which will be used to find vhds to stamp: {}".format(all_dev_items_real_paths))
+        self.logger.log("device items which will be used to find vhds to stamp: {0}".format(all_dev_items_real_paths))
 
         root_device_path = os.path.realpath(os.path.join(CommonVariables.azure_symlinks_dir, "root"))
         root_vhd_needs_stamping = disk_util.is_parent_of_any(root_device_path, all_dev_items_real_paths)
