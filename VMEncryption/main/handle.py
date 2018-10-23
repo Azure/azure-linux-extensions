@@ -522,8 +522,8 @@ def enable():
             msg = e.message
             hutil.do_exit(exit_code=0,
                           operation='Enable',
-                          status=CommonVariables.configuration_error,
-                          code=(CommonVariables.unknown_error),
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.configuration_error),
                           message=msg)
 
         hutil.disk_util.log_lsblk_output()
