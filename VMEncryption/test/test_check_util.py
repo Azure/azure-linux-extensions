@@ -44,13 +44,16 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
 
     def test_is_kv_url(self):
-        self.cutil.check_kv_url("https://testkv.vault.azure.net/", "")
-        self.cutil.check_kv_url("https://test-kv2.vault.azure.net/", "")
-        self.cutil.check_kv_url("https://test-kv2.vault.azure.net:443/", "")
-        self.cutil.check_kv_url("https://test-kv2.vault.azure.net:443/keys/kekname/kekversion", "")
-        self.assertRaises(Exception, self.cutil.check_kv_url, "http://testkv.vault.azure.net/", "")
-        self.assertRaises(Exception, self.cutil.check_kv_url, "https://https://testkv.vault.azure.net/", "")
-        self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.testkv.vault.azure.net/", "")
+        dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
+
+        for dns_suffix in dns_suffix_list:
+            self.cutil.check_kv_url("https://testkv." + dns_suffix + "/", "")
+            self.cutil.check_kv_url("https://test-kv2." + dns_suffix + "/", "")
+            self.cutil.check_kv_url("https://test-kv2." + dns_suffix + ":443/", "")
+            self.cutil.check_kv_url("https://test-kv2." + dns_suffix + ":443/keys/kekname/kekversion", "")
+            self.assertRaises(Exception, self.cutil.check_kv_url, "http://testkv." + dns_suffix + "/", "")
+            self.assertRaises(Exception, self.cutil.check_kv_url, "https://https://testkv." + dns_suffix + "/", "")
+            self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.testkv." + dns_suffix + "/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.vault.azure.com/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://", "")
 

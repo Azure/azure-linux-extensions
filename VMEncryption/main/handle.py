@@ -314,6 +314,7 @@ def update_encryption_settings():
         else:
             logger.log('Secret has already been updated')
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
+            disk_util.log_lsblk_output()
             hutil.exit_if_same_seq()
 
             # remount bek volume
@@ -1552,6 +1553,7 @@ def daemon_encrypt():
                                    status=CommonVariables.extension_success_status,
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
+            disk_util.log_lsblk_output()
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
