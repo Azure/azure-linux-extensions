@@ -73,12 +73,12 @@ class UbuntuPatching(AbstractPatching):
         self.command_executor.Execute(cmd)
 
         packages = ['at',
-					'cryptsetup-bin',
-					'lsscsi',
-					'python-parted',
+                    'cryptsetup-bin',
+                    'lsscsi',
+                    'python-parted',
                     'python-six',
-					'procps',
-					'psmisc']
+                    'procps',
+                    'psmisc']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
         self.command_executor.Execute(cmd)
