@@ -55,7 +55,7 @@ class AbstractPatching(object):
 
     def install_cryptsetup(self):
         pass
-        
+
     def install_extras(self):
         pass
 

@@ -464,13 +464,6 @@ def main():
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
 
-    if ((not re.match("^([-/]*)(install)", a)) and (DistroPatcher is None)):
-        hutil.do_exit(exit_code=0,
-                      operation='Enable',
-                      status=CommonVariables.extension_error_status,
-                      code=(CommonVariables.os_not_supported),
-                      message='Enable failed: the os is not supported')
-
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -479,7 +472,14 @@ def main():
         elif re.match("^([-/]*)(install)", a):
             install()
         elif re.match("^([-/]*)(enable)", a):
-            enable()
+            if DistroPatcher is None:
+                hutil.do_exit(exit_code=0,
+                            operation='Enable',
+                            status=CommonVariables.extension_error_status,
+                            code=(CommonVariables.os_not_supported),
+                            message='Enable failed: OS distribution is not supported')
+            else:
+                enable()
         elif re.match("^([-/]*)(update)", a):
             update()
         elif re.match("^([-/]*)(daemon)", a):
