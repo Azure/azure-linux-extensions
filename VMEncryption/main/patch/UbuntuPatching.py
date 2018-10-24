@@ -73,6 +73,7 @@ class UbuntuPatching(AbstractPatching):
                     'cryptsetup-bin',
                     'lsscsi',
                     'python-parted',
+                    'python-six',
                     'procps',
                     'psmisc']
 
