@@ -80,8 +80,10 @@ class SuSEPatching(AbstractPatching):
 
     def install_adal(self):
         if self.distro_info[1] == "11":
-            # SLES 11 images do not support install of python-pip, fail early if adal is missing 
-            self.command_executor.ExecuteInBash('pip list | grep -F adal', raise_exception_on_failure=True)
+            try:
+                self.command_executor.ExecuteInBash('pip list | grep -F adal', raise_exception_on_failure=True)
+            except: 
+                raise ModuleNotFoundError('SLES 11 environment is missing python-pip and adal')
         else:
             self.command_executor.Execute('zypper -l -y install python-pip')
             self.command_executor.Execute('python -m pip install --upgrade pip')
