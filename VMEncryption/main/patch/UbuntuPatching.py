@@ -67,7 +67,7 @@ class UbuntuPatching(AbstractPatching):
 
     def install_extras(self):
         """
-        install the sg_dd because the default dd do not support the sparse write
+        install the sg_dd because the default dd does not support sparse write
         """
         cmd = " ".join(['apt-get', 'update'])
         self.command_executor.Execute(cmd)
@@ -76,6 +76,7 @@ class UbuntuPatching(AbstractPatching):
 					'cryptsetup-bin',
 					'lsscsi',
 					'python-parted',
+                    'python-six',
 					'procps',
 					'psmisc']
 
