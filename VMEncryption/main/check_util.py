@@ -109,6 +109,9 @@ class CheckUtil(object):
             raise Exception('\n' + message + '\n URL should be https: ' + test_url + "\n")
 
         dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
+        # Add new suffixes here when a new national cloud is introduced.
+        # Relevant link: https://docs.microsoft.com/en-us/azure/key-vault/key-vault-access-behind-firewall#key-vault-operations
+
         dns_match = False
         for dns_suffix in dns_suffix_list:
             escaped_dns_suffix = dns_suffix.replace(".","\.")
