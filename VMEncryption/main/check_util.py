@@ -106,9 +106,30 @@ class CheckUtil(object):
         except:
             raise Exception(message + '\nMalformed URL: ' + test_url)
 
-        if not (parse_result.scheme.lower() == "https" and \
-                re.match('[a-zA-Z0-9\-]+\.vault\.azure\.net(:443)?$', parse_result.netloc)):
-            raise Exception('\n' + message + '\nActual: ' + test_url + '\nExpected: ' + expected + "\n")
+        if not parse_result.scheme.lower() == "https" :
+            raise Exception('\n' + message + '\n URL should be https: ' + test_url + "\n")
+
+        if not parse_result.netloc:
+            raise Exception(message + '\nMalformed URL: ' + test_url)
+
+        # Don't bother with explicit dns check, the host already does and should start returning better error messages.
+
+        # dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
+        # Add new suffixes here when a new national cloud is introduced.
+        # Relevant link: https://docs.microsoft.com/en-us/azure/key-vault/key-vault-access-behind-firewall#key-vault-operations
+
+        # dns_match = False
+        # for dns_suffix in dns_suffix_list:
+        #     escaped_dns_suffix = dns_suffix.replace(".","\.")
+        #     if re.match('[a-zA-Z0-9\-]+\.' + escaped_dns_suffix + '(:443)?$', parse_result.netloc):
+        #         # matched a valid dns, set matched to true
+        #         dns_match = True
+        # if not dns_match:
+        #     raise Exception('\n' + message + '\nProvided URL does not match known valid URL formats: ' + \
+        #         "\n\tProvided URL: " + test_url + \
+        #         "\n\tKnown valid formats:\n\t\t" + \
+        #         "\n\t\t".join(["https://<keyvault-name>." + dns_suffix + "/" for dns_suffix in dns_suffix_list]) )
+
         return
 
     def check_kv_id(self, test_id, message):
@@ -141,8 +162,8 @@ class CheckUtil(object):
         kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
 
-        self.check_kv_url(kv_url, "Key Vault URL is required, but was missing or invalid")
-        self.check_kv_id(kv_id, "Key Vault ID is required, but was missing or invalid")
+        self.check_kv_url(kv_url, "Encountered an error while checking the Key Vault URL")
+        self.check_kv_id(kv_id, "Enountered an error while checking the Key Vault ID")
         if kek_url:
             self.check_kv_url(kek_url, "A KEK URL was specified, but was invalid")
             self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KeyVault ID was invalid")
