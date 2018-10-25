@@ -108,21 +108,27 @@ class CheckUtil(object):
         if not parse_result.scheme.lower() == "https" :
             raise Exception('\n' + message + '\n URL should be https: ' + test_url + "\n")
 
-        dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
+        if not parse_result.netloc:
+            raise Exception(message + '\nMalformed URL: ' + test_url)
+
+        # Don't bother with explicit dns check, the host already does and should start returning better error messages.
+
+        # dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
         # Add new suffixes here when a new national cloud is introduced.
         # Relevant link: https://docs.microsoft.com/en-us/azure/key-vault/key-vault-access-behind-firewall#key-vault-operations
 
-        dns_match = False
-        for dns_suffix in dns_suffix_list:
-            escaped_dns_suffix = dns_suffix.replace(".","\.")
-            if re.match('[a-zA-Z0-9\-]+\.' + escaped_dns_suffix + '(:443)?$', parse_result.netloc):
-                # matched a valid dns, set matched to true
-                dns_match = True
-        if not dns_match:
-            raise Exception('\n' + message + '\nProvided URL does not match known valid URL formats: ' + \
-                "\n\tProvided URL: " + test_url + \
-                "\n\tKnown valid formats:\n\t\t" + \
-                "\n\t\t".join(["https://<keyvault-name>." + dns_suffix + "/" for dns_suffix in dns_suffix_list]) )
+        # dns_match = False
+        # for dns_suffix in dns_suffix_list:
+        #     escaped_dns_suffix = dns_suffix.replace(".","\.")
+        #     if re.match('[a-zA-Z0-9\-]+\.' + escaped_dns_suffix + '(:443)?$', parse_result.netloc):
+        #         # matched a valid dns, set matched to true
+        #         dns_match = True
+        # if not dns_match:
+        #     raise Exception('\n' + message + '\nProvided URL does not match known valid URL formats: ' + \
+        #         "\n\tProvided URL: " + test_url + \
+        #         "\n\tKnown valid formats:\n\t\t" + \
+        #         "\n\t\t".join(["https://<keyvault-name>." + dns_suffix + "/" for dns_suffix in dns_suffix_list]) )
+
         return
 
     def check_kv_id(self, test_id, message):
