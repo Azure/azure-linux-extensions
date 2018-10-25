@@ -161,8 +161,8 @@ class CheckUtil(object):
         kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
 
-        self.check_kv_url(kv_url, "Key Vault URL is required, but was missing or invalid")
-        self.check_kv_id(kv_id, "Key Vault ID is required, but was missing or invalid")
+        self.check_kv_url(kv_url, "Encountered an error while checking the Key Vault URL")
+        self.check_kv_id(kv_id, "Enountered an error while checking the Key Vault ID")
         if kek_url:
             self.check_kv_url(kek_url, "A KEK URL was specified, but was invalid")
             self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KeyVault ID was invalid")
