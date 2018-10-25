@@ -50,6 +50,8 @@ class FreezeSnapshotter(object):
         self.freezer = freezer
         self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
+        if(para_parser.snapshotTaskToken == None):
+            para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
