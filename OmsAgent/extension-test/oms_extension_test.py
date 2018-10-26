@@ -107,8 +107,25 @@ def add_extension(extension, publisher, vmname, resource_group, private_settings
 def remove_extension(extension, vmname, resource_group):
     os.system('az vm extension delete -n {} --vm-name {} --resource-group {}'.format(extension, vmname, resource_group))
 
+def get_vm_resources(resource_group, vmname):
+    vm_cli_out = json.loads(subprocess.check_output('az vm show -g {0} -n {1} --debug'.format(resource_group, vmname), shell=True))
+    os_disk = vm_cli_out['storageProfile']['osDisk']['name']
+    nic_name = vm_cli_out['networkProfile']['networkInterfaces'][0]['id'].split('/')[-1]
+    ip_list = json.loads(subprocess.check_output('az vm list-ip-addresses -n {0} -g {1} --debug'.format(vmname, resource_group), shell=True))
+    ip_name = ip_list[0]['virtualMachine']['network']['publicIpAddresses'][0]['name']
+    return os_disk, nic_name, ip_name
+
 def delete_vm(resource_group, vmname):
     os.system('az vm delete -g {} -n {} --yes'.format(resource_group, vmname))
+
+def delete_vm_disk(resource_group, os_disk):
+    os.system('az disk delete --resource-group {0} --name {1} --yes --debug'.format(resource_group, os_disk))
+
+def delete_nic(resource_group, nic_name):
+    os.system('az network nic delete --resource-group {0} --name {1} --no-wait --debug'.format(resource_group, nic_name))
+
+def delete_ip(resource_group, ip_name):
+    os.system('az network public-ip delete -resource-group {0} -name {1}'.format(resource_group, ip_name))
 
 
 def create_vm_and_install_extensions(vmname, image, dnsname):
@@ -138,7 +155,11 @@ def remove_extension_and_delete_vm(vmname, dnsname, distname):
     remove_extension(extension, vmname, resource_group)
     run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -copyextlogs')
     copy_from_vm(dnsname, username, password, location, '{0}-extension.log'.format(distname))
+    disk, nic, ip = get_vm_resources(resource_group, vmname)
     delete_vm(resource_group, vmname)
+    delete_vm_disk(resource_group, disk)
+    delete_nic(resource_group, nic)
+    delete_ip(resource_group, ip)
 
 
 htmlstart="""<!DOCTYPE html>
@@ -344,7 +365,7 @@ statustable = """
     {5}
   <tr>
 </table>
-""".format(vmsth, all_vms_install_message, all_vms_verify_message, all_vms_remove_message, all_vms_reinstall_message, resultsth)
+""".format(diststh, all_vms_install_message, all_vms_verify_message, all_vms_remove_message, all_vms_reinstall_message, resultsth)
 resulthtmlOpen.write(statustable)
 
 # Create final html & log file
