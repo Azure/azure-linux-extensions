@@ -43,21 +43,30 @@ with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
         exit()
     parameters = json.loads(parameters)
 
-workspace_id = parameters['workspace id']
-workspace_key = parameters['workspace key']
 resource_group = parameters['resource group']
 location = parameters['location']
-subscription = parameters['subscription']
 username = parameters['username']
 password = parameters['password']
 nsg_group = parameters['nsg group']
 nsg_resource_group = parameters['nsg resource group']
 size = parameters['size'] # Preferred: 'Standard_B1ms'
+extension = parameters['extension'] #OmsAgentForLinux
 publisher = parameters['publisher'] # Microsoft.EnterpriseCloud.Monitoring
-extension = parameters['extension'] # OmsAgentForLinux
-nsg = "/subscriptions/"+ subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg_group
+key_vault = parameters['key vault']
+subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name omslinux-automation-kv', shell=True))["value"])
+workspace_id = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
+workspace_key = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-key --vault-name {0}'.format(key_vault), shell=True))["value"])
 public_settings = { "workspaceId": workspace_id }
 private_settings = { "workspaceKey": workspace_key }
+nsg = "/subscriptions/"+ subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg_group
+
+if os.system('az network nsg show --resource-group {0} --name {1}'.format(nsg_resource_group, nsg_group)) == 0:
+    print "Network Security Group successfully validated"
+else:
+    print("""Please verify that the nsg or nsg resource group are valid and are in the right subscription.
+If there is no Network Security Group, please create new one. NSG is a must to create a VM in this testing.""")
+    exit()
+
 
 resultlog = "finalresult.log"
 resulthtml = "finalresult.html"

@@ -40,9 +40,9 @@ def check_e2e(hostname):
         parameters['app secret'])
 
     head = {'Authorization': 'Bearer ' + token['accessToken']}
-    subscription = parameters['subscription']
+    subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name omslinux-automation-kv', shell=True))["value"])
     resource_group = parameters['resource group']
-    workspace = parameters['workspace']
+    workspace = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     url = ENDPOINT.format(subscription, resource_group, workspace)
 
     sources = ['Heartbeat', 'Syslog', 'Perf', 'ApacheAccess_CL', 'MySQL_CL', 'Custom_Log_CL']

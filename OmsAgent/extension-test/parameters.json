@@ -6,7 +6,6 @@
   "app secret": "<app-secret>",
   "resource group": "<resource-group-name>",
   "location": "<location>",
-  "subscription": "<subscription-id>",
   "username": "<username>",
   "password": "<password>",
   "nsg resource group": "<nsg-resource-group>",
@@ -15,6 +14,5 @@
   "publisher": "<publisher>", 
   "extension": "<extension>",
   "workspace": "<workspace-name>",
-  "workspace id": "<workspace-id>",
-  "workspace key": "<worspace-key>"
+  "key vault": "<key-vault-name"
 }
