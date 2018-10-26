@@ -6,7 +6,7 @@
   "app secret": "<app-secret>",
   "resource group": "<resource-group-name>",
   "location": "<location>",
-  "subscription id": "<subscription-id>",
+  "subscription": "<subscription-id>",
   "username": "<username>",
   "password": "<password>",
   "nsg resource group": "<nsg-resource-group>",
