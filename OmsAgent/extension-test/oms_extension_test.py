@@ -53,7 +53,7 @@ size = parameters['size'] # Preferred: 'Standard_B1ms'
 extension = parameters['extension'] #OmsAgentForLinux
 publisher = parameters['publisher'] # Microsoft.EnterpriseCloud.Monitoring
 key_vault = parameters['key vault']
-subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name omslinux-automation-kv', shell=True))["value"])
+subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name {0}'.format(key_vault), shell=True))["value"])
 workspace_id = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
 workspace_key = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-key --vault-name {0}'.format(key_vault), shell=True))["value"])
 public_settings = { "workspaceId": workspace_id }
