@@ -31,16 +31,19 @@ def check_e2e(hostname):
             print('Please replace placeholders in parameters.json')
             exit()
         parameters = json.loads(parameters)
-
-    authority_url = parameters['authority host url'] + '/' + parameters['tenant']
+    
+    tenant_id = str(json.loads(subprocess.check_output('az keyvault secret show --name tenant-id --vault-name {0}'.format(key_vault), shell=True))["value"])
+    app_id = str(json.loads(subprocess.check_output('az keyvault secret show --name app-id --vault-name {0}'.format(key_vault), shell=True))["value"])
+    app_secret = str(json.loads(subprocess.check_output('az keyvault secret show --name app-secret --vault-name {0}'.format(key_vault), shell=True))["value"])
+    authority_url = parameters['authority host url'] + '/' + tenant_id
     context = adal.AuthenticationContext(authority_url)
     token = context.acquire_token_with_client_credentials(
         parameters['resource'],
-        parameters['app id'],
-        parameters['app secret'])
+        app_id,
+        app_secret)
 
     head = {'Authorization': 'Bearer ' + token['accessToken']}
-    subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name omslinux-automation-kv', shell=True))["value"])
+    subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     resource_group = parameters['resource group']
     workspace = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     url = ENDPOINT.format(subscription, resource_group, workspace)
