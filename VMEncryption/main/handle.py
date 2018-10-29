@@ -61,9 +61,6 @@ from __builtin__ import int
 def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
-    hutil.do_status_report(operation='Install', status=CommonVariables.extension_success_status, status_code=str(CommonVariables.success), message='Installing pre-requisites')
-    logger.log("Installing pre-requisites")
-    DistroPatcher.install_extras()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -507,9 +504,6 @@ def enable():
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
-            logger.log("Installing pre-requisites")
-            DistroPatcher.install_extras()
-
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, protected_settings, public_settings)
 
             if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
@@ -522,9 +516,6 @@ def enable():
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
-
-            logger.log("Installing pre-requisites")
-            DistroPatcher.install_extras()
 
             disable_encryption()
 
@@ -1299,7 +1290,7 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
     device_items_to_encrypt = filter(lambda di: os.path.join('/dev/', di.name) in dev_path_reference_table, device_items_to_encrypt)
 
     msg = 'Encrypting and formatting {0} data volumes'.format(len(device_items_to_encrypt))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='EnableEncryptionFormatAll',
                            status=CommonVariables.extension_success_status,
@@ -1368,7 +1359,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
     device_items_to_encrypt = find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util)
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='EnableEncryption',
                            status=CommonVariables.extension_success_status,
@@ -1423,7 +1414,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     crypt_items = disk_util.get_crypt_items()
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
-    logger.log(msg);
+    logger.log(msg)
 
     hutil.do_status_report(operation='DisableEncryption',
                            status=CommonVariables.extension_success_status,
@@ -1805,6 +1796,10 @@ def daemon():
     logger.log("waiting for 2 minutes before continuing the daemon")
     time.sleep(120)
 
+    logger.log("Installing pre-requisites") 
+    DistroPatcher.install_extras() 
+
+    # try decrypt, if decryption marker exists
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     if decryption_marker.config_file_exists():
         try:
@@ -1827,6 +1822,7 @@ def daemon():
                 
             return
 
+    # try encrypt, in absence of decryption marker 
     try:
         daemon_encrypt()
     except Exception as e:

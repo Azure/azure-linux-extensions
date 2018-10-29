@@ -50,6 +50,8 @@ class FreezeSnapshotter(object):
         self.freezer = freezer
         self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
+        if(para_parser.snapshotTaskToken == None):
+            para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
@@ -71,11 +73,12 @@ class FreezeSnapshotter(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
-                if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True):
-                        self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
-                        self.takeSnapshotFrom = CommonVariables.onlyGuest
+                snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
+                self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
+                if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
+                    self.takeSnapshotFrom = snapshotMethodConfigValue
+                else:
+                    self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
                     self.taskId = customSettings["backupTaskId"]
@@ -199,25 +202,39 @@ class FreezeSnapshotter(object):
                         error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
                         self.logger.log(error_msg, True, 'Warning')
                     else:
-                        error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                        run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                        if all_failed and self.takeSnapshotFrom == CommonVariables.onlyGuest:
-                           self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                           error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
-                        else:
-                            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
-                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
-                        run_status = 'error'
-
                         #making FailedSnapshotLimitReached error incase of "snapshot blob calls is exceeded"
                         if blob_snapshot_info_array != None:
                             for blob_snapshot_info in blob_snapshot_info_array:
-                                if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None and ("The rate of snapshot blob calls is exceeded" in blob_snapshot_info.errorMessage or "The snapshot count against this blob has been exceeded" in blob_snapshot_info.errorMessage):
-                                    run_result = CommonVariables.FailedSnapshotLimitReached
-                                    run_status = 'error'
-                                    error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
-                                    self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached)
-                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                                if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
+                                    # if any blob-snapshot has failed with SnapshotRateExceeded with IsAnySnapshotFailed RegKey already true, assign StausCode FailedSnapshotLimitReached
+                                    IsAnySnapshotFailedConfigValue = self.hutil.get_value_from_configfile(CommonVariables.IsAnySnapshotFailed)
+                                    self.logger.log('IsAnySnapshotFailedConfigValue : ' + str(IsAnySnapshotFailedConfigValue))
+                                    if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage and (IsAnySnapshotFailedConfigValue == None or IsAnySnapshotFailedConfigValue == '' or IsAnySnapshotFailedConfigValue == 'False'):
+                                        run_result = CommonVariables.error
+                                        run_status = 'error'
+                                        error_msg = 'Retrying when snapshot failed with SnapshotRateExceeded'
+                                        self.logger.log(error_msg, True, 'Error')
+                                        self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'True')
+                                        time.sleep(600)
+                                        break
+                                    elif 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage or 'The snapshot count against this blob has been exceeded' in blob_snapshot_info.errorMessage:
+                                        run_result = CommonVariables.FailedSnapshotLimitReached
+                                        run_status = 'error'
+                                        error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
+                                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached)
+                                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                                        self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
+                                        break
+                        if(run_result == CommonVariables.success):
+                            error_msg = 'T:S snapshot result: ' + str(snapshot_result)
+                            run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                            if all_failed and self.takeSnapshotFrom == CommonVariables.onlyGuest:
+                                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                            else:
+                                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                            run_status = 'error'
 
                         self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
