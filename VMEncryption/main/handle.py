@@ -59,23 +59,7 @@ from __builtin__ import int
 
 
 def install():
-    if DistroPatcher is None:
-        hutil.do_exit(exit_code=0,
-                      operation='Install',
-                      status=CommonVariables.extension_error_status,
-                      code=(CommonVariables.os_not_supported),
-                      message='Install failed: OS distribution is not supported')
-
     hutil.do_parse_context('Install')
-    try:
-        DistroPatcher.install_adal()
-    except:
-        hutil.do_exit(exit_code=0,
-                operation='Install',
-                status=CommonVariables.extension_error_status,
-                code=(CommonVariables.missing_dependency),
-                message='Install failed: OS environment is missing dependencies')
-
     hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
@@ -260,6 +244,10 @@ def update_encryption_settings():
                 executor.Execute("update-initramfs -u -k all", True)
 
             os.unlink(temp_keyfile.name)
+
+            # install Python ADAL support if using client certificate authentication 
+            if extension_parameter.AADClientCertThumbprint: 
+                DistroPatcher.install_adal()
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
@@ -681,6 +669,10 @@ def enable_encryption():
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
+
+                    # install Python ADAL support if using client certificate authentication 
+                    if extension_parameter.AADClientCertThumbprint: 
+                        DistroPatcher.install_adal()
 
                     kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                            KeyVaultURL=extension_parameter.KeyVaultURL,
