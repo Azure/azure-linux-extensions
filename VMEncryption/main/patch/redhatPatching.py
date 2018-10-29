@@ -86,7 +86,7 @@ class redhatPatching(AbstractPatching):
         # https://access.redhat.com/solutions/1519803 
         self.command_executor.Execute('yum install -y python27-python-pip')
         self.command_executor.Execute('scl enable python27 "pip install --upgrade pip"')
-        self.command_executor.Execute('scl enable python27 "pip install adal" ')
+        self.command_executor.Execute('scl enable python27 "pip install adal"')
 
     def install_extras(self):
         packages = ['cryptsetup',
