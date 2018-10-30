@@ -91,9 +91,14 @@ class ParameterParser(object):
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
         
-        if(self.includedDisks != None):
-            if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
-                self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
-                if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
-                    self.includeLunList.append(-1)
-
+        try:
+            if(self.includedDisks != None):
+                if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
+                    self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
+                    if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
+                        self.includeLunList.append(-1)
+                
+                    backup_logger.log("LUN list - " + str(self.includeLunList), True)
+        except Exception as e:
+            errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
+            backup_logger.log(errorMsg, True)
