@@ -745,6 +745,12 @@ class DiskUtil(object):
 
         return azure_udev_links
 
+    def log_lsblk_output(self):
+        lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(lsblk_command, communicator=proc_comm)
+        self.logger.log('\n' + str(proc_comm.stdout) + '\n')
+
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
