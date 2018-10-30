@@ -92,7 +92,8 @@ $ az account set --subscription subscription_name
 
 #### All images
 
-Replace 'short' with 'long' to run long_run_tests
+- Replace 'short' with 'long' to run long_run_tests
+- Add 'verbose' after short/long to get detailed logs
 
 ```bash
 $ python -u oms_extension_test.py short
@@ -101,5 +102,5 @@ $ python -u oms_extension_test.py short
 #### Subset of images
 
 ```bash
-$ python -u oms_extension_test.py short image1 image2 ...
+$ python -u oms_extension_test.py short verbose image1 image2 ...
 ```

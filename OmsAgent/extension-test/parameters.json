@@ -1,6 +1,6 @@
 {
   "resource": "https://management.azure.com",
-  "authority host URL": "https://login.microsoftonline.com",
+  "authority host url": "https://login.microsoftonline.com",
   "resource group": "<resource-group-name>",
   "location": "<location>",
   "username": "<username>",
@@ -11,5 +11,5 @@
   "publisher": "<publisher>", 
   "extension": "<extension>",
   "workspace": "<workspace-name>",
-  "key vault": "<key-vault-name"
+  "key vault": "<key-vault-name>"
 }

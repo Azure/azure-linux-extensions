@@ -51,7 +51,12 @@ if len(sys.argv) == 1:
 is_long = sys.argv[1] == 'long'
 
 if len(sys.argv) > 2:
-    vms_list = sys.argv[2:]
+    if re.match('^([-/]*)(verbose)', sys.argv[2]):
+        vms_list = sys.argv[3:]
+        runwith = '--verbose'
+    else:
+        vms_list = sys.argv[2:]
+        runwith = ''
     images = {}
     for vm in vms_list:
         vm_dict = { vm: images_list[vm] }
@@ -124,52 +129,52 @@ def replace_items(infile,old_word,new_word):
 
 # Secure copy required files from local to vm
 def copy_to_vm(dnsname, username, password, location):
-    os.system("echo y | pscp -pw {} -r omsfiles/* {}@{}.{}.cloudapp.azure.com:/tmp/".format(password, username, dnsname.lower(), location))
+    os.system("echo y | pscp -pw {0} -r omsfiles/* {1}@{2}.{3}.cloudapp.azure.com:/tmp/".format(password, username, dnsname.lower(), location))
 
 # Secure copy files from vm to local
 def copy_from_vm(dnsname, username, password, location, filename):
-    os.system("echo y | pscp -pw {} -r {}@{}.{}.cloudapp.azure.com:/home/scratch/{} .".format(password, username, dnsname.lower(), location, filename))
+    os.system("echo y | pscp -pw {0} -r {1}@{2}.{3}.cloudapp.azure.com:/home/scratch/{4} .".format(password, username, dnsname.lower(), location, filename))
 
 # Run scripts on vm using AZ CLI
 def run_command(resource_group, vmname, commandid, script):
-    os.system('az vm run-command invoke -g {} -n {} --command-id {} --scripts "{}"'.format(resource_group, vmname, commandid, script))
+    os.system('az vm run-command invoke -g {0} -n {1} --command-id {2} --scripts "{3}" {4}'.format(resource_group, vmname, commandid, script, runwith))
 
 # Create vm using AZ CLI
 def create_vm(resource_group, vmname, image, username, password, location, dnsname, vmsize, networksecuritygroup):
-    os.system('az vm create -g {} -n {} --image {} --admin-username {} --admin-password {} --location {} --public-ip-address-dns-name {} --size {} --nsg {}'.format(resource_group, vmname, image, username, password, location, dnsname, vmsize, networksecuritygroup))
+    os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --admin-password {4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, password, location, dnsname, vmsize, networksecuritygroup, runwith))
 
 # Add extension to vm using AZ CLI
 def add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings):
-    os.system('az vm extension set -n {} --publisher {} --vm-name {} --resource-group {} --protected-settings "{}" --settings "{}"'.format(extension, publisher, vmname, resource_group, private_settings, public_settings))
+    os.system('az vm extension set -n {0} --publisher {1} --vm-name {2} --resource-group {3} --protected-settings "{4}" --settings "{5}" {6}'.format(extension, publisher, vmname, resource_group, private_settings, public_settings, runwith))
 
 # Delete extension from vm using AZ CLI
 def delete_extension(extension, vmname, resource_group):
-    os.system('az vm extension delete -n {} --vm-name {} --resource-group {}'.format(extension, vmname, resource_group))
+    os.system('az vm extension delete -n {0} --vm-name {1} --resource-group {2} {3}'.format(extension, vmname, resource_group, runwith))
 
 # Get vm details using AZ CLI
 def get_vm_resources(resource_group, vmname):
-    vm_cli_out = json.loads(subprocess.check_output('az vm show -g {0} -n {1} --debug'.format(resource_group, vmname), shell=True))
+    vm_cli_out = json.loads(subprocess.check_output('az vm show -g {0} -n {1}'.format(resource_group, vmname), shell=True))
     os_disk = vm_cli_out['storageProfile']['osDisk']['name']
     nic_name = vm_cli_out['networkProfile']['networkInterfaces'][0]['id'].split('/')[-1]
-    ip_list = json.loads(subprocess.check_output('az vm list-ip-addresses -n {0} -g {1} --debug'.format(vmname, resource_group), shell=True))
+    ip_list = json.loads(subprocess.check_output('az vm list-ip-addresses -n {0} -g {1}'.format(vmname, resource_group), shell=True))
     ip_name = ip_list[0]['virtualMachine']['network']['publicIpAddresses'][0]['name']
     return os_disk, nic_name, ip_name
 
 # Delete vm using AZ CLI
 def delete_vm(resource_group, vmname):
-    os.system('az vm delete -g {} -n {} --yes'.format(resource_group, vmname))
+    os.system('az vm delete -g {0} -n {1} --yes {2}'.format(resource_group, vmname, runwith))
 
 # Delete vm disk using AZ CLI
 def delete_vm_disk(resource_group, os_disk):
-    os.system('az disk delete --resource-group {0} --name {1} --yes --debug'.format(resource_group, os_disk))
+    os.system('az disk delete --resource-group {0} --name {1} --yes {2}'.format(resource_group, os_disk, runwith))
 
 # Delete vm network interface using AZ CLI
 def delete_nic(resource_group, nic_name):
-    os.system('az network nic delete --resource-group {0} --name {1} --no-wait --debug'.format(resource_group, nic_name))
+    os.system('az network nic delete --resource-group {0} --name {1} --no-wait {2}'.format(resource_group, nic_name, runwith))
 
 # Delete vm ip from AZ CLI
 def delete_ip(resource_group, ip_name):
-    os.system('az network public-ip delete --resource-group {0} --name {1}'.format(resource_group, ip_name))
+    os.system('az network public-ip delete --resource-group {0} --name {1} {2}'.format(resource_group, ip_name, runwith))
 
 
 htmlstart="""<!DOCTYPE html>
