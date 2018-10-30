@@ -167,7 +167,7 @@ class CheckUtil(object):
         if kek_url:
             self.check_kv_url(kek_url, "A KEK URL was specified, but was invalid")
             self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KeyVault ID was invalid")
-            if kek_algorithm not in CommonVariables.encryption_algorithms:
+            if kek_algorithm is None or kek_algorithm.lower() not in [algo.lower() for algo in CommonVariables.encryption_algorithms]:
                 if kek_algorithm:
                     raise Exception(
                         "The KEK encryption algorithm requested was not recognized")
