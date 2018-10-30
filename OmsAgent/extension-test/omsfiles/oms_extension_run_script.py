@@ -27,17 +27,21 @@ if "check_output" not in dir( subprocess ): # duck punch it in!
 
         subprocess.check_output = check_output
 
-operation = None
+# Create directory and copy files
+if not os.path.isdir('/home/scratch/'):
+    os.system('mkdir /home/scratch/ \
+            && cp /tmp/*.py /home/scratch/ \
+            && cp /tmp/*.log /home/scratch/ \
+            && cp /tmp/*.conf /home/scratch/')
 
-outFile = '/tmp/omsresults.log'
-openFile = open(outFile, 'w+')
+out_file = '/home/scratch/omsresults.log'
+open_file = open(out_file, 'w+')
 
 def main():
     # Determine the operation being executed
     vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
     linux_detect_installer()
-    
-    global operation
+
     if len(sys.argv) == 2:
         option = sys.argv[1]
         if re.match('^([-/]*)(preinstall)', option):
@@ -112,6 +116,7 @@ def is_vm_supported_for_extension():
     return vm_supported, vm_dist, vm_ver
 
 def replace_items(infile,old_word,new_word):
+    """Replace old_word with new_world in file infile."""
     if not os.path.isfile(infile):
         print "Error on replace_word, not a regular file: "+infile
         sys.exit(1)
@@ -131,6 +136,7 @@ def detect_workspace_id():
         workspace_id = None
 
 def linux_detect_installer():
+    """Check what installer (dpkg or rpm) should be used."""
     global INSTALLER
     INSTALLER=None
     if vm_supported and (vm_dist.startswith('Ubuntu') or vm_dist.startswith('debian')):
@@ -141,7 +147,7 @@ def linux_detect_installer():
         INSTALLER='ZYPPER'
 
 def install_additional_packages():
-    #Add additional packages command here
+    """Install additional packages command here."""
     if INSTALLER == 'APT':
         os.system('apt-get -y install wget apache2 git dos2unix \
                 && service apache2 start')
@@ -153,9 +159,11 @@ def install_additional_packages():
                 && service apache2 start')
 
 def enable_dsc():
+    """Enable DSC"""
     os.system('/opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py --enable')
 
 def disable_dsc():
+    """Disable DSC"""
     os.system('/opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py --disable')
     Pending_mof = '/etc/opt/omi/conf/omsconfig/configuration/Pending.mof'
     Current_mof = '/etc/opt/omi/conf/omsconfig/configuration/Pending.mof'
@@ -164,19 +172,20 @@ def disable_dsc():
         os.remove(Current_mof)
 
 def copy_config_files():
-    os.system('dos2unix /tmp/perf.conf \
-            && dos2unix /tmp/rsyslog-oms.conf \
-            && dos2unix /tmp/apache_access.log \
-            && dos2unix /tmp/custom.log \
-            && dos2unix /tmp/error.log \
-            && dos2unix /tmp/mysql-slow.log \
-            && dos2unix /tmp/mysql.log \
-            && cat /tmp/perf.conf >> /etc/opt/microsoft/omsagent/{0}/conf/omsagent.conf \
-            && cp /tmp/rsyslog-oms.conf /etc/opt/omi/conf/omsconfig/rsyslog-oms.conf \
-            && cp /tmp/rsyslog-oms.conf /etc/rsyslog.d/95-omsagent.conf \
+    """Convert, copy, and set permissions for agent configuration files."""
+    os.system('dos2unix /home/scratch/perf.conf \
+            && dos2unix /home/scratch/rsyslog-oms.conf \
+            && dos2unix /home/scratch/apache_access.log \
+            && dos2unix /home/scratch/custom.log \
+            && dos2unix /home/scratch/error.log \
+            && dos2unix /home/scratch/mysql-slow.log \
+            && dos2unix /home/scratch/mysql.log \
+            && cat /home/scratch/perf.conf >> /etc/opt/microsoft/omsagent/{0}/conf/omsagent.conf \
+            && cp /home/scratch/rsyslog-oms.conf /etc/opt/omi/conf/omsconfig/rsyslog-oms.conf \
+            && cp /home/scratch/rsyslog-oms.conf /etc/rsyslog.d/95-omsagent.conf \
             && chown omsagent:omiusers /etc/rsyslog.d/95-omsagent.conf \
             && chmod 644 /etc/rsyslog.d/95-omsagent.conf \
-            && cp /tmp/customlog.conf /etc/opt/microsoft/omsagent/{0}/conf/omsagent.d/customlog.conf \
+            && cp /home/scratch/customlog.conf /etc/opt/microsoft/omsagent/{0}/conf/omsagent.d/customlog.conf \
             && chown omsagent:omiusers /etc/opt/microsoft/omsagent/{0}/conf/omsagent.d/customlog.conf \
             && cp /etc/opt/microsoft/omsagent/sysconf/omsagent.d/apache_logs.conf /etc/opt/microsoft/omsagent/{0}/conf/omsagent.d/apache_logs.conf \
             && chown omsagent:omiusers /etc/opt/microsoft/omsagent/{0}/conf/omsagent.d/apache_logs.conf \
@@ -226,25 +235,25 @@ def apache_mysql_conf():
 def inject_logs():
     """Inject logs (after) agent is running in order to simulate real Apache/MySQL/Custom logs output."""
     if INSTALLER == 'APT':
-        os.system('cp /tmp/apache_access.log /var/log/apache2/access.log \
+        os.system('cp /home/scratch/apache_access.log /var/log/apache2/access.log \
                 && chown root:root /var/log/apache2/access.log \
                 && chmod 644 /var/log/apache2/access.log \
                 && dos2unix /var/log/apache2/access.log')
     elif INSTALLER == 'YUM':
-        os.system('cp /tmp/apache_access.log /var/log/httpd/access_log \
+        os.system('cp /home/scratch/apache_access.log /var/log/httpd/access_log \
                 && chown root:root /var/log/httpd/access_log \
                 && chmod 644 /var/log/httpd/access_log \
                 && dos2unix /var/log/httpd/access_log')
     elif INSTALLER == 'ZYPPER':
-        os.system('cp /tmp/apache_access.log /var/log/apache2/access_log \
+        os.system('cp /home/scratch/apache_access.log /var/log/apache2/access_log \
                 && chown root:root /var/log/apache2/access_log \
                 && chmod 644 /var/log/apache2/access_log \
                 && dos2unix /var/log/apache2/access_log')
 
-    os.system('cp /tmp/mysql.log /var/log/mysql/mysql.log \
-            && cp /tmp/error.log /var/log/mysql/error.log \
-            && cp /tmp/mysql-slow.log /var/log/mysql/mysql-slow.log \
-            && cp /tmp/custom.log /var/log/custom.log')
+    os.system('cp /home/scratch/mysql.log /var/log/mysql/mysql.log \
+            && cp /home/scratch/error.log /var/log/mysql/error.log \
+            && cp /home/scratch/mysql-slow.log /var/log/mysql/mysql-slow.log \
+            && cp /home/scratch/custom.log /var/log/custom.log')
 
 def config_start_oms_services():
     """Orchestrate overall configuration prior to agent start."""
@@ -254,6 +263,7 @@ def config_start_oms_services():
     apache_mysql_conf()
 
 def restart_services():
+    """Restart rsyslog, OMI, and OMS."""
     time.sleep(10)
     os.system('service rsyslog restart \
                 && /opt/omi/bin/service_control restart \
@@ -274,20 +284,20 @@ def exec_command(cmd):
         print(e.returncode)
         return e.returncode
 
-def write_log_output(openFile, out):
+def write_log_output(log, out):
     """Save command output to the log file."""
     if(type(out) != str):
         out = str(out)
-    openFile.write(out + '\n')
-    openFile.write('-' * 80)
-    openFile.write('\n')
+    log.write(out + '\n')
+    log.write('-' * 80)
+    log.write('\n')
 
-def write_log_command(openFile, cmd):
+def write_log_command(log, cmd):
     """Print command and save command to log file."""
     print(cmd)
-    openFile.write(cmd + '\n')
-    openFile.write('=' * 40)
-    openFile.write('\n')
+    log.write(cmd + '\n')
+    log.write('=' * 40)
+    log.write('\n')
 
 def check_pkg_status(pkg):
     """Check pkg install status and return output and derived status."""
@@ -307,25 +317,26 @@ def check_pkg_status(pkg):
         else:
             status = 'Not Installed'
 
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, output)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, output)
     return (output, status)
 
 def result_commands():
+    """Determine and store status of agent."""
     global waagentOut, onboardStatus, omiRunStatus, psefomsagent, omsagentRestart, omiRestart
     global omiInstallOut, omsagentInstallOut, omsconfigInstallOut, scxInstallOut, omiInstallStatus, omsagentInstallStatus, omsconfigInstallStatus, scxInstallStatus
     cmd='waagent --version'
     waagentOut = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, waagentOut)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, waagentOut)
     cmd = '/opt/microsoft/omsagent/bin/omsadmin.sh -l'
     onboardStatus = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, onboardStatus)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, onboardStatus)
     cmd = 'scxadmin -status'
     omiRunStatus = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, omiRunStatus)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, omiRunStatus)
 
     omiInstallOut, omiInstallStatus = check_pkg_status('omi')
     omsagentInstallOut, omsagentInstallStatus = check_pkg_status('omsagent')
@@ -335,21 +346,21 @@ def result_commands():
     # OMS agent process check
     cmd = 'ps -ef | egrep "omsagent|omi"'
     psefomsagent = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, psefomsagent)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, psefomsagent)
 
     time.sleep(10)
     # OMS agent restart
     cmd = '/opt/microsoft/omsagent/bin/service_control restart'
     omsagentRestart = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, omsagentRestart)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, omsagentRestart)
 
     # OMI agent restart
     cmd = '/opt/omi/bin/service_control restart'
     omiRestart = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, omiRestart)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, omiRestart)
 
 def service_control_commands():
     """Determine and store results of various service commands."""
@@ -358,31 +369,32 @@ def service_control_commands():
     # OMS stop (shutdown the agent)
     cmd = '/opt/microsoft/omsagent/bin/service_control stop'
     serviceStop = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, serviceStop)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, serviceStop)
 
     # OMS disable (disable agent from starting upon system start)
     cmd = '/opt/microsoft/omsagent/bin/service_control disable'
     serviceDisable = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, serviceDisable)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, serviceDisable)
 
     # OMS enable (enable agent to start upon system start)
     cmd = '/opt/microsoft/omsagent/bin/service_control enable'
     serviceEnable = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, serviceEnable)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, serviceEnable)
 
     # OMS start (start the agent)
     cmd = '/opt/microsoft/omsagent/bin/service_control start'
     serviceStart = exec_command(cmd)
-    write_log_command(openFile, cmd)
-    write_log_output(openFile, serviceStart)
+    write_log_command(open_file, cmd)
+    write_log_output(open_file, serviceStart)
 
 def write_html():
-    os.system('rm /tmp/omsresults.html')
-    htmlFile = '/tmp/omsresults.html'
-    f = open(htmlFile, 'w+')
+    """Use stored command results to create an HTML report of the test results."""
+    os.system('rm /home/scratch/omsresults.html')
+    html_file = '/home/scratch/omsresults.html'
+    f = open(html_file, 'w+')
     message="""
 <div class="text" style="white-space: pre-wrap" >
 
@@ -469,7 +481,7 @@ def write_html():
     f.close()
 
 def dist_status():
-    f = open('/tmp/omsresults.status', 'w+')
+    f = open('/home/scratch/omsresults.status', 'w+')
     if os.system('/opt/microsoft/omsagent/bin/omsadmin.sh -l') == 0:
         detect_workspace_id()
         x_out = subprocess.check_output('/opt/microsoft/omsagent/bin/omsadmin.sh -l', shell=True)
@@ -494,14 +506,14 @@ def copy_extension_log():
     split_name = vm_dist.split(' ')
     split_ver = vm_ver.split('.')
     if vm_dist.startswith('Red Hat'):
-        extlogfile = '/tmp/{0}-extension.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extension.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
     else:
-        extlogfile = '/tmp/{0}-extension.log'.format(split_name[0].lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extension.log'.format(split_name[0].lower()+split_ver[0])
 
     extlogfileOpen = open(extlogfile, 'a+')
     oms_azure_ext_dir = '/var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/'
     ext_vers = sorted_dir(oms_azure_ext_dir)
-    write_log_command(extlogfileOpen, 'Extension Install Logs:')
+    write_log_command(extlogfileOpen, 'Extension Logs:')
     if ext_vers[0].startswith('extension'):
         append_file(oms_azure_ext_dir + ext_vers[0], extlogfileOpen)
     else:

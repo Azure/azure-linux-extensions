@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 
 import adal
 import requests
@@ -32,6 +33,7 @@ def check_e2e(hostname):
             exit()
         parameters = json.loads(parameters)
     
+    key_vault = parameters['key vault']
     tenant_id = str(json.loads(subprocess.check_output('az keyvault secret show --name tenant-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     app_id = str(json.loads(subprocess.check_output('az keyvault secret show --name app-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     app_secret = str(json.loads(subprocess.check_output('az keyvault secret show --name app-secret --vault-name {0}'.format(key_vault), shell=True))["value"])
@@ -43,9 +45,9 @@ def check_e2e(hostname):
         app_secret)
 
     head = {'Authorization': 'Bearer ' + token['accessToken']}
-    subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name susbscription-id --vault-name {0}'.format(key_vault), shell=True))["value"])
+    subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name subscription-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     resource_group = parameters['resource group']
-    workspace = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
+    workspace = parameters['workspace']
     url = ENDPOINT.format(subscription, resource_group, workspace)
 
     sources = ['Heartbeat', 'Syslog', 'Perf', 'ApacheAccess_CL', 'MySQL_CL', 'Custom_Log_CL']

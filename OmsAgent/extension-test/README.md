@@ -4,12 +4,17 @@
 ## Requirements
 
 * [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-* [Putty PSCP](https://www.putty.org/)
+* Putty PSCP
+  * [Putty for Windows](https://www.putty.org/)
+  * Putty tools for Linux:
+    * For DPKG: 'sudo apt-get install putty-tools'
+    * For RPM: 'sudo yum install putty-tools'
+    * For SUSE: 'sudo zypper install putty-tools'
 * Python 2.7+ & [pip](https://pip.pypa.io/en/stable/installing/)
-* [Requests](http://docs.python-requests.org/en/master/), [ADAL](https://github.com/AzureAD/azure-activedirectory-library-for-python)
+* [Requests](http://docs.python-requests.org/en/master/), [ADAL](https://github.com/AzureAD/azure-activedirectory-library-for-python), [rstr](https://pypi.org/project/rstr/)
 
 ```bash
-$ pip install requests adal
+$ pip install requests adal rstr
 ```
 
 ## Images currently supported for testing:
@@ -28,7 +33,7 @@ $ pip install requests adal
 1. Create a resource group that will be used to store all test resources
 2. Create an Azure Key Vault to store test secrets
 3. Create a Log Analytics workspace where your test VMs will send data
-  - From the workspace blade, navigate to Settings > Advanced Settings > and note the workspace ID and key for later
+  - From the workspace blade, navigate to Settings > Advanced Settings > and note the workspace Id and Key for later
 4. Create a network security group, preferably in West US 2
   - From the NSG blade, navigate to Settings > Inbound Security Rules > Add
   - Use the following settings
@@ -68,10 +73,12 @@ $ pip install requests adal
     - `Select` – verify_e2e
   - Save
 2. Log in to Azure using the Azure CLI and set your subscription
+
 ```bash
 $ az login
 $ az account set --subscription subscription_name
 ```
+
 3. Custom Log Setup:
   - [Custom logs Docs](https://docs.microsoft.com/en-us/azure/log-analytics/log-analytics-data-sources-custom-logs)
   - Add custom.log file to setup Custom_Log_CL
@@ -85,12 +92,14 @@ $ az account set --subscription subscription_name
 
 #### All images
 
+Replace 'short' with 'long' to run long_run_tests
+
 ```bash
-$ python -u oms_extension_test.py
+$ python -u oms_extension_test.py short
 ```
 
 #### Subset of images
 
 ```bash
-$ python -u oms_extension_test.py image1 image2 ...
+$ python -u oms_extension_test.py short image1 image2 ...
 ```
