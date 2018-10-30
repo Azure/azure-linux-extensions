@@ -1,7 +1,7 @@
 # OmsAgent Extension
 Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboard to Operations Management Suite
 
-Latest version is 1.4.
+Latest version is 1.8.1.
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
