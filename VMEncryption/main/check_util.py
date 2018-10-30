@@ -95,7 +95,6 @@ class CheckUtil(object):
 
     def check_kv_url(self, test_url, message):
         """basic sanity check of the key vault url"""
-        expected = "https://{keyvault-name}.vault.azure.net/"
 
         if test_url is None:
             raise Exception(message + '\nNo URL supplied')
