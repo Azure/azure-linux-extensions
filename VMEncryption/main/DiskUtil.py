@@ -202,9 +202,7 @@ class DiskUtil(object):
                 new_mount_content = mount_content_item
 
             with open(self.encryption_environment.azure_crypt_mount_config_path,'w') as wf:
-                wf.write('\n')
                 wf.write(new_mount_content)
-                wf.write('\n')
             return True
         except Exception as e:
             return False
@@ -222,9 +220,7 @@ class DiskUtil(object):
             filtered_mount_lines = filter(lambda line: not crypt_item.mapper_name in line, mount_lines)
 
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
-                wf.write('\n')
                 wf.write('\n'.join(filtered_mount_lines))
-                wf.write('\n')
 
             return True
 
@@ -440,16 +436,12 @@ class DiskUtil(object):
                 filtered_contents.append(line)
 
         with open('/etc/fstab', 'w') as f:
-            f.write('\n')
             f.write('\n'.join(filtered_contents))
-            f.write('\n')
 
         self.logger.log("fstab updated successfully")
 
         with open('/etc/fstab.azure.backup', 'a+') as f:
-            f.write('\n')
             f.write('\n'.join(removed_lines))
-            f.write('\n')
 
         self.logger.log("fstab.azure.backup updated successfully")
 
@@ -476,25 +468,28 @@ class DiskUtil(object):
                 filtered_contents.append(line)
 
         with open('/etc/fstab.azure.backup', 'w') as f:
-            f.write('\n')
             f.write('\n'.join(filtered_contents))
-            f.write('\n')
 
         self.logger.log("fstab.azure.backup updated successfully")
 
         with open('/etc/fstab', 'a+') as f:
-            f.write('\n')
             f.write('\n'.join(removed_lines))
-            f.write('\n')
 
         self.logger.log("fstab updated successfully")
+
+    def mount_bek_volume(self, bek_label, mount_point, option_string):
+        """
+        mount the BEK volume
+        """
+        self.make_sure_path_exists(mount_point)
+        mount_cmd = self.distro_patcher.mount_path + ' -L "' + bek_label + '" ' + mount_point + ' -o ' + option_string
+        return self.command_executor.Execute(mount_cmd)
 
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
         """
         self.make_sure_path_exists(mount_point)
-        return_code = -1
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
         else: 

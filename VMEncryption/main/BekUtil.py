@@ -31,7 +31,6 @@ class BekUtil(object):
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
-        self.passphrase_device = None
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
 
     def generate_passphrase(self, algorithm):
@@ -49,26 +48,16 @@ class BekUtil(object):
     def get_bek_passphrase_file(self, encryption_config):
         bek_filename = encryption_config.get_bek_filename()
 
-        if TestHooks.search_not_only_ide:
-            self.logger.log("TESTHOOK: search not only ide set")
-            azure_devices = self.disk_util.get_device_items(None)
-        else:
-            azure_devices = self.disk_util.get_azure_devices()
+        try:
+            self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+            self.disk_util.mount_bek_volume("BEK VOLUME", self.bek_filesystem_mount_point, "fmask=077")
 
-        for azure_device in azure_devices:
-            fstype = str(azure_device.file_system).lower()
-            if fstype in ['vfat']:
-                try:
-                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
-                                                    self.bek_filesystem_mount_point,
-                                                    fstype)
+            if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
+                return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
-                    if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
-                        return os.path.join(self.bek_filesystem_mount_point, bek_filename)
-                except Exception as e:
-                    message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
-                    self.logger.log(message)
+        except Exception as e:
+            message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
+            self.logger.log(message)
 
         return None
 
