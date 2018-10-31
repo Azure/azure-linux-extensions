@@ -6,9 +6,9 @@
   "username": "<username>",
   "password": "<password>",
   "nsg resource group": "<nsg-resource-group>",
-  "nsg group": "<nsg-group>",
+  "nsg": "<nsg>",
   "size": "<size>",
-  "publisher": "<publisher>", 
+  "publisher": "<publisher>",
   "extension": "<extension>",
   "workspace": "<workspace-name>",
   "key vault": "<key-vault-name>"

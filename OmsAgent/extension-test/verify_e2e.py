@@ -32,7 +32,7 @@ def check_e2e(hostname):
             print('Please replace placeholders in parameters.json')
             exit()
         parameters = json.loads(parameters)
-    
+
     key_vault = parameters['key vault']
     tenant_id = str(json.loads(subprocess.check_output('az keyvault secret show --name tenant-id --vault-name {0}'.format(key_vault), shell=True))["value"])
     app_id = str(json.loads(subprocess.check_output('az keyvault secret show --name app-id --vault-name {0}'.format(key_vault), shell=True))["value"])
@@ -52,20 +52,13 @@ def check_e2e(hostname):
 
     sources = ['Heartbeat', 'Syslog', 'Perf', 'ApacheAccess_CL', 'MySQL_CL', 'Custom_Log_CL']
     distro = hostname.split('-')[0]
-    try:
-        with open('{}/e2eresults.json'.format(os.getcwd()), 'r') as infile:
-            try:
-                results = json.load(infile)
-            except ValueError:
-                results = {}
-    except IOError:
-        results = {}
+    results = {}
     results[distro] = {}
 
     print('Verifying data from computer {}'.format(hostname))
     for s in sources:
         query = '%s | where Computer == \'%s\' | take 1' % (s, hostname)
-        timespan = 'P10Y'
+        timespan = 'P15M'
         r = requests.post(url, headers=head, json={'query':query, 'timespan':timespan})
 
         if r.status_code == requests.codes.ok:
@@ -82,8 +75,6 @@ def check_e2e(hostname):
 
     results[distro] = [results[distro]]
     print(results)
-    with open('{}/e2eresults.json'.format(os.getcwd()), 'w+') as outfile:
-        json.dump(results, outfile)
     return results
 
 def main():
