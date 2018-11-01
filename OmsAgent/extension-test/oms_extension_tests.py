@@ -74,7 +74,6 @@ with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
 resource_group = parameters['resource group']
 location = parameters['location']
 username = parameters['username']
-password = parameters['password']
 nsg_group = parameters['nsg group']
 nsg_resource_group = parameters['nsg resource group']
 size = parameters['size'] # Preferred: 'Standard_B1ms'
@@ -87,6 +86,8 @@ workspace_key = str(json.loads(subprocess.check_output('az keyvault secret show 
 public_settings = { "workspaceId": workspace_id }
 private_settings = { "workspaceKey": workspace_key }
 nsg = "/subscriptions/"+ subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg_group
+ssh_public = '~/.ssh/id_rsa.pub'
+ssh_private = '~/.ssh/id_rsa'
 
 # Detect the host system and validate nsg
 if system() == 'Windows':
@@ -128,20 +129,20 @@ def replace_items(infile,old_word,new_word):
     f2.write(m)
 
 # Secure copy required files from local to vm
-def copy_to_vm(dnsname, username, password, location):
-    os.system("echo y | pscp -pw {0} -r omsfiles/* {1}@{2}.{3}.cloudapp.azure.com:/tmp/".format(password, username, dnsname.lower(), location))
+def copy_to_vm(dnsname, username, ssh_private, location):
+    os.system("scp -i {0} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -r omsfiles/* {1}@{2}.{3}.cloudapp.azure.com:/tmp/".format(ssh_private, username, dnsname.lower(), location))
 
 # Secure copy files from vm to local
-def copy_from_vm(dnsname, username, password, location, filename):
-    os.system("echo y | pscp -pw {0} -r {1}@{2}.{3}.cloudapp.azure.com:/home/scratch/{4} .".format(password, username, dnsname.lower(), location, filename))
+def copy_from_vm(dnsname, username, ssh_private, location, filename):
+    os.system("scp -i {0} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -r {1}@{2}.{3}.cloudapp.azure.com:/home/scratch/{4} omsfiles/.".format(ssh_private, username, dnsname.lower(), location, filename))
 
 # Run scripts on vm using AZ CLI
 def run_command(resource_group, vmname, commandid, script):
     os.system('az vm run-command invoke -g {0} -n {1} --command-id {2} --scripts "{3}" {4}'.format(resource_group, vmname, commandid, script, runwith))
 
 # Create vm using AZ CLI
-def create_vm(resource_group, vmname, image, username, password, location, dnsname, vmsize, networksecuritygroup):
-    os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --admin-password {4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, password, location, dnsname, vmsize, networksecuritygroup, runwith))
+def create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, networksecuritygroup):
+    os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --ssh-key-value @{4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, networksecuritygroup, runwith))
 
 # Add extension to vm using AZ CLI
 def add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings):
@@ -238,21 +239,21 @@ def create_vm_and_install_extension():
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         print "\nCreate VM and Install Extension - {}: {} \n".format(vmname, image)
-        create_vm(resource_group, vmname, image, username, password, location, dnsname, size, nsg)
-        copy_to_vm(dnsname, username, password, location)
+        create_vm(resource_group, vmname, image, username, ssh_private, location, dnsname, size, nsg)
+        copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
-        copy_from_vm(dnsname, username, password, location, 'omsresults.*')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Creating VM and Adding OMS Extension')
         html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
         html_open.write("<h2> Install OMS Agent </h2>")
-        append_file('omsresults.log', log_open)
-        append_file('omsresults.html', html_open)
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsresults.status', 'r').read()
+        status = open('omsfiles/omsresults.status', 'r').read()
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>Install Success</span></td>"""
@@ -321,14 +322,14 @@ def remove_extension():
         print "\nRemove Extension: {} \n".format(vmname)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
-        copy_from_vm(dnsname, username, password, location, 'omsresults.*')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Removing OMS Extension')
         html_open.write('<h2> Remove Extension: {0} <h2>'.format(vmname))
-        append_file('omsresults.log', log_open)
-        append_file('omsresults.html', html_open)
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsresults.status', 'r').read()
+        status = open('omsfiles/omsresults.status', 'r').read()
         if status == "Agent Found":
             message += """
                             <td><span style="background-color: red; color: white">Remove Failed</span></td>"""
@@ -355,14 +356,14 @@ def reinstall_extension():
         print "\n Reinstall Extension: {} \n".format(vmname)
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
-        copy_from_vm(dnsname, username, password, location, 'omsresults.*')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Reinstall OMS Extension')
         html_open.write('<h2> Reinstall Extension: {0} <h2>'.format(vmname))
-        append_file('omsresults.log', log_open)
-        append_file('omsresults.html', html_open)
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsresults.status')
+        status = open('omsfiles/omsresults.status')
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>Reinstall Success</span></td>"""
@@ -387,14 +388,14 @@ def check_status():
         dnsname = vmname
         print "\n Checking Status: {0} \n".format(vmname)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
-        copy_from_vm(dnsname, username, password, location, 'omsresults.*')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Long Run OMS Extension')
         html_open.write('<h2> Status After Long Run OMS Extension: {0} <h2>'.format(vmname))
-        append_file('omsresults.log', log_open)
-        append_file('omsresults.html', html_open)
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsresults.status')
+        status = open('omsfiles/omsresults.status')
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>Reinstall Success</span></td>"""
@@ -416,7 +417,7 @@ def remove_extension_and_delete_vm():
         print "\n Remove extension and Delete VM: {} \n".format(vmname)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyextlogs')
-        copy_from_vm(dnsname, username, password, location, '{0}-extension.log'.format(distname))
+        copy_from_vm(dnsname, username, ssh_private, location, '{0}-extension.log'.format(distname))
         disk, nic, ip = get_vm_resources(resource_group, vmname)
         delete_vm(resource_group, vmname)
         delete_vm_disk(resource_group, disk)

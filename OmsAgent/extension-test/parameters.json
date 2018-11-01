@@ -4,7 +4,6 @@
   "resource group": "<resource-group-name>",
   "location": "<location>",
   "username": "<username>",
-  "password": "<password>",
   "nsg resource group": "<nsg-resource-group>",
   "nsg group": "<nsg-group>",
   "size": "<size>",

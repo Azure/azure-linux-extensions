@@ -149,13 +149,13 @@ def linux_detect_installer():
 def install_additional_packages():
     """Install additional packages command here."""
     if INSTALLER == 'APT':
-        os.system('apt-get -y install wget apache2 git dos2unix \
+        os.system('apt-get -y update && apt-get -y install wget apache2 git dos2unix \
                 && service apache2 start')
     elif INSTALLER == 'YUM':
-        os.system('yum install -y wget httpd git dos2unix \
+        os.system('yum -y update && yum install -y wget httpd git dos2unix \
                 && service httpd start')
     elif INSTALLER == 'ZYPPER':
-        os.system('zypper install -y wget httpd git dos2unix\
+        os.system('zypper -y update && zypper install -y wget httpd git dos2unix\
                 && service apache2 start')
 
 def enable_dsc():
