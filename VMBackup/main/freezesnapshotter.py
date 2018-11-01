@@ -39,7 +39,8 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
-from dhcpHandler import DhcpHandler
+# need to be implemented in next release
+#from dhcpHandler import DhcpHandler
 
 class FreezeSnapshotter(object):
     """description of class"""
@@ -58,6 +59,8 @@ class FreezeSnapshotter(object):
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
 
+        #implement in next release
+        '''
         # fetching wireserver IP from DHCP
         self.dhcpHandlerObj = None
         try:
@@ -67,6 +70,8 @@ class FreezeSnapshotter(object):
             errorMsg = "Failed to get hostIp from DHCP with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, True, 'Error')
             self.hostIp = '168.63.129.16'
+        '''
+
         self.logger.log( "hostIp : " + self.hostIp)
 
         try:
