@@ -28,6 +28,7 @@ from verify_e2e import check_e2e
 from json2html import *
 
 E2E_DELAY = 10 # Delay (minutes) before checking for data
+AUTOUPGRADE_DELAY = 30 # Delay (minutes) before rechecking the extension version
 LONG_DELAY = 250 # Delay (minutes) before rechecking extension
 
 images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180',
@@ -49,9 +50,10 @@ if len(sys.argv) == 1:
     print(('Please indicate run length (short or long) and optional image subset:\n'
            '$ python -u oms_extension_tests.py length [image...]'))
 is_long = sys.argv[1] == 'long'
+is_autoupgrade = sys.argv[1] == 'autoupgrade'
 
 if len(sys.argv) > 2:
-    if re.match('^([-/]*)(verbose)', sys.argv[2]):
+    if sys.argv[2] == 'verbose':
         vms_list = sys.argv[3:]
         runwith = '--verbose'
     else:
@@ -161,6 +163,11 @@ def get_vm_resources(resource_group, vmname):
     ip_name = ip_list[0]['virtualMachine']['network']['publicIpAddresses'][0]['name']
     return os_disk, nic_name, ip_name
 
+def get_extension_version_now(resource_group, vmname, extension):
+    vm_ext_out = json.loads(subprocess.check_output('az vm extension show --resource-group {0} --vm-name {1} --name {2}'.format(resource_group, vmname, extension), shell=True))
+    installed_version = int(('').join(str(vm_ext_out["instanceView"]["typeHandlerVersion"]).split('.')))
+    return installed_version
+
 # Delete vm using AZ CLI
 def delete_vm(resource_group, vmname):
     os.system('az vm delete -g {0} -n {1} --yes {2}'.format(resource_group, vmname, runwith))
@@ -211,6 +218,11 @@ def main():
     """Orchestrate fundemental testing steps onlined in header docstring."""
     install_oms_msg = create_vm_and_install_extension()
     verify_oms_msg = verify_data()
+    if is_autoupgrade:
+        autoupgrade_status_msg = autoupgrade_status()
+        autoupgrade_verify_msg = verify_data()
+    else:
+        autoupgrade_verify_msg, autoupgrade_status_msg = None, None
     remove_oms_msg = remove_extension()
     reinstall_oms_msg = reinstall_extension()
     if is_long:
@@ -224,7 +236,7 @@ def main():
     else:
         long_verify_msg, long_status_msg = None, None
     remove_extension_and_delete_vm()
-    messages = (install_oms_msg, verify_oms_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
+    messages = (install_oms_msg, verify_oms_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
     create_report(messages)
 
 
@@ -308,6 +320,48 @@ def verify_data():
         elif success_count == 0:
             message += """
                             <td><span style='background-color: red; color: white'>Verify Failed</span></td>"""
+    return message
+
+def autoupgrade_status():
+    message = ""
+    for vmname in vmnames:
+        initial_version = get_extension_version_now(resource_group, vmname, extension)
+        time_lapsed = 0
+        while initial_version >= get_extension_version_now(resource_group, vmname, extension):
+            time.sleep(AUTOUPGRADE_DELAY*60)
+            time_lapsed+=AUTOUPGRADE_DELAY*60
+            if time_lapsed >= 86400:
+                print('Process waiting for more than 24 hrs. Please check the deployment of the new version is completed or not')
+            if time_lapsed >= 93600:
+                print("""Process waiting for more than 26 hrs. No New version of extension has been deployed.
+                    If a new version is deployed, please check for any errors and re-run""")
+                break
+
+        distname = vmname.split('-')[0]
+        vm_log_file = distname + "result.log"
+        vm_html_file = distname + "result.html"
+        log_open = open(vm_log_file, 'a+')
+        html_open = open(vm_html_file, 'a+')
+        dnsname = vmname
+        print("\n Checking Status After AutoUpgrade: {0} \n".format(vmname))
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
+        write_log_command(log_open, 'Status After AutoUpgrade OMS Extension')
+        html_open.write('<h2> Status After AutoUpgrade OMS Extension: {0} <h2>'.format(vmname))
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
+        log_open.close()
+        html_open.close()
+        status = open('omsfiles/omsresults.status')
+        if status == "Agent Found":
+            message += """
+                            <td><span style='background-color: #66ff99'>AutoUpgrade Success</span></td>"""
+        elif status == "Onboarding Failed":
+            message += """
+                            <td><span style='background-color: red; color: white'>Onboarding Failed</span></td>"""
+        elif status == "Agent Not Found":
+            message += """
+                            <td><span style='background-color: red; color: white'>AutoUpgrade Failed</span></td>"""
     return message
 
 def remove_extension():
@@ -430,7 +484,7 @@ def remove_extension_and_delete_vm():
 
 def create_report(messages):
     """Compile the final HTML report."""
-    install_oms_msg, verify_oms_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg = messages
+    install_oms_msg, verify_oms_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg = messages
     result_log_file = open("finalresult.log", "a+")
 
     # summary table
@@ -443,6 +497,20 @@ def create_report(messages):
         resultsth += """
                 <th><a href='#{0}'>{0} results</a></th>""".format(distname)
 
+    if autoupgrade_verify_msg and autoupgrade_status_msg:
+        autoupgrade_summary = """
+        <tr>
+          <td>AutoUpgrade Verify Data</td>
+          {0}
+        </tr>
+        <tr>
+          <td>AutoUpgrade Status</td>
+          {1}
+        </tr>
+        """.format(autoupgrade_verify_msg, autoupgrade_status_msg)
+    else:
+        autoupgrade_summary = ""
+    
     # pre-compile long-running summary
     if long_verify_msg and long_status_msg:
         long_running_summary = """
@@ -473,21 +541,22 @@ def create_report(messages):
         <td>Verify Data</td>
         {2}
     </tr>
+    {3}
     <tr>
         <td>Remove OMSAgent</td>
-        {3}
+        {4}
     </tr>
     <tr>
         <td>Reinstall OMSAgent</td>
-        {4}
+        {5}
     </tr>
-    {5}
+    {6}
     <tr>
         <td>Result Link</td>
-        {6}
+        {7}
     <tr>
     </table>
-    """.format(diststh, install_oms_msg, verify_oms_msg, remove_oms_msg, reinstall_oms_msg, long_running_summary, resultsth)
+    """.format(diststh, install_oms_msg, verify_oms_msg, autoupgrade_summary, remove_oms_msg, reinstall_oms_msg, long_running_summary, resultsth)
     result_html_file.write(statustable)
 
     # Create final html & log file
