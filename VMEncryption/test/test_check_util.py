@@ -67,19 +67,26 @@ class TestCheckUtil(unittest.TestCase):
 
     def test_fatal_checks(self):
         self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.VolumeTypeKey: "DATA",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
+            })
+        self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
             })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat
             })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256'
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
@@ -87,7 +94,8 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600'
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
 
     def test_mount_scheme(self):

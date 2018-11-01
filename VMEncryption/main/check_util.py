@@ -132,6 +132,12 @@ class CheckUtil(object):
         return
 
     def validate_key_vault_params(self, public_settings):
+
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            # No need to check the KV urls if its not an encryption operation
+            return
+
         kek_url = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         kv_url = public_settings.get(CommonVariables.KeyVaultURLKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
