@@ -11,10 +11,10 @@
     * For RPM: 'sudo yum install putty-tools'
     * For SUSE: 'sudo zypper install putty-tools'
 * Python 2.7+ & [pip](https://pip.pypa.io/en/stable/installing/)
-* [Requests](http://docs.python-requests.org/en/master/), [ADAL](https://github.com/AzureAD/azure-activedirectory-library-for-python), [rstr](https://pypi.org/project/rstr/)
+* [Requests](http://docs.python-requests.org/en/master/), [ADAL](https://github.com/AzureAD/azure-activedirectory-library-for-python), [json2html](https://github.com/softvar/json2html), [rstr](https://pypi.org/project/rstr/)
 
 ```bash
-$ pip install requests adal rstr
+$ pip install requests adal json2html rstr
 ```
 
 ## Images currently supported for testing:
@@ -48,10 +48,23 @@ $ pip install requests adal rstr
     - `Name` – AllowSSH
   - Add
 5. [Increase your VM quota](https://docs.microsoft.com/en-us/azure/azure-supportability/resource-manager-core-quotas-request) to 15 in the region you will specify below in parameters.json
+6. [Optional] Register your own AAD app to allow end-to-end verification script to access Microsoft REST APIs
+  - Azure Portal > Azure Active Directory > App Registrations (Preview) > New Registration
+    - `Name` – A name of your choice, can be changed later
+    - `Supported Account Types` – Accounts in this organizational directory only (Microsoft)
+    - `Redirect URI (Optional)` – Leave blank
+    - Register
+    - Use Application (client) ID value displayed in app overview to replace `<app-id>` in parameters.json
+  - In blade of new registration > Certificates & Secrets > New Client Secret
+    - `Description` – A descriptive word or phrase of your choice
+    - `Expires` – Never
+    - Add
+    - *Copy down the new client secret value!* Use this to replace `<app-secret>` in parameters.json
 
 #### Parameters
 1. In your Azure Key Vault, manually upload secrets with the following name-value pairings:
-  - `<app-id>`, `<app-secret>` – verify_e2e service principal ID, secret (available in OneNote document)
+  - `<tenant>` – your AAD tenant, visible in Azure Portal > Azure Active Directory > Properties > Directory ID
+  - `<app-id>`, `<app-secret>` – verify_e2e service principal ID, secret (available in OneNote document, or use the values from the app you optionally registered in step 6 above)
   - `<subscription-id>` – ID of subscription that hosts your desired Log Analytics test workspace
   - `<tenant-id>` – ID of your Azure AD tenant
   - `<workspace-id>`, `<workspace-key>` – Log Analytics test workspace ID, key  
@@ -59,7 +72,7 @@ $ pip install requests adal rstr
   - `<resource group>`, `<location>` – resource group, region (e.g. westus2) in which you want your VMs created
   - `<username>`, `<password>` – the VM username and password (see [requirements](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/faq#what-are-the-password-requirements-when-creating-a-vm))
   - `<nsg resource group>` – resource group of your NSG
-  - `<nsg group>` – NSG name
+  - `<nsg>` – NSG name
   - `<size>` – Standard_B1ms
   - `<workspace>` – name of the workspace you created
   - `<key vault>` – name of the Key Vault you created

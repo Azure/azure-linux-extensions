@@ -74,7 +74,7 @@ with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
 resource_group = parameters['resource group']
 location = parameters['location']
 username = parameters['username']
-nsg_group = parameters['nsg group']
+nsg = parameters['nsg']
 nsg_resource_group = parameters['nsg resource group']
 size = parameters['size'] # Preferred: 'Standard_B1ms'
 extension = parameters['extension'] # OmsAgentForLinux
@@ -85,17 +85,17 @@ workspace_id = str(json.loads(subprocess.check_output('az keyvault secret show -
 workspace_key = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-key --vault-name {0}'.format(key_vault), shell=True))["value"])
 public_settings = { "workspaceId": workspace_id }
 private_settings = { "workspaceKey": workspace_key }
-nsg = "/subscriptions/"+ subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg_group
+nsg_uri = "/subscriptions/" + subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg
 ssh_public = '~/.ssh/id_rsa.pub'
 ssh_private = '~/.ssh/id_rsa'
 
 # Detect the host system and validate nsg
 if system() == 'Windows':
-    if os.system('az network nsg show --resource-group {0} --name {1} --query "[?n]"'.format(nsg_resource_group, nsg_group)) == 0:
-        print "Network Security Group successfully validated"
+    if os.system('az network nsg show --resource-group {0} --name {1} --query "[?n]"'.format(nsg_resource_group, nsg)) == 0:
+        print("Network Security Group successfully validated")
 elif system() == 'Linux':
-    if os.system('az network nsg show --resource-group {0} --name {1} > /dev/null 2>&1'.format(nsg_resource_group, nsg_group)) == 0:
-        print "Network Security Group successfully validated"
+    if os.system('az network nsg show --resource-group {0} --name {1} > /dev/null 2>&1'.format(nsg_resource_group, nsg)) == 0:
+        print("Network Security Group successfully validated")
 else:
     print("""Please verify that the nsg or nsg resource group are valid and are in the right subscription.
 If there is no Network Security Group, please create new one. NSG is a must to create a VM in this testing.""")
@@ -120,7 +120,7 @@ def append_file(src, dest):
 # Common logic to replace string in a file
 def replace_items(infile,old_word,new_word):
     if not os.path.isfile(infile):
-        print "Error on replace_word, not a regular file: "+infile
+        print("Error on replace_word, not a regular file: " + infile)
         sys.exit(1)
 
     f1=open(infile,'r').read()
@@ -141,8 +141,8 @@ def run_command(resource_group, vmname, commandid, script):
     os.system('az vm run-command invoke -g {0} -n {1} --command-id {2} --scripts "{3}" {4}'.format(resource_group, vmname, commandid, script, runwith))
 
 # Create vm using AZ CLI
-def create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, networksecuritygroup):
-    os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --ssh-key-value @{4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, networksecuritygroup, runwith))
+def create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, nsg_uri):
+    os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --ssh-key-value @{4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, nsg_uri, runwith))
 
 # Add extension to vm using AZ CLI
 def add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings):
@@ -178,7 +178,7 @@ def delete_ip(resource_group, ip_name):
     os.system('az network public-ip delete --resource-group {0} --name {1} {2}'.format(resource_group, ip_name, runwith))
 
 
-htmlstart="""<!DOCTYPE html>
+htmlstart = """<!DOCTYPE html>
 <html>
 <head>
 <style>
@@ -214,14 +214,17 @@ def main():
     remove_oms_msg = remove_extension()
     reinstall_oms_msg = reinstall_extension()
     if is_long:
-        time.sleep(LONG_DELAY)
+        for i in reversed(range(1, LONG_DELAY + 1)):
+            sys.stdout.write('\rLong-term delay: T-{0} minutes...'.format(i))
+            sys.stdout.flush()
+            time.sleep(60)
+        print('')
         long_verify_msg = verify_data()
         long_status_msg = check_status()
     else:
         long_verify_msg, long_status_msg = None, None
     remove_extension_and_delete_vm()
-    messages = (install_oms_msg, verify_oms_msg, remove_oms_msg,
-                reinstall_oms_msg, long_verify_msg, long_status_msg)
+    messages = (install_oms_msg, verify_oms_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
     create_report(messages)
 
 
@@ -238,8 +241,8 @@ def create_vm_and_install_extension():
         vm_html_file = distname.lower() + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
-        print "\nCreate VM and Install Extension - {}: {} \n".format(vmname, image)
-        create_vm(resource_group, vmname, image, username, ssh_private, location, dnsname, size, nsg)
+        print("\nCreate VM and Install Extension - {0}: {1} \n".format(vmname, image))
+        create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
         copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
@@ -269,8 +272,10 @@ def verify_data():
     """Verify data end-to-end, returning HTML results."""
     # Delay to allow data to propagate
     for i in reversed(range(1, E2E_DELAY + 1)):
-        print('E2E propagation delay: T-{} Minutes'.format(i))
+        sys.stdout.write('\rE2E propagation delay: T-{0} minutes...'.format(i))
+        sys.stdout.flush()
         time.sleep(60)
+    print('')
 
     message = ""
     for vmname in vmnames:
@@ -279,14 +284,11 @@ def verify_data():
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
-        os.system('rm e2eresults.json')
-        check_e2e(vmname)
+        data = check_e2e(vmname)
 
         # write detailed table for vm
         html_open.write("<h2> Verify Data from OMS workspace </h2>")
         write_log_command(log_open, 'Status After Verifying Data')
-        with open('e2eresults.json', 'r') as infile:
-            data = json.load(infile)
         results = data[distname][0]
         log_open.write(distname + ':\n' + json.dumps(results, indent=4, separators=(',', ': ')) + '\n')
         # prepend distro column to results row before generating the table
@@ -319,7 +321,7 @@ def remove_extension():
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
-        print "\nRemove Extension: {} \n".format(vmname)
+        print("\nRemove Extension: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
@@ -353,7 +355,7 @@ def reinstall_extension():
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
-        print "\n Reinstall Extension: {} \n".format(vmname)
+        print("\n Reinstall Extension: {0} \n".format(vmname))
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
@@ -386,7 +388,7 @@ def check_status():
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
-        print "\n Checking Status: {0} \n".format(vmname)
+        print("\n Checking Status: {0} \n".format(vmname))
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Long Run OMS Extension')
@@ -414,7 +416,7 @@ def remove_extension_and_delete_vm():
         vm_log_file = distname + "result.log"
         log_open = open(vm_log_file, 'a+')
         dnsname = vmname
-        print "\n Remove extension and Delete VM: {} \n".format(vmname)
+        print("\n Remove extension and Delete VM: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyextlogs')
         copy_from_vm(dnsname, username, ssh_private, location, '{0}-extension.log'.format(distname))
@@ -440,22 +442,22 @@ def create_report(messages):
                 <th>{0}</th>""".format(distname)
         resultsth += """
                 <th><a href='#{0}'>{0} results</a></th>""".format(distname)
-    
+
     # pre-compile long-running summary
     if long_verify_msg and long_status_msg:
         long_running_summary = """
         <tr>
-          <td>Long-term Verify Data</td>
+          <td>Long-Term Verify Data</td>
           {0}
         </tr>
         <tr>
-          <td>Long-term Status</td>
+          <td>Long-Term Status</td>
           {1}
         </tr>
         """.format(long_verify_msg, long_status_msg)
     else:
         long_running_summary = ""
-    
+
     statustable = """
     <table>
     <caption><h2>Test Result Table</h2><caption>
@@ -494,7 +496,7 @@ def create_report(messages):
         append_file(distname + "result.log", result_log_file)
         append_file(distname + "result.html", result_html_file)
 
-    htmlend="""
+    htmlend = """
     </body>
     </html>
     """

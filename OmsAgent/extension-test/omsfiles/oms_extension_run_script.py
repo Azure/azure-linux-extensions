@@ -1,31 +1,32 @@
+import datetime
 import os
 import os.path
 import platform
-import subprocess
 import re
+import subprocess
 import sys
 import time
 
-if "check_output" not in dir( subprocess ): # duck punch it in!
-        def check_output(*popenargs, **kwargs):
-            r"""Run command with arguments and return its output as a byte string.
-            Backported from Python 2.7 as it's implemented as pure python on stdlib.
-            >>> check_output(['/usr/bin/python', '--version'])
-            Python 2.6.2
-            """
-            process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-            output, unused_err = process.communicate()
-            retcode = process.poll()
-            if retcode:
-                cmd = kwargs.get("args")
-                if cmd is None:
-                    cmd = popenargs[0]
-                error = subprocess.CalledProcessError(retcode, cmd)
-                error.logput = output
-                raise error
-            return output
+if "check_output" not in dir(subprocess): # duck punch it in!
+    def check_output(*popenargs, **kwargs):
+        r"""Run command with arguments and return its output as a byte string.
+        Backported from Python 2.7 as it's implemented as pure python on stdlib.
+        >>> check_output(['/usr/bin/python', '--version'])
+        Python 2.6.2
+        """
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            error = subprocess.CalledProcessError(retcode, cmd)
+            error.logput = output
+            raise error
+        return output
 
-        subprocess.check_output = check_output
+    subprocess.check_output = check_output
 
 # Create directory and copy files
 if not os.path.isdir('/home/scratch/'):
@@ -64,7 +65,7 @@ def main():
         elif re.match('^([-/]*)(copyextlogs)', option):
             copy_extension_log()
     else:
-        print "No operation specified. run with 'preinstall' or 'postinstall' or 'status' or 'copyextlogs'"
+        print("No operation specified. run with 'preinstall' or 'postinstall' or 'status' or 'copyextlogs'")
 
 def is_vm_supported_for_extension():
 
@@ -75,8 +76,7 @@ def is_vm_supported_for_extension():
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'] #SLES
-    }
+                       'suse' : ['12']} #SLES
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
@@ -115,15 +115,15 @@ def is_vm_supported_for_extension():
 
     return vm_supported, vm_dist, vm_ver
 
-def replace_items(infile,old_word,new_word):
+def replace_items(infile, old_word, new_word):
     """Replace old_word with new_world in file infile."""
     if not os.path.isfile(infile):
-        print "Error on replace_word, not a regular file: "+infile
+        print("Error on replace_word, not a regular file: " + infile)
         sys.exit(1)
 
-    f1=open(infile,'r').read()
-    f2=open(infile,'w')
-    m=f1.replace(old_word,new_word)
+    f1 = open(infile, 'r').read()
+    f2 = open(infile, 'w')
+    m = f1.replace(old_word, new_word)
     f2.write(m)
 
 def detect_workspace_id():
@@ -138,13 +138,13 @@ def detect_workspace_id():
 def linux_detect_installer():
     """Check what installer (dpkg or rpm) should be used."""
     global INSTALLER
-    INSTALLER=None
+    INSTALLER = None
     if vm_supported and (vm_dist.startswith('Ubuntu') or vm_dist.startswith('debian')):
-        INSTALLER='APT'
+        INSTALLER = 'APT'
     elif vm_supported and (vm_dist.startswith('CentOS') or vm_dist.startswith('Oracle') or vm_dist.startswith('Red Hat')):
-        INSTALLER='YUM'
+        INSTALLER = 'YUM'
     elif vm_supported  and vm_dist.startswith('SUSE Linux'):
-        INSTALLER='ZYPPER'
+        INSTALLER = 'ZYPPER'
 
 def install_additional_packages():
     """Install additional packages command here."""
@@ -234,26 +234,31 @@ def apache_mysql_conf():
 
 def inject_logs():
     """Inject logs (after) agent is running in order to simulate real Apache/MySQL/Custom logs output."""
+
+    # set apache timestamps to current time to ensure they are searchable with 1 hour period in log analytics
+    now = datetime.datetime.utcnow().strftime('[%d/%b/%Y:%H:%M:%S +0000]')
+    os.system(r"sed -i 's|\(\[.*\]\)|{0}|' /home/temp/omsfiles/apache_access.log".format(now))
+
     if INSTALLER == 'APT':
-        os.system('cp /home/scratch/apache_access.log /var/log/apache2/access.log \
+        os.system('cat /home/scratch/apache_access.log >> /var/log/apache2/access.log \
                 && chown root:root /var/log/apache2/access.log \
                 && chmod 644 /var/log/apache2/access.log \
                 && dos2unix /var/log/apache2/access.log')
     elif INSTALLER == 'YUM':
-        os.system('cp /home/scratch/apache_access.log /var/log/httpd/access_log \
+        os.system('cat /home/scratch/apache_access.log >> /var/log/httpd/access_log \
                 && chown root:root /var/log/httpd/access_log \
                 && chmod 644 /var/log/httpd/access_log \
                 && dos2unix /var/log/httpd/access_log')
     elif INSTALLER == 'ZYPPER':
-        os.system('cp /home/scratch/apache_access.log /var/log/apache2/access_log \
+        os.system('cat /home/scratch/apache_access.log >> /var/log/apache2/access_log \
                 && chown root:root /var/log/apache2/access_log \
                 && chmod 644 /var/log/apache2/access_log \
                 && dos2unix /var/log/apache2/access_log')
 
-    os.system('cp /home/scratch/mysql.log /var/log/mysql/mysql.log \
-            && cp /home/scratch/error.log /var/log/mysql/error.log \
-            && cp /home/scratch/mysql-slow.log /var/log/mysql/mysql-slow.log \
-            && cp /home/scratch/custom.log /var/log/custom.log')
+    os.system('cat /home/scratch/mysql.log >> /var/log/mysql/mysql.log \
+            && cat /home/scratch/error.log >> /var/log/mysql/error.log \
+            && cat /home/scratch/mysql-slow.log >> /var/log/mysql/mysql-slow.log \
+            && cat /home/scratch/custom.log >> /var/log/custom.log')
 
 def config_start_oms_services():
     """Orchestrate overall configuration prior to agent start."""
@@ -325,7 +330,7 @@ def result_commands():
     """Determine and store status of agent."""
     global waagentOut, onboardStatus, omiRunStatus, psefomsagent, omsagentRestart, omiRestart
     global omiInstallOut, omsagentInstallOut, omsconfigInstallOut, scxInstallOut, omiInstallStatus, omsagentInstallStatus, omsconfigInstallStatus, scxInstallStatus
-    cmd='waagent --version'
+    cmd = 'waagent --version'
     waagentOut = exec_command(cmd)
     write_log_command(open_file, cmd)
     write_log_output(open_file, waagentOut)
@@ -395,7 +400,7 @@ def write_html():
     os.system('rm /home/scratch/omsresults.html')
     html_file = '/home/scratch/omsresults.html'
     f = open(html_file, 'w+')
-    message="""
+    message = """
 <div class="text" style="white-space: pre-wrap" >
 
 <table>
@@ -498,7 +503,7 @@ def sorted_dir(folder):
     def getmtime(name):
         path = os.path.join(folder, name)
         return os.path.getmtime(path)
-    
+
     return sorted(os.listdir(folder), key=getmtime, reverse=True)
 
 def copy_extension_log():
@@ -519,7 +524,7 @@ def copy_extension_log():
     else:
         append_file(oms_azure_ext_dir + ext_vers[0] + '/extension.log', extlogfileOpen)
     extlogfileOpen.close()
-    
 
-if __name__ == '__main__' :
+
+if __name__ == '__main__':
     main()
