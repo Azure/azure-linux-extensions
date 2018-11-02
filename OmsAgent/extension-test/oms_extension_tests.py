@@ -51,14 +51,25 @@ if len(sys.argv) == 1:
            '$ python -u oms_extension_tests.py length [image...]'))
 is_long = sys.argv[1] == 'long'
 is_autoupgrade = sys.argv[1] == 'autoupgrade'
+is_instantupgrade = sys.argv[1] == 'instantupgrade'
+runwith = '--verbose'
 
 if len(sys.argv) > 2:
-    if sys.argv[2] == 'verbose':
+    if sys.argv[2] == 'debug':
         vms_list = sys.argv[3:]
-        runwith = '--verbose'
+        runwith = '--debug'
+    elif sys.argv[3] == 'debug':
+        vms_list = sys.argv[4:]
+        runwith = '--debug'
+        is_autoupgrade = sys.argv[2] == 'autoupgrade'
+        is_instantupgrade = sys.argv[2] == 'instantupgrade'
+    elif sys.argv[3] != 'debug':
+        vms_list = sys.argv[3:]
+        is_autoupgrade = sys.argv[2] == 'autoupgrade'
+        is_instantupgrade = sys.argv[2] == 'instantupgrade'
     else:
         vms_list = sys.argv[2:]
-        runwith = ''
+
     images = {}
     for vm in vms_list:
         vm_dict = { vm: images_list[vm] }
@@ -90,6 +101,8 @@ private_settings = { "workspaceKey": workspace_key }
 nsg_uri = "/subscriptions/" + subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg
 ssh_public = '~/.ssh/id_rsa.pub'
 ssh_private = '~/.ssh/id_rsa'
+if parameters['old version']:
+    old_version = parameters['old version']
 
 # Detect the host system and validate nsg
 if system() == 'Windows':
@@ -119,17 +132,6 @@ def append_file(src, dest):
     dest.write(f.read())
     f.close()
 
-# Common logic to replace string in a file
-def replace_items(infile,old_word,new_word):
-    if not os.path.isfile(infile):
-        print("Error on replace_word, not a regular file: " + infile)
-        sys.exit(1)
-
-    f1=open(infile,'r').read()
-    f2=open(infile,'w')
-    m=f1.replace(old_word,new_word)
-    f2.write(m)
-
 # Secure copy required files from local to vm
 def copy_to_vm(dnsname, username, ssh_private, location):
     os.system("scp -i {0} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -r omsfiles/* {1}@{2}.{3}.cloudapp.azure.com:/tmp/".format(ssh_private, username, dnsname.lower(), location))
@@ -147,8 +149,8 @@ def create_vm(resource_group, vmname, image, username, ssh_public, location, dns
     os.system('az vm create -g {0} -n {1} --image {2} --admin-username {3} --ssh-key-value @{4} --location {5} --public-ip-address-dns-name {6} --size {7} --nsg {8} {9}'.format(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, nsg_uri, runwith))
 
 # Add extension to vm using AZ CLI
-def add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings):
-    os.system('az vm extension set -n {0} --publisher {1} --vm-name {2} --resource-group {3} --protected-settings "{4}" --settings "{5}" {6}'.format(extension, publisher, vmname, resource_group, private_settings, public_settings, runwith))
+def add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option):
+    os.system('az vm extension set -n {0} --publisher {1} --vm-name {2} --resource-group {3} --protected-settings "{4}" --settings "{5}" {6} {7}'.format(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option, runwith))
 
 # Delete extension from vm using AZ CLI
 def delete_extension(extension, vmname, resource_group):
@@ -216,13 +218,22 @@ result_html_file.write(htmlstart)
 
 def main():
     """Orchestrate fundemental testing steps onlined in header docstring."""
-    install_oms_msg = create_vm_and_install_extension()
-    verify_oms_msg = verify_data()
+    if is_instantupgrade:
+        install_oms_msg = create_vm_and_install_old_extension()
+        verify_oms_msg = verify_data()
+        instantupgrade_verify_msg = force_upgrade_extension()
+        instantupgrade_status_msg = verify_data()
+    else:
+        instantupgrade_verify_msg, instantupgrade_status_msg = None, None
+        install_oms_msg = create_vm_and_install_extension()
+        verify_oms_msg = verify_data()
+
     if is_autoupgrade:
-        autoupgrade_status_msg = autoupgrade_status()
+        autoupgrade_status_msg = autoupgrade()
         autoupgrade_verify_msg = verify_data()
     else:
         autoupgrade_verify_msg, autoupgrade_status_msg = None, None
+    
     remove_oms_msg = remove_extension()
     reinstall_oms_msg = reinstall_extension()
     if is_long:
@@ -236,7 +247,7 @@ def main():
     else:
         long_verify_msg, long_status_msg = None, None
     remove_extension_and_delete_vm()
-    messages = (install_oms_msg, verify_oms_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
+    messages = (install_oms_msg, verify_oms_msg, instantupgrade_verify_msg, instantupgrade_status_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
     create_report(messages)
 
 
@@ -244,6 +255,7 @@ def create_vm_and_install_extension():
     """Create vm and install the extension, returning HTML results."""
 
     message = ""
+    update_option = ""
     for distname, image in images.iteritems():
         uid = rstr.xeger(r'[0-9a-f]{8}')
         vmname = distname.lower() + '-' + uid
@@ -258,7 +270,7 @@ def create_vm_and_install_extension():
         copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
-        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings)
+        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Creating VM and Adding OMS Extension')
@@ -278,6 +290,81 @@ def create_vm_and_install_extension():
         elif status == "Agent Not Found":
             message += """
                             <td><span style='background-color: red; color: white'>Install Failed</span></td>"""
+    return message
+
+def create_vm_and_install_old_extension():
+    """Create vm and install a specific version of the extension, returning HTML results."""
+
+    message = ""
+    update_option = '--version ' + old_version + ' --no-auto-upgrade'
+    for distname, image in images.iteritems():
+        uid = rstr.xeger(r'[0-9a-f]{8}')
+        vmname = distname.lower() + '-' + uid
+        vmnames.append(vmname)
+        dnsname = vmname
+        vm_log_file = distname.lower() + "result.log"
+        vm_html_file = distname.lower() + "result.html"
+        log_open = open(vm_log_file, 'a+')
+        html_open = open(vm_html_file, 'a+')
+        print("\nCreate VM and Install Extension {0} v-{1} - {2}: {3} \n".format(extension, old_version, vmname, image))
+        create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
+        copy_to_vm(dnsname, username, ssh_private, location)
+        delete_extension(extension, vmname, resource_group)
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
+        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
+        write_log_command(log_open, "Status After Creating VM and Adding OMS Extension version: {0}".format(old_version))
+        html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
+        html_open.write("<h2> Install OMS Agent version: {0} </h2>".format(old_version))
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
+        log_open.close()
+        html_open.close()
+        status = open('omsfiles/omsresults.status', 'r').read()
+        if status == "Agent Found":
+            message += """
+                            <td><span style='background-color: #66ff99'>Install Success</span></td>"""
+        elif status == "Onboarding Failed":
+            message += """
+                            <td><span style='background-color: red; color: white'>Onboarding Failed</span></td>"""
+        elif status == "Agent Not Found":
+            message += """
+                            <td><span style='background-color: red; color: white'>Install Failed</span></td>"""
+    return message
+
+def force_upgrade_extension():
+    """ Force Update the extension to the latest version """
+
+    message = ""
+    update_option = '--force-update'
+    for vmname in vmnames:
+        distname = vmname.split('-')[0]
+        vm_log_file = distname + "result.log"
+        vm_html_file = distname + "result.html"
+        log_open = open(vm_log_file, 'a+')
+        html_open = open(vm_html_file, 'a+')
+        dnsname = vmname
+        print("\n Force Upgrade Extension: {0} \n".format(vmname))
+        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
+        write_log_command(log_open, 'Status After Force Upgrading OMS Extension')
+        html_open.write('<h2> Force Upgrade Extension: {0} <h2>'.format(vmname))
+        append_file('omsfiles/omsresults.log', log_open)
+        append_file('omsfiles/omsresults.html', html_open)
+        log_open.close()
+        html_open.close()
+        status = open('omsfiles/omsresults.status').read()
+        if status == "Agent Found":
+            message += """
+                            <td><span style='background-color: #66ff99'>Reinstall Success</span></td>"""
+        elif status == "Onboarding Failed":
+            message += """
+                            <td><span style='background-color: red; color: white'>Onboarding Failed</span></td>"""
+        elif status == "Agent Not Found":
+            message += """
+                            <td><span style='background-color: red; color: white'>Reinstall Failed</span></td>"""
     return message
 
 def verify_data():
@@ -322,7 +409,9 @@ def verify_data():
                             <td><span style='background-color: red; color: white'>Verify Failed</span></td>"""
     return message
 
-def autoupgrade_status():
+def autoupgrade():
+    """ Waits for the extension to get updated automatically and continues with the tests after. Maximum wait time is 26 hours """
+
     message = ""
     for vmname in vmnames:
         initial_version = get_extension_version_now(resource_group, vmname, extension)
@@ -330,8 +419,9 @@ def autoupgrade_status():
         while initial_version >= get_extension_version_now(resource_group, vmname, extension):
             time.sleep(AUTOUPGRADE_DELAY*60)
             time_lapsed+=AUTOUPGRADE_DELAY*60
-            if time_lapsed >= 86400:
-                print('Process waiting for more than 24 hrs. Please check the deployment of the new version is completed or not')
+            if 86400 <= time_lapsed < 93600:
+                remaining_wait_time = (93600 - time_lapsed)/60
+                print('Process waiting for more than 24 hrs. Please check the deployment of the new version is completed or not. This wait will end in {0} minutes'.format(remaining_wait_time))
             if time_lapsed >= 93600:
                 print("""Process waiting for more than 26 hrs. No New version of extension has been deployed.
                     If a new version is deployed, please check for any errors and re-run""")
@@ -352,7 +442,7 @@ def autoupgrade_status():
         append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsfiles/omsresults.status')
+        status = open('omsfiles/omsresults.status').read()
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>AutoUpgrade Success</span></td>"""
@@ -400,7 +490,7 @@ def remove_extension():
 
 def reinstall_extension():
     """Reinstall the extension, returning HTML results."""
-
+    update_option = '--force-update'
     message = ""
     for vmname in vmnames:
         distname = vmname.split('-')[0]
@@ -410,7 +500,7 @@ def reinstall_extension():
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
         print("\n Reinstall Extension: {0} \n".format(vmname))
-        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings)
+        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Reinstall OMS Extension')
@@ -419,7 +509,7 @@ def reinstall_extension():
         append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsfiles/omsresults.status')
+        status = open('omsfiles/omsresults.status').read()
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>Reinstall Success</span></td>"""
@@ -451,7 +541,7 @@ def check_status():
         append_file('omsfiles/omsresults.html', html_open)
         log_open.close()
         html_open.close()
-        status = open('omsfiles/omsresults.status')
+        status = open('omsfiles/omsresults.status').read()
         if status == "Agent Found":
             message += """
                             <td><span style='background-color: #66ff99'>Reinstall Success</span></td>"""
@@ -479,12 +569,12 @@ def remove_extension_and_delete_vm():
         delete_vm_disk(resource_group, disk)
         delete_nic(resource_group, nic)
         delete_ip(resource_group, ip)
-        append_file('{0}-extension.log'.format(distname), log_open)
+        append_file('omsfiles/{0}-extension.log'.format(distname), log_open)
         log_open.close()
 
 def create_report(messages):
     """Compile the final HTML report."""
-    install_oms_msg, verify_oms_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg = messages
+    install_oms_msg, verify_oms_msg, instantupgrade_verify_msg, instantupgrade_status_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg = messages
     result_log_file = open("finalresult.log", "a+")
 
     # summary table
@@ -496,6 +586,20 @@ def create_report(messages):
                 <th>{0}</th>""".format(distname)
         resultsth += """
                 <th><a href='#{0}'>{0} results</a></th>""".format(distname)
+    
+    if instantupgrade_verify_msg and instantupgrade_status_msg:
+        instantupgrade_summary = """
+        <tr>
+          <td>Instant Upgrade Verify Data</td>
+          {0}
+        </tr>
+        <tr>
+          <td>Instant Upgrade Status</td>
+          {1}
+        </tr>
+        """.format(instantupgrade_verify_msg, instantupgrade_status_msg)
+    else:
+        instantupgrade_summary = ""
 
     if autoupgrade_verify_msg and autoupgrade_status_msg:
         autoupgrade_summary = """
@@ -542,21 +646,22 @@ def create_report(messages):
         {2}
     </tr>
     {3}
+    {4}
     <tr>
         <td>Remove OMSAgent</td>
-        {4}
+        {5}
     </tr>
     <tr>
         <td>Reinstall OMSAgent</td>
-        {5}
+        {6}
     </tr>
-    {6}
+    {7}
     <tr>
         <td>Result Link</td>
-        {7}
+        {8}
     <tr>
     </table>
-    """.format(diststh, install_oms_msg, verify_oms_msg, autoupgrade_summary, remove_oms_msg, reinstall_oms_msg, long_running_summary, resultsth)
+    """.format(diststh, install_oms_msg, verify_oms_msg, instantupgrade_summary, autoupgrade_summary, remove_oms_msg, reinstall_oms_msg, long_running_summary, resultsth)
     result_html_file.write(statustable)
 
     # Create final html & log file

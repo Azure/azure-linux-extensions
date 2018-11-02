@@ -76,6 +76,7 @@ $ pip install requests adal json2html rstr
   - `<size>` – Standard_B1ms
   - `<workspace>` – name of the workspace you created
   - `<key vault>` – name of the Key Vault you created
+  - `<old version>` - specific version of the extension
 
 #### Other
 1. Allow the end-to-end verification script to read your workspace
@@ -105,15 +106,32 @@ $ az account set --subscription subscription_name
 
 #### All images
 
-- Replace 'short' with 'long' to run long_run_tests
-- Add 'verbose' after short/long to get detailed logs
+- Replace '<mode>' with the mode in which you want to run the tests
+- Available modes: 
+  - `short`: Runs the tests in the default mode
+  - `long`: Runs the tests just like the default mode but add a very longer wait time
+  - `autoupgrade`: Runs the tests just like the default mode but waits till the agent is updated to a new version and terminates if running for more than 26 hours.
+  - `instantupgrade`: Install the older version first and runs the default tests after force upgrade to newer version
+- AZ CLI commands run with 'verbose' by default. Add 'debug' after short/long to see complete debug logs of az cli
 
 ```bash
-$ python -u oms_extension_test.py short
+$ python -u oms_extension_tests.py short
 ```
 
 #### Subset of images
 
 ```bash
-$ python -u oms_extension_test.py short verbose image1 image2 ...
+$ python -u oms_extension_tests.py short debug image1 image2 ...
+```
+
+#### Autoupgrade of images (This option will wait until the extension is upgraded to the new version and continue to next steps after verifying data)
+
+```bash
+$ python -u oms_extension_tests.py autoupgrade image1 image2 ...
+```
+
+#### Instantupgrade of images (This option will install the desired older version of extension first and then force upgrade to the latest version)
+
+```bash
+$ python -u oms_extension_tests.py instantupgrade image1 image2 ...
 ```

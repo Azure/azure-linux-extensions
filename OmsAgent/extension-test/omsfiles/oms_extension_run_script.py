@@ -237,7 +237,7 @@ def inject_logs():
 
     # set apache timestamps to current time to ensure they are searchable with 1 hour period in log analytics
     now = datetime.datetime.utcnow().strftime('[%d/%b/%Y:%H:%M:%S +0000]')
-    os.system(r"sed -i 's|\(\[.*\]\)|{0}|' /home/temp/omsfiles/apache_access.log".format(now))
+    os.system(r"sed -i 's|\(\[.*\]\)|{0}|' /home/scratch/apache_access.log".format(now))
 
     if INSTALLER == 'APT':
         os.system('cat /home/scratch/apache_access.log >> /var/log/apache2/access.log \

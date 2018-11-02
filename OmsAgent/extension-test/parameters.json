@@ -10,5 +10,6 @@
   "publisher": "<publisher>",
   "extension": "<extension>",
   "workspace": "<workspace-name>",
-  "key vault": "<key-vault-name>"
+  "key vault": "<key-vault-name>",
+  "old version": "<old-extesion-version>"
 }
