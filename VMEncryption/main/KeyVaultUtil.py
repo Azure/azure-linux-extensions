@@ -97,7 +97,7 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             raise
 
-    def is_adal_available(self)
+    def is_adal_available(self):
         try:
             import adal
             self.logger.log('Python ADAL library is natively available on the system')
@@ -106,7 +106,7 @@ class KeyVaultUtil(object):
             self.logger.log('Python ADAL library is not natively available on the system')
             return False
 
-    def is_scl_adal_available(self)
+    def is_scl_adal_available(self):
         try:
             subprocess.check_call(['scl', 'enable', 'python27', "python -c 'import adal'"])
             self.logger.log('Python ADAL library is available on the system via SCL')
@@ -115,12 +115,12 @@ class KeyVaultUtil(object):
             self.logger.log('Python ADAL library is not available on the system via SCL')
             return False
 
-    def get_access_token_with_certificate(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint)
+    def get_access_token_with_certificate(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint):
         # construct path to the private key file which is stored and managed by waagent inside of the lib directory
         import waagent
         prv_path = os.path.join(waagent.LibDir, AADClientCertThumbprint.upper() + '.prv')
 
-        if is_adal_available()
+        if is_adal_available():
             import adal
             prv_data = waagent.GetFileContents(prv_path)
             context = adal.AuthenticationContext(AuthorizeUri)
@@ -139,7 +139,7 @@ class KeyVaultUtil(object):
             if os.path.isfile(tmp_path): 
                 os.remove(tmp_path)
             return access_token
-        else
+        else:
             raise ModuleNotFoundError('Python ADAL library required for client certificate authentication was not found')
 
     def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
@@ -151,7 +151,7 @@ class KeyVaultUtil(object):
 
         if AADClientCertThumbprint:
             return get_access_token_with_certificate(KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint)
-        else
+        else:
             # retrieve access token directly, adal library not required
             token_uri = AuthorizeUri + "/oauth2/token"
             request_content = "resource=" + urllib.quote(KeyVaultResourceName) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
