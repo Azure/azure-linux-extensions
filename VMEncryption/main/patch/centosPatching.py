@@ -74,8 +74,8 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-            packages = ['cryptsetup',
-                        'cryptsetup-reencrypt']
+        packages = ['cryptsetup',
+                    'cryptsetup-reencrypt']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')

@@ -82,7 +82,7 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-         packages = ['cryptsetup',
+        packages = ['cryptsetup',
                     'cryptsetup-reencrypt']
 
         if self.distro_info[1].startswith("6."):
