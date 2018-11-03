@@ -3,6 +3,9 @@
 
 ## Requirements
 
+* If host machine is Windows:
+  * Must active Windows Subsystem for Linux [WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
+* Create a ssh key using [ssh-keygen](https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/)
 * [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 * Putty PSCP
   * [Putty for Windows](https://www.putty.org/)
@@ -18,6 +21,7 @@ $ pip install requests adal json2html rstr
 ```
 
 ## Images currently supported for testing:
+
 * CentOS 6 and 7
 * Oracle Linux 6 and 7
 * Debian 8 and 9
@@ -30,6 +34,7 @@ $ pip install requests adal json2html rstr
 ### Prepare
 
 #### Resources
+
 1. Create a resource group that will be used to store all test resources
 2. Create an Azure Key Vault to store test secrets
 3. Create a Log Analytics workspace where your test VMs will send data
@@ -74,9 +79,11 @@ $ pip install requests adal json2html rstr
   - `<nsg resource group>` – resource group of your NSG
   - `<nsg>` – NSG name
   - `<size>` – Standard_B1ms
+  - `<publisher>` - pulisher name (For OMSAgent: Microsoft.EnterpriseCloud.Monitoring)
+  - `<extension>` - extension name (For OMSAgent: OmsAgentForLinux)
   - `<workspace>` – name of the workspace you created
   - `<key vault>` – name of the Key Vault you created
-  - `<old version>` - specific version of the extension
+  - `<old version>` - specific version of the extension (define as empty "" if not using)
 
 #### Other
 1. Allow the end-to-end verification script to read your workspace
@@ -104,24 +111,29 @@ $ az account set --subscription subscription_name
 
 ### Run test scripts
 
-#### All images
-
-- Replace '<mode>' with the mode in which you want to run the tests
 - Available modes: 
-  - `short`: Runs the tests in the default mode
+  - default: No options needed. Runs the install & reinstall tests on the latest agent with a 10 min wait time before verification.
   - `long`: Runs the tests just like the default mode but add a very longer wait time
   - `autoupgrade`: Runs the tests just like the default mode but waits till the agent is updated to a new version and terminates if running for more than 26 hours.
   - `instantupgrade`: Install the older version first and runs the default tests after force upgrade to newer version
-- AZ CLI commands run with 'verbose' by default. Add 'debug' after short/long to see complete debug logs of az cli
+  - `debug`: AZ CLI commands run with '--verbose' by default. Add 'debug' after short/long to see complete debug logs of az cli
+
+#### All images in default mode
 
 ```bash
-$ python -u oms_extension_tests.py short
+$ python -u oms_extension_tests.py
+```
+
+#### All images in default mode with debug in long run
+
+```bash
+$ python -u oms_extension_tests.py long debug
 ```
 
 #### Subset of images
 
 ```bash
-$ python -u oms_extension_tests.py short debug image1 image2 ...
+$ python -u oms_extension_tests.py image1 image2 ...
 ```
 
 #### Autoupgrade of images (This option will wait until the extension is upgraded to the new version and continue to next steps after verifying data)
@@ -131,6 +143,8 @@ $ python -u oms_extension_tests.py autoupgrade image1 image2 ...
 ```
 
 #### Instantupgrade of images (This option will install the desired older version of extension first and then force upgrade to the latest version)
+
+Note: Must define a proper value for the `old_version` in parameters.json file else the program will encounter an undefined typeHandler error.
 
 ```bash
 $ python -u oms_extension_tests.py instantupgrade image1 image2 ...

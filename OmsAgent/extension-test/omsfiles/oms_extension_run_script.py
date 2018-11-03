@@ -51,7 +51,7 @@ def main():
             detect_workspace_id()
             config_start_oms_services()
             restart_services()
-            time.sleep(30)
+            time.sleep(120)
             inject_logs()
             result_commands()
             service_control_commands()

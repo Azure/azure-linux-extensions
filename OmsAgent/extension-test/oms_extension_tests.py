@@ -45,37 +45,32 @@ images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180'
          'suse12': 'SUSE:SLES:12-SP2:latest'}
 
 vmnames = []
+images = {}
 
-if len(sys.argv) == 1:
-    print(('Please indicate run length (short or long) and optional image subset:\n'
-           '$ python -u oms_extension_tests.py length [image...]'))
-is_long = sys.argv[1] == 'long'
-is_autoupgrade = sys.argv[1] == 'autoupgrade'
-is_instantupgrade = sys.argv[1] == 'instantupgrade'
 runwith = '--verbose'
 
-if len(sys.argv) > 2:
-    if sys.argv[2] == 'debug':
-        vms_list = sys.argv[3:]
-        runwith = '--debug'
-    elif sys.argv[3] == 'debug':
-        vms_list = sys.argv[4:]
-        runwith = '--debug'
-        is_autoupgrade = sys.argv[2] == 'autoupgrade'
-        is_instantupgrade = sys.argv[2] == 'instantupgrade'
-    elif sys.argv[3] != 'debug':
-        vms_list = sys.argv[3:]
-        is_autoupgrade = sys.argv[2] == 'autoupgrade'
-        is_instantupgrade = sys.argv[2] == 'instantupgrade'
-    else:
-        vms_list = sys.argv[2:]
+vms_list = []
+if len(sys.argv) > 0:
+    options = sys.argv[1:]
+    vms_list = [ i for i in options if i not in ('long', 'debug', 'autoupgrade', 'instantupgrade')]
+    is_long = 'long' in options
+    runwith = '--debug' if 'debug' in options else '--verbose'
+    if 'autoupgrade' in options and 'instantupgrade' in options:
+        print("Select only one option from 'autoupgrade' and 'instantupgrade'. You cannot run both at the same time")
+        exit()
+    is_autoupgrade = 'autoupgrade' in options
+    is_instantupgrade = 'instantupgrade' in options
+else:
+    is_long = is_debug = is_autoupgrade = is_instantupgrade = False
 
-    images = {}
+if vms_list:
     for vm in vms_list:
         vm_dict = { vm: images_list[vm] }
         images.update(vm_dict)
 else:
     images = images_list
+
+print "List of VMs & Image Sources added for testing: {}".format(images)
 
 with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
     parameters = f.read()
@@ -166,7 +161,7 @@ def get_vm_resources(resource_group, vmname):
     return os_disk, nic_name, ip_name
 
 def get_extension_version_now(resource_group, vmname, extension):
-    vm_ext_out = json.loads(subprocess.check_output('az vm extension show --resource-group {0} --vm-name {1} --name {2}'.format(resource_group, vmname, extension), shell=True))
+    vm_ext_out = json.loads(subprocess.check_output('az vm extension show --resource-group {0} --vm-name {1} --name {2} --expand instanceView'.format(resource_group, vmname, extension), shell=True))
     installed_version = int(('').join(str(vm_ext_out["instanceView"]["typeHandlerVersion"]).split('.')))
     return installed_version
 
@@ -221,8 +216,8 @@ def main():
     if is_instantupgrade:
         install_oms_msg = create_vm_and_install_old_extension()
         verify_oms_msg = verify_data()
-        instantupgrade_verify_msg = force_upgrade_extension()
-        instantupgrade_status_msg = verify_data()
+        instantupgrade_status_msg = force_upgrade_extension()
+        instantupgrade_verify_msg = verify_data()
     else:
         instantupgrade_verify_msg, instantupgrade_status_msg = None, None
         install_oms_msg = create_vm_and_install_extension()
@@ -242,8 +237,8 @@ def main():
             sys.stdout.flush()
             time.sleep(60)
         print('')
-        long_verify_msg = verify_data()
         long_status_msg = check_status()
+        long_verify_msg = verify_data()
     else:
         long_verify_msg, long_status_msg = None, None
     remove_extension_and_delete_vm()
@@ -490,6 +485,7 @@ def remove_extension():
 
 def reinstall_extension():
     """Reinstall the extension, returning HTML results."""
+
     update_option = '--force-update'
     message = ""
     for vmname in vmnames:
@@ -555,6 +551,7 @@ def check_status():
 
 def remove_extension_and_delete_vm():
     """Remove extension and delete vm."""
+
     for vmname in vmnames:
         distname = vmname.split('-')[0]
         vm_log_file = distname + "result.log"
@@ -574,6 +571,7 @@ def remove_extension_and_delete_vm():
 
 def create_report(messages):
     """Compile the final HTML report."""
+
     install_oms_msg, verify_oms_msg, instantupgrade_verify_msg, instantupgrade_status_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg = messages
     result_log_file = open("finalresult.log", "a+")
 
