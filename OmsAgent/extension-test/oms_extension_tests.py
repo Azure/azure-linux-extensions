@@ -94,8 +94,8 @@ workspace_key = str(json.loads(subprocess.check_output('az keyvault secret show 
 public_settings = { "workspaceId": workspace_id }
 private_settings = { "workspaceKey": workspace_key }
 nsg_uri = "/subscriptions/" + subscription + "/resourceGroups/" + nsg_resource_group + "/providers/Microsoft.Network/networkSecurityGroups/" + nsg
-ssh_public = '~/.ssh/id_rsa.pub'
-ssh_private = '~/.ssh/id_rsa'
+ssh_private = parameters['ssh private']
+ssh_public = ssh_private + '.pub'
 if parameters['old version']:
     old_version = parameters['old version']
 

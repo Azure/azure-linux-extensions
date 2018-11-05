@@ -152,7 +152,7 @@ def install_additional_packages():
         os.system('apt-get -y update && apt-get -y install wget apache2 git dos2unix \
                 && service apache2 start')
     elif INSTALLER == 'YUM':
-        os.system('yum -y update && yum install -y wget httpd git dos2unix \
+        os.system('yum install -y wget httpd git dos2unix \
                 && service httpd start')
     elif INSTALLER == 'ZYPPER':
         os.system('zypper -y update && zypper install -y wget httpd git dos2unix\

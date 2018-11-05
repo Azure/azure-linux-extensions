@@ -4,6 +4,7 @@
   "resource group": "<resource-group-name>",
   "location": "<location>",
   "username": "<username>",
+  "ssh private": "<ssh-private-keyfile-path>",
   "nsg resource group": "<nsg-resource-group>",
   "nsg": "<nsg>",
   "size": "<size>",
