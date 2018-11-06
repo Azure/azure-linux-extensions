@@ -150,7 +150,7 @@ class KeyVaultUtil(object):
             raise ValueError("Both AADClientSecret and AADClientCertThumbprint were supplied, when only one of these was expected.")
 
         if AADClientCertThumbprint:
-            return get_access_token_with_certificate(KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint)
+            return self.get_access_token_with_certificate(KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint)
         else:
             # retrieve access token directly, adal library not required
             token_uri = AuthorizeUri + "/oauth2/token"
