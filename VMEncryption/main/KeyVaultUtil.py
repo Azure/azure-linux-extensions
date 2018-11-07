@@ -120,14 +120,14 @@ class KeyVaultUtil(object):
         import waagent
         prv_path = os.path.join(waagent.LibDir, AADClientCertThumbprint.upper() + '.prv')
 
-        if is_adal_available():
+        if self.is_adal_available():
             import adal
             prv_data = waagent.GetFileContents(prv_path)
             context = adal.AuthenticationContext(AuthorizeUri)
             result_json = context.acquire_token_with_client_certificate(KeyVaultResourceName, AADClientID, prv_data, AADClientCertThumbprint)
             access_token = result_json["accessToken"]
             return access_token
-        elif is_scl_adal_available:
+        elif self.is_scl_adal_available():
             # On RHEL, support for python-pip and the adal library are made available outside of default python via SCL 
             tmp_data = { "auth": AuthorizeUri, "client": AADClientID, "certificate": prv_path, "thumbprint": AADClientCertThumbprint}
             tmp_fd, tmp_path = mkstemp()
@@ -140,7 +140,7 @@ class KeyVaultUtil(object):
                 os.remove(tmp_path)
             return access_token
         else:
-            raise ModuleNotFoundError('Python ADAL library required for client certificate authentication was not found')
+            raise Exception('Python ADAL library required for client certificate authentication was not found')
 
     def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
         if not AADClientSecret and not AADClientCertThumbprint:
