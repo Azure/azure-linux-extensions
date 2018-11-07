@@ -265,17 +265,18 @@ def restore_state(workspaceId):
             shutil.move(etc_backup_path, etc_final_path)
 
         # now ensure the permissions and ownership is set recursively
-        uid = pwd.getpwnam(AgentUser).pw_uid
-        gid = grp.getgrnam(AgentGroup).gr_gid
-        os.chmod(etc_final_path, 750)
-        os.chown(etc_final_path, uid, gid)
-        for root, dirs, files in os.walk(etc_final_path):
-            for d in dirs:
-                os.chmod(os.path.join(root, d), 750)
-                os.chown(os.path.join(root, d), uid, gid)
-            for f in files:
-                os.chmod(os.path.join(root, f), 640)
-                os.chown(os.path.join(root, f), uid, gid)   
+        if (os.path.isdir(etc_final_path)):
+            uid = pwd.getpwnam(AgentUser).pw_uid
+            gid = grp.getgrnam(AgentGroup).gr_gid
+            os.chmod(etc_final_path, 750)
+            os.chown(etc_final_path, uid, gid)
+            for root, dirs, files in os.walk(etc_final_path):
+                for d in dirs:
+                    os.chmod(os.path.join(root, d), 750)
+                    os.chown(os.path.join(root, d), uid, gid)
+                for f in files:
+                    os.chmod(os.path.join(root, f), 640)
+                    os.chown(os.path.join(root, f), uid, gid)   
     except Exception as e:
         hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
        
