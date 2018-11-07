@@ -18,6 +18,8 @@
 
 import os
 import os.path
+import pwd
+import grp
 import re
 import sys
 import traceback
@@ -108,6 +110,10 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 # vmResourceId Metadata Service
 VMResourceIDMetadataHost = '169.254.169.254'
 VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
+
+# agent permissions
+AgentUser='omsagent'
+AgentGroup='omiusers'
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -257,6 +263,20 @@ def restore_state(workspaceId):
         etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
         if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
             shutil.move(etc_backup_path, etc_final_path)
+
+        # now ensure the permissions and ownership is set recursively
+        if (os.path.isdir(etc_final_path)):
+            uid = pwd.getpwnam(AgentUser).pw_uid
+            gid = grp.getgrnam(AgentGroup).gr_gid
+            os.chmod(etc_final_path, 750)
+            os.chown(etc_final_path, uid, gid)
+            for root, dirs, files in os.walk(etc_final_path):
+                for d in dirs:
+                    os.chmod(os.path.join(root, d), 750)
+                    os.chown(os.path.join(root, d), uid, gid)
+                for f in files:
+                    os.chmod(os.path.join(root, f), 640)
+                    os.chown(os.path.join(root, f), uid, gid)   
     except Exception as e:
         hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
        
