@@ -50,6 +50,8 @@ class FreezeSnapshotter(object):
         self.freezer = freezer
         self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
+        if(para_parser.snapshotTaskToken == None):
+            para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
@@ -77,6 +79,12 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = snapshotMethodConfigValue
                 else:
                     self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
+                
+                if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True):
+                        self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
+                        self.takeSnapshotFrom = CommonVariables.onlyGuest
+
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
                     self.taskId = customSettings["backupTaskId"]
