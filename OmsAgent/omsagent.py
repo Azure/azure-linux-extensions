@@ -423,15 +423,15 @@ def enable():
     if (os.path.isdir(etc_final_path)):
         uid = pwd.getpwnam(AgentUser).pw_uid
         gid = grp.getgrnam(AgentGroup).gr_gid
-        os.system('chown {1}:{2} {0}'.format(etc_final_path, uid, gid))
-        os.system('chmod {1} {0}'.format(etc_final_path, 750))        
+        os.chown(etc_final_path, uid, gid)
+        os.chmod(etc_final_path, 0750)
         for root, dirs, files in os.walk(etc_final_path):
             for d in dirs:
-                os.system('chown {1}:{2} {0}'.format(os.path.join(root, d), uid, gid))
-                os.system('chmod {1} {0}'.format(os.path.join(root, d), 750))
+                os.chown(os.path.join(root, d), uid, gid)
+                os.chmod(os.path.join(root, d), 0750)                
             for f in files:
-                os.system('chown {1}:{2} {0}'.format(os.path.join(root, f), uid, gid))
-                os.system('chmod {1} {0}'.format(os.path.join(root, f), 640))                 
+                os.chown(os.path.join(root, f), uid, gid)
+                os.chmod(os.path.join(root, f), 0640)                
 
     if exit_code is 0:
         # Create a marker file to denote the workspace that was
