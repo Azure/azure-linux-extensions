@@ -35,14 +35,6 @@ class TestCheckUtil(unittest.TestCase):
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertTrue(self.cutil.is_insufficient_memory())
 
-    def test_is_kv_id(self):
-        self.cutil.check_kv_id("/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
-        self.cutil.check_kv_id("/subscriptions/759532d8-9991-4d04-878f-49f0f4804906/resourceGroups/adenszqtrrg/providers/Microsoft.KeyVault/vaults/adenszqtrkv", "")
-        self.assertRaises(Exception, self.cutil.check_kv_id, "////", "")
-        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/", "")
-        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault////////", "")
-        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
-
     def test_is_kv_url(self):
         dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
 
@@ -75,34 +67,35 @@ class TestCheckUtil(unittest.TestCase):
 
     def test_fatal_checks(self):
         self.cutil.precheck_for_fatal_failures({
-            Common.CommonVariables.VolumeTypeKey: "ALL",
-            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname"
+            Common.CommonVariables.VolumeTypeKey: "DATA",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
             })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname"
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
             })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256'
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat
+            })
+        self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600'
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
 
     def test_mount_scheme(self):

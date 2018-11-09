@@ -131,41 +131,20 @@ class CheckUtil(object):
 
         return
 
-    def check_kv_id(self, test_id, message):
-        """basic sanity check of the key vault id"""
-        # more strict checking would validate the full key vault id format
-        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
-
-        if test_id is None:
-            raise Exception(message + '\nNo Resource ID supplied')
-
-        id_splits = test_id.lower().split('/')
-
-        if not (len(id_splits) >= 9 and \
-                id_splits[0] == "" and \
-                id_splits[1] == "subscriptions" and \
-                id_splits[2] != "" and \
-                id_splits[3] == "resourcegroups" and \
-                id_splits[4] != "" and \
-                id_splits[5] == "providers" and \
-                id_splits[6] == "microsoft.keyvault" and \
-                id_splits[7] == "vaults" and \
-                id_splits[8] != ""):
-            raise Exception('\n' + message + '\nActual: ' + test_id + '\nExpected: ' + expected + "\n")
-        return
-
     def validate_key_vault_params(self, public_settings):
+
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            # No need to check the KV urls if its not an encryption operation
+            return
+
         kek_url = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         kv_url = public_settings.get(CommonVariables.KeyVaultURLKey)
-        kv_id = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
-        kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
 
         self.check_kv_url(kv_url, "Encountered an error while checking the Key Vault URL")
-        self.check_kv_id(kv_id, "Enountered an error while checking the Key Vault ID")
         if kek_url:
             self.check_kv_url(kek_url, "A KEK URL was specified, but was invalid")
-            self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KeyVault ID was invalid")
             if kek_algorithm is None or kek_algorithm.lower() not in [algo.lower() for algo in CommonVariables.encryption_algorithms]:
                 if kek_algorithm:
                     raise Exception(
@@ -174,10 +153,6 @@ class CheckUtil(object):
                     self.logger.log(
                         "No KEK algorithm specified will default to {0}".format(
                             CommonVariables.default_encryption_algorithm))
-        else:
-            if kek_kv_id:
-                raise Exception(
-                    "The KEK KeyVault ID was specified but the KEK URL was missing")
 
     def validate_volume_type(self, public_settings):
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)

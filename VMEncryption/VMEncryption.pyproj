@@ -25,10 +25,8 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="HandlerManifest.json" />
     <Content Include="main\oscrypto\91ade\cryptroot-ask-ade.sh" />
     <Content Include="MANIFEST.in" />
-    <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
