@@ -316,6 +316,7 @@ def update_encryption_settings():
         else:
             logger.log('Secret has already been updated')
             mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
+            disk_util.log_lsblk_output()
             hutil.exit_if_same_seq()
 
             # remount bek volume
@@ -511,10 +512,28 @@ def enable():
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
+        public_settings = get_public_settings()
+        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
+        cutil = CheckUtil(logger)
+
+        # run fatal prechecks, report error if exceptions are caught
+        try:
+            cutil.precheck_for_fatal_failures(public_settings)
+        except Exception as e:
+            logger.log("PRECHECK: Fatal Exception thrown during precheck")
+            logger.log(traceback.format_exc())
+            msg = e.message
+            hutil.do_exit(exit_code=0,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.configuration_error),
+                          message=msg)
+
+        hutil.disk_util.log_lsblk_output()
+
         # run prechecks and log any failures detected
         try:
-            cutil = CheckUtil(logger)
-            if cutil.is_precheck_failure():
+            if cutil.is_non_fatal_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
@@ -522,8 +541,6 @@ def enable():
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
-        public_settings = get_public_settings()
-        logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
@@ -1538,6 +1555,7 @@ def daemon_encrypt():
                                    status=CommonVariables.extension_success_status,
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
+            disk_util.log_lsblk_output()
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
