@@ -59,7 +59,7 @@ from __builtin__ import int
 from MetadataUtil import MetadataUtil
 
 
-def install():    
+def install():
     hutil.do_parse_context('Install')
     hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
@@ -522,7 +522,7 @@ def enable():
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
-            msg = e.message
+            msg = str(e)
             hutil.do_exit(exit_code=0,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
@@ -1349,7 +1349,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
         if disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type()):
             continue
         if device_item.name == bek_util.passphrase_device:
-            logger.log("skip for the passphrase disk ".format(device_item))
+            logger.log("skip for the passphrase disk {0}".format(device_item))
             continue
 
         if encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
@@ -1740,7 +1740,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                     elif type(json_parsed) is list:
                         encryption_format_items = json_parsed
                     else:
-                        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+                        raise Exception("JSON parse error. Input: {0}".format(disk_format_query))
                 except Exception:
                     encryption_marker.clear_config()
                     raise
