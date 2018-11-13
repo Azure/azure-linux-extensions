@@ -51,8 +51,6 @@ def main():
             detect_workspace_id()
             config_start_oms_services()
             restart_services()
-            time.sleep(120)
-            inject_logs()
             result_commands()
             service_control_commands()
             write_html()
@@ -62,6 +60,9 @@ def main():
             service_control_commands()
             write_html()
             dist_status()
+        elif re.match('^([-/]*)(injectlogs)', option):
+            time.sleep(120)
+            inject_logs()
         elif re.match('^([-/]*)(copyextlogs)', option):
             copy_extension_log()
     else:
@@ -155,7 +156,7 @@ def install_additional_packages():
         os.system('yum install -y wget httpd git dos2unix \
                 && service httpd start')
     elif INSTALLER == 'ZYPPER':
-        os.system('zypper -y update && zypper install -y wget httpd git dos2unix\
+        os.system('zypper install -y wget httpd git dos2unix\
                 && service apache2 start')
 
 def enable_dsc():

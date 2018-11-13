@@ -18,17 +18,18 @@ import os.path
 import subprocess
 import re
 import sys
-import time
 import rstr
 
+from time import sleep
+from datetime import datetime, timedelta
 from platform import system
 from collections import OrderedDict
 from verify_e2e import check_e2e
 
 from json2html import *
 
-E2E_DELAY = 10 # Delay (minutes) before checking for data
-AUTOUPGRADE_DELAY = 30 # Delay (minutes) before rechecking the extension version
+E2E_DELAY = 15 # Delay (minutes) before checking for data
+AUTOUPGRADE_DELAY = 15 # Delay (minutes) before rechecking the extension version
 LONG_DELAY = 250 # Delay (minutes) before rechecking extension
 
 images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180',
@@ -46,6 +47,7 @@ images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180'
 
 vmnames = []
 images = {}
+install_times = {}
 
 runwith = '--verbose'
 
@@ -126,6 +128,12 @@ def append_file(src, dest):
     f = open(src, 'r')
     dest.write(f.read())
     f.close()
+
+# Get time difference in minutes and seconds
+def get_time_diff(timevalue1, timevalue2):
+    timediff = timevalue2 - timevalue1
+    minutes, seconds = divmod(timediff.days * 86400 + timediff.seconds, 60)
+    return minutes, seconds
 
 # Secure copy required files from local to vm
 def copy_to_vm(dnsname, username, ssh_private, location):
@@ -235,7 +243,7 @@ def main():
         for i in reversed(range(1, LONG_DELAY + 1)):
             sys.stdout.write('\rLong-term delay: T-{0} minutes...'.format(i))
             sys.stdout.flush()
-            time.sleep(60)
+            sleep(60)
         print('')
         long_status_msg = check_status()
         long_verify_msg = verify_data()
@@ -251,6 +259,7 @@ def create_vm_and_install_extension():
 
     message = ""
     update_option = ""
+    install_times.clear()
     for distname, image in images.iteritems():
         uid = rstr.xeger(r'[0-9a-f]{8}')
         vmname = distname.lower() + '-' + uid
@@ -267,6 +276,8 @@ def create_vm_and_install_extension():
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        install_times.update({vmname: datetime.now()})
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Creating VM and Adding OMS Extension')
         html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
@@ -291,7 +302,8 @@ def create_vm_and_install_old_extension():
     """Create vm and install a specific version of the extension, returning HTML results."""
 
     message = ""
-    update_option = '--version ' + old_version + ' --no-auto-upgrade'
+    update_option = '--version {0} --no-auto-upgrade'.format(old_version)
+    install_times.clear()
     for distname, image in images.iteritems():
         uid = rstr.xeger(r'[0-9a-f]{8}')
         vmname = distname.lower() + '-' + uid
@@ -308,6 +320,8 @@ def create_vm_and_install_old_extension():
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        install_times.update({vmname: datetime.now()})
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, "Status After Creating VM and Adding OMS Extension version: {0}".format(old_version))
         html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
@@ -333,6 +347,7 @@ def force_upgrade_extension():
 
     message = ""
     update_option = '--force-update'
+    install_times.clear()
     for vmname in vmnames:
         distname = vmname.split('-')[0]
         vm_log_file = distname + "result.log"
@@ -343,6 +358,8 @@ def force_upgrade_extension():
         print("\n Force Upgrade Extension: {0} \n".format(vmname))
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        install_times.update({vmname: datetime.now()})
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Force Upgrading OMS Extension')
         html_open.write('<h2> Force Upgrade Extension: {0} <h2>'.format(vmname))
@@ -364,12 +381,6 @@ def force_upgrade_extension():
 
 def verify_data():
     """Verify data end-to-end, returning HTML results."""
-    # Delay to allow data to propagate
-    for i in reversed(range(1, E2E_DELAY + 1)):
-        sys.stdout.write('\rE2E propagation delay: T-{0} minutes...'.format(i))
-        sys.stdout.flush()
-        time.sleep(60)
-    print('')
 
     message = ""
     for vmname in vmnames:
@@ -378,7 +389,17 @@ def verify_data():
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
-        data = check_e2e(vmname)
+        
+        # Delay to allow data to propagate
+        while datetime.now() < (install_times[vmname] + timedelta(minutes=E2E_DELAY)):
+            mins, secs = get_time_diff(datetime.now(), install_times[vmname] + timedelta(minutes=E2E_DELAY))
+            sys.stdout.write('\rE2E propagation delay: {0} minutes {1} seconds...'.format(mins, secs))
+            sys.stdout.flush()
+            sleep(1)
+        print('')
+        minutes, _ = get_time_diff(install_times[vmname], datetime.now())
+        timespan = 'PT{0}M'.format(minutes)
+        data = check_e2e(vmname, timespan)
 
         # write detailed table for vm
         html_open.write("<h2> Verify Data from OMS workspace </h2>")
@@ -408,16 +429,20 @@ def autoupgrade():
     """ Waits for the extension to get updated automatically and continues with the tests after. Maximum wait time is 26 hours """
 
     message = ""
+    install_times.clear()
     for vmname in vmnames:
         initial_version = get_extension_version_now(resource_group, vmname, extension)
         time_lapsed = 0
         while initial_version >= get_extension_version_now(resource_group, vmname, extension):
-            time.sleep(AUTOUPGRADE_DELAY*60)
-            time_lapsed+=AUTOUPGRADE_DELAY*60
-            if 86400 <= time_lapsed < 93600:
-                remaining_wait_time = (93600 - time_lapsed)/60
-                print('Process waiting for more than 24 hrs. Please check the deployment of the new version is completed or not. This wait will end in {0} minutes'.format(remaining_wait_time))
-            if time_lapsed >= 93600:
+            sleep(AUTOUPGRADE_DELAY*60)
+            time_lapsed+=AUTOUPGRADE_DELAY
+            if time_lapsed < 1440:
+                sys.stdout.write("waiting for new version. Time Lapsed: {0} minutes".format(time_lapsed))
+                sys.stdout.flush()
+            elif 1440 <= time_lapsed < 1560:
+                sys.stdout.write('Process waiting for more than 24 hrs. Please check the deployment of the new version is completed or not. This wait will end in {0} minutes'.format(1560 - time_lapsed))
+                sys.stdout.flush()
+            elif time_lapsed >= 1560:
                 print("""Process waiting for more than 26 hrs. No New version of extension has been deployed.
                     If a new version is deployed, please check for any errors and re-run""")
                 break
@@ -429,7 +454,9 @@ def autoupgrade():
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
         print("\n Checking Status After AutoUpgrade: {0} \n".format(vmname))
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        install_times.update({vmname: datetime.now()})
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After AutoUpgrade OMS Extension')
         html_open.write('<h2> Status After AutoUpgrade OMS Extension: {0} <h2>'.format(vmname))
@@ -521,6 +548,7 @@ def check_status():
     """Check agent status."""
 
     message = ""
+    install_times.clear()
     for vmname in vmnames:
         distname = vmname.split('-')[0]
         vm_log_file = distname + "result.log"
@@ -530,6 +558,8 @@ def check_status():
         dnsname = vmname
         print("\n Checking Status: {0} \n".format(vmname))
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
+        install_times.update({vmname: datetime.now()})
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Long Run OMS Extension')
         html_open.write('<h2> Status After Long Run OMS Extension: {0} <h2>'.format(vmname))
