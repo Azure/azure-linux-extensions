@@ -299,7 +299,7 @@ class Watcher:
             self._consecutive_restarts_due_to_error = 0       
 
     def received_heartbeat_recently(self):
-        heartbeat_file = '/var/opt/microsoft/omsagent/log/ODSIngestions.status'
+        heartbeat_file = '/var/opt/microsoft/omsagent/log/ODSIngestion.status'
         curr_time = int(time.time()) 
         return_val = True
         file_update_time = curr_time
