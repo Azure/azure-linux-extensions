@@ -19,6 +19,8 @@ import subprocess
 import re
 import sys
 import rstr
+import glob
+import shutil
 
 from time import sleep
 from datetime import datetime, timedelta
@@ -252,6 +254,7 @@ def main():
     remove_extension_and_delete_vm()
     messages = (install_oms_msg, verify_oms_msg, instantupgrade_verify_msg, instantupgrade_status_msg, autoupgrade_verify_msg, autoupgrade_status_msg, remove_oms_msg, reinstall_oms_msg, long_verify_msg, long_status_msg)
     create_report(messages)
+    mv_result_files()
 
 
 def create_vm_and_install_extension():
@@ -487,6 +490,7 @@ def remove_extension():
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
         print("\nRemove Extension: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
@@ -587,16 +591,19 @@ def remove_extension_and_delete_vm():
         vm_log_file = distname + "result.log"
         log_open = open(vm_log_file, 'a+')
         dnsname = vmname
+        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
+        copy_from_vm(dnsname, username, ssh_private, location, '{0}-omsagent.log'.format(distname))
         print("\n Remove extension and Delete VM: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyextlogs')
-        copy_from_vm(dnsname, username, ssh_private, location, '{0}-extension.log'.format(distname))
+        copy_from_vm(dnsname, username, ssh_private, location, '{0}-extnwatcher.log'.format(distname))
         disk, nic, ip = get_vm_resources(resource_group, vmname)
         delete_vm(resource_group, vmname)
         delete_vm_disk(resource_group, disk)
         delete_nic(resource_group, nic)
         delete_ip(resource_group, ip)
-        append_file('omsfiles/{0}-extension.log'.format(distname), log_open)
+        append_file('omsfiles/{0}-extnwatcher.log'.format(distname), log_open)
+        append_file('omsfiles/{0}-omsagent.log'.format(distname), log_open)
         log_open.close()
 
 def create_report(messages):
@@ -697,12 +704,23 @@ def create_report(messages):
         distname = vmname.split('-')[0]
         append_file(distname + "result.log", result_log_file)
         append_file(distname + "result.html", result_html_file)
-
+    
+    result_log_file.close()
     htmlend = """
     </body>
     </html>
     """
     result_html_file.write(htmlend)
+    result_html_file.close()
+
+def mv_result_files():
+    if not os.path.exists('results'):
+        os.makedirs('results')
+    
+    file_types = ['*result.*', 'omsfiles/*-extnwatcher.log', 'omsfiles/*-omsagent.log']
+    for files in file_types:
+        for f in glob.glob(files):
+            shutil.move(os.path.join(f), os.path.join('results/'))
 
 if __name__ == '__main__':
     main()

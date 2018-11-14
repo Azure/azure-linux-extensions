@@ -63,8 +63,11 @@ def main():
         elif re.match('^([-/]*)(injectlogs)', option):
             time.sleep(120)
             inject_logs()
+        elif re.match('^([-/]*)(copyomslogs)', option):
+            detect_workspace_id()
+            copy_oms_logs()
         elif re.match('^([-/]*)(copyextlogs)', option):
-            copy_extension_log()
+            copy_extension_logs()
     else:
         print("No operation specified. run with 'preinstall' or 'postinstall' or 'status' or 'copyextlogs'")
 
@@ -507,25 +510,42 @@ def sorted_dir(folder):
 
     return sorted(os.listdir(folder), key=getmtime, reverse=True)
 
-def copy_extension_log():
+def copy_oms_logs():
+    omslogfile = ""
+    split_name = vm_dist.split(' ')
+    split_ver = vm_ver.split('.')
+    if vm_dist.startswith('Red Hat'):
+        omslogfile = '/home/scratch/{0}-omsagent.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
+    else:
+        omslogfile = '/home/scratch/{0}-omsagent.log'.format(split_name[0].lower()+split_ver[0])
+    omslogfileOpen = open(omslogfile, 'a+')
+    omsagent_file = '/var/opt/microsoft/omsagent/{0}/log/omsagent.log'.format(workspace_id)
+    write_log_command(omslogfileOpen, '\n OmsAgent Logs:\n')
+    append_file(omsagent_file, omslogfileOpen)
+
+def copy_extension_logs():
     extlogfile = ""
     split_name = vm_dist.split(' ')
     split_ver = vm_ver.split('.')
     if vm_dist.startswith('Red Hat'):
-        extlogfile = '/home/scratch/{0}-extension.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
     else:
-        extlogfile = '/home/scratch/{0}-extension.log'.format(split_name[0].lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format(split_name[0].lower()+split_ver[0])
 
     extlogfileOpen = open(extlogfile, 'a+')
     oms_azure_ext_dir = '/var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/'
-    ext_vers = sorted_dir(oms_azure_ext_dir)
-    write_log_command(extlogfileOpen, 'Extension Logs:')
-    if ext_vers[0].startswith('extension'):
-        append_file(oms_azure_ext_dir + ext_vers[0], extlogfileOpen)
+    ext_contents = sorted_dir(oms_azure_ext_dir)
+    if ext_contents[0].startswith('extension') or ext_contents[0].startswith('watcher'):
+        write_log_command(extlogfileOpen, '\n Extension Logs:\n')
+        append_file(oms_azure_ext_dir + '/extension.log', extlogfileOpen)
+        write_log_command(extlogfileOpen, '\n Watcher Logs:\n')
+        append_file(oms_azure_ext_dir + '/watcher.log', extlogfileOpen)
     else:
-        append_file(oms_azure_ext_dir + ext_vers[0] + '/extension.log', extlogfileOpen)
+        write_log_command(extlogfileOpen, '\n Extension Logs:\n')
+        append_file(oms_azure_ext_dir + ext_contents[0] + '/extension.log', extlogfileOpen)
+        write_log_command(extlogfileOpen, '\n Watcher Logs:\n')
+        append_file(oms_azure_ext_dir + ext_contents[0] + '/watcher.log', extlogfileOpen)
     extlogfileOpen.close()
-
 
 if __name__ == '__main__':
     main()
