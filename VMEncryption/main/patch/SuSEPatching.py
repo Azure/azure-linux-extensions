@@ -83,9 +83,9 @@ class SuSEPatching(AbstractPatching):
             try:
                 self.command_executor.ExecuteInBash('pip list | grep -F adal', raise_exception_on_failure=True)
             except: 
-                raise ModuleNotFoundError('SLES 11 environment is missing python-pip and adal')
+                raise Exception('SLES 11 environment is missing python-pip and adal')
         else:
-            self.command_executor.Execute('zypper -l -y install python-pip')
+            self.command_executor.Execute('zypper --gpg-auto-import-keys install -l -y python-pip')
             self.command_executor.Execute('python -m pip install --upgrade pip')
             self.command_executor.Execute('python -m pip install adal')
 

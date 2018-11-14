@@ -58,8 +58,10 @@ class UbuntuPatching(AbstractPatching):
         self.touch_path = '/usr/bin/touch'
 
     def install_adal(self):
+        self.command_executor.Execute('apt-get update')
         self.command_executor.Execute('apt-get install -y python-pip')
         self.command_executor.Execute('python -m pip install --upgrade pip')
+        self.command_executor.Execute('python -m pip install --upgrade setuptools')
         self.command_executor.Execute('python -m pip install adal')
 
     def install_extras(self):

@@ -23,7 +23,7 @@ def get_key(filename):
     return private_key
 
 try:
-    with open('data.json') as json_file:
+    with open(sys.argv[1]) as json_file:
         d = json.load(json_file)
     key = get_key(d['certificate'])
     context = adal.AuthenticationContext(d['auth'])
