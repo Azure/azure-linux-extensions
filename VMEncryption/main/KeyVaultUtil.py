@@ -134,7 +134,8 @@ class KeyVaultUtil(object):
             with open(tmp_path,'w') as tmp_file:
                 json.dump(tmp_data,tmp_file)
             os.close(tmp_fd)
-            scl_args = 'python TokenUtil.py ' + tmp_path
+            tok_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'TokenUtil.py')
+            scl_args = 'python ' + tok_path + ' ' + tmp_path
             access_token = subprocess.check_output(['scl', 'enable', 'python27', scl_args])
             if os.path.isfile(tmp_path): 
                 os.remove(tmp_path)
