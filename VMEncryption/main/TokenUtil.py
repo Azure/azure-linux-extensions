@@ -27,7 +27,7 @@ try:
         d = json.load(json_file)
     key = get_key(d['certificate'])
     context = adal.AuthenticationContext(d['auth'])
-    token = context.acquire_token_with_client_certificate(d['client'],d['client'],key,d['thumbprint'])
+    token = context.acquire_token_with_client_certificate(d['resource'],d['client'],key,d['thumbprint'])
     if token and 'accessToken' in token:
         print(token['accessToken'])
 except:

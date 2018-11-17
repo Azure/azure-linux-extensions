@@ -129,7 +129,7 @@ class KeyVaultUtil(object):
             return access_token
         elif self.is_scl_adal_available():
             # On RHEL, support for python-pip and the adal library are made available outside of default python via SCL 
-            tmp_data = { "auth": AuthorizeUri, "client": AADClientID, "certificate": prv_path, "thumbprint": AADClientCertThumbprint}
+            tmp_data = { "auth": AuthorizeUri, "resource": KeyVaultResourceName, "client": AADClientID, "certificate": prv_path, "thumbprint": AADClientCertThumbprint}
             tmp_fd, tmp_path = mkstemp()
             with open(tmp_path,'w') as tmp_file:
                 json.dump(tmp_data,tmp_file)
