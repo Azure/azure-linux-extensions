@@ -240,7 +240,11 @@ class DefaultOSUtil(object):
     def get_mac_in_bytes(self):
         mac = get_mac()
         machex = '%012x' % mac
-        macb = bytearray.fromhex(machex)
+        try:
+            macb = bytearray.fromhex(machex)
+        except TypeError:
+            # Work-around for Python 2.6 bug 
+            macb = bytearray.fromhex(unicode(machex))
         return macb
         
     def allow_dhcp_broadcast(self):
