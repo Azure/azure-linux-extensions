@@ -53,6 +53,9 @@ class debianPatching(AbstractPatching):
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/bin/umount'
 
+    def install_cryptsetup(self):
+        pass
+
     def install_extras(self):
         pass
 

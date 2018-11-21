@@ -53,6 +53,9 @@ class AbstractPatching(object):
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/usr/bin/umount'
 
+    def install_cryptsetup(self):
+        pass
+
     def install_extras(self):
         pass
 
