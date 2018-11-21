@@ -155,7 +155,7 @@ class CommonVariables:
     process_success = 0
     success = 0
     os_not_supported = 51
-    missing_dependancy = 52
+    missing_dependency = 52
     configuration_error = 53
     luks_format_error = 2
     scsi_number_not_found = 3

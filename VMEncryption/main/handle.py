@@ -225,8 +225,10 @@ def get_protected_settings():
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
-
     logger.log('Updating encryption settings')
+
+    # ensure cryptsetup package is still available in case it was for some reason removed after enable
+    DistroPatcher.install_cryptsetup()
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
@@ -463,13 +465,6 @@ def main():
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
 
-    if DistroPatcher is None:
-        hutil.do_exit(exit_code=0,
-                      operation='Enable',
-                      status=CommonVariables.extension_error_status,
-                      code=(CommonVariables.os_not_supported),
-                      message='Enable failed: the os is not supported')
-
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
             disable()
@@ -478,7 +473,14 @@ def main():
         elif re.match("^([-/]*)(install)", a):
             install()
         elif re.match("^([-/]*)(enable)", a):
-            enable()
+            if DistroPatcher is None:
+                hutil.do_exit(exit_code=0,
+                            operation='Enable',
+                            status=CommonVariables.extension_error_status,
+                            code=(CommonVariables.os_not_supported),
+                            message='Enable failed: OS distribution is not supported')
+            else:
+                enable()
         elif re.match("^([-/]*)(update)", a):
             update()
         elif re.match("^([-/]*)(daemon)", a):
@@ -520,7 +522,7 @@ def enable():
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
-            msg = e.message
+            msg = str(e)
             hutil.do_exit(exit_code=0,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
@@ -1347,7 +1349,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
         if disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type()):
             continue
         if device_item.name == bek_util.passphrase_device:
-            logger.log("skip for the passphrase disk ".format(device_item))
+            logger.log("skip for the passphrase disk {0}".format(device_item))
             continue
 
         if encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
@@ -1738,7 +1740,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                     elif type(json_parsed) is list:
                         encryption_format_items = json_parsed
                     else:
-                        raise Exception("JSON parse error. Input: {0}".format(encryption_parameters))
+                        raise Exception("JSON parse error. Input: {0}".format(disk_format_query))
                 except Exception:
                     encryption_marker.clear_config()
                     raise

@@ -78,15 +78,15 @@ class SuSEPatching(AbstractPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
 
+    def install_cryptsetup(self):
+        packages = ['cryptsetup']
+        cmd = " ".join((['zypper', 'install', '-l', '-y'] + packages))
+        self.command_executor.Execute(cmd)
+        
     def install_extras(self):
         packages = ['cryptsetup', 'lsscsi']
         cmd = " ".join((['zypper', 'install', '-l', '-y'] + packages))
         self.command_executor.Execute(cmd)
         
-        if not self.distro_info[1] == "11":
-            packages = ['libffi-devel', 'openssl-devel', 'python-devel']
-            cmd = " ".join(['zypper', 'install', '-l', '-y'] + packages)
-            self.command_executor.Execute(cmd)
-
     def update_prereq(self):
         pass

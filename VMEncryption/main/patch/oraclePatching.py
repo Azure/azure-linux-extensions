@@ -74,6 +74,11 @@ class oraclePatching(redhatPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
 
+    def install_cryptsetup(self):
+        packages = ['cryptsetup']
+        for package in packages:
+            self.logger.log("installation for " + package + 'result is ' + str(subprocess.call(['yum', 'install','-y', package])))
+
     def install_extras(self):
         common_extras = ['cryptsetup','lsscsi']
         for extra in common_extras:
