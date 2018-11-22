@@ -81,40 +81,14 @@ class redhatPatching(AbstractPatching):
             self.touch_path = '/usr/bin/touch'
             self.umount_path = '/usr/bin/umount'
 
+    def install_adal(self):
+        # On RHEL, RHSCL pip >= version 8.1 is the supported mechanism to install adal 
+        # https://access.redhat.com/solutions/1519803 
+        self.command_executor.Execute('yum install -y python27-python-pip')
+        self.command_executor.Execute('scl enable python27 "pip install --upgrade pip"')
+        self.command_executor.Execute('scl enable python27 "pip install adal"')
+
     def install_extras(self):
-        epel_packages_installed = False
-        attempt = 0
-
-        while not epel_packages_installed:
-            attempt += 1
-            self.logger.log("Attempt #{0} to locate EPEL packages".format(attempt))
-            if self.distro_info[1].startswith("6."):
-                if self.command_executor.Execute("rpm -q python-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y python-pip")
-
-                    if not self.command_executor.Execute("rpm -q python-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-            else:
-                if self.command_executor.Execute("rpm -q python2-pip"):
-                    epel_cmd = "yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-
-                    if self.command_executor.Execute("rpm -q epel-release"):
-                        self.command_executor.Execute(epel_cmd)
-
-                    self.command_executor.Execute("yum install -y python2-pip")
-
-                    if not self.command_executor.Execute("rpm -q python2-pip"):
-                        epel_packages_installed = True
-                else:
-                    epel_packages_installed = True
-
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
@@ -124,11 +98,7 @@ class redhatPatching(AbstractPatching):
                     'at',
                     'patch',
                     'procps-ng',
-                    'util-linux',
-                    'gcc',
-                    'libffi-devel',
-                    'openssl-devel',
-                    'python-devel']
+                    'util-linux']
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')
@@ -137,10 +107,6 @@ class redhatPatching(AbstractPatching):
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
-
-        if self.command_executor.Execute("pip show adal"):
-            self.command_executor.Execute("pip install --upgrade six")
-            self.command_executor.Execute("pip install adal")
 
     def update_prereq(self):
         if (self.distro_info[1].startswith('7.')):

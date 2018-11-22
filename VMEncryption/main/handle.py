@@ -173,8 +173,10 @@ def get_protected_settings():
 
 def update_encryption_settings():
     hutil.do_parse_context('UpdateEncryptionSettings')
-
     logger.log('Updating encryption settings')
+
+    # re-install extra packages like cryptsetup if no longer on system from earlier enable
+    DistroPatcher.install_extras()
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
@@ -242,6 +244,10 @@ def update_encryption_settings():
                 executor.Execute("update-initramfs -u -k all", True)
 
             os.unlink(temp_keyfile.name)
+
+            # install Python ADAL support if using client certificate authentication 
+            if extension_parameter.AADClientCertThumbprint: 
+                DistroPatcher.install_adal()
 
             kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                    KeyVaultURL=extension_parameter.KeyVaultURL,
@@ -663,6 +669,10 @@ def enable_encryption():
                         extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
+
+                    # install Python ADAL support if using client certificate authentication 
+                    if extension_parameter.AADClientCertThumbprint: 
+                        DistroPatcher.install_adal()
 
                     kek_secret_id_created = keyVaultUtil.create_kek_secret(Passphrase=extension_parameter.passphrase,
                                                                            KeyVaultURL=extension_parameter.KeyVaultURL,
