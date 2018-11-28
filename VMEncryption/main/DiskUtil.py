@@ -21,20 +21,20 @@ import json
 import os
 import os.path
 import re
-import shlex
-import sys
-from subprocess import *
 import shutil
 import traceback
 import uuid
 import glob
 
+from subprocess import Popen
+
 from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
-from CommandExecutor import *
-from Common import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables, CryptItem, DeviceItem, LvmItem
+
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -101,7 +101,7 @@ class DiskUtil(object):
         if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
             self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
         else:
-            with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 for line in f:
                     if not line.strip():
                         continue
@@ -192,7 +192,7 @@ class DiskUtil(object):
                                   str(crypt_item.current_luks_slot))
 
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-                with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
+                with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                     existing_content = f.read()
                     if existing_content is not None and existing_content.strip() != "":
                         new_mount_content = existing_content + "\n" + mount_content_item
@@ -201,10 +201,10 @@ class DiskUtil(object):
             else:
                 new_mount_content = mount_content_item
 
-            with open(self.encryption_environment.azure_crypt_mount_config_path,'w') as wf:
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
                 wf.write(new_mount_content)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def remove_crypt_item(self, crypt_item):
@@ -217,14 +217,14 @@ class DiskUtil(object):
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 mount_lines = f.readlines()
 
-            filtered_mount_lines = filter(lambda line: not crypt_item.mapper_name in line, mount_lines)
+            filtered_mount_lines = filter(lambda line: crypt_item.mapper_name not in line, mount_lines)
 
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
                 wf.write('\n'.join(filtered_mount_lines))
 
             return True
 
-        except Exception as e:
+        except Exception:
             return False
 
     def update_crypt_item(self, crypt_item):
@@ -253,10 +253,10 @@ class DiskUtil(object):
             return return_code
         else:
             return_code = self.luks_open(passphrase_file=passphrase_file,
-                                        dev_path=dev_path,
-                                        mapper_name=mapper_name,
-                                        header_file=header_file,
-                                        uses_cleartext_key=False)
+                                         dev_path=dev_path,
+                                         mapper_name=mapper_name,
+                                         header_file=header_file,
+                                         uses_cleartext_key=False)
             if return_code != CommonVariables.process_success:
                 self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
             return return_code
@@ -280,7 +280,7 @@ class DiskUtil(object):
     def check_shrink_fs(self, dev_path, size_shrink_to):
         return_code = self.check_fs(dev_path)
         if return_code == CommonVariables.process_success:
-            return_code = self.shrink_fs(dev_path = dev_path, size_shrink_to = size_shrink_to)
+            return_code = self.shrink_fs(dev_path=dev_path, size_shrink_to=size_shrink_to)
             return return_code
         else:
             return return_code
@@ -290,7 +290,7 @@ class DiskUtil(object):
         return the return code of the process for error handling.
         """
         self.hutil.log("dev path to cryptsetup luksFormat {0}".format(dev_path))
-        #walkaround for sles sp3
+        # walkaround for sles sp3
         if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
             proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
@@ -301,12 +301,12 @@ class DiskUtil(object):
             return self.command_executor.Execute(cryptsetup_cmd, input=passphrase)
         else:
             if header_file is not None:
-                cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
+                cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, header_file, passphrase_file)
             else:
-                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path , dev_path , passphrase_file)
-            
+                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
+
             return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_add_key(self, passphrase_file, dev_path, mapper_name, header_file, new_key_path):
         """
         return the return code of the process for error handling.
@@ -323,7 +323,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, new_key_path, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_remove_key(self, passphrase_file, dev_path, header_file):
         """
         return the return code of the process for error handling.
@@ -336,7 +336,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_kill_slot(self, passphrase_file, dev_path, header_file, keyslot):
         """
         return the return code of the process for error handling.
@@ -349,7 +349,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, keyslot, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
         """
         return the return code of the process for error handling.
@@ -387,9 +387,9 @@ class DiskUtil(object):
         self.hutil.log("keyfile: " + (passphrase_file))
 
         if header_file:
-            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name, header_file , passphrase_file)
+            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path, dev_path, mapper_name, header_file, passphrase_file)
         else:
-            cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name , passphrase_file)
+            cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, mapper_name, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
 
@@ -402,15 +402,15 @@ class DiskUtil(object):
 
         return self.command_executor.Execute(cryptsetup_cmd)
 
-    #TODO error handling.
+    # TODO error handling.
     def append_mount_info(self, dev_path, mount_point):
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
         mount_content_item = dev_path + " " + mount_point + "  auto defaults 0 0"
         new_mount_content = ""
-        with open("/etc/fstab",'r') as f:
+        with open("/etc/fstab", 'r') as f:
             existing_content = f.read()
             new_mount_content = existing_content + "\n" + mount_content_item
-        with open("/etc/fstab",'w') as wf:
+        with open("/etc/fstab", 'w') as wf:
             wf.write(new_mount_content)
 
     def remove_mount_info(self, mount_point):
@@ -426,7 +426,7 @@ class DiskUtil(object):
         with open('/etc/fstab', 'r') as f:
             for line in f.readlines():
                 line = line.strip()
-                pattern = '\s' + re.escape(mount_point) + '\s'
+                pattern = '\\s' + re.escape(mount_point) + '\\s'
 
                 if re.search(pattern, line):
                     self.logger.log("removing fstab line: {0}".format(line))
@@ -458,7 +458,7 @@ class DiskUtil(object):
         with open('/etc/fstab.azure.backup', 'r') as f:
             for line in f.readlines():
                 line = line.strip()
-                pattern = '\s' + re.escape(mount_point) + '\s'
+                pattern = '\\s' + re.escape(mount_point) + '\\s'
 
                 if re.search(pattern, line):
                     self.logger.log("removing fstab.azure.backup line: {0}".format(line))
@@ -492,7 +492,7 @@ class DiskUtil(object):
         self.make_sure_path_exists(mount_point)
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
-        else: 
+        else:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point + ' -t ' + file_system
 
         return self.command_executor.Execute(mount_cmd)
@@ -545,17 +545,17 @@ class DiskUtil(object):
         data_drives_encrypted = True
         for mount_item in mount_items:
             if mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
-                not "/mnt" == mount_item["dest"] and \
-                not "/" == mount_item["dest"] and \
-                not "/oldroot/mnt/resource" == mount_item["dest"] and \
-                not "/oldroot/boot" == mount_item["dest"] and \
-                not "/oldroot" == mount_item["dest"] and \
-                not "/mnt/resource" == mount_item["dest"] and \
-                not "/boot" == mount_item["dest"]:
+               not "/mnt" == mount_item["dest"] and \
+               not "/" == mount_item["dest"] and \
+               not "/oldroot/mnt/resource" == mount_item["dest"] and \
+               not "/oldroot/boot" == mount_item["dest"] and \
+               not "/oldroot" == mount_item["dest"] and \
+               not "/mnt/resource" == mount_item["dest"] and \
+               not "/boot" == mount_item["dest"]:
 
                 data_drives_found = True
 
-                if not "/dev/mapper" in mount_item["src"]:
+                if "/dev/mapper" not in mount_item["src"]:
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
@@ -564,12 +564,10 @@ class DiskUtil(object):
                 if grep_result == 0 and not os.path.exists('/volumes.lvm'):
                     self.logger.log("OS PV is encrypted")
                     os_drive_encrypted = True
-            elif mount_item["dest"] == "/" and \
-                "/dev/mapper" in mount_item["src"] or \
-                "/dev/dm" in mount_item["src"]:
+            elif mount_item["dest"] == "/" and "/dev/mapper" in mount_item["src"] or "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
-    
+
         if not data_drives_found:
             encryption_status["data"] = "NotMounted"
         elif data_drives_encrypted:
@@ -586,18 +584,18 @@ class DiskUtil(object):
             volume_type = encryption_config.get_volume_type().lower()
 
             if volume_type == CommonVariables.VolumeTypeData.lower() or \
-                volume_type == CommonVariables.VolumeTypeAll.lower():
+               volume_type == CommonVariables.VolumeTypeAll.lower():
                 encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
-                volume_type == CommonVariables.VolumeTypeAll.lower():
+               volume_type == CommonVariables.VolumeTypeAll.lower():
                 encryption_status["os"] = "EncryptionInProgress"
         elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
         return json.dumps(encryption_status)
 
-    def query_dev_sdx_path_by_scsi_id(self, scsi_number): 
+    def query_dev_sdx_path_by_scsi_id(self, scsi_number):
         p = Popen([self.distro_patcher.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity, err = p.communicate()
         # identity sample: [5:0:0:0] disk Msft Virtual Disk 1.0 /dev/sdc
@@ -637,7 +635,7 @@ class DiskUtil(object):
         the behaviour is if we could get the uuid, then return, if not, just return the sdx.
         """
         self.logger.log("querying the sdx path of:{0}".format(sdx_path))
-        #blkid path
+        # blkid path
         p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity, err = p.communicate()
         identity = identity.lower()
@@ -648,7 +646,7 @@ class DiskUtil(object):
         index_of_quote = identity.find('"')
         uuid = identity[0:index_of_quote]
         if uuid.strip() == "":
-            #TODO this is strange?  BUGBUG
+            # TODO this is strange?  BUGBUG
             return sdx_path
         return os.path.join("/dev/disk/by-uuid/", uuid)
 
@@ -713,7 +711,7 @@ class DiskUtil(object):
     def get_block_device_to_azure_udev_table(self):
         table = {}
         azure_links_dir = '/dev/disk/azure'
-        
+
         if not os.path.exists(azure_links_dir):
             return table
 
@@ -752,7 +750,7 @@ class DiskUtil(object):
         device_items_to_return = []
         device_items = []
 
-        #first get all the device names
+        # first get all the device names
         if dev_path is None:
             lsblk_command = 'lsblk -b -nl -o NAME'
         else:
@@ -825,10 +823,10 @@ class DiskUtil(object):
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN'
             else:
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN ' + dev_path
-            
+
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            
+
             device_items = []
             lvm_items = self.get_lvm_items()
             for line in proc_comm.stdout.splitlines():
@@ -848,7 +846,7 @@ class DiskUtil(object):
 
                         if property_item_pair[0] == 'FSTYPE':
                             device_item.file_system = property_item_pair[1].strip('"')
-                        
+
                         if property_item_pair[0] == 'MOUNTPOINT':
                             device_item.mount_point = property_item_pair[1].strip('"')
 
@@ -976,7 +974,7 @@ class DiskUtil(object):
                 self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.", level=CommonVariables.WarningLevel)
                 return True
 
-            supported_device_type = ["disk","part","raid0","raid1","raid5","raid10","lvm"]
+            supported_device_type = ["disk", "part", "raid0", "raid1", "raid5", "raid10", "lvm"]
             if device_item.type not in supported_device_type:
                 self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.", level=CommonVariables.WarningLevel)
                 return True
@@ -1030,10 +1028,10 @@ class DiskUtil(object):
 
     def find_block_sdx_path(self, vmbus):
         device = None
-        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path , vmbus)):
+        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path, vmbus)):
             if root.endswith("/block"):
                 device = dirs[0]
-            else : #older distros
+            else:  # older distros
                 for d in dirs:
                     if ':' in d and "block" == d.split(':')[0]:
                         device = d.split(':')[1]

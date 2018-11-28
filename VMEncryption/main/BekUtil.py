@@ -16,31 +16,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DiskUtil import *
-from Common import *
 import base64
 import os.path
 import os
-import traceback
 
 """
 add retry-logic to the network api call.
 """
+
+
 class BekUtil(object):
     """description of class"""
+
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
 
     def generate_passphrase(self, algorithm):
-        if TestHooks.use_hard_code_passphrase:
-            return TestHooks.hard_code_passphrase
-        else:
-            with open("/dev/urandom", "rb") as _random_source:
-                bytes = _random_source.read(127)
-                passphrase_generated = base64.b64encode(bytes)
-            return passphrase_generated
+        with open("/dev/urandom", "rb") as _random_source:
+            bytes = _random_source.read(127)
+            passphrase_generated = base64.b64encode(bytes)
+        return passphrase_generated
 
     #
     # Returns the LinuxPassPhraseFileName path
@@ -56,7 +53,7 @@ class BekUtil(object):
                 return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
         except Exception as e:
-            message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
+            message = "Failed to get BEK with error: {0}".format(e)
             self.logger.log(message)
 
         return None

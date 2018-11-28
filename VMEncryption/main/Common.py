@@ -33,7 +33,7 @@ class CommonVariables:
     luks_header_size = 4096 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
-    #TODO for the sles 11, we should use the ext3
+    # TODO for the sles 11, we should use the ext3
     default_file_system = 'ext4'
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
@@ -66,7 +66,7 @@ class CommonVariables:
     VolumeTypeData = 'Data'
     VolumeTypeAll = 'All'
 
-    SupportedVolumeTypes = [ VolumeTypeOS, VolumeTypeData, VolumeTypeAll ]
+    SupportedVolumeTypes = [VolumeTypeOS, VolumeTypeData, VolumeTypeAll]
 
     """
     command types
@@ -162,14 +162,10 @@ class CommonVariables:
     operation_lookback_failed = 23
     unknown_error = 100
 
-class TestHooks:
-    search_not_only_ide = False
-    use_hard_code_passphrase = False
-    hard_code_passphrase = "Quattro!"
 
 class DeviceItem(object):
     def __init__(self):
-        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN
+        # NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN
         self.name = None
         self.type = None
         self.file_system = None
@@ -181,23 +177,27 @@ class DeviceItem(object):
         self.majmin = None
         self.device_id = None
         self.azure_name = None
+
     def __str__(self):
         return ("name:" + str(self.name) + " type:" + str(self.type) +
                 " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
                 " label:" + str(self.label) + " model:" + str(self.model) +
                 " size:" + str(self.size) + " majmin:" + str(self.majmin) +
-                " device_id:" + str(self.device_id)) + " azure_name:" + str(self.azure_name) 
+                " device_id:" + str(self.device_id)) + " azure_name:" + str(self.azure_name)
+
 
 class LvmItem(object):
     def __init__(self):
-        #lv_name,vg_name,lv_kernel_major,lv_kernel_minor
+        # lv_name,vg_name,lv_kernel_major,lv_kernel_minor
         self.lv_name = None
         self.vg_name = None
         self.lv_kernel_major = None
         self.lv_kernel_minor = None
+
     def __str__(self):
         return ("lv_name:" + str(self.lv_name) + " vg_name:" + str(self.vg_name) +
                 " lv_kernel_major:" + str(self.lv_kernel_major) + " lv_kernel_minor:" + str(self.lv_kernel_minor))
+
 
 class CryptItem(object):
     def __init__(self):
@@ -208,7 +208,7 @@ class CryptItem(object):
         self.luks_header_path = None
         self.uses_cleartext_key = None
         self.current_luks_slot = None
-        
+
     def __str__(self):
         return ("name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) +
                 " mount_point:" + str(self.mount_point) + " file_system:" + str(self.file_system) +
