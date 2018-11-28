@@ -238,10 +238,15 @@ def update_encryption_settings():
 
                 disk_util.update_crypt_item(crypt_item)
 
-            logger.log("New key successfully added to all encrypted devices")
 
+            # For Ubuntu and RedHat, the initramfs needs to be repacked after a new key is added
             if DistroPatcher.distro_info[0] == "Ubuntu":
                 executor.Execute("update-initramfs -u -k all", True)
+
+            if DistroPatcher.distro_info[0] == "redhat":
+                executor.Execute("dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+
+            logger.log("New key successfully added to all encrypted devices")
 
             os.unlink(temp_keyfile.name)
 
