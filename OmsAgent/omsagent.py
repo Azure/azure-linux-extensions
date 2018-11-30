@@ -360,8 +360,7 @@ def enable():
         hutil_log_info('vmResourceId from Metadata API is {0}'.format(vmResourceId))
 
     if vmResourceId is None:
-        raise MetadataAPIException('Failed to get vmResourceId from ' \
-                                   'Metadata API')
+        hutil_log_info('This may be a classic VM')
 
     enableAutomaticManagement = public_settings.get('enableAutomaticManagement')
 
@@ -486,6 +485,10 @@ def get_vmresourceid_from_metadata():
 
     try:
         response = json.loads(urllib2.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None #classic vm
+
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
         else:
