@@ -134,42 +134,42 @@ class DiskUtil(object):
 
             encryption_status = json.loads(self.get_encryption_status())
 
-            if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
-                crypt_item = CryptItem()
-                crypt_item.mapper_name = "osencrypt"
+        if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+            crypt_item = CryptItem()
+            crypt_item.mapper_name = "osencrypt"
 
+            proc_comm = ProcessCommunicator()
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+
+            if grep_result == 0:
+                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+            else:
                 proc_comm = ProcessCommunicator()
-                grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+                self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
-                if grep_result == 0:
-                    crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
-                else:
-                    proc_comm = ProcessCommunicator()
-                    self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
+                for line in proc_comm.stdout.splitlines():
+                    if 'osencrypt' in line:
+                        majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
+                        src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
+                        crypt_item.dev_path = '/dev/' + src_device.name
+                        break
 
-                    for line in proc_comm.stdout.splitlines():
-                        if 'osencrypt' in line:
-                            majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                            src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
-                            crypt_item.dev_path = '/dev/' + src_device.name
-                            break
+            rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
+            crypt_item.file_system = rootfs_dev["fs"]
 
-                rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
-                crypt_item.file_system = rootfs_dev["fs"]
+            if not crypt_item.dev_path:
+                raise Exception("Could not locate block device for rootfs")
 
-                if not crypt_item.dev_path:
-                    raise Exception("Could not locate block device for rootfs")
+            crypt_item.luks_header_path = "/boot/luks/osluksheader"
 
-                crypt_item.luks_header_path = "/boot/luks/osluksheader"
+            if not os.path.exists(crypt_item.luks_header_path):
+                crypt_item.luks_header_path = crypt_item.dev_path
 
-                if not os.path.exists(crypt_item.luks_header_path):
-                    crypt_item.luks_header_path = crypt_item.dev_path
+            crypt_item.mount_point = "/"
+            crypt_item.uses_cleartext_key = False
+            crypt_item.current_luks_slot = -1
 
-                crypt_item.mount_point = "/"
-                crypt_item.uses_cleartext_key = False
-                crypt_item.current_luks_slot = -1
-
-                crypt_items.append(crypt_item)
+            crypt_items.append(crypt_item)
 
         return crypt_items
 

@@ -244,7 +244,7 @@ def update_encryption_settings():
                 executor.Execute("update-initramfs -u -k all", True)
 
             if DistroPatcher.distro_info[0] == "redhat":
-                executor.Execute("dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
 
             logger.log("New key successfully added to all encrypted devices")
 
