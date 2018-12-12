@@ -2837,14 +2837,14 @@ class Logger(object):
             except IOError as e:
                 pass
 
-    def Log(self, message):
+    def Log(self, message, output_to_console=True):
         """
         Standard Log function.
         Logs to self.file_path, and con_path
         """
-        self.LogWithPrefix("", message)
+        self.LogWithPrefix("", message, output_to_console)
 
-    def LogWithPrefix(self, prefix, message):
+    def LogWithPrefix(self, prefix, message, output_to_console=True):
         """
         Prefix each line of 'message' with current time+'prefix'.
         """
@@ -2854,7 +2854,9 @@ class Logger(object):
         for line in message.split('\n'):
             line = t + line
             self.LogToFile(line)
-            self.LogToCon(line)
+
+            if output_to_console:
+                self.LogToCon(line)
 
     def NoLog(self, message):
         """
