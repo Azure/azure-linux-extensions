@@ -47,31 +47,39 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                  stderr=err_out)
         time.sleep(1)
         while child.poll() is None:
-            msg = LogUtil.get_formatted_log("Command is running...",
+            msg_with_cmd_output = LogUtil.get_formatted_log("Command is running...",
                                             LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            hutil.log(msg)
-            hutil.do_status_report(operation, 'transitioning', '0', msg)
+            msg_without_cmd_output = "Command is running... Stdout/Stderr omitted from output."
+            hutil.log_to_file(msg_with_cmd_output)
+            hutil.log_to_console(msg_without_cmd_output)
+
+            hutil.do_status_report(operation, 'transitioning', '0', msg_without_cmd_output)
             time.sleep(interval)
 
         exit_code = child.returncode
         if child.returncode and child.returncode != 0:
-            msg = LogUtil.get_formatted_log("Command returned an error.",
+            msg_with_cmd_output = LogUtil.get_formatted_log("Command returned an error.",
                                             LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            hutil.error(msg)
+            msg_without_cmd_output = "Command returned an error. Stdout/Stderr omitted from output."
+
+            hutil.error(msg_without_cmd_output)
             waagent.AddExtensionEvent(name=extension_short_name,
                                       op=operation,
                                       isSuccess=False,
                                       version=version,
-                                      message="(01302)" + msg)
+                                      message="(01302)" + msg_without_cmd_output)
         else:
-            msg = LogUtil.get_formatted_log("Command is finished.",
+            msg_with_cmd_output = LogUtil.get_formatted_log("Command is finished.",
                                             LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            hutil.log(msg)
+            msg_without_cmd_output = "Command is finished. Stdout/Stderr omitted from output."
+            hutil.log_to_file(msg_with_cmd_output)
+            hutil.log_to_console(msg_without_cmd_output)
+
             waagent.AddExtensionEvent(name=extension_short_name,
                                       op=operation,
                                       isSuccess=True,
                                       version=version,
-                                      message="(01302)" + msg)
+                                      message="(01302)" + msg_without_cmd_output)
             end_time = time.time()
             waagent.AddExtensionEvent(name=extension_short_name,
                                       op=operation,
@@ -80,7 +88,7 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                       message=("(01304)Command execution time: "
                                                "{0}s").format(str(end_time - start_time)))
 
-        log_or_exit(hutil, exit_after_run, exit_code, operation, msg)
+        log_or_exit(hutil, exit_after_run, exit_code, operation, msg_with_cmd_output)
     except Exception as e:
         error_msg = ("Failed to launch command with error: {0},"
                      "stacktrace: {1}").format(e, traceback.format_exc())

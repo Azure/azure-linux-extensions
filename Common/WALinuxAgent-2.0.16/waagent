@@ -2795,7 +2795,7 @@ class Logger(object):
         """
         return (counter < 10) or ((counter < 100) and ((counter % 10) == 0)) or ((counter % 100) == 0)
 
-    def LogToFile(self, message):
+    def WriteToFile(self, message):
         """
         Write 'message' to logfile.
         """
@@ -2815,7 +2815,7 @@ class Logger(object):
             except IOError as e:
                 pass
 
-    def LogToCon(self, message):
+    def WriteToConsole(self, message):
         """
         Write 'message' to /dev/console.
         This supports serial port logging if the /dev/console
@@ -2844,17 +2844,23 @@ class Logger(object):
         """
         self.LogWithPrefix("", message)
 
-    def LogWithPrefix(self, prefix, message):
+    def LogToConsole(self, message):
         """
-        Prefix each line of 'message' with current time+'prefix'.
+        Logs message to console by pre-pending each line of 'message' with current time.
         """
-        t = time.localtime()
-        t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
-        t += prefix
+        log_prefix = self._get_log_prefix("")
         for line in message.split('\n'):
-            line = t + line
-            self.LogToFile(line)
-            self.LogToCon(line)
+            line = log_prefix + line
+            self.WriteToConsole(line)
+
+    def LogToFile(self, message):
+        """
+        Logs message to file by pre-pending each line of 'message' with current time.
+        """
+        log_prefix = self._get_log_prefix("")
+        for line in message.split('\n'):
+            line = log_prefix + line
+            self.WriteToFile(line)
 
     def NoLog(self, message):
         """
@@ -2868,23 +2874,31 @@ class Logger(object):
         """
         self.LogWithPrefixIfVerbose('', message)
 
+    def LogWithPrefix(self, prefix, message):
+        """
+        Prefix each line of 'message' with current time+'prefix'.
+        """
+        log_prefix = self._get_log_prefix(prefix)
+        for line in message.split('\n'):
+            line = log_prefix + line
+            self.WriteToFile(line)
+            self.WriteToConsole(line)
+
     def LogWithPrefixIfVerbose(self, prefix, message):
         """
         Only log 'message' if global Verbose is True.
         Prefix each line of 'message' with current time+'prefix'.
         """
         if self.verbose == True:
-            t = time.localtime()
-            t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
-            t += prefix
+            log_prefix = self._get_log_prefix(prefix)
             for line in message.split('\n'):
-                line = t + line
-                self.LogToFile(line)
-                self.LogToCon(line)
+                line = log_prefix + line
+                self.WriteToFile(line)
+                self.WriteToConsole(line)
 
     def Warn(self, message):
         """
-        Prepend the text "WARNING:" to the prefix for each line in 'message'.
+        Prepend the text "WARNING:" for each line in 'message'.
         """
         self.LogWithPrefix("WARNING:", message)
 
@@ -2901,6 +2915,13 @@ class Logger(object):
         """
         self.LogWithPrefix("ERROR:", message)
 
+    def _get_log_prefix(self, prefix):
+        """
+        Generates the log prefix with timestamp+'prefix'.
+        """
+        t = time.localtime()
+        t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+        return t + prefix
 
 def LoggerInit(log_file_path, log_con_path, verbose=False):
     """
