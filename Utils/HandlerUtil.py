@@ -85,10 +85,8 @@ class HandlerContext:
         return
 
 class HandlerUtility:
-    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName = 'extension.log', console_logger=None, file_logger=None):
+    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName = 'extension.log'):
         self._log = log
-        self._log_to_con = console_logger
-        self._log_to_file = file_logger
         self._error = error        
         self._logFileName = logFileName
         if s_name is None or l_name is None or extension_version is None:
@@ -146,18 +144,6 @@ class HandlerUtility:
 
     def log(self, message):
         self._log(self._get_log_prefix() + message)
-
-    def log_to_console(self, message):
-        if self._log_to_con is not None:
-            self._log_to_con(self._get_log_prefix() + message)
-        else:
-            self.error("Unable to log to console, console log method not set")
-
-    def log_to_file(self, message):
-        if self._log_to_file is not None:
-            self._log_to_file(self._get_log_prefix() + message)
-        else:
-            self.error("Unable to log to file, file log method not set")
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)

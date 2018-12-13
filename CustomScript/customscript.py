@@ -93,7 +93,7 @@ def dummy_command(operation, status, msg):
 
 
 def parse_context(operation):
-    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName, console_logger=waagent.LogToCon, file_logger=waagent.LogToFile)
+    hutil = Util.HandlerUtility(waagent.Log, waagent.Error, ExtensionShortName)
     hutil.do_parse_context(operation)
     return hutil
 
