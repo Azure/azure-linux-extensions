@@ -47,9 +47,9 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                  stderr=err_out)
         time.sleep(1)
         while child.poll() is None:
-            msg = "Command is running... "
+            msg = "Command is running..."
             msg_with_cmd_output = LogUtil.get_formatted_log(msg, LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            msg_without_cmd_output = msg + "Stdout/Stderr omitted from output."
+            msg_without_cmd_output = msg + " Stdout/Stderr omitted from output."
 
             hutil.log_to_file(msg_with_cmd_output)
             hutil.log_to_console(msg_without_cmd_output)
@@ -58,9 +58,9 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
 
         exit_code = child.returncode
         if child.returncode and child.returncode != 0:
-            msg = "Command returned an error (exit_code: %d). " % exit_code
+            msg = "Command returned an error."
             msg_with_cmd_output = LogUtil.get_formatted_log(msg, LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            msg_without_cmd_output = msg + "Stdout/Stderr omitted from output."
+            msg_without_cmd_output = msg + " Stdout/Stderr omitted from output."
 
             hutil.error(msg_without_cmd_output)
             waagent.AddExtensionEvent(name=extension_short_name,
@@ -69,9 +69,9 @@ def run_command(hutil, args, cwd, operation, extension_short_name, version, exit
                                       version=version,
                                       message="(01302)" + msg_without_cmd_output)
         else:
-            msg = "Command is finished (exit_code: %d). " % exit_code
+            msg = "Command is finished."
             msg_with_cmd_output = LogUtil.get_formatted_log(msg, LogUtil.tail(std_out_file), LogUtil.tail(err_out_file))
-            msg_without_cmd_output = msg + "Stdout/Stderr omitted from output."
+            msg_without_cmd_output = msg + " Stdout/Stderr omitted from output."
 
             hutil.log_to_file(msg_with_cmd_output)
             hutil.log_to_console(msg_without_cmd_output)
