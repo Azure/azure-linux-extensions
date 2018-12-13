@@ -2927,9 +2927,9 @@ def LoggerInit(log_file_path, log_con_path, verbose=False):
     """
     Create log object and export its methods to global scope.
     """
-    global Log, LogWithPrefix, LogIfVerbose, LogWithPrefixIfVerbose, Error, ErrorWithPrefix, Warn, NoLog, ThrottleLog, myLogger
+    global Log, LogToConsole, LogToFile, LogWithPrefix, LogIfVerbose, LogWithPrefixIfVerbose, Error, ErrorWithPrefix, Warn, NoLog, ThrottleLog, myLogger
     l = Logger(log_file_path, log_con_path, verbose)
-    Log, LogWithPrefix, LogIfVerbose, LogWithPrefixIfVerbose, Error, ErrorWithPrefix, Warn, NoLog, ThrottleLog, myLogger = l.Log, l.LogWithPrefix, l.LogIfVerbose, l.LogWithPrefixIfVerbose, l.Error, l.ErrorWithPrefix, l.Warn, l.NoLog, l.ThrottleLog, l
+    Log, LogToConsole, LogToFile, LogWithPrefix, LogIfVerbose, LogWithPrefixIfVerbose, Error, ErrorWithPrefix, Warn, NoLog, ThrottleLog, myLogger = l.Log, l.LogToConsole, l.LogToFile, l.LogWithPrefix, l.LogIfVerbose, l.LogWithPrefixIfVerbose, l.Error, l.ErrorWithPrefix, l.Warn, l.NoLog, l.ThrottleLog, l
 
 
 def Linux_ioctl_GetInterfaceMac(ifname):
