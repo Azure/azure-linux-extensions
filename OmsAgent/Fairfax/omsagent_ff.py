@@ -70,7 +70,7 @@ ExtensionStateSubdirectory = 'state'
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.u -w {1} -s {2} {3}'
+OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}'
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
