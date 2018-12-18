@@ -151,8 +151,8 @@ class HandlerUtility:
 
     @staticmethod
     def redact_protected_settings(content):
-        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings:": "*** REDACTED ***"', content)
-        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint:": "*** REDACTED ***"', redacted_tmp)
+        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
         return redacted
 
     def _parse_config(self, ctxt):
