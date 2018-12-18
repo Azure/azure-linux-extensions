@@ -28,7 +28,7 @@ HandlerEnvironment.json
     "configFolder": "<your config folder location>",
     "statusFolder": "<your status folder location>",
     "heartbeatFile": "<your heartbeat file location>",
-    
+
   }
 }]
 
@@ -51,7 +51,6 @@ Example Status Report:
 
 """
 
-
 import os
 import os.path
 import sys
@@ -70,8 +69,9 @@ DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
 
+
 class HandlerContext:
-    def __init__(self,name):
+    def __init__(self, name):
         self._name = name
         self._version = '0.0'
         self._config_dir = None
@@ -82,13 +82,17 @@ class HandlerContext:
         self._seq_no = -1
         self._status_file = None
         self._settings_file = None
-        self._config = None 
+        self._config = None
         return
 
+
 class HandlerUtility:
-    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName = 'extension.log'):
+    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName='extension.log',
+                 console_logger=None, file_logger=None):
         self._log = log
-        self._error = error        
+        self._log_to_con = console_logger
+        self._log_to_file = file_logger
+        self._error = error
         self._logFileName = logFileName
         if s_name is None or l_name is None or extension_version is None:
             (l_name, s_name, extension_version) = self._get_extension_info()
@@ -99,7 +103,7 @@ class HandlerUtility:
 
     def get_extension_version(self):
         return self._extension_version
-    
+
     def _get_log_prefix(self):
         return self._log_prefix
 
@@ -131,13 +135,13 @@ class HandlerUtility:
             for file in files:
                 try:
                     cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if(freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder,file))
+                    if (freshest_time == None):
+                        freshest_time = os.path.getmtime(join(config_folder, file))
                         seq_no = cur_seq_no
                     else:
-                        current_file_m_time = os.path.getmtime(join(config_folder,file))
-                        if(current_file_m_time > freshest_time):
-                            freshest_time=current_file_m_time
+                        current_file_m_time = os.path.getmtime(join(config_folder, file))
+                        if (current_file_m_time > freshest_time):
+                            freshest_time = current_file_m_time
                             seq_no = cur_seq_no
                 except ValueError:
                     continue
@@ -145,6 +149,18 @@ class HandlerUtility:
 
     def log(self, message):
         self._log(self._get_log_prefix() + message)
+
+    def log_to_console(self, message):
+        if self._log_to_con is not None:
+            self._log_to_con(self._get_log_prefix() + message)
+        else:
+            self.error("Unable to log to console, console log method not set")
+
+    def log_to_file(self, message):
+        if self._log_to_file is not None:
+            self._log_to_file(self._get_log_prefix() + message)
+        else:
+            self.error("Unable to log to file, file log method not set")
 
     def error(self, message):
         self._error(self._get_log_prefix() + message)
@@ -158,7 +174,7 @@ class HandlerUtility:
     def _parse_config(self, ctxt):
         config = None
         try:
-            config=json.loads(ctxt)
+            config = json.loads(ctxt)
         except:
             self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(ctxt))
 
@@ -171,50 +187,50 @@ class HandlerUtility:
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 protectedSettings = handlerSettings['protectedSettings']
-                thumb=handlerSettings['protectedSettingsCertThumbprint']
-                cert=waagent.LibDir+'/'+thumb+'.crt'
-                pkey=waagent.LibDir+'/'+thumb+'.prv'
+                thumb = handlerSettings['protectedSettingsCertThumbprint']
+                cert = waagent.LibDir + '/' + thumb + '.crt'
+                pkey = waagent.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
                 openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
                 cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
                 if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb )
-                    self.do_exit(1,"Enable",'error','1', 'Failed to decrypt protectedSettings')
-                jctxt=''
+                    self.error("OpenSSL decode error using  thumbprint " + thumb)
+                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+                jctxt = ''
                 try:
-                    jctxt=json.loads(cleartxt)
+                    jctxt = json.loads(cleartxt)
                 except:
                     self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self,operation):
+    def do_parse_context(self, operation):
         _context = self.try_parse_context()
         if not _context:
-            self.do_exit(1,operation,'error','1', operation + ' Failed')
+            self.do_exit(1, operation, 'error', '1', operation + ' Failed')
         return _context
-            
+
     def try_parse_context(self):
         self._context = HandlerContext(self._short_name)
-        handler_env=None
-        config=None
-        ctxt=None
-        code=0
+        handler_env = None
+        config = None
+        ctxt = None
+        code = 0
         # get the HandlerEnvironment.json. According to the extension handler spec, it is always in the ./ directory
         self.log('cwd is ' + os.path.realpath(os.path.curdir))
-        handler_env_file='./HandlerEnvironment.json'
+        handler_env_file = './HandlerEnvironment.json'
         if not os.path.isfile(handler_env_file):
             self.error("Unable to locate " + handler_env_file)
             return None
         ctxt = waagent.GetFileContents(handler_env_file)
-        if ctxt == None :
+        if ctxt == None:
             self.error("Unable to read " + handler_env_file)
         try:
-            handler_env=json.loads(ctxt)
+            handler_env = json.loads(ctxt)
         except:
             pass
-        if handler_env == None :
+        if handler_env == None:
             self.log("JSON error processing " + handler_env_file)
             return None
         if type(handler_env) == list:
@@ -222,25 +238,25 @@ class HandlerUtility:
 
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
-        self._context._config_dir=handler_env['handlerEnvironment']['configFolder']
-        self._context._log_dir= handler_env['handlerEnvironment']['logFolder']
-        
-        self._context._log_file= os.path.join(handler_env['handlerEnvironment']['logFolder'],self._logFileName)
+        self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
+        self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
+
+        self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'], self._logFileName)
         self._change_log_file()
-        self._context._status_dir=handler_env['handlerEnvironment']['statusFolder']
-        self._context._heartbeat_file=handler_env['handlerEnvironment']['heartbeatFile']
+        self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
+        self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
         self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
         if self._context._seq_no < 0:
             self.error("Unable to locate a .settings file!")
             return None
         self._context._seq_no = str(self._context._seq_no)
         self.log('sequence number is ' + self._context._seq_no)
-        self._context._status_file= os.path.join(self._context._status_dir, self._context._seq_no +'.status')
+        self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
         self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
         self.log("setting file path is" + self._context._settings_file)
-        ctxt=None
-        ctxt=waagent.GetFileContents(self._context._settings_file)
-        if ctxt == None :
+        ctxt = None
+        ctxt = waagent.GetFileContents(self._context._settings_file)
+        if ctxt == None:
             error_msg = 'Unable to read ' + self._context._settings_file + '. '
             self.error(error_msg)
             return None
@@ -249,15 +265,14 @@ class HandlerUtility:
         self._context._config = self._parse_config(ctxt)
         return self._context
 
-
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
-        LoggerInit(self._context._log_file,'/dev/stdout')
+        LoggerInit(self._context._log_file, '/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 
     def set_verbose_log(self, verbose):
-        if(verbose == "1" or verbose == 1):
+        if (verbose == "1" or verbose == 1):
             self.log("Enable verbose log")
             LoggerInit(self._context._log_file, '/dev/stdout', verbose=True)
         else:
@@ -284,9 +299,9 @@ class HandlerUtility:
             self.scrub_settings_file()
 
     def _get_most_recent_seq(self):
-        if(os.path.isfile('mrseq')):
+        if (os.path.isfile('mrseq')):
             seq = waagent.GetFileContents('mrseq')
-            if(seq):
+            if (seq):
                 return int(seq)
 
         return -1
@@ -297,52 +312,52 @@ class HandlerUtility:
     def get_inused_config_seq(self):
         return self._get_most_recent_seq()
 
-    def set_inused_config_seq(self,seq):
+    def set_inused_config_seq(self, seq):
         self._set_most_recent_seq(seq)
 
-    def _set_most_recent_seq(self,seq):
+    def _set_most_recent_seq(self, seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
-        tstamp=time.strftime(DateTimeFormat, time.gmtime())
+        tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
-            "version" : self._context._version,
-            "timestampUTC" : tstamp,
-            "status" : {
-                "name" : self._context._name,
-                "operation" : operation,
-                "status" : status,
-                "code" : status_code,
-                "formattedMessage" : {
-                    "lang" : "en-US",
-                    "message" : message
+            "version": self._context._version,
+            "timestampUTC": tstamp,
+            "status": {
+                "name": self._context._name,
+                "operation": operation,
+                "status": status,
+                "code": status_code,
+                "formattedMessage": {
+                    "lang": "en-US",
+                    "message": message
                 }
             }
         }]
         stat_rept = json.dumps(stat)
         if self._context._status_file:
-            tmp = "%s.tmp" %(self._context._status_file)
-            with open(tmp,'w+') as f:
+            tmp = "%s.tmp" % (self._context._status_file)
+            with open(tmp, 'w+') as f:
                 f.write(stat_rept)
             os.rename(tmp, self._context._status_file)
 
-    def do_heartbeat_report(self, heartbeat_file,status,code,message):
+    def do_heartbeat_report(self, heartbeat_file, status, code, message):
         # heartbeat
-        health_report='[{"version":"1.0","heartbeat":{"status":"' + status+ '","code":"'+ code + '","Message":"' + message + '"}}]'
-        if waagent.SetFileContents(heartbeat_file,health_report) == None :
+        health_report = '[{"version":"1.0","heartbeat":{"status":"' + status + '","code":"' + code + '","Message":"' + message + '"}}]'
+        if waagent.SetFileContents(heartbeat_file, health_report) == None:
             self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
-    def do_exit(self,exit_code,operation,status,code,message):
+    def do_exit(self, exit_code, operation, status, code, message):
         try:
-            self.do_status_report(operation, status,code,message)
+            self.do_status_report(operation, status, code, message)
         except Exception as e:
-            self.log("Can't update status: "+str(e))
+            self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
 
     def get_name(self):
         return self._context._name
-    
+
     def get_seq_no(self):
         return self._context._seq_no
 
