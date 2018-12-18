@@ -9,6 +9,8 @@ import random
 import subprocess
 import time
 import traceback
+import os
+import sys
 
 import subprocessfactory
 from httpclient import *
@@ -157,7 +159,7 @@ class CurlHttpClient(HttpClient):
         cmd.append(STATUS_CODE_DELIMITER + CURL_HTTP_CODE_SPECIAL_VAR + "\n")
 
         if headers is not None:
-            for key, value in headers.iteritems():
+            for key, value in headers.items():
                 cmd.append(OPTION_HEADER)
                 cmd.append(key + ": " + value)
 
@@ -171,7 +173,7 @@ class CurlHttpClient(HttpClient):
         if self.insecure:
             cmd.append(OPTION_INSECURE)
 
-        cmd.append('--verbose')    
+        cmd.append('--verbose')
         cmd.append(url)
         return cmd
 
@@ -185,10 +187,10 @@ class CurlHttpClient(HttpClient):
 
             # write data to disk
             data_file_name = base64.standard_b64encode(str(time.time()) +
-                                                       str(random.randint(0, sys.maxint)) +
-                                                       str(random.randint(0, sys.maxint)) +
-                                                       str(random.randint(0, sys.maxint)) +
-                                                       str(random.randint(0, sys.maxint)))
+                                                       str(random.randint(0, sys.maxsize)) +
+                                                       str(random.randint(0, sys.maxsize)) +
+                                                       str(random.randint(0, sys.maxsize)) +
+                                                       str(random.randint(0, sys.maxsize)))
             data_file_path = os.path.join("/tmp", data_file_name)
             f = open(data_file_path, "wb")
             f.write(serialized_data)
@@ -204,13 +206,13 @@ class CurlHttpClient(HttpClient):
                 env = os.environ.copy()
                 p = subprocessfactory.create_subprocess(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = p.communicate()
-                
+
                 if p.returncode != EXIT_SUCCESS:
                     raise Exception("Http request failed due to curl error. [returncode=" + str(p.returncode) + "]" +
                                     "[stderr=" + str(err) + "]")
 
                 return self.parse_raw_output(out)
-            except Exception, e:
+            except Exception as e:
                 raise Exception("Unknown exception while issuing request. [exception=" + str(e) + "]" +
                                 "[stacktrace=" + str(traceback.format_exc()) + "]")
         finally:

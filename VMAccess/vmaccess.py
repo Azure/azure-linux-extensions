@@ -90,7 +90,7 @@ def enable():
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
 
-        hutil.exit_if_enabled()
+        hutil.exit_if_enabled(remove_protected_settings=True)
         if _is_sshd_config_modified(protect_settings):
             _backup_sshd_config(SshdConfigPath)
 

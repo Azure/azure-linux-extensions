@@ -34,7 +34,7 @@ class HttpClient:
         # validate presence of cert/key in case they were removed after process creation
         if (cert_path is not None and not os.path.isfile(self.cert_path)) or \
                 (key_path is not None and not os.path.isfile(self.key_path)):
-            print cert_path
+            print(cert_path)
             raise Exception("Invalid certificate or key file path.")
 
         self.default_headers = {self.ACCEPT_HEADER_KEY: self.APP_JSON_HEADER_VALUE,

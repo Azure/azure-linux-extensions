@@ -58,6 +58,7 @@ import imp
 import base64
 import json
 import time
+import re
 
 from xml.etree import ElementTree
 from os.path import join
@@ -164,15 +165,21 @@ class HandlerUtility:
     def error(self, message):
         self._error(self._get_log_prefix() + message)
 
+    @staticmethod
+    def redact_protected_settings(content):
+        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
+        return redacted
+
     def _parse_config(self, ctxt):
         config = None
         try:
             config = json.loads(ctxt)
         except:
-            self.error('JSON exception decoding ' + ctxt)
+            self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(ctxt))
 
         if config is None:
-            self.error("JSON error processing settings file:" + ctxt)
+            self.error("JSON error processing settings file:" + HandlerUtility.redact_protected_settings(ctxt))
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
             if 'protectedSettings' in handlerSettings and \
@@ -193,8 +200,8 @@ class HandlerUtility:
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
-                    self.error('JSON exception decoding ' + cleartxt)
-                handlerSettings['protectedSettings'] = jctxt
+                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config
 
@@ -254,7 +261,7 @@ class HandlerUtility:
             self.error(error_msg)
             return None
 
-        self.log("JSON config: " + ctxt)
+        self.log("JSON config: " + HandlerUtility.redact_protected_settings(ctxt))
         self._context._config = self._parse_config(ctxt)
         return self._context
 
@@ -279,15 +286,17 @@ class HandlerUtility:
         self._set_most_recent_seq(self._context._seq_no)
         self.log("set most recent sequence number to " + self._context._seq_no)
 
-    def exit_if_enabled(self):
-        self.exit_if_seq_smaller()
+    def exit_if_enabled(self, remove_protected_settings=False):
+        self.exit_if_seq_smaller(remove_protected_settings)
 
-    def exit_if_seq_smaller(self):
-        if (self.is_seq_smaller()):
-            self.log(
-                "Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
+    def exit_if_seq_smaller(self, remove_protected_settings):
+        if(self.is_seq_smaller()):
+            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
             sys.exit(0)
         self.save_seq()
+
+        if remove_protected_settings:
+            self.scrub_settings_file()
 
     def _get_most_recent_seq(self):
         if (os.path.isfile('mrseq')):
@@ -370,3 +379,9 @@ class HandlerUtility:
         if (handlerSettings != None):
             return self.get_handler_settings().get('publicSettings')
         return None
+
+    def scrub_settings_file(self):
+        content = waagent.GetFileContents(self._context._settings_file)
+        redacted = HandlerUtility.redact_protected_settings(content)
+
+        waagent.SetFileContents(self._context._settings_file, redacted)
