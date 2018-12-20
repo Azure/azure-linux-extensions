@@ -299,6 +299,7 @@ def update_encryption_settings():
 
                 if distro_version.startswith('7.'):
                     executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                    logger.log("Update initrd image with new osluksheader.")
 
             os.unlink(temp_keyfile.name)
 
