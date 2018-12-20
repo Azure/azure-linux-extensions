@@ -244,7 +244,7 @@ def update_encryption_settings():
                 executor.Execute("update-initramfs -u -k all", True)
 
             if DistroPatcher.distro_info[0] == "redhat" or DistroPatcher.distro_info[0] == "centos":
-                distro_version = distro_info[1]
+                distro_version = DistroPatcher.distro_info[1]
 
                 if distro_version.startswith('7.'):
                     executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
