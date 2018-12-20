@@ -155,6 +155,14 @@ class CheckUtil(object):
                             CommonVariables.default_encryption_algorithm))
 
     def validate_volume_type(self, public_settings):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
+            # No need to validate volume type for Query Encryption Status operation
+            self.logger.log(
+                "Ignore validating volume type for ".format(
+                CommonVariables.QueryEncryptionStatus))
+            return
+
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
         supported_types = CommonVariables.SupportedVolumeTypes
         if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
@@ -163,6 +171,8 @@ class CheckUtil(object):
     def precheck_for_fatal_failures(self, public_settings):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
+
+        if public_settings.
         self.validate_volume_type(public_settings)
 
     def is_non_fatal_precheck_failure(self):
