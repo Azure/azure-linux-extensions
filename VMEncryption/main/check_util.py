@@ -189,7 +189,7 @@ class CheckUtil(object):
         if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
             # No need to validate volume type for Query Encryption Status operation
             self.logger.log(
-                "Ignore validating volume type for ".format(
+                "Ignore validating volume type for {0}".format(
                 CommonVariables.QueryEncryptionStatus))
             return
 
