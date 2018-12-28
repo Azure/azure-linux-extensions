@@ -226,7 +226,7 @@ class KeyVaultUtil(object):
 
             self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             result_content = result.read()
-            self.logger.log("result_content is {0}".format(result_content))
+            # self.logger.log("result_content is {0}".format(result_content))
             result_json = json.loads(result_content)
             secret_id = result_json["id"]
             http_util.connection.close()
