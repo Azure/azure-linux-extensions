@@ -67,6 +67,9 @@ class TestCheckUtil(unittest.TestCase):
 
     def test_fatal_checks(self):
         self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus
+            })
+        self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
             })
@@ -89,7 +92,10 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
-        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
+            Common.CommonVariables.VolumeTypeKey: "123",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
+            })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",

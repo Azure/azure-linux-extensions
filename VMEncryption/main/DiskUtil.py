@@ -489,12 +489,19 @@ class DiskUtil(object):
 
         self.logger.log("fstab updated successfully")
 
+    def mount_bek_volume(self, bek_label, mount_point, option_string):
+        """
+        mount the BEK volume
+        """
+        self.make_sure_path_exists(mount_point)
+        mount_cmd = self.distro_patcher.mount_path + ' -L "' + bek_label + '" ' + mount_point + ' -o ' + option_string
+        return self.command_executor.Execute(mount_cmd)
+
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
         """
         self.make_sure_path_exists(mount_point)
-        return_code = -1
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
         else: 
