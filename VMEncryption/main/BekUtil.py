@@ -16,18 +16,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DiskUtil import *
-from Common import *
+from Common import TestHooks
 import base64
 import os.path
-import os
-import traceback
 
 """
 add retry-logic to the network api call.
 """
+
+
 class BekUtil(object):
-    """description of class"""
+    """
+    Utility functions related to the BEK VOLUME and BEK files
+    """
+
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
@@ -42,10 +44,11 @@ class BekUtil(object):
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated
 
-    #
-    # Returns the LinuxPassPhraseFileName path
-    #
     def get_bek_passphrase_file(self, encryption_config):
+        """
+        Returns the LinuxPassPhraseFileName path
+        """
+
         bek_filename = encryption_config.get_bek_filename()
 
         try:
@@ -56,7 +59,7 @@ class BekUtil(object):
                 return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
         except Exception as e:
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(azure_device, e)
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(e)
             self.logger.log(message)
 
         return None
