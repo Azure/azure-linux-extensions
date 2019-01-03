@@ -116,7 +116,7 @@ class FreezeSnapshotter(object):
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
 
-        if not (self.extensionErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success or run_result == CommonVariables.success):
+        if not (run_result == CommonVariables.success):
             self.hutil.SetExtErrorCode(self.extensionErrorCode)
 
         return run_result, run_status, snapshot_info_array
@@ -317,6 +317,8 @@ class FreezeSnapshotter(object):
         return run_result, run_status, blob_snapshot_info_array, all_failed
 
     def takeSnapshotFromOnlyHost(self):
+        run_result = CommonVariables.success
+        run_status = 'success'
         all_failed= False
         is_inconsistent =  False
         blob_snapshot_info_array = None
