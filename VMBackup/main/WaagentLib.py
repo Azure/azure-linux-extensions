@@ -858,6 +858,147 @@ class SuSEDistro(AbstractDistro):
     def stopDHCP(self):
         Run("service " + self.dhcp_client_name + " stop", chk_err=False)
 
+############################################################
+#	archlinuxDistro
+############################################################
+
+archlinux_init_file = """\
+#!/bin/bash
+#
+# Init file for AzureLinuxAgent.
+#
+# chkconfig: 2345 60 80
+# description: AzureLinuxAgent
+#
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+RETVAL=0
+FriendlyName="AzureLinuxAgent"
+WAZD_BIN=/usr/sbin/waagent
+
+start()
+{
+    echo -n $"Starting $FriendlyName: "
+    $WAZD_BIN -daemon &
+}
+
+stop()
+{
+    echo -n $"Stopping $FriendlyName: "
+    killproc -p /var/run/waagent.pid $WAZD_BIN
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    reload)
+        ;;
+    report)
+        ;;
+    status)
+        status $WAZD_BIN
+        RETVAL=$?
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|status}"
+        RETVAL=1
+esac
+exit $RETVAL
+"""
+
+
+class archlinuxDistro(AbstractDistro):
+    """
+    Arch Linux Distro concrete class
+    Put Arch Linux specific behavior here...
+    """
+
+    def __init__(self):
+        super(archlinuxDistro, self).__init__()
+        self.service_cmd = '/sbin/service'
+        self.ssh_service_restart_option = 'condrestart'
+        self.ssh_service_name = 'sshd'
+        self.hostname_file_path = None if DistInfo()[1] < '7.0' else '/etc/hostname'
+        self.init_file = archlinux_init_file
+        self.grubKernelBootOptionsFile = '/boot/grub/menu.lst'
+        self.grubKernelBootOptionsLine = 'kernel'
+
+    def publishHostname(self, name):
+        super(archlinuxDistro, self).publishHostname(name)
+        if DistInfo()[1] < '7.0':
+            filepath = "/etc/sysconfig/network"
+            if os.path.isfile(filepath):
+                ReplaceFileContentsAtomic(filepath, "HOSTNAME=" + name + "\n"
+                                          + "\n".join(
+                    filter(lambda a: not a.startswith("HOSTNAME"), GetFileContents(filepath).split('\n'))))
+
+        ethernetInterface = MyDistro.GetInterfaceName()
+        filepath = "/etc/sysconfig/network-scripts/ifcfg-" + ethernetInterface
+        if os.path.isfile(filepath):
+            ReplaceFileContentsAtomic(filepath, "DHCP_HOSTNAME=" + name + "\n"
+                                      + "\n".join(
+                filter(lambda a: not a.startswith("DHCP_HOSTNAME"), GetFileContents(filepath).split('\n'))))
+        return 0
+
+    def installAgentServiceScriptFiles(self):
+        SetFileContents(self.init_script_file, self.init_file)
+        os.chmod(self.init_script_file, 0o744)
+        return 0
+
+    def registerAgentService(self):
+        self.installAgentServiceScriptFiles()
+        return Run('systemctl enable ' + self.agent_service_name)
+
+    def uninstallAgentService(self):
+        return Run('systemctl disable ' + self.agent_service_name)
+
+    def unregisterAgentService(self):
+        self.stopAgentService()
+        return self.uninstallAgentService()
+
+    def checkPackageInstalled(self, p):
+        if Run("pacman -Q " + p, chk_err=False):
+            return 0
+        else:
+            return 1
+
+    def checkPackageUpdateable(self, p):
+        if Run("pacman -Qu | grep " + p, chk_err=False):
+            return 1
+        else:
+            return 0
+
+    def checkDependencies(self):
+        """
+        Generic dependency check.
+        Return 1 unless all dependencies are satisfied.
+        """
+        if DistInfo()[1] < '7.0' and self.checkPackageInstalled('NetworkManager'):
+            Error(GuestAgentLongName + " is not compatible with network-manager.")
+            return 1
+        try:
+            m = __import__('pyasn1')
+        except ImportError:
+            Error(GuestAgentLongName + " requires python-pyasn1 for your Linux distribution.")
+            return 1
+        for a in self.requiredDeps:
+            if Run("which " + a + " > /dev/null 2>&1", chk_err=False):
+                Error("Missing required dependency: " + a)
+                return 1
+        return 0
 
 ############################################################
 #	redhatDistro
@@ -4484,6 +4625,9 @@ def DistInfo(fullname=0):
     if 'linux_distribution' in dir(platform):
         distinfo = list(platform.linux_distribution(full_distribution_name=fullname))
         distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
+        if '-ARCH' in platform.release():
+            distinfo[0] = 'archlinux'
+            distinfo[1] = re.sub('\-.*\Z', '', str(platform.release()))
         if os.path.exists("/etc/euleros-release"):
             distinfo[0] = "euleros"
         return distinfo
