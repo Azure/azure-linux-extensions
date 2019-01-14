@@ -257,6 +257,9 @@ class FreezeSnapshotter(object):
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
                     self.logger.log(error_msg, True, 'Error')
+                else :
+                    #Setting IsAnySnapshotFailed to false when success
+                    self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
         except Exception as e:
             if(self.hutil.get_value_from_configfile('doseq') == '2'):
                 self.hutil.set_value_to_configfile('doseq', '0')
