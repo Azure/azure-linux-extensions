@@ -23,6 +23,7 @@ import platform
 from patch.UbuntuPatching import UbuntuPatching
 from patch.debianPatching import debianPatching
 from patch.redhatPatching import redhatPatching
+from patch.archlinuxPatching import archlinuxPatching
 from patch.centosPatching import centosPatching
 from patch.SuSEPatching import SuSEPatching
 from patch.oraclePatching import oraclePatching
