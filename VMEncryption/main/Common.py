@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999323'
+    extension_version = '0.1.0.999327'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -49,6 +49,8 @@ class CommonVariables:
     AADClientIDKey = 'AADClientID'
     AADClientCertThumbprintKey = 'AADClientCertThumbprint'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
+    encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
+    default_encryption_algorithm = 'RSA-OAEP'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
 
@@ -133,7 +135,9 @@ class CommonVariables:
     extension_error_status = 'error'
     process_success = 0
     success = 0
-    os_not_supported = 1
+    os_not_supported = 51
+    missing_dependency = 52
+    configuration_error = 53
     luks_format_error = 2
     scsi_number_not_found = 3
     device_not_blank = 4

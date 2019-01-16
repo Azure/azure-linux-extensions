@@ -39,7 +39,8 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
-from dhcpHandler import DhcpHandler
+# need to be implemented in next release
+#from dhcpHandler import DhcpHandler
 
 class FreezeSnapshotter(object):
     """description of class"""
@@ -50,12 +51,17 @@ class FreezeSnapshotter(object):
         self.freezer = freezer
         self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
+        if(para_parser.snapshotTaskToken == None):
+            para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
         self.isManaged = False
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
+        self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
 
+        #implement in next release
+        '''
         # fetching wireserver IP from DHCP
         self.dhcpHandlerObj = None
         try:
@@ -65,6 +71,8 @@ class FreezeSnapshotter(object):
             errorMsg = "Failed to get hostIp from DHCP with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, True, 'Error')
             self.hostIp = '168.63.129.16'
+        '''
+
         self.logger.log( "hostIp : " + self.hostIp)
 
         try:
@@ -77,6 +85,12 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = snapshotMethodConfigValue
                 else:
                     self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
+                
+                if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True):
+                        self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
+                        self.takeSnapshotFrom = CommonVariables.onlyGuest
+
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
                     self.taskId = customSettings["backupTaskId"]
@@ -101,6 +115,9 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
+
+        if not (run_result == CommonVariables.success):
+            self.hutil.SetExtErrorCode(self.extensionErrorCode)
 
         return run_result, run_status, snapshot_info_array
     
@@ -133,8 +150,8 @@ class FreezeSnapshotter(object):
                 run_result = CommonVariables.FailedFsFreezeFailed
                 run_status = 'error'
                 error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed)
-                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Warning')
                 if(self.hutil.get_value_from_configfile('doseq') == '2'):
                     self.hutil.set_value_to_configfile('doseq', '0')
@@ -219,19 +236,19 @@ class FreezeSnapshotter(object):
                                         run_result = CommonVariables.FailedSnapshotLimitReached
                                         run_status = 'error'
                                         error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
-                                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached)
-                                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                                        self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached
+                                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                                         self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
                                         break
                         if(run_result == CommonVariables.success):
                             error_msg = 'T:S snapshot result: ' + str(snapshot_result)
                             run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                             if all_failed and self.takeSnapshotFrom == CommonVariables.onlyGuest:
-                                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                             else:
-                                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork
+                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                             run_status = 'error'
 
                         self.logger.log(error_msg, True, 'Error')
@@ -240,6 +257,9 @@ class FreezeSnapshotter(object):
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
                     self.logger.log(error_msg, True, 'Error')
+                else :
+                    #Setting IsAnySnapshotFailed to false when success
+                    self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
         except Exception as e:
             if(self.hutil.get_value_from_configfile('doseq') == '2'):
                 self.hutil.set_value_to_configfile('doseq', '0')
@@ -267,7 +287,7 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
 
         if all_failed and run_result != CommonVariables.success:
-            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
 
         return run_result, run_status, blob_snapshot_info_array, all_failed
 
@@ -293,13 +313,15 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
 
             if all_snapshots_failed and run_result != CommonVariables.success:
-                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
             elif run_result != CommonVariables.success :
-                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork
 
         return run_result, run_status, blob_snapshot_info_array, all_failed
 
     def takeSnapshotFromOnlyHost(self):
+        run_result = CommonVariables.success
+        run_status = 'success'
         all_failed= False
         is_inconsistent =  False
         blob_snapshot_info_array = None
@@ -320,8 +342,8 @@ class FreezeSnapshotter(object):
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 run_status = 'error'
                 if self.takeSnapshotFrom == CommonVariables.onlyHost:
-                    self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork)
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.hutil.ExtErrorCode)
+                    self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
+                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 error_msg = 'Enable failed in taking snapshot through host'
                 self.logger.log("T:S " + error_msg, True)
 

@@ -21,7 +21,6 @@
 # Output of running the script on Linux:
 # The scheduled events endpoint IP address will be available as part of the environment variable for all users.
 
-import argparse
 import os
 import socket
 import struct

@@ -25,10 +25,8 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="HandlerManifest.json" />
     <Content Include="main\oscrypto\91ade\cryptroot-ask-ade.sh" />
     <Content Include="MANIFEST.in" />
-    <Content Include="README.txt" />
     <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
@@ -46,6 +44,7 @@
     <Compile Include="main\BekUtil.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\check_util.py" />
     <Compile Include="main\CommandExecutor.py">
       <SubType>Code</SubType>
     </Compile>
@@ -153,6 +152,10 @@
     <Compile Include="main\Utils\__init__.py" />
     <Compile Include="main\__init__.py" />
     <Compile Include="setup.py" />
+    <Compile Include="test\console_logger.py" />
+    <Compile Include="test\test_check_util.py" />
+    <Compile Include="test\test_ResourceDiskUtil.py" />
+    <Compile Include="test\__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="main\" />
@@ -178,6 +181,7 @@
     <Folder Include="main\oscrypto\ubuntu_1404\encryptscripts\" />
     <Folder Include="main\patch\" />
     <Folder Include="main\Utils\" />
+    <Folder Include="test\" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />

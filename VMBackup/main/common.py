@@ -47,6 +47,10 @@ class CommonVariables:
     hostStatusCodeDoSnapshot = 'hostStatusCodeDoSnapshot'
     guestExtension = 'guestExtension'
     backupHostService = 'backupHostService'
+    includedDisks = 'includedDisks'
+    isAnyDiskExcluded = 'isAnyDiskExcluded'
+    dataDiskLunList = 'dataDiskLunList'
+    isOSDiskIncluded = 'isOSDiskIncluded'
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'

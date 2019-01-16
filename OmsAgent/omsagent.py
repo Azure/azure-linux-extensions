@@ -18,6 +18,8 @@
 
 import os
 import os.path
+import pwd
+import grp
 import re
 import sys
 import traceback
@@ -43,7 +45,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.6.1-3.universal.x64.sh'
+BundleFileName = 'omsagent-1.8.1-256.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -108,6 +110,10 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 # vmResourceId Metadata Service
 VMResourceIDMetadataHost = '169.254.169.254'
 VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
+
+# agent permissions
+AgentUser='omsagent'
+AgentGroup='omiusers'
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -256,7 +262,7 @@ def restore_state(workspaceId):
         etc_backup_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
         etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
         if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
-            shutil.move(etc_backup_path, etc_final_path)
+            shutil.move(etc_backup_path, etc_final_path)        
     except Exception as e:
         hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
        
@@ -354,8 +360,7 @@ def enable():
         hutil_log_info('vmResourceId from Metadata API is {0}'.format(vmResourceId))
 
     if vmResourceId is None:
-        raise MetadataAPIException('Failed to get vmResourceId from ' \
-                                   'Metadata API')
+        hutil_log_info('This may be a classic VM')
 
     enableAutomaticManagement = public_settings.get('enableAutomaticManagement')
 
@@ -411,6 +416,22 @@ def enable():
                                          final_check = raise_if_no_internet,
                                          check_error = True, log_cmd = False)
 
+    # now ensure the permissions and ownership is set recursively
+    workspaceId = public_settings.get('workspaceId')
+    etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
+    if (os.path.isdir(etc_final_path)):
+        uid = pwd.getpwnam(AgentUser).pw_uid
+        gid = grp.getgrnam(AgentGroup).gr_gid
+        os.chown(etc_final_path, uid, gid)
+        os.chmod(etc_final_path, 0750)
+        for root, dirs, files in os.walk(etc_final_path):
+            for d in dirs:
+                os.chown(os.path.join(root, d), uid, gid)
+                os.chmod(os.path.join(root, d), 0750)                
+            for f in files:
+                os.chown(os.path.join(root, f), uid, gid)
+                os.chmod(os.path.join(root, f), 0640)                
+
     if exit_code is 0:
         # Create a marker file to denote the workspace that was
         # onboarded using the extension. This will allow supporting
@@ -464,6 +485,10 @@ def get_vmresourceid_from_metadata():
 
     try:
         response = json.loads(urllib2.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None #classic vm
+
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
         else:

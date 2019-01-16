@@ -57,6 +57,13 @@ class UbuntuPatching(AbstractPatching):
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
 
+    def install_adal(self):
+        self.command_executor.Execute('apt-get update')
+        self.command_executor.Execute('apt-get install -y python-pip')
+        self.command_executor.Execute('python -m pip install --upgrade pip')
+        self.command_executor.Execute('python -m pip install --upgrade setuptools')
+        self.command_executor.Execute('python -m pip install adal')
+
     def install_extras(self):
         """
         install the sg_dd because the default dd do not support the sparse write
@@ -67,21 +74,13 @@ class UbuntuPatching(AbstractPatching):
         packages = ['at',
                     'cryptsetup-bin',
                     'lsscsi',
-                    'python-six',
                     'python-parted',
+                    'python-six',
                     'procps',
-                    'psmisc',
-                    'gcc',
-                    'libssl-dev',
-                    'libffi-dev',
-                    'python-dev',
-                    'python-pip']
+                    'psmisc']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
         self.command_executor.Execute(cmd)
         
-        cmd = " ".join(['pip', 'install', 'adal'])
-        self.command_executor.Execute(cmd)
-
     def update_prereq(self):
         pass
