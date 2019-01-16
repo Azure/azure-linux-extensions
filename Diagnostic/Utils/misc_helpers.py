@@ -41,17 +41,20 @@ def wala_event_type_for_telemetry(ext_op_type):
     return "HeartBeat" if ext_op_type == "Daemon" else ext_op_type
 
 
-def get_storage_endpoint_with_account(account, endpoint_without_account):
+def get_storage_endpoints_with_account(account, endpoint_without_account):
     endpoint = endpoint_without_account
     if endpoint:
         parts = endpoint.split('//', 1)
         if len(parts) > 1:
-            endpoint = parts[0]+'//'+account+".table."+parts[1]
+            tableEndpoint = parts[0]+'//'+account+".table."+parts[1]
+            blobEndpoint = parts[0]+'//'+account+".blob."+parts[1]
         else:
-            endpoint = 'https://'+account+".table."+parts[0]
+            tableEndpoint = 'https://'+account+".table."+parts[0]
+            blobEndpoint = 'https://'+account+".blob."+parts[0]
     else:
-        endpoint = 'https://'+account+'.table.core.windows.net'
-    return endpoint
+        tableEndpoint = 'https://'+account+'.table.core.windows.net'
+        blobEndpoint = 'https://'+account+'.blob.core.windows.net'
+    return (tableEndpoint, blobEndpoint)
 
 
 def check_suspected_memory_leak(pid, logger_err):
