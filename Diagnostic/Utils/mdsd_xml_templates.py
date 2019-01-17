@@ -71,8 +71,8 @@ obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
 entire_xml_cfg_tmpl = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
-    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" blobEndpoint="" />
+    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" blobEndpoint="" />
   </Accounts>
 
   <Management defaultRetentionInDays="90" eventVolume="">

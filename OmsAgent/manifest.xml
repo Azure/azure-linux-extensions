@@ -7,7 +7,7 @@
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
   <Description>Microsoft Operations Management Suite Agent for Linux</Description>
-  <IsInternalExtension>true</IsInternalExtension>
+  <IsInternalExtension>false</IsInternalExtension>
   <Eula>https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/LICENSE</Eula>
   <PrivacyUri>http://www.microsoft.com/privacystatement/en-us/OnlineServices/Default.aspx</PrivacyUri>
   <HomepageUri>https://github.com/Microsoft/OMS-Agent-for-Linux</HomepageUri>

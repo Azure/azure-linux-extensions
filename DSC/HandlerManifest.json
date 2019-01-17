@@ -3,11 +3,11 @@
     "name" : "DSCForLinux",   
     "version": 1.0,
     "handlerManifest": {
-      "disableCommand": "dsc.py -disable",
-      "enableCommand": "dsc.py -enable",
-      "installCommand": "dsc.py -install",
-      "uninstallCommand": "dsc.py -uninstall",
-      "updateCommand": "dsc.py -update",
+      "disableCommand": "./extension_shim.sh -c ./dsc.py -d",
+      "enableCommand": "./extension_shim.sh -c ./dsc.py -e",
+      "installCommand": "./extension_shim.sh -c ./dsc.py -i",
+      "uninstallCommand": "./extension_shim.sh -c ./dsc.py -u",
+      "updateCommand": "./extension_shim.sh -c ./dsc.py -p",
       "rebootAfterInstall": false,
       "reportHeartbeat": false
     }

@@ -144,7 +144,7 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
         expected_xml_str = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
-    <SharedAccessSignature account="ladunittestfakeaccount" decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.crt,4E4F545F415F5245414C5F544F4B454E)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" />
+    <SharedAccessSignature account="ladunittestfakeaccount" decryptKeyPath="B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.prv" isDefault="true" key="ENCRYPTED(B175B535DFE9F93659E5AFD893BF99BBF9DF28A5.crt,4E4F545F415F5245414C5F544F4B454E)" moniker="moniker" tableEndpoint="https://ladunittestfakeaccount.table.core.windows.net/" blobEndpoint="https://ladunittestfakeaccount.blob.core.windows.net/" />
   </Accounts>
 
   <Management defaultRetentionInDays="90" eventVolume="Large">
