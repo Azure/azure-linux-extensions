@@ -331,8 +331,8 @@ class LadConfigAll:
                             "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
         XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                             "tableEndpoint", endpoints[0], ['isDefault', 'true'])
-+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-+                            "blobEndpoint", endpoints[1], ['isDefault', 'true'])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "blobEndpoint", endpoints[1], ['isDefault', 'true'])
         XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
 
     def _set_xml_attr(self, key, value, xml_path, selector=[]):
@@ -464,7 +464,7 @@ class LadConfigAll:
             return False, "Must specify storageAccountSasToken"
         if '?' == token[0]:
             token = token[1:]
-        endpoint = get_storage_endpoints_with_account(account,
+        endpoints = get_storage_endpoints_with_account(account,
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
         self._update_account_settings(account, token, endpoints)
 
