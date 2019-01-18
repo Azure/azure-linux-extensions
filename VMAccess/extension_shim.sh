@@ -107,7 +107,7 @@ if [ -z "$PYTHON" ]; then
    echo "No Python interpreter found on the box" >&2
    exit 51 # Not Supported
 else
-    `${PYTHON} --version`
+   echo `${PYTHON} --version`
 fi
 
 ${PYTHON} ${COMMAND} ${operation}
