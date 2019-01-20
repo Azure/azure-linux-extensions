@@ -76,7 +76,7 @@ class StripdownState(OSEncryptionState):
             # the restarted process shall see the marker and advance the state machine
             self.command_executor.ExecuteInBash('sleep 30 && systemctl start walinuxagent &', True)
 
-            self.context.hutil.do_exit(exit_code=0,
+            self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                                        operation='EnableEncryptionOSVolume',
                                        status=CommonVariables.extension_error_status,
                                        code=CommonVariables.encryption_failed,

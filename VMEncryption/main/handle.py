@@ -60,7 +60,6 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
-    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -151,7 +150,7 @@ def disable_encryption():
         message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
 
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
@@ -266,7 +265,7 @@ def update_encryption_settings():
                                                                    DiskEncryptionKeyFileName=extension_parameter.DiskEncryptionKeyFileName)
 
             if kek_secret_id_created is None:
-                hutil.do_exit(exit_code=0,
+                hutil.do_exit(exit_code=CommonVariables.create_encryption_secret_failed,
                                 operation='UpdateEncryptionSettings',
                                 status=CommonVariables.extension_error_status,
                                 code=str(CommonVariables.create_encryption_secret_failed),
@@ -335,7 +334,7 @@ def update_encryption_settings():
     except Exception as e:
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='UpdateEncryptionSettings',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
@@ -345,6 +344,7 @@ def update():
     hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
     DistroPatcher.update_prereq()
+    hutil.restore_old_configs()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():
@@ -429,7 +429,7 @@ def main():
     hutil.disk_util = disk_util
 
     if DistroPatcher is None:
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.os_not_supported,
                       operation='Enable',
                       status=CommonVariables.extension_error_status,
                       code=(CommonVariables.os_not_supported),
@@ -486,7 +486,7 @@ def enable():
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
             msg = e.message
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.configuration_error),
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.configuration_error),
@@ -538,10 +538,10 @@ def enable():
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
             logger.log(msg)
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
-                          code=(CommonVariables.unknown_error),
+                          code=(CommonVariables.configuration_error),
                           message=msg)
 
 def enable_encryption():
@@ -654,17 +654,17 @@ def enable_encryption():
                             logger.log("Unsupported volume type specified and BEK volume does not exist, clearing encryption config")
                             encryption_config.clear_config()
 
-                    hutil.do_exit(exit_code=0,
+                    hutil.do_exit(exit_code=CommonVariables.configuration_error,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
-                                  code=str(CommonVariables.volue_type_not_support),
+                                  code=str(CommonVariables.configuration_error),
                                   message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
 
                 if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
-                    hutil.do_exit(exit_code=0,
+                    hutil.do_exit(exit_code=CommonVariables.configuration_error,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
-                                  code=str(CommonVariables.command_not_support),
+                                  code=str(CommonVariables.configuration_error),
                                   message='Command "{0}" is not supported'.format(extension_parameter.command))
 
                 """
@@ -692,7 +692,7 @@ def enable_encryption():
 
                     if kek_secret_id_created is None:
                         encryption_config.clear_config()
-                        hutil.do_exit(exit_code=0,
+                        hutil.do_exit(exit_code=CommonVariables.create_encryption_secret_failed,
                                       operation='EnableEncryption',
                                       status=CommonVariables.extension_error_status,
                                       code=str(CommonVariables.create_encryption_secret_failed),
@@ -728,7 +728,7 @@ def enable_encryption():
     except Exception as e:
         message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
@@ -1510,7 +1510,7 @@ def daemon_encrypt():
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
     if bek_passphrase_file is None:
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.passphrase_file_not_found,
                       operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,
                       code=CommonVariables.passphrase_file_not_found,
@@ -1532,7 +1532,7 @@ def daemon_encrypt():
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='EnableEncryptionDataVolumes',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
@@ -1610,7 +1610,7 @@ def daemon_encrypt():
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='EnableEncryptionOSVolume',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
@@ -1629,7 +1629,7 @@ def daemon_encrypt():
                                                                                                                  traceback.format_exc(),
                                                                                                                  os_encryption.state)
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='EnableEncryptionOSVolume',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
@@ -1777,7 +1777,7 @@ def daemon_decrypt():
             raise Exception("command {0} not supported.".format(decryption_marker.get_current_command()))
         
         if failed_item != None:
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='Disable',
                           status=CommonVariables.extension_error_status,
                           code=CommonVariables.encryption_failed,
@@ -1820,7 +1820,7 @@ def daemon():
             logger.log(msg=error_msg,
                         level=CommonVariables.ErrorLevel)
                 
-            hutil.do_exit(exit_code=0,
+            hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='Disable',
                           status=CommonVariables.extension_error_status,
                           code=str(CommonVariables.encryption_failed),
@@ -1840,7 +1840,7 @@ def daemon():
         error_msg = ("Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
         logger.log(msg=error_msg,
                     level=CommonVariables.ErrorLevel)
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                         operation='Enable',
                         status=CommonVariables.extension_error_status,
                         code=str(CommonVariables.encryption_failed),
@@ -1876,7 +1876,7 @@ def start_daemon(operation):
                       code=str(CommonVariables.success),
                       message=encryption_config.get_secret_id())
     else:
-        hutil.do_exit(exit_code=0,
+        hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                       operation=operation,
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.encryption_failed),
