@@ -187,7 +187,4 @@ class CheckUtil(object):
         if self.is_unsupported_mount_scheme():
             detected = True
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
-        if self.is_invalid_lvm_os():
-            detected = True
-            self.logger.log("PRECHECK: Invalid LVM OS scheme detected")
         return detected
