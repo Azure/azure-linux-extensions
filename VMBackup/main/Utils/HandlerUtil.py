@@ -487,6 +487,16 @@ class HandlerUtility:
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
+                if(distinfo[0] == ''):
+                    osfile= open("/etc/os-release", "r")
+                    for line in osfile:
+                        lists=str(line).split("=")
+                        if(lists[0]== "NAME"):
+                            distroname = lists[1].split("\"")
+                        if(lists[0]=="VERSION"):
+                            distroversion = lists[1].split("\"")
+                    osfile.close()
+                    return distroname+"-"+distroversion,platform.release()
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
