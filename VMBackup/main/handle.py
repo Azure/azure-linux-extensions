@@ -350,6 +350,7 @@ def daemon():
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
 
+                PluginHostObj = PluginHost(logger=backup_logger)
                 PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
                 doFsConsistentbackup = False
                 appconsistentBackup = False
