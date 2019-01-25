@@ -496,7 +496,7 @@ class HandlerUtility:
                         if(lists[0]=="VERSION"):
                             distroversion = lists[1].split("\"")
                     osfile.close()
-                    return distroname+"-"+distroversion,platform.release()
+                    return distroname[1]+"-"+distroversion[1],platform.release()
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
