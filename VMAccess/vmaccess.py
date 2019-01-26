@@ -69,7 +69,7 @@ def enable():
     hutil = Util.HandlerUtility(waagent.Log, waagent.Error)
     hutil.do_parse_context('Enable')
     try:
-        _forcibly_reset_chap(hutil)
+        hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
 
         reset_ssh = None
         remove_user = None
@@ -85,16 +85,14 @@ def enable():
                                       message="(03002)Argument error, conflicting operations")
             raise Exception("Cannot reset sshd_config and remove a user in one operation.")
 
-        # check port each time the VM boots up
-        if reset_ssh:
-            _open_ssh_port()
-            hutil.log("Succeeded in check and open ssh port.")
+        _forcibly_reset_chap(hutil)
 
-        hutil.exit_if_enabled(remove_protected_settings=True)
         if _is_sshd_config_modified(protect_settings):
             _backup_sshd_config(SshdConfigPath)
 
         if reset_ssh:
+            _open_ssh_port()
+            hutil.log("Succeeded in check and open ssh port.")
             waagent.AddExtensionEvent(name=hutil.get_name(), op="scenario", isSuccess=True, message="reset-ssh")
             _reset_sshd_config(SshdConfigPath)
             hutil.log("Succeeded in reset sshd_config.")
