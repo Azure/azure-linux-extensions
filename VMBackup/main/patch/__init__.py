@@ -23,6 +23,7 @@ import platform
 from patch.UbuntuPatching import UbuntuPatching
 from patch.debianPatching import debianPatching
 from patch.redhatPatching import redhatPatching
+from patch.archlinuxPatching import archlinuxPatching
 from patch.centosPatching import centosPatching
 from patch.SuSEPatching import SuSEPatching
 from patch.oraclePatching import oraclePatching
@@ -37,6 +38,9 @@ def DistInfo():
         distinfo = list(platform.linux_distribution(full_distribution_name=0))
         # remove trailing whitespace in distro name
         distinfo[0] = distinfo[0].strip()
+        if '-ARCH' in platform.release():
+            distinfo[0] = 'archlinux'
+            distinfo[1] = re.sub('\-.*\Z', '', str(platform.release()))
         return distinfo
     else:
         return platform.dist()
