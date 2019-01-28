@@ -486,7 +486,7 @@ def enable():
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
             msg = e.message
-            hutil.do_exit(exit_code=CommonVariables.configuration_error),
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.configuration_error),
