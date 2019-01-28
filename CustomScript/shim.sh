@@ -16,7 +16,7 @@ function find_python(){
         eval ${python_exec_command}="python"
     else
         # Python was not found. Searching for Python3 now.
-        if command -v python >/dev/null 2>&1 ; then
+        if command -v python3 >/dev/null 2>&1 ; then
             eval ${python_exec_command}="python3"
         fi
     fi
