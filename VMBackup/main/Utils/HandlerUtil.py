@@ -284,6 +284,15 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
 
+    '''
+    Sample /etc/azure/vmbackup.conf
+ 
+    [SnapshotThread]
+    doseq = 1
+    isanysnapshotfailed = False
+    UploadStatusAndLog = True
+    WriteLog = True
+    '''
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -294,6 +303,9 @@ class HandlerUtility:
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
+        except Exception as e:
+            pass
+
         return value
  
     def set_value_to_configfile(self, key, value):
@@ -465,9 +477,13 @@ class HandlerUtility:
                 process_wait_time -= 1
             out = p.stdout.read()
             out = str(out)
-            out =  out.split(" ")
-            waagent = out[0]
-            waagent_version = waagent.split("-")[-1] #getting only version number
+            if "Goal state agent: " in out:
+                 waagent_version = out.split("Goal state agent: ")[1].strip()
+            else:
+                out =  out.split(" ")
+                waagent = out[0]
+                waagent_version = waagent.split("-")[-1] #getting only version number
+
             os.chdir(cur_dir)
             return waagent_version
         except Exception as e:

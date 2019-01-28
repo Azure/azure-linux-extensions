@@ -227,7 +227,7 @@ def daemon():
     hutil.do_parse_context('Executing')
 
     try:
-        backup_logger.log('starting to enable', True)
+        backup_logger.log('starting daemon', True)
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
