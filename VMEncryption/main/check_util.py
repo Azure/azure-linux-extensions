@@ -149,7 +149,17 @@ class CheckUtil(object):
         if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
 
-    def validate_lvm_os(self):
+    def validate_lvm_os(self, public_settings):
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey).lower()
+        if volume_type == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("LVM OS validation skipped (Volume type: DATA)")
+            return
+
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey).lower()
+        if encryption_operation  == CommonVariables.QueryEncryptionStatus.lower():
+            self.logger.log("LVM OS validation skipped (Encryption Operation: QueryEncryptionStatus)")
+            return
+
         """ if an lvm os disk is present, check the lv names """
         detected = False
         # run checks only when the root OS volume type is LVM

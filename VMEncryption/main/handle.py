@@ -341,10 +341,13 @@ def update_encryption_settings():
                       message=message)
 
 def update():
+    # this method is called when updating an older version of the extension to a newer version
     hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
     DistroPatcher.update_prereq()
-    hutil.restore_old_configs()
+    # during update to new extension version, sweep configuration settings files from the prior 
+    # version into the new configuration settings directory that will be used by the new extension
+    hutil.restore_old_configs() 
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 def exit_without_status_report():

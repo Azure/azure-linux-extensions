@@ -438,7 +438,8 @@ class HandlerUtility:
 
     def restore_old_configs(self):
         # restores all archived settings files carried over from prior extension versions 
-        # uses cp --preserve=timestamps for faster performance than shutil.copy2() 
+        # use cp for faster performance than iterating over each file using shutil.copy2() 
+        # use --preserve=timestamps to ensure that _get_current_seq_no() can sort by timestamp
         if os.path.exists(self.config_archive_folder) and os.path.exists(self._context._config_dir):
             try:
                 src = self.config_archive_folder + '/*.settings'

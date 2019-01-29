@@ -83,11 +83,11 @@ manifest_obj = [{
   "name": CommonVariables.extension_name,
   "version": "1.0",
   "handlerManifest": {
-    "installCommand": "extension_shim.sh -c " + main_entry + " --install",
-    "uninstallCommand": "extension_shim.sh -c " + main_entry + " --uninstall",
-    "updateCommand": "extension_shim.sh -c " + main_entry + " --update",
-    "enableCommand": "extension_shim.sh -c " + main_entry + " --enable",
-    "disableCommand": "extension_shim.sh -c " + main_entry + " --disable",
+    "installCommand": "extension_shim.sh -c {0} --install".format(main_entry),
+    "uninstallCommand": "extension_shim.sh -c {0} --uninstall".format(main_entry),
+    "updateCommand": "extension_shim.sh -c {0} --update".format(main_entry),
+    "enableCommand": "extension_shim.sh -c {0} --enable".format(main_entry),
+    "disableCommand": "extension_shim.sh -c {0} --disable".format(main_entry),
     "rebootAfterInstall": False,
     "reportHeartbeat": False
   }
