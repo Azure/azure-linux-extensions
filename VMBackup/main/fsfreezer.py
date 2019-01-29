@@ -76,7 +76,7 @@ class FreezeHandler(object):
     def startproc(self,args):
         binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
         binary_thread.start()
-        for i in range(0,33):
+        for i in range(0,330):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
