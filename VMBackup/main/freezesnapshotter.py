@@ -222,15 +222,14 @@ class FreezeSnapshotter(object):
                             for blob_snapshot_info in blob_snapshot_info_array:
                                 if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
                                     # if any blob-snapshot has failed with SnapshotRateExceeded with IsAnySnapshotFailed RegKey already true, assign StausCode FailedSnapshotLimitReached
-                                    IsAnySnapshotFailedConfigValue = self.hutil.get_value_from_configfile(CommonVariables.IsAnySnapshotFailed)
-                                    self.logger.log('IsAnySnapshotFailedConfigValue : ' + str(IsAnySnapshotFailedConfigValue))
-                                    if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage and (IsAnySnapshotFailedConfigValue == None or IsAnySnapshotFailedConfigValue == '' or IsAnySnapshotFailedConfigValue == 'False'):
+                                    SnapshotRateExceededFailureCount = self.hutil.get_value_from_configfile(CommonVariables.SnapshotRateExceededFailureCount)
+                                    self.logger.log('SnapshotRateExceededFailureCount : ' + str(SnapshotRateExceededFailureCount))
+                                    if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage and (SnapshotRateExceededFailureCount == None or SnapshotRateExceededFailureCount == '' or int(SnapshotRateExceededFailureCount) != 3):
                                         run_result = CommonVariables.error
                                         run_status = 'error'
                                         error_msg = 'Retrying when snapshot failed with SnapshotRateExceeded'
                                         self.logger.log(error_msg, True, 'Error')
-                                        self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'True')
-                                        time.sleep(600)
+                                        self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount, str( int(SnapshotRateExceededFailureCount) + 1))
                                         break
                                     elif 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage or 'The snapshot count against this blob has been exceeded' in blob_snapshot_info.errorMessage:
                                         run_result = CommonVariables.FailedSnapshotLimitReached
@@ -238,7 +237,7 @@ class FreezeSnapshotter(object):
                                         error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
                                         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached
                                         error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                                        self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
+                                        self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount,'0')
                                         break
                         if(run_result == CommonVariables.success):
                             error_msg = 'T:S snapshot result: ' + str(snapshot_result)
@@ -258,8 +257,8 @@ class FreezeSnapshotter(object):
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
                     self.logger.log(error_msg, True, 'Error')
                 else :
-                    #Setting IsAnySnapshotFailed to false when success
-                    self.hutil.set_value_to_configfile(CommonVariables.IsAnySnapshotFailed,'False')
+                    #resetting SnapshotRateExceededFailureCount when success
+                    self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount,'0')
         except Exception as e:
             if(self.hutil.get_value_from_configfile('doseq') == '2'):
                 self.hutil.set_value_to_configfile('doseq', '0')

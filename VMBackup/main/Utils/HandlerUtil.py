@@ -139,15 +139,17 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message,level='Info'):
-        if sys.version_info > (3,):
-            if self.logging_file is not None:
-                self.log_py3(message)
+        WriteLog = self.get_value_from_configfile('WriteLog')
+        if (WriteLog == None or WriteLog == 'True'):
+            if sys.version_info > (3,):
+                if self.logging_file is not None:
+                    self.log_py3(message)
+                else:
+                    pass
+                #self.log_to_file() 
             else:
-                pass
-            #self.log_to_file() 
-        else:
-            self._log(self._get_log_prefix() + message)
-        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+                self._log(self._get_log_prefix() + message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
@@ -282,6 +284,15 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
 
+    '''
+    Sample /etc/azure/vmbackup.conf
+ 
+    [SnapshotThread]
+    doseq = 1
+    isanysnapshotfailed = False
+    UploadStatusAndLog = True
+    WriteLog = True
+    '''
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -292,11 +303,9 @@ class HandlerUtility:
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
-                else:
-                    self.log("Config File doesn't have the key :" + key, 'Info')
         except Exception as e:
-            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.log(errorMsg, 'Warning')
+            pass
+
         return value
  
     def set_value_to_configfile(self, key, value):
@@ -468,9 +477,13 @@ class HandlerUtility:
                 process_wait_time -= 1
             out = p.stdout.read()
             out = str(out)
-            out =  out.split(" ")
-            waagent = out[0]
-            waagent_version = waagent.split("-")[-1] #getting only version number
+            if "Goal state agent: " in out:
+                 waagent_version = out.split("Goal state agent: ")[1].strip()
+            else:
+                out =  out.split(" ")
+                waagent = out[0]
+                waagent_version = waagent.split("-")[-1] #getting only version number
+
             os.chdir(cur_dir)
             return waagent_version
         except Exception as e:
@@ -524,7 +537,7 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
-        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
