@@ -1,6 +1,6 @@
 import unittest
 import mock
-import main
+
 from main import check_util
 from main import Common
 from StringIO import StringIO

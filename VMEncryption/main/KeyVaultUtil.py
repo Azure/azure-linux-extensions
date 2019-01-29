@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import httplib
-import urlparse
 import urllib
 import json
 import uuid
@@ -29,9 +28,7 @@ import subprocess
 
 from tempfile import mkstemp 
 from HttpUtil import HttpUtil
-from Common import *
 from urlparse import urlparse
-from CommandExecutor import *
 
 class KeyVaultUtil(object):
     def __init__(self, logger):

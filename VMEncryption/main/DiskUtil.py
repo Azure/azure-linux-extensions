@@ -21,9 +21,7 @@ import json
 import os
 import os.path
 import re
-import shlex
-import sys
-from subprocess import *
+from subprocess import Popen
 import shutil
 import traceback
 import uuid
@@ -33,8 +31,8 @@ from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
-from CommandExecutor import *
-from Common import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -206,7 +204,7 @@ class DiskUtil(object):
                 wf.write(new_mount_content)
                 wf.write('\n')
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def remove_crypt_item(self, crypt_item):
@@ -228,7 +226,7 @@ class DiskUtil(object):
 
             return True
 
-        except Exception as e:
+        except Exception:
             return False
 
     def update_crypt_item(self, crypt_item):
