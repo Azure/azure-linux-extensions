@@ -52,11 +52,12 @@ class FreezeResult(object):
         return error_str
 
 class FreezeHandler(object):
-    def __init__(self,logger):
+    def __init__(self,logger,hutil):
         # sig_handle valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
         self.sig_handle = 0
         self.child= None
         self.logger=logger
+        self.hutil = hutil
 
     def sigusr1_handler(self,signal,frame):
         self.logger.log('freezed',False)
@@ -76,7 +77,13 @@ class FreezeHandler(object):
     def startproc(self,args):
         binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
         binary_thread.start()
-        for i in range(0,330):
+        proc_sleep_time = self.hutil.get_value_from_configfile('SafeFreezeWaitInSeconds')
+        if(proc_sleep_time == None or proc_sleep_time == ''):
+            proc_sleep_time = 66
+
+        self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time))
+
+        for i in range(0,(int(proc_sleep_time)/2)):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
@@ -90,11 +97,12 @@ class FreezeHandler(object):
         signal.signal(signal.SIGCHLD,self.sigchld_handler)
 
 class FsFreezer:
-    def __init__(self, patching, logger):
+    def __init__(self, patching, logger, hutil):
         """
         """
         self.patching = patching
         self.logger = logger
+        self.hutil = hutil
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
@@ -104,7 +112,7 @@ class FsFreezer:
             self.mounts = None
         self.frozen_items = set()
         self.unfrozen_items = set()
-        self.freeze_handler = FreezeHandler(self.logger)
+        self.freeze_handler = FreezeHandler(self.logger, self.hutil)
 
 
     def should_skip(self, mount):
