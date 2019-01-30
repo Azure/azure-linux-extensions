@@ -41,6 +41,7 @@ class ResourceDiskUtil(object):
     RD_KEY_FILE = '/mnt/azure_bek_disk/LinuxPassPhraseFileName'
     RD_KEY_FILE_MOUNT_POINT = '/mnt/azure_bek_disk'
     RD_KEY_VOLUME_LABEL = 'BEK VOLUME'
+    RD_MAPPER_NAME = 'resourceencrypt'
 
     def __init__(self, hutil, logger, distro_patcher):
         self.hutil = hutil
@@ -182,7 +183,8 @@ class ResourceDiskUtil(object):
         """ retrieve current device mapper path backing the encrypted resource disk mount point """
         device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
         for device_item in device_items:
-            if device_item.type.lower() == 'crypt':
+            ##fstype should be crypto_LUKS
+            if device_item.file_system == "crypto_LUKS" :
                 self.logger.log('Found device mapper: ' + device_item.name.lower(), level='Info')
                 return device_item.name.lower()
         return None
@@ -226,23 +228,15 @@ class ResourceDiskUtil(object):
             
     def try_remount(self):
         """ mount encrypted resource disk if not already mounted"""
+        self.logger.log("In try_remount")
         if self.is_crypt_mounted():
-            self.logger.log("resource disk already encrypted and mounted", level='Info')
+            self.logger.log("Resource disk already encrypted and mounted")
             return True
 
         if self.resource_disk_exists() and self.resource_disk_partition_exists() and self.is_luks_device() and self.is_valid_key():
-            # store the currently associated path and name
-            current_mapper_name = self.get_rd_device_mapper()
-            if current_mapper_name:
-                self.mapper_name = current_mapper_name
-                self.mapper_path = self.DM_PREFIX + self.mapper_name
-                if not self.is_luks_device_opened:
-                    # attempt to open
-                    self.disk_util.luks_open(passphrase_file=self.RD_KEY_FILE, dev_path=self.RD_DEV_PATH, mapper_name=self.mapper_name, header_file=None, uses_cleartext_key=False)
-                    if not self.is_luks_device_opened:
-                        return False
-                # attempt mount
-                return self.mount()
+            self.disk_util.luks_open(passphrase_file=self.RD_KEY_FILE, dev_path=self.RD_DEV_PATH, mapper_name="resourceencrypt", header_file=None, uses_cleartext_key=False)
+            self.logger.log("Trying to mount resource disk."')
+            return self.mount()
 
         # conditions required to re-mount were not met
         return False
