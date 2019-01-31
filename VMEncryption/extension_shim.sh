@@ -4,7 +4,7 @@
 COMMAND=""
 PYTHON=""
 
-USAGE="$(basename "$0") [-h] [-i|--install] [-u|--uninstall] [-d|--disable] [-e|--enable] [-p|--update]
+USAGE="$(basename "$0") [-h] [-i|--install] [-u|--uninstall] [-d|--disable] [-e|--enable] [-p|--update] [-m|--daemon]
 
 Program to find the installed python on the box and invoke a Python extension script using Python 2.7.
 
@@ -15,6 +15,7 @@ where:
     -d|--disable    disable the extension
     -e|--enable     enable the extension
     -p|--update     update the extension
+    -m|--daemon     invoke daemon option
     -c|--command    command to run
 
 example:
@@ -50,6 +51,7 @@ for arg in "$@"; do
     "--enable")     set -- "$@" "-e" ;;
     "--disable")    set -- "$@" "-d" ;;
     "--uninstall")  set -- "$@" "-u" ;;
+    "--daemon")     set -- "$@" "-m" ;;
     *)              set -- "$@" "$arg"
   esac
 done
@@ -81,6 +83,9 @@ while getopts "iudephc:?" o; do
             ;;
         p)
             operation="-update"
+            ;;
+        m)
+            operation="-daemon"
             ;;
         c)
             COMMAND="$OPTARG"

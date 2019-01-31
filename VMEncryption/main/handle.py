@@ -1860,14 +1860,16 @@ def daemon():
         logger.log("exiting daemon")
 
 def start_daemon(operation):
-    args = [os.path.join(os.getcwd(), __file__), "-daemon"]
-    logger.log("start_daemon with args: {0}".format(args))
     #This process will start a new background process by calling
-    #    handle.py -daemon
+    #    extension_shim.sh -c handle.py -daemon
     #to run the script and will exit itself immediatelly.
+    shim_path = os.path.join(os.getcwd(),'..',CommonVariables.extension_shim_filename)
+    script_path = os.path.join(os.getcwd(), __file__)
+    args = [shim_path, '-c', script_path, "-daemon"]
+    logger.log("start_daemon with args: {0}".format(args))
 
     #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
-    #throw Broke pipe exeception when parent process exit.
+    #throw broken pipe exception when parent process exit.
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
     

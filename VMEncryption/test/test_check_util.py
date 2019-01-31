@@ -121,17 +121,46 @@ class TestCheckUtil(unittest.TestCase):
         with mock.patch("__builtin__.open", mock.mock_open(read_data=proc_mounts_output)) as mock_open:
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
 
-    @mock.patch("os.system", return_value=0)
-    def test_lvm_os_lvm_present(self, os_system):
-        # if there is LVM
-        self.assertFalse(self.cutil.is_invalid_lvm_os())
+    # Skip LVM OS validation when OS volume is not being targeted
+    def test_skip_lvm_os_check_if_data_only_enable(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+
+    def test_skip_lvm_os_check_if_data_only_ef(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat})
+
+    def test_skip_lvm_os_check_if_data_only_efa(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll})
+
+    def test_skip_lvm_os_check_if_data_only_disable(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption})
+
+    def test_skip_lvm_os_check_if_query_only_data(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "OS", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+
+    def test_skip_lvm_os_check_if_query_only_os(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "OS", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+
+    def test_skip_lvm_os_check_if_query_only_all(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
 
     @mock.patch("os.system", return_value=-1)
     def test_lvm_os_lvm_absent(self, os_system):
-        # if there is no LVM
-        self.assertFalse(self.cutil.is_invalid_lvm_os())
+        # using patched return value of -1, simulate no LVM OS 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
 
-    @mock.patch("os.system", side_effect=[0, -1, 0, 0, 0, 0, 0, 0])
-    def test_lvm_os_lvm_faulty(self, os_system):
-        # if there is faulty LVM
-        self.assertTrue(self.cutil.is_invalid_lvm_os())
+    @mock.patch("os.system", return_value=0)
+    def test_lvm_os_valid(self, os_system):
+        # simulate a valid LVM OS and a valid naming scheme by always returning 0
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+
+    @mock.patch("os.system", side_effect=[0, -1])
+    def test_lvm_os_lv_missing_expected_name(self, os_system):
+        # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
+        self.assertRaises(Exception, self.cutil.validate_lvm_os, {Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})

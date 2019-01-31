@@ -183,7 +183,7 @@ class CheckUtil(object):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
-        self.validate_lvm_os()
+        self.validate_lvm_os(public_settings)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """

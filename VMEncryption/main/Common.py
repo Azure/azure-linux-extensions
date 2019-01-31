@@ -25,6 +25,7 @@ class CommonVariables:
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
     extension_description = extension_label
+    extension_shim_filename = "extension_shim.sh"
 
     """
     disk/file system related
