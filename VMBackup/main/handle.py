@@ -245,7 +245,7 @@ def daemon():
         errMsg = 'Failed to validate sequence number with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
 
-    freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
+    freezer = FsFreezer(patching= MyPatching, logger = backup_logger, hutil = hutil)
     global_error_result = None
     # precheck
     freeze_called = False
