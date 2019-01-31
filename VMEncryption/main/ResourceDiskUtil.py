@@ -26,7 +26,6 @@ import os
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables
-from DiskUtil import DiskUtil
 
 class ResourceDiskUtil(object):
     """ Resource Disk Encryption Utilities """
@@ -38,18 +37,18 @@ class ResourceDiskUtil(object):
     DM_PREFIX = CommonVariables.dev_mapper_root
     # todo: consolidate this and other key file path references
     # (BekUtil.py, ExtensionParameter.py, and dracut patches)
-    RD_KEY_FILE = '/mnt/azure_bek_disk/LinuxPassPhraseFileName'
     RD_KEY_FILE_MOUNT_POINT = '/mnt/azure_bek_disk'
     RD_KEY_VOLUME_LABEL = 'BEK VOLUME'
     RD_MAPPER_NAME = 'resourceencrypt'
+    RD_MAPPER_PATH = os.path.join(DM_PREFIX, RD_MAPPER_NAME)
 
-    def __init__(self, hutil, logger, distro_patcher):
+    def __init__(self, hutil, logger, distro_patcher, disk_util, passphrase_filename):
+        # type: (HandlerUtility, BackupLogger, DistroPatcher, DiskUtil, str) -> None
         self.hutil = hutil
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
-        self.disk_util = DiskUtil(hutil=self.hutil, patching=distro_patcher, logger=self.logger, encryption_environment=None)
-        self.mapper_name = str(uuid.uuid4())
-        self.mapper_path = os.path.join(self.DM_PREFIX, self.mapper_name)
+        self.disk_util = disk_util
+        self.passphrase_filename = passphrase_filename # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
 
     def is_encrypt_format_all(self):
         """ return true if current encryption operation is EncryptFormatAll """
@@ -86,7 +85,7 @@ class ResourceDiskUtil(object):
         # suppress logging to avoid log clutter if the key doesn't match
         if not self.resource_disk_partition_exists():
             return False
-        cmd = 'cryptsetup luksOpen ' + self.RD_DEV_PATH + ' --test-passphrase --key-file ' + self.RD_KEY_FILE
+        cmd = 'cryptsetup luksOpen ' + self.RD_DEV_PATH + ' --test-passphrase --key-file ' + self.passphrase_filename
         return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def resource_disk_exists(self):
@@ -108,8 +107,10 @@ class ResourceDiskUtil(object):
 
     def encrypt(self):
         """ use disk util with the appropriate device mapper """
-        self.mount_key_volume()
-        return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH, passphrase_file=self.RD_KEY_FILE, mapper_name=self.mapper_name, header_file=None)) == CommonVariables.process_success
+        return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH,
+                                                 passphrase_file=self.passphrase_filename,
+                                                 mapper_name=self.RD_MAPPER_PATH,
+                                                 header_file=None)) == CommonVariables.process_success
 
     def make(self):
         """ make a default file system on top of the crypt layer """
@@ -128,7 +129,7 @@ class ResourceDiskUtil(object):
             self.disk_util.mount_filesystem(key_volume_device_name, self.RD_KEY_FILE_MOUNT_POINT)
         return os.path.exists(self.RD_KEY_FILE)
         
-    def mount(self):
+    def mount(self, dev_path):
         """ mount the file system previously made on top of the crypt layer """
         #ensure that resource disk mount point directory has been created
         cmd = 'mkdir -p ' + self.RD_MOUNT_POINT
@@ -137,7 +138,7 @@ class ResourceDiskUtil(object):
             return False
 
         # mount to mount point directory
-        mount_result = self.disk_util.mount_filesystem(dev_path=self.mapper_path, mount_point=self.RD_MOUNT_POINT, file_system=CommonVariables.default_file_system)
+        mount_result = self.disk_util.mount_filesystem(dev_path=dev_path, mount_point=self.RD_MOUNT_POINT)
         if mount_result != CommonVariables.process_success:
             self.logger.log(msg="Failed to mount file system on resource disk", level=CommonVariables.ErrorLevel)
             return False
@@ -165,11 +166,16 @@ class ResourceDiskUtil(object):
 
     def unmount_resource_disk(self):
         """ unmount resource disk """
-        # after service healing multiple unmounts of key file mount point may be required
-        self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
-        self.disk_util.umount(self.RD_KEY_FILE_MOUNT_POINT)
         self.disk_util.umount(self.RD_MOUNT_POINT)
         self.disk_util.umount('/mnt')
+
+    def is_plain_mounted(self):
+        """ return true if mount point is mounted from a non-crypt layer """
+        mount_items = self.disk_util.get_mount_items()
+        for mount_item in mount_items:
+            if mount_item["dest"] == self.RD_MOUNT_POINT and not mount_item["src"].startswith(self.DM_PREFIX):
+                return True
+        return False
 
     def is_crypt_mounted(self):
         """ return true if mount point is already on a crypt layer """
@@ -179,19 +185,25 @@ class ResourceDiskUtil(object):
                 return True
         return False
 
-    def get_rd_device_mapper(self):
-        """ retrieve current device mapper path backing the encrypted resource disk mount point """
+    def get_rd_device_mappers(self):
+        """ retreive any device mapper device on the resource disk (e.g. /dev/dm-0) """
         device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
+        device_mapper_paths = []
         for device_item in device_items:
             ##fstype should be crypto_LUKS
-            if device_item.file_system == "crypto_LUKS" :
-                self.logger.log('Found device mapper: ' + device_item.name.lower(), level='Info')
-                return device_item.name.lower()
-        return None
+            dev_path = self.disk_util.get_device_path(device_item)
+            if dev_path and dev_path.startswith("/dev/dm-"):
+                device_mapper_paths.append(dev_path)
+                self.logger.log('Found device mapper: ' + dev_path, level='Info')
+        return device_mapper_paths
 
     def remove_device_mapper(self):
-        """ use dmsetup to remove the resource disk device mapper if it exists """
-        dm_name = self.get_rd_device_mapper()
+        """ 
+        Use dmsetup to remove the resource disk device mapper if it exists.
+        This is to allow us to make sure that the resource disk is not being used by anything and we can
+        safely luksFormat it.
+        """
+        dm_name = self.get_rd_device_mappers()
         if dm_name:
             cmd = 'dmsetup remove ' + self.DM_PREFIX + dm_name
             if self.executor.Execute(cmd) == CommonVariables.process_success:
@@ -227,16 +239,26 @@ class ResourceDiskUtil(object):
         return self.executor.Execute(cmd) == CommonVariables.process_success
             
     def try_remount(self):
-        """ mount encrypted resource disk if not already mounted"""
+        """ mount the resource disk if not already mounted"""
         self.logger.log("In try_remount")
-        if self.is_crypt_mounted():
-            self.logger.log("Resource disk already encrypted and mounted")
-            return True
 
-        if self.resource_disk_exists() and self.resource_disk_partition_exists() and self.is_luks_device() and self.is_valid_key():
-            self.disk_util.luks_open(passphrase_file=self.RD_KEY_FILE, dev_path=self.RD_DEV_PATH, mapper_name="resourceencrypt", header_file=None, uses_cleartext_key=False)
-            self.logger.log("Trying to mount resource disk."')
-            return self.mount()
+        if self.passphrase_filename:
+            self.logger.log("passphrase_filename(value={0}) is not null, so trying to mount encrypted Resource Disk".format(self.passphrase_filename))
+
+            if self.is_crypt_mounted():
+                self.logger.log("Resource disk already encrypted and mounted")
+                return True
+
+            if self.resource_disk_partition_exists() and self.is_luks_device() and self.is_valid_key():
+                self.disk_util.luks_open(passphrase_file=self.passphrase_filename, dev_path=self.RD_DEV_PATH, mapper_name=self.RD_MAPPER_NAME, header_file=None, uses_cleartext_key=False)
+                self.logger.log("Trying to mount resource disk.")
+                return self.mount(self.RD_MAPPER_PATH)
+        else:
+            self.logger.log("passphrase_filename(value={0}) is null, so trying to mount plain Resource Disk".format(self.passphrase_filename))
+            if self.is_plain_mounted():
+                self.logger.log("Resource disk already encrypted and mounted")
+                return True
+            return self.mount(self.RD_DEV_PATH)
 
         # conditions required to re-mount were not met
         return False
@@ -248,7 +270,7 @@ class ResourceDiskUtil(object):
         if self.resource_disk_partition_exists():
             self.disk_util.swapoff()
             self.unmount_resource_disk()
-            self.remove_device_mapper()
+            self.remove_device_mappers()
             self.clear_luks_header()
         self.prepare_partition()
         return True
