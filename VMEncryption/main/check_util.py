@@ -150,21 +150,28 @@ class CheckUtil(object):
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
 
     def validate_lvm_os(self, public_settings):
-        volume_type = public_settings.get(CommonVariables.VolumeTypeKey).lower()
-        if volume_type == CommonVariables.VolumeTypeData.lower():
-            self.logger.log("LVM OS validation skipped (Volume type: DATA)")
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if not encryption_operation:
+            self.logger.log("LVM OS validation skipped (no encryption operation)")
             return
-
-        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey).lower()
-        if encryption_operation  == CommonVariables.QueryEncryptionStatus.lower():
+        elif encryption_operation.lower() == CommonVariables.QueryEncryptionStatus.lower():
             self.logger.log("LVM OS validation skipped (Encryption Operation: QueryEncryptionStatus)")
             return
 
-        """ if an lvm os disk is present, check the lv names """
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if not volume_type:
+            self.logger.log("LVM OS validation skipped (no volume type)")
+            return
+        elif volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("LVM OS validation skipped (Volume Type: DATA)")
+            return
+
+        #  run lvm check if volume type, encryption operation were specified and OS type is LVM
         detected = False
-        # run checks only when the root OS volume type is LVM
-        if os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0:
-            # LVM OS volume detected, check that required logical volume names exist
+        # first, check if the root OS volume type is LVM
+        if ( encryption_operation and volume_type and 
+             os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
+            # next, check that all required logical volume names exist
             lvlist = ['rootvg-tmplv',
                       'rootvg-usrlv',
                       'rootvg-swaplv',

@@ -138,17 +138,32 @@ class TestCheckUtil(unittest.TestCase):
         # skip lvm detection if data only 
         self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption})
 
-    def test_skip_lvm_os_check_if_query_only_data(self):
-        # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "OS", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+    def test_skip_lvm_os_check_if_query(self):
+        # skip lvm detection if query status operation is invoked without volume type
+        self.cutil.validate_lvm_os({Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
 
-    def test_skip_lvm_os_check_if_query_only_os(self):
-        # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "OS", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+    def test_skip_lvm_no_encryption_operation(self):
+        # skip lvm detection if no encryption operation 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL"})
 
-    def test_skip_lvm_os_check_if_query_only_all(self):
-        # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+    def test_skip_lvm_no_volume_type(self):
+        # skip lvm detection if no volume type specified
+        self.cutil.validate_lvm_os({Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll})
+
+    @mock.patch("os.system", return_value=-1)
+    def test_no_lvm_no_config(self, os_system):
+        # simulate no LVM OS, no config 
+        self.cutil.validate_lvm_os({})
+
+    @mock.patch("os.system", return_value=0)
+    def test_lvm_no_config(self, os_system):
+        # simulate valid LVM OS, no config
+        self.cutil.validate_lvm_os({})
+
+    @mock.patch("os.system", side_effect=[0, -1])
+    def test_invalid_lvm_no_config(self, os_system):
+        # simulate invalid LVM naming scheme, but no config setting to encrypt OS
+        self.cutil.validate_lvm_os({})
 
     @mock.patch("os.system", return_value=-1)
     def test_lvm_os_lvm_absent(self, os_system):
