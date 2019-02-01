@@ -60,15 +60,23 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
+    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
+    # Prior extension versions archived their configs in [old:uninstall], not in [old:disable]
+    # Currently, the only reliable place to restore old configs is in [new:install]
+    # Once all running versions archive in [old:disable], restore can be moved to [new:update]
+    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
     hutil.do_parse_context('Disable')
+    # archiving old configs during disable rather than uninstall will allow subsequent versions
+    # to restore these configs in their update step rather than their install step once all
+    # released versions of the extension are archiving in disable rather than uninstall
+    hutil.archive_old_configs()
     hutil.do_exit(0, 'Disable', CommonVariables.extension_success_status, '0', 'Disable succeeded')
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
-    hutil.archive_old_configs()
     hutil.do_exit(0, 'Uninstall', CommonVariables.extension_success_status, '0', 'Uninstall succeeded')
 
 def disable_encryption():
