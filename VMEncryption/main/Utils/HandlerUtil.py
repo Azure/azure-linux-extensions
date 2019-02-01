@@ -437,23 +437,23 @@ class HandlerUtility:
                     shutil.copy2(src, dest)
 
     def restore_old_configs(self):
-        if not os.path.exists(self.config_archive_folder):
-            return
+        # restores all archived settings files carried over from prior extension versions 
+        # use cp for faster performance than iterating over each file using shutil.copy2() 
+        # use --preserve=timestamps to ensure that _get_current_seq_no() can sort by timestamp
+        if os.path.exists(self.config_archive_folder) and os.path.exists(self._context._config_dir):
+            try:
+                src = self.config_archive_folder + '/*.settings'
+                dst = self._context._config_dir
+                cmd = "cp {0} {1} --preserve=timestamps".format(src,dst)
+                subprocess.check_output(cmd,stderr=subprocess.STDOUT,shell=True)
+            except subprocess.CalledProcessError as e:
+                self.log("restore_old_configs error (settings): {0}".format(e))
 
-        for root, dirs, files in os.walk(self.config_archive_folder):
-            for file in files:
-                if file.endswith('.settings'):
-                    src = os.path.join(root, file)
-                    dest = os.path.join(self._context._config_dir, file)
-
-                    self.log("Copying {0} to {1}".format(src, dest))
-
-                    shutil.copy2(src, dest)
-
-                if file == 'mrseq':
-                    src = os.path.join(root, file)
-                    dest = os.path.join(os.path.join(self._context._config_dir, '..'), file)
-
-                    self.log("Copying {0} to {1}".format(src, dest))
-
-                    shutil.copy2(src, dest)
+            try:
+                src = os.path.join(self.config_archive_folder,'mrseq')
+                if os.path.exists(src):
+                    dst = os.path.join(self._context._config_dir,'..')
+                    cmd = "cp {0} {1} --preserve=timestamps".format(src,dst)
+                    subprocess.check_output(cmd,stderr=subprocess.STDOUT,shell=True)
+            except subprocess.CalledProcessError as e:
+                self.log("restore_old_configs error (mrseq): {0}".format(e))
