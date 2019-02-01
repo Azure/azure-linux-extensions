@@ -1863,9 +1863,9 @@ def start_daemon(operation):
     #This process will start a new background process by calling
     #    extension_shim.sh -c handle.py -daemon
     #to run the script and will exit itself immediatelly.
-    shim_path = os.path.join(os.getcwd(),'..',CommonVariables.extension_shim_filename)
-    script_path = os.path.join(os.getcwd(), __file__)
-    args = [shim_path, '-c', script_path, "-daemon"]
+    shim_path = os.path.join(os.getcwd(), CommonVariables.extension_shim_filename)
+    shim_opts = '-c ' + os.path.join(os.getcwd(), __file__) + ' -daemon'
+    args = [shim_path, shim_opts]
     logger.log("start_daemon with args: {0}".format(args))
 
     #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
