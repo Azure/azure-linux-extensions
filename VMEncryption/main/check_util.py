@@ -201,10 +201,9 @@ class CheckUtil(object):
         # first, check if the root OS volume type is LVM
         if ( encryption_operation and volume_type and 
              os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
-            # next, check that all required logical volume names exist
+            # next, check that all required logical volume names exist (swaplv not required)
             lvlist = ['rootvg-tmplv',
                       'rootvg-usrlv',
-                      'rootvg-swaplv',
                       'rootvg-optlv',
                       'rootvg-homelv',
                       'rootvg-varlv',
