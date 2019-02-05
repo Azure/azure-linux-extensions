@@ -240,7 +240,6 @@ def daemon():
                 backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
                 hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
-        hutil.exit_if_same_seq()
     except Exception as e:
         errMsg = 'Failed to validate sequence number with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -502,6 +501,23 @@ def update():
 def enable():
     global backup_logger,hutil,error_msg,para_parser
     try:
+        hutil.do_parse_context('Enable')
+
+        backup_logger.log('starting enable', True)
+
+        hutil.exit_if_same_seq()
+
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+
+        temp_status= 'success'
+        temp_result=CommonVariables.ExtensionTempTerminalState
+        temp_msg='Transitioning state in extension'
+        blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
+
+        status_report_to_file(file_report_msg)
+
         start_daemon()
         sys.exit(0)
     except Exception as e:
