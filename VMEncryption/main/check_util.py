@@ -75,25 +75,6 @@ class CheckUtil(object):
                     detected = True
         return detected
 
-    def is_invalid_lvm_os(self):
-        """ if an lvm os disk is present, check the lv names """
-        detected = False
-        # run checks only when the root OS volume type is LVM
-        if os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0:
-            # LVM OS volume detected, check that required logical volume names exist
-            lvlist = ['rootvg-tmplv',
-                      'rootvg-usrlv',
-                      'rootvg-swaplv',
-                      'rootvg-optlv',
-                      'rootvg-homelv',
-                      'rootvg-varlv',
-                      'rootvg-rootlv']
-            for lvname in lvlist:
-                if not os.system("lsblk -o NAME | grep -q '" + lvname + "'") == 0:
-                    self.logger.log('WARNING: LVM OS scheme is missing LV [' + lvname + ']')
-                    detected = True
-        return detected
-
     def check_kv_url(self, test_url, message):
         """basic sanity check of the key vault url"""
 
@@ -168,10 +149,47 @@ class CheckUtil(object):
         if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
 
+    def validate_lvm_os(self, public_settings):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if not encryption_operation:
+            self.logger.log("LVM OS validation skipped (no encryption operation)")
+            return
+        elif encryption_operation.lower() == CommonVariables.QueryEncryptionStatus.lower():
+            self.logger.log("LVM OS validation skipped (Encryption Operation: QueryEncryptionStatus)")
+            return
+
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if not volume_type:
+            self.logger.log("LVM OS validation skipped (no volume type)")
+            return
+        elif volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("LVM OS validation skipped (Volume Type: DATA)")
+            return
+
+        #  run lvm check if volume type, encryption operation were specified and OS type is LVM
+        detected = False
+        # first, check if the root OS volume type is LVM
+        if ( encryption_operation and volume_type and 
+             os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
+            # next, check that all required logical volume names exist  ( swaplv is not required )
+            lvlist = ['rootvg-tmplv',
+                      'rootvg-usrlv',
+                      'rootvg-optlv',
+                      'rootvg-homelv',
+                      'rootvg-varlv',
+                      'rootvg-rootlv']
+            for lvname in lvlist:
+                if not os.system("lsblk -o NAME | grep -q '" + lvname + "'") == 0:
+                    self.logger.log('LVM OS scheme is missing LV [' + lvname + ']')
+                    detected = True
+        if detected:
+            raise Exception("LVM OS disk layout does not satisfy prerequisites ( see https://aka.ms/adelvm )")
+
     def precheck_for_fatal_failures(self, public_settings):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
+        self.validate_lvm_os(public_settings)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """
@@ -185,7 +203,4 @@ class CheckUtil(object):
         if self.is_unsupported_mount_scheme():
             detected = True
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
-        if self.is_invalid_lvm_os():
-            detected = True
-            self.logger.log("PRECHECK: Invalid LVM OS scheme detected")
         return detected
