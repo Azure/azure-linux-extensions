@@ -57,7 +57,7 @@ class PrereqState(OSEncryptionState):
             raise Exception("RHEL72LVMEncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
                                                                                             distro_info[1]))
 
-        self.context.distro_patcher.install_extras()
+        self.context.distro_patcher.install_extras(raise_on_failure=True)
 
         self._patch_waagent()
         self.command_executor.Execute('systemctl daemon-reload', True)

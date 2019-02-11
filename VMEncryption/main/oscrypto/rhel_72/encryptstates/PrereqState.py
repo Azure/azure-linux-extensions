@@ -21,6 +21,7 @@
 
 from OSEncryptionState import *
 from pprint import pprint
+import re
 
 
 class PrereqState(OSEncryptionState):

@@ -24,7 +24,8 @@ import shutil
 import inspect
 
 from AbstractPatching import AbstractPatching
-from main.CommandExecutor import CommandExecutor, ProcessCommunicator
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables
 
 
 class redhatPatching(AbstractPatching):
