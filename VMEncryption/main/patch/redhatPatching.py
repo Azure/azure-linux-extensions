@@ -19,22 +19,14 @@
 
 import os
 import os.path
-import sys
-import imp
-import base64
 import re
-import json
-import platform
 import shutil
-import time
-import traceback
-import datetime
-import subprocess
 import inspect
 
 from AbstractPatching import AbstractPatching
-from Common import *
-from CommandExecutor import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables
+
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
@@ -53,7 +45,7 @@ class redhatPatching(AbstractPatching):
             self.echo_path = '/bin/echo'
             self.getenforce_path = '/usr/sbin/getenforce'
             self.setenforce_path = '/usr/sbin/setenforce'
-            self.lsblk_path = '/bin/lsblk' 
+            self.lsblk_path = '/bin/lsblk'
             self.lsscsi_path = '/usr/bin/lsscsi'
             self.mkdir_path = '/bin/mkdir'
             self.mount_path = '/bin/mount'
@@ -87,11 +79,11 @@ class redhatPatching(AbstractPatching):
 
         if self.distro_info[1].startswith("6."):
             packages.remove('cryptsetup')
-            
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
-    def install_extras(self):
+    def install_extras(self, raise_on_failure=False):
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
@@ -109,7 +101,16 @@ class redhatPatching(AbstractPatching):
             packages.remove('util-linux')
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
-            self.command_executor.Execute("yum install -y " + " ".join(packages))
+            ret_val = self.command_executor.Execute("yum install -y " + " ".join(packages))
+            if ret_val != CommonVariables.process_success and raise_on_failure:
+                msg = """
+                Failed to install all required dependencies.
+                Please check the internet connection, firewall settings
+                and package manager setup on the VM and try again.
+                Alternatively, install the following dependencies manually and then try again:
+                {}"""
+                msg = msg.format(str(packages))
+                raise Exception(msg)
 
     def update_prereq(self):
         if (self.distro_info[1].startswith('7.')):
@@ -120,7 +121,7 @@ class redhatPatching(AbstractPatching):
                 if os.path.exists("/lib/dracut/modules.d/90lvm/"):
                     shutil.rmtree("/lib/dracut/modules.d/91lvm/")
                 else:
-                    os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
+                    os.rename("/lib/dracut/modules.d/91lvm/", "/lib/dracut/modules.d/90lvm/")
                 dracut_repack_needed = True
 
             if redhatPatching.is_old_patching_system():
@@ -132,7 +133,7 @@ class redhatPatching(AbstractPatching):
                 dracut_repack_needed = True
 
             if os.path.exists("/dev/mapper/osencrypt"):
-                #TODO: only do this if needed (if code and existing module are different)
+                # TODO: only do this if needed (if code and existing module are different)
                 redhatPatching.add_91_ade_dracut_module(self.command_executor)
                 dracut_repack_needed = True
 
@@ -182,7 +183,6 @@ class redhatPatching(AbstractPatching):
         sed_grub_cmd = "sed -i.bak '/osencrypt-locked/d' /etc/crypttab"
         command_executor.Execute(command_to_execute=sed_grub_cmd, raise_exception_on_failure=True)
 
-
     @staticmethod
     def remove_old_patching_system(logger, command_executor):
         logger.log("Removing patches and recreating initrd image")
@@ -190,11 +190,11 @@ class redhatPatching(AbstractPatching):
         command_executor.Execute('mv /lib/dracut/modules.d/90crypt/cryptroot-ask.sh.orig /lib/dracut/modules.d/90crypt/cryptroot-ask.sh', False)
         command_executor.Execute('mv /lib/dracut/modules.d/90crypt/module-setup.sh.orig /lib/dracut/modules.d/90crypt/module-setup.sh', False)
         command_executor.Execute('mv /lib/dracut/modules.d/90crypt/parse-crypt.sh.orig /lib/dracut/modules.d/90crypt/parse-crypt.sh', False)
-        
+
         sed_grub_cmd = "sed -i.bak '/rd.luks.uuid=osencrypt/d' /etc/default/grub"
         command_executor.Execute(sed_grub_cmd)
-    
-        redhatPatching.append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
+
+        redhatPatching.append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n',
                                                '/etc/default/grub')
 
         redhatPatching.append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
