@@ -57,69 +57,59 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(method(), True)
 
     @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.resource_disk_partition_exists')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     def test_is_luks_device(self, mock_partition_exists, mock_execute):
-        self._test_resource_disk_partition_dependant_method(self.resource_disk.is_luks_device, mock_partition_exists, mock_execute)
-
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.resource_disk_partition_exists')
-    def test_is_luks_device_opened(self, mock_partition_exists, mock_execute):
-        self._test_resource_disk_partition_dependant_method(self.resource_disk.is_luks_device_opened, mock_partition_exists, mock_execute)
-
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.resource_disk_partition_exists')
-    def test_is_valid_key(self, mock_partition_exists, mock_execute):
-        self._test_resource_disk_partition_dependant_method(self.resource_disk.is_valid_key, mock_partition_exists, mock_execute)
+        self._test_resource_disk_partition_dependant_method(self.resource_disk._is_luks_device, mock_partition_exists, mock_execute)
 
     @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
     def test_configure_waagent(self, mock_execute):
         mock_execute.side_effect = [-1,
                                     0,
                                     0]
-        self.assertEqual(self.resource_disk.configure_waagent(), False)
+        self.assertEqual(self.resource_disk._configure_waagent(), False)
         mock_execute.assert_called_once()
-        self.assertEqual(self.resource_disk.configure_waagent(), True)
+        self.assertEqual(self.resource_disk._configure_waagent(), True)
 
     def test_is_plain_mounted(self):
         self.resource_disk.disk_util.get_mount_items.return_value = []
-        self.assertEqual(self.resource_disk.is_plain_mounted(), False)
+        self.assertEqual(self.resource_disk._is_plain_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/dm-0", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_plain_mounted(), False)
+        self.assertEqual(self.resource_disk._is_plain_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/mapper/something", "dest": "/mnt/"}]
-        self.assertEqual(self.resource_disk.is_plain_mounted(), False)
+        self.assertEqual(self.resource_disk._is_plain_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdcx", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_plain_mounted(), True)
+        self.assertEqual(self.resource_disk._is_plain_mounted(), True)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_plain_mounted(), True)
+        self.assertEqual(self.resource_disk._is_plain_mounted(), True)
 
     def test_is_crypt_mounted(self):
         self.resource_disk.disk_util.get_mount_items.return_value = []
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), False)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/dm-0", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), True)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), True)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/mapper/something", "dest": "/mnt/"}]
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), False)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/mapper/something", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), True)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), True)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdcx", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), False)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
-        self.assertEqual(self.resource_disk.is_crypt_mounted(), False)
+        self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.resource_disk_partition_exists')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.is_luks_device')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.is_crypt_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.is_plain_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.mount')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
     def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists):
 
         # Case 1, when there is a passphrase and the resource disk is not already encrypted and mounted.
