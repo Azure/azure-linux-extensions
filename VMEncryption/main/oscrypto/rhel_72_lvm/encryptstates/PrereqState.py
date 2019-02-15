@@ -19,8 +19,9 @@
 # Requires Python 2.7+
 #
 
-from OSEncryptionState import *
-from pprint import pprint
+from OSEncryptionState import OSEncryptionState
+import re
+
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
@@ -31,7 +32,7 @@ class PrereqState(OSEncryptionState):
 
         if not super(PrereqState, self).should_enter():
             return False
-        
+
         self.context.logger.log("Performing enter checks for prereq state")
 
         return True
@@ -47,15 +48,16 @@ class PrereqState(OSEncryptionState):
 
         if (((distro_info[0] == 'centos' and distro_info[1] == '7.3.1611') or
              (distro_info[0] == 'centos' and distro_info[1].startswith('7.4')) or
+             (distro_info[0] == 'centos' and distro_info[1].startswith('7.5')) or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.3') or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.4') or
-             (distro_info[0] == 'redhat' and distro_info[1] == '7.5')) and
-            self.disk_util.is_os_disk_lvm()):
+             (distro_info[0] == 'redhat' and distro_info[1] == '7.5') or
+             (distro_info[0] == 'redhat' and distro_info[1] == '7.6')) and self.disk_util.is_os_disk_lvm()):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:
             raise Exception("RHEL72LVMEncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
-                                                                                            distro_info[1]))
+                                                                                               distro_info[1]))
 
         self.context.distro_patcher.install_extras()
 
