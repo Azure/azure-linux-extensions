@@ -351,7 +351,7 @@ class HandlerUtility:
                 file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg, 'Error')
  
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
