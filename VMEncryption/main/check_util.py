@@ -175,9 +175,16 @@ class CheckUtil(object):
             return
 
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
-        supported_types = CommonVariables.SupportedVolumeTypes
-        if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
-            raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
+
+        # get supported volume types
+        instance = MetadataUtil(logger)
+        if instance.is_vmss():
+            supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
+        else:
+            supported_volume_types = CommonVariables.SupportedVolumeTypes
+
+        if not volume_type.lower() in map(lambda x: x.lower(), supported_volume_types) :
+            raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
     def validate_lvm_os(self, public_settings):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)

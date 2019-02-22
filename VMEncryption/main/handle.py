@@ -677,13 +677,6 @@ def enable_encryption():
                 start_daemon('EnableEncryption')
             else:
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
-
-                # get supported volume types
-                instance = MetadataUtil(logger)
-                if instance.is_vmss():
-                    supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
-                else:
-                    supported_volume_types = CommonVariables.SupportedVolumeTypes
                 
                 # validate parameters
                 if(extension_parameter.VolumeType is None or
