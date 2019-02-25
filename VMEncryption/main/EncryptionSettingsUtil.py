@@ -234,8 +234,8 @@ class EncryptionSettingsUtil(object):
                 else:
                     raise Exception("no response from encryption settings update request")
             except Exception as e:
+                retry_count += 1
                 if retry_count < retry_count_max:
-                    retry_count += 1
                     time.sleep(5) # sleep for 5 seconds before retrying.
                 else:
                     raise e
