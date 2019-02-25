@@ -59,7 +59,7 @@ class BekUtil(object):
                 return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
         except Exception as e:
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(e)
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
             self.logger.log(message)
 
         return None
