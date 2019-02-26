@@ -57,7 +57,10 @@ class TestCheckUtil(unittest.TestCase):
         # self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.vault.azure.com/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://", "")
 
-    def test_validate_volume_type(self):
+    @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
+    def test_validate_volume_type(self, mock_is_vmss):
+        # First test for normal VMs
+        mock_is_vmss.return_value = False
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "DATA"})
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "ALL"})
         self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "all"})
@@ -73,7 +76,23 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: ""})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "123"})
 
-    def test_fatal_checks(self):
+        # Then test for VMSS
+        mock_is_vmss.return_value = True
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "DATA"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "Data"})
+        self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: "data"})
+        for vt in Common.CommonVariables.SupportedVolumeTypesVMSS:
+            self.cutil.validate_volume_type({Common.CommonVariables.VolumeTypeKey: vt})
+
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "ALL"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "all"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "Os"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "OS"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "os"})
+
+    @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
+    def test_fatal_checks(self, mock_is_vmss):
+        mock_is_vmss.return_value = False
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption

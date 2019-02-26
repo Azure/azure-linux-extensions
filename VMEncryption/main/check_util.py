@@ -23,6 +23,7 @@ import os.path
 import urlparse
 import re
 from Common import CommonVariables
+from MetadataUtil import MetadataUtil
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -177,7 +178,7 @@ class CheckUtil(object):
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
 
         # get supported volume types
-        instance = MetadataUtil(logger)
+        instance = MetadataUtil(self.logger)
         if instance.is_vmss():
             supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
         else:
