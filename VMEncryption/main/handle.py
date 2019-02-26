@@ -679,6 +679,7 @@ def enable_encryption():
                 
                 # validate parameters
                 if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+                    encryption_config.clear_config()
                     hutil.do_exit(exit_code=CommonVariables.configuration_error,
                                   operation='EnableEncryption',
                                   status=CommonVariables.extension_error_status,
@@ -698,6 +699,7 @@ def enable_encryption():
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
+                start_daemon('EnableEncryption')
 
     except Exception as e:
         message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
