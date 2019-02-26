@@ -56,7 +56,6 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import *
 from __builtin__ import int
-from MetadataUtil import MetadataUtil
 
 
 def install():
@@ -679,21 +678,6 @@ def enable_encryption():
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
                 
                 # validate parameters
-                if(extension_parameter.VolumeType is None or
-                   not any([extension_parameter.VolumeType.lower() == vt.lower() for vt in supported_volume_types])):
-                    if encryption_config.config_file_exists():
-                        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-                        
-                        if existing_passphrase_file is None:
-                            logger.log("Unsupported volume type specified and BEK volume does not exist, clearing encryption config")
-                            encryption_config.clear_config()
-
-                    hutil.do_exit(exit_code=CommonVariables.configuration_error,
-                                  operation='EnableEncryption',
-                                  status=CommonVariables.extension_error_status,
-                                  code=str(CommonVariables.configuration_error),
-                                  message='VolumeType "{0}" is not supported'.format(extension_parameter.VolumeType))
-
                 if extension_parameter.command not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
                     hutil.do_exit(exit_code=CommonVariables.configuration_error,
                                   operation='EnableEncryption',

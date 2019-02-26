@@ -75,6 +75,7 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "NON-OS"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: ""})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "123"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
         # Then test for VMSS
         mock_is_vmss.return_value = True
@@ -89,6 +90,7 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "Os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "OS"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "os"})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
     @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
     def test_fatal_checks(self, mock_is_vmss):
