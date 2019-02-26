@@ -21,9 +21,7 @@ import json
 import os
 import os.path
 import re
-import shlex
-import sys
-from subprocess import *
+from subprocess import Popen
 import shutil
 import traceback
 import uuid
@@ -33,8 +31,8 @@ from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
-from CommandExecutor import *
-from Common import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -132,44 +130,44 @@ class DiskUtil(object):
 
                     crypt_items.append(crypt_item)
 
-            encryption_status = json.loads(self.get_encryption_status())
+        encryption_status = json.loads(self.get_encryption_status())
 
-            if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
-                crypt_item = CryptItem()
-                crypt_item.mapper_name = "osencrypt"
+        if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+            crypt_item = CryptItem()
+            crypt_item.mapper_name = CommonVariables.osmapper_name
 
+            proc_comm = ProcessCommunicator()
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(crypt_item.mapper_name), communicator=proc_comm)
+
+            if grep_result == 0:
+                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+            else:
                 proc_comm = ProcessCommunicator()
-                grep_result = self.command_executor.ExecuteInBash("cryptsetup status osencrypt | grep device:", communicator=proc_comm)
+                self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
-                if grep_result == 0:
-                    crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
-                else:
-                    proc_comm = ProcessCommunicator()
-                    self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
+                for line in proc_comm.stdout.splitlines():
+                    if crypt_item.mapper_name in line:
+                        majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
+                        src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
+                        crypt_item.dev_path = '/dev/' + src_device.name
+                        break
 
-                    for line in proc_comm.stdout.splitlines():
-                        if 'osencrypt' in line:
-                            majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                            src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
-                            crypt_item.dev_path = '/dev/' + src_device.name
-                            break
+            rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
+            crypt_item.file_system = rootfs_dev["fs"]
 
-                rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
-                crypt_item.file_system = rootfs_dev["fs"]
+            if not crypt_item.dev_path:
+                raise Exception("Could not locate block device for rootfs")
 
-                if not crypt_item.dev_path:
-                    raise Exception("Could not locate block device for rootfs")
+            crypt_item.luks_header_path = "/boot/luks/osluksheader"
 
-                crypt_item.luks_header_path = "/boot/luks/osluksheader"
+            if not os.path.exists(crypt_item.luks_header_path):
+                crypt_item.luks_header_path = crypt_item.dev_path
 
-                if not os.path.exists(crypt_item.luks_header_path):
-                    crypt_item.luks_header_path = crypt_item.dev_path
+            crypt_item.mount_point = "/"
+            crypt_item.uses_cleartext_key = False
+            crypt_item.current_luks_slot = -1
 
-                crypt_item.mount_point = "/"
-                crypt_item.uses_cleartext_key = False
-                crypt_item.current_luks_slot = -1
-
-                crypt_items.append(crypt_item)
+            crypt_items.append(crypt_item)
 
         return crypt_items
 
@@ -206,7 +204,7 @@ class DiskUtil(object):
                 wf.write(new_mount_content)
                 wf.write('\n')
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def remove_crypt_item(self, crypt_item):
@@ -228,7 +226,7 @@ class DiskUtil(object):
 
             return True
 
-        except Exception as e:
+        except Exception:
             return False
 
     def update_crypt_item(self, crypt_item):
@@ -489,12 +487,19 @@ class DiskUtil(object):
 
         self.logger.log("fstab updated successfully")
 
+    def mount_bek_volume(self, bek_label, mount_point, option_string):
+        """
+        mount the BEK volume
+        """
+        self.make_sure_path_exists(mount_point)
+        mount_cmd = self.distro_patcher.mount_path + ' -L "' + bek_label + '" ' + mount_point + ' -o ' + option_string
+        return self.command_executor.Execute(mount_cmd)
+
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
         """
         self.make_sure_path_exists(mount_point)
-        return_code = -1
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
         else: 
@@ -548,6 +553,7 @@ class DiskUtil(object):
         os_drive_encrypted = False
         data_drives_found = False
         data_drives_encrypted = True
+        osmapper_path = os.path.join(CommonVariables.dev_mapper_root, CommonVariables.osmapper_name)
         for mount_item in mount_items:
             if mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
                 not "/mnt" == mount_item["dest"] and \
@@ -560,17 +566,17 @@ class DiskUtil(object):
 
                 data_drives_found = True
 
-                if not "/dev/mapper" in mount_item["src"]:
+                if not CommonVariables.dev_mapper_root in mount_item["src"]:
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     data_drives_encrypted = False
 
             if self.is_os_disk_lvm():
-                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep /dev/mapper/osencrypt', suppress_logging=True)
+                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep {0}'.format(osmapper_path), suppress_logging=True)
                 if grep_result == 0 and not os.path.exists('/volumes.lvm'):
                     self.logger.log("OS PV is encrypted")
                     os_drive_encrypted = True
             elif mount_item["dest"] == "/" and \
-                "/dev/mapper" in mount_item["src"] or \
+                CommonVariables.dev_mapper_root in mount_item["src"] or \
                 "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
@@ -597,7 +603,7 @@ class DiskUtil(object):
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                 volume_type == CommonVariables.VolumeTypeAll.lower():
                 encryption_status["os"] = "EncryptionInProgress"
-        elif os.path.exists('/dev/mapper/osencrypt') and not os_drive_encrypted:
+        elif os.path.exists(osmapper_path) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
         return json.dumps(encryption_status)

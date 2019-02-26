@@ -16,22 +16,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DiskUtil import *
-from Common import *
+from Common import TestHooks
 import base64
 import os.path
-import os
-import traceback
 
 """
 add retry-logic to the network api call.
 """
+
+
 class BekUtil(object):
-    """description of class"""
+    """
+    Utility functions related to the BEK VOLUME and BEK files
+    """
+
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
-        self.passphrase_device = None
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
 
     def generate_passphrase(self, algorithm):
@@ -43,32 +44,23 @@ class BekUtil(object):
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated
 
-    #
-    # Returns the LinuxPassPhraseFileName path
-    #
     def get_bek_passphrase_file(self, encryption_config):
+        """
+        Returns the LinuxPassPhraseFileName path
+        """
+
         bek_filename = encryption_config.get_bek_filename()
 
-        if TestHooks.search_not_only_ide:
-            self.logger.log("TESTHOOK: search not only ide set")
-            azure_devices = self.disk_util.get_device_items(None)
-        else:
-            azure_devices = self.disk_util.get_azure_devices()
+        try:
+            self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+            self.disk_util.mount_bek_volume("BEK VOLUME", self.bek_filesystem_mount_point, "fmask=077")
 
-        for azure_device in azure_devices:
-            fstype = str(azure_device.file_system).lower()
-            if fstype in ['vfat']:
-                try:
-                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
-                                                    self.bek_filesystem_mount_point,
-                                                    fstype)
+            if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
+                return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
-                    if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
-                        return os.path.join(self.bek_filesystem_mount_point, bek_filename)
-                except Exception as e:
-                    message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
-                    self.logger.log(message)
+        except Exception as e:
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
+            self.logger.log(message)
 
         return None
 

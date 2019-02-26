@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import httplib
-import urlparse
 import urllib
 import json
 import uuid
@@ -29,9 +28,7 @@ import subprocess
 
 from tempfile import mkstemp 
 from HttpUtil import HttpUtil
-from Common import *
 from urlparse import urlparse
-from CommandExecutor import *
 
 class KeyVaultUtil(object):
     def __init__(self, logger):
@@ -226,7 +223,7 @@ class KeyVaultUtil(object):
 
             self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             result_content = result.read()
-            self.logger.log("result_content is {0}".format(result_content))
+            # Do NOT log the result_content. It contains the uploaded secret and we don't want that in the logs.
             result_json = json.loads(result_content)
             secret_id = result_json["id"]
             http_util.connection.close()
