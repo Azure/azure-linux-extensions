@@ -23,6 +23,7 @@ import os.path
 import urlparse
 import re
 from Common import CommonVariables
+from MetadataUtil import MetadataUtil
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -175,9 +176,16 @@ class CheckUtil(object):
             return
 
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
-        supported_types = CommonVariables.SupportedVolumeTypes
-        if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
-            raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
+
+        # get supported volume types
+        instance = MetadataUtil(self.logger)
+        if instance.is_vmss():
+            supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
+        else:
+            supported_volume_types = CommonVariables.SupportedVolumeTypes
+
+        if not volume_type.lower() in map(lambda x: x.lower(), supported_volume_types) :
+            raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
     def validate_lvm_os(self, public_settings):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
