@@ -1627,6 +1627,12 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+        elif distro_name == 'SuSE' and distro_version in ['12', '15']:
+            from oscrypto.suse_12 import Suse12EncryptionStateMachine
+            os_encryption = Suse12EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
         else:
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)

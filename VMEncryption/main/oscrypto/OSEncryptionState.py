@@ -161,6 +161,11 @@ class OSEncryptionState(object):
         if matches:
             return matches[0]
 
+        # for path-to-UUID style OSes like Suse
+        matches = re.findall(r'/dev/disk/by-uuid/(.*?)\s+{0}\s+'.format(mountpoint), contents)
+        if matches:
+            return matches[0]
+
     def _get_block_device_size(self, dev):
         if not os.path.exists(dev):
             return 0

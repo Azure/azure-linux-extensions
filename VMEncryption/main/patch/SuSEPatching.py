@@ -42,7 +42,7 @@ class SuSEPatching(AbstractPatching):
         self.distro_info = distro_info
         self.command_executor = CommandExecutor(logger)
 
-        if distro_info[1] == "11":
+        if distro_info[1] in ["11", "12", "15"]:
             self.logger = logger
             self.base64_path = '/usr/bin/base64'
             self.bash_path = '/bin/bash'
@@ -58,6 +58,7 @@ class SuSEPatching(AbstractPatching):
             self.mount_path = '/bin/mount'
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
+            self.touch_path = '/bin/touch'
             self.umount_path = '/bin/umount'
             self.blockdev_path = '/sbin/blockdev'
         else:
@@ -79,17 +80,18 @@ class SuSEPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_adal(self):
-        if self.distro_info[1] == "11":
+        if self.distro_info[1] in ["11", "12", "15"]:
             try:
                 self.command_executor.ExecuteInBash('pip list | grep -F adal', raise_exception_on_failure=True)
             except: 
-                raise Exception('SLES 11 environment is missing python-pip and adal')
+                raise Exception('SLES environment is missing python-pip and adal')
         else:
             self.command_executor.Execute('zypper --gpg-auto-import-keys install -l -y python-pip')
             self.command_executor.Execute('python -m pip install --upgrade pip')
             self.command_executor.Execute('python -m pip install adal')
 
     def install_extras(self):
+        # packages = ['cryptsetup', 'lsscsi', 'azure-cli']
         packages = ['cryptsetup', 'lsscsi']
         cmd = " ".join((['zypper', 'install', '-l', '-y'] + packages))
         self.command_executor.Execute(cmd)

@@ -293,7 +293,7 @@ class DiskUtil(object):
         """
         self.hutil.log("dev path to cryptsetup luksFormat {0}".format(dev_path))
         #walkaround for sles sp3
-        if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
+        if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] in ['11','12','15']:
             proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
             self.command_executor.Execute(passphrase_cmd, communicator=proc_comm)
@@ -826,7 +826,7 @@ class DiskUtil(object):
         return device_items_to_return
 
     def get_device_items(self, dev_path):
-        if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
+        if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] in ['11', '12', '15']:
             return self.get_device_items_sles(dev_path)
         else:
             if dev_path:
