@@ -1627,7 +1627,7 @@ def daemon_encrypt():
                           message=message)
 
         try:
-            if os_encryption.state == 'uninitialized' and not are_disks_stamped_with_current_config(encryption_config):
+            if not disk_util.is_in_memfs_root() and not are_disks_stamped_with_current_config(encryption_config):
                 stamp_disks_with_settings(os_items_to_stamp, encryption_config)
 
             os_encryption.start_encryption()

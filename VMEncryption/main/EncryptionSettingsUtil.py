@@ -244,6 +244,7 @@ class EncryptionSettingsUtil(object):
                     raise Exception("no response from encryption settings update request")
             except Exception as e:
                 retry_count += 1
+                self.logger.log("Encountered exception while postiong encyrption settings to Wire Server (attempt #{0}):\n{1}".format(str(retry_count), str(e)))
                 if retry_count < retry_count_max:
                     time.sleep(5) # sleep for 5 seconds before retrying.
                 else:
