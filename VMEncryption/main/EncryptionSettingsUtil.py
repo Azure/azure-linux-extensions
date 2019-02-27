@@ -24,7 +24,6 @@ import time
 from shutil import copyfile
 import uuid
 from Common import CommonVariables
-from HttpUtil import HttpUtil
 
 
 class EncryptionSettingsUtil(object):
@@ -201,6 +200,16 @@ class EncryptionSettingsUtil(object):
 
         return
 
+    def get_http_util(self):
+        """
+        Importing WAAgentUtil automatically causes unit tests to fail because WAAgentUtil
+        tries to find and load waagent's source code right when you import it.
+        And HttpUtil imports WAAgentUtil internally (again, causing unittests to fail very unproductively).
+        Therefore putting the import here and mocking this method in the test helps the test proceed productively.
+        """
+        from HttpUtil import HttpUtil
+        return HttpUtil(self.logger)
+
     def post_to_wireserver(self, data):
         """ Request EnableEncryption operation on settings file via wire server """
         self.write_settings_file(data)
@@ -208,7 +217,7 @@ class EncryptionSettingsUtil(object):
             raise Exception(
                 'Disk encryption settings file not found: ' + self.get_settings_file_path())
 
-        http_util = HttpUtil(self.logger)
+        http_util = self.get_http_util()
 
         retry_count_max = 3
         retry_count = 0
