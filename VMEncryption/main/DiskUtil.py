@@ -636,6 +636,7 @@ class DiskUtil(object):
         return items
 
     def is_in_memfs_root(self):
+        # TODO: make this more robust. This could fail due to mount paths with spaces and tmpfs (e.g. '/mnt/ tmpfs')
         mounts = file('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
