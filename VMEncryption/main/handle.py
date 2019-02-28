@@ -1576,7 +1576,8 @@ def daemon_encrypt():
 
         if (((distro_name == 'redhat' and distro_version == '7.3') or
              (distro_name == 'redhat' and distro_version == '7.4') or
-             (distro_name == 'redhat' and distro_version == '7.5')) and
+             (distro_name == 'redhat' and distro_version == '7.5') or
+             (distro_name == 'redhat' and distro_version == '7.6')) and
            (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1584,7 +1585,8 @@ def daemon_encrypt():
                                                             logger=logger,
                                                             encryption_environment=encryption_environment)
         elif (((distro_name == 'centos' and distro_version == '7.3.1611') or
-              (distro_name == 'centos' and distro_version.startswith('7.4'))) and
+              (distro_name == 'centos' and distro_version.startswith('7.4')) or
+              (distro_name == 'centos' and distro_version.startswith('7.5'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1595,6 +1597,8 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.3') or
               (distro_name == 'redhat' and distro_version == '7.4') or
               (distro_name == 'redhat' and distro_version == '7.5') or
+              (distro_name == 'redhat' and distro_version == '7.6') or
+              (distro_name == 'centos' and distro_version.startswith('7.5')) or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
               (distro_name == 'centos' and distro_version == '7.3.1611') or
               (distro_name == 'centos' and distro_version == '7.2.1511')):
