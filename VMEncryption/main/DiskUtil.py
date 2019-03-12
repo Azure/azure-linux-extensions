@@ -664,6 +664,8 @@ class DiskUtil(object):
                 return disk_by_uuid_path
 
         # Found nothing very persistent. Just return the original sdx path.
+        # And Log it.
+        self.logger.log(msg="Failed to find a persistent path for [{0}].".format(sdx_path), level=CommonVariables.WarningLevel)
         return sdx_path
 
     def get_device_path(self, dev_name):

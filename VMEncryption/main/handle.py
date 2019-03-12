@@ -130,7 +130,6 @@ def disable_encryption():
             if crypt_item.dev_path.startswith("/dev/sd"):
                 logger.log('Updating crypt item entry to use mapper name')
                 logger.log('Device name before update: {0}'.format(crypt_item.dev_path))
-                # crypt_item.dev_path = disk_util.query_dev_id_path_by_sdx_path(crypt_item.dev_path)
                 crypt_item.dev_path = disk_util.get_persistent_path_by_sdx_path(crypt_item.dev_path)
                 logger.log('Device name after update: {0}'.format(crypt_item.dev_path))
 
@@ -998,7 +997,6 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
                 original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                # crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                 crypt_item_to_update.dev_path = disk_util.get_persistent_path_by_sdx_path(original_dev_name_path)
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
@@ -1154,7 +1152,6 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                    # crypt_item_to_update.dev_path = disk_util.query_dev_id_path_by_sdx_path(original_dev_name_path)
                     crypt_item_to_update.dev_path = disk_util.get_persistent_path_by_sdx_path(original_dev_name_path)
                     crypt_item_to_update.luks_header_path = luks_header_file_path
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
