@@ -735,12 +735,35 @@ class DiskUtil(object):
     def query_dev_id_path_by_sdx_path(self, sdx_path):
         """
         return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
+        Update: now we have realised that by-id is not a good way to refer to devices (they can change on reallocations or resizes).
+        Try not to use this- use get_stable_path_from_sdx instead
         """
         for disk_by_id in os.listdir(CommonVariables.disk_by_id_root):
             disk_by_id_path = os.path.join(CommonVariables.disk_by_id_root, disk_by_id)
             if os.path.realpath(disk_by_id_path) == sdx_path:
                 return disk_by_id_path
 
+        return sdx_path
+
+    def get_persistent_path_by_sdx_path(self, sdx_path):
+        """
+        return a stable path for this /dev/sdx device
+        """
+        sdx_realpath = os.path.realpath(sdx_path)
+
+        # First try finding an Azure symlink
+        azure_name_table = self.get_block_device_to_azure_udev_table()
+        if sdx_realpath in azure_name_table:
+            return azure_name_table[sdx_realpath]
+
+        # Then try matching a uuid symlink. Those are probably the best
+        for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
+            disk_by_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, disk_by_uuid)
+
+            if os.path.realpath(disk_by_uuid_path) == sdx_realpath:
+                return disk_by_uuid_path
+
+        # Found nothing very persistent. Just return the original sdx path.
         return sdx_path
 
     def get_device_path(self, dev_name):
