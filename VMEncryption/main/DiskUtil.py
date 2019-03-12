@@ -645,32 +645,6 @@ class DiskUtil(object):
 
         return sdx_path
 
-    def query_dev_uuid_path_by_sdx_path(self, sdx_path):
-        """
-        the behaviour is if we could get the uuid, then return, if not, just return the sdx.
-        """
-        self.logger.log("querying the sdx path of:{0}".format(sdx_path))
-        #blkid path
-        p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        identity, err = p.communicate()
-        identity = identity.lower()
-        self.logger.log("blkid output is: \n" + identity)
-        uuid_pattern = 'uuid="'
-        index_of_uuid = identity.find(uuid_pattern)
-        identity = identity[index_of_uuid + len(uuid_pattern):]
-        index_of_quote = identity.find('"')
-        uuid = identity[0:index_of_quote]
-        if uuid.strip() == "":
-            #TODO this is strange?  BUGBUG
-            return sdx_path
-        return os.path.join("/dev/disk/by-uuid/", uuid)
-
-    def query_dev_uuid_path_by_scsi_number(self, scsi_number):
-        # find the scsi using the filter
-        # TODO figure out why the disk formated using fdisk do not have uuid
-        sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
-        return self.query_dev_uuid_path_by_sdx_path(sdx_path)
-
     def get_persistent_path_by_sdx_path(self, sdx_path):
         """
         return a stable path for this /dev/sdx device
