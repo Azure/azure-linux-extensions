@@ -92,8 +92,9 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
+    @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
     @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
-    def test_fatal_checks(self, mock_is_vmss):
+    def test_fatal_checks(self, mock_is_vmss, mock_exec):
         mock_is_vmss.return_value = False
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
@@ -215,3 +216,15 @@ class TestCheckUtil(unittest.TestCase):
     def test_lvm_os_lv_missing_expected_name(self, os_system):
         # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
         self.assertRaises(Exception, self.cutil.validate_lvm_os, {Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+    
+    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_vfat(self, os_system):
+        # simulate call to modprobe vfat that succeeds and returns cleanly from execute 
+        self.cutil.validate_vfat()
+
+    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", side_effect = Exception("Test"))
+    def test_no_vfat(self, os_system):
+        # simulate call to modprobe vfat that fails and raises exception from execute 
+        self.assertRaises(Exception, self.cutil.validate_vfat) 
+
+        
