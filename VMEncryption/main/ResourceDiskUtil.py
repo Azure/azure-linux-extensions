@@ -68,12 +68,12 @@ class ResourceDiskUtil(object):
         """ use disk util with the appropriate device mapper """
         return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH,
                                                  passphrase_file=self.passphrase_filename,
-                                                 mapper_name=self.RD_MAPPER_PATH,
+                                                 mapper_name=self.RD_MAPPER_NAME,
                                                  header_file=None)) == CommonVariables.process_success
 
     def _format_encrypted_partition(self):
         """ make a default file system on top of the crypt layer """
-        make_result = self.disk_util.format_disk(dev_path=self.mapper_path, file_system=CommonVariables.default_file_system)
+        make_result = self.disk_util.format_disk(dev_path=self.RD_MAPPER_PATH, file_system=CommonVariables.default_file_system)
         if make_result != CommonVariables.process_success:
             self.logger.log(msg="Failed to make file system on ephemeral disk", level=CommonVariables.ErrorLevel)
             return False
@@ -148,7 +148,7 @@ class ResourceDiskUtil(object):
         device_mappers = []
         for device_item in device_items:
             # fstype should be crypto_LUKS
-            dev_path = self.disk_util.get_device_path(device_item)
+            dev_path = self.disk_util.get_device_path(device_item.name)
             if dev_path and dev_path.startswith("/dev/mapper"):
                 device_mappers.append(device_item)
                 self.logger.log('Found device mapper: ' + dev_path, level='Info')
@@ -249,16 +249,16 @@ class ResourceDiskUtil(object):
 
     def encrypt_format_mount(self):
         if not self.prepare():
-            self.logger.error("Failed to prepare VM for Resource Disk Encryption")
+            self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
         if not self._encrypt():
-            self.logger.error("Failed to encrypt Resource Disk Encryption")
+            self.logger.log("Failed to encrypt Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
         if not self._format_encrypted_partition():
-            self.logger.error("Failed to format the encrypted Resource Disk Encryption")
+            self.logger.log("Failed to format the encrypted Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
         if not self._mount_resource_disk(self.RD_MAPPER_PATH):
-            self.logger.error("Failed to mount after formatting and encrypting the Resource Disk Encryption")
+            self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
         return True
 
