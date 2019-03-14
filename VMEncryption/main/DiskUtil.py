@@ -635,6 +635,8 @@ class DiskUtil(object):
     def query_dev_id_path_by_sdx_path(self, sdx_path):
         """
         return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
+        Update: now we have realised that by-id is not a good way to refer to devices (they can change on reallocations or resizes).
+        Try not to use this- use get_stable_path_from_sdx instead
         """
         for disk_by_id in os.listdir(CommonVariables.disk_by_id_root):
             disk_by_id_path = os.path.join(CommonVariables.disk_by_id_root, disk_by_id)
@@ -643,31 +645,28 @@ class DiskUtil(object):
 
         return sdx_path
 
-    def query_dev_uuid_path_by_sdx_path(self, sdx_path):
+    def get_persistent_path_by_sdx_path(self, sdx_path):
         """
-        the behaviour is if we could get the uuid, then return, if not, just return the sdx.
+        return a stable path for this /dev/sdx device
         """
-        self.logger.log("querying the sdx path of:{0}".format(sdx_path))
-        #blkid path
-        p = Popen([self.distro_patcher.blkid_path, sdx_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        identity, err = p.communicate()
-        identity = identity.lower()
-        self.logger.log("blkid output is: \n" + identity)
-        uuid_pattern = 'uuid="'
-        index_of_uuid = identity.find(uuid_pattern)
-        identity = identity[index_of_uuid + len(uuid_pattern):]
-        index_of_quote = identity.find('"')
-        uuid = identity[0:index_of_quote]
-        if uuid.strip() == "":
-            #TODO this is strange?  BUGBUG
-            return sdx_path
-        return os.path.join("/dev/disk/by-uuid/", uuid)
+        sdx_realpath = os.path.realpath(sdx_path)
 
-    def query_dev_uuid_path_by_scsi_number(self, scsi_number):
-        # find the scsi using the filter
-        # TODO figure out why the disk formated using fdisk do not have uuid
-        sdx_path = self.query_dev_sdx_path_by_scsi_id(scsi_number)
-        return self.query_dev_uuid_path_by_sdx_path(sdx_path)
+        # First try finding an Azure symlink
+        azure_name_table = self.get_block_device_to_azure_udev_table()
+        if sdx_realpath in azure_name_table:
+            return azure_name_table[sdx_realpath]
+
+        # Then try matching a uuid symlink. Those are probably the best
+        for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
+            disk_by_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, disk_by_uuid)
+
+            if os.path.realpath(disk_by_uuid_path) == sdx_realpath:
+                return disk_by_uuid_path
+
+        # Found nothing very persistent. Just return the original sdx path.
+        # And Log it.
+        self.logger.log(msg="Failed to find a persistent path for [{0}].".format(sdx_path), level=CommonVariables.WarningLevel)
+        return sdx_path
 
     def get_device_path(self, dev_name):
         device_path = None
