@@ -201,3 +201,5 @@ class RHEL72LVMEncryptionStateMachine(OSEncryptionStateMachine):
         
         self.stop_machine()
         self.log_machine_state()
+
+        self._reboot()

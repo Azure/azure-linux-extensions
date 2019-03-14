@@ -38,18 +38,20 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
-        log_msg = ""
-        if sys.version_info > (3,):
-            log_msg = self.log_to_con_py3(msg, level)
-        else:
-            log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
-            self.log_to_con(log_msg)
-        if self.enforced_local_flag_value != None:
-            local = self.enforced_local_flag_value
-        if(local):
-            self.hutil.log(str(msg),level)
-        else:
-            self.msg += log_msg
+        WriteLog = self.hutil.get_value_from_configfile('WriteLog')
+        if (WriteLog == None or WriteLog == 'True'):
+            log_msg = ""
+            if sys.version_info > (3,):
+                log_msg = self.log_to_con_py3(msg, level)
+            else:
+                log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
+                self.log_to_con(log_msg)
+            if self.enforced_local_flag_value != None:
+                local = self.enforced_local_flag_value
+            if(local):
+                self.hutil.log(str(msg),level)
+            else:
+                self.msg += log_msg
 
     def log_to_con(self, msg):
         try:
@@ -88,32 +90,34 @@ class Backuplogger(object):
         self.hutil.log(self.msg)
 
     def commit_to_blob(self, logbloburi):
-        log_to_blob = ""
-        blobWriter = BlobWriter(self.hutil)
-        # append the wala log at the end.
-        try:
-            # distro information
-            if(self.hutil is not None and self.hutil.patching is not None and self.hutil.patching.distro_info is not None):
-                distro_str = ""
-                if(len(self.hutil.patching.distro_info)>1):
-                    distro_str = self.hutil.patching.distro_info[0] + " " + self.hutil.patching.distro_info[1]
-                else:
-                    distro_str = self.hutil.patching.distro_info[0]
-                self.msg = "Distro Info:" + distro_str + "\n" + self.msg
-            self.msg = "Guest Agent Version is :" + waagent.GuestAgentVersion + "\n" + self.msg
-            with open("/var/log/waagent.log", 'rb') as file:
-                file.seek(0, os.SEEK_END)
-                length = file.tell()
-                seek_len_abs = 1024 * 10
-                if(length < seek_len_abs):
-                    seek_len_abs = length
-                file.seek(0 - seek_len_abs, os.SEEK_END)
-                tail_wala_log = file.read()
-                log_to_blob = str(self.hutil.fetch_log_message()) + "Tail of previous logs:" + str(self.prev_log) + "Tail of WALA Log:" + str(tail_wala_log) + "Tail of shell script log:" + str(self.hutil.get_shell_script_log())
-        except Exception as e:
-            errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.hutil.log(errMsg)
-        blobWriter.WriteBlob(log_to_blob, logbloburi)
+        UploadStatusAndLog = self.hutil.get_value_from_configfile('UploadStatusAndLog')
+        if (UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
+            log_to_blob = ""
+            blobWriter = BlobWriter(self.hutil)
+            # append the wala log at the end.
+            try:
+                # distro information
+                if(self.hutil is not None and self.hutil.patching is not None and self.hutil.patching.distro_info is not None):
+                    distro_str = ""
+                    if(len(self.hutil.patching.distro_info)>1):
+                        distro_str = self.hutil.patching.distro_info[0] + " " + self.hutil.patching.distro_info[1]
+                    else:
+                        distro_str = self.hutil.patching.distro_info[0]
+                    self.msg = "Distro Info:" + distro_str + "\n" + self.msg
+                self.msg = "Guest Agent Version is :" + waagent.GuestAgentVersion + "\n" + self.msg
+                with open("/var/log/waagent.log", 'rb') as file:
+                    file.seek(0, os.SEEK_END)
+                    length = file.tell()
+                    seek_len_abs = 1024 * 10
+                    if(length < seek_len_abs):
+                        seek_len_abs = length
+                    file.seek(0 - seek_len_abs, os.SEEK_END)
+                    tail_wala_log = file.read()
+                    log_to_blob = str(self.hutil.fetch_log_message()) + "Tail of previous logs:" + str(self.prev_log) + "Tail of WALA Log:" + str(tail_wala_log) + "Tail of shell script log:" + str(self.hutil.get_shell_script_log())
+            except Exception as e:
+                errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+                self.hutil.log(errMsg)
+            blobWriter.WriteBlob(log_to_blob, logbloburi)
 
     def set_prev_log(self):
         self.prev_log = self.hutil.get_prev_log()

@@ -20,11 +20,12 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999327'
+    extension_version = '0.1.0.999332'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
     extension_description = extension_label
+    extension_shim_filename = "extension_shim.sh"
 
     """
     disk/file system related
@@ -37,6 +38,7 @@ class CommonVariables:
     default_file_system = 'ext4'
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
+    osmapper_name = 'osencrypt'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
 

@@ -139,15 +139,17 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message,level='Info'):
-        if sys.version_info > (3,):
-            if self.logging_file is not None:
-                self.log_py3(message)
+        WriteLog = self.get_value_from_configfile('WriteLog')
+        if (WriteLog == None or WriteLog == 'True'):
+            if sys.version_info > (3,):
+                if self.logging_file is not None:
+                    self.log_py3(message)
+                else:
+                    pass
+                #self.log_to_file() 
             else:
-                pass
-            #self.log_to_file() 
-        else:
-            self._log(self._get_log_prefix() + message)
-        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+                self._log(self._get_log_prefix() + message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
@@ -282,6 +284,15 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
 
+    '''
+    Sample /etc/azure/vmbackup.conf
+ 
+    [SnapshotThread]
+    doseq = 1
+    isanysnapshotfailed = False
+    UploadStatusAndLog = True
+    WriteLog = True
+    '''
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -292,11 +303,9 @@ class HandlerUtility:
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
-                else:
-                    self.log("Config File doesn't have the key :" + key, 'Info')
         except Exception as e:
-            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.log(errorMsg, 'Warning')
+            pass
+
         return value
  
     def set_value_to_configfile(self, key, value):
@@ -342,7 +351,7 @@ class HandlerUtility:
                 file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg, 'Error')
  
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
@@ -468,9 +477,13 @@ class HandlerUtility:
                 process_wait_time -= 1
             out = p.stdout.read()
             out = str(out)
-            out =  out.split(" ")
-            waagent = out[0]
-            waagent_version = waagent.split("-")[-1] #getting only version number
+            if "Goal state agent: " in out:
+                 waagent_version = out.split("Goal state agent: ")[1].strip()
+            else:
+                out =  out.split(" ")
+                waagent = out[0]
+                waagent_version = waagent.split("-")[-1] #getting only version number
+
             os.chdir(cur_dir)
             return waagent_version
         except Exception as e:
@@ -487,6 +500,16 @@ class HandlerUtility:
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
+                if(distinfo[0] == ''):
+                    osfile= open("/etc/os-release", "r")
+                    for line in osfile:
+                        lists=str(line).split("=")
+                        if(lists[0]== "NAME"):
+                            distroname = lists[1].split("\"")
+                        if(lists[0]=="VERSION"):
+                            distroversion = lists[1].split("\"")
+                    osfile.close()
+                    return distroname[1]+"-"+distroversion[1],platform.release()
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
@@ -514,7 +537,7 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
-        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)

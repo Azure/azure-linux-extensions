@@ -29,17 +29,33 @@ from patch.oraclePatching import oraclePatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
-    if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['FreeBSD', release]
+    try:
+        if 'FreeBSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['FreeBSD', release]
+            return distinfo
+        if 'linux_distribution' in dir(platform):
+            distinfo = list(platform.linux_distribution(full_distribution_name=0))
+            # remove trailing whitespace in distro name
+            if(distinfo[0] == ''):
+                osfile= open("/etc/os-release", "r")
+                for line in osfile:
+                    lists=str(line).split("=")
+                    if(lists[0]== "NAME"):
+                        distname = lists[1].split("\"")
+                        distinfo[0] = distname[1]
+                        if(distinfo[0].lower() == "sles"):
+                            distinfo[0] = "SuSE"
+                osfile.close()
+            distinfo[0] = distinfo[0].strip()
+            return distinfo
+        else:
+            return platform.dist()
+    except Exception as e:
+        errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        logger.log(errMsg)
+        distinfo = ['Abstract','1.0']
         return distinfo
-    if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=0))
-        # remove trailing whitespace in distro name
-        distinfo[0] = distinfo[0].strip()
-        return distinfo
-    else:
-        return platform.dist()
 
 def GetMyPatching(logger):
     """

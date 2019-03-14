@@ -1,10 +1,11 @@
 import unittest
 import mock
-import main
+
 from main import check_util
 from main import Common
 from StringIO import StringIO
 import console_logger
+
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -18,8 +19,8 @@ class TestCheckUtil(unittest.TestCase):
         stream.seek(0)
         return stream
 
-    @mock.patch('os.path.isfile', return_value = False)
-    @mock.patch('os.path.isdir', return_value = False)
+    @mock.patch('os.path.isfile', return_value=False)
+    @mock.patch('os.path.isdir', return_value=False)
     def test_appcompat(self, os_path_isdir, os_path_isfile):
         self.assertFalse(self.cutil.is_app_compat_issue_detected())
 
@@ -67,6 +68,9 @@ class TestCheckUtil(unittest.TestCase):
 
     def test_fatal_checks(self):
         self.cutil.precheck_for_fatal_failures({
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus
+            })
+        self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
             })
@@ -89,7 +93,10 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
-        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
+            Common.CommonVariables.VolumeTypeKey: "123",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
+            })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -118,20 +125,64 @@ class TestCheckUtil(unittest.TestCase):
         /dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
         /dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0
         """
-        with mock.patch("__builtin__.open", mock.mock_open(read_data=proc_mounts_output)) as mock_open:
+        with mock.patch("__builtin__.open", mock.mock_open(read_data=proc_mounts_output)):
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
 
+    # Skip LVM OS validation when OS volume is not being targeted
+    def test_skip_lvm_os_check_if_data_only_enable(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+
+    def test_skip_lvm_os_check_if_data_only_ef(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat})
+
+    def test_skip_lvm_os_check_if_data_only_efa(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll})
+
+    def test_skip_lvm_os_check_if_data_only_disable(self):
+        # skip lvm detection if data only 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "DATA", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption})
+
+    def test_skip_lvm_os_check_if_query(self):
+        # skip lvm detection if query status operation is invoked without volume type
+        self.cutil.validate_lvm_os({Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus})
+
+    def test_skip_lvm_no_encryption_operation(self):
+        # skip lvm detection if no encryption operation 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL"})
+
+    def test_skip_lvm_no_volume_type(self):
+        # skip lvm detection if no volume type specified
+        self.cutil.validate_lvm_os({Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll})
+
+    @mock.patch("os.system", return_value=-1)
+    def test_no_lvm_no_config(self, os_system):
+        # simulate no LVM OS, no config 
+        self.cutil.validate_lvm_os({})
+
     @mock.patch("os.system", return_value=0)
-    def test_lvm_os_lvm_present(self, os_system):
-        # if there is LVM
-        self.assertFalse(self.cutil.is_invalid_lvm_os())
+    def test_lvm_no_config(self, os_system):
+        # simulate valid LVM OS, no config
+        self.cutil.validate_lvm_os({})
+
+    @mock.patch("os.system", side_effect=[0, -1])
+    def test_invalid_lvm_no_config(self, os_system):
+        # simulate invalid LVM naming scheme, but no config setting to encrypt OS
+        self.cutil.validate_lvm_os({})
 
     @mock.patch("os.system", return_value=-1)
     def test_lvm_os_lvm_absent(self, os_system):
-        # if there is no LVM
-        self.assertFalse(self.cutil.is_invalid_lvm_os())
+        # using patched return value of -1, simulate no LVM OS 
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
 
-    @mock.patch("os.system", side_effect=[0, -1, 0, 0, 0, 0, 0, 0])
-    def test_lvm_os_lvm_faulty(self, os_system):
-        # if there is faulty LVM
-        self.assertTrue(self.cutil.is_invalid_lvm_os())
+    @mock.patch("os.system", return_value=0)
+    def test_lvm_os_valid(self, os_system):
+        # simulate a valid LVM OS and a valid naming scheme by always returning 0
+        self.cutil.validate_lvm_os({Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+
+    @mock.patch("os.system", side_effect=[0, -1])
+    def test_lvm_os_lv_missing_expected_name(self, os_system):
+        # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
+        self.assertRaises(Exception, self.cutil.validate_lvm_os, {Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})

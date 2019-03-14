@@ -4,9 +4,9 @@
 COMMAND=""
 PYTHON=""
 
-USAGE="$(basename "$0") [-h] [-i|--install] [-u|--uninstall] [-d|--disable] [-e|--enable] [-p|--update]
+USAGE="$(basename "$0") [-h] [-i|--install] [-u|--uninstall] [-d|--disable] [-e|--enable] [-p|--update] [-m|--daemon]
 
-Program to find the installed python on the box and invoke a Python extension script.
+Program to find the installed python on the box and invoke a Python extension script using Python 2.7.
 
 where:
     -h|--help       show this help text
@@ -15,12 +15,13 @@ where:
     -d|--disable    disable the extension
     -e|--enable     enable the extension
     -p|--update     update the extension
+    -m|--daemon     invoke daemon option
     -c|--command    command to run
 
 example:
 # Install usage
 $ bash extension_shim.sh -i
-python ./vmaccess.py -install
+python ./main/handle.py -install
 
 # Custom executable python file
 $ bash extension_shim.sh -c ""hello.py"" -i
@@ -37,11 +38,6 @@ function find_python(){
     # Check if there is python defined.
     if command -v python >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python"
-    else
-        # Python was not found. Searching for Python3 now.
-        if command -v python3 >/dev/null 2>&1 ; then
-            eval ${python_exec_command}="python3"
-        fi
     fi
 }
 
@@ -55,6 +51,7 @@ for arg in "$@"; do
     "--enable")     set -- "$@" "-e" ;;
     "--disable")    set -- "$@" "-d" ;;
     "--uninstall")  set -- "$@" "-u" ;;
+    "--daemon")     set -- "$@" "-m" ;;
     *)              set -- "$@" "$arg"
   esac
 done
@@ -87,6 +84,9 @@ while getopts "iudephc:?" o; do
         p)
             operation="-update"
             ;;
+        m)
+            operation="-daemon"
+            ;;
         c)
             COMMAND="$OPTARG"
             ;;
@@ -97,18 +97,23 @@ while getopts "iudephc:?" o; do
     esac
 done
 
-shift $((OPTIND-1))
+shift "$((OPTIND-1))"
 
 # If find_python is not able to find a python installed, $PYTHON will be null.
 find_python PYTHON
-
 
 if [ -z "$PYTHON" ]; then
    echo "No Python interpreter found on the box" >&2
    exit 51 # Not Supported
 else
-   echo `${PYTHON} --version`
+    PYTHON_VER=`${PYTHON} --version 2>&1`
+    if [[ "$PYTHON_VER" =~ "Python 2.6" ]] || [[ "$PYTHON_VER" =~ "Python 2.7" ]]; then
+        echo $PYTHON_VER
+    else
+        echo "Expected Python 2.7, found $PYTHON_VER" >&2
+        exit 51 # Not Supported
+    fi
 fi
 
-${PYTHON} ${COMMAND} ${operation}
+${PYTHON} ${COMMAND} ${operation} 2>&1
 # DONE
