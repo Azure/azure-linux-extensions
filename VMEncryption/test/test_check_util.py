@@ -66,7 +66,8 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: ""})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {Common.CommonVariables.VolumeTypeKey: "123"})
 
-    def test_fatal_checks(self):
+    @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
+    def test_fatal_checks(self, mock_exec):
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus
             })
@@ -77,12 +78,14 @@ class TestCheckUtil(unittest.TestCase):
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
             })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat
             })
         self.cutil.precheck_for_fatal_failures({
@@ -90,11 +93,21 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
+            Common.CommonVariables.AADClientIDKey: "INVALIDKEY",
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
+            })
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "123",
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
             })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
@@ -102,6 +115,7 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             })
 
@@ -186,3 +200,63 @@ class TestCheckUtil(unittest.TestCase):
     def test_lvm_os_lv_missing_expected_name(self, os_system):
         # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
         self.assertRaises(Exception, self.cutil.validate_lvm_os, {Common.CommonVariables.VolumeTypeKey: "ALL", Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption})
+
+    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_vfat(self, os_system):
+        # simulate call to modprobe vfat that succeeds and returns cleanly from execute 
+        self.cutil.validate_vfat()
+
+    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", side_effect = Exception("Test"))
+    def test_no_vfat(self, os_system):
+        # simulate call to modprobe vfat that fails and raises exception from execute 
+        self.assertRaises(Exception, self.cutil.validate_vfat) 
+
+    def test_validate_aad(self):
+        # positive tests
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = "00000000-0000-0000-0000-000000000000"
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryption
+        self.cutil.validate_aad(test_settings)
+
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = "00000000-0000-aaaa-0000-000000000000"
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryptionFormat
+        self.cutil.validate_aad(test_settings)
+
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = "00000000-0000-AAAA-0000-000000000000"
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryptionFormatAll
+        self.cutil.validate_aad(test_settings)
+
+        test_settings = {} 
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.DisableEncryption
+        self.cutil.validate_aad(test_settings)
+
+        test_settings = {} 
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.QueryEncryptionStatus
+        self.cutil.validate_aad(test_settings)
+
+        # negative tests
+        # settings file that does not include AAD client ID field
+        test_settings = {} 
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryption
+        self.assertRaises(Exception, self.cutil.validate_aad, test_settings)
+
+        # invalid characters in the client ID
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = "BORKED"
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryption
+        self.assertRaises(Exception, self.cutil.validate_aad, test_settings)
+
+        # empty string
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = ""
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryption
+        self.assertRaises(Exception, self.cutil.validate_aad, test_settings)
+
+        # unicode left and right double quotes (simulating a copy-paste error)
+        test_settings = {} 
+        test_settings[Common.CommonVariables.AADClientIDKey] = u'\u201c' + "00000000-0000-0000-0000-000000000000" + u'\u201d'
+        test_settings[Common.CommonVariables.EncryptionEncryptionOperationKey] = Common.CommonVariables.EnableEncryption
+        self.assertRaises(Exception, self.cutil.validate_aad, test_settings)
+
