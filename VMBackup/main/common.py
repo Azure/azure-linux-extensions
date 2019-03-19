@@ -84,6 +84,7 @@ class CommonVariables:
     #error_upload_status_blob = 16
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
+    FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
 
     """

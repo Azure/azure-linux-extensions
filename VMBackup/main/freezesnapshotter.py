@@ -104,6 +104,7 @@ class FreezeSnapshotter(object):
     def doFreezeSnapshot(self):
         run_result = CommonVariables.success
         run_status = 'success'
+        all_failed = False
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed = self.takeSnapshotFromGuest()
@@ -113,6 +114,9 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
+
+        if (run_result == CommonVariables.success):
+            run_result = self.updateErrorCode(blob_snapshot_info_array, all_failed)
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
 
@@ -131,6 +135,48 @@ class FreezeSnapshotter(object):
                     snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
 
         return snapshot_info_array
+
+    def updateErrorCode(self, blob_snapshot_info_array, all_failed):
+        run_result = CommonVariables.success
+        any_failed = False
+
+        if blob_snapshot_info_array != None:
+            for blob_snapshot_info in blob_snapshot_info_array:
+                if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
+                    if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage:
+                        run_result = CommonVariables.FailedRetryableSnapshotRateExceeded
+                        run_status = 'error'
+                        error_msg = 'Retrying when snapshot failed with SnapshotRateExceeded'
+                        self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded
+                        self.logger.log(error_msg, True, 'Error')
+                        break
+                    elif 'The snapshot count against this blob has been exceeded' in blob_snapshot_info.errorMessage:
+                        run_result = CommonVariables.FailedSnapshotLimitReached
+                        run_status = 'error'
+                        error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
+                        self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+                        self.logger.log(error_msg, True, 'Error')
+                        break
+                    elif blob_snapshot_info.isSuccessful == False and not all_failed:
+                        any_failed = True
+
+        if run_result == CommonVariables.success and all_failed:
+            run_status = 'error'
+            run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+            error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedNoNetwork errror'
+            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+            self.logger.log(error_msg, True, 'Error')
+        elif run_result == CommonVariables.success and any_failed:
+            run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+            error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedRestrictedNetwork errror'
+            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+            run_status = 'error'
+            self.logger.log(error_msg, True, 'Error')
+        
+        return run_result
 
     def freeze(self):
         try:
@@ -216,49 +262,11 @@ class FreezeSnapshotter(object):
                         run_status = 'error'
                         error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
                         self.logger.log(error_msg, True, 'Warning')
-                    else:
-                        #making FailedSnapshotLimitReached error incase of "snapshot blob calls is exceeded"
-                        if blob_snapshot_info_array != None:
-                            for blob_snapshot_info in blob_snapshot_info_array:
-                                if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
-                                    # if any blob-snapshot has failed with SnapshotRateExceeded with IsAnySnapshotFailed RegKey already true, assign StausCode FailedSnapshotLimitReached
-                                    SnapshotRateExceededFailureCount = self.hutil.get_value_from_configfile(CommonVariables.SnapshotRateExceededFailureCount)
-                                    self.logger.log('SnapshotRateExceededFailureCount : ' + str(SnapshotRateExceededFailureCount))
-                                    if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage and (SnapshotRateExceededFailureCount == None or SnapshotRateExceededFailureCount == '' or int(SnapshotRateExceededFailureCount) != 3):
-                                        run_result = CommonVariables.error
-                                        run_status = 'error'
-                                        error_msg = 'Retrying when snapshot failed with SnapshotRateExceeded'
-                                        self.logger.log(error_msg, True, 'Error')
-                                        self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount, str( int(SnapshotRateExceededFailureCount) + 1))
-                                        break
-                                    elif 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage or 'The snapshot count against this blob has been exceeded' in blob_snapshot_info.errorMessage:
-                                        run_result = CommonVariables.FailedSnapshotLimitReached
-                                        run_status = 'error'
-                                        error_msg = 'T:S Enable failed with FailedSnapshotLimitReached errror'
-                                        self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSnapshotLimitReached
-                                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                                        self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount,'0')
-                                        break
-                        if(run_result == CommonVariables.success):
-                            error_msg = 'T:S snapshot result: ' + str(snapshot_result)
-                            run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                            if all_failed and self.takeSnapshotFrom == CommonVariables.onlyGuest:
-                                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                            else:
-                                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                            run_status = 'error'
-
-                        self.logger.log(error_msg, True, 'Error')
                 elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
                     self.logger.log(error_msg, True, 'Error')
-                else :
-                    #resetting SnapshotRateExceededFailureCount when success
-                    self.hutil.set_value_to_configfile(CommonVariables.SnapshotRateExceededFailureCount,'0')
         except Exception as e:
             if(self.hutil.get_value_from_configfile('doseq') == '2'):
                 self.hutil.set_value_to_configfile('doseq', '0')
@@ -337,13 +345,5 @@ class FreezeSnapshotter(object):
             time_after_snapshot = datetime.datetime.now()
             HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
             self.logger.log('T:S snapshotall ends...', True)
-            if(all_failed or self.check_snapshot_array_fail(blob_snapshot_info_array)):
-                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                run_status = 'error'
-                if self.takeSnapshotFrom == CommonVariables.onlyHost:
-                    self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
-                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                error_msg = 'Enable failed in taking snapshot through host'
-                self.logger.log("T:S " + error_msg, True)
 
         return run_result, run_status, blob_snapshot_info_array, all_failed
