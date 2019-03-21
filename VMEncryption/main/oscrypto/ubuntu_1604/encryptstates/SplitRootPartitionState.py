@@ -37,7 +37,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         if not super(SplitRootPartitionState, self).should_enter():
             return False
-        
+
         self.context.logger.log("Performing enter checks for split_root_partition state")
 
 
@@ -50,6 +50,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
             self.command_executor.Execute('systemctl restart systemd-udevd')
             self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.command_executor.Execute('systemctl restart systemd-networkd')
             self.command_executor.Execute('udevadm trigger')
 
             sleep(10)
@@ -58,7 +59,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         if not attempt < 10:
             return False
-                
+
         return True
 
     def enter(self):
@@ -75,8 +76,8 @@ class SplitRootPartitionState(OSEncryptionState):
 
         desired_boot_partition_size = parted.sizeToSectors(256, 'MiB', device.sectorSize)
         self.context.logger.log("Desired boot partition size (sectors): {0}".format(desired_boot_partition_size))
-      
-        desired_root_fs_size = original_root_fs_size - desired_boot_partition_size
+
+        desired_root_fs_size = int(original_root_fs_size - desired_boot_partition_size)
         self.context.logger.log("Desired root filesystem size (sectors): {0}".format(desired_root_fs_size))
 
         attempt = 1
@@ -104,7 +105,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         self.context.logger.log("Root filesystem resized successfully")
 
-        root_partition = disk.partitions[0]
+        root_partition = disk.getPartitionByPath(os.path.realpath(self.rootfs_block_device))
 
         original_root_partition_start = root_partition.geometry.start
         original_root_partition_end = root_partition.geometry.end
@@ -148,45 +149,35 @@ class SplitRootPartitionState(OSEncryptionState):
 
         disk.commit()
 
-        probed_root_fs = parted.probeFileSystem(disk.partitions[0].geometry)
+        probed_root_fs = parted.probeFileSystem(desired_root_partition_geometry)
         if not probed_root_fs == 'ext4':
             raise Exception("Probed root fs is not ext4")
 
-        disk.partitions[1].setFlag(parted.PARTITION_BOOT)
+        root_partition = disk.getPartitionByPath(os.path.realpath(self.rootfs_block_device))
+        if (root_partition.getFlag(parted.PARTITION_BOOT)):
+            boot_partition = disk.getPartitionByPath(os.path.realpath(self.bootfs_block_device))
+            boot_partition.setFlag(parted.PARTITION_BOOT)
+            disk.commit()
 
-        disk.commit()
-        
         self.command_executor.Execute("partprobe", True)
         self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
-        
+
         boot_partition_uuid = self._get_uuid(self.bootfs_block_device)
 
         # Move stuff from /oldroot/boot to new partition, make new partition mountable at the same spot
         self.command_executor.Execute("mount {0} /oldroot".format(self.rootfs_block_device), True)
-        self.command_executor.Execute("mkdir /oldroot/memroot", True)
-        self.command_executor.Execute("mount --make-rprivate /", True)
-        self.command_executor.Execute("pivot_root /oldroot /oldroot/memroot", True)
-        self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /memroot/$i /$i; done", True)
-        self.command_executor.Execute("mv /boot /boot.backup", True)
-        self.command_executor.Execute("mkdir /boot", True)
+        self.command_executor.Execute("mkdir -p /boot", True)
+        self.command_executor.Execute("cp /oldroot/etc/fstab /etc/fstab", True)
         self._append_boot_partition_uuid_to_fstab(boot_partition_uuid)
-        self.command_executor.Execute("cp /etc/fstab /memroot/etc/fstab", True)
+        self.command_executor.Execute("cp /etc/fstab /oldroot/etc/fstab", True)
         self.command_executor.Execute("mount /boot", True)
-        self.command_executor.ExecuteInBash("mv /boot.backup/* /boot/", True)
-        self.command_executor.Execute("rmdir /boot.backup", True)
-        self.command_executor.Execute("mount --make-rprivate /", True)
-        self.command_executor.Execute("pivot_root /memroot /memroot/oldroot", True)
-        self.command_executor.Execute("rmdir /oldroot/memroot", True)
-        self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /oldroot/$i /$i; done", True)
-        self.command_executor.Execute("systemctl restart rsyslog", True)
-        self.command_executor.Execute("systemctl restart systemd-udevd", True)
-        self.command_executor.Execute("systemctl restart walinuxagent", True)
-        self.command_executor.Execute("umount /oldroot/boot", True)
+        self.command_executor.ExecuteInBash("mv /oldroot/boot/* /boot/", True)
+        self.command_executor.Execute("umount /boot", True)
         self.command_executor.Execute("umount /oldroot", True)
-        
+
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
-        
+
         self.command_executor.ExecuteInBash("mount /boot || mountpoint /boot", True)
         self.command_executor.ExecuteInBash("[ -e /boot/grub ]", True)
         self.command_executor.Execute("umount /boot", True)
@@ -239,7 +230,7 @@ class SplitRootPartitionState(OSEncryptionState):
 
         if not attempt < 10:
             return Exception("Could not dumpe2fs, stderr: \n{0}".format(proc_comm.stderr))
-        
+
 
         root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
         root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)

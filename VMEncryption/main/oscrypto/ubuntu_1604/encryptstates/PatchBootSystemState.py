@@ -26,6 +26,7 @@ import sys
 from time import sleep
 from OSEncryptionState import *
 
+
 class PatchBootSystemState(OSEncryptionState):
     def __init__(self, context):
         super(PatchBootSystemState, self).__init__('PatchBootSystemState', context)
