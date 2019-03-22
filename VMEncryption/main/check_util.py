@@ -211,13 +211,24 @@ class CheckUtil(object):
         else: 
             raise Exception(CommonVariables.AADClientIDKey + ' property was not found in settings')
             
-    def precheck_for_fatal_failures(self, public_settings):
+    def validate_memory_os_encryption(self, public_settings, encryption_status):
+        is_enable_operation = False
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            is_enable_operation = True
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if is_enable_operation and not volume_type.lower() == CommonVariables.VolumeTypeData.lower() and encryption_status["os"] == "NotEncrypted":
+            if self.is_insufficient_memory():
+                raise Exception("Not enough memory for enabling encryption on OS volume. 8 GB memory is recommended.")
+
+    def precheck_for_fatal_failures(self, public_settings, encryption_status):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
         self.validate_lvm_os(public_settings)
         self.validate_vfat()
         self.validate_aad(public_settings)
+        self.validate_memory_os_encryption(public_settings, encryption_status)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """
