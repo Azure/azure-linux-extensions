@@ -99,13 +99,13 @@ class TestCheckUtil(unittest.TestCase):
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
-            })
+            }, { "os": "NotEncrypted" })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
-    })
+            }, { "os": "NotEncrypted" })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -113,7 +113,7 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
             Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat
-            })
+            }, { "os": "NotEncrypted" })
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -122,9 +122,9 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
-            })
+            }, { "os": "NotEncrypted" })
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
-        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"})
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {Common.CommonVariables.VolumeTypeKey: "123"}, {"os": "NotEncrypted"})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -133,7 +133,7 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
-            })
+            }, { "os": "NotEncrypted" })
 
     def test_mount_scheme(self):
         proc_mounts_output = """
@@ -226,5 +226,58 @@ class TestCheckUtil(unittest.TestCase):
     def test_no_vfat(self, os_system):
         # simulate call to modprobe vfat that fails and raises exception from execute 
         self.assertRaises(Exception, self.cutil.validate_vfat) 
+      
+    @mock.patch('os.popen')
+    def test_minimum_memory(self, os_popen):
+        output = "6000000"
+        os_popen.return_value = self.get_mock_filestream(output)
+        self.assertRaises(Exception, self.cutil.validate_memory_os_encryption, {
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
+            }, { "os": "NotEncrypted" })
+        try:
+            self.cutil.validate_memory_os_encryption( {
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
+            }, { "os": "Encrypted" })
+        except Exception:
+            self.fail("validate_memory_os_encryption threw unexpected exception")
+        try:
+            output = "8000000"
+            os_popen.return_value = self.get_mock_filestream(output)
+            self.cutil.validate_memory_os_encryption( {
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
+            }, { "os": "Encrypted" })
+        except Exception:
+            self.fail("validate_memory_os_encryption threw unexpected exception")
+        try:
+            output = "8000000"
+            os_popen.return_value = self.get_mock_filestream(output)
+            self.cutil.validate_memory_os_encryption( {
+            Common.CommonVariables.VolumeTypeKey: "ALL",
+            Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+            Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
+            }, { "os": "NotEncrypted" })
+        except Exception:
+            self.fail("validate_memory_os_encryption threw unexpected exception")
 
-        
