@@ -24,6 +24,7 @@ import urlparse
 import re
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
+from CommandExecutor import CommandExecutor
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -223,11 +224,20 @@ class CheckUtil(object):
         if detected:
             raise Exception("LVM OS disk layout does not satisfy prerequisites ( see https://aka.ms/adelvm )")
 
+    def validate_vfat(self):
+        """ Check for vfat module using modprobe and raise exception if not found """
+        try:
+            executor = CommandExecutor(self.logger)
+            executor.Execute("modprobe vfat", True)
+        except:
+            raise RuntimeError('Incompatible system, prerequisite vfat module was not found.')
+
     def precheck_for_fatal_failures(self, public_settings):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
         self.validate_lvm_os(public_settings)
+        self.validate_vfat()
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """
