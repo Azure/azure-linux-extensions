@@ -116,7 +116,7 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
 
         if (run_result == CommonVariables.success):
-            run_result = self.updateErrorCode(blob_snapshot_info_array, all_failed)
+            run_result, run_status = self.updateErrorCode(blob_snapshot_info_array, all_failed)
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
 
@@ -139,6 +139,7 @@ class FreezeSnapshotter(object):
     def updateErrorCode(self, blob_snapshot_info_array, all_failed):
         run_result = CommonVariables.success
         any_failed = False
+        run_status = 'success'
 
         if blob_snapshot_info_array != None:
             for blob_snapshot_info in blob_snapshot_info_array:
@@ -176,7 +177,7 @@ class FreezeSnapshotter(object):
             run_status = 'error'
             self.logger.log(error_msg, True, 'Error')
         
-        return run_result
+        return run_result, run_status
 
     def freeze(self):
         try:
@@ -311,11 +312,6 @@ class FreezeSnapshotter(object):
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
             run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
-            if(all_failed and run_result != CommonVariables.success):
-                run_result = CommonVariables.error
-                run_status = 'error'
-                error_msg = 'T:S Enable failed with error in transient error from xstore'
-                self.logger.log("Marking retryble error when presnapshot succeeds but dosnapshot fails through host", True, 'Warning')
         else:
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
 
