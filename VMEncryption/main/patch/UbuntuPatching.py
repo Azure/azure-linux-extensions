@@ -58,8 +58,12 @@ class UbuntuPatching(AbstractPatching):
         self.touch_path = '/usr/bin/touch'
 
     def install_adal(self):
-        self.command_executor.Execute('apt-get update')
-        self.command_executor.Execute('apt-get install -y python-pip')
+        return_code = self.command_executor.Execute('apt-get install -y python-pip')
+        # If install fails, try running apt-get update and then try install again
+        if return_code != 0:
+            self.logger.log('python-pip installation failed. Retrying installation after running update')
+            self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            self.command_executor.Execute('apt-get install -y python-pip')
         self.command_executor.Execute('python -m pip install --upgrade pip')
         self.command_executor.Execute('python -m pip install --upgrade setuptools')
         self.command_executor.Execute('python -m pip install adal')
@@ -68,9 +72,6 @@ class UbuntuPatching(AbstractPatching):
         """
         install the sg_dd because the default dd do not support the sparse write
         """
-        cmd = " ".join(['apt-get', 'update'])
-        self.command_executor.Execute(cmd)
-
         packages = ['at',
                     'cryptsetup-bin',
                     'lsscsi',
@@ -80,7 +81,14 @@ class UbuntuPatching(AbstractPatching):
                     'psmisc']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-        self.command_executor.Execute(cmd)
+        return_code = self.command_executor.Execute(cmd)
+
+        # If install fails, try running apt-get update and then try install again
+        if return_code != 0:
+            self.logger.log('prereq packages installation failed. Retrying installation after running update')
+            self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+            self.command_executor.Execute(cmd)
         
     def update_prereq(self):
         pass

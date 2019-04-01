@@ -496,10 +496,24 @@ def enable():
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
         cutil = CheckUtil(logger)
+        # Mount already encrypted disks before running fatal prechecks
+        disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+        bek_util = BekUtil(disk_util, logger)
+        existing_passphrase_file = None
+        encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
+
+        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if existing_passphrase_file is not None:
+            mount_encrypted_disks(disk_util=disk_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=existing_passphrase_file)
+
+        encryption_status = json.loads(disk_util.get_encryption_status())
 
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings)
+            cutil.precheck_for_fatal_failures(public_settings, encryption_status)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -595,6 +609,7 @@ def enable_encryption():
                        level=CommonVariables.WarningLevel)
             hutil.redo_last_status()
             exit_without_status_report()
+    
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
