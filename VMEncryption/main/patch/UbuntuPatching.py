@@ -58,12 +58,17 @@ class UbuntuPatching(AbstractPatching):
         self.touch_path = '/usr/bin/touch'
 
     def install_cryptsetup(self):
-        cmd = " ".join(['apt-get', 'update'])
-        self.command_executor.Execute(cmd)
-        
         packages = ['cryptsetup-bin']
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-        self.command_executor.Execute(cmd)
+        return_code = self.command_executor.Execute(cmd)
+        
+        # If install fails, try running apt-get update and then try install again
+        if return_code != 0:
+            self.logger.log('cryptsetup installation failed. Retrying installation after running update')
+            self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+            self.command_executor.Execute(cmd)
+
 
     def install_extras(self):
         """
