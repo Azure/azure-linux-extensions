@@ -207,7 +207,8 @@ class Watcher:
                 "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status",
                 "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
                 "/var/opt/microsoft/omsconfig/status/dscperforminventory",
-                "/var/opt/microsoft/omsconfig/status/dscsetlcm"
+                "/var/opt/microsoft/omsconfig/status/dscsetlcm",
+                "/var/opt/microsoft/omsconfig/status/omsconfighost"
             ]            
         for sf in status_files:
             if os.path.isfile(sf):
