@@ -55,6 +55,7 @@ from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
 from PluginHost import PluginHostResult
+import platform
 
 #Main function is the only entrence to this extension handler
 
@@ -258,6 +259,14 @@ def daemon():
         HandlerUtil.HandlerUtility.add_to_telemetery_data("pythonVersion", python_version)
     except Exception as e:
         errMsg = 'Failed to do retrieve python version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, True, 'Error')
+
+    #fetching platform architecture
+    try:
+        architecture = platform.architecture()[0]
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("platformArchitecture", architecture)
+    except Exception as e:
+        errMsg = 'Failed to do retrieve "platform architecture" with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
 
     try:

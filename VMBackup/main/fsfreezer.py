@@ -83,7 +83,7 @@ class FreezeHandler(object):
 
         self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time))
 
-        for i in range(0,(int(proc_sleep_time)/2)):
+        for i in range(0,(int(proc_sleep_time/2))):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)

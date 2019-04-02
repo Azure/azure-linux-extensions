@@ -14,6 +14,7 @@ class ExtensionErrorCodeEnum():
     error = 2
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
+    FailedRetryableSnapshotRateExceeded = 173
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
 
     FailedRetryableFsFreezeFailed = 201
@@ -47,6 +48,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
+            ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
