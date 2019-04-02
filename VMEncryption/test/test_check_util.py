@@ -6,6 +6,12 @@ from main import Common
 from StringIO import StringIO
 import console_logger
 
+class MockDistroPatcher:
+    def __init__(self, name, version, kernel):
+        self.distro_info = [None] * 2
+        self.distro_info[0] = name
+        self.distro_info[1] = version
+        self.kernel_version = kernel
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -68,26 +74,27 @@ class TestCheckUtil(unittest.TestCase):
 
     @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
     def test_fatal_checks(self, mock_exec):
+        mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.QueryEncryptionStatus
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "DATA",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.DisableEncryption
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
             Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormat
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.cutil.precheck_for_fatal_failures({
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -95,7 +102,7 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
             Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {})
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
@@ -104,12 +111,12 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-256',
             Common.CommonVariables.AADClientIDKey: "INVALIDKEY",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
-            })
+            }, mock_distro_patcher)
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "123",
             Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryption
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
         self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
@@ -117,7 +124,11 @@ class TestCheckUtil(unittest.TestCase):
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
             Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
-            }, { "os": "NotEncrypted" })
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
+        mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.4')
+        self.assertRaises(Exception, self.cutil.precheck_for_fatal_failures, {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, { "os": "NotEncrypted" }, mock_distro_patcher)
 
     def test_mount_scheme(self):
         proc_mounts_output = """
@@ -267,49 +278,95 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_memory_os_encryption, {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             }, { "os": "NotEncrypted" })
         try:
             self.cutil.validate_memory_os_encryption( {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             }, { "os": "Encrypted" })
         except Exception:
-            self.fail("validate_memory_os_encryption threw unexpected exception")
+            self.fail("validate_memory_os_encryption threw unexpected exception\nException message was:\n" + str(e))
         try:
             output = "8000000"
             os_popen.return_value = self.get_mock_filestream(output)
             self.cutil.validate_memory_os_encryption( {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             }, { "os": "Encrypted" })
         except Exception:
-            self.fail("validate_memory_os_encryption threw unexpected exception")
+            self.fail("validate_memory_os_encryption threw unexpected exception\nException message was:\n" + str(e))
         try:
             output = "8000000"
             os_popen.return_value = self.get_mock_filestream(output)
             self.cutil.validate_memory_os_encryption( {
             Common.CommonVariables.VolumeTypeKey: "ALL",
             Common.CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            Common.CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            Common.CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
             Common.CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+            Common.CommonVariables.AADClientIDKey: "00000000-0000-0000-0000-000000000000",
             Common.CommonVariables.EncryptionEncryptionOperationKey: Common.CommonVariables.EnableEncryptionFormatAll
             }, { "os": "NotEncrypted" })
         except Exception:
-            self.fail("validate_memory_os_encryption threw unexpected exception")
+            self.fail("validate_memory_os_encryption threw unexpected exception\nException message was:\n" + str(e))
+
+    def test_supported_os(self):
+        # test exception is raised for Ubuntu 14.04 kernel version
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('Ubuntu', '14.04', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is not raised for Ubuntu 14.04 kernel version 4.15
+        try:
+            self.cutil.is_supported_os( {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('Ubuntu', '14.04', '4.15'), {"os" : "NotEncrypted"})
+        except Exception as e:
+            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        # test exception is not raised for already encrypted OS volume
+        try:
+            self.cutil.is_supported_os( {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('Ubuntu', '14.04', '4.4'), {"os" : "Encrypted"})
+        except Exception as e:
+            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        # test exception is raised for unsupported OS
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('Ubuntu', '12.04', ''), {"os" : "NotEncrypted"})
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('redhat', '6.7', ''), {"os" : "NotEncrypted"})
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('centos', '7.9', ''), {"os" : "NotEncrypted"})
+        # test exception is not raised for supported OS
+        try:
+            self.cutil.is_supported_os( {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('Ubuntu', '18.04', ''), {"os" : "NotEncrypted"})
+        except Exception as e:
+            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        try:
+            self.cutil.is_supported_os( {
+            Common.CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('centos', '7.2.1511', ''), {"os" : "NotEncrypted"})
+        except Exception as e:
+            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        # test exception is not raised for DATA volume
+        try:
+            self.cutil.is_supported_os( {
+            Common.CommonVariables.VolumeTypeKey: "DATA"
+            }, MockDistroPatcher('SuSE', '12.4', ''), {"os" : "NotEncrypted"})
+        except Exception as e:
+            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))

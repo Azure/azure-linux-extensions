@@ -513,7 +513,7 @@ def enable():
 
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status)
+            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
