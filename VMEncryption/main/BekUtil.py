@@ -16,22 +16,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DiskUtil import *
-from Common import *
+from Common import TestHooks
 import base64
 import os.path
-import os
-import traceback
 
 """
 add retry-logic to the network api call.
 """
+
+
 class BekUtil(object):
-    """description of class"""
+    """
+    Utility functions related to the BEK VOLUME and BEK files
+    """
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
-        self.passphrase_device = None
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
 
     def generate_passphrase(self, algorithm):
@@ -44,70 +44,49 @@ class BekUtil(object):
             return passphrase_generated
 
     def store_bek_passphrase(self, encryption_config, passphrase):
+
         bek_filename = encryption_config.get_bek_filename()
 
-        if TestHooks.search_not_only_ide:
-            self.logger.log("TESTHOOK: search not only ide set")
-            azure_devices = self.disk_util.get_device_items(None)
+        try:
+            self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+            self.mount_bek_volume()
+
+            with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "w") as f:
+                f.write(passphrase)
+        except Exception as e:
+            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(str(e))
+            self.logger.log(message)
+            raise e
         else:
-            azure_devices = self.disk_util.get_azure_devices()
-
-        for azure_device in azure_devices:
-            fstype = str(azure_device.file_system).lower()
-            label = str(azure_device.label).lower()
-            # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
-            # the second word gets truncated
-            if fstype in ['vfat'] and label == 'bek':
-                try:
-                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
-                                                    self.bek_filesystem_mount_point,
-                                                    fstype)
-
-                    with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "w") as f:
-                        f.write(passphrase)
-                except Exception as e:
-                    message = "Failed to store BEK in {0} with error: {1}".format(azure_device, e)
-                    self.logger.log(message)
-                else:
-                    self.logger.log("Stored BEK in {0}".format(azure_device))
-                    return
-
-        raise Exception("Did not find BEK volume to store passphrase in")
+            self.logger.log("Stored BEK in the BEK VOLUME successfully")
+            return
 
     def get_bek_passphrase_file(self, encryption_config):
+        """
+        Returns the LinuxPassPhraseFileName path
+        """
+
         bek_filename = encryption_config.get_bek_filename()
 
-        if TestHooks.search_not_only_ide:
-            self.logger.log("TESTHOOK: search not only ide set")
-            azure_devices = self.disk_util.get_device_items(None)
-        else:
-            azure_devices = self.disk_util.get_azure_devices()
+        try:
+            self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+            self.mount_bek_volume()
 
-        for azure_device in azure_devices:
-            fstype = str(azure_device.file_system).lower()
-            label = str(azure_device.label).lower()
-            # disk label is actually "BEK VOLUME", but due to but in lsblk parsing
-            # the second word gets truncated
-            if fstype in ['vfat'] and label == 'bek':
-                try:
-                    self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
-                    self.disk_util.mount_filesystem(os.path.join('/dev/', azure_device.name),
-                                                    self.bek_filesystem_mount_point,
-                                                    fstype)
+            if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
+                return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
-                    if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
-                        return os.path.join(self.bek_filesystem_mount_point, bek_filename)
+            for file in os.listdir(self.bek_filesystem_mount_point):
+                if bek_filename in file:
+                    return os.path.join(self.bek_filesystem_mount_point, file)
 
-                    for file in os.listdir(self.bek_filesystem_mount_point):
-                        if bek_filename in file:
-                            return os.path.join(self.bek_filesystem_mount_point, file)
-
-                except Exception as e:
-                    message = "Failed to get BEK from {0} with error: {1}".format(azure_device, e)
-                    self.logger.log(message)
+        except Exception as e:
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
+            self.logger.log(message)
 
         return None
+
+    def mount_bek_volume(self):
+        self.disk_util.mount_by_label("BEK VOLUME", self.bek_filesystem_mount_point, "fmask=077")
 
     def umount_azure_passhprase(self, encryption_config, force=False):
         passphrase_file = self.get_bek_passphrase_file(encryption_config)

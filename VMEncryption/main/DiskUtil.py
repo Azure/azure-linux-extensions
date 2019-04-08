@@ -21,9 +21,7 @@ import json
 import os
 import os.path
 import re
-import shlex
-import sys
-from subprocess import *
+from subprocess import Popen
 import shutil
 import traceback
 import uuid
@@ -33,8 +31,8 @@ from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
-from CommandExecutor import *
-from Common import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -586,6 +584,18 @@ class DiskUtil(object):
             f.write('\n')
 
         self.logger.log("fstab updated successfully")
+
+    def mount_by_label(self, label, mount_point, option_string=None):
+        """
+        mount the BEK volume
+        """
+        self.make_sure_path_exists(mount_point)
+        if option_string is not None and option_string != "":
+            mount_cmd = self.distro_patcher.mount_path + ' -L "' + label + '" ' + mount_point + ' -o ' + option_string
+        else:
+            mount_cmd = self.distro_patcher.mount_path + ' -L "' + label + '" ' + mount_point
+
+        return self.command_executor.Execute(mount_cmd)
 
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """

@@ -48,6 +48,11 @@ class CommonVariables:
         <DiskEncryptionSettingsFile>{settings_file_name}</DiskEncryptionSettingsFile>
     </DiskEncryptionData>
     """
+    wireprotocol_msg_template_v3 = """<?xml version="1.0"?>
+    <DiskEncryptionData version="3.0">
+        <DiskEncryptionDetailsAsJson>{settings_json_blob}</DiskEncryptionDetailsAsJson>
+    </DiskEncryptionData>
+    """
 
     """
     disk/file system related
