@@ -33,8 +33,8 @@ class EncryptionSettingsUtil(object):
 
     def __init__(self, logger):
         self.logger = logger
-        self._CURRENT_DISK_ENCRYPTION_DATA_VERSION = "4.0"
-        self._PREVIOUS_DISK_ENCRYPTION_DATA_VERSION = "3.0"
+        self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
+        self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -187,14 +187,17 @@ class EncryptionSettingsUtil(object):
             protector_base64 = base64.standard_b64encode(protector)
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
+        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
+
         data = {
-            "DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
+            "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
             "DiskEncryptionOperation": "EnableEncryption",
             "KeyVaultUrl": kv_url,
             "KeyVaultResourceId": kv_id,
             "KekUrl": kek_url,
             "KekVaultResourceId": kek_kv_id,
             "KekAlgorithm": kek_algorithm,
+            "Protectors": protectors_name_only,
             "Disks": data_disks_settings_data
         }
 
@@ -245,10 +248,10 @@ class EncryptionSettingsUtil(object):
 
                     http_util.connection.close()
                     if result.status != httplib.OK and result.status != httplib.ACCEPTED:
-                        raise Exception("Encryption settings update request was not accepted")
+                        raise Exception("Encryption settings post request was not accepted")
                     return
                 else:
-                    raise Exception("No response from encryption settings update request")
+                    raise Exception("No response from encryption settings post request")
             except Exception as e:
                 retry_count += 1
                 self.logger.log("Encountered exception while posting encryption settings to Wire Server (attempt #{0}):\n{1}".format(str(retry_count), str(e)))
@@ -273,7 +276,7 @@ class EncryptionSettingsUtil(object):
         except Exception:
             self.logger.log("Falling back on old Wire Server protocol")
             data.pop("Protectors")
-            data["DiskEncryptionDataVersion"] = self._PREVIOUS_DISK_ENCRYPTION_DATA_VERSION
+            data["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
 
             self.write_settings_file(data)
             if not os.path.isfile(self.get_settings_file_path()):
@@ -316,7 +319,7 @@ class EncryptionSettingsUtil(object):
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
-        data = {"DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
+        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",

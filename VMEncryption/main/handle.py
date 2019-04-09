@@ -184,6 +184,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
     settings = EncryptionSettingsUtil(logger)
     new_protector_name = settings.get_new_protector_name()
     settings.create_protector_file(current_passphrase_file, new_protector_name)
+
     data = settings.get_settings_data(
         protector_name=new_protector_name,
         kv_url=extension_parameter.KeyVaultURL,

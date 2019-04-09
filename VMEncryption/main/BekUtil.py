@@ -33,6 +33,7 @@ class BekUtil(object):
         self.disk_util = disk_util
         self.logger = logger
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
+        self.bek_label = 'BEK VOLUME'
 
     def generate_passphrase(self, algorithm):
         if TestHooks.use_hard_code_passphrase:
@@ -86,7 +87,7 @@ class BekUtil(object):
         return None
 
     def mount_bek_volume(self):
-        self.disk_util.mount_by_label("BEK VOLUME", self.bek_filesystem_mount_point, "fmask=077")
+        self.disk_util.mount_by_label(self.bek_label, self.bek_filesystem_mount_point, "fmask=077")
 
     def umount_azure_passhprase(self, encryption_config, force=False):
         passphrase_file = self.get_bek_passphrase_file(encryption_config)
