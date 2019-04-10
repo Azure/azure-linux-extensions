@@ -22,9 +22,11 @@ import os
 import os.path
 import urlparse
 import re
+import json
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
+from distutils.version import LooseVersion
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -242,13 +244,43 @@ class CheckUtil(object):
             if self.is_insufficient_memory():
                 raise Exception("Not enough memory for enabling encryption on OS volume. 8 GB memory is recommended.")
 
-    def precheck_for_fatal_failures(self, public_settings, encryption_status):
+    def is_supported_os(self, public_settings, DistroPatcher, encryption_status):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
+            self.logger.log("Query encryption operation detected. Skipping OS encryption validation check.")
+            return
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        # If volume type is data allow the operation (At this point we are sure a patch file for the distro exist)
+        if volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("Volume Type is DATA. Skipping OS encryption validation check.")
+            return
+        # If OS volume is already encrypted just return (Should not break already encryted VM's)
+        if encryption_status["os"] != "NotEncrypted":
+            self.logger.log("OS volume already encrypted. Skipping OS encryption validation check.")
+            return
+        distro_name = DistroPatcher.distro_info[0]
+        distro_version = DistroPatcher.distro_info[1]
+        supported_os_file = os.path.join(os.getcwd(), 'main/SupportedOS.json')
+        with open(supported_os_file) as json_file:
+            data = json.load(json_file)
+            if distro_name in data:
+                versions = data[distro_name]
+                for version in versions:
+                    if distro_version.startswith(version['Version']):
+                        if 'Kernel' in version and LooseVersion(DistroPatcher.kernel_version) < LooseVersion(version['Kernel']):
+                            raise Exception('Kernel version {0} is not supported. Upgrade to kernel version {1}'.format(DistroPatcher.kernel_version, version['Kernel']))
+                        else:
+                            return
+            raise Exception('Distro {0} {1} is not supported for OS encryption'.format(distro_name, distro_version))
+
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
         self.validate_lvm_os(public_settings)
         self.validate_vfat()
         self.validate_memory_os_encryption(public_settings, encryption_status)
+        self.is_supported_os(public_settings, DistroPatcher, encryption_status)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """

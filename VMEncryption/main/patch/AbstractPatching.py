@@ -52,6 +52,7 @@ class AbstractPatching(object):
         self.openssl_path = '/usr/bin/openssl'
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/usr/bin/umount'
+        self.kernel_version = platform.release()
 
     def install_cryptsetup(self):
         pass
