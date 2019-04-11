@@ -291,11 +291,8 @@ class FreezeSnapshotter(object):
 
         time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
 
-        if(run_result != CommonVariables.success and all_snapshots_failed):
+        if(all_snapshots_failed):
             run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
-
-        if all_failed and run_result != CommonVariables.success:
-            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
 
         return run_result, run_status, blob_snapshot_info_array, all_failed
 
