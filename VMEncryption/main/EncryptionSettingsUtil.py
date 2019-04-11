@@ -85,7 +85,7 @@ class EncryptionSettingsUtil(object):
 
     def get_settings_file_path(self):
         """get the full path to the current encryption settings file"""
-        return os.path(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
+        return os.path.join(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
 
     def get_settings_file_name(self):
         """get the base file name of the current encryption settings file"""

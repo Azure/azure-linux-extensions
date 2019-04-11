@@ -1366,7 +1366,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
             continue
         if disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type()):
             continue
-        if device_item.name == bek_util.passphrase_device:
+        if device_item.label == "BEK":
             logger.log("skip for the passphrase disk {0}".format(device_item))
             continue
 
