@@ -145,6 +145,9 @@ class SplitRootPartitionState(OSEncryptionState):
                                                   type=parted.PARTITION_NORMAL,
                                                   geometry=desired_boot_partition_geometry)
 
+        if (root_partition.getFlag(parted.PARTITION_BOOT)):
+            desired_boot_partition.setFlag(parted.PARTITION_BOOT)
+
         disk.addPartition(partition=desired_boot_partition, constraint=boot_partition_constraint)
 
         disk.commit()
@@ -152,12 +155,6 @@ class SplitRootPartitionState(OSEncryptionState):
         probed_root_fs = parted.probeFileSystem(desired_root_partition_geometry)
         if not probed_root_fs == 'ext4':
             raise Exception("Probed root fs is not ext4")
-
-        root_partition = disk.getPartitionByPath(os.path.realpath(self.rootfs_block_device))
-        if (root_partition.getFlag(parted.PARTITION_BOOT)):
-            boot_partition = disk.getPartitionByPath(os.path.realpath(self.bootfs_block_device))
-            boot_partition.setFlag(parted.PARTITION_BOOT)
-            disk.commit()
 
         self.command_executor.Execute("partprobe", True)
         self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
