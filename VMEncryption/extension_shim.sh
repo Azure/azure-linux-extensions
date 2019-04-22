@@ -115,5 +115,12 @@ else
     fi
 fi
 
+${PYTHON} main/Utils/WAAgentUtil.py
+
+if [ $? -ne 0 ]; then
+    echo "Cannot locate waagent. Please verify if this Distro is supported by Azure Disk Encryption"
+    exit 52 # Missing Dependency
+fi
+
 ${PYTHON} ${COMMAND} ${operation} 2>&1
 # DONE
