@@ -236,6 +236,8 @@ def telemetry():
 
     watcher_thread.join()
     self_mon_thread.join()
+ 
+    return 0, ""   
 
 def prepare_update():
     """
@@ -252,7 +254,7 @@ def prepare_update():
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
 
-    return 0
+    return 0, ""
 
 def restore_state(workspaceId):
     """
@@ -562,7 +564,7 @@ def disable():
         return 1
 
     exit_code, output = run_command_and_log(DisableOMSAgentServiceCommand)
-    return exit_code
+    return exit_code, output
 
 
 # Dictionary of operations strings to methods
