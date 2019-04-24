@@ -2,7 +2,7 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.EnterpriseCloud.Monitoring</ProviderNameSpace>
   <Type>OmsAgentForLinux</Type>
-  <Version>1.9.1</Version>
+  <Version>1.10.1</Version>
   <Label>Microsoft Operations Management Suite Agent for Linux</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>

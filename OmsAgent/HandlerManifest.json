@@ -1,7 +1,7 @@
 [
   {
     "name":  "OmsAgentForLinux",
-    "version": "1.9.1",
+    "version": "1.10.1",
     "handlerManifest": {
       "installCommand": "omsagent.py -install",
       "uninstallCommand": "omsagent.py -uninstall",
