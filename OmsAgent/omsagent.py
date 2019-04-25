@@ -984,7 +984,7 @@ def run_command_with_retries(cmd, retries, retry_check, final_check = None,
 
     return exit_code
 
-    def run_command_with_retries_output(cmd, retries, retry_check, final_check = None,
+def run_command_with_retries_output(cmd, retries, retry_check, final_check = None,
                              check_error = True, log_cmd = True,
                              initial_sleep_time = InitialRetrySleepSeconds,
                              sleep_increase_factor = 1):
