@@ -882,7 +882,7 @@ class DiskUtil(object):
         }
 
         mount_items = self.get_mount_items()
-        device_items = self.get_device_items()
+        device_items = self.get_device_items(None)
         device_items_dict = {di.mount_point: di for di in device_items}
 
         os_drive_encrypted = False
@@ -898,9 +898,11 @@ class DiskUtil(object):
 
         special_azure_devices_to_skip = self.get_azure_devices()
         for mount_item in mount_items:
-            device_item = device_items_dict[mount_item["src"]]
+            device_item = device_items_dict.get(mount_item["dest"])
 
-            if self.is_data_disk(device_item, special_azure_devices_to_skip):
+            if device_item is not None and \
+               mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
+               self.is_data_disk(device_item, special_azure_devices_to_skip):
                 data_drives_found = True
 
                 if not device_item.type == "crypt":
