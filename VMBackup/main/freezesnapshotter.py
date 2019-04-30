@@ -159,6 +159,8 @@ class FreezeSnapshotter(object):
                         error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                         self.logger.log(error_msg, True, 'Error')
                         break
+                    elif blob_snapshot_info.isSuccessful == False and not all_failed:
+                        any_failed = True
                 elif blob_snapshot_info != None and blob_snapshot_info.isSuccessful == False:
                     any_failed = True
 
