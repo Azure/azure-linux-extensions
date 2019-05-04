@@ -4,7 +4,7 @@ Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboar
 Latest version is 1.9.1.
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
+* [Learn more: Azure Virtual Machine Extensions](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux)
 
 OmsAgent Extension can:
 * Install the omsagent
