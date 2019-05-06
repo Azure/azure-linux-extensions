@@ -84,7 +84,25 @@ def init_distro_specific_actions():
     global g_dist_config, RunGetOutput
     dist = platform.dist()
     try:
-        g_dist_config = DistroSpecific.get_distro_actions(dist[0], dist[1], hutil.log)
+        if dist[0] != '':
+            name = dist[0]
+            version = dist[1]
+        else:
+            try:
+                # platform.dist() in python 2.7.15 does not recognize SLES/OpenSUSE.
+                with open("/etc/os-release") as fp:
+                    line = fp.readline()
+                    name = line.split("=")[1]
+                    name = name.split(" ")[0]
+                    name = name.replace("\"", "").replace("\n", "")
+                    line = fp.readline()
+                    version = line.split("=")[1]
+                    version = version.split(".")[0]
+                    version = version.replace("\"", "").replace("\n", "")
+            except:
+                raise
+
+        g_dist_config = DistroSpecific.get_distro_actions(name.lower(), version, hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
     except exceptions.LookupError as ex:
         hutil.error("os version: {0}:{1} not supported".format(dist[0], dist[1]))
