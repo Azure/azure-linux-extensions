@@ -326,6 +326,7 @@ DistroMap = {
     'centos': CentosActions, 
     'oracle': RedhatActions,
     'SuSE:12': Suse12Actions,
+    'SuSE': Suse12Actions,
     'sles:15': Suse12Actions,
     'opensuse:15':Suse12Actions
 }

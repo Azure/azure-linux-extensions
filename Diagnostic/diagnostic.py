@@ -83,22 +83,25 @@ def init_distro_specific_actions():
     # TODO Exit immediately if distro is unknown
     global g_dist_config, RunGetOutput
     dist = platform.dist()
+    name = ''
+    version = ''
     try:
         if dist[0] != '':
             name = dist[0]
             version = dist[1]
         else:
             try:
-                # platform.dist() in python 2.7.15 does not recognize SLES/OpenSUSE.
-                with open("/etc/os-release") as fp:
-                    line = fp.readline()
-                    name = line.split("=")[1]
-                    name = name.split(" ")[0]
-                    name = name.replace("\"", "").replace("\n", "")
-                    line = fp.readline()
-                    version = line.split("=")[1]
-                    version = version.split(".")[0]
-                    version = version.replace("\"", "").replace("\n", "")
+                # platform.dist() in python 2.7.15 does not recognize SLES/OpenSUSE 15.
+                with open("/etc/os-release", "r") as fp:
+                    for line in fp:
+                        if line.startswith("ID="):
+                            name = line.split("=")[1]
+                            name = name.split("-")[0]
+                            name = name.replace("\"", "").replace("\n", "")
+                    elif line.startswith("VERSION_ID="):
+                            version = line.split("=")[1]
+                            version = version.split(".")[0]
+                            version = version.replace("\"", "").replace("\n", "")
             except:
                 raise
 
