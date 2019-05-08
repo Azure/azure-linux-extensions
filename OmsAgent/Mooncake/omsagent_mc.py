@@ -425,7 +425,7 @@ def enable():
         os.chown(etc_final_path, uid, gid)
         
         # octal numbers are represented differently in python 3
-        if sys.version_info.major > 2:
+        if sys.version_info >= (3,):
             os.chmod(etc_final_path, 0o750)
         else:    
             os.chmod(etc_final_path, 0750)
@@ -433,16 +433,16 @@ def enable():
         for root, dirs, files in os.walk(etc_final_path):
             for d in dirs:
                 os.chown(os.path.join(root, d), uid, gid)
-                if sys.version_info.major > 2:
+                if sys.version_info >= (3,):
                     os.chmod(os.path.join(root, d), 0o750)
                 else:    
                     os.chmod(os.path.join(root, d), 0750)                
             for f in files:
                 os.chown(os.path.join(root, f), uid, gid)                  
-                if sys.version_info.major > 2:
+                if sys.version_info >= (3,):
                     os.chmod(os.path.join(root, f), 0o640)
                 else:    
-                    os.chmod(os.path.join(root, f), 0640)                  
+                    os.chmod(os.path.join(root, f), 0640)                           
 
     if exit_code is 0:
         # Create a marker file to denote the workspace that was
