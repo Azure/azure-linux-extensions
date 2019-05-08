@@ -100,9 +100,10 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
+    @mock.patch('main.check_util.CheckUtil.validate_memory_os_encryption')
     @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
     @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
-    def test_fatal_checks(self, mock_is_vmss, mock_exec):
+    def test_fatal_checks(self, mock_is_vmss, mock_exec, mock_validate_memory):
         mock_is_vmss.return_value = False
         mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
         self.cutil.precheck_for_fatal_failures({
