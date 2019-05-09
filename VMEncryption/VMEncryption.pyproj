@@ -67,6 +67,7 @@
     <Compile Include="main\patch\debianPatching.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\ResourceDiskUtil.py" />
     <Compile Include="main\TransactionalCopyTask.py">
       <SubType>Code</SubType>
     </Compile>
@@ -154,7 +155,7 @@
     <Compile Include="setup.py" />
     <Compile Include="test\console_logger.py" />
     <Compile Include="test\test_check_util.py" />
-    <Compile Include="test\test_ResourceDiskUtil.py" />
+    <Compile Include="test\test_resource_disk_util.py" />
     <Compile Include="test\__init__.py" />
   </ItemGroup>
   <ItemGroup>

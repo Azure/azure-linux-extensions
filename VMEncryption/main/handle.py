@@ -416,7 +416,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
     # mount encrypted resource disk
     volume_type = encryption_config.get_volume_type().lower()
     if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, get_public_settings())
         resource_disk_util.automount()
         logger.log("mounted encrypted resource disk")
 
@@ -1600,6 +1600,7 @@ def daemon_encrypt():
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
             disk_util.log_lsblk_output()
+            mount_encrypted_disks(disk_util, bek_util, bek_passphrase_file, encryption_config)
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
