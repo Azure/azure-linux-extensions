@@ -25,6 +25,7 @@ import sys
 from inspect import ismethod
 from time import sleep
 from OSEncryptionState import *
+from distutils.version import LooseVersion
 
 class EncryptBlockDeviceState(OSEncryptionState):
     def __init__(self, context):
@@ -56,7 +57,12 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                             status_code=str(CommonVariables.success),
                                             message='OS disk encryption started')
 
-        self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt bs=52428800'.format(self.rootfs_block_device), True)
+        # Enable used space encryption on RHEL 7.3 and above
+        distro_info = self.context.distro_patcher.distro_info
+        if distro_info[0] == 'redhat' and LooseVersion(distro_info[1]) >= LooseVersion('7.3'):
+            self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt conv=sparse bs=64K'.format(self.rootfs_block_device), True)
+        else:
+            self.command_executor.Execute('dd if={0} of=/dev/mapper/osencrypt bs=52428800'.format(self.rootfs_block_device), True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit encrypt_block_device state")
