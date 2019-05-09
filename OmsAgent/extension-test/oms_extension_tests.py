@@ -45,7 +45,8 @@ images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180'
          'centos7': 'OpenLogic:CentOS:7.5:latest',
          'oracle6': 'Oracle:Oracle-Linux:6.9:latest',
          'oracle7': 'Oracle:Oracle-Linux:7.5:latest',
-         'suse12': 'SUSE:SLES:12-SP2:latest'}
+         'sles12': 'SUSE:SLES:12-SP3:latest',
+         'sles15': 'SUSE:SLES:15:latest'}
 
 vmnames = []
 images = {}
@@ -74,7 +75,7 @@ if vms_list:
 else:
     images = images_list
 
-print "List of VMs & Image Sources added for testing: {}".format(images)
+print("List of VMs & Image Sources added for testing: {}".format(images))
 
 with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
     parameters = f.read()
@@ -89,8 +90,8 @@ username = parameters['username']
 nsg = parameters['nsg']
 nsg_resource_group = parameters['nsg resource group']
 size = parameters['size'] # Preferred: 'Standard_B1ms'
-extension = parameters['extension'] # OmsAgentForLinux
-publisher = parameters['publisher'] # Microsoft.EnterpriseCloud.Monitoring
+extension = 'OmsAgentForLinux'
+publisher = 'Microsoft.EnterpriseCloud.Monitoring'
 key_vault = parameters['key vault']
 subscription = str(json.loads(subprocess.check_output('az keyvault secret show --name subscription-id --vault-name {0}'.format(key_vault), shell=True))["value"])
 workspace_id = str(json.loads(subprocess.check_output('az keyvault secret show --name workspace-id --vault-name {0}'.format(key_vault), shell=True))["value"])
@@ -102,6 +103,15 @@ ssh_private = parameters['ssh private']
 ssh_public = ssh_private + '.pub'
 if parameters['old version']:
     old_version = parameters['old version']
+
+# Sometimes Azure VM images become unavailable or are unavailable in certain regions, lets check...
+for distname, image in images.iteritems():
+    img_publisher, _, sku, _ = image.split(':')
+    if subprocess.check_output('az vm image list --all --location {0} --publisher {1} --sku {2}'.format(location, img_publisher, sku), shell=True) == '[]\n':
+        print('Could not find image for {0} in {1}, please double check VM image availability'.format(distname, location))
+        exit()
+    else:
+        print('VM image availability successfully validated')
 
 # Detect the host system and validate nsg
 if system() == 'Windows':
@@ -115,6 +125,8 @@ else:
 If there is no Network Security Group, please create new one. NSG is a must to create a VM in this testing.""")
     exit()
 
+# Remove intermediate log and html files
+os.system('rm -rf ./*.log ./*.html ./results 2> /dev/null')
 
 result_html_file = open("finalresult.html", 'a+')
 
