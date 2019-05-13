@@ -174,7 +174,7 @@ class DiskUtil(object):
                     continue
 
                 if not os.path.exists(azure_crypt_mount_backup_location):
-                    self.logger.log(msg=("MountPoint info not found for {0}", device_item_real_path), level=CommonVariables.ErrorLevel)
+                    self.logger.log(msg=("MountPoint info not found for" + device_item_real_path), level=CommonVariables.ErrorLevel)
                     # Not sure when this happens..
                     # in this case also, just add an entry to the azure_crypt_mount without a mount point.
                     self.add_crypt_item(crypt_item)

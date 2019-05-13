@@ -49,7 +49,7 @@ class ResourceDiskUtil(object):
         encryption_operation = self.public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if encryption_operation in [CommonVariables.EnableEncryptionFormatAll]:
             return True
-        self.logger.log("unable to identify current encryption operation")
+        self.logger.log("Current encryption operation is not EnableEncryptionFormatAll")
         return False
 
     def _is_luks_device(self):
@@ -146,10 +146,11 @@ class ResourceDiskUtil(object):
         """
         device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
         device_mappers = []
+        mapper_device_types = ["raid0","raid1","raid5","raid10","lvm"]
         for device_item in device_items:
             # fstype should be crypto_LUKS
             dev_path = self.disk_util.get_device_path(device_item.name)
-            if dev_path and dev_path.startswith("/dev/mapper"):
+            if device_item.type in mapper_device_types:
                 device_mappers.append(device_item)
                 self.logger.log('Found device mapper: ' + dev_path, level='Info')
         return device_mappers
@@ -181,7 +182,7 @@ class ResourceDiskUtil(object):
                     something_closed = True
                 else:
                     # try a dmsetup remove, in case its non-crypt device mapper (lvm, raid, something we don't know)
-                    cmd = 'dmsetup remove ' + self.disk_util.get_device_path(dm_item)
+                    cmd = 'dmsetup remove ' + self.disk_util.get_device_path(dm_item.name)
                     if self.executor.Execute(cmd) == CommonVariables.process_success:
                         something_closed = True
                     else:

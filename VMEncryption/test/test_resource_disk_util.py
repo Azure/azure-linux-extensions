@@ -32,7 +32,7 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.logger = ConsoleLogger()
         self.mock_disk_util = mock.create_autospec(DiskUtil)
         self.mock_passhprase_filename = "mock_passphrase_filename"
-        mock_public_settings = {}  # update this before tests
+        mock_public_settings = {}
         self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_passhprase_filename, mock_public_settings)
 
     def _test_resource_disk_partition_dependant_method(self, method, mock_partition_exists, mock_execute):
