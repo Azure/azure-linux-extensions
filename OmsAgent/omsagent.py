@@ -81,7 +81,7 @@ EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
-EnableCalledBeforeSuccessfulInstall = 9
+EnableCalledBeforeSuccessfulInstall = 52 # since install is a missing dependency
 UnsupportedOpenSSL = 55 #60, temporary as it excludes from SLA
 # OneClick error codes
 OneClickErrorCode = 40
