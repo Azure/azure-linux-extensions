@@ -234,7 +234,16 @@ def update_encryption_settings():
     logger.log('Updating encryption settings')
 
     # ensure cryptsetup package is still available in case it was for some reason removed after enable
-    DistroPatcher.install_cryptsetup()
+    try:
+        DistroPatcher.install_cryptsetup()
+    except Exception as e:
+        message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        hutil.do_exit(exit_code=CommonVariables.missing_dependency,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.missing_dependency),
+                      message=message)
+
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
