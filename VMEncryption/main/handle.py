@@ -87,16 +87,6 @@ def disable_encryption():
     decryption_marker = DecryptionMarkConfig(logger, encryption_environment)
     executor = CommandExecutor(logger)
 
-    if decryption_marker.config_file_exists():
-        logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
-        start_daemon('DisableEncryption')
-
-        hutil.do_exit(exit_code=0,
-                      operation='DisableEncryption',
-                      status=CommonVariables.extension_success_status,
-                      code=str(CommonVariables.success),
-                      message='Decryption started')
-
     exit_status = {
         'operation': 'DisableEncryption',
         'status': CommonVariables.extension_success_status,
@@ -160,7 +150,16 @@ def disable_encryption():
 
         bek_util.store_bek_passphrase(encryption_config, '')
 
-        executor.Execute("reboot")
+        bek_util.delete_bek_passphrase_file(encryption_config)
+
+        if decryption_marker.config_file_exists():
+            logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
+            start_daemon('DisableEncryption')
+            hutil.do_exit(exit_code=0,
+                          operation='DisableEncryption',
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message='Decryption started')
 
     except Exception as e:
         message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -1843,7 +1842,7 @@ def daemon_decrypt():
                           code=CommonVariables.encryption_failed,
                           message='Decryption failed for {0}'.format(failed_item))
         else:
-            encryption_config.clear_config()
+            encryption_config.clear_config(clear_parameter_file=True)
             logger.log("clearing the decryption mark after successful decryption")
             decryption_marker.clear_config()
 

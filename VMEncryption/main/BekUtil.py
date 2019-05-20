@@ -93,3 +93,13 @@ class BekUtil(object):
         passphrase_file = self.get_bek_passphrase_file(encryption_config)
         if force or (passphrase_file and os.path.exists(passphrase_file)):
             self.disk_util.umount(self.bek_filesystem_mount_point)
+
+    def delete_bek_passphrase_file(self, encryption_config):
+        bek_filename = encryption_config.get_bek_filename()
+        bek_file = self.get_bek_passphrase_file(encryption_config)
+        if not bek_file:
+            return
+        bek_dir = os.path.dirname(bek_file)
+        for file in os.listdir(bek_dir):
+            if bek_filename in file:
+                os.remove(os.path.join(bek_dir, file))
