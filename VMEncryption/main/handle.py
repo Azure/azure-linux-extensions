@@ -928,7 +928,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
 
-            if not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]:
+            if not ongoing_item_config.get_file_system().lower() in CommonVariables.inplace_supported_file_systems:
                 logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
                            level=CommonVariables.WarningLevel)
 

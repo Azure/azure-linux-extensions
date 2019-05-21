@@ -77,14 +77,8 @@ class DiskUtil(object):
 
     def format_disk(self, dev_path, file_system):
         mkfs_command = ""
-        if file_system == "ext4":
-            mkfs_command = "mkfs.ext4"
-        elif file_system == "ext3":
-            mkfs_command = "mkfs.ext3"
-        elif file_system == "xfs":
-            mkfs_command = "mkfs.xfs"
-        elif file_system == "btrfs":
-            mkfs_command = "mkfs.btrfs"
+        if file_system in CommonVariables.format_supported_file_systems:
+            mkfs_command = "mkfs." + file_system
         mkfs_cmd = "{0} {1}".format(mkfs_command, dev_path)
         return self.command_executor.Execute(mkfs_cmd)
 
@@ -883,7 +877,7 @@ class DiskUtil(object):
 
         mount_items = self.get_mount_items()
         device_items = self.get_device_items(None)
-        device_items_dict = {di.mount_point: di for di in device_items}
+        device_items_dict = {device_item.mount_point: device_item for device_item in device_items}
 
         os_drive_encrypted = False
         data_drives_found = False
@@ -901,7 +895,7 @@ class DiskUtil(object):
             device_item = device_items_dict.get(mount_item["dest"])
 
             if device_item is not None and \
-               mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
+               mount_item["fs"] in CommonVariables.format_supported_file_systems and \
                self.is_data_disk(device_item, special_azure_devices_to_skip):
                 data_drives_found = True
 
@@ -1338,7 +1332,7 @@ class DiskUtil(object):
         if device_item.device_id.startswith('00000000-0000'):
             self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
             return False
-        # Resource Disk. Not considered a "data disk" exactly (is not attached via portal and we have a separate code path for encyrpting it)
+        # Resource Disk. Not considered a "data disk" exactly (is not attached via portal and we have a separate code path for encrypting it)
         if device_item.device_id.startswith('00000000-0001'):
             self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
             return False
