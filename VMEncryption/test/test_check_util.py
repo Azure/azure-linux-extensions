@@ -72,8 +72,9 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: ""})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "123"})
 
+    @mock.patch('main.check_util.CheckUtil.validate_memory_os_encryption')
     @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
-    def test_fatal_checks(self, mock_exec):
+    def test_fatal_checks(self, mock_exec, mock_validate_memory):
         mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
         self.cutil.precheck_for_fatal_failures({
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.QueryEncryptionStatus
