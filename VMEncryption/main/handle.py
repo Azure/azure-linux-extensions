@@ -1491,10 +1491,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         def raw_device_item_match(device_item):
             sdx_device_name = os.path.join("/dev/", device_item.name)
-            if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
-                return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
-            else:
-                return crypt_item.dev_path == sdx_device_name
+            return os.path.realpath(sdx_device_name) == os.path.realpath(crypt_item.dev_path)
 
         def mapped_device_item_match(device_item):
             return crypt_item.mapper_name == device_item.name
@@ -1847,7 +1844,7 @@ def daemon_decrypt():
                           code=CommonVariables.encryption_failed,
                           message='Decryption failed for {0}'.format(failed_item))
         else:
-            encryption_config.clear_config()
+            encryption_config.clear_config(clear_parameter_file=True)
             logger.log("clearing the decryption mark after successful decryption")
             decryption_marker.clear_config()
 
