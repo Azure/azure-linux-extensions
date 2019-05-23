@@ -430,7 +430,7 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+    resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, get_public_settings())
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
@@ -1573,6 +1573,10 @@ def daemon_encrypt():
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
             disk_util.log_lsblk_output()
+            mount_encrypted_disks(disk_util=disk_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=bek_passphrase_file)
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():

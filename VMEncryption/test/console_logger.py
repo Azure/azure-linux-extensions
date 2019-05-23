@@ -17,14 +17,15 @@
 # *********************************************************
 
 import os
-import string
 import json
+
 
 class HandlerContext:
     def __init__(self, name):
         self._name = name
         self._version = '0.0'
         return
+
 
 class ConsoleLogger(object):
     def __init__(self):
@@ -38,4 +39,4 @@ class ConsoleLogger(object):
         print(log_msg)
 
     def error(self, msg):
-        log(msg,'Error')
+        self.log(msg, 'Error')

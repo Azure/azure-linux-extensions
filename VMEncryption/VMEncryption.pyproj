@@ -153,9 +153,8 @@
     <Compile Include="setup.py" />
     <Compile Include="test\console_logger.py" />
     <Compile Include="test\test_check_util.py" />
-    <Compile Include="test\test_DiskUtil.py" />
-    <Compile Include="test\test_MetadataUtil.py" />
-    <Compile Include="test\test_ResourceDiskUtil.py" />
+    <Compile Include="test\test_encryption_settings_util.py" />
+    <Compile Include="test\test_resource_disk_util.py" />
     <Compile Include="test\__init__.py" />
   </ItemGroup>
   <ItemGroup>
