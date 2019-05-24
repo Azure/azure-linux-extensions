@@ -621,13 +621,25 @@ def is_vm_supported_for_extension():
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'] #SLES
+                       'suse' : ['12', '15'] # SLES
     }
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
         vm_dist, vm_ver, vm_id = platform.dist()
+
+    if not vm_dist and not vm_ver: # SLES 15
+        with open('/etc/os-release', 'r') as fp:
+            for line in fp:
+                if line.startswith('ID='):
+                    name = line.split('=')[1]
+                    name = name.split('-')[0]
+                    name = name.replace('\"', '').replace('\n', '')
+            elif line.startswith('VERSION_ID='):
+                    version = line.split('=')[1]
+                    version = version.split('.')[0]
+                    version = version.replace('\"', '').replace('\n', '')
 
     vm_supported = False
 

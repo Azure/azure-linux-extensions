@@ -80,12 +80,24 @@ def is_vm_supported_for_extension():
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12']} #SLES
+                       'suse' : ['12', '15']} # SLES
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
         vm_dist, vm_ver, vm_id = platform.dist()
+
+    if not vm_dist and not vm_ver: # SLES 15
+        with open('/etc/os-release', 'r') as fp:
+            for line in fp:
+                if line.startswith('ID='):
+                    name = line.split('=')[1]
+                    name = name.split('-')[0]
+                    name = name.replace('\"', '').replace('\n', '')
+            elif line.startswith('VERSION_ID='):
+                    version = line.split('=')[1]
+                    version = version.split('.')[0]
+                    version = version.replace('\"', '').replace('\n', '')
 
     vm_supported = False
 
@@ -515,9 +527,9 @@ def copy_oms_logs():
     split_name = vm_dist.split(' ')
     split_ver = vm_ver.split('.')
     if vm_dist.startswith('Red Hat'):
-        omslogfile = '/home/scratch/{0}-omsagent.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
+        omslogfile = '/home/scratch/{0}-omsagent.log'.format((split_name[0]+split_name[1]).lower() + split_ver[0])
     else:
-        omslogfile = '/home/scratch/{0}-omsagent.log'.format(split_name[0].lower()+split_ver[0])
+        omslogfile = '/home/scratch/{0}-omsagent.log'.format(split_name[0].lower() + split_ver[0])
     omslogfileOpen = open(omslogfile, 'a+')
     omsagent_file = '/var/opt/microsoft/omsagent/{0}/log/omsagent.log'.format(workspace_id)
     write_log_command(omslogfileOpen, '\n OmsAgent Logs:\n')
@@ -528,9 +540,9 @@ def copy_extension_logs():
     split_name = vm_dist.split(' ')
     split_ver = vm_ver.split('.')
     if vm_dist.startswith('Red Hat'):
-        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format((split_name[0]+split_name[1]).lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format((split_name[0]+split_name[1]).lower() + split_ver[0])
     else:
-        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format(split_name[0].lower()+split_ver[0])
+        extlogfile = '/home/scratch/{0}-extnwatcher.log'.format(split_name[0].lower() + split_ver[0])
 
     extlogfileOpen = open(extlogfile, 'a+')
     oms_azure_ext_dir = '/var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/'
