@@ -27,6 +27,7 @@ from Common import *
 from ConfigParser import ConfigParser
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
+import os.path
 
 # parameter format should be like this:
 #{"command":"enableencryption","query":[{"source_scsi_number":"[5:0:0:0]","target_scsi_number":"[5:0:0:2]"},{"source_scsi_number":"[5:0:0:1]","target_scsi_number":"[5:0:0:3]"}],
@@ -198,8 +199,10 @@ class ExtensionParameter(object):
             self.logger.log('Current config KeyEncryptionAlgorithm {0} differs from effective config KeyEncryptionAlgorithm {1}'.format(self.KeyEncryptionAlgorithm, self.get_kek_algorithm()))
             return True
 
-        bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
-        bek_passphrase = file(bek_passphrase_file).read()
+        bek_passphrase_file_name = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        bek_passphrase = None
+        if bek_passphrase_file_name is not None and os.path.exists(bek_passphrase_file_name):
+            bek_passphrase = file(bek_passphrase_file_name).read()
 
         if (self.passphrase and bek_passphrase) and \
            (self.passphrase != bek_passphrase):
