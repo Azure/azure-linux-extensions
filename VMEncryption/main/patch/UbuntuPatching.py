@@ -62,7 +62,11 @@ class UbuntuPatching(AbstractPatching):
         # If install fails, try running apt-get update and then try install again
         if return_code != 0:
             self.logger.log('python-pip installation failed. Retrying installation after running update')
-            self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update', timeout=30)
+            # Fail early if apt-get update times out.
+            if return_code == -9:
+                msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
+                raise Exception(msg)
             self.command_executor.Execute('apt-get install -y python-pip')
         self.command_executor.Execute('python -m pip install --upgrade pip')
         self.command_executor.Execute('python -m pip install --upgrade setuptools')
@@ -86,7 +90,11 @@ class UbuntuPatching(AbstractPatching):
         # If install fails, try running apt-get update and then try install again
         if return_code != 0:
             self.logger.log('prereq packages installation failed. Retrying installation after running update')
-            self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            # Fail early if apt-get update times out.
+            if return_code == -9:
+                msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
+                raise Exception(msg)
             cmd = " ".join(['apt-get', 'install', '-y'] + packages)
             self.command_executor.Execute(cmd)
         
