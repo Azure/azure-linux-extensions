@@ -98,7 +98,7 @@ def init_distro_specific_actions():
                             name = line.split("=")[1]
                             name = name.split("-")[0]
                             name = name.replace("\"", "").replace("\n", "")
-                    elif line.startswith("VERSION_ID="):
+                        elif line.startswith("VERSION_ID="):
                             version = line.split("=")[1]
                             version = version.split(".")[0]
                             version = version.replace("\"", "").replace("\n", "")
