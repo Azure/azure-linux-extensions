@@ -637,9 +637,9 @@ def is_vm_supported_for_extension():
                     name = name.split('-')[0]
                     name = name.replace('\"', '').replace('\n', '')
                 elif line.startswith('VERSION_ID='):
-                        version = line.split('=')[1]
-                        version = version.split('.')[0]
-                        version = version.replace('\"', '').replace('\n', '')
+                    version = line.split('=')[1]
+                    version = version.split('.')[0]
+                    version = version.replace('\"', '').replace('\n', '')
 
     vm_supported = False
 
