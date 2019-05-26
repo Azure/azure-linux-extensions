@@ -318,15 +318,15 @@ class CentosActions(RedhatActions):
 DistroMap = {
     'debian': CredativActions,  # Credative Debian Linux took the 'debian' platform name with the curl deficiency,
                                 # when all other Debian-based distros have curl, so is this strange mapping...
-    'Kali': DebianActions,
-    'Ubuntu': DebianActions, 
-    'Ubuntu:16.04': Ubuntu1510OrHigherActions, 
-    'Ubuntu:18.04': Ubuntu1510OrHigherActions,
-    'redhat': RedhatActions, 
-    'centos': CentosActions, 
+    'kali': DebianActions,
+    'ubuntu': DebianActions,
+    'ubuntu:16.04': Ubuntu1510OrHigherActions,
+    'ubuntu:18.04': Ubuntu1510OrHigherActions,
+    'redhat': RedhatActions,
+    'centos': CentosActions,
     'oracle': RedhatActions,
-    'SuSE:12': Suse12Actions,
-    'SuSE': Suse12Actions,
+    'suse:12': Suse12Actions,
+    'suse': Suse12Actions,
     'sles:15': Suse12Actions,
     'opensuse:15':Suse12Actions
 }
