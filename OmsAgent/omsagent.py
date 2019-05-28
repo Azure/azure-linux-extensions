@@ -633,13 +633,13 @@ def is_vm_supported_for_extension():
         with open('/etc/os-release', 'r') as fp:
             for line in fp:
                 if line.startswith('ID='):
-                    name = line.split('=')[1]
-                    name = name.split('-')[0]
-                    name = name.replace('\"', '').replace('\n', '')
+                    vm_dist = line.split('=')[1]
+                    vm_dist = vm_dist.split('-')[0]
+                    vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                 elif line.startswith('VERSION_ID='):
-                    version = line.split('=')[1]
-                    version = version.split('.')[0]
-                    version = version.replace('\"', '').replace('\n', '')
+                    vm_ver = line.split('=')[1]
+                    vm_ver = vm_ver.split('.')[0]
+                    vm_ver = vm_ver.replace('\"', '').replace('\n', '')
 
     vm_supported = False
 
