@@ -80,7 +80,7 @@ def is_vm_supported_for_extension():
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12', '15']} # SLES
+                       'suse' : ['12'], 'sles' : ['15'] # SLES
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
