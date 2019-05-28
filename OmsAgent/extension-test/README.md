@@ -79,8 +79,6 @@ $ pip install requests adal json2html rstr
   - `<nsg resource group>` – resource group of your NSG
   - `<nsg>` – NSG name
   - `<size>` – Standard_B1ms
-  - `<publisher>` - pulisher name (For OMSAgent: Microsoft.EnterpriseCloud.Monitoring)
-  - `<extension>` - extension name (For OMSAgent: OmsAgentForLinux)
   - `<workspace>` – name of the workspace you created
   - `<key vault>` – name of the Key Vault you created
   - `<old version>` - specific version of the extension (define as empty "" if not using)
