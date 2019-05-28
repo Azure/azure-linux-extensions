@@ -8,8 +8,6 @@
   "nsg resource group": "<nsg-resource-group>",
   "nsg": "<nsg>",
   "size": "<size>",
-  "publisher": "<publisher>",
-  "extension": "<extension>",
   "workspace": "<workspace-name>",
   "key vault": "<key-vault-name>",
   "old version": "<old-extesion-version>"
