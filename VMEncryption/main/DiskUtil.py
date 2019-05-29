@@ -97,6 +97,34 @@ class DiskUtil(object):
         self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
         return self.command_executor.Execute(mkdir_cmd)
 
+    def parse_crypttab_line(self, line):
+        crypttab_parts = line.strip().split()
+
+        if len(crypttab_parts) < 3: # Line should have enough content
+            return None
+
+        if crypttab_parts[0].startswith("#"): # Line should not be a comment
+            return None
+
+        crypt_item = CryptItem()
+        crypt_item.mapper_name = crypttab_parts[0]
+        crypt_item.dev_path = crypttab_parts[1]
+        keyfile_path = crypttab_parts[2]
+        if CommonVariables.encryption_key_file_name not in keyfile_path and self.encryption_environment.cleartext_key_base_path not in keyfile_path:
+            return None # if the key_file path doesn't have the encryption key file name, its probably not for us to mess with
+        if self.encryption_environment.cleartext_key_base_path in keyfile_path:
+            crypt_item.uses_cleartext_key = True
+        crypttab_option_string = crypttab_parts[3]
+        crypttab_options = crypttab_option_string.split(',')
+        for option in crypttab_options:
+            option_pair = option.split("=")
+            if len(option_pair) == 2:
+                key = option_pair[0].strip()
+                value = option_pair[1].strip()
+                if key == "header":
+                    crypt_item.luks_header_path = value
+        return crypt_item
+
     def parse_azure_crypt_mount_line(self, line):
 
         crypt_item = CryptItem()
@@ -151,6 +179,7 @@ class DiskUtil(object):
 
                 temp_mount_point = os.path.join("/mnt/", crypt_item.mapper_name)
                 azure_crypt_mount_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/azure_crypt_mount_line")
+                crypttab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/crypttab_line")
 
                 # try to open to the temp mapper name generated above
                 return_code = self.luks_open(passphrase_file=passphrase_file,
@@ -171,22 +200,29 @@ class DiskUtil(object):
                     self.luks_close(crypt_item.mapper_name)
                     continue
 
-                if not os.path.exists(azure_crypt_mount_backup_location):
+                if not os.path.exists(azure_crypt_mount_backup_location) and not os.path.exists(crypttab_backup_location):
                     self.logger.log(msg=("MountPoint info not found for" + device_item_real_path), level=CommonVariables.ErrorLevel)
                     # Not sure when this happens..
                     # in this case also, just add an entry to the azure_crypt_mount without a mount point.
                     self.add_crypt_item(crypt_item)
-                    self.umount(temp_mount_point)
-                    self.luks_close(crypt_item.mapper_name)
-                    continue
-
-                with open(azure_crypt_mount_backup_location,'r') as f:
-                    for line in f:
-                        if not line.strip():
-                            continue
-                        # copy the crypt_item from the backup to the central os location
-                        parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
-                        self.add_crypt_item(parsed_crypt_item)
+                elif os.path.exists(azure_crypt_mount_backup_location):
+                    with open(azure_crypt_mount_backup_location,'r') as f:
+                        for line in f:
+                            if not line.strip():
+                                continue
+                            # copy the crypt_item from the backup to the central os location
+                            parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
+                            self.add_crypt_item(parsed_crypt_item)
+                elif os.path.exists(crypttab_backup_location):
+                    with open(crypttab_backup_location,'r') as f:
+                        for line in f:
+                            if not line.strip():
+                                continue
+                            # copy the crypt_item from the backup to the central os location
+                            parsed_crypt_item = self.parse_crypttab_line(line)
+                            if parsed_crypt_item is None:
+                                continue
+                            self.add_crypt_item(parsed_crypt_item)
 
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
@@ -203,11 +239,12 @@ class DiskUtil(object):
 
         crypt_items = []
         rootfs_crypt_item_found = False
+        non_root_crypt_item_found_in_azure_crypt_mount = False
 
         if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
             self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
         else:
-            with open(self.encryption_environment.azure_crypt_mount_config_path,'r') as f:
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 for line in f:
                     if not line.strip():
                         continue
@@ -216,8 +253,30 @@ class DiskUtil(object):
 
                     if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name :
                         rootfs_crypt_item_found = True
+                    else:
+                        non_root_crypt_item_found_in_azure_crypt_mount = True
 
                     crypt_items.append(crypt_item)
+
+        if not non_root_crypt_item_found_in_azure_crypt_mount:
+            self.logger.log("Using crypttab instead of azure_crypt_mount file.")
+            crypttab_path = "/etc/crypttab"
+            if not os.path.exists(crypttab_path):
+                self.logger.log("{0} does not exist".format(crypttab_path))
+            else:
+                with open(crypttab_path, 'r') as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+
+                        crypt_item = self.parse_crypttab_line(line)
+                        if crypt_item is None:
+                            continue
+
+                        if crypt_item.mapper_name == CommonVariables.osmapper_name :
+                            rootfs_crypt_item_found = True
+
+                        crypt_items.append(crypt_item)
 
         encryption_status = json.loads(self.get_encryption_status())
 
@@ -262,7 +321,61 @@ class DiskUtil(object):
 
         return crypt_items
 
+    def should_use_azure_crypt_mount(self):
+        if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            return False
+
+        non_os_entry_found = False
+        with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+
+                parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
+                if parsed_crypt_item.mapper_name != CommonVariables.osmapper_name:
+                    non_os_entry_found = True
+
+        # if there is a non_os_entry found we should use azure_crypt_mount. Otherwise we shouldn't
+        return non_os_entry_found
+
     def add_crypt_item(self, crypt_item, backup_folder=None):
+        if self.should_use_azure_crypt_mount():
+            return self.add_crypt_item_to_azure_crypt_mount(crypt_item, backup_folder)
+        else:
+            return self.add_crypt_item_to_crypttab(crypt_item, backup_folder)
+
+    def add_crypt_item_to_crypttab(self, crypt_item, backup_folder=None):
+        #def add_crypttab_item(self, mapper_name, dev_path, key_file, luks_header_path=None, backup_folder=None):
+
+        # TODO: figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
+        if crypt_item.uses_cleartext_key:
+            key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
+        else:
+            # get the scsi and lun number for the dev_path of this crypt_item
+            scsi_lun_numbers = self.get_azure_data_disk_controller_and_lun_numbers([os.path.realpah(crypt_item.dev_path)])
+            if len(scsi_lun_numbers) == 0:
+                # The default in case we didn't get any scsi/lun numbers
+                key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
+            else:
+                scsi_controller, lun_number = scsi_lun_numbers[0]
+                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
+
+        crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
+        if crypt_item.luks_header_path:
+            crypttab_line += ",header=" + crypt_item.luks_header_path
+
+        with open("/etc/crypttab", "a") as wf:
+            wf.write(crypttab_line + "\n")
+
+        if backup_folder is not None:
+            backup_file = os.path.join(backup_folder, "crypttab_line")
+            self.make_sure_path_exists(backup_folder)
+            with open(backup_file, "w") as wf:
+                wf.write(crypttab_line)
+            self.logger.log("Added crypttab item {0} to {1}".format(mapper_name, backup_file))
+        return True
+
+    def add_crypt_item_to_azure_crypt_mount(self, crypt_item, backup_folder=None):
         """
         TODO we should judge that the second time.
         format is like this:
@@ -513,6 +626,57 @@ class DiskUtil(object):
         with open("/etc/fstab",'w') as wf:
             wf.write(new_mount_content)
 
+    def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
+        self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
+
+        if not mount_point:
+            self.logger.log("modify_fstab_entry_encrypt: mount_point is empty")
+            return
+
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+
+        with open('/etc/fstab', 'r') as f:
+            lines = f.readlines()
+
+        relevant_line = None
+        for i in range(len(lines)):
+            line = lines[i]
+            fstab_parts = line.strip().split()
+
+            if len(fstab_parts) < 2: # Line should have enough content
+                continue
+
+            if fstab_parts[0].startswith("#"): # Line should not be a comment
+                continue
+
+            fstab_device = fstab_parts[0]
+            fstab_mount_point = fstab_parts[1]
+
+            if fstab_mount_point != mount_point: # Not the line we are looking for
+                continue
+
+            self.logger.log("Found the relevant fstab line: " + line)
+            relevant_line = line
+
+            if self.should_use_azure_crypt_mount():
+                # in this case we just remove the line
+                lines.pop(i)
+                break
+            else:
+                new_line = relevant_line.replace(fstab_device, mapper_path)
+                self.logger.log("Replacing that line with: " + new_line)
+                lines[i] = new_line
+                break
+
+        with open('/etc/fstab', 'w') as f:
+            f.writelines(lines)
+
+        if relevant_line is not None:
+            with open('/etc/fstab.azure.backup', 'a+') as f:
+                f.write('\n')
+                f.write(relevant_line)
+
+
     def remove_mount_info(self, mount_point):
         if not mount_point:
             self.logger.log("remove_mount_info: mount_point is empty")
@@ -556,8 +720,8 @@ class DiskUtil(object):
 
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
 
-        filtered_contents = []
-        removed_lines = []
+        lines_to_keep_in_backup_fstab = []
+        lines_to_put_back_to_fstab = []
 
         with open('/etc/fstab.azure.backup', 'r') as f:
             for line in f.readlines():
@@ -566,21 +730,30 @@ class DiskUtil(object):
 
                 if re.search(pattern, line):
                     self.logger.log("removing fstab.azure.backup line: {0}".format(line))
-                    removed_lines.append(line)
+                    lines_to_put_back_to_fstab.append(line)
                     continue
 
-                filtered_contents.append(line)
+                lines_to_keep_in_backup_fstab.append(line)
 
         with open('/etc/fstab.azure.backup', 'w') as f:
-            f.write('\n')
-            f.write('\n'.join(filtered_contents))
+            f.write('\n'.join(lines_to_keep_in_backup_fstab))
             f.write('\n')
 
         self.logger.log("fstab.azure.backup updated successfully")
 
-        with open('/etc/fstab', 'a+') as f:
-            f.write('\n')
-            f.write('\n'.join(removed_lines))
+        lines_that_remain_in_fstab = []
+        with open('/etc/fstab', 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                pattern = '\s' + re.escape(mount_point) + '\s'
+                if re.search(pattern, line):
+                    # This line should not remain in the fstab.
+                    self.logger.log("removing fstab line: {0}".format(line))
+                    continue
+                lines_that_remain_in_fstab.append(line)
+
+        with open('/etc/fstab', 'w') as f:
+            f.write('\n'.join(lines_that_remain_in_fstab + lines_to_put_back_to_fstab))
             f.write('\n')
 
         self.logger.log("fstab updated successfully")

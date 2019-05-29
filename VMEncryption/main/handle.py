@@ -301,9 +301,9 @@ def update_encryption_settings():
 
                 logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
-                crypt_item.current_luks_slot = new_keyslot
+                #crypt_item.current_luks_slot = new_keyslot
 
-                disk_util.update_crypt_item(crypt_item)
+                #disk_util.update_crypt_item(crypt_item)
 
             logger.log("New key successfully added to all encrypted devices")
 
@@ -442,36 +442,36 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         if resource_disk_util.try_remount():
             logger.log("mounted encrypted resource disk")
 
+    #add walkaround for the centos 7.0
+    se_linux_status = None
+    if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+        se_linux_status = encryption_environment.get_se_linux()
+        if se_linux_status.lower() == 'enforcing':
+            encryption_environment.disable_se_linux()
+
     # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
 
-        #add walkaround for the centos 7.0
-        se_linux_status = None
-        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
-            se_linux_status = encryption_environment.get_se_linux()
-            if se_linux_status.lower() == 'enforcing':
-                encryption_environment.disable_se_linux()
-
-        luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
-                                               dev_path=crypt_item.dev_path,
-                                               mapper_name=crypt_item.mapper_name,
-                                               header_file=crypt_item.luks_header_path,
-                                               uses_cleartext_key=crypt_item.uses_cleartext_key)
+        if not os.path.exists(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)):
+            luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                                   dev_path=crypt_item.dev_path,
+                                                   mapper_name=crypt_item.mapper_name,
+                                                   header_file=crypt_item.luks_header_path,
+                                                   uses_cleartext_key=crypt_item.uses_cleartext_key)
 
         logger.log("luks open result is {0}".format(luks_open_result))
 
-        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
-            if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
-                encryption_environment.enable_se_linux()
-        if crypt_item.mount_point != 'None':
+        if str(crypt_item.mount_point) != 'None':
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
         else:
             logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
 
-    if bek_util:
-        bek_util.umount_azure_passhprase(encryption_config)
+    if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+        if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
+            encryption_environment.enable_se_linux()
+
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
@@ -806,7 +806,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             crypt_item_to_update = CryptItem()
             crypt_item_to_update.mapper_name = mapper_name
             crypt_item_to_update.dev_path = dev_path_in_query
-            crypt_item_to_update.luks_header_path = "None"
+            crypt_item_to_update.luks_header_path = None
             crypt_item_to_update.file_system = file_system
             crypt_item_to_update.uses_cleartext_key = False
             crypt_item_to_update.current_luks_slot = 0
@@ -824,11 +824,11 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             mount_result = disk_util.mount_filesystem(dev_path=encrypted_device_path, mount_point=crypt_item_to_update.mount_point)
             logger.log(msg=("mount result is {0}".format(mount_result)))
 
-            logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
-            disk_util.remove_mount_info(crypt_item_to_update.mount_point)
+            logger.log(msg="modifying/removing the entry for unencrypted drive in fstab", level=CommonVariables.InfoLevel)
+            disk_util.modify_fstab_entry_encrypt(crypt_item_to_update.mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
 
             backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
-            update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, backup_folder)
+            update_crypt_item_result = disk_util.add_crypt_item(crypt_item, backup_folder=backup_folder)
             if not update_crypt_item_result:
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
         else:
@@ -1012,7 +1012,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 if mount_point:
                     logger.log(msg="removing entry for unencrypted drive from fstab",
                                level=CommonVariables.InfoLevel)
-                    disk_util.remove_mount_info(mount_point)
+                    disk_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
                 else:
                     logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
                                level=CommonVariables.InfoLevel)
@@ -1172,7 +1172,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                     if mount_point:
                         logger.log(msg="removing entry for unencrypted drive from fstab",
                                    level=CommonVariables.InfoLevel)
-                        disk_util.remove_mount_info(mount_point)
+                        disk_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
                     else:
                         logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
                                    level=CommonVariables.InfoLevel)
@@ -1749,7 +1749,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
 
             if not encryption_marker.config_file_exists():
                 logger.log("Data volumes are not marked for encryption")
-                bek_util.umount_azure_passhprase(encryption_config)
                 return True
 
             if encryption_marker.get_current_command() == CommonVariables.EnableEncryption:
@@ -1792,7 +1791,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = 'Encryption failed for {0}'.format(failed_item)
                 raise Exception(message)
             else:
-                bek_util.umount_azure_passhprase(encryption_config)
                 return True
     except Exception as e:
         raise
