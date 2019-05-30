@@ -262,10 +262,6 @@ class EncryptionSettingsUtil(object):
 
     def post_to_wireserver(self, data):
         """ Request EnableEncryption operation on settings file via wire server """
-        if not os.path.isfile(self.get_settings_file_path()):
-            raise Exception(
-                'Disk encryption settings file not found: ' + self.get_settings_file_path())
-
         http_util = self.get_http_util()
 
         # V3 message content
