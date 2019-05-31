@@ -54,6 +54,10 @@ class BekUtil(object):
 
             with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "w") as f:
                 f.write(passphrase)
+            for bek_file in os.listdir(self.bek_filesystem_mount_point):
+                if bek_filename in bek_file and bek_filename != bek_file:
+                    with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "w") as f:
+                        f.write(passphrase)
         except Exception as e:
             message = "Failed to store BEK in BEK VOLUME with error: {0}".format(str(e))
             self.logger.log(message)
