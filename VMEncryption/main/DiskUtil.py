@@ -639,6 +639,7 @@ class DiskUtil(object):
             lines = f.readlines()
 
         relevant_line = None
+        bek_line_found = False
         for i in range(len(lines)):
             line = lines[i]
             fstab_parts = line.strip().split()
@@ -651,6 +652,9 @@ class DiskUtil(object):
 
             fstab_device = fstab_parts[0]
             fstab_mount_point = fstab_parts[1]
+
+            if fstab_mount_point == CommonVariables.encryption_key_mount_point:
+                bek_line_found = True
 
             if fstab_mount_point != mount_point: # Not the line we are looking for
                 continue
@@ -667,6 +671,9 @@ class DiskUtil(object):
                 self.logger.log("Replacing that line with: " + new_line)
                 lines[i] = new_line
                 break
+
+        if not bek_line_found:
+            lines.append('LABEL=BEK\040\VOLUME {0} auto defaults,discard,nofail 0 0'.format(CommonVariables.encryption_key_mount_point))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
