@@ -43,9 +43,9 @@ images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180'
          'redhat7': 'RedHat:RHEL:7.3:latest',
          'centos6': 'OpenLogic:CentOS:6.9:latest',
          'centos7': 'OpenLogic:CentOS:7.5:latest',
-         'oracle6': 'Oracle:Oracle-Linux:6.9:latest',
+#         'oracle6': 'Oracle:Oracle-Linux:6.9:latest',
          'oracle7': 'Oracle:Oracle-Linux:7.5:latest',
-         'suse12': 'SUSE:SLES:12-SP2:latest'}
+         'suse12': 'SUSE:SLES:12-SP3:latest'}
 
 vmnames = []
 images = {}
