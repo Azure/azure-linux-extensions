@@ -45,7 +45,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.10.0-1.universal.x64.sh'
+BundleFileName = 'omsagent-1.11.0-6.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -81,7 +81,7 @@ EnableErrorOMSReturned403 = 5
 EnableErrorOMSReturnedNon200 = 6
 EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
-EnableCalledBeforeSuccessfulInstall = 9
+EnableCalledBeforeSuccessfulInstall = 52 # since install is a missing dependency
 UnsupportedOpenSSL = 55 #60, temporary as it excludes from SLA
 # OneClick error codes
 OneClickErrorCode = 40
@@ -419,32 +419,35 @@ def enable():
                                          check_error = True, log_cmd = False)
 
     # now ensure the permissions and ownership is set recursively
-    workspaceId = public_settings.get('workspaceId')
-    etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
-    if (os.path.isdir(etc_final_path)):
-        uid = pwd.getpwnam(AgentUser).pw_uid
-        gid = grp.getgrnam(AgentGroup).gr_gid
-        os.chown(etc_final_path, uid, gid)
+    try:
+        workspaceId = public_settings.get('workspaceId')
+        etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
+        if (os.path.isdir(etc_final_path)):
+            uid = pwd.getpwnam(AgentUser).pw_uid
+            gid = grp.getgrnam(AgentGroup).gr_gid
+            os.chown(etc_final_path, uid, gid)
 
-        # octal numbers are represented differently in python 3
-        if sys.version_info >= (3,):
-            os.chmod(etc_final_path, 0o750)
-        else:    
-            os.chmod(etc_final_path, 0750)
+            # octal numbers are represented differently in python 3
+            if sys.version_info >= (3,):
+                os.chmod(etc_final_path, 0o750)
+            else:    
+                os.chmod(etc_final_path, 0750)
 
-        for root, dirs, files in os.walk(etc_final_path):
-            for d in dirs:
-                os.chown(os.path.join(root, d), uid, gid)
-                if sys.version_info >= (3,):
-                    os.chmod(os.path.join(root, d), 0o750)
-                else:    
-                    os.chmod(os.path.join(root, d), 0750)                
-            for f in files:
-                os.chown(os.path.join(root, f), uid, gid)                  
-                if sys.version_info >= (3,):
-                    os.chmod(os.path.join(root, f), 0o640)
-                else:    
-                    os.chmod(os.path.join(root, f), 0640)                           
+            for root, dirs, files in os.walk(etc_final_path):
+                for d in dirs:
+                    os.chown(os.path.join(root, d), uid, gid)
+                    if sys.version_info >= (3,):
+                        os.chmod(os.path.join(root, d), 0o750)
+                    else:    
+                        os.chmod(os.path.join(root, d), 0750)                
+                for f in files:
+                    os.chown(os.path.join(root, f), uid, gid)                  
+                    if sys.version_info >= (3,):
+                        os.chmod(os.path.join(root, f), 0o640)
+                    else:    
+                        os.chmod(os.path.join(root, f), 0640)                           
+    except:
+        hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
     if exit_code is 0:
         # Create a marker file to denote the workspace that was
@@ -957,11 +960,12 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output: \n{0}'.format(output))
 
     # also write output to STDOUT since WA agent uploads that to Azlinux Kusto DB
+    # take only the last 3200 characters as extension cuts off after that
     try:
         if sys.version_info >= (3,):
-            print(output)
+            print(output[-3200:])
         else:    
-            print output        
+            print output[-3200:]        
     except:
         hutil_log_info('Failed to write output to STDOUT')
 

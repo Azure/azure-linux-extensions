@@ -180,7 +180,15 @@ def update_encryption_settings():
     logger.log('Updating encryption settings')
 
     # re-install extra packages like cryptsetup if no longer on system from earlier enable
-    DistroPatcher.install_extras()
+    try:
+        DistroPatcher.install_extras()
+    except Exception as e:
+        message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        hutil.do_exit(exit_code=CommonVariables.missing_dependency,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.missing_dependency),
+                      message=message)
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
@@ -408,7 +416,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
     # mount encrypted resource disk
     volume_type = encryption_config.get_volume_type().lower()
     if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-        resource_disk_util = ResourceDiskUtil(hutil, logger, DistroPatcher)
+        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, get_public_settings())
         resource_disk_util.automount()
         logger.log("mounted encrypted resource disk")
 
@@ -1592,6 +1600,7 @@ def daemon_encrypt():
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
             disk_util.log_lsblk_output()
+            mount_encrypted_disks(disk_util, bek_util, bek_passphrase_file, encryption_config)
 
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
@@ -1614,7 +1623,8 @@ def daemon_encrypt():
                                                             encryption_environment=encryption_environment)
         elif (((distro_name == 'centos' and distro_version == '7.3.1611') or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
-              (distro_name == 'centos' and distro_version.startswith('7.5'))) and
+              (distro_name == 'centos' and distro_version.startswith('7.5')) or
+              (distro_name == 'centos' and distro_version.startswith('7.6'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1626,6 +1636,7 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.4') or
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
+              (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
               (distro_name == 'centos' and distro_version == '7.3.1611') or

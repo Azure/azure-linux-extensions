@@ -722,15 +722,14 @@ class DiskUtil(object):
 
     def get_block_device_to_azure_udev_table(self):
         table = {}
-        azure_links_dir = '/dev/disk/azure'
         
-        if not os.path.exists(azure_links_dir):
+        if not os.path.exists(CommonVariables.azure_symlinks_dir):
             return table
 
-        for top_level_item in os.listdir(azure_links_dir):
-            top_level_item_full_path = os.path.join(azure_links_dir, top_level_item)
+        for top_level_item in os.listdir(CommonVariables.azure_symlinks_dir):
+            top_level_item_full_path = os.path.join(CommonVariables.azure_symlinks_dir, top_level_item)
             if os.path.isdir(top_level_item_full_path):
-                scsi_path = os.path.join(azure_links_dir, top_level_item)
+                scsi_path = os.path.join(CommonVariables.azure_symlinks_dir, top_level_item)
                 for symlink in os.listdir(scsi_path):
                     symlink_full_path = os.path.join(scsi_path, symlink)
                     table[os.path.realpath(symlink_full_path)] = symlink_full_path
@@ -741,10 +740,10 @@ class DiskUtil(object):
     def get_azure_symlinks(self):
         azure_udev_links = {}
 
-        if os.path.exists('/dev/disk/azure'):
+        if os.path.exists(CommonVariables.azure_symlinks_dir):
             wdbackup = os.getcwd()
-            os.chdir('/dev/disk/azure')
-            for symlink in os.listdir('/dev/disk/azure'):
+            os.chdir(CommonVariables.azure_symlinks_dir)
+            for symlink in os.listdir(CommonVariables.azure_symlinks_dir):
                 azure_udev_links[os.path.basename(symlink)] = os.path.realpath(symlink)
             os.chdir(wdbackup)
 
