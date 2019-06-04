@@ -352,7 +352,7 @@ class DiskUtil(object):
             key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
-            scsi_lun_numbers = self.get_azure_data_disk_controller_and_lun_numbers([os.path.realpah(crypt_item.dev_path)])
+            scsi_lun_numbers = self.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
             if len(scsi_lun_numbers) == 0:
                 # The default in case we didn't get any scsi/lun numbers
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
@@ -372,7 +372,7 @@ class DiskUtil(object):
             self.make_sure_path_exists(backup_folder)
             with open(backup_file, "w") as wf:
                 wf.write(crypttab_line)
-            self.logger.log("Added crypttab item {0} to {1}".format(mapper_name, backup_file))
+            self.logger.log("Added crypttab item {0} to {1}".format(crypt_item.mapper_name, backup_file))
         return True
 
     def add_crypt_item_to_azure_crypt_mount(self, crypt_item, backup_folder=None):
@@ -673,10 +673,11 @@ class DiskUtil(object):
                 break
 
         if not bek_line_found:
-            lines.append('LABEL=BEK\040\VOLUME {0} auto defaults,discard,nofail 0 0'.format(CommonVariables.encryption_key_mount_point))
+            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0'.format(CommonVariables.encryption_key_mount_point))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
+            f.write('\n')
 
         if relevant_line is not None:
             with open('/etc/fstab.azure.backup', 'a+') as f:
@@ -890,8 +891,8 @@ class DiskUtil(object):
                     encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
-                volume_type == CommonVariables.VolumeTypeAll.lower():
-                 if not os_drive_encrypted:
+               volume_type == CommonVariables.VolumeTypeAll.lower():
+                if not os_drive_encrypted:
                     encryption_status["os"] = "EncryptionInProgress"
         elif os.path.exists(self.get_osmapper_path()) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"

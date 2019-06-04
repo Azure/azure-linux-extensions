@@ -16,45 +16,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import array
-import base64
 import filecmp
-import httplib
-import imp
 import json
 import os
 import os.path
 import re
-import shlex
-import string
 import subprocess
 import sys
-import datetime
 import time
 import tempfile
 import traceback
-import urllib2
-import urlparse
 import uuid
+import shutil
 
 from Utils import HandlerUtil
-from Common import *
+from Common import CommonVariables, CryptItem
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
 from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
-from EncryptionConfig import *
-from patch import *
-from BekUtil import *
+from EncryptionConfig import EncryptionConfig
+from patch import GetDistroPatcher
+from BekUtil import BekUtil
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
 from EncryptionEnvironment import EncryptionEnvironment
-from MachineIdentity import MachineIdentity
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
-from CommandExecutor import *
+from CommandExecutor import CommandExecutor, ProcessCommunicator
 from __builtin__ import int
 
 
@@ -203,6 +194,17 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message='Encryption settings stamped')
+
+    filenames = []
+    for disk in data.get("Disks", []):
+        for volume in disk.get("Volumes", []):
+            for tag in volume.get("SecretTags", []):
+                if tag.get("Name") == 'DiskEncryptionKeyFileName':
+                    if tag.get("Value") is not None:
+                        filenames.append(str(["Value"]))
+
+    for filename in filenames:
+        shutil.copy(current_passphrase_file, os.path.join(CommonVariables.encryption_key_mount_point, filename))
 
     settings.remove_protector_file(new_protector_name)
 
@@ -460,8 +462,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
                                                    mapper_name=crypt_item.mapper_name,
                                                    header_file=crypt_item.luks_header_path,
                                                    uses_cleartext_key=crypt_item.uses_cleartext_key)
-
-        logger.log("luks open result is {0}".format(luks_open_result))
+            logger.log("luks open result is {0}".format(luks_open_result))
 
         if str(crypt_item.mount_point) != 'None':
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
@@ -629,7 +630,6 @@ def enable_encryption():
     """
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     bek_util = BekUtil(disk_util, logger)
-    executor = CommandExecutor(logger)
     
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -668,8 +668,6 @@ def enable_encryption():
     try:
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
         
-        kek_secret_id_created = None
-
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
         if encryption_marker.config_file_exists():
             # verify the encryption mark
@@ -828,7 +826,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             disk_util.modify_fstab_entry_encrypt(crypt_item_to_update.mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
 
             backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
-            update_crypt_item_result = disk_util.add_crypt_item(crypt_item, backup_folder=backup_folder)
+            update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, backup_folder=backup_folder)
             if not update_crypt_item_result:
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
         else:
