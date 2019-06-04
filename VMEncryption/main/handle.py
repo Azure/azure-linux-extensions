@@ -930,7 +930,7 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
 
-            if not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]:
+            if not ongoing_item_config.get_file_system().lower() in CommonVariables.inplace_supported_file_systems:
                 logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
                            level=CommonVariables.WarningLevel)
 
@@ -1406,10 +1406,11 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
 def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     device_items = disk_util.get_device_items(None)
     device_items_to_encrypt = []
+    special_azure_devices_to_skip = disk_util.get_azure_devices()
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
-        should_skip = disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type())
+        should_skip = disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, encryption_marker.get_volume_type())
         if not should_skip and \
            not any(di.name == device_item.name for di in device_items_to_encrypt):
             device_items_to_encrypt.append(device_item)
