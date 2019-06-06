@@ -1417,9 +1417,6 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
             continue
         if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, encryption_marker.get_volume_type()):
             continue
-        if device_item.label == "BEK":
-            logger.log("skip for the passphrase disk {0}".format(device_item))
-            continue
 
         if encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
             if device_item.mount_point is None or device_item.mount_point == "":
