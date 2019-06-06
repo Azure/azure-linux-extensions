@@ -201,7 +201,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
             for tag in volume.get("SecretTags", []):
                 if tag.get("Name") == 'DiskEncryptionKeyFileName':
                     if tag.get("Value") is not None:
-                        filenames.append(str(["Value"]))
+                        filenames.append(str(tag["Value"]))
 
     for filename in filenames:
         shutil.copy(current_passphrase_file, os.path.join(CommonVariables.encryption_key_mount_point, filename))

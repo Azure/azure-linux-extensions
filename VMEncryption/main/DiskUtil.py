@@ -165,12 +165,15 @@ class DiskUtil(object):
                         break
                 if found_in_crypt_mount:
                     # Its already in crypt_mount so nothing to do yet
-                    self.logger.log("{0} is already in the azure_crypt_mount file".format(device_item.name))
+                    self.logger.log("{0} is already in the azure_crypt_mount/crypttab file".format(device_item.name))
                     continue
                 # Otherwise, unlock and mount it at a test spot and extract mount info
 
                 crypt_item = CryptItem()
                 crypt_item.dev_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
+                if crypt_item.dev_path == "/dev/disk/azure/resource-part1":
+                    # Ignore the resource disk. We have other code for that.
+                    continue
                 # dev_path will always start with "/" so we strip that out and generate a temporary mapper name from the rest
                 # e.g. /dev/disk/azure/scsi1/lun1 --> dev-disk-azure-scsi1-lun1-unlocked  | /dev/mapper/lv0 --> dev-mapper-lv0-unlocked
                 crypt_item.mapper_name = crypt_item.dev_path[5:].replace("/","-") + "-unlocked"
@@ -412,28 +415,36 @@ class DiskUtil(object):
     def remove_crypt_item(self, crypt_item, backup_folder=None):
         try:
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-                filtered_mount_lines = []
+                crypt_file_path = self.encryption_environment.azure_crypt_mount_config_path
+                crypt_line_parser = lambda line: self.parse_azure_crypt_mount_line(line)
+                line_file_name = "azure_crypt_mount_line"
+            elif os.path.exists("/etc/crypttab"):
+                crypt_file_path = "/etc/crypttab"
+                crypt_line_parser = lambda line: self.parse_crypttab_line(line)
+                line_file_name = "crypttab_line"
+            else:
+                return True
 
-                with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-                    for line in f:
-                        if not line.strip():
-                            continue
+            filtered_mount_lines = []
+            with open(crypt_file_path, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
 
-                        parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
-                        if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
-                            self.logger.log("Removing crypt mount entry: {0}".format(line))
-                            continue
+                    parsed_crypt_item = crypt_line_parser(line)
+                    if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
+                        self.logger.log("Removing crypt mount entry: {0}".format(line))
+                        continue
 
-                        filtered_mount_lines.append(line)
+                    filtered_mount_lines.append(line)
 
-                with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
-                    wf.write(''.join(filtered_mount_lines))
+            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+                wf.write(''.join(filtered_mount_lines))
 
             if backup_folder is not None:
-                backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
+                backup_file = os.path.join(backup_folder, line_file_name)
                 if os.path.exists(backup_file):
                     os.remove(backup_file)
-                    os.rmdir(backup_folder)
 
             return True
 
@@ -626,6 +637,19 @@ class DiskUtil(object):
         with open("/etc/fstab",'w') as wf:
             wf.write(new_mount_content)
 
+    def is_bek_in_fstab_file(self, lines):
+        for line in lines:
+            fstab_parts = line.strip().split()
+            if len(fstab_parts) < 2: # Line should have enough content
+                continue
+            if fstab_parts[0].startswith("#"): # Line should not be a comment
+                continue
+            fstab_device = fstab_parts[0]
+            fstab_mount_point = fstab_parts[1]
+            if fstab_mount_point == CommonVariables.encryption_key_mount_point:
+                return True
+        return False
+
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
 
@@ -653,9 +677,6 @@ class DiskUtil(object):
             fstab_device = fstab_parts[0]
             fstab_mount_point = fstab_parts[1]
 
-            if fstab_mount_point == CommonVariables.encryption_key_mount_point:
-                bek_line_found = True
-
             if fstab_mount_point != mount_point: # Not the line we are looking for
                 continue
 
@@ -672,16 +693,14 @@ class DiskUtil(object):
                 lines[i] = new_line
                 break
 
-        if not bek_line_found:
-            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0'.format(CommonVariables.encryption_key_mount_point))
+        if not self.is_bek_in_fstab_file(lines):
+            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
-            f.write('\n')
 
         if relevant_line is not None:
             with open('/etc/fstab.azure.backup', 'a+') as f:
-                f.write('\n')
                 f.write(relevant_line)
 
 
