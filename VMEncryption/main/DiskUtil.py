@@ -1327,7 +1327,7 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
-    def is_data_disk(self, device_item, azure_devices):
+    def is_data_disk(self, device_item, special_azure_devices_to_skip):
         # Root disk
         if device_item.device_id.startswith('00000000-0000'):
             self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
@@ -1336,10 +1336,17 @@ class DiskUtil(object):
         if device_item.device_id.startswith('00000000-0001'):
             self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
             return False
+        # BEK VOLUME
+        if device_item.file_system == "vfat" and device_item.label.lower() == "bek":
+            self.logger.log(msg="skipping BEK VOLUME", level=CommonVariables.WarningLevel)
+            return False
 
-        for azure_blk_item in azure_devices:
+
+        # We let the caller specify a list of devices to skip. Usually its just a list of IDE devices.
+        # IDE devices (in Gen 1) include Resource disk and BEK VOLUME. This check works pretty wel in Gen 1, but not in Gen 2.
+        for azure_blk_item in special_azure_devices_to_skip:
             if azure_blk_item.name == device_item.name:
-                self.logger.log(msg="the mountpoint is the azure disk root or resource, so skip it.")
+                self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
                 return False
 
         return True
