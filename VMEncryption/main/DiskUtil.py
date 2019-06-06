@@ -242,11 +242,8 @@ class DiskUtil(object):
 
         crypt_items = []
         rootfs_crypt_item_found = False
-        non_root_crypt_item_found_in_azure_crypt_mount = False
 
-        if not os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
-            self.logger.log("{0} does not exist".format(self.encryption_environment.azure_crypt_mount_config_path))
-        else:
+        if self.should_use_azure_crypt_mount():
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 for line in f:
                     if not line.strip():
@@ -256,12 +253,9 @@ class DiskUtil(object):
 
                     if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name :
                         rootfs_crypt_item_found = True
-                    else:
-                        non_root_crypt_item_found_in_azure_crypt_mount = True
 
                     crypt_items.append(crypt_item)
-
-        if not non_root_crypt_item_found_in_azure_crypt_mount:
+        else:
             self.logger.log("Using crypttab instead of azure_crypt_mount file.")
             crypttab_path = "/etc/crypttab"
             if not os.path.exists(crypttab_path):
