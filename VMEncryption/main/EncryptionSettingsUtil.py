@@ -17,9 +17,11 @@
 import httplib
 import json
 import os
+import os.path
 import socket
 import re
 import time
+import base64
 
 from shutil import copyfile
 import uuid
@@ -31,7 +33,8 @@ class EncryptionSettingsUtil(object):
 
     def __init__(self, logger):
         self.logger = logger
-        self._CURRENT_DISK_ENCRYPTION_DATA_VERSION = "3.0"
+        self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
+        self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -68,7 +71,7 @@ class EncryptionSettingsUtil(object):
 
     def create_protector_file(self, existing_passphrase_file, protector_name):
         """create temporary protector file corresponding to protector name"""
-        dst = CommonVariables.encryption_key_mount_point + '/' + protector_name
+        dst = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
         copyfile(existing_passphrase_file, dst)
         import ctypes
         libc = ctypes.CDLL("libc.so.6")
@@ -77,12 +80,12 @@ class EncryptionSettingsUtil(object):
 
     def remove_protector_file(self, protector_name):
         """remove temporary protector file corresponding to protector name parameter"""
-        os.remove(CommonVariables.encryption_key_mount_point + '/' + protector_name)
+        os.remove(os.path.join(CommonVariables.encryption_key_mount_point, protector_name))
         return
 
     def get_settings_file_path(self):
         """get the full path to the current encryption settings file"""
-        return CommonVariables.encryption_key_mount_point + '/' + self.get_settings_file_name()
+        return os.path.join(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
 
     def get_settings_file_name(self):
         """get the base file name of the current encryption settings file"""
@@ -178,16 +181,31 @@ class EncryptionSettingsUtil(object):
                     }]
                 })
 
+        full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        with open(full_protector_path) as protector_file:
+            protector = protector_file.read()
+            protector_base64 = base64.standard_b64encode(protector)
+            protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
+
+        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
+
         data = {
-            "DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
+            "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
             "DiskEncryptionOperation": "EnableEncryption",
             "KeyVaultUrl": kv_url,
             "KeyVaultResourceId": kv_id,
             "KekUrl": kek_url,
             "KekVaultResourceId": kek_kv_id,
             "KekAlgorithm": kek_algorithm,
+            "Protectors": protectors_name_only,
             "Disks": data_disks_settings_data
         }
+
+        self.logger.log("Settings without the protectors array: " + json.dumps(data, sort_keys=True, indent=4))
+        self.logger.log("Full Settings JSON might be found later in the BEK VOLUME")
+
+        data["Protectors"] = protectors
+
         return data
 
     def write_settings_file(self, data):
@@ -210,14 +228,7 @@ class EncryptionSettingsUtil(object):
         from HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
-    def post_to_wireserver(self, data):
-        """ Request EnableEncryption operation on settings file via wire server """
-        self.write_settings_file(data)
-        if not os.path.isfile(self.get_settings_file_path()):
-            raise Exception(
-                'Disk encryption settings file not found: ' + self.get_settings_file_path())
-
-        http_util = self.get_http_util()
+    def _post_to_wireserver_helper(self, msg_data, http_util):
 
         retry_count_max = 3
         retry_count = 0
@@ -226,8 +237,7 @@ class EncryptionSettingsUtil(object):
                 result = http_util.Call(method='POST',
                                         http_uri=CommonVariables.wireserver_endpoint,
                                         headers=CommonVariables.wireprotocol_msg_headers,
-                                        data=CommonVariables.wireprotocol_msg_template_v2.format(
-                                            settings_file_name=self.get_settings_file_name()),
+                                        data=msg_data,
                                         use_https=False)
 
                 if result is not None:
@@ -238,17 +248,38 @@ class EncryptionSettingsUtil(object):
 
                     http_util.connection.close()
                     if result.status != httplib.OK and result.status != httplib.ACCEPTED:
-                        raise Exception("encryption settings update request was not accepted")
+                        raise Exception("Encryption settings post request was not accepted")
                     return
                 else:
-                    raise Exception("no response from encryption settings update request")
+                    raise Exception("No response from encryption settings post request")
             except Exception as e:
                 retry_count += 1
                 self.logger.log("Encountered exception while posting encryption settings to Wire Server (attempt #{0}):\n{1}".format(str(retry_count), str(e)))
                 if retry_count < retry_count_max:
-                    time.sleep(5) # sleep for 5 seconds before retrying.
+                    time.sleep(5)  # sleep for 5 seconds before retrying.
                 else:
                     raise e
+
+    def post_to_wireserver(self, data):
+        """ Request EnableEncryption operation on settings file via wire server """
+        http_util = self.get_http_util()
+
+        # V3 message content
+        msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
+        try:
+            self._post_to_wireserver_helper(msg_data, http_util)
+        except Exception:
+            self.logger.log("Falling back on old Wire Server protocol")
+            data.pop("Protectors")
+            data["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
+
+            self.write_settings_file(data)
+            if not os.path.isfile(self.get_settings_file_path()):
+                raise Exception(
+                    'Disk encryption settings file not found: ' + self.get_settings_file_path())
+
+            msg_data = CommonVariables.wireprotocol_msg_template_v2.format(settings_file_name=self.get_settings_file_name())
+            self._post_to_wireserver_helper(msg_data, http_util)
 
     def clear_encryption_settings(self, disk_util):
         """
@@ -283,7 +314,7 @@ class EncryptionSettingsUtil(object):
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
-        data = {"DiskEncryptionDataVersion": self._CURRENT_DISK_ENCRYPTION_DATA_VERSION,
+        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",

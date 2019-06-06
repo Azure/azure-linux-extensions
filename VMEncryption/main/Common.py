@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '1.1.0.36'
+    extension_version = '1.1.0.37'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
@@ -46,6 +46,11 @@ class CommonVariables:
     wireprotocol_msg_template_v2 = """<?xml version="1.0"?>
     <DiskEncryptionData version="2.0">
         <DiskEncryptionSettingsFile>{settings_file_name}</DiskEncryptionSettingsFile>
+    </DiskEncryptionData>
+    """
+    wireprotocol_msg_template_v3 = """<?xml version="1.0"?>
+    <DiskEncryptionData version="3.0">
+        <DiskEncryptionDetailsAsJson>{settings_json_blob}</DiskEncryptionDetailsAsJson>
     </DiskEncryptionData>
     """
 
