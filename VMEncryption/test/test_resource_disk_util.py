@@ -142,7 +142,7 @@ class TestResourceDiskUtil(unittest.TestCase):
 
         mock_mount.assert_called_with(ResourceDiskUtil.RD_MAPPER_PATH)
 
-        # Case 3, The RD is encyrpted and mounted.
+        # Case 3, The RD is encrypted and mounted.
         mock_crypt_mounted.return_value = True
         mock_mount.reset_mock()
         mock_mount.return_value = True

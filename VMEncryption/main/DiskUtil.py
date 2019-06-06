@@ -1356,7 +1356,7 @@ class DiskUtil(object):
         """
 
         if encrypt_volume_type.lower() == 'data' and not self.is_data_disk(device_item, special_azure_devices_to_skip):
-            return True # Skip data disks
+            return True # Skip non-data disks
 
         if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
