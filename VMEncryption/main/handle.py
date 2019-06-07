@@ -134,7 +134,7 @@ def disable_encryption():
                 logger.log('Device name after update: {0}'.format(crypt_item.dev_path))
 
             crypt_item.uses_cleartext_key = True
-            disk_util.update_crypt_item(crypt_item)
+            disk_util.update_crypt_item(crypt_item, None)
 
             logger.log('Added cleartext key for {0}'.format(crypt_item))
 
@@ -246,9 +246,9 @@ def update_encryption_settings():
 
                 logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
-                crypt_item.current_luks_slot = new_keyslot
+                # crypt_item.current_luks_slot = new_keyslot
 
-                disk_util.update_crypt_item(crypt_item)
+                # disk_util.update_crypt_item(crypt_item)
 
             logger.log("New key successfully added to all encrypted devices")
 
@@ -420,33 +420,35 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
         resource_disk_util.automount()
         logger.log("mounted encrypted resource disk")
 
+    # add walkaround for the centos 7.0
+    se_linux_status = None
+    if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+        se_linux_status = encryption_environment.get_se_linux()
+        if se_linux_status.lower() == 'enforcing':
+            encryption_environment.disable_se_linux()
+
     # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in disk_util.get_crypt_items():
         if not crypt_item:
             continue
 
-        # add walkaround for the centos 7.0
-        se_linux_status = None
-        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
-            se_linux_status = encryption_environment.get_se_linux()
-            if se_linux_status.lower() == 'enforcing':
-                encryption_environment.disable_se_linux()
+        if not os.path.exists(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)):
+            luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                                   dev_path=crypt_item.dev_path,
+                                                   mapper_name=crypt_item.mapper_name,
+                                                   header_file=crypt_item.luks_header_path,
+                                                   uses_cleartext_key=crypt_item.uses_cleartext_key)
 
-        luks_open_result = disk_util.luks_open(passphrase_file=passphrase_file,
-                                               dev_path=crypt_item.dev_path,
-                                               mapper_name=crypt_item.mapper_name,
-                                               header_file=crypt_item.luks_header_path,
-                                               uses_cleartext_key=crypt_item.uses_cleartext_key)
+            logger.log("luks open result is {0}".format(luks_open_result))
 
-        logger.log("luks open result is {0}".format(luks_open_result))
-
-        if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
-            if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
-                encryption_environment.enable_se_linux()
-        if crypt_item.mount_point != 'None':
+        if str(crypt_item.mount_point) != 'None':
             disk_util.mount_crypt_item(crypt_item, passphrase_file)
         else:
             logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+
+    if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
+        if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
+            encryption_environment.enable_se_linux()
 
 
 def main():
@@ -853,7 +855,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     crypt_item_to_update.dev_path = dev_path_in_query
-                    crypt_item_to_update.luks_header_path = "None"
+                    crypt_item_to_update.luks_header_path = None
                     crypt_item_to_update.file_system = file_system
                     crypt_item_to_update.uses_cleartext_key = False
                     crypt_item_to_update.current_luks_slot = 0
@@ -867,11 +869,11 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                     if "full_mount_point" in encryption_item and encryption_item["full_mount_point"] != "":
                         crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
-                    logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
-                    disk_util.remove_mount_info(crypt_item_to_update.mount_point)
+                    logger.log(msg="modifying/removing the entry for unencrypted drive in fstab", level=CommonVariables.InfoLevel)
+                    disk_util.modify_fstab_entry_encrypt(crypt_item_to_update.mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
 
                     disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
-                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, passphrase)
                     if not update_crypt_item_result:
                         logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
@@ -1045,14 +1047,14 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
                     crypt_item_to_update.mount_point = "None"
                 else:
                     crypt_item_to_update.mount_point = mount_point
-                update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+                update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, passphrase_file)
                 if not update_crypt_item_result:
                     logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
                 if mount_point:
                     logger.log(msg="removing entry for unencrypted drive from fstab",
                                level=CommonVariables.InfoLevel)
-                    disk_util.remove_mount_info(mount_point)
+                    disk_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
                 else:
                     logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
                                level=CommonVariables.InfoLevel)
@@ -1201,7 +1203,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                         crypt_item_to_update.mount_point = "None"
                     else:
                         crypt_item_to_update.mount_point = mount_point
-                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update)
+                    update_crypt_item_result = disk_util.add_crypt_item(crypt_item_to_update, passphrase_file)
                     if not update_crypt_item_result:
                         logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
                     if crypt_item_to_update.mount_point != "None":
@@ -1212,7 +1214,7 @@ def encrypt_inplace_with_seperate_header_file(passphrase_file,
                     if mount_point:
                         logger.log(msg="removing entry for unencrypted drive from fstab",
                                    level=CommonVariables.InfoLevel)
-                        disk_util.remove_mount_info(mount_point)
+                        disk_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
                     else:
                         logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
                                    level=CommonVariables.InfoLevel)
@@ -1769,7 +1771,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
 
             if not encryption_marker.config_file_exists():
                 logger.log("Data volumes are not marked for encryption")
-                bek_util.umount_azure_passhprase(encryption_config)
                 return True
 
             if encryption_marker.get_current_command() == CommonVariables.EnableEncryption:
@@ -1796,7 +1797,6 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 message = 'Encryption failed for {0}'.format(failed_item)
                 raise Exception(message)
             else:
-                bek_util.umount_azure_passhprase(encryption_config)
                 return True
     except Exception:
         raise

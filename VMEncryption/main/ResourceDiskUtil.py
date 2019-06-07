@@ -22,7 +22,7 @@ import time
 import os
 
 from CommandExecutor import CommandExecutor
-from Common import CommonVariables
+from Common import CommonVariables, CryptItem
 
 
 class ResourceDiskUtil(object):
@@ -248,6 +248,17 @@ class ResourceDiskUtil(object):
         self._prepare_partition()
         return True
 
+    def add_to_fstab(self):
+        with open("/etc/fstab") as f:
+            lines = f.readlines()
+
+        if self.disk_util.is_bek_in_fstab_file(lines):
+            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
+        lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+
+        with open('/etc/fstab', 'w') as f:
+            f.writelines(lines)
+
     def encrypt_format_mount(self):
         if not self.prepare():
             self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
@@ -261,6 +272,14 @@ class ResourceDiskUtil(object):
         if not self._mount_resource_disk(self.RD_MAPPER_PATH):
             self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
+        if not self.disk_util.should_use_azure_crypt_mount():
+            self.logger.log("Adding resource disk to the crypttab file")
+            crypt_item = CryptItem()
+            crypt_item.dev_path = self.RD_DEV_PATH
+            crypt_item.mapper_name = self.RD_MAPPER_NAME
+            crypt_item.uses_cleartext_key = False
+            self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
+            self.add_to_fstab()
         return True
 
     def automount(self):
