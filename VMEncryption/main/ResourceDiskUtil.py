@@ -252,9 +252,11 @@ class ResourceDiskUtil(object):
         with open("/etc/fstab") as f:
             lines = f.readlines()
 
-        if self.disk_util.is_bek_in_fstab_file(lines):
+        if not self.disk_util.is_bek_in_fstab_file(lines):
             lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
-        lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+
+        if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
+            lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
@@ -278,6 +280,7 @@ class ResourceDiskUtil(object):
             crypt_item.dev_path = self.RD_DEV_PATH
             crypt_item.mapper_name = self.RD_MAPPER_NAME
             crypt_item.uses_cleartext_key = False
+            self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
             self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
             self.add_to_fstab()
         return True
