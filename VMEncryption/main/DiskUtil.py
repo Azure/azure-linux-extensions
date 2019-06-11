@@ -237,7 +237,6 @@ class DiskUtil(object):
             return self.add_crypt_item_to_crypttab(crypt_item, key_file_path)
 
     def add_crypt_item_to_crypttab(self, crypt_item, key_file):
-
         if key_file is None and crypt_item.uses_cleartext_key:
             line_key_file = self.encryption_environment.cleartext_key_base_path + mapper_name
         else:
@@ -290,7 +289,7 @@ class DiskUtil(object):
 
     def remove_crypt_item(self, crypt_item):
         try:
-            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            if self.should_use_azure_crypt_mount():
                 crypt_file_path = self.encryption_environment.azure_crypt_mount_config_path
                 crypt_line_parser = self.parse_azure_crypt_mount_line
             elif os.path.exists("/etc/crypttab"):
@@ -312,7 +311,7 @@ class DiskUtil(object):
 
                     filtered_mount_lines.append(line)
 
-            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+            with open(crypt_file_path, 'w') as wf:
                 wf.write(''.join(filtered_mount_lines))
 
             return True
@@ -506,7 +505,6 @@ class DiskUtil(object):
         with open("/etc/fstab",'w') as wf:
             wf.write(new_mount_content)
 
-
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
             fstab_parts = line.strip().split()
@@ -660,6 +658,13 @@ class DiskUtil(object):
         mount_cmd = self.distro_patcher.mount_path + ' -L "' + bek_label + '" ' + mount_point + ' -o ' + option_string
         return self.command_executor.Execute(mount_cmd)
 
+    def mount_auto(self, dev_path_or_mount_point):
+        """
+        mount the file system via fstab entry
+        """
+        mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path_or_mount_point
+        return self.command_executor.Execute(mount_cmd)
+
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
@@ -674,8 +679,12 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        mount_filesystem_result = self.mount_filesystem(os.path.join('/dev/mapper', crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
-        self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
+        if str(crypt_item.mount_point) != 'None':
+            mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
+            self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
+        else:
+            logger.log(msg=('mount_point is None so trying an auto mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+            mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def swapoff(self):
         return self.command_executor.Execute('swapoff -a')

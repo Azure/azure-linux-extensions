@@ -146,7 +146,7 @@ class ResourceDiskUtil(object):
         """
         device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
         device_mappers = []
-        mapper_device_types = ["raid0","raid1","raid5","raid10","lvm"]
+        mapper_device_types = ["raid0", "raid1", "raid5", "raid10", "lvm", "crypt"]
         for device_item in device_items:
             # fstype should be crypto_LUKS
             dev_path = self.disk_util.get_device_path(device_item.name)

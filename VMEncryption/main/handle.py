@@ -372,9 +372,9 @@ def update():
     hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
     DistroPatcher.update_prereq()
-    # during update to new extension version, sweep configuration settings files from the prior 
+    # during update to new extension version, sweep configuration settings files from the prior
     # version into the new configuration settings directory that will be used by the new extension
-    hutil.restore_old_configs() 
+    hutil.restore_old_configs()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 
@@ -441,10 +441,7 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
 
             logger.log("luks open result is {0}".format(luks_open_result))
 
-        if str(crypt_item.mount_point) != 'None':
-            disk_util.mount_crypt_item(crypt_item, passphrase_file)
-        else:
-            logger.log(msg=('mount_point is None so skipping mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+        disk_util.mount_crypt_item(crypt_item, passphrase_file)
 
     if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
@@ -632,7 +629,6 @@ def enable_encryption():
                        level=CommonVariables.WarningLevel)
             hutil.redo_last_status()
             exit_without_status_report()
-    
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
@@ -1841,7 +1837,7 @@ def daemon_decrypt():
         else:
             raise Exception("command {0} not supported.".format(decryption_marker.get_current_command()))
 
-        if failed_item != None:
+        if failed_item is not None:
             hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='Disable',
                           status=CommonVariables.extension_error_status,
