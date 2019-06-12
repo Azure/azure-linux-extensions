@@ -174,7 +174,7 @@ def main():
                       'in /var/log/azure/Microsoft.EnterpriseCloud.' \
                       'Monitoring.OmsAgentForLinux'
         elif exit_code is 127 and operation == 'Install':
-            # happens if shell bundle couldn't be extracted due low space or missing dependency
+            # happens if shell bundle couldn't be extracted due to low space or missing dependency
             exit_code = 52 # since it is a missing dependency
             message = 'Install failed with exit code 127. Please check that ' \
                       'dependencies are installed. For details, check logs ' \
