@@ -683,7 +683,7 @@ class DiskUtil(object):
             mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
             self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
         else:
-            logger.log(msg=('mount_point is None so trying an auto mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+            self.logger.log(msg=('mount_point is None so trying an auto mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
             mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def swapoff(self):

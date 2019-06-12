@@ -121,7 +121,10 @@ class ResourceDiskUtil(object):
     def _unmount_resource_disk(self):
         """ unmount resource disk """
         self.disk_util.umount(self.RD_MOUNT_POINT)
+        self.disk_util.umount(CommonVariables.encryption_key_mount_point)
         self.disk_util.umount('/mnt')
+        self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
+        self.disk_util.mount_bek_volume("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
 
     def _is_plain_mounted(self):
         """ return true if mount point is mounted from a non-crypt layer """
