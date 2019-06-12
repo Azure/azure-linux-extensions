@@ -173,6 +173,13 @@ def main():
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.EnterpriseCloud.' \
                       'Monitoring.OmsAgentForLinux'
+        elif exit_code is 127 and operation == 'Install':
+            # happens if shell bundle couldn't be extracted due low space or missing dependency
+            exit_code = 52 # since it is a missing dependency
+            message = 'Install failed with exit code 127. Please check that ' \
+                      'dependencies are installed. For details, check logs ' \
+                      'in /var/log/azure/Microsoft.EnterpriseCloud.' \
+                      'Monitoring.OmsAgentForLinux'
         elif exit_code is DPKGLockedErrorCode and operation == 'Install':
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
@@ -189,9 +196,19 @@ def main():
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
+    
+    # log message to STDOUT for waagent to pick up for upload to kusto
+    try:
+        if sys.version_info >= (3,):
+            print(message[-3200:])
+        else:    
+            print message[-3200:]        
+    except:
+        hutil_log_info('Failed to write message to STDOUT')
 
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)
+    log_and_exit(operation, exit_code, message)   
+        
 
 
 def stop_telemetry_process():
