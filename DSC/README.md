@@ -362,7 +362,7 @@ $publicConfig = '{
 - CentOS 6.5 and higher
 - RHEL 6.5 and higher
 - openSUSE 13.1 and 42.5
-- SUSE Linux Enterprise Server 11, 12, and 13.1
+- SUSE Linux Enterprise Server 11 SP3 and 12
 
 ## 5. Debug
 * The status of the extension is reported back to Azure so that user can see the status on Azure Portal
