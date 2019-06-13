@@ -199,10 +199,11 @@ def main():
     
     # log message to STDOUT for waagent to pick up for upload to kusto
     try:
-        if sys.version_info >= (3,):
-            print(message[-3200:])
-        else:    
-            print message[-3200:]        
+        if exit_code is not 0:
+            if sys.version_info >= (3,):
+                print(message[-3200:])
+            else:    
+                print message[-3200:]        
     except:
         hutil_log_info('Failed to write message to STDOUT')
 
@@ -979,10 +980,11 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     # also write output to STDOUT since WA agent uploads that to Azlinux Kusto DB
     # take only the last 3200 characters as extension cuts off after that
     try:
-        if sys.version_info >= (3,):
-            print(output[-3200:])
-        else:    
-            print output[-3200:]        
+        if exit_code is not 0:
+            if sys.version_info >= (3,):
+                print(output[-3200:])
+            else:    
+                print output[-3200:]        
     except:
         hutil_log_info('Failed to write output to STDOUT')
 
