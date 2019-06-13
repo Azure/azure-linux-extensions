@@ -528,7 +528,7 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
             hutil.log(package_name + ' is installed successfully')
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=False, message="Failed to install RPM package :" + package_path)
-            raise Exception('Failed to install package {0}: {1}'.format(package_name, stderr))
+            raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release, install_options):
     version = deb_get_pkg_version(package_name)
@@ -545,7 +545,7 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
             hutil.do_exit(DPKGLockedErrorCode, 'Install', 'error', str(DPKGLockedErrorCode), 'Install failed because the package manager on the VM is currently locked. Please try installing again.')
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=False, message="Failed to install debian package :" + package_path)
-            raise Exception('Failed to install package {0}: {1}'.format(package_name, stderr))
+            raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 def install_package(package):
     if distro_category == DistroCategory.debian:
@@ -562,7 +562,7 @@ def zypper_package_install(package):
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install zypper package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, stderr))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 def yum_package_install(package):
     hutil.log('yum install -y ' + package)
@@ -571,7 +571,7 @@ def yum_package_install(package):
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install yum package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, stderr))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 def apt_package_install(package):
     hutil.log('apt-get install -y --force-yes ' + package)
@@ -580,7 +580,7 @@ def apt_package_install(package):
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Failed to install apt package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, stderr))    
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 def get_openssl_version():
     cmd_result = waagent.RunGetOutput("openssl version")
@@ -601,7 +601,7 @@ def start_omiservice():
     if code == 0:
         hutil.log('Service omid is started')
     else:
-        raise Exception('Failed to start service omid, status : {0}'.format(stderr))
+        raise Exception('Failed to start service omid, status: stdout: {0}, stderr: {1}'.format(output, stderr))
 
 def download_file():
     waagent.AddExtensionEvent(name=ExtensionShortName, op="EnableInProgress", isSuccess=True, message="Downloading file")
@@ -736,7 +736,7 @@ def apply_dsc_configuration(config_file_path):
         code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
     else:
-        error_msg = 'Failed to apply MOF configuration: {0}'.format(stderr)
+        error_msg = 'Failed to apply MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr))
         waagent.AddExtensionEvent(name=ExtensionShortName, op=Operation.ApplyMof, isSuccess=True, message=error_msg)
         hutil.error(error_msg)
         raise Exception(error_msg)
@@ -749,7 +749,7 @@ def apply_dsc_meta_configuration(config_file_path):
         code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output
     else:
-        error_msg = 'Failed to apply Meta MOF configuration: {0}'.format(stderr)
+        error_msg = 'Failed to apply Meta MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr))
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.ApplyMetaMof,
@@ -864,7 +864,7 @@ def install_module(file_path):
                               isSuccess=True,
                               message="Running the cmd: " + cmd)
     if not code == 0:
-        error_msg = 'Failed to install DSC Module ' + file_path + ':{0}'.format(stderr)
+        error_msg = 'Failed to install DSC Module ' + file_path + ' stdout: {0}, stderr: {1}'.format(output, stderr)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.InstallModule,
@@ -885,7 +885,7 @@ def remove_module():
                               isSuccess=True,
                               message="Running the cmd: " + cmd)    
     if not code == 0:
-        error_msg = 'Failed to remove DSC Module ' + module_name + ': {0}'.format(stderr)
+        error_msg = 'Failed to remove DSC Module ' + module_name + ' stdout: {0}, stderr: {1}'.format(output, stderr)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.RemoveModule,
@@ -964,7 +964,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
                                   message="Registration URL " + registation_url + "Optional parameters to Registration" + optional_parameters)
     code, output, stderr = run_cmd(cmd + optional_parameters)
     if not code == 0:
-        error_msg = '(03109)Failed to register with Azure Automation DSC: {0}'.format(stderr)
+        error_msg = '(03109)Failed to register with Azure Automation DSC: stdout: {0}, stderr: {1}'.format(output, stderr)
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName,
                                   op=Operation.Register,
