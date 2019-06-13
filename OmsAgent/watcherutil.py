@@ -173,7 +173,7 @@ class Watcher:
                         {{
 
             			"name": "Version",
-            			"value": "1.11.3"
+            			"value": "1.11.5"
              		}},
 
                         {{
