@@ -259,7 +259,7 @@ class ResourceDiskUtil(object):
             lines.append(CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point))
 
         if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
-            lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+            lines.append('{0} {1} auto defaults,discard,nofail,nobootwait 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
