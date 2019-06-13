@@ -134,13 +134,13 @@ def get_distro_category():
     hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), distro_name + 'is not supported.')
     
 def check_supported_OS():
-    """
+"""
     Checks if the VM this extension is running on is supported by DSC
     Returns for platform.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match.
     All other distros not supported will get error code 51
-    """
+"""
     supported_dists = {'redhat' : ['6', '7'], # CentOS
                        'centos' : ['6', '7'], # CentOS
                        'red hat' : ['6', '7'], # Redhat
@@ -408,6 +408,12 @@ def run_cmd(cmd):
     return exit_code, stdout, stderr
  
 def run_dpkg_cmd_with_retry(cmd):
+"""
+    Attempts to run the cmd - if it fails, checks to see if dpkg is locked by another
+    process, if so, it will sleep for 5 seconds and then try running the command again.
+    If dpkg is still locked, then it will return the DPKGLockedErrorCode which won't
+    count against our SLA numbers.
+"""
     exit_code, output, stderr = run_cmd(cmd)
     if not exit_code == 0:
         dpkg_locked = is_dpkg_locked(exit_code, stderr)
@@ -904,7 +910,7 @@ def deb_uninstall_package(package_name):
     if code == 0:
         hutil.log('Package ' + package_name + ' was removed successfully')
     elif code == DPKGLockedErrorCode:
-        hutil.do_exit(DPKGLockedErrorCode, 'Install', 'error', str(DPKGLockedErrorCode), 'operation failed because the package manager on the VM is currently locked. Please try again.')
+        hutil.do_exit(DPKGLockedErrorCode, 'Install', 'error', str(DPKGLockedErrorCode), 'Operation failed because the package manager on the VM is currently locked. Please try again.')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="failed to remove the package" + package_name)
         raise Exception('Failed to remove package ' + package_name)
@@ -919,10 +925,10 @@ def rpm_uninstall_package(package_name):
         raise Exception('Failed to remove package ' + package_name)
         
 def is_dpkg_locked(exit_code, output):
-    """
+"""
     If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
-    """
+"""
     if exit_code is not 0:
         dpkg_locked_search = r'^.*dpkg.+lock.*$'
         dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
