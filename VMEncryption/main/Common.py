@@ -43,6 +43,7 @@ class CommonVariables:
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
     encryption_key_mount_point = '/mnt/azure_bek_disk/'
+    bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail,nobootwait 0 0\n'
 
     """
     parameter key names

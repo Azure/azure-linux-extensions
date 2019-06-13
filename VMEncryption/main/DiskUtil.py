@@ -560,7 +560,7 @@ class DiskUtil(object):
                 break
 
         if not self.is_bek_in_fstab_file(lines):
-            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
+            lines.append(CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point))
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
@@ -830,6 +830,12 @@ class DiskUtil(object):
         azure_name_table = self.get_block_device_to_azure_udev_table()
         if sdx_realpath in azure_name_table:
             return azure_name_table[sdx_realpath]
+
+        # A mapper path is also pretty good (especially for raid or lvm)
+        for mapper_name in os.listdir(CommonVariables.dev_mapper_root):
+            mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
+            if os.path.realpath(mapper_path) == sdx_realpath:
+                return mapper_path
 
         # Then try matching a uuid symlink. Those are probably the best
         for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):

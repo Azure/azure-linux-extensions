@@ -256,7 +256,7 @@ class ResourceDiskUtil(object):
             lines = f.readlines()
 
         if not self.disk_util.is_bek_in_fstab_file(lines):
-            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
+            lines.append(CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point))
 
         if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
             lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
