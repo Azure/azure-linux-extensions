@@ -58,7 +58,7 @@ nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
 extension_handler_version = "2.70.0.10"
 
-# Error codes ******We should update these values and add more to the SLA query in Kusto so they can be unique.
+# Error codes
 UnsupportedDistro = 51 #excludes from SLA
 DPKGLockedErrorCode = 51 #excludes from SLA
 
