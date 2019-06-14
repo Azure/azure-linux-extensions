@@ -342,9 +342,7 @@ class DiskUtil(object):
             return self.add_crypt_item_to_crypttab(crypt_item, backup_folder)
 
     def add_crypt_item_to_crypttab(self, crypt_item, backup_folder=None):
-        #def add_crypttab_item(self, mapper_name, dev_path, key_file, luks_header_path=None, backup_folder=None):
-
-        # TODO: figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
+        # figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
         if crypt_item.uses_cleartext_key:
             key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
@@ -358,7 +356,7 @@ class DiskUtil(object):
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
 
         crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
-        if crypt_item.luks_header_path:
+        if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path
 
         with open("/etc/crypttab", "a") as wf:
@@ -432,7 +430,7 @@ class DiskUtil(object):
 
                     filtered_mount_lines.append(line)
 
-            with open(self.encryption_environment.azure_crypt_mount_config_path, 'w') as wf:
+            with open(crypt_file_path, 'w') as wf:
                 wf.write(''.join(filtered_mount_lines))
 
             if backup_folder is not None:
@@ -688,7 +686,8 @@ class DiskUtil(object):
                 break
 
         if not self.is_bek_in_fstab_file(lines):
-            lines.append('LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'.format(CommonVariables.encryption_key_mount_point))
+            lines.append(CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point))
+            self.add_bek_to_default_cryptdisks()
 
         with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
@@ -697,6 +696,13 @@ class DiskUtil(object):
             with open('/etc/fstab.azure.backup', 'a+') as f:
                 f.write(relevant_line)
 
+    def add_bek_to_default_cryptdisks(self):
+        if os.path.exists("/etc/defaults/cryptdisks"):
+            with open("/etc/defaults/cryptdisks", 'r') as f:
+                lines = f.readlines()
+            if not any(["azure_bek_disk" in line for line in lines]):
+                with open("/etc/defaults/cryptdisks", 'a') as f:
+                    f.write(CommonVariables.etc_defaults_cryptdisks_line)
 
     def remove_mount_info(self, mount_point):
         if not mount_point:
@@ -791,6 +797,13 @@ class DiskUtil(object):
 
         return self.command_executor.Execute(mount_cmd)
 
+    def mount_auto(self, dev_path_or_mount_point):
+        """
+        mount the file system via fstab entry
+        """
+        mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path_or_mount_point
+        return self.command_executor.Execute(mount_cmd)
+
     def mount_filesystem(self, dev_path, mount_point, file_system=None):
         """
         mount the file system.
@@ -806,8 +819,14 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
-        self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
+        if str(crypt_item.mount_point) != 'None':
+            mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name),
+                                                            crypt_item.mount_point,
+                                                            crypt_item.file_system)
+            self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
+        else:
+            self.logger.log(msg=('mount_point is None so trying an auto mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
+            mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def swapoff(self):
         return self.command_executor.Execute('swapoff -a')
@@ -959,6 +978,12 @@ class DiskUtil(object):
         azure_name_table = self.get_block_device_to_azure_udev_table()
         if sdx_realpath in azure_name_table:
             return azure_name_table[sdx_realpath]
+
+        # A mapper path is also pretty good (especially for raid or lvm)
+        for mapper_name in os.listdir(CommonVariables.dev_mapper_root):
+            mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
+            if os.path.realpath(mapper_path) == sdx_realpath:
+                return mapper_path
 
         # Then try matching a uuid symlink. Those are probably the best
         for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
