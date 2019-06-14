@@ -230,11 +230,12 @@ class Watcher:
                         except Exception as e:
                             self._hutil_log("Error parsing telemetry status file: "+sf)
                             self._hutil_log("Exception info: "+traceback.format_exc())
-                    try:
-                        os.remove(sf)
-                    except Exception as e:
-                        self._hutil_log("Error removing telemetry status file: "+  sf)
-                        self._hutil_log("Exception info: " + traceback.format_exc())
+                    if sf == "/var/opt/microsoft/omsconfig/status/omsconfighost":
+                        try:
+                            os.remove(sf)
+                        except Exception as e:
+                            self._hutil_log("Error removing telemetry status file: "+  sf)
+                            self._hutil_log("Exception info: " + traceback.format_exc())
                 else:
                     self._hutil_log("Telemetry status file not updated in last 5 mins: "+sf)
             else:
