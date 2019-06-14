@@ -245,13 +245,18 @@ class Watcher:
                         message = status_data["message"]
 
                         event = self.create_telemetry_event(operation,operation_success,message,"300000")
-                        self._hutil_log("Writing telemetry event: "+event)
+                        self._hutil_log("Writing telemetry event: " + event)
                         self.write_waagent_event(event)
-                        self._hutil_log("Successfully processed telemetry status file: "+omsconfighost_event_file)
+                        self._hutil_log("Successfully processed telemetry status file: " + omsconfighost_event_file)
 
                     except Exception as e:
-                        self._hutil_log("Error parsing omsconfighost telemetry event file: "+omsconfighost_event_file)
-                        self._hutil_log("Exception info: "+traceback.format_exc())
+                        self._hutil_log("Error parsing omsconfighost telemetry event file: " + omsconfighost_event_file)
+                        self._hutil_log("Exception info: " + traceback.format_exc())
+                try:
+                    os.remove(omsconfighost_event_file)
+                except Exception as e:
+                    self._hutil_log("Error removing omsconfighost telemetry event file: "+  omsconfighost_event_file)
+                    self._hutil_log("Exception info: " + traceback.format_exc())
 
         pass
 
