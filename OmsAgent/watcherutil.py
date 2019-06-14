@@ -207,9 +207,8 @@ class Watcher:
                 "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status",
                 "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
                 "/var/opt/microsoft/omsconfig/status/dscperforminventory",
-                "/var/opt/microsoft/omsconfig/status/dscsetlcm",
-                "/var/opt/microsoft/omsconfig/status/omsconfighost"
-            ]            
+                "/var/opt/microsoft/omsconfig/status/dscsetlcm"
+            ]
         for sf in status_files:
             if os.path.isfile(sf):
                 mod_time = os.path.getmtime(sf)
@@ -230,11 +229,30 @@ class Watcher:
 
                         except Exception as e:
                             self._hutil_log("Error parsing telemetry status file: "+sf)
-                            self._hutil_log("Exception info: "+traceback.format_exc())                            
+                            self._hutil_log("Exception info: "+traceback.format_exc())
                 else:
                     self._hutil_log("Telemetry status file not updated in last 5 mins: "+sf)
             else:
                 self._hutil_log("Telemetry status file does not exist: "+sf)
+        
+        for omsconfighost_event_file in os.listdir("/var/opt/microsoft/omsconfig/status"):
+            if omsconfighost_event_file.startswith("omsconfighost"):
+                with open(omsconfighost_event_file) as json_file:
+                    try:
+                        status_data = json.load(json_file)
+                        operation = status_data["operation"]
+                        operation_success = status_data["success"]
+                        message = status_data["message"]
+
+                        event = self.create_telemetry_event(operation,operation_success,message,"300000")
+                        self._hutil_log("Writing telemetry event: "+event)
+                        self.write_waagent_event(event)
+                        self._hutil_log("Successfully processed telemetry status file: "+omsconfighost_event_file)
+
+                    except Exception as e:
+                        self._hutil_log("Error parsing omsconfighost telemetry event file: "+omsconfighost_event_file)
+                        self._hutil_log("Exception info: "+traceback.format_exc())
+
         pass
 
     def watch(self):
