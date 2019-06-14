@@ -32,8 +32,9 @@ class CommonVariables:
     """
     encryption_key_file_name = 'LinuxPassPhraseFileName'
     encryption_key_mount_point = '/mnt/azure_bek_disk'
-    bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail,nobootwait 0 0\n'
-    etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT /mnt/azure_bek_disk"\n'
+    bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
+    bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
+    etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
     encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
     default_encryption_algorithm = 'RSA-OAEP'
     encryption_settings_file_name_pattern = 'settings_{0}.json'

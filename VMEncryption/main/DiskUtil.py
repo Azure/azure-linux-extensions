@@ -686,7 +686,7 @@ class DiskUtil(object):
                 break
 
         if not self.is_bek_in_fstab_file(lines):
-            lines.append(CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point))
+            lines.append(self.get_fstab_bek_line())
             self.add_bek_to_default_cryptdisks()
 
         with open('/etc/fstab', 'w') as f:
@@ -696,13 +696,19 @@ class DiskUtil(object):
             with open('/etc/fstab.azure.backup', 'a+') as f:
                 f.write(relevant_line)
 
+    def get_fstab_bek_line(self):
+        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1] == '14':
+            return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
+        else:
+            return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
+
     def add_bek_to_default_cryptdisks(self):
-        if os.path.exists("/etc/defaults/cryptdisks"):
-            with open("/etc/defaults/cryptdisks", 'r') as f:
+        if os.path.exists("/etc/default/cryptdisks"):
+            with open("/etc/default/cryptdisks", 'r') as f:
                 lines = f.readlines()
             if not any(["azure_bek_disk" in line for line in lines]):
-                with open("/etc/defaults/cryptdisks", 'a') as f:
-                    f.write(CommonVariables.etc_defaults_cryptdisks_line)
+                with open("/etc/default/cryptdisks", 'a') as f:
+                    f.write(CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
 
     def remove_mount_info(self, mount_point):
         if not mount_point:
