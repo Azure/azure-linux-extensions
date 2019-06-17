@@ -257,7 +257,7 @@ class ResourceDiskUtil(object):
             lines = f.readlines()
 
         if not self.disk_util.is_bek_in_fstab_file(lines):
-            lines.append(self.get_fstab_bek_line())
+            lines.append(self.disk_util.get_fstab_bek_line())
             self.disk_util.add_bek_to_default_cryptdisks()
 
         if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
