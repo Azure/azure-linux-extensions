@@ -196,17 +196,7 @@ def main():
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
-    
-    # log message to STDOUT for waagent to pick up for upload to kusto
-    try:
-        if exit_code is not 0:
-            if sys.version_info >= (3,):
-                print(message[-3200:])
-            else:    
-                print message[-3200:]        
-    except:
-        hutil_log_info('Failed to write message to STDOUT')
-
+     
     # Finish up and log messages
     log_and_exit(operation, exit_code, message)   
         
@@ -976,18 +966,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
-
-    # also write output to STDOUT since WA agent uploads that to Azlinux Kusto DB
-    # take only the last 3200 characters as extension cuts off after that
-    try:
-        if exit_code is not 0:
-            if sys.version_info >= (3,):
-                print(output[-3200:])
-            else:    
-                print output[-3200:]        
-    except:
-        hutil_log_info('Failed to write output to STDOUT')
-
+  
     return exit_code, output
 
 
