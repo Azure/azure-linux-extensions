@@ -843,8 +843,8 @@ class DiskUtil(object):
 
     def umount_all_crypt_items(self):
         for crypt_item in self.get_crypt_items():
-            self.logger.log("Unmounting {0}".format(crypt_item.mount_point))
-            self.umount(crypt_item.mount_point)
+            self.logger.log("Unmounting {0}".format(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)))
+            self.umount(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def mount_all(self):
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
