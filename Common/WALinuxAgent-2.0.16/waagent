@@ -6507,9 +6507,33 @@ def DistInfo(fullname=0):
     if 'linux_distribution' in dir(platform):
         distinfo = list(platform.linux_distribution(full_distribution_name=fullname))
         distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
+        if not distinfo[0]:
+            distinfo = dist_info_SLES15()
         return distinfo
     else:
         return platform.dist()
+
+def dist_info_SLES15():
+    os_release_filepath = "/etc/os-release"
+    if not os.path.isfile(os_release_filepath):
+        return ""
+    info = open(os_release_filepath).readlines()
+    found_name_sles = False
+    found_id_sles = False
+    version_id = ""
+    for line in info:
+        if "NAME=\"SLES\"" in line:
+            found_name_sles = True
+        if "ID=\"sles\"" in line:
+            found_id_sles = True
+        if "VERSION_ID" in line:
+            match = re.match(r'VERSION_ID="([.0-9]+)"', line)
+            if match:
+                version_id = match.group(1)
+    if found_name_sles and found_id_sles:
+        return "SuSE", version_id, "suse"
+    return ["","",""]
+
 
 
 def PackagedInstall(buildroot):
