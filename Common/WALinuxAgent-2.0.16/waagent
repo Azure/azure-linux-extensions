@@ -6530,7 +6530,7 @@ def dist_info_SLES15():
             match = re.match(r'VERSION_ID="([.0-9]+)"', line)
             if match:
                 version_id = match.group(1)
-    if found_name_sles and found_id_sles:
+    if found_name_sles and found_id_sles and version_id:
         return "SuSE", version_id, "suse"
     return ["","",""]
 
