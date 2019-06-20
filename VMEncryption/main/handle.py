@@ -1219,6 +1219,8 @@ def decrypt_inplace_copy_data(passphrase_file,
                 if mount_point and mount_point != "None":
                     logger.log(msg="restoring entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
                     disk_util.restore_mount_info(ongoing_item_config.get_mount_point())
+                elif crypt_item.mapper_name:
+                    disk_util.restore_mount_info(crypt_item.mapper_name)
                 else:
                     logger.log(msg=crypt_item.dev_path + " was not in fstab when encryption was enabled, no need to restore",
                                level=CommonVariables.InfoLevel)
@@ -1491,7 +1493,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         if decryption_result_phase == CommonVariables.DecryptionPhaseDone:
             disk_util.luks_close(crypt_item.mapper_name)
-            disk_util.mount_all()
+            #disk_util.mount_all()
             backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/") if crypt_item.mount_point else None
             disk_util.remove_crypt_item(crypt_item, backup_folder)
 

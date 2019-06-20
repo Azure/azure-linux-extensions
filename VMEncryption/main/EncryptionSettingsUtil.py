@@ -311,6 +311,8 @@ class EncryptionSettingsUtil(object):
                     }]
                 }
 
+        protectors_null = [{"Name": "nullProtector.bek", "Base64Key": ""}]
+
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
@@ -318,6 +320,7 @@ class EncryptionSettingsUtil(object):
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",
+                "Protectors": protectors_null,
                 "KekUrl": "",
                 "KekVaultResourceId": "",
                 "KeyVaultResourceId": "",

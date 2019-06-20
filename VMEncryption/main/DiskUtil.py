@@ -34,6 +34,7 @@ from TransactionalCopyTask import TransactionalCopyTask
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
+
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
@@ -100,10 +101,10 @@ class DiskUtil(object):
     def parse_crypttab_line(self, line):
         crypttab_parts = line.strip().split()
 
-        if len(crypttab_parts) < 3: # Line should have enough content
+        if len(crypttab_parts) < 3:  # Line should have enough content
             return None
 
-        if crypttab_parts[0].startswith("#"): # Line should not be a comment
+        if crypttab_parts[0].startswith("#"):  # Line should not be a comment
             return None
 
         crypt_item = CryptItem()
@@ -111,7 +112,7 @@ class DiskUtil(object):
         crypt_item.dev_path = crypttab_parts[1]
         keyfile_path = crypttab_parts[2]
         if CommonVariables.encryption_key_file_name not in keyfile_path and self.encryption_environment.cleartext_key_base_path not in keyfile_path:
-            return None # if the key_file path doesn't have the encryption key file name, its probably not for us to mess with
+            return None  # if the key_file path doesn't have the encryption key file name, its probably not for us to mess with
         if self.encryption_environment.cleartext_key_base_path in keyfile_path:
             crypt_item.uses_cleartext_key = True
         crypttab_option_string = crypttab_parts[3]
@@ -152,7 +153,7 @@ class DiskUtil(object):
         azure_name_table = self.get_block_device_to_azure_udev_table()
 
         for device_item in device_items:
-            if device_item.file_system == "crypto_LUKS" :
+            if device_item.file_system == "crypto_LUKS":
                 # Found an encrypted device, let's check if it is in the azure_crypt_mount file
                 # Check this by comparing the dev paths
                 self.logger.log("Found an encrypted device at {0}".format(device_item.name))
@@ -258,6 +259,15 @@ class DiskUtil(object):
         else:
             self.logger.log("Using crypttab instead of azure_crypt_mount file.")
             crypttab_path = "/etc/crypttab"
+
+            fstab_items = []
+
+            with open("/etc/fstab", "r") as f:
+                for line in f.readlines():
+                    fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+                    if fstab_device is not None:
+                        fstab_items.append((fstab_device, fstab_mount_point))
+
             if not os.path.exists(crypttab_path):
                 self.logger.log("{0} does not exist".format(crypttab_path))
             else:
@@ -273,6 +283,9 @@ class DiskUtil(object):
                         if crypt_item.mapper_name == CommonVariables.osmapper_name :
                             rootfs_crypt_item_found = True
 
+                        for device_path, mount_path in fstab_items:
+                            if crypt_item.mapper_name in device_path:
+                                crypt_item.mount_point = mount_path
                         crypt_items.append(crypt_item)
 
         encryption_status = json.loads(self.get_encryption_status())
@@ -408,11 +421,11 @@ class DiskUtil(object):
         try:
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 crypt_file_path = self.encryption_environment.azure_crypt_mount_config_path
-                crypt_line_parser = lambda line: self.parse_azure_crypt_mount_line(line)
+                crypt_line_parser = self.parse_azure_crypt_mount_line
                 line_file_name = "azure_crypt_mount_line"
             elif os.path.exists("/etc/crypttab"):
                 crypt_file_path = "/etc/crypttab"
-                crypt_line_parser = lambda line: self.parse_crypttab_line(line)
+                crypt_line_parser = self.parse_crypttab_line
                 line_file_name = "crypttab_line"
             else:
                 return True
@@ -631,16 +644,23 @@ class DiskUtil(object):
 
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
-            fstab_parts = line.strip().split()
-            if len(fstab_parts) < 2: # Line should have enough content
-                continue
-            if fstab_parts[0].startswith("#"): # Line should not be a comment
-                continue
-            fstab_device = fstab_parts[0]
-            fstab_mount_point = fstab_parts[1]
+            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
             if fstab_mount_point == CommonVariables.encryption_key_mount_point:
                 return True
         return False
+
+    def parse_fstab_line(self, line):
+        fstab_parts = line.strip().split()
+
+        if len(fstab_parts) < 2: # Line should have enough content
+            return None, None
+
+        if fstab_parts[0].startswith("#"): # Line should not be a comment
+            return None, None
+
+        fstab_device = fstab_parts[0]
+        fstab_mount_point = fstab_parts[1]
+        return fstab_device, fstab_mount_point
 
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
@@ -655,19 +675,9 @@ class DiskUtil(object):
             lines = f.readlines()
 
         relevant_line = None
-        bek_line_found = False
         for i in range(len(lines)):
             line = lines[i]
-            fstab_parts = line.strip().split()
-
-            if len(fstab_parts) < 2: # Line should have enough content
-                continue
-
-            if fstab_parts[0].startswith("#"): # Line should not be a comment
-                continue
-
-            fstab_device = fstab_parts[0]
-            fstab_mount_point = fstab_parts[1]
+            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
 
             if fstab_mount_point != mount_point: # Not the line we are looking for
                 continue
@@ -746,9 +756,9 @@ class DiskUtil(object):
 
         self.logger.log("fstab.azure.backup updated successfully")
 
-    def restore_mount_info(self, mount_point):
-        if not mount_point:
-            self.logger.log("restore_mount_info: mount_point is empty")
+    def restore_mount_info(self, mount_point_or_mapper_name):
+        if not mount_point_or_mapper_name:
+            self.logger.log("restore_mount_info: mount_point_or_mapper_name is empty")
             return
 
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
@@ -759,7 +769,7 @@ class DiskUtil(object):
         with open('/etc/fstab.azure.backup', 'r') as f:
             for line in f.readlines():
                 line = line.strip()
-                pattern = '\s' + re.escape(mount_point) + '\s'
+                pattern = '\s' + re.escape(mount_point_or_mapper_name) + '\s'
 
                 if re.search(pattern, line):
                     self.logger.log("removing fstab.azure.backup line: {0}".format(line))
@@ -778,7 +788,7 @@ class DiskUtil(object):
         with open('/etc/fstab', 'r') as f:
             for line in f.readlines():
                 line = line.strip()
-                pattern = '\s' + re.escape(mount_point) + '\s'
+                pattern = '\s' + re.escape(mount_point_or_mapper_name) + '\s'
                 if re.search(pattern, line):
                     # This line should not remain in the fstab.
                     self.logger.log("removing fstab line: {0}".format(line))
@@ -815,7 +825,6 @@ class DiskUtil(object):
         mount the file system.
         """
         self.make_sure_path_exists(mount_point)
-        return_code = -1
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
         else: 
@@ -825,14 +834,14 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
-        if str(crypt_item.mount_point) != 'None':
+        self.logger.log(msg=('First trying to auto mount for the item'))
+        mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
+        if str(crypt_item.mount_point) != 'None' and mount_filesystem_result != CommonVariables.process_success:
+            self.logger.log(msg=('mount_point is not None and auto mount failed. Trying manual mount.'), level=CommonVariables.WarningLevel)
             mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name),
                                                             crypt_item.mount_point,
                                                             crypt_item.file_system)
             self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
-        else:
-            self.logger.log(msg=('mount_point is None so trying an auto mount for the item {0}'.format(crypt_item)), level=CommonVariables.WarningLevel)
-            mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def swapoff(self):
         return self.command_executor.Execute('swapoff -a')
@@ -1100,7 +1109,6 @@ class DiskUtil(object):
                     continue
 
                 for symlink in os.listdir(top_level_item_full_path):
-                    full_path = os.path.join(top_level_item_full_path, symlink)
                     if symlink.startswith(self._LUN_PREFIX):
                         try:
                             lun_number = int(symlink[3:])
