@@ -6516,7 +6516,7 @@ def DistInfo(fullname=0):
 def dist_info_SLES15():
     os_release_filepath = "/etc/os-release"
     if not os.path.isfile(os_release_filepath):
-        return ""
+        return ["","",""]
     info = open(os_release_filepath).readlines()
     found_name_sles = False
     found_id_sles = False
