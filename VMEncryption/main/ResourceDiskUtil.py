@@ -22,7 +22,7 @@ import time
 import os
 
 from CommandExecutor import CommandExecutor
-from Common import CommonVariables
+from Common import CommonVariables, CryptItem
 
 
 class ResourceDiskUtil(object):
@@ -37,12 +37,13 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, passphrase_filename, public_settings):
+    def __init__(self, logger, disk_util, passphrase_filename, public_settings, distro_info):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
         self.disk_util = disk_util
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
+        self.distro_info = distro_info
 
     def _is_encrypt_format_all(self):
         """ return true if current encryption operation is EncryptFormatAll """
@@ -121,7 +122,10 @@ class ResourceDiskUtil(object):
     def _unmount_resource_disk(self):
         """ unmount resource disk """
         self.disk_util.umount(self.RD_MOUNT_POINT)
+        self.disk_util.umount(CommonVariables.encryption_key_mount_point)
         self.disk_util.umount('/mnt')
+        self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
+        self.disk_util.mount_by_label("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
 
     def _is_plain_mounted(self):
         """ return true if mount point is mounted from a non-crypt layer """
@@ -146,7 +150,7 @@ class ResourceDiskUtil(object):
         """
         device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
         device_mappers = []
-        mapper_device_types = ["raid0","raid1","raid5","raid10","lvm"]
+        mapper_device_types = ["raid0", "raid1", "raid5", "raid10", "lvm", "crypt"]
         for device_item in device_items:
             # fstype should be crypto_LUKS
             dev_path = self.disk_util.get_device_path(device_item.name)
@@ -248,6 +252,23 @@ class ResourceDiskUtil(object):
         self._prepare_partition()
         return True
 
+    def add_to_fstab(self):
+        with open("/etc/fstab") as f:
+            lines = f.readlines()
+
+        if not self.disk_util.is_bek_in_fstab_file(lines):
+            lines.append(self.disk_util.get_fstab_bek_line())
+            self.disk_util.add_bek_to_default_cryptdisks()
+
+        if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
+            if self.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):
+                lines.append('{0} {1} auto defaults,discard,nobootwait 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+            else:
+                lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+
+        with open('/etc/fstab', 'w') as f:
+            f.writelines(lines)
+
     def encrypt_format_mount(self):
         if not self.prepare():
             self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
@@ -261,6 +282,15 @@ class ResourceDiskUtil(object):
         if not self._mount_resource_disk(self.RD_MAPPER_PATH):
             self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
+        if not self.disk_util.should_use_azure_crypt_mount():
+            self.logger.log("Adding resource disk to the crypttab file")
+            crypt_item = CryptItem()
+            crypt_item.dev_path = self.RD_DEV_PATH
+            crypt_item.mapper_name = self.RD_MAPPER_NAME
+            crypt_item.uses_cleartext_key = False
+            self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
+            self.disk_util.add_crypt_item_to_crypttab(crypt_item)
+            self.add_to_fstab()
         return True
 
     def automount(self):
