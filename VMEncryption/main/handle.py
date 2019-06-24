@@ -212,9 +212,10 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
     encryption_config.secret_id = new_protector_name
     encryption_config.secret_seq_num = hutil.get_current_seq()
     encryption_config.commit()
+    extension_parameter.commit()
 
 def are_disks_stamped_with_current_config(encryption_config):
-    return encryption_config.get_secret_seq_num() == hutil.get_current_seq()
+    return encryption_config.get_secret_seq_num() == str(hutil.get_current_seq())
 
 def get_public_settings():
     public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -258,12 +259,18 @@ def update_encryption_settings():
     executor = CommandExecutor(logger)
     executor.Execute("mount /boot")
 
+    settings_stamped = False
+    updated_crypt_items = []
+    old_passphrase = None
+
     try:
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        with open(existing_passphrase_file, 'r') as f:
+            old_passphrase = f.read()
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
@@ -305,6 +312,7 @@ def update_encryption_settings():
                 #crypt_item.current_luks_slot = new_keyslot
 
                 #disk_util.update_crypt_item(crypt_item)
+                updated_crypt_items.append(crypt_item)
 
             logger.log("New key successfully added to all encrypted devices")
 
@@ -320,31 +328,16 @@ def update_encryption_settings():
 
             os.unlink(temp_keyfile.name)
 
-            # backup old disk encryption key file
-            shutil.copy(existing_passphrase_file, encryption_environment.bek_backup_path)
-            logger.log("Backed up BEK at {0}".format(encryption_environment.bek_backup_path))
-
             # store new passphrase and overwrite old encryption key file
             bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
             stamp_disks_with_settings(items_to_encrypt=[], encryption_config=encryption_config)
+            settings_stamped = True
 
-            # commit local encryption config
-            # encryption_config.passphrase_file_name = extension_parameter.DiskEncryptionKeyFileName
-            # encryption_config.secret_id = new_protector_name
-            # encryption_config.secret_seq_num = hutil.get_current_seq()
-            # encryption_config.commit()
-
-            # reboot into new key
-            executor.Execute("reboot")
-        else:
-            logger.log('Secret has already been updated')
-            mount_encrypted_disks(disk_util, bek_util, existing_passphrase_file, encryption_config)
-            disk_util.log_lsblk_output()
-            hutil.exit_if_same_seq()
-
-            # remount bek volume
             existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+
+            logger.log('Secret has already been updated')
+            disk_util.log_lsblk_output()
 
             if extension_parameter.passphrase and extension_parameter.passphrase != file(existing_passphrase_file).read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
@@ -353,11 +346,15 @@ def update_encryption_settings():
 
             logger.log('Removing old passphrase')
 
+            temp_oldkeyfile = tempfile.NamedTemporaryFile(delete=False)
+            temp_oldkeyfile.write(old_passphrase)
+            temp_oldkeyfile.close()
+
             for crypt_item in disk_util.get_crypt_items():
                 if not crypt_item:
                     continue
 
-                if filecmp.cmp(existing_passphrase_file, encryption_environment.bek_backup_path):
+                if filecmp.cmp(existing_passphrase_file, temp_oldkeyfile.name):
                     logger.log('Current BEK and backup are the same, skipping removal')
                     continue
 
@@ -365,8 +362,8 @@ def update_encryption_settings():
 
                 keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
                 logger.log("Keyslots before removal: {0}".format(keyslots))
-
-                luks_remove_result = disk_util.luks_remove_key(passphrase_file=encryption_environment.bek_backup_path,
+                
+                luks_remove_result = disk_util.luks_remove_key(passphrase_file=temp_oldkeyfile.name,
                                                                dev_path=crypt_item.dev_path,
                                                                header_file=crypt_item.luks_header_path)
                 logger.log("luks remove result is {0}".format(luks_remove_result))
@@ -377,7 +374,8 @@ def update_encryption_settings():
             logger.log("Old key successfully removed from all encrypted devices")
             hutil.save_seq()
             extension_parameter.commit()
-            os.unlink(encryption_environment.bek_backup_path)
+            os.unlink(temp_oldkeyfile.name)
+            bek_util.umount_azure_passhprase(encryption_config)
 
         hutil.do_exit(exit_code=0,
                         operation='UpdateEncryptionSettings',
@@ -385,13 +383,66 @@ def update_encryption_settings():
                         code=str(CommonVariables.success),
                         message='Encryption settings updated')
     except Exception as e:
+        if not settings_stamped:
+            clear_new_luks_keys(disk_util, old_passphrase, extension_parameter.passphrase, bek_util, encryption_config, updated_crypt_items)
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
+        bek_util.umount_azure_passhprase(encryption_config)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='UpdateEncryptionSettings',
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
                       message=message)
+
+def clear_new_luks_keys(disk_util, old_passphrase, new_passphrase, bek_util, encryption_config, updated_crypt_items):
+    try:
+
+        if not old_passphrase:
+            logger.log("Old passphrase does not exist. Nothing to revert.")
+            return
+
+        if not new_passphrase:
+            logger.log("New passphrase does not exist. Nothing to clear.")
+            return
+        
+        temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+        temp_keyfile.write(new_passphrase)
+        temp_keyfile.close()
+
+        executor = CommandExecutor(logger)
+        for crypt_item in updated_crypt_items:
+            if not crypt_item:
+                continue
+            
+            logger.log('Removing new passphrase from {0}'.format(crypt_item.dev_path))
+            before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+            logger.log("Keyslots before removal: {0}".format(before_keyslots))
+            
+            luks_remove_result = disk_util.luks_remove_key(passphrase_file=temp_keyfile.name,
+                                                           dev_path=crypt_item.dev_path,
+                                                           header_file=crypt_item.luks_header_path)
+            
+            logger.log("luks remove result is {0}".format(luks_remove_result))
+            
+            after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
+            logger.log("Keyslots after removal: {0}".format(after_keyslots))
+            
+        if DistroPatcher.distro_info[0] == "Ubuntu":
+            executor.Execute("update-initramfs -u -k all", True)
+                
+        if DistroPatcher.distro_info[0] == "redhat" or DistroPatcher.distro_info[0] == "centos":
+            distro_version = DistroPatcher.distro_info[1]
+                    
+            if distro_version.startswith('7.'):
+                executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+                logger.log("Update initrd image with new osluksheader.")
+                
+        bek_util.store_bek_passphrase(encryption_config, old_passphrase)
+        os.unlink(temp_keyfile.name)
+        logger.log("Cleared new luks keys.")
+    except Exception as e:
+        msg = "Failed to clear new luks key with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=msg, level=CommonVariables.WarningLevel)
 
 def update():
     hutil.do_parse_context('Update')
@@ -713,7 +764,6 @@ def enable_encryption():
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
-                    extension_parameter.commit()
 
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
@@ -1559,6 +1609,7 @@ def daemon_encrypt():
         except Exception as e:
             message = "Failed to encrypt data volumes with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            encryption_marker.clear_config()
             hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='EnableEncryptionDataVolumes',
                           status=CommonVariables.extension_error_status,
@@ -1669,6 +1720,7 @@ def daemon_encrypt():
                                                                                                                  traceback.format_exc(),
                                                                                                                  os_encryption.state)
             logger.log(msg=message, level=CommonVariables.ErrorLevel)
+            encryption_marker.clear_config()
             hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                           operation='EnableEncryptionOSVolume',
                           status=CommonVariables.extension_error_status,
