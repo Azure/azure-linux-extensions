@@ -635,24 +635,27 @@ def is_vm_supported_for_extension():
                        'suse' : ['12'], 'sles' : ['15'] # SLES
     }
 
+    vm_supported = False
+
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
         vm_dist, vm_ver, vm_id = platform.dist()
 
-    if not vm_dist and not vm_ver: # SLES 15
-        with open('/etc/os-release', 'r') as fp:
-            for line in fp:
-                if line.startswith('ID='):
-                    vm_dist = line.split('=')[1]
-                    vm_dist = vm_dist.split('-')[0]
-                    vm_dist = vm_dist.replace('\"', '').replace('\n', '')
-                elif line.startswith('VERSION_ID='):
-                    vm_ver = line.split('=')[1]
-                    vm_ver = vm_ver.split('.')[0]
-                    vm_ver = vm_ver.replace('\"', '').replace('\n', '')
-
-    vm_supported = False
+    if not vm_dist and not vm_ver: # SLES 15 and others
+        try:
+            with open('/etc/os-release', 'r') as fp:
+                for line in fp:
+                    if line.startswith('ID='):
+                        vm_dist = line.split('=')[1]
+                        vm_dist = vm_dist.split('-')[0]
+                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                    elif line.startswith('VERSION_ID='):
+                        vm_ver = line.split('=')[1]
+                        vm_ver = vm_ver.split('.')[0]
+                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
+        except:
+            return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
     for supported_dist in supported_dists.keys():
