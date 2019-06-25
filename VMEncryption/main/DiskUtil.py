@@ -77,14 +77,8 @@ class DiskUtil(object):
 
     def format_disk(self, dev_path, file_system):
         mkfs_command = ""
-        if file_system == "ext4":
-            mkfs_command = "mkfs.ext4"
-        elif file_system == "ext3":
-            mkfs_command = "mkfs.ext3"
-        elif file_system == "xfs":
-            mkfs_command = "mkfs.xfs"
-        elif file_system == "btrfs":
-            mkfs_command = "mkfs.btrfs"
+        if file_system in CommonVariables.format_supported_file_systems:
+            mkfs_command = "mkfs." + file_system
         mkfs_cmd = "{0} {1}".format(mkfs_command, dev_path)
         return self.command_executor.Execute(mkfs_cmd)
 
@@ -882,38 +876,40 @@ class DiskUtil(object):
         }
 
         mount_items = self.get_mount_items()
+        device_items = self.get_device_items(None)
+        device_items_dict = {device_item.mount_point: device_item for device_item in device_items}
 
         os_drive_encrypted = False
         data_drives_found = False
         all_data_drives_encrypted = True
-        for mount_item in mount_items:
-            if mount_item["fs"] in ["ext2", "ext4", "ext3", "xfs"] and \
-                not "/mnt" == mount_item["dest"] and \
-                not "/" == mount_item["dest"] and \
-                not "/oldroot/mnt/resource" == mount_item["dest"] and \
-                not "/oldroot/boot" == mount_item["dest"] and \
-                not "/oldroot" == mount_item["dest"] and \
-                not "/mnt/resource" == mount_item["dest"] and \
-                not "/boot" == mount_item["dest"]:
 
+        if self.is_os_disk_lvm():
+            grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep {0}'.format(self.get_osmapper_path()),
+                                                              suppress_logging=True)
+            if grep_result == 0 and not os.path.exists('/volumes.lvm'):
+                self.logger.log("OS PV is encrypted")
+                os_drive_encrypted = True
+
+        special_azure_devices_to_skip = self.get_azure_devices()
+        for mount_item in mount_items:
+            device_item = device_items_dict.get(mount_item["dest"])
+
+            if device_item is not None and \
+               mount_item["fs"] in CommonVariables.format_supported_file_systems and \
+               self.is_data_disk(device_item, special_azure_devices_to_skip):
                 data_drives_found = True
 
-                if not CommonVariables.dev_mapper_root in mount_item["src"]:
+                if not device_item.type == "crypt":
                     self.logger.log("Data volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                     all_data_drives_encrypted = False
 
-            if self.is_os_disk_lvm():
-                grep_result = self.command_executor.ExecuteInBash('pvdisplay | grep {0}'.format(self.get_osmapper_path()),
-                                                                  suppress_logging=True)
-                if grep_result == 0 and not os.path.exists('/volumes.lvm'):
-                    self.logger.log("OS PV is encrypted")
-                    os_drive_encrypted = True
-            elif mount_item["dest"] == "/" and \
-                CommonVariables.dev_mapper_root in mount_item["src"] or \
-                "/dev/dm" in mount_item["src"]:
+            if mount_item["dest"] == "/" and \
+               not self.is_os_disk_lvm() and \
+               CommonVariables.dev_mapper_root in mount_item["src"] or \
+               "/dev/dm" in mount_item["src"]:
                 self.logger.log("OS volume {0} is mounted from {1}".format(mount_item["dest"], mount_item["src"]))
                 os_drive_encrypted = True
-    
+
         if not data_drives_found:
             encryption_status["data"] = "NotMounted"
         elif all_data_drives_encrypted:
@@ -1331,7 +1327,31 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
-    def should_skip_for_inplace_encryption(self, device_item, encrypt_volume_type):
+    def is_data_disk(self, device_item, special_azure_devices_to_skip):
+        # Root disk
+        if device_item.device_id.startswith('00000000-0000'):
+            self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
+            return False
+        # Resource Disk. Not considered a "data disk" exactly (is not attached via portal and we have a separate code path for encrypting it)
+        if device_item.device_id.startswith('00000000-0001'):
+            self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
+            return False
+        # BEK VOLUME
+        if device_item.file_system == "vfat" and device_item.label.lower() == "bek":
+            self.logger.log(msg="skipping BEK VOLUME", level=CommonVariables.WarningLevel)
+            return False
+
+
+        # We let the caller specify a list of devices to skip. Usually its just a list of IDE devices.
+        # IDE devices (in Gen 1) include Resource disk and BEK VOLUME. This check works pretty wel in Gen 1, but not in Gen 2.
+        for azure_blk_item in special_azure_devices_to_skip:
+            if azure_blk_item.name == device_item.name:
+                self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
+                return False
+
+        return True
+
+    def should_skip_for_inplace_encryption(self, device_item, special_azure_devices_to_skip, encrypt_volume_type):
         """
         TYPE="raid0"
         TYPE="part"
@@ -1342,14 +1362,8 @@ class DiskUtil(object):
         if the answer is yes, then skip it.
         """
 
-        if encrypt_volume_type.lower() == 'data':
-            self.logger.log(msg="enabling encryption for data volumes", level=CommonVariables.WarningLevel)
-            if device_item.device_id.startswith('00000000-0000'):
-                self.logger.log(msg="skipping root disk", level=CommonVariables.WarningLevel)
-                return True
-            if device_item.device_id.startswith('00000000-0001'):
-                self.logger.log(msg="skipping resource disk", level=CommonVariables.WarningLevel)
-                return True
+        if encrypt_volume_type.lower() == 'data' and not self.is_data_disk(device_item, special_azure_devices_to_skip):
+            return True # Skip non-data disks
 
         if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
@@ -1372,7 +1386,6 @@ class DiskUtil(object):
                 self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)), level=CommonVariables.WarningLevel)
                 return True
 
-            azure_blk_items = self.get_azure_devices()
             if device_item.type == "crypt":
                 self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)), level=CommonVariables.WarningLevel)
                 return True
@@ -1380,7 +1393,8 @@ class DiskUtil(object):
             if device_item.mount_point == "/":
                 self.logger.log(msg=("the mountpoint is root:{0}, so skip it.".format(device_item)), level=CommonVariables.WarningLevel)
                 return True
-            for azure_blk_item in azure_blk_items:
+
+            for azure_blk_item in special_azure_devices_to_skip:
                 if azure_blk_item.name == device_item.name:
                     self.logger.log(msg="the mountpoint is the azure disk root or resource, so skip it.")
                     return True

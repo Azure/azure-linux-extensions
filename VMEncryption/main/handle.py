@@ -928,9 +928,13 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
 
-            if not ongoing_item_config.get_file_system().lower() in ["ext2", "ext3", "ext4"]:
-                logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
-                           level=CommonVariables.WarningLevel)
+            device_fs = ongoing_item_config.get_file_system().lower()
+            if not device_fs in CommonVariables.inplace_supported_file_systems:
+                if device_fs in CommonVariables.format_supported_file_systems:
+                    msg = "Encrypting {0} file system is not supported for data-preserving encryption. Consider using the encrypt-format-all option.".format(device_fs)
+                else:
+                    msg = "AzureDiskEncryption does not support the {0} file system".format(device_fs)
+                logger.log(msg=msg, level=CommonVariables.WarningLevel)
 
                 ongoing_item_config.clear_config()
                 return current_phase
@@ -1405,15 +1409,13 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
     device_items = disk_util.get_device_items(None)
     dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
     device_items_to_encrypt = []
+    special_azure_devices_to_skip = disk_util.get_azure_devices()
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
         if any(di.name == device_item.name for di in device_items_to_encrypt):
             continue
-        if disk_util.should_skip_for_inplace_encryption(device_item, encryption_marker.get_volume_type()):
-            continue
-        if device_item.label == "BEK":
-            logger.log("skip for the passphrase disk {0}".format(device_item))
+        if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, encryption_marker.get_volume_type()):
             continue
 
         if encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
