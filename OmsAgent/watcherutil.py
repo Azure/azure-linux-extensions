@@ -230,7 +230,7 @@ class Watcher:
                         except Exception as e:
                             self._hutil_log("Error parsing telemetry status file: "+sf)
                             self._hutil_log("Exception info: "+traceback.format_exc())
-                    if sf == "/var/opt/microsoft/omsconfig/status/omsconfighost":
+                    if sf.startswith("/var/opt/microsoft/omsconfig/status"):
                         try:
                             os.remove(sf)
                         except Exception as e:
