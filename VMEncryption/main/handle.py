@@ -203,7 +203,9 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
                         filenames.append(str(tag["Value"]))
 
     for filename in filenames:
-        shutil.copy(current_passphrase_file, os.path.join(CommonVariables.encryption_key_mount_point, filename))
+        filepath = os.path.join(CommonVariables.encryption_key_mount_point, filename)
+        if filename != current_passphrase_file:
+            shutil.copy(current_passphrase_file, filepath)
 
     settings.remove_protector_file(new_protector_name)
 
