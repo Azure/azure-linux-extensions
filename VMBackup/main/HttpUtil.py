@@ -107,7 +107,9 @@ class HttpUtil(object):
         responseBody = None
         try:
             resp = None
-            if(self.proxyHost == None or self.proxyPort == None):
+            snapshotThroughProxy = self.hutil.get_value_from_configfile(SnapshotThroughProxy)
+
+            if(snapshotThroughProxy == None or snapshotThroughProxy != "True" or self.proxyHost == None or self.proxyPort != None):
                 if(isHttpCall):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 10) # making call with port 80 to make it http call
                 else:

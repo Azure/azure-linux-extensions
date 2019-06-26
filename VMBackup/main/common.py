@@ -60,6 +60,7 @@ class CommonVariables:
     SnapshotMethod = 'SnapshotMethod'
     IsAnySnapshotFailed = 'IsAnySnapshotFailed'
     SnapshotRateExceededFailureCount = 'SnapshotRateExceededFailureCount'
+    SnapshotThroughProxy = 'SnapshotThroughProxy'
 
     status_transitioning = 'transitioning'
     status_warning = 'warning'
