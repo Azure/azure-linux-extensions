@@ -1546,7 +1546,6 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         if decryption_result_phase == CommonVariables.DecryptionPhaseDone:
             disk_util.luks_close(crypt_item.mapper_name)
-            #disk_util.mount_all()
             backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/") if crypt_item.mount_point else None
             disk_util.remove_crypt_item(crypt_item, backup_folder)
 
@@ -1554,6 +1553,8 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         else:
             # decryption failed for a crypt_item, return the failed item to caller
             return crypt_item
+
+    disk_util.mount_all()
 
     return None
 
