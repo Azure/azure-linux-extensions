@@ -270,10 +270,11 @@ class EncryptionSettingsUtil(object):
             self._post_to_wireserver_helper(msg_data, http_util)
         except Exception:
             self.logger.log("Falling back on old Wire Server protocol")
-            data.pop("Protectors")
-            data["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
+            data_copy = data.copy()
+            data_copy.pop("Protectors")
+            data_copy["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
 
-            self.write_settings_file(data)
+            self.write_settings_file(data_copy)
             if not os.path.isfile(self.get_settings_file_path()):
                 raise Exception(
                     'Disk encryption settings file not found: ' + self.get_settings_file_path())
