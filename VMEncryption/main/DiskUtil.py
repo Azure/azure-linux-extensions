@@ -410,7 +410,7 @@ class DiskUtil(object):
 
     def remove_crypt_item(self, crypt_item, backup_folder=None):
         try:
-            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            if self.should_use_azure_crypt_mount():
                 crypt_file_path = self.encryption_environment.azure_crypt_mount_config_path
                 crypt_line_parser = self.parse_azure_crypt_mount_line
                 line_file_name = "azure_crypt_mount_line"
@@ -698,7 +698,7 @@ class DiskUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1] == '14':
+        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):
             return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
         else:
             return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
