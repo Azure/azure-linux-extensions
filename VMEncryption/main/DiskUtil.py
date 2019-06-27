@@ -698,7 +698,7 @@ class DiskUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):
+        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1].startswith('14'):
             return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
         else:
             return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
