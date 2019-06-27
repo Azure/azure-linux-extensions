@@ -423,12 +423,13 @@ class DiskUtil(object):
 
             filtered_mount_lines = []
             with open(crypt_file_path, 'r') as f:
+                self.logger.log("removing an entry from {0}".format(crypt_file_path))
                 for line in f:
                     if not line.strip():
                         continue
 
                     parsed_crypt_item = crypt_line_parser(line)
-                    if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
+                    if parsed_crypt_item is not None and parsed_crypt_item.mapper_name == crypt_item.mapper_name:
                         self.logger.log("Removing crypt mount entry: {0}".format(line))
                         continue
 
