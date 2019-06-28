@@ -927,9 +927,8 @@ class DiskUtil(object):
             volume_type = encryption_config.get_volume_type().lower()
 
             if volume_type == CommonVariables.VolumeTypeData.lower() or \
-                volume_type == CommonVariables.VolumeTypeAll.lower():
-                if data_drives_found and not all_data_drives_encrypted:
-                    encryption_status["data"] = "EncryptionInProgress"
+               volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                volume_type == CommonVariables.VolumeTypeAll.lower():
