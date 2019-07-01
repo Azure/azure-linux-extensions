@@ -410,7 +410,7 @@ class DiskUtil(object):
 
     def remove_crypt_item(self, crypt_item, backup_folder=None):
         try:
-            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            if self.should_use_azure_crypt_mount():
                 crypt_file_path = self.encryption_environment.azure_crypt_mount_config_path
                 crypt_line_parser = self.parse_azure_crypt_mount_line
                 line_file_name = "azure_crypt_mount_line"
@@ -423,12 +423,13 @@ class DiskUtil(object):
 
             filtered_mount_lines = []
             with open(crypt_file_path, 'r') as f:
+                self.logger.log("removing an entry from {0}".format(crypt_file_path))
                 for line in f:
                     if not line.strip():
                         continue
 
                     parsed_crypt_item = crypt_line_parser(line)
-                    if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
+                    if parsed_crypt_item is not None and parsed_crypt_item.mapper_name == crypt_item.mapper_name:
                         self.logger.log("Removing crypt mount entry: {0}".format(line))
                         continue
 
@@ -698,7 +699,7 @@ class DiskUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1] == '14':
+        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1].startswith('14'):
             return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
         else:
             return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
@@ -926,9 +927,8 @@ class DiskUtil(object):
             volume_type = encryption_config.get_volume_type().lower()
 
             if volume_type == CommonVariables.VolumeTypeData.lower() or \
-                volume_type == CommonVariables.VolumeTypeAll.lower():
-                if data_drives_found and not all_data_drives_encrypted:
-                    encryption_status["data"] = "EncryptionInProgress"
+               volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_status["data"] = "EncryptionInProgress"
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                volume_type == CommonVariables.VolumeTypeAll.lower():
