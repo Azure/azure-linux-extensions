@@ -306,12 +306,13 @@ class DiskUtil(object):
 
             filtered_mount_lines = []
             with open(crypt_file_path, 'r') as f:
+                self.logger.log("removing an entry from {0}".format(crypt_file_path))
                 for line in f:
                     if not line.strip():
                         continue
 
                     parsed_crypt_item = crypt_line_parser(line)
-                    if parsed_crypt_item.mapper_name == crypt_item.mapper_name:
+                    if parsed_crypt_item is not None and parsed_crypt_item.mapper_name == crypt_item.mapper_name:
                         self.logger.log("Removing crypt mount entry: {0}".format(line))
                         continue
 
@@ -574,7 +575,7 @@ class DiskUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1] == '14':
+        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1].startswith('14'):
             return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
         else:
             return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)

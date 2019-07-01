@@ -1541,6 +1541,8 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
             # decryption failed for a crypt_item, return the failed item to caller
             return crypt_item
 
+    disk_util.mount_all()
+
     return None
 
 
