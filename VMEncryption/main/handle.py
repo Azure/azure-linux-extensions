@@ -234,7 +234,7 @@ def get_protected_settings():
         return protected_settings_str
 
 
-def update_encryption_settings():
+def update_encryption_settings(extra_items_to_encrypt=[]):
     hutil.do_parse_context('UpdateEncryptionSettings')
     logger.log('Updating encryption settings')
 
@@ -333,7 +333,7 @@ def update_encryption_settings():
             # store new passphrase and overwrite old encryption key file
             bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-            stamp_disks_with_settings(items_to_encrypt=[], encryption_config=encryption_config)
+            stamp_disks_with_settings(items_to_encrypt=extra_items_to_encrypt, encryption_config=encryption_config)
             settings_stamped = True
 
             existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
@@ -379,11 +379,17 @@ def update_encryption_settings():
             os.unlink(temp_oldkeyfile.name)
             bek_util.umount_azure_passhprase(encryption_config)
 
-        hutil.do_exit(exit_code=0,
-                        operation='UpdateEncryptionSettings',
-                        status=CommonVariables.extension_success_status,
-                        code=str(CommonVariables.success),
-                        message='Encryption settings updated')
+        if len(extra_items_to_encrypt) > 0:
+            hutil.do_status_report(operation='UpdateEncryptionSettings',
+                                   status=CommonVariables.extension_success_status,
+                                   status_code=str(CommonVariables.success),
+                                   message='Encryption settings updated')
+        else:
+            hutil.do_exit(exit_code=0,
+                          operation='UpdateEncryptionSettings',
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message='Encryption settings updated')
     except Exception as e:
         if not settings_stamped:
             clear_new_luks_keys(disk_util, old_passphrase, extension_parameter.passphrase, bek_util, encryption_config, updated_crypt_items)
@@ -592,7 +598,10 @@ def enable():
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         bek_util = BekUtil(disk_util, logger)
         existing_passphrase_file = None
+        existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
+        if encryption_config.config_file_exists():
+            existing_volume_type = encryption_config.get_volume_type()
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
@@ -603,10 +612,12 @@ def enable():
                                   passphrase_file=existing_passphrase_file)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
+        logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
+        logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher)
+            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -634,15 +645,7 @@ def enable():
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
-            extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
-
-            if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
-                logger.log("Config has changed, updating encryption settings")
-                update_encryption_settings()
-                extension_parameter.commit()
-            else:
-                logger.log("Config did not change or first call, enabling encryption")
-                enable_encryption()
+            handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
@@ -668,6 +671,71 @@ def enable():
                           code=(CommonVariables.configuration_error),
                           message=msg)
 
+def are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation):
+    are_data_disk_encrypted = True if encryption_status['data'] == 'Encrypted' else False
+    is_os_disk_encrypted = True if encryption_status['os'] == 'Encrypted' else False
+    items_to_encrypt = []
+    if volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+        if are_data_disk_encrypted:
+            logger.log('All data drives are encrypted.')
+            return True, items_to_encrypt
+        else:
+            logger.log('Not all data drives are encrypted.')
+            items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, bek_util, volume_type, encryption_operation)
+            return False, items_to_encrypt
+    elif volume_type.lower() == CommonVariables.VolumeTypeOS.lower():
+        if is_os_disk_encrypted:
+            logger.log('OS drive is encrypted.')
+            return True, items_to_encrypt
+        else:
+            logger.log('OS Drive is not encrypted.')
+            items_to_encrypt = os_device_to_encrypt(disk_util)
+            return False, items_to_encrypt
+    elif volume_type.lower() == CommonVariables.VolumeTypeAll.lower():
+        if are_data_disk_encrypted and is_os_disk_encrypted:
+            logger.log('Both OS and Data drives are encrypted.')
+            return True, items_to_encrypt
+        else:
+            if not are_data_disk_encrypted:
+                items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, bek_util, volume_type, encryption_operation)
+            if not is_os_disk_encrypted:
+                items_to_encrypt = items_to_encrypt + os_device_to_encrypt(disk_util)
+            return False, items_to_encrypt
+
+def handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation):
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+
+    if extension_parameter.config_file_exists() and extension_parameter.config_changed():
+        logger.log("Config has changed, updating encryption settings")
+        are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
+        if not are_devices_encrypted:
+            logger.log('Required devices not encrypted for volume type {0}. Calling update to stamp encryption settings.'.format(volume_type))
+            update_encryption_settings(items_to_encrypt)
+            logger.log('Encryption Settings stamped. Calling enable to encrypt new devices.')
+            enable_encryption()
+        else:
+            logger.log('Calling Update Encryption Setting.')
+            update_encryption_settings()
+    else:
+        logger.log("Config did not change or first call, enabling encryption")
+        encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
+        if encryption_marker.config_file_exists():
+            logger.log('Encryption marker exists. Calling Enable')
+            enable_encryption()
+        else:
+            hutil.exit_if_same_seq()
+            are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
+            if are_devices_encrypted:
+                hutil.do_exit(exit_code=CommonVariables.success,
+                              operation='EnableEncryption',
+                              status=CommonVariables.extension_success_status,
+                              code=str(CommonVariables.success),
+                              message=CommonVariables.SuccessMessage[volume_type.lower()])
+            else:
+                logger.log('Calling enable for volume type {0}.'.format(volume_type))
+                enable_encryption()
+
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
     # we need to start another subprocess to do it, because the initial process
@@ -688,20 +756,12 @@ def enable_encryption():
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
 
-    # If the BEK is present try to remount everything
     existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-    if existing_passphrase_file is not None:
-        disk_util.consolidate_azure_crypt_mount(existing_passphrase_file)
-        mount_encrypted_disks(disk_util=disk_util,
-                              bek_util=bek_util,
-                              encryption_config=encryption_config,
-                              passphrase_file=existing_passphrase_file)
-    else:
-        if encryption_config.config_file_exists():
-            logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
+    if existing_passphrase_file is None and encryption_config.config_file_exists():
+        logger.log(msg="EncryptionConfig is present, but could not get the key file.",
                        level=CommonVariables.WarningLevel)
-            hutil.redo_last_status()
-            exit_without_status_report()
+        hutil.redo_last_status()
+        exit_without_status_report()
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
@@ -725,16 +785,6 @@ def enable_encryption():
         else:
             encryption_config = EncryptionConfig(encryption_environment, logger)
 
-            exit_status = None
-            if encryption_config.config_file_exists():
-                exit_status = {
-                    'operation': 'EnableEncryption',
-                    'status': CommonVariables.extension_success_status,
-                    'status_code': str(CommonVariables.success),
-                    'message': ""
-                }
-
-            hutil.exit_if_same_seq(exit_status)
             hutil.save_seq()
 
             encryption_config.volume_type = extension_parameter.VolumeType
@@ -815,8 +865,9 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
     device_items_to_stamp = device_items_to_encrypt + os_items_to_stamp
     if len(device_items_to_stamp) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
-        stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
-                                  encryption_config=encryption_config)
+        if not are_disks_stamped_with_current_config(encryption_config):
+            stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
+                                      encryption_config=encryption_config)
 
     for device_item, encryption_item, dev_path_in_query in zip(device_items_to_encrypt, encrypt_format_items_to_encrypt, query_dev_paths_to_encrypt):
         if device_item.mount_point:
@@ -1406,21 +1457,32 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
 
     return enable_encryption_format(passphrase, encryption_format_items, disk_util, force)
 
+def os_device_to_encrypt(disk_util):
+    os_items_to_stamp = []
+    device_items = disk_util.get_device_items(None)
+    for device_item in device_items:
+        if device_item.mount_point == "/":
+            os_items_to_stamp.append(device_item)
+    return os_items_to_stamp
 
-def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util):
+def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_type=None, current_command=None):
     device_items = disk_util.get_device_items(None)
     dev_path_reference_table = disk_util.get_block_device_to_azure_udev_table()
     device_items_to_encrypt = []
     special_azure_devices_to_skip = disk_util.get_azure_devices()
+    if not volume_type:
+        volume_type = encryption_marker.get_volume_type()
+    if not current_command:
+        current_command = encryption_marker.get_current_command()
     for device_item in device_items:
         logger.log("device_item == " + str(device_item))
 
         if any(di.name == device_item.name for di in device_items_to_encrypt):
             continue
-        if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, encryption_marker.get_volume_type()):
+        if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, volume_type):
             continue
 
-        if encryption_marker.get_current_command() == CommonVariables.EnableEncryptionFormatAll:
+        if current_command() == CommonVariables.EnableEncryptionFormatAll:
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
@@ -1444,8 +1506,9 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
     device_items_to_stamp = device_items_to_encrypt + os_items_to_stamp
     if len(device_items_to_stamp) > 0:
         encryption_config = EncryptionConfig(encryption_environment, logger)
-        stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
-                                  encryption_config=encryption_config)
+        if not are_disks_stamped_with_current_config(encryption_config):
+            stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
+                                      encryption_config=encryption_config)
 
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg)
