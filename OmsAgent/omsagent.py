@@ -969,6 +969,14 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
+        
+    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
+    # take only the last 100 characters as extension cuts off after that	
+    try:	
+        if exit_code is not 0:	
+            sys.stderr.write(output[-100:])        	
+    except:	
+        hutil_log_info('Failed to write output to STDERR')	
   
     return exit_code, output
 
