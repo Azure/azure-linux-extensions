@@ -1626,6 +1626,8 @@ def daemon_encrypt():
                                    status_code=str(CommonVariables.success),
                                    message='Encryption succeeded for data volumes')
             disk_util.log_lsblk_output()
+            # Post encryption mounting - should reload encryption_config here
+            encryption_config = EncryptionConfig(encryption_environment, logger)
             mount_encrypted_disks(disk_util=disk_util,
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
