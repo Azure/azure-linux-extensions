@@ -974,7 +974,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     # take only the last 100 characters as extension cuts off after that	
     try:	
         if exit_code is not 0:	
-            sys.stderr.write(output[-100:])        	
+            sys.stderr.write(output[-500:])        	
     except:	
         hutil_log_info('Failed to write output to STDERR')	
   
