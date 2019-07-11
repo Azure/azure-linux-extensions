@@ -192,6 +192,15 @@ class CommonVariables:
     operation_lookback_failed = 23
     unknown_error = 100
 
+    """
+    Success Message
+    """
+    SuccessMessage = {
+                    VolumeTypeData.lower(): 'Encryption succeeded for data volumes',
+                    VolumeTypeOS.lower(): 'Encryption succeeded for OS volume',
+                    VolumeTypeAll.lower(): 'Encryption succeeded for all volumes'
+                }
+
 class TestHooks:
     search_not_only_ide = False
     use_hard_code_passphrase = False

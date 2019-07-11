@@ -273,7 +273,24 @@ class CheckUtil(object):
                             return
             raise Exception('Distro {0} {1} is not supported for OS encryption'.format(distro_name, distro_version))
 
-    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher):
+    def validate_volume_type_for_enable(self, public_settings, existing_volume_type):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if not encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            self.logger.log("Current operation is not an enable. Skipping volume type validation.")
+            return
+        if not existing_volume_type:
+            self.logger.log('Existing volume type not found. First enable.')
+            return
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if volume_type.lower() == existing_volume_type.lower():
+            self.logger.log('No change in volume type.')
+            return
+        if volume_type.lower() == CommonVariables.VolumeTypeAll.lower():
+            self.logger.log('Upgrading volume type from {0} to {1}'.format(existing_volume_type, volume_type))
+            return
+        raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
+
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
@@ -281,6 +298,7 @@ class CheckUtil(object):
         self.validate_vfat()
         self.validate_memory_os_encryption(public_settings, encryption_status)
         self.is_supported_os(public_settings, DistroPatcher, encryption_status)
+        self.validate_volume_type_for_enable(public_settings, existing_volume_type)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """
