@@ -99,7 +99,7 @@ class HttpUtil(object):
             else:
                 return CommonVariables.error_http_failure
 
-    def HttpCallGetResponse(self, method, sasuri_obj, data, headers , responseBodyRequired = False, isHttpCall = False):
+    def HttpCallGetResponse(self, method, sasuri_obj, data, headers , responseBodyRequired = False, isHostCall = False):
         result = CommonVariables.error_http_failure
         resp = None
         responeBody = ""
@@ -107,10 +107,9 @@ class HttpUtil(object):
         responseBody = None
         try:
             resp = None
-            snapshotThroughProxy = self.hutil.get_value_from_configfile(SnapshotThroughProxy)
 
-            if(snapshotThroughProxy == None or snapshotThroughProxy != "True" or self.proxyHost == None or self.proxyPort != None):
-                if(isHttpCall):
+            if(isHostCall or self.proxyHost == None or self.proxyPort != None):
+                if(isHostCall):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 10) # making call with port 80 to make it http call
                 else:
                     connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
