@@ -75,7 +75,7 @@ class HostSnapshotter(object):
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
                 self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(httpResp.status))
@@ -129,7 +129,7 @@ class HostSnapshotter(object):
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
