@@ -20,9 +20,11 @@
 
 import time
 import os
+import tempfile
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables, CryptItem
+from BekUtil import BekUtil
 
 
 class ResourceDiskUtil(object):
@@ -293,6 +295,13 @@ class ResourceDiskUtil(object):
             self.add_to_fstab()
         return True
 
+    def _generate_rd_temp_password(self):
+        tmp_password = BekUtil(self.disk_util, self.logger).generate_passphrase()
+        temp_keyfile = tempfile.NamedTemporaryFile(delete=False, dir=CommonVariables.encryption_key_mount_point)
+        temp_keyfile.write(tmp_password)
+        temp_keyfile.close()
+        self.passphrase_filename = temp_keyfile.name
+
     def automount(self):
         """ encrypt resource disk """
         # try to remount if the disk was previously encrypted and is still valid
@@ -301,6 +310,8 @@ class ResourceDiskUtil(object):
 
         # unencrypted or unusable
         if self._is_encrypt_format_all():
+            if not self.passphrase_filename:
+                self._generate_rd_temp_password()
             return self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')

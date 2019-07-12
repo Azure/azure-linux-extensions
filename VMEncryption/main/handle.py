@@ -276,7 +276,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                extension_parameter.passphrase = bek_util.generate_passphrase()
 
             logger.log('Recreating secret to store in the KeyVault')
 
@@ -760,6 +760,10 @@ def enable_encryption():
     if existing_passphrase_file is None and encryption_config.config_file_exists():
         logger.log(msg="EncryptionConfig is present, but could not get the key file.",
                        level=CommonVariables.WarningLevel)
+        mount_encrypted_disks(disk_util=disk_util,
+                              bek_util=bek_util,
+                              encryption_config=encryption_config,
+                              passphrase_file=existing_passphrase_file)
         hutil.redo_last_status()
         exit_without_status_report()
 
@@ -811,7 +815,7 @@ def enable_encryption():
                 # generate passphrase and passphrase file if needed
                 if existing_passphrase_file is None:
                     if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                        extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                        extension_parameter.passphrase = bek_util.generate_passphrase()
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 

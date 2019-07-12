@@ -607,6 +607,9 @@ class DiskUtil(object):
 
         self.hutil.log("keyfile: " + (passphrase_file))
 
+        if not passphrase_file:
+            return CommonVariables.passphrase_too_long_or_none
+
         if header_file:
             cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name, header_file , passphrase_file)
         else:
