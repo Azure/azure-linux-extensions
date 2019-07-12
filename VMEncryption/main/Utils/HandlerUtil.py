@@ -375,7 +375,7 @@ class HandlerUtility:
 
     def save_seq(self):
         self.set_last_seq(self._context._seq_no)
-        self.log("set most recent sequence number to " + self._context._seq_no)
+        self.log("set most recent sequence number to " + str(self._context._seq_no))
 
     def set_last_seq(self, seq):
         waagent.SetFileContents('mrseq', str(seq))
