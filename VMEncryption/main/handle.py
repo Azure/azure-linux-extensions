@@ -1479,7 +1479,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_t
         if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, volume_type):
             continue
 
-        if current_command() == CommonVariables.EnableEncryptionFormatAll:
+        if current_command == CommonVariables.EnableEncryptionFormatAll:
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
