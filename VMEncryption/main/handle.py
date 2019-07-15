@@ -522,7 +522,8 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
                                                    uses_cleartext_key=crypt_item.uses_cleartext_key)
             logger.log("luks open result is {0}".format(luks_open_result))
 
-        disk_util.mount_crypt_item(crypt_item, passphrase_file)
+        if os.path.exists(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)):
+            disk_util.mount_crypt_item(crypt_item, passphrase_file)
 
     if DistroPatcher.distro_info[0].lower() == 'centos' and DistroPatcher.distro_info[1].startswith('7.0'):
         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
@@ -610,6 +611,11 @@ def enable():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
+        elif encryption_config.config_file_exists():
+            mount_encrypted_disks(disk_util=disk_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=None)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
