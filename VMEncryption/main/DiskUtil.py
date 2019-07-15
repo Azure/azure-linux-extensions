@@ -344,25 +344,27 @@ class DiskUtil(object):
 
     def add_crypt_item(self, crypt_item, backup_folder=None):
         if self.should_use_azure_crypt_mount():
-            return self.add_crypt_item_to_azure_crypt_mount(crypt_item, backup_folder)
+            return self.add_crypt_item_to_azure_crypt_mount(crypt_item, backup_folder=backup_folder)
         else:
-            return self.add_crypt_item_to_crypttab(crypt_item, backup_folder)
+            return self.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
 
-    def add_crypt_item_to_crypttab(self, crypt_item, backup_folder=None):
+    def add_crypt_item_to_crypttab(self, crypt_item, backup_folder=None, key_file_param=None):
         # figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
-        if crypt_item.uses_cleartext_key:
-            key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
+        if key_file_param:
+            key_file_derived = key_file_param
+        elif crypt_item.uses_cleartext_key:
+            key_file_derived = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
             scsi_lun_numbers = self.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
             if len(scsi_lun_numbers) == 0:
                 # The default in case we didn't get any scsi/lun numbers
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
+                key_file_derived = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
             else:
                 scsi_controller, lun_number = scsi_lun_numbers[0]
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
+                key_file_derived = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
 
-        crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
+        crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file_derived)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path
 

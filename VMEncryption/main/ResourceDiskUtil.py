@@ -234,8 +234,8 @@ class ResourceDiskUtil(object):
                 return self._mount_resource_disk(self.RD_MAPPER_PATH)
         else:
             self.logger.log("passphrase_filename(value={0}) is null, so trying to mount plain Resource Disk".format(self.passphrase_filename))
-            if self._is_plain_mounted():
-                self.logger.log("Resource disk already encrypted and mounted")
+            if self._is_plain_mounted() or self._is_crypt_mounted():
+                self.logger.log("Resource disk already mounted. Aborting plain mount.")
                 return True
             return self._mount_resource_disk(self.RD_DEV_PATH)
 
@@ -291,7 +291,7 @@ class ResourceDiskUtil(object):
             crypt_item.mapper_name = self.RD_MAPPER_NAME
             crypt_item.uses_cleartext_key = False
             self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
-            self.disk_util.add_crypt_item_to_crypttab(crypt_item)
+            self.disk_util.add_crypt_item_to_crypttab(crypt_item, key_file_param=self.passphrase_filename)
             self.add_to_fstab()
         return True
 
