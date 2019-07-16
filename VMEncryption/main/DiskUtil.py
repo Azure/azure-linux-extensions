@@ -35,8 +35,9 @@ from io import open
 
 
 class DiskUtil(object):
-    os_disk_lvm = None
-    sles_cache = {}
+    _IS_OS_DISK_LVM_CACHE = None
+    _SLES_CACHE = {}
+    _LVM_ITEMS_CACHE = None
 
     def __init__(self, hutil, patching, logger, encryption_environment):
         self.encryption_environment = encryption_environment
@@ -632,8 +633,8 @@ class DiskUtil(object):
         return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
-        if (dev_name, property_name) in DiskUtil.sles_cache:
-            return DiskUtil.sles_cache[(dev_name, property_name)]
+        if (dev_name, property_name) in DiskUtil._SLES_CACHE:
+            return DiskUtil._SLES_CACHE[(dev_name, property_name)]
 
         self.logger.log("getting property of device {0}".format(dev_name))
 
@@ -658,7 +659,7 @@ class DiskUtil(object):
                         if len(disk_info_item_array) > 1:
                             property_value = disk_info_item_array[1]
 
-        DiskUtil.sles_cache[(dev_name, property_name)] = property_value
+        DiskUtil._SLES_CACHE[(dev_name, property_name)] = property_value
         return property_value
 
     def get_block_device_to_azure_udev_table(self):
@@ -874,15 +875,26 @@ class DiskUtil(object):
             return device_items
 
     def get_lvm_items(self):
+        """
+        Returns a list of LVM items as reported by 'lvs'
+        Because this method is frequently used we use a Cache to save the return value once the 'lvs' command is called.
+        To clear this Cache set the variable _LVM_ITEMS_CACHE to None
+        """
+        if DiskUtil._LVM_ITEMS_CACHE is not None:
+            self.logger.log("DiskUtil.get_lvm_items: returning cached output")
+            return DiskUtil._LVM_ITEMS_CACHE
+
         lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
         proc_comm = ProcessCommunicator()
 
         try:
-            self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+            if self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+                # No cacheing if the command fails
+                return []
         except Exception:
             return []  # return empty list on non-lvm systems that do not have lvs
 
-        lvm_items = []
+        DiskUtil._LVM_ITEMS_CACHE = []
 
         for line in proc_comm.stdout.splitlines():
             if not line:
@@ -908,30 +920,30 @@ class DiskUtil(object):
                 if key == 'LVM2_LV_KERNEL_MINOR':
                     lvm_item.lv_kernel_minor = value
 
-            lvm_items.append(lvm_item)
+            DiskUtil._LVM_ITEMS_CACHE.append(lvm_item)
 
-        return lvm_items
+        return DiskUtil._LVM_ITEMS_CACHE
 
     def is_os_disk_lvm(self):
-        if DiskUtil.os_disk_lvm is not None:
-            return DiskUtil.os_disk_lvm
+        if DiskUtil._IS_OS_DISK_LVM_CACHE is not None:
+            return DiskUtil._IS_OS_DISK_LVM_CACHE
 
         device_items = self.get_device_items(None)
 
         if not any([item.type.lower() == 'lvm' for item in device_items]):
-            DiskUtil.os_disk_lvm = False
+            DiskUtil._IS_OS_DISK_LVM_CACHE = False
             return False
 
         lvm_items = [item for item in self.get_lvm_items() if item.vg_name == "rootvg"]
 
         current_lv_names = set([item.lv_name for item in lvm_items])
 
-        DiskUtil.os_disk_lvm = False
+        DiskUtil._IS_OS_DISK_LVM_CACHE = False
 
         if 'homelv' in current_lv_names and 'rootlv' in current_lv_names:
-            DiskUtil.os_disk_lvm = True
+            DiskUtil._IS_OS_DISK_LVM_CACHE = True
 
-        return DiskUtil.os_disk_lvm
+        return DiskUtil._IS_OS_DISK_LVM_CACHE
 
     def is_data_disk(self, device_item, special_azure_devices_to_skip):
         # Root disk
