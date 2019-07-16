@@ -160,6 +160,11 @@ def main():
     exit_code = 0
     message = '{0} succeeded'.format(operation)
 
+    exit_code = check_disk_space_availability()
+    if(exit_code not 0):
+        message = '{0} failed due to low disk space'.format(operation)
+        log_and_exit(operation, exit_code, message)   
+
     # Invoke operation
     try:
         global HUtilObject
@@ -200,7 +205,28 @@ def main():
     # Finish up and log messages
     log_and_exit(operation, exit_code, message)   
         
+def check_disk_space_availability():
+    """
+    Check if there is the required space on the machine.
+    """
+    try:
+        if get_free_space_mb("/var") < 200 or get_free_space_mb("/etc") < 200:
+            # 52 is the exit code for missing dependency i.e. disk space
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            return 52
+        else:
+            return 0
+    except:
+        print('Failed to check disk usage.')
+        return 0
+        
 
+def get_free_space_mb(dirname):
+    """
+    Get the free space in MB in the directory path.
+    """
+    st = os.statvfs(dirname)
+    return st.f_bavail * st.f_frsize / 1024 / 1024
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
@@ -974,7 +1000,13 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     # take only the last 100 characters as extension cuts off after that	
     try:	
         if exit_code is not 0:	
-            sys.stderr.write(output[-500:])        	
+            sys.stderr.write(output[-500:])        
+
+        if exit_code is 19 and "rpmdb" in output:
+            # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+            # 52 is the exit code for missing dependency i.e. rpmdb
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
     except:	
         hutil_log_info('Failed to write output to STDERR')	
   
