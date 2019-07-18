@@ -1455,7 +1455,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
 
     encryption_format_items = map(device_item_to_encryption_format_item, device_items)
 
-    return enable_encryption_format(passphrase, encryption_format_items, disk_util, force)
+    return enable_encryption_format(passphrase, encryption_format_items, disk_util, force, os_items_to_stamp=os_items_to_stamp)
 
 def os_device_to_encrypt(disk_util):
     os_items_to_stamp = []
