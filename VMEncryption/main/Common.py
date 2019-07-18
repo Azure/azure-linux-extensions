@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env python
 #
-# Azure Disk Encryption Extension
+# Azure Disk Encryption For Linux Extension
 #
 # Copyright 2019 Microsoft Corporation
 #
