@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VMEncryption extension
+# Azure Disk Encryption For Linux Extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2019 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,22 +51,14 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
-    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
-    # Prior extension versions archived their configs in [old:uninstall], not in [old:disable]
-    # Currently, the only reliable place to restore old configs is in [new:install]
-    # Once all running versions archive in [old:disable], restore can be moved to [new:update]
-    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
-
 
 def disable():
     hutil.do_parse_context('Disable')
-    # archiving old configs during disable rather than uninstall will allow subsequent versions
-    # to restore these configs in their update step rather than their install step once all
-    # released versions of the extension are archiving in disable rather than uninstall
+    # Archive configs at disable to make them available to new extension version prior to update 
+    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
     hutil.archive_old_configs()
     hutil.do_exit(0, 'Disable', CommonVariables.extension_success_status, '0', 'Disable succeeded')
-
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
@@ -368,13 +360,12 @@ def update_encryption_settings():
 
 
 def update():
+    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
     # this method is called when updating an older version of the extension to a newer version
     hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
+    DistroPatcher.install_extras()
     DistroPatcher.update_prereq()
-    # during update to new extension version, sweep configuration settings files from the prior
-    # version into the new configuration settings directory that will be used by the new extension
-    hutil.restore_old_configs()
     hutil.do_exit(0, 'Update', CommonVariables.extension_success_status, '0', 'Update Succeeded')
 
 
@@ -847,7 +838,7 @@ def enable_encryption_format(passphrase, disk_format_query, disk_util, force=Fal
                         file_system = CommonVariables.default_file_system
                     format_disk_result = disk_util.format_disk(dev_path=encrypted_device_path, file_system=file_system)
                     if format_disk_result != CommonVariables.process_success:
-                        logger.log(msg=("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level=CommonVariables.ErrorLevel)
+                        logger.log(msg=("format of disk {0} failed with result: {1}".format(encrypted_device_path, format_disk_result)), level=CommonVariables.ErrorLevel
                     crypt_item_to_update = CryptItem()
                     crypt_item_to_update.mapper_name = mapper_name
                     crypt_item_to_update.dev_path = dev_path_in_query
