@@ -332,6 +332,22 @@ def install():
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
 
+    # Clean status file to mitigate diskspace issues on small VMs
+    status_files = [
+            "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
+            "/var/opt/microsoft/omsconfig/status/dscperforminventory",
+            "/var/opt/microsoft/omsconfig/status/dscsetlcm",
+            "/var/opt/microsoft/omsconfig/status/omsconfighost"
+        ]
+    for sf in status_files:
+        if os.path.isfile(sf):
+            if sf.startswith("/var/opt/microsoft/omsconfig/status"):
+                try:
+                    os.remove(sf)
+                except Exception as e:
+                    hutil_log_info('Error removing telemetry status file before installation: {0}'.format(sf))
+                    hutil_log_info('Exception info: {0}'.format(traceback.format_exc()))
+
     os.chmod(bundle_path, 100)
     cmd = InstallCommandTemplate.format(bundle_path)
     hutil_log_info('Running command "{0}"'.format(cmd))
