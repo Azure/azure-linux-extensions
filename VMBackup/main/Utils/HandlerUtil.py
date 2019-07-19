@@ -136,6 +136,7 @@ class HandlerUtility:
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
+            self.update_settings_file()
             sys.exit(0)
 
     def log(self, message,level='Info'):
@@ -691,7 +692,7 @@ class HandlerUtility:
         if(self._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings') != None):
             del self._context._config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
             self.log("removing the protected settings" + json.dumps(self._context._config))
-            waagent.SetFileContents(self._context._settings_file,self._context._config)
+            waagent.SetFileContents(self._context._settings_file,json.dumps(self._context._config))
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):

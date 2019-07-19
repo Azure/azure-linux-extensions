@@ -153,8 +153,9 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     return blob_report_msg, file_report_msg
 
 def exit_with_commit_log(status,result,error_msg, para_parser):
-    global backup_logger
+    global backup_logger, hutil
     backup_logger.log(error_msg, True, 'Error')
+    hutil.update_settings_file()
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     blob_report_msg, file_report_msg = get_status_to_report(status, result, error_msg, None)
