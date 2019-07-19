@@ -292,6 +292,8 @@ class HandlerUtility:
     isanysnapshotfailed = False
     UploadStatusAndLog = True
     WriteLog = True
+
+    doseq valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
     def get_value_from_configfile(self, key):
         global backup_logger
@@ -683,6 +685,13 @@ class HandlerUtility:
         except Exception as e:
             self.log("Can't receive shell log file: " + str(e))
             return lines
+
+    def update_settings_file(self):
+        self.log("removing the protected settings" + json.dumps(self._context._config))
+        if(self._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings') != None):
+            del self._context._config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
+            self.log("removing the protected settings" + json.dumps(self._context._config))
+            waagent.SetFileContents(self._context._settings_file,self._context._config)
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):

@@ -193,16 +193,14 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('doseq') == '2'):
-            hutil.set_value_to_configfile('doseq', '1')
-        if(hutil.get_value_from_configfile('doseq') != '1'):
-            hutil.set_value_to_configfile('doseq', '2')
+        if(hutil.get_value_from_configfile('doseq') == None):
+            hutil.set_value_to_configfile('doseq', '0')
+        doseqflag = hutil.get_value_from_configfile('doseq')
+        backup_logger.log("doseq flag set as :" + str(doseqflag), True, 'Info')
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
     except Exception as e:
-        if(hutil.get_value_from_configfile('doseq') == '2'):
-            hutil.set_value_to_configfile('doseq', '0')
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         run_result = CommonVariables.error
@@ -480,6 +478,7 @@ def daemon():
         hutil.SetExtErrorCode(run_result) #setting extension errorcode at the end if missed somewhere
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         total_used_size = -1
+        hutil.update_settings_file()
         blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
         if(hutil.is_status_file_exists()):
             status_report_to_file(file_report_msg)
@@ -487,6 +486,7 @@ def daemon():
     except Exception as e:
         errMsg = 'Failed to log status in extension'
         backup_logger.log(errMsg, True, 'Error')
+        hutil.update_settings_file()
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:

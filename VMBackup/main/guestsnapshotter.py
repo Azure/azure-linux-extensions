@@ -183,13 +183,16 @@ class GuestSnapshotter(object):
         unable_to_sleep = False
         all_snapshots_failed = False
         try:
+            self.logger.log("before start of multiprocessing queues..")
             mp_jobs = []
+            queue_creation_starttime = datetime.datetime.now()
             global_logger = mp.Queue()
             global_error_logger = mp.Queue()
             snapshot_result_error = mp.Queue()
             snapshot_info_indexer_queue = mp.Queue()
             time_before_snapshot_start = datetime.datetime.now()
             blobs = paras.blobs
+
             if blobs is not None:
                 # initialize blob_snapshot_info_array
                 mp_jobs = []
@@ -201,8 +204,16 @@ class GuestSnapshotter(object):
                     mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     blob_index = blob_index + 1
 
+                counter = 0
                 for job in mp_jobs:
                     job.start()
+                    if(counter == 0):
+                        queue_creation_endtime = datetime.datetime.now()
+                        timediff = queue_creation_endtime - queue_creation_starttime
+                        if(timediff.seconds >= 10):
+                            self.logger.log("Setting to sequential snapshot")
+                            HandlerUtil.HandlerUtility.set_value_to_configfile('doseq', '1')
+                    counter = counter + 1
 
                 time_after_snapshot_start = datetime.datetime.now()
                 timeout = self.get_value_from_configfile('timeout')
@@ -252,6 +263,8 @@ class GuestSnapshotter(object):
         except Exception as e:
             errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
+            self.logger.log("Setting to sequential snapshot")
+            HandlerUtil.HandlerUtility.set_value_to_configfile('doseq', '1')
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
@@ -325,7 +338,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-        if (self.get_value_from_configfile('doseq') == '1') or (len(paras.blobs) <= 4):
+        if (self.get_value_from_configfile('doseq') == '1' or self.get_value_from_configfile('doseq') == '2' or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)

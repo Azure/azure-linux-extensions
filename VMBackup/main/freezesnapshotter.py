@@ -202,11 +202,7 @@ class FreezeSnapshotter(object):
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed
                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Warning')
-                if(self.hutil.get_value_from_configfile('doseq') == '2'):
-                    self.hutil.set_value_to_configfile('doseq', '0')
         except Exception as e:
-            if(self.hutil.get_value_from_configfile('doseq') == '2'):
-                self.hutil.set_value_to_configfile('doseq', '0')
             errMsg = 'Failed to do the freeze with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             run_result = CommonVariables.error
@@ -251,8 +247,6 @@ class FreezeSnapshotter(object):
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
-                if(self.hutil.get_value_from_configfile('doseq') == '2'):
-                    self.hutil.set_value_to_configfile('doseq', '0')
                 if(snapshot_result is not None and len(snapshot_result.errors) > 0):
                     if unable_to_sleep:
                         run_result = CommonVariables.error
@@ -260,7 +254,6 @@ class FreezeSnapshotter(object):
                         error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
                         self.logger.log(error_msg, True, 'Warning')
                     elif is_inconsistent == True :
-                        self.hutil.set_value_to_configfile('doseq', '1') 
                         run_result = CommonVariables.error
                         run_status = 'error'
                         error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
@@ -271,8 +264,6 @@ class FreezeSnapshotter(object):
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
                     self.logger.log(error_msg, True, 'Error')
         except Exception as e:
-            if(self.hutil.get_value_from_configfile('doseq') == '2'):
-                self.hutil.set_value_to_configfile('doseq', '0')
             errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             run_result = CommonVariables.error
