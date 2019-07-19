@@ -212,7 +212,7 @@ class GuestSnapshotter(object):
                         timediff = queue_creation_endtime - queue_creation_starttime
                         if(timediff.seconds >= 10):
                             self.logger.log("Setting to sequential snapshot")
-                            HandlerUtil.HandlerUtility.set_value_to_configfile('doseq', '1')
+                            HandlerUtil.HandlerUtility.set_value_to_configfile('seqsnapshot', '1')
                     counter = counter + 1
 
                 time_after_snapshot_start = datetime.datetime.now()
@@ -264,7 +264,7 @@ class GuestSnapshotter(object):
             errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
             self.logger.log("Setting to sequential snapshot")
-            HandlerUtil.HandlerUtility.set_value_to_configfile('doseq', '1')
+            HandlerUtil.HandlerUtility.set_value_to_configfile('seqsnapshot', '1')
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
@@ -338,7 +338,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-        if (self.get_value_from_configfile('doseq') == '1' or self.get_value_from_configfile('doseq') == '2' or (len(paras.blobs) <= 4)):
+        if (self.get_value_from_configfile('seqsnapshot') == '1' or self.get_value_from_configfile('seqsnapshot') == '2' or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)

@@ -194,10 +194,10 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('doseq') == None):
-            hutil.set_value_to_configfile('doseq', '0')
-        doseqflag = hutil.get_value_from_configfile('doseq')
-        backup_logger.log("doseq flag set as :" + str(doseqflag), True, 'Info')
+        if(hutil.get_value_from_configfile('seqsnapshot') == None):
+            hutil.set_value_to_configfile('seqsnapshot', '0')
+        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
+        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
@@ -291,10 +291,10 @@ def daemon():
         WATCHOUT that, the _context_config are using the most freshest timestamp.
         if the time sync is alive, this should be right.
         """
-        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
-
+        hutil.update_settings_file()
 
         if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
             error_msg = "unable to load certificate"
@@ -517,7 +517,7 @@ def enable():
 
         hutil.exit_if_same_seq()
 
-        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 

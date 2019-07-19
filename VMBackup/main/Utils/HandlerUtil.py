@@ -289,12 +289,12 @@ class HandlerUtility:
     Sample /etc/azure/vmbackup.conf
  
     [SnapshotThread]
-    doseq = 1
+    seqsnapshot = 1
     isanysnapshotfailed = False
     UploadStatusAndLog = True
     WriteLog = True
 
-    doseq valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
+    seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
     def get_value_from_configfile(self, key):
         global backup_logger
