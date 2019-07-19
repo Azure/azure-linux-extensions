@@ -160,6 +160,22 @@ def main():
     exit_code = 0
     message = '{0} succeeded'.format(operation)
 
+    # Clean status file to mitigate diskspace issues on small VMs
+    status_files = [
+            "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
+            "/var/opt/microsoft/omsconfig/status/dscperforminventory",
+            "/var/opt/microsoft/omsconfig/status/dscsetlcm",
+            "/var/opt/microsoft/omsconfig/status/omsconfighost"
+        ]
+    for sf in status_files:
+        if os.path.isfile(sf):
+            if sf.startswith("/var/opt/microsoft/omsconfig/status"):
+                try:
+                    os.remove(sf)
+                except Exception as e:
+                    hutil_log_info('Error removing telemetry status file before installation: {0}'.format(sf))
+                    hutil_log_info('Exception info: {0}'.format(traceback.format_exc()))
+
     exit_code = check_disk_space_availability()
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
