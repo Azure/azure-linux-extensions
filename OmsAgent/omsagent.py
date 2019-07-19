@@ -161,7 +161,7 @@ def main():
     message = '{0} succeeded'.format(operation)
 
     exit_code = check_disk_space_availability()
-    if(exit_code not 0):
+    if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)   
 
