@@ -45,6 +45,7 @@ MemoryThresholdToWatchFor = 20
 OmsAgentPidFile = "/var/opt/microsoft/omsagent/run/omsagent.pid"
 OmsAgentLogFile = "/var/opt/microsoft/omsagent/log/omsagent.log"
 reg_ex = re.compile('([0-9]{4}-[0-9]{2}-[0-9]{2}.*)\[(\w+)\]:(.*)')
+maxMessageSize = 100
 
 """
 We can add to the list below with more error messages to identify non recoverable errors.
@@ -220,7 +221,8 @@ class Watcher:
                             status_data = json.load(json_file)
                             operation = status_data["operation"]
                             operation_success = status_data["success"]
-                            message = status_data["message"]
+                            # Truncating the message to prevent flooding the system
+                            message = status_data["message"][:maxMessageSize]
 
                             event = self.create_telemetry_event(operation,operation_success,message,"300000")
                             self._hutil_log("Writing telemetry event: "+event)
@@ -232,6 +234,7 @@ class Watcher:
                             self._hutil_log("Exception info: "+traceback.format_exc())
                     if sf.startswith("/var/opt/microsoft/omsconfig/status"):
                         try:
+                            self._hutil_log("Cleaning up: " + sf)
                             os.remove(sf)
                         except Exception as e:
                             self._hutil_log("Error removing telemetry status file: "+  sf)
