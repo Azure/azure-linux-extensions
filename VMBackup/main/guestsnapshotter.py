@@ -65,9 +65,10 @@ class SnapshotResult(object):
 
 class GuestSnapshotter(object):
     """description of class"""
-    def __init__(self, logger):
+    def __init__(self, logger, hutil):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
+        self.hutil = hutil
 
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         temp_logger=''
@@ -212,7 +213,7 @@ class GuestSnapshotter(object):
                         timediff = queue_creation_endtime - queue_creation_starttime
                         if(timediff.seconds >= 10):
                             self.logger.log("Setting to sequential snapshot")
-                            HandlerUtil.HandlerUtility.set_value_to_configfile('seqsnapshot', '1')
+                            self.hutil.set_value_to_configfile('seqsnapshot', '1')
                     counter = counter + 1
 
                 time_after_snapshot_start = datetime.datetime.now()
@@ -264,7 +265,7 @@ class GuestSnapshotter(object):
             errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
             self.logger.log("Setting to sequential snapshot")
-            HandlerUtil.HandlerUtility.set_value_to_configfile('seqsnapshot', '1')
+            self.hutil.set_value_to_configfile('seqsnapshot', '1')
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
