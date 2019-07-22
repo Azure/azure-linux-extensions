@@ -174,7 +174,7 @@ class Watcher:
                         {{
 
             			"name": "Version",
-            			"value": "1.11.13"
+            			"value": "1.11.15"
              		}},
 
                         {{
