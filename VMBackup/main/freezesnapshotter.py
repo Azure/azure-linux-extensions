@@ -243,7 +243,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)

@@ -183,6 +183,7 @@ class GuestSnapshotter(object):
         thaw_done_local = thaw_done
         unable_to_sleep = False
         all_snapshots_failed = False
+        set_next_backup_to_seq = False
         try:
             self.logger.log("before start of multiprocessing queues..")
             mp_jobs = []
@@ -202,7 +203,12 @@ class GuestSnapshotter(object):
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                    try:
+                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                    except Exception as e:
+                        self.logger.log("Setting flag for sequential snapshot")
+                        set_next_backup_to_seq = True
+
                     blob_index = blob_index + 1
 
                 counter = 0
@@ -212,8 +218,8 @@ class GuestSnapshotter(object):
                         queue_creation_endtime = datetime.datetime.now()
                         timediff = queue_creation_endtime - queue_creation_starttime
                         if(timediff.seconds >= 10):
-                            self.logger.log("Setting to sequential snapshot")
-                            self.hutil.set_value_to_configfile('seqsnapshot', '1')
+                            self.logger.log("Setting flag for sequential snapshot")
+                            set_next_backup_to_seq = True
                     counter = counter + 1
 
                 time_after_snapshot_start = datetime.datetime.now()
@@ -230,6 +236,9 @@ class GuestSnapshotter(object):
                     time_after_thaw = datetime.datetime.now()
                     HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
                     thaw_done_local = True
+                    if(set_next_backup_to_seq == True):
+                        self.logger.log("Setting to sequential snapshot")
+                        self.hutil.set_value_to_configfile('seqsnapshot', '1')
                     self.logger.log('T:S thaw result ' + str(thaw_result))
                     if(thaw_result is not None and len(thaw_result.errors) > 0  and (snapshot_result is None or len(snapshot_result.errors) == 0)):
                         is_inconsistent = True
@@ -239,7 +248,7 @@ class GuestSnapshotter(object):
                 logging = [global_logger.get() for job in mp_jobs]
                 self.logger.log(str(logging))
                 error_logging = [global_error_logger.get() for job in mp_jobs]
-                self.logger.log(error_logging,False,'Error')
+                self.logger.log(str(error_logging),False,'Error')
                 if not snapshot_result_error.empty():
                     results = [snapshot_result_error.get() for job in mp_jobs]
                     for result in results:
@@ -264,8 +273,6 @@ class GuestSnapshotter(object):
         except Exception as e:
             errorMsg = " Unable to perform parallel snapshot with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
-            self.logger.log("Setting to sequential snapshot")
-            self.hutil.set_value_to_configfile('seqsnapshot', '1')
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
