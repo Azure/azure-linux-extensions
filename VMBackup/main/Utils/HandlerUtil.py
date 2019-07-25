@@ -688,10 +688,9 @@ class HandlerUtility:
             return lines
 
     def update_settings_file(self):
-        self.log("removing the protected settings" + json.dumps(self._context._config))
         if(self._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings') != None):
             del self._context._config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
-            self.log("removing the protected settings" + json.dumps(self._context._config))
+            self.log("removing the protected settings")
             waagent.SetFileContents(self._context._settings_file,json.dumps(self._context._config))
 
 class ComplexEncoder(json.JSONEncoder):
