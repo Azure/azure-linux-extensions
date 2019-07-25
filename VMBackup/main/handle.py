@@ -153,9 +153,8 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     return blob_report_msg, file_report_msg
 
 def exit_with_commit_log(status,result,error_msg, para_parser):
-    global backup_logger, hutil
+    global backup_logger
     backup_logger.log(error_msg, True, 'Error')
-    hutil.update_settings_file()
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     blob_report_msg, file_report_msg = get_status_to_report(status, result, error_msg, None)
@@ -455,6 +454,7 @@ def daemon():
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
+        hutil.update_settings_file()
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
@@ -479,7 +479,6 @@ def daemon():
         hutil.SetExtErrorCode(run_result) #setting extension errorcode at the end if missed somewhere
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         total_used_size = -1
-        hutil.update_settings_file()
         blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
         if(hutil.is_status_file_exists()):
             status_report_to_file(file_report_msg)
@@ -487,7 +486,6 @@ def daemon():
     except Exception as e:
         errMsg = 'Failed to log status in extension'
         backup_logger.log(errMsg, True, 'Error')
-        hutil.update_settings_file()
     if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
         backup_logger.commit(para_parser.logsBlobUri)
     else:
@@ -531,6 +529,7 @@ def enable():
         start_daemon()
         sys.exit(0)
     except Exception as e:
+        hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         global_error_result = e
         temp_status= 'error'
