@@ -206,8 +206,9 @@ class GuestSnapshotter(object):
                     try:
                         mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
-                        self.logger.log("Setting flag for sequential snapshot")
-                        set_next_backup_to_seq = True
+                        self.logger.log("multiprocess queue creation failed")
+                        all_snapshots_failed = True
+                        raise Exception("Exception while creating multiprocess queue")
 
                     blob_index = blob_index + 1
 
@@ -218,7 +219,7 @@ class GuestSnapshotter(object):
                         queue_creation_endtime = datetime.datetime.now()
                         timediff = queue_creation_endtime - queue_creation_starttime
                         if(timediff.seconds >= 10):
-                            self.logger.log("Setting flag for sequential snapshot")
+                            self.logger.log("mp queue creation took more than 10 secs. Setting next backup to sequential")
                             set_next_backup_to_seq = True
                     counter = counter + 1
 
