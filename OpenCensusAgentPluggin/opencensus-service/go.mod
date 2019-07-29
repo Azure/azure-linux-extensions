@@ -8,7 +8,7 @@ require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.12.3-0.20190626200219-09504ed717c7 // TODO: pin a released version
 	contrib.go.opencensus.io/exporter/zipkin v0.1.1
 	contrib.go.opencensus.io/resource v0.1.1
-	github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190711172825-09f39f7ce008
+	github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190729080708-927f6d285646
 	github.com/DataDog/datadog-go v2.2.0+incompatible // indirect
 	github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20181026070331-e7c4bd17b329
 	github.com/VividCortex/gohistogram v1.0.0 // indirect

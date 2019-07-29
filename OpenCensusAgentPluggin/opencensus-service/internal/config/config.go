@@ -16,9 +16,6 @@ package config
 
 import (
 	"fmt"
-	"net"
-	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -29,13 +26,8 @@ import (
 	"github.com/census-instrumentation/opencensus-service/consumer"
 
 	"github.com/census-instrumentation/opencensus-service/exporter/azuremonitorexporter"
-	"github.com/census-instrumentation/opencensus-service/exporter/honeycombexporter"
-	"github.com/census-instrumentation/opencensus-service/exporter/jaegerexporter"
 	"github.com/census-instrumentation/opencensus-service/exporter/opencensusexporter"
-	"github.com/census-instrumentation/opencensus-service/exporter/prometheusexporter"
-	"github.com/census-instrumentation/opencensus-service/exporter/zipkinexporter"
 	"github.com/census-instrumentation/opencensus-service/receiver/opencensusreceiver"
-	"github.com/census-instrumentation/opencensus-service/receiver/prometheusreceiver"
 )
 
 // We expect the configuration.yaml file to look like this:
@@ -69,47 +61,23 @@ import (
 
 const (
 	defaultOCReceiverAddress = ":55678"
-	defaultZPagesPort        = 55679
 )
 
 var defaultOCReceiverCorsAllowedOrigins = []string{}
-
-var defaultScribeConfiguration = &ScribeReceiverConfig{
-	Port:     9410,
-	Category: "zipkin",
-}
 
 // Config denotes the configuration for the various elements of an agent, that is:
 // * Receivers
 // * ZPages
 // * Exporters
 type Config struct {
-	Receivers *Receivers    `mapstructure:"receivers"`
-	ZPages    *ZPagesConfig `mapstructure:"zpages"`
-	Exporters *Exporters    `mapstructure:"exporters"`
+	Receivers *Receivers `mapstructure:"receivers"`
+	Exporters *Exporters `mapstructure:"exporters"`
 }
 
 // Receivers denotes configurations for the various telemetry ingesters, such as:
-// * Jaeger (traces)
 // * OpenCensus (metrics and traces)
-// * Prometheus (metrics)
-// * Zipkin (traces)
 type Receivers struct {
-	OpenCensus *ReceiverConfig       `mapstructure:"opencensus"`
-	Zipkin     *ReceiverConfig       `mapstructure:"zipkin"`
-	Jaeger     *ReceiverConfig       `mapstructure:"jaeger"`
-	Scribe     *ScribeReceiverConfig `mapstructure:"zipkin-scribe"`
-	VMMetrics  *ReceiverConfig       `mapstructure:"vmmetrics"`
-
-	// Prometheus contains the Prometheus configurations.
-	// Such as:
-	//      scrape_configs:
-	//          - job_name: "agent"
-	//              scrape_interval: 5s
-	//
-	//          static_configs:
-	//              - targets: ['localhost:9988']
-	Prometheus *prometheusreceiver.Configuration `mapstructure:"prometheus"`
+	OpenCensus *ReceiverConfig `mapstructure:"opencensus"`
 }
 
 // ReceiverConfig is the per-receiver configuration that identifies attributes
@@ -155,13 +123,7 @@ type ScribeReceiverConfig struct {
 // Exporters denotes the configurations for the various backends
 // that this service exports observability signals to.
 type Exporters struct {
-	Zipkin *zipkinexporter.ZipkinConfig `mapstructure:"zipkin"`
-}
-
-// ZPagesConfig denotes the configuration that zPages will be run with.
-type ZPagesConfig struct {
-	Disabled bool `mapstructure:"disabled"`
-	Port     int  `mapstructure:"port"`
+	//Zipkin *zipkinexporter.ZipkinConfig `mapstructure:"zipkin"`
 }
 
 // OpenCensusReceiverAddress is a helper to safely retrieve the address
@@ -212,120 +174,6 @@ func (c *Config) openCensusReceiverEnabled() bool {
 		c.Receivers.OpenCensus != nil
 }
 
-// ZPagesDisabled returns true if zPages have not been enabled.
-// It returns true if Config is nil or if ZPages are explicitly disabled.
-func (c *Config) ZPagesDisabled() bool {
-	if c == nil {
-		return true
-	}
-	return c.ZPages != nil && c.ZPages.Disabled
-}
-
-// ZPagesPort tries to dereference the port on which zPages will be
-// served.
-// If zPages are disabled, it returns (-1, false)
-// Else if no port is set, it returns the default  55679
-func (c *Config) ZPagesPort() (int, bool) {
-	if c.ZPagesDisabled() {
-		return -1, false
-	}
-	port := defaultZPagesPort
-	if c != nil && c.ZPages != nil && c.ZPages.Port > 0 {
-		port = c.ZPages.Port
-	}
-	return port, true
-}
-
-// ZipkinReceiverEnabled returns true if Config is non-nil
-// and if the Zipkin receiver configuration is also non-nil.
-func (c *Config) ZipkinReceiverEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.Receivers != nil && c.Receivers.Zipkin != nil
-}
-
-// ZipkinScribeReceiverEnabled returns true if Config is non-nil
-// and if the Scribe receiver configuration is also non-nil.
-func (c *Config) ZipkinScribeReceiverEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.Receivers != nil && c.Receivers.Scribe != nil
-}
-
-// JaegerReceiverEnabled returns true if Config is non-nil
-// and if the Jaeger receiver configuration is also non-nil.
-func (c *Config) JaegerReceiverEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.Receivers != nil && c.Receivers.Jaeger != nil
-}
-
-// PrometheusReceiverEnabled returns true if Config is non-nil
-// and if the Jaeger receiver configuration is also non-nil.
-func (c *Config) PrometheusReceiverEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.Receivers != nil && c.Receivers.Prometheus != nil
-}
-
-// PrometheusConfiguration deferences and returns the Prometheus configuration
-// if non-nil.
-func (c *Config) PrometheusConfiguration() *prometheusreceiver.Configuration {
-	if c == nil || c.Receivers == nil {
-		return nil
-	}
-	return c.Receivers.Prometheus
-}
-
-// ZipkinReceiverAddress is a helper to safely retrieve the address
-// that the Zipkin receiver will run on.
-// If Config is nil or the Zipkin receiver's configuration is nil, it
-// will return the default of "localhost:9411"
-func (c *Config) ZipkinReceiverAddress() string {
-	if c == nil || c.Receivers == nil {
-		return zipkinexporter.DefaultZipkinEndpointHostPort
-	}
-	inCfg := c.Receivers
-	if inCfg.Zipkin == nil || inCfg.Zipkin.Address == "" {
-		return zipkinexporter.DefaultZipkinEndpointHostPort
-	}
-	return inCfg.Zipkin.Address
-}
-
-// ZipkinScribeConfig is a helper to safely retrieve the Zipkin Scribe
-// configuration.
-func (c *Config) ZipkinScribeConfig() *ScribeReceiverConfig {
-	if c == nil || c.Receivers == nil || c.Receivers.Scribe == nil {
-		return defaultScribeConfiguration
-	}
-	cfg := c.Receivers.Scribe
-	if cfg.Port == 0 {
-		cfg.Port = defaultScribeConfiguration.Port
-	}
-	if cfg.Category == "" {
-		cfg.Category = defaultScribeConfiguration.Category
-	}
-	return cfg
-}
-
-// JaegerReceiverPorts is a helper to safely retrieve the address
-// that the Jaeger receiver will run on.
-func (c *Config) JaegerReceiverPorts() (collectorPort, thriftPort int) {
-	if c == nil || c.Receivers == nil {
-		return 0, 0
-	}
-	rCfg := c.Receivers
-	if rCfg.Jaeger == nil {
-		return 0, 0
-	}
-	jc := rCfg.Jaeger
-	return jc.CollectorHTTPPort, jc.CollectorThriftPort
-}
-
 // HasTLSCredentials returns true if TLSCredentials is non-nil
 func (rCfg *ReceiverConfig) HasTLSCredentials() bool {
 	return rCfg != nil && rCfg.TLSCredentials != nil && rCfg.TLSCredentials.nonEmpty()
@@ -373,56 +221,6 @@ func (c *Config) OpenCensusReceiverTLSCredentialsServerOption() (opt opencensusr
 	return tlsCreds.ToOpenCensusReceiverServerOption()
 }
 
-// VMMetricsReceiverEnabled returns true if Config is non-nil.
-func (c *Config) VMMetricsReceiverEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.Receivers != nil && c.Receivers.VMMetrics != nil
-}
-
-// CheckLogicalConflicts serves to catch logical errors such as
-// if the Zipkin receiver port conflicts with that of the exporter,
-// lest we'll have a self DOS because spans will be exported "out" from
-// the exporter, yet be received from the receiver, then sent back out
-// and back in a never ending loop.
-func (c *Config) CheckLogicalConflicts() error {
-	if c.Exporters == nil || c.Exporters.Zipkin == nil || !c.ZipkinReceiverEnabled() {
-		return nil
-	}
-
-	zc := c.Exporters.Zipkin
-
-	zExporterAddr := zc.EndpointURL()
-	zExporterURL, err := url.Parse(zExporterAddr)
-	if err != nil {
-		return fmt.Errorf("parsing ZipkinExporter address %q got error: %v", zExporterAddr, err)
-	}
-
-	zReceiverHostPort := c.ZipkinReceiverAddress()
-
-	zExporterHostPort := zExporterURL.Host
-	if zReceiverHostPort == zExporterHostPort {
-		return fmt.Errorf("ZipkinExporter address (%q) is the same as the receiver address (%q)",
-			zExporterHostPort, zReceiverHostPort)
-	}
-	zExpHost, zExpPort, _ := net.SplitHostPort(zExporterHostPort)
-	zReceiverHost, zReceiverPort, _ := net.SplitHostPort(zReceiverHostPort)
-	if eqHosts(zExpHost, zReceiverHost) && zExpPort == zReceiverPort {
-		return fmt.Errorf("ZipkinExporter address (%q) aka (%s on port %s)\nis the same as the receiver address (%q) aka (%s on port %s)",
-			zExporterHostPort, zExpHost, zExpPort, zReceiverHostPort, zReceiverHost, zReceiverPort)
-	}
-
-	// Otherwise, now let's resolve the IPs and ensure that they aren't the same
-	zExpIPAddr, _ := net.ResolveIPAddr("ip", zExpHost)
-	zReceiverIPAddr, _ := net.ResolveIPAddr("ip", zReceiverHost)
-	if zExpIPAddr != nil && zReceiverIPAddr != nil && reflect.DeepEqual(zExpIPAddr, zReceiverIPAddr) && zExpPort == zReceiverPort {
-		return fmt.Errorf("ZipkinExporter address (%q) aka (%+v)\nis the same as the\nreceiver address (%q) aka (%+v)",
-			zExporterHostPort, zExpIPAddr, zReceiverHostPort, zReceiverIPAddr)
-	}
-	return nil
-}
-
 func eqHosts(host1, host2 string) bool {
 	if host1 == host2 {
 		return true
@@ -455,12 +253,8 @@ func ExportersFromViperConfig(logger *zap.Logger, v *viper.Viper) ([]consumer.Tr
 		name string
 		fn   func(*viper.Viper) ([]consumer.TraceConsumer, []consumer.MetricsConsumer, []func() error, error)
 	}{
-		{name: "zipkin", fn: zipkinexporter.ZipkinExportersFromViper},
-		{name: "jaeger", fn: jaegerexporter.JaegerExportersFromViper},
 		//{name: "kafka", fn: kafkaexporter.KafkaExportersFromViper},
 		{name: "opencensus", fn: opencensusexporter.OpenCensusTraceExportersFromViper},
-		{name: "prometheus", fn: prometheusexporter.PrometheusExportersFromViper},
-		{name: "honeycomb", fn: honeycombexporter.HoneycombTraceExportersFromViper},
 		{name: "azuremonitor", fn: azuremonitorexporter.AzureMonitorExportersFromViper},
 	}
 

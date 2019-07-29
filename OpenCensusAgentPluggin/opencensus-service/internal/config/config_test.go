@@ -19,55 +19,9 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/census-instrumentation/opencensus-service/exporter/zipkinexporter"
 	"github.com/census-instrumentation/opencensus-service/internal/config"
 	"github.com/census-instrumentation/opencensus-service/internal/config/viperutils"
 )
-
-// Issue #233: Zipkin receiver and exporter loopback detection
-// would mistakenly report that "localhost:9410" and "localhost:9411"
-// were equal, due to a mistake in parsing out their addresses,
-// but also after IP resolution, the equivalence of ports was not being
-// checked.
-func TestZipkinReceiverExporterLogicalConflictChecks(t *testing.T) {
-	regressionYAML := []byte(`
-receivers:
-    zipkin:
-        address: "localhost:9410"
-
-exporters:
-    zipkin:
-        endpoint: "http://localhost:9411/api/v2/spans"
-`)
-
-	v := viper.New()
-	err := viperutils.LoadYAMLBytes(v, regressionYAML)
-	if err != nil {
-		t.Fatalf("Unexpected YAML parse error: %v", err)
-	}
-	var cfg config.Config
-	err = v.Unmarshal(&cfg)
-	if err != nil {
-		t.Fatalf("Unexpected error unmarshaling viper: %s", err)
-	}
-	if err := cfg.CheckLogicalConflicts(); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if g, w := cfg.Receivers.Zipkin.Address, "localhost:9410"; g != w {
-		t.Errorf("Receivers.Zipkin.EndpointURL mismatch\nGot: %s\nWant:%s", g, w)
-	}
-
-	var ecfg struct {
-		Exporters *struct {
-			Zipkin *zipkinexporter.ZipkinConfig `mapstructure:"zipkin"`
-		} `mapstructure:"exporters"`
-	}
-	_ = v.Unmarshal(&ecfg)
-	if g, w := ecfg.Exporters.Zipkin.EndpointURL(), "http://localhost:9411/api/v2/spans"; g != w {
-		t.Errorf("Exporters.Zipkin.EndpointURL mismatch\nGot: %s\nWant:%s", g, w)
-	}
-}
 
 // Issue #377: If Config.OpenCensus == nil, invoking
 // CanRunOpenCensus{Metrics, Trace}Receiver() would crash.

@@ -35,15 +35,9 @@ import (
 	"github.com/census-instrumentation/opencensus-service/internal/config/viperutils"
 	"github.com/census-instrumentation/opencensus-service/internal/pprofserver"
 	"github.com/census-instrumentation/opencensus-service/internal/version"
-	"github.com/census-instrumentation/opencensus-service/internal/zpagesserver"
 	"github.com/census-instrumentation/opencensus-service/observability"
 	"github.com/census-instrumentation/opencensus-service/processor/multiconsumer"
-	"github.com/census-instrumentation/opencensus-service/receiver/jaegerreceiver"
 	"github.com/census-instrumentation/opencensus-service/receiver/opencensusreceiver"
-	"github.com/census-instrumentation/opencensus-service/receiver/prometheusreceiver"
-	"github.com/census-instrumentation/opencensus-service/receiver/vmmetricsreceiver"
-	"github.com/census-instrumentation/opencensus-service/receiver/zipkinreceiver"
-	"github.com/census-instrumentation/opencensus-service/receiver/zipkinreceiver/zipkinscribereceiver"
 )
 
 var rootCmd = &cobra.Command{
@@ -92,13 +86,6 @@ func runOCAgent() {
 		log.Fatalf("Error unmarshalling yaml config file %v: %v", configYAMLFile, err)
 	}
 
-	// Ensure that we check and catch any logical errors with the
-	// configuration e.g. if an receiver shares the same address
-	// as an exporter which would cause a self DOS and waste resources.
-	if err := agentConfig.CheckLogicalConflicts(); err != nil {
-		log.Fatalf("Configuration logical error: %v", err)
-	}
-
 	// TODO: don't hardcode info level logging
 	conf := zap.NewProductionConfig()
 	conf.Level.SetLevel(zapcore.InfoLevel)
@@ -127,63 +114,6 @@ func runOCAgent() {
 		log.Fatal(err)
 	}
 	closeFns = append(closeFns, ocReceiverDoneFn)
-
-	// If zPages are enabled, run them
-	zPagesPort, zPagesEnabled := agentConfig.ZPagesPort()
-	if zPagesEnabled {
-		zCloseFn, err := zpagesserver.Run(asyncErrorChan, zPagesPort)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Running zPages on port %d", zPagesPort)
-		closeFns = append(closeFns, zCloseFn)
-	}
-
-	// TODO: Generalize the startup of these receivers when unifying them w/ collector
-	// If the Zipkin receiver is enabled, then run it
-	if agentConfig.ZipkinReceiverEnabled() {
-		zipkinReceiverAddr := agentConfig.ZipkinReceiverAddress()
-		zipkinReceiverDoneFn, err := runZipkinReceiver(zipkinReceiverAddr, commonSpanSink, asyncErrorChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		closeFns = append(closeFns, zipkinReceiverDoneFn)
-	}
-
-	if agentConfig.ZipkinScribeReceiverEnabled() {
-		zipkinScribeDoneFn, err := runZipkinScribeReceiver(agentConfig.ZipkinScribeConfig(), commonSpanSink, asyncErrorChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		closeFns = append(closeFns, zipkinScribeDoneFn)
-	}
-
-	if agentConfig.JaegerReceiverEnabled() {
-		collectorHTTPPort, collectorThriftPort := agentConfig.JaegerReceiverPorts()
-		jaegerDoneFn, err := runJaegerReceiver(collectorThriftPort, collectorHTTPPort, commonSpanSink, asyncErrorChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		closeFns = append(closeFns, jaegerDoneFn)
-	}
-
-	// If the Prometheus receiver is enabled, then run it.
-	if agentConfig.PrometheusReceiverEnabled() {
-		promDoneFn, err := runPrometheusReceiver(logger, viperCfg, commonMetricsSink, asyncErrorChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		closeFns = append(closeFns, promDoneFn)
-	}
-
-	// If the VMMetrics receiver is enabled, then run it.
-	if agentConfig.VMMetricsReceiverEnabled() {
-		vmmDoneFn, err := runVMMetricsReceiver(viperCfg, commonMetricsSink, asyncErrorChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		closeFns = append(closeFns, vmmDoneFn)
-	}
 
 	// Always cleanup finally
 	defer func() {
@@ -261,90 +191,5 @@ func runOCReceiver(logger *zap.Logger, acfg *config.Config, tc consumer.TraceCon
 	}
 
 	doneFn = ocr.Stop
-	return doneFn, nil
-}
-
-func runJaegerReceiver(collectorThriftPort, collectorHTTPPort int, next consumer.TraceConsumer, asyncErrorChan chan<- error) (doneFn func() error, err error) {
-	config := &jaegerreceiver.Configuration{
-		CollectorThriftPort: collectorThriftPort,
-		CollectorHTTPPort:   collectorHTTPPort,
-
-		// TODO: (@odeke-em, @pjanotti) send a change
-		// to dynamically retrieve the Jaeger Agent's ports
-		// and not use their defaults of 5778, 6831, 6832
-	}
-	jtr, err := jaegerreceiver.New(context.Background(), config, next)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new Jaeger receiver: %v", err)
-	}
-	if err := jtr.StartTraceReception(context.Background(), asyncErrorChan); err != nil {
-		return nil, fmt.Errorf("failed to start Jaeger receiver: %v", err)
-	}
-	doneFn = func() error {
-		return jtr.StopTraceReception(context.Background())
-	}
-	log.Printf("Running Jaeger receiver with CollectorThriftPort %d CollectHTTPPort %d", collectorThriftPort, collectorHTTPPort)
-	return doneFn, nil
-}
-
-func runZipkinReceiver(addr string, next consumer.TraceConsumer, asyncErrorChan chan<- error) (doneFn func() error, err error) {
-	zi, err := zipkinreceiver.New(addr, next)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create the Zipkin receiver: %v", err)
-	}
-
-	if err := zi.StartTraceReception(context.Background(), asyncErrorChan); err != nil {
-		return nil, fmt.Errorf("cannot start Zipkin receiver with address %q: %v", addr, err)
-	}
-	doneFn = func() error {
-		return zi.StopTraceReception(context.Background())
-	}
-	log.Printf("Running Zipkin receiver with address %q", addr)
-	return doneFn, nil
-}
-
-func runZipkinScribeReceiver(config *config.ScribeReceiverConfig, next consumer.TraceConsumer, asyncErrorChan chan<- error) (doneFn func() error, err error) {
-	zs, err := zipkinscribereceiver.NewReceiver(config.Address, config.Port, config.Category, next)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create the Zipkin Scribe receiver: %v", err)
-	}
-
-	if err := zs.StartTraceReception(context.Background(), asyncErrorChan); err != nil {
-		return nil, fmt.Errorf("cannot start Zipkin Scribe receiver with %v: %v", config, err)
-	}
-	doneFn = func() error {
-		return zs.StopTraceReception(context.Background())
-	}
-	log.Printf("Running Zipkin Scribe receiver with %+v", *config)
-	return doneFn, nil
-}
-
-func runPrometheusReceiver(logger *zap.Logger, v *viper.Viper, next consumer.MetricsConsumer, asyncErrorChan chan<- error) (doneFn func() error, err error) {
-	pmr, err := prometheusreceiver.New(logger, v.Sub("receivers.prometheus"), next)
-	if err != nil {
-		return nil, err
-	}
-	if err := pmr.StartMetricsReception(context.Background(), asyncErrorChan); err != nil {
-		return nil, err
-	}
-	doneFn = func() error {
-		return pmr.StopMetricsReception(context.Background())
-	}
-	log.Print("Running Prometheus receiver")
-	return doneFn, nil
-}
-
-func runVMMetricsReceiver(v *viper.Viper, next consumer.MetricsConsumer, asyncErrorChan chan<- error) (doneFn func() error, err error) {
-	vmr, err := vmmetricsreceiver.New(v.Sub("receivers.vmmetrics"), next)
-	if err != nil {
-		return nil, err
-	}
-	if err := vmr.StartMetricsReception(context.Background(), asyncErrorChan); err != nil {
-		return nil, err
-	}
-	doneFn = func() error {
-		return vmr.StopMetricsReception(context.Background())
-	}
-	log.Print("Running VMMetrics receiver")
 	return doneFn, nil
 }

@@ -35,6 +35,8 @@ github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190711134204-14
 github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190711134204-144fed1d6221/go.mod h1:QxpXE0qPdcRvfaV4czo7OpdmYKVxagRuYboxAJoLuyI=
 github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190711172825-09f39f7ce008 h1:t3WdkSso2Az2xCSaQob/xUfTHcu/CF/2m7wdOgFk49Y=
 github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190711172825-09f39f7ce008/go.mod h1:QxpXE0qPdcRvfaV4czo7OpdmYKVxagRuYboxAJoLuyI=
+github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190729080708-927f6d285646 h1:5UqoJBBCYAIX4L7RR85Nem1kj/15odTdLr202QU9dR4=
+github.com/ChrisCoe/opencensus-go-exporter-azuremonitor v0.0.0-20190729080708-927f6d285646/go.mod h1:QxpXE0qPdcRvfaV4czo7OpdmYKVxagRuYboxAJoLuyI=
 github.com/DataDog/datadog-go v2.2.0+incompatible h1:V5BKkxACZLjzHjSgBbr2gvLA2Ae49yhc6CSY7MLy5k4=
 github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20181026070331-e7c4bd17b329 h1:WOxkY7ClXANNyQQuq4rxQrM/nQnjXCpvqY0ipYxB9cQ=
