@@ -223,12 +223,16 @@ class DiskUtil(object):
                             self.add_crypt_item(parsed_crypt_item)
                     fstab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/fstab_line")
                     if os.path.exists(fstab_backup_location):
+                        fstab_backup_line = None
                         with open(fstab_backup_location, 'r') as f:
                             for line in f:
                                 if not line.strip():
                                     continue
                                 # copy the crypt_item from the backup to the central os location
                                 fstab_backup_line = line
+                        if fstab_backup_line is not None:
+                            with open("/etc/fstab", 'a') as f:
+                                f.writeline(fstab_backup_line)
 
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
@@ -385,7 +389,7 @@ class DiskUtil(object):
             self.logger.log("Added crypttab item {0} to {1}".format(crypt_item.mapper_name, crypttab_backup_file))
 
             if crypt_item.mount_point:
-                # We need to backup the fsbab line too
+                # We need to backup the fstab line too
                 fstab_backup_line = None
                 with open("/etc/fstab") as f:
                     for line in f.readlines():
