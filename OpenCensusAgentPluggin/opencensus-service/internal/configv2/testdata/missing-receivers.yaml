@@ -1,7 +1,0 @@
-receivers:
-exporters:
-  exampleexporter:
-processors:
-  exampleprocessor:
-pipelines:
-  traces:

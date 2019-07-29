@@ -1,9 +1,0 @@
-receivers:
-  multireceiver:
-exporters:
-  exampleexporter/:
-processors:
-  exampleprocessor:
-pipelines:
-  traces:
-    receivers: [somereceiver]
