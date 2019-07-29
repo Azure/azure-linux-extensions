@@ -1,0 +1,7 @@
+receivers:
+  opencensus:
+    address: "127.0.0.1:55678"
+
+exporters:
+  azureMonitor:
+    instrumentationKey: "111a0d2f-ab53-4b62-a54f-4722f09fd136"

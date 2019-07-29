@@ -1,0 +1,19 @@
+language: go
+
+go_import_path: github.com/census-instrumentation/opencensus-service
+
+go:
+  - 1.12.x
+ 
+env:
+  global:
+    GO111MODULE=on
+
+install:
+  - make install-tools
+
+script:
+  - make travis-ci
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

@@ -1,0 +1,24 @@
+bin/
+
+# GoLand IDEA
+/.idea/
+
+# VS Code
+.vscode
+
+# Emacs
+*~
+\#*\#
+
+# Miscellaneous files
+*.sw[op]
+*.DS_Store
+
+# Binaries are copied (as needed) to the same location as their respective Dockerfile in
+# order to simplify docker build commands. Ignore these files if proper clean up fails.
+cmd/ocagent/ocagent_linux
+cmd/occollector/occollector_linux
+
+# Coverage
+coverage.txt
+coverage.html
