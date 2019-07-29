@@ -232,7 +232,7 @@ class DiskUtil(object):
                                 fstab_backup_line = line
                         if fstab_backup_line is not None:
                             with open("/etc/fstab", 'a') as f:
-                                f.writeline(fstab_backup_line)
+                                f.writelines([fstab_backup_line])
 
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
