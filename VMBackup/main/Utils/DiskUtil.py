@@ -256,16 +256,22 @@ class DiskUtil(object):
             errMsg = 'Exception in mount command, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             is_mount_path_wrong = True
-        if is_mount_path_wrong == False :
-            out_mount_output, err = p.communicate()
-            if sys.version_info > (3,):
-                out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
-            else:
-                out_mount_output = str(out_mount_output)
-            self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
-            error_msg = str(err)
-            if(error_msg is not None and error_msg.strip() != ""):
-                self.logger.log(str(err), True)
+
+        try:
+            if is_mount_path_wrong == False :
+                out_mount_output, err = p.communicate()
+                if sys.version_info > (3,):
+                    out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
+                else:
+                    out_mount_output = str(out_mount_output)
+                self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
+                error_msg = str(err)
+                if(error_msg is not None and error_msg.strip() != ""):
+                    self.logger.log(str(err), True)
+        except Exception as e:
+            errMsg = 'Exception in mount output reading, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
+
         return is_mount_path_wrong, out_mount_output, error_msg
 
     def get_mount_points(self):
