@@ -20,12 +20,15 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '1.1.0.43'
+    extension_version = '1.1.0.44'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
     extension_description = extension_label
     extension_shim_filename = "extension_shim.sh"
+    test_extension_publisher = 'Microsoft.Azure.Security.Edp.'
+    # Change based on test pipeline used
+    test_extension_name = 'AzureDiskEncryptionForLinux'
 
     """
     wire protocol message format
