@@ -293,6 +293,14 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
+            # Install dependencies (omsagent, which includes omi, scx).
+            configurator = create_core_components_configs()
+            dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+            if dependencies_err != 0:
+                g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+                hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
+                return
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
@@ -372,13 +380,6 @@ def start_mdsd(configurator):
 
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
-
-    # We first need to install dependencies (omsagent, which includes omi) because even running 'mdsd -v'
-    # requires omi client library (/opt/omi/lib/libmicxx.so).
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
-    if dependencies_err != 0:
-        g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
-        return
 
     # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
