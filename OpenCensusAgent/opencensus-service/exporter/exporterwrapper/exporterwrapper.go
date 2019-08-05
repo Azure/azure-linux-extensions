@@ -22,7 +22,14 @@
 package exporterwrapper
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net"
+	"strconv"
+	"time"
 
 	"go.opencensus.io/trace"
 
@@ -62,7 +69,8 @@ func PushOcProtoSpansToOCTraceExporter(ocExporter trace.Exporter, td data.TraceD
 	var goodSpans []*tracepb.Span
 	for _, span := range td.Spans {
 		sd, err := spandatatranslator.ProtoSpanToOCSpanData(span)
-		ConvertOCSpanDataToApplicationInsightsSchema(sd)
+		spanData := ConvertOCSpanDataToApplicationInsightsSchema(sd)
+		SendSpanTo1Agent(spanData)
 		if err == nil {
 			//ocExporter.ExportSpan(sd) // We don't export here and instead let the 1Agent export the span
 			goodSpans = append(goodSpans, span)
@@ -72,4 +80,48 @@ func PushOcProtoSpansToOCTraceExporter(ocExporter trace.Exporter, td data.TraceD
 	}
 
 	return len(td.Spans) - len(goodSpans), internal.CombineErrors(errs)
+}
+
+type mdsdJSON struct {
+	Tag    string   `json:"TAG"` // Tag is used to see if acknowledged by 1Agent
+	Source string   `json:"SOURCE"`
+	Data   []string `json:"DATA"` // Data must be an array
+}
+
+// SendTraceTo1Agent makes a connection to 1Agent and passes in the OpenCensus proto trace in JSON format
+func SendSpanTo1Agent(spanData string) {
+	log.Println("Starting funnel of data.")
+
+	conn, err := net.Dial("unix", "/var/run/mdsd/default_json.socket")
+	if err != nil {
+		log.Printf("Error connecting: %v", err)
+		return
+	}
+	dataList := []string{
+		spanData, //WholeTrace, this part is defined in schema found in mdsd.xml
+	}
+	id := time.Now().UTC()
+
+	trace := new(mdsdJSON)
+	trace.Tag = strconv.FormatInt(id.Unix(), 10) // Use time to create a unique Tag
+	trace.Source = "funnel"                      // "funnel" defined in schema
+	trace.Data = dataList
+
+	byteData, err := json.Marshal(trace)
+	if err != nil {
+		log.Printf("Error marshaling mdsdJSON: %v", err)
+		return
+	}
+	_, err = conn.Write(byteData)
+	if err != nil {
+		log.Printf("Error writing to 1Agent: %v", err)
+		return
+	}
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		log.Printf("Error reading 1Agent connection:%v", err)
+		return
+	}
+	fmt.Println(line) // Tag returned from 1Agent
 }
