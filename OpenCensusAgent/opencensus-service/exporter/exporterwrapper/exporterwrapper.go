@@ -62,8 +62,9 @@ func PushOcProtoSpansToOCTraceExporter(ocExporter trace.Exporter, td data.TraceD
 	var goodSpans []*tracepb.Span
 	for _, span := range td.Spans {
 		sd, err := spandatatranslator.ProtoSpanToOCSpanData(span)
+		ConvertOCSpanDataToApplicationInsightsSchema(sd)
 		if err == nil {
-			ocExporter.ExportSpan(sd)
+			//ocExporter.ExportSpan(sd) // We don't export here and instead let the 1Agent export the span
 			goodSpans = append(goodSpans, span)
 		} else {
 			errs = append(errs, err)
