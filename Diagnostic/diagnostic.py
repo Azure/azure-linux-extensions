@@ -398,8 +398,9 @@ def start_mdsd(configurator):
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
     # Don't check if starting succeeded, as it'll be done in the loop below anyway.
-    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running", should_log=False)[0] is 1
     if not omi_running:
+        hutil.log("OMI is not running. Restarting it.")
         RunGetOutput("/opt/omi/bin/service_control restart")
 
     log_dir = hutil.get_log_dir()
