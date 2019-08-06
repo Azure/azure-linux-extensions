@@ -51,11 +51,6 @@ from __builtin__ import int
 
 def install():
     hutil.do_parse_context('Install')
-    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
-    # Prior extensions archived their configs in [old:uninstall], not in [old:disable]
-    # As such, the first opportunity to restore old configs is in [new:install]
-    # In the future, moving the config archive/restore step to disable/update is preferred
-    hutil.restore_old_configs()
     hutil.do_exit(0, 'Install', CommonVariables.extension_success_status, str(CommonVariables.success), 'Install Succeeded')
 
 def disable():
@@ -453,6 +448,8 @@ def clear_new_luks_keys(disk_util, old_passphrase, new_passphrase, bek_util, enc
         logger.log(msg=msg, level=CommonVariables.WarningLevel)
 
 def update():
+    # The extension update handshake is [old:disable][new:update][old:uninstall][new:install]
+    # this method is called when updating an older version of the extension to a newer version
     hutil.do_parse_context('Update')
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()
@@ -898,7 +895,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
                 file_system = CommonVariables.default_file_system
             format_disk_result = disk_util.format_disk(dev_path = encrypted_device_path, file_system = file_system)
             if format_disk_result != CommonVariables.process_success:
-                logger.log(msg = ("format disk {0} failed".format(encrypted_device_path, format_disk_result)), level = CommonVariables.ErrorLevel)
+                logger.log(msg=("format of disk {0} failed with result: {1}".format(encrypted_device_path, format_disk_result)), level=CommonVariables.ErrorLevel)
                 return device_item
             crypt_item_to_update = CryptItem()
             crypt_item_to_update.mapper_name = mapper_name
@@ -1482,7 +1479,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_t
         if disk_util.should_skip_for_inplace_encryption(device_item, special_azure_devices_to_skip, volume_type):
             continue
 
-        if current_command() == CommonVariables.EnableEncryptionFormatAll:
+        if current_command == CommonVariables.EnableEncryptionFormatAll:
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
