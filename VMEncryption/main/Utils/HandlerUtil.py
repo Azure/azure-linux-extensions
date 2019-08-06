@@ -90,6 +90,7 @@ class HandlerUtility:
         self.disk_util = None
         self.find_last_nonquery_operation = False
         self.config_archive_folder = '/var/lib/azure_disk_encryption_archive'
+        self._context = HandlerContext(self._short_name)
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -113,6 +114,11 @@ class HandlerUtility:
                                 seq_no = cur_seq_no
                 except ValueError:
                     continue
+
+        if seq_no < 0: 
+            # guest agent is expected to provide at least one settings file to extension
+            self.error("unable to get current sequence number from config folder")
+                    
         return seq_no
 
     def get_last_seq(self):
@@ -127,7 +133,12 @@ class HandlerUtility:
         settings_files = [os.path.basename(f) for f in settings_files]
         seq_nums = [int(re.findall(r'(\d+)\.settings', f)[0]) for f in settings_files]
 
-        return max(seq_nums)
+        if seq_nums: 
+            return max(seq_nums) 
+        else:  
+            # guest agent is expected to provide at least one settings file to the extension
+            self.log("unable to get latest sequence number from config folder")
+            return -1
 
     def get_current_seq(self):
         return int(self._context._seq_no)
@@ -163,22 +174,30 @@ class HandlerUtility:
         sys.stderr.write(message)
         self._error(self._get_log_prefix() + ': ' + message)
 
-    def _parse_config(self, ctxt):
+    def _parse_config(self, config_txt):
         config = None
         try:
-            config = json.loads(ctxt)
+            config = json.loads(config_txt)
         except:
-            self.error('JSON exception decoding ' + ctxt)
+            self.error('JSON exception decoding ' + config_txt)
 
         if config == None:
-            self.error("JSON error processing settings file:" + ctxt)
+            self.error("JSON error processing settings file:" + config_txt)
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
+
+            # skip unnecessary decryption of protected settings for query status 
+            # operations, to avoid timeouts in case of multiple settings files
+            if handlerSettings.has_key('publicSettings'):
+                ps = handlerSettings.get('publicSettings')
+                op = ps.get(CommonVariables.EncryptionEncryptionOperationKey)
+                if op == CommonVariables.QueryEncryptionStatus:
+                    return config
+            
             if handlerSettings.has_key('protectedSettings') and \
                     handlerSettings.has_key("protectedSettingsCertThumbprint") and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
-                protectedSettings = handlerSettings['protectedSettings']
                 thumb = handlerSettings['protectedSettingsCertThumbprint']
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
@@ -188,15 +207,14 @@ class HandlerUtility:
                 cleartxt = None
                 cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 if cleartxt == None:
-                    self.error("OpenSSh decode error using  thumbprint " + thumb)
-                    do_exit(1, self.operation,'error','1', self.operation + ' Failed')
+                    self.error("OpenSSh decode error using thumbprint " + thumb)
+                    self.do_exit(1, self.operation,'error','1', self.operation + ' Failed')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
-                    self.error('JSON exception decoding ' + cleartxt)
+                    self.error('JSON exception loading protected settings')
                 handlerSettings['protectedSettings'] = jctxt
-                self.log('Config decoded correctly.')
         return config
 
     def do_parse_context(self, operation):
@@ -213,34 +231,121 @@ class HandlerUtility:
 
         return _context
 
-    def try_parse_context(self):
-        self._context = HandlerContext(self._short_name)
-        handler_env = None
-        config = None
-        ctxt = None
-        code = 0
-        # get the HandlerEnvironment.json.  According to the extension handler
-        # spec, it is always in the ./ directory
-        self.log('cwd is ' + os.path.realpath(os.path.curdir))
+    def is_valid_nonquery(self, settings_file_path):
+        # note: the nonquery operations list includes update and disable 
+        nonquery_ops = [ CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll, CommonVariables.UpdateEncryptionSettings, CommonVariables.DisableEncryption ] 
+
+        if settings_file_path and os.path.exists(settings_file_path):
+            # open file and look for presence of nonquery operation 
+            config_txt = waagent.GetFileContents(settings_file_path)
+            config_obj = self._parse_config(config_txt)
+            public_settings_str = config_obj['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
+
+            # if not json already, load string as json 
+            if isinstance(public_settings_str, basestring):
+                public_settings = json.loads(public_settings_str)
+            else:
+                public_settings = public_settings_str
+
+            operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+            if operation and (operation in nonquery_ops):
+                return True
+
+        # invalid input, or not recognized as a valid nonquery operation 
+        return False
+
+
+    def get_last_nonquery_config_path(self):
+        # pre: internal self._context._config_dir and _seq_no, _settings_file must be set prior to call
+        # post: returns path to last nonquery settings file in current config, archived folder, or None
+        
+        # validate that internal preconditions are satisfied and internal variables are initialized
+        if self._context._seq_no < 0:
+            self.error("current context sequence number must be initialized and non-negative") 
+        if not self._context._config_dir or not os.path.isdir(self._context._config_dir):
+            self.error("current context config dir must be initialized and point to a path that exists")
+        if not self._context._settings_file or not os.path.exists(self._context._settings_file):
+            self.error("current context settings file variable must be initialized and point to a file that exists")
+
+        # check timestamp of pointer to last archived settings file 
+        curr_path = self._context._settings_file
+        last_path = os.path.join(self.config_archive_folder, "lnq.settings")
+        
+        # if an archived nonquery settings file exists, use it if it is newer than current settings
+        if os.path.exists(last_path) and (os.stat(last_path).st_mtime > os.stat(curr_path).st_mtime):
+            return last_path
+        else:
+            # reverse iterate through numbered settings files in config dir
+            # and return path to the first nonquery settings file found
+            for i in range(self._context._seq_no,-1,-1):
+                curr_path = os.path.join(self._context._config_dir, str(i) + '.settings')
+                if self.is_valid_nonquery(curr_path):                    
+                    return curr_path
+            
+            # nothing was found in the current config settings, check the archived settings
+            if os.path.exists(last_path):
+                return last_path
+            else:
+                if os.path.exists(self.config_archive_folder):                        
+                    # walk through any archived [n].settings files found in archived settings folder 
+                    # sorted by reverse timestamp (processing newest to oldest) until a nonquery settings file found 
+                    files = sorted(os.listdir(self.config_archive_folder), key=os.path.getctime, reverse=True)
+                    for f in files:
+                        curr_path = os.path.join(self._context._config_dir, f)
+                        # TODO: check that file name matches the [n].settings format
+                        if self.is_valid_nonquery(curr_path):
+                            # found, copy to last_nonquery_settings in archived settings
+                            return curr_path
+
+        # unable to find any nonquery settings file 
+        return None 
+        
+    def get_last_config(self, nonquery):
+        # precondition:  self._context._config_dir, self._context._seq_no are already set and valid 
+        # postcondition: a configuration object from the last configuration settings file is returned 
+        # if nonquery flag is true, search for the last settings file that was not a query status operation
+        # if nonquery is false, return the current settings file 
+        if nonquery:
+            last_config_path = self.get_last_nonquery_config_path()
+        else:
+            last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings') 
+
+        config_txt = waagent.GetFileContents(last_config_path)
+        config_obj = self._parse_config(config_txt)
+        return config_obj
+
+    def get_handler_env(self):
+        # load environment variables from HandlerEnvironment.json 
+        # according to spec, it is always in the ./ directory
+        #self.log('cwd is ' + os.path.realpath(os.path.curdir))
         handler_env_file = './HandlerEnvironment.json'
         if not os.path.isfile(handler_env_file):
             self.error("Unable to locate " + handler_env_file)
             return None
-        ctxt = waagent.GetFileContents(handler_env_file)
-        if ctxt == None :
+        handler_env_json_str = waagent.GetFileContents(handler_env_file)
+
+        if handler_env_json_str == None :
             self.error("Unable to read " + handler_env_file)
         try:
-            handler_env = json.loads(ctxt)
+            handler_env = json.loads(handler_env_json_str)
         except:
             pass
+
         if handler_env == None :
-            self.log("JSON error processing " + handler_env_file)
+            # TODO - treat this as a telemetry error indicating an agent bug, as this file should always be available and readable 
+            self.log("JSON error processing " + str(handler_env_file))
             return None
         if type(handler_env) == list:
             handler_env = handler_env[0]
+        return handler_env
 
-        self.log("Parsing context, find_last_nonquery_operation={0}".format(self.find_last_nonquery_operation))
-
+    def try_parse_context(self):        
+        # precondition: agent is in a properly running state with at least one settings file in config folder
+        #               any archived settings from prior instances of the extension were saved to archive folder
+        # postcondition: context variables initialized to reflect current handler environment and prior call history 
+                
+        # initialize handler environment context variables
+        handler_env = self.get_handler_env()
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
@@ -249,81 +354,45 @@ class HandlerUtility:
         self._change_log_file()
         self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
         self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
+
+        # initialize the current sequence number corresponding to settings files in config folder
         self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
-        if self._context._seq_no < 0:
-            self.error("Unable to locate a .settings file!")
-            return None
-        self._context._seq_no = str(self._context._seq_no)
-
-        encryption_operation = None
+        self._context._settings_file = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
         
-        while not encryption_operation:
-            self.log('Parsing context for sequence number: ' + self._context._seq_no)
-            
-            self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-
-            self.log("setting file path is" + self._context._settings_file)
-            ctxt = None
-            ctxt = waagent.GetFileContents(self._context._settings_file)
-            if ctxt == None :
-                error_msg = 'Unable to read ' + self._context._settings_file + '. '
-                self.error(error_msg)
-
-                if int(self._context._seq_no) > 0:
-                    self._context._seq_no = str(int(self._context._seq_no) - 1)
-                    continue
-
-                return None
-            else:
-                if self.operation is not None and self.operation.lower() == "enable":
-                    # we should keep the current status file
-                    # self.backup_settings_status_file(self._context._seq_no)
-                    pass
-
-            self._context._config = self._parse_config(ctxt)
-
-            public_settings_str = self._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-            if isinstance(public_settings_str, basestring):
-                public_settings = json.loads(public_settings_str)
-            else:
-                public_settings = public_settings_str
-            encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-            self.log("Encryption operation: {0}".format(encryption_operation))
-
-            if self.find_last_nonquery_operation and encryption_operation == CommonVariables.QueryEncryptionStatus:
-                self.log("find_last_nonquery_operation was True and encryption_operation was query")
-                if int(self._context._seq_no) <= 0:
-                    self.log("reached zero, returning")
-                    return None
-
-                self.log("decrementing sequence number")
-                encryption_operation = None
-                self._context._seq_no = str(int(self._context._seq_no) - 1)
+        # get a config object corresponding to the last settings file, skipping QueryEncryptionStatus settings 
+        # files when find_last_nonquery_operation is True, falling back to archived settings if necessary
+        # note - in the case of nonquery settings file retrieval, when preceded by one or more query settings 
+        # file that are more recent, the config object will not match the active settings file or sequence number
+        self._context._config = self.get_last_config(self.find_last_nonquery_operation)
 
         return self._context
 
     def _change_log_file(self):
-        self.log("Change log file to " + self._context._log_file)
+        #self.log("Change log file to " + self._context._log_file)
         LoggerInit(self._context._log_file,'/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 
     def save_seq(self):
         self.set_last_seq(self._context._seq_no)
-        self.log("set most recent sequence number to " + self._context._seq_no)
+        self.log("set most recent sequence number to " + str(self._context._seq_no))
 
     def set_last_seq(self, seq):
         waagent.SetFileContents('mrseq', str(seq))
 
     def redo_last_status(self):
-        latest_seq = str(self.get_latest_seq())
-        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+        latest_sequence_num = self.get_latest_seq()
+        if (latest_sequence_num > 0):
+            latest_seq = str(latest_sequence_num)
+            self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
 
-        previous_seq = str(self.get_latest_seq() - 1)
-        previous_status_file = os.path.join(self._context._status_dir, previous_seq + '.status')
+            previous_seq = str(latest_sequence_num - 1)
+            previous_status_file = os.path.join(self._context._status_dir, previous_seq + '.status')
 
-        shutil.copy2(previous_status_file, self._context._status_file)
-        self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
+            shutil.copy2(previous_status_file, self._context._status_file)
+            self.log("[StatusReport ({0})] Copied {1} to {2}".format(latest_seq, previous_status_file, self._context._status_file))
+        else: 
+            self.log("unable to redo last status, no prior status found")
 
     def redo_current_status(self):
         stat_rept = waagent.GetFileContents(self._context._status_file)
@@ -335,7 +404,13 @@ class HandlerUtility:
                               stat[0]["status"]["formattedMessage"]["message"])
 
     def do_status_report(self, operation, status, status_code, message):
-        latest_seq = str(self.get_latest_seq())
+        latest_seq_num = self.get_latest_seq()
+        if (latest_seq_num >= 0): 
+            latest_seq = str(self.get_latest_seq())
+        else:
+            self.log("sequence number could not be derived from settings files, using 0.status")
+            latest_seq = "0"
+
         self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
 
         if message is None:
@@ -403,7 +478,7 @@ class HandlerUtility:
                     if file.endswith('.settings') and file != (_seq_no + ".settings"):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._config_dir, file), join(self._context._config_dir, new_file_name))
-                except Exception as e:
+                except:
                     self.log("failed to rename the settings file.")
 
     def do_exit(self, exit_code, operation, status, code, message):
@@ -426,34 +501,10 @@ class HandlerUtility:
         if not os.path.exists(self.config_archive_folder):
             os.makedirs(self.config_archive_folder)
 
-        for root, dirs, files in os.walk(os.path.join(self._context._config_dir, '..')):
-            for file in files:
-                if file.endswith('.settings') or file == 'mrseq':
-                    src = os.path.join(root, file)
-                    dest = os.path.join(self.config_archive_folder, file)
-
-                    self.log("Copying {0} to {1}".format(src, dest))
-
-                    shutil.copy2(src, dest)
-
-    def restore_old_configs(self):
-        # restores all archived settings files carried over from prior extension versions 
-        # use cp for faster performance than iterating over each file using shutil.copy2() 
-        # use --preserve=timestamps to ensure that _get_current_seq_no() can sort by timestamp
-        if os.path.exists(self.config_archive_folder) and os.path.exists(self._context._config_dir):
-            try:
-                src = self.config_archive_folder + '/*.settings'
-                dst = self._context._config_dir
-                cmd = "cp {0} {1} --preserve=timestamps".format(src,dst)
-                subprocess.check_output(cmd,stderr=subprocess.STDOUT,shell=True)
-            except subprocess.CalledProcessError as e:
-                self.log("restore_old_configs error (settings): {0}".format(e))
-
-            try:
-                src = os.path.join(self.config_archive_folder,'mrseq')
-                if os.path.exists(src):
-                    dst = os.path.join(self._context._config_dir,'..')
-                    cmd = "cp {0} {1} --preserve=timestamps".format(src,dst)
-                    subprocess.check_output(cmd,stderr=subprocess.STDOUT,shell=True)
-            except subprocess.CalledProcessError as e:
-                self.log("restore_old_configs error (mrseq): {0}".format(e))
+        # only persist latest nonquery settings file to archived settings 
+        # and prevent the accumulation of large numbers of obsolete files 
+        src = self.get_last_nonquery_config_path()
+        if src:
+            dest = os.path.join(self.config_archive_folder, 'lnq.settings')
+            if src != dest: 
+                shutil.copy2(src,dest)
