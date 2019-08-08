@@ -24,8 +24,6 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/census-instrumentation/opencensus-service/consumer"
-
-	"github.com/census-instrumentation/opencensus-service/exporter/azuremonitorexporter"
 	"github.com/census-instrumentation/opencensus-service/exporter/opencensusexporter"
 	"github.com/census-instrumentation/opencensus-service/receiver/opencensusreceiver"
 )
@@ -253,9 +251,7 @@ func ExportersFromViperConfig(logger *zap.Logger, v *viper.Viper) ([]consumer.Tr
 		name string
 		fn   func(*viper.Viper) ([]consumer.TraceConsumer, []consumer.MetricsConsumer, []func() error, error)
 	}{
-		//{name: "kafka", fn: kafkaexporter.KafkaExportersFromViper},
 		{name: "opencensus", fn: opencensusexporter.OpenCensusTraceExportersFromViper},
-		{name: "azuremonitor", fn: azuremonitorexporter.AzureMonitorExportersFromViper},
 	}
 
 	var traceExporters []consumer.TraceConsumer
