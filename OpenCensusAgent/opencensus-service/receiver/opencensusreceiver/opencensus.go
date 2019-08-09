@@ -74,7 +74,6 @@ const source string = "OpenCensus"
 // as the various Stop*Reception methods or simply Stop to end it.
 func New(addr string, tc consumer.TraceConsumer, opts ...Option) (*Receiver, error) {
 	// TODO: (@odeke-em) use options to enable address binding changes.
-	fmt.Println("new receiver made")
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -189,7 +188,6 @@ func (ocr *Receiver) StopMetricsReception(ctx context.Context) error {
 
 // Start runs all the receivers/services namely, Trace and Metrics services.
 func (ocr *Receiver) Start(ctx context.Context) error {
-	fmt.Println("le start receiver")
 	if err := ocr.registerTraceConsumer(); err != nil && err != errAlreadyStarted {
 		return err
 	}
@@ -248,7 +246,6 @@ func (ocr *Receiver) httpServer() *http.Server {
 }
 
 func (ocr *Receiver) startServer() error {
-	fmt.Println("called start Server")
 	err := errAlreadyStarted
 	ocr.startServerOnce.Do(func() {
 		errChan := make(chan error, 1)

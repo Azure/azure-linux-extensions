@@ -58,9 +58,6 @@ func NewTraceExporter(exporterFormat string, pushTraceData PushTraceData, option
 	}
 
 	opts := newExporterOptions(options...)
-	if opts.recordMetrics {
-		pushTraceData = pushTraceDataWithMetrics(pushTraceData)
-	}
 
 	if opts.spanName != "" {
 		pushTraceData = pushTraceDataWithSpan(pushTraceData, opts.spanName)
@@ -72,15 +69,6 @@ func NewTraceExporter(exporterFormat string, pushTraceData PushTraceData, option
 	}, nil
 }
 
-func pushTraceDataWithMetrics(next PushTraceData) PushTraceData {
-	return func(ctx context.Context, td data.TraceData) (int, error) {
-		// TOOD: Add retry logic here if we want to support because we need to record special metrics.
-		droppedSpans, err := next(ctx, td)
-		// TODO: How to record the reason of dropping?
-		observability.RecordTraceExporterMetrics(ctx, len(td.Spans), droppedSpans)
-		return droppedSpans, err
-	}
-}
 
 func pushTraceDataWithSpan(next PushTraceData, spanName string) PushTraceData {
 	return func(ctx context.Context, td data.TraceData) (int, error) {
