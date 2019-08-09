@@ -244,7 +244,7 @@ class DiskUtil(object):
 
     def add_crypt_item_to_crypttab(self, crypt_item, key_file):
         if key_file is None and crypt_item.uses_cleartext_key:
-            line_key_file = self.encryption_environment.cleartext_key_base_path + mapper_name
+            line_key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
             line_key_file = key_file
 
