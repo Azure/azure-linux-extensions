@@ -45,7 +45,7 @@ ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
 omi_package_prefix = 'packages/omi-1.1.0.ssl_'
-dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.1-296.ssl_'
 omi_major_version = 1
 omi_minor_version = 1
 omi_build = 0
