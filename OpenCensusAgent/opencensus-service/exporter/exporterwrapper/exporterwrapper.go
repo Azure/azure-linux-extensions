@@ -103,7 +103,7 @@ func SendSpanTo1Agent(spanData string) {
 	id := time.Now().UTC()
 
 	trace := new(mdsdJSON)
-	trace.Tag = strconv.FormatInt(id.Unix(), 10) // Use time to create a unique Tag
+	trace.Tag = strconv.FormatInt(id.UnixNano(), 10) // Use time to create a unique Tag
 	trace.Source = "funnel"                      // "funnel" defined in schema
 	trace.Data = dataList
 
