@@ -31,9 +31,9 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/census-instrumentation/opencensus-service/consumer"
+	"github.com/census-instrumentation/opencensus-service/exporter/exporterwrapper"
 	"github.com/census-instrumentation/opencensus-service/internal/config"
 	"github.com/census-instrumentation/opencensus-service/internal/config/viperutils"
-	"github.com/census-instrumentation/opencensus-service/exporter/exporterwrapper"
 	"github.com/census-instrumentation/opencensus-service/internal/pprofserver"
 	"github.com/census-instrumentation/opencensus-service/internal/version"
 	"github.com/census-instrumentation/opencensus-service/observability"
@@ -74,7 +74,6 @@ func main() {
 }
 
 func runOCAgent() {
-	fmt.Println("it's ya boy")
 	viperCfg.SetConfigFile(configYAMLFile)
 	err := viperCfg.ReadInConfig()
 	if err != nil {
