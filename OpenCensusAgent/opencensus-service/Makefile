@@ -7,9 +7,6 @@ ALL_SRC := $(shell find . -name '*.go' \
 # ALL_PKGS is used with 'go cover'
 ALL_PKGS := $(shell go list $(sort $(dir $(ALL_SRC))))
 
-GOTEST_OPT?=-v -race -timeout 30s
-GOTEST_OPT_WITH_COVERAGE = $(GOTEST_OPT) -coverprofile=coverage.txt -covermode=atomic
-GOTEST=go test
 GOFMT=gofmt
 GOLINT=golint
 GOVET=go vet
@@ -29,26 +26,9 @@ all-pkgs:
 all-srcs:
 	@echo $(ALL_SRC) | tr ' ' '\n' | sort
 
-.DEFAULT_GOAL := fmt-vet-lint-test
-
-.PHONY: fmt-vet-lint-test
-fmt-vet-lint-test: fmt vet lint test
-
-.PHONY: test
-test:
-	$(GOTEST) $(GOTEST_OPT) $(ALL_PKGS)
 
 .PHONY: travis-ci
-travis-ci: fmt vet lint test-with-cover
 
-.PHONY: test-with-cover
-test-with-cover:
-	@echo Verifying that all packages have test files to count in coverage
-	@scripts/check-test-files.sh $(subst github.com/census-instrumentation/opencensus-service/,./,$(ALL_PKGS))
-	@echo pre-compiling tests
-	@time go test -i $(ALL_PKGS)
-	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
-	go tool cover -html=coverage.txt -o coverage.html
 
 .PHONY: fmt
 fmt:
