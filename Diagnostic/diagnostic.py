@@ -293,6 +293,14 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
+            # Install dependencies (omsagent, which includes omi, scx).
+            configurator = create_core_components_configs()
+            dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+            if dependencies_err != 0:
+                g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+                hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
+                return
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
@@ -373,13 +381,6 @@ def start_mdsd(configurator):
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    # We first need to install dependencies (omsagent, which includes omi) because even running 'mdsd -v'
-    # requires omi client library (/opt/omi/lib/libmicxx.so).
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
-    if dependencies_err != 0:
-        g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
-        return
-
     # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
     tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
@@ -397,8 +398,9 @@ def start_mdsd(configurator):
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
     # Don't check if starting succeeded, as it'll be done in the loop below anyway.
-    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running", should_log=False)[0] is 1
     if not omi_running:
+        hutil.log("OMI is not running. Restarting it.")
         RunGetOutput("/opt/omi/bin/service_control restart")
 
     log_dir = hutil.get_log_dir()
