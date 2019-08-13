@@ -94,7 +94,7 @@ func SendSpanTo1Agent(spanData string) {
 
 	conn, err := net.Dial("unix", "/var/run/mdsd/default_json.socket")
 	if err != nil {
-		log.Printf("Error connecting: %v", err)
+		log.Printf("Error connecting: %v. Check if mdsd is running", err)
 		return
 	}
 	dataList := []string{
@@ -104,7 +104,7 @@ func SendSpanTo1Agent(spanData string) {
 
 	trace := new(mdsdJSON)
 	trace.Tag = strconv.FormatInt(id.UnixNano(), 10) // Use time to create a unique Tag
-	trace.Source = "funnel"                      // "funnel" defined in schema
+	trace.Source = "funnel"                          // "funnel" defined in schema
 	trace.Data = dataList
 
 	byteData, err := json.Marshal(trace)

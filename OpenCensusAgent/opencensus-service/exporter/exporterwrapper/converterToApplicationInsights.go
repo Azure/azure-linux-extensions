@@ -3,6 +3,7 @@ package exporterwrapper
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -27,10 +28,14 @@ func getHostName() string {
 }
 
 func ConvertOCSpanDataToApplicationInsightsSchema(sd *trace.SpanData) string {
+	iKey := os.Getenv("APPLICATIONINSIGHTS_KEY")
 	envelope := Envelope{
-		IKey: os.Getenv("APPLICATIONINSIGHTS_KEY"),
+		IKey: iKey,
 		Tags: AzureMonitorContext,
 		Time: FormatTime(sd.StartTime),
+	}
+	if iKey == "" {
+		log.Fatalf("The instrumentation key is not provided")
 	}
 
 	envelope.Tags["ai.operation.id"] = sd.SpanContext.TraceID.String()
