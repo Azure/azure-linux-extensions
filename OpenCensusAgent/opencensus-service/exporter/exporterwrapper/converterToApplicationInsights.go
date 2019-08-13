@@ -100,7 +100,6 @@ const (
 	// All custom time formats for go have to be for the timestamp Jan 2 15:04:05 2006 MST
 	// as mentioned here (https://godoc.org/time#Time.Format)
 	TimeFormat = "2006-01-02T15:04:05.000000Z"
-	HourOffset = 7 // TODO: Calculate time offset in a better way
 )
 
 /* Calculates number of days, hours, minutes, seconds, and milliseconds in a
@@ -136,7 +135,7 @@ func divMod(numerator, denominator int64) (quotient, remainder int64) {
 @return time stamp
 */
 func FormatTime(t time.Time) string {
-	t = t.Local().Add(time.Hour * HourOffset)
+	t = t.UTC()
 	formattedTime := t.Format(TimeFormat)
 	return formattedTime
 }
