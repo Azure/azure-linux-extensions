@@ -221,6 +221,18 @@ class DiskUtil(object):
                             if parsed_crypt_item is None:
                                 continue
                             self.add_crypt_item(parsed_crypt_item)
+                    fstab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/fstab_line")
+                    if os.path.exists(fstab_backup_location):
+                        fstab_backup_line = None
+                        with open(fstab_backup_location, 'r') as f:
+                            for line in f:
+                                if not line.strip():
+                                    continue
+                                # copy the crypt_item from the backup to the central os location
+                                fstab_backup_line = line
+                        if fstab_backup_line is not None:
+                            with open("/etc/fstab", 'a') as f:
+                                f.writelines([fstab_backup_line])
 
                 # close the file and then unmount and close
                 self.umount(temp_mount_point)
@@ -370,11 +382,26 @@ class DiskUtil(object):
             wf.write(crypttab_line + "\n")
 
         if backup_folder is not None:
-            backup_file = os.path.join(backup_folder, "crypttab_line")
+            crypttab_backup_file = os.path.join(backup_folder, "crypttab_line")
             self.make_sure_path_exists(backup_folder)
-            with open(backup_file, "w") as wf:
+            with open(crypttab_backup_file, "w") as wf:
                 wf.write(crypttab_line)
-            self.logger.log("Added crypttab item {0} to {1}".format(crypt_item.mapper_name, backup_file))
+            self.logger.log("Added crypttab item {0} to {1}".format(crypt_item.mapper_name, crypttab_backup_file))
+
+            if crypt_item.mount_point:
+                # We need to backup the fstab line too
+                fstab_backup_line = None
+                with open("/etc/fstab") as f:
+                    for line in f.readlines():
+                        device, mountpoint = self.parse_fstab_line(line)
+                        if mountpoint == crypt_item.mount_point and crypt_item.mapper_name in device:
+                            fstab_backup_line = line
+                if fstab_backup_line is not None:
+                    fstab_backup_file = os.path.join(backup_folder, "fstab_line")
+                    with open(fstab_backup_file, "w") as wf:
+                        wf.write(fstab_backup_line)
+                    self.logger.log("Added fstab item {0} to {1}".format(fstab_backup_line, fstab_backup_file))
+
         return True
 
     def add_crypt_item_to_azure_crypt_mount(self, crypt_item, backup_folder=None):
