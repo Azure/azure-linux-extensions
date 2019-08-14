@@ -28,7 +28,6 @@ func getHostName() string {
 
 func ConvertOCSpanDataToApplicationInsightsSchema(sd *trace.SpanData) string {
 	envelope := Envelope{
-		IKey: os.Getenv("APPLICATIONINSIGHTS_KEY"),
 		Tags: AzureMonitorContext,
 		Time: FormatTime(sd.StartTime),
 	}
@@ -146,7 +145,6 @@ type Data struct {
 }
 
 type Envelope struct {
-	IKey       string                 `json:"iKey"`
 	Tags       map[string]interface{} `json:"tags"`
 	Name       string                 `json:"name"`
 	Time       string                 `json:"time"`
