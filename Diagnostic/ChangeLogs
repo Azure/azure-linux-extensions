@@ -1,3 +1,6 @@
+2019-08-14: LAD-3.0.123
+    - Fix a race condition in install. The dependencies were installed during "enable" step; which is not idempotent.
+
 2019-06-17: LAD-3.0.121
     - Add logrotate policy to manage mdsd log files.
 
