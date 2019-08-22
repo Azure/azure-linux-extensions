@@ -921,9 +921,14 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
 
-            if not ongoing_item_config.get_file_system().lower() in CommonVariables.inplace_supported_file_systems:
-                logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
-                           level=CommonVariables.WarningLevel)
+            # log an appropriate warning if the file system type is not supported
+            device_fs = ongoing_item_config.get_file_system().lower()
+            if not device_fs in CommonVariables.inplace_supported_file_systems:
+                if device_fs in CommonVariables.format_supported_file_systems:
+                    msg = "Encrypting {0} file system is not supported for data-preserving encryption. Consider using the encrypt-format-all option.".format(device_fs)
+                else:
+                    msg = "AzureDiskEncryption does not support the {0} file system".format(device_fs)
+                logger.log(msg=msg, level=CommonVariables.WarningLevel)
 
                 ongoing_item_config.clear_config()
                 return current_phase
