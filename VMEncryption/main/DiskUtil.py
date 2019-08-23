@@ -905,7 +905,7 @@ class DiskUtil(object):
 
         mount_items = self.get_mount_items()
         device_items = self.get_device_items(None)
-        device_items_dict = {device_item.mount_point: device_item for device_item in device_items}
+        device_items_dict = dict([(device_item.mount_point,device_item) for device_item in device_items])
 
         os_drive_encrypted = False
         data_drives_found = False
