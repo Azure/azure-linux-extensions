@@ -61,7 +61,7 @@ class CommonVariables:
     disk/file system related
     """
     sector_size = 512
-    luks_header_size = 4096 * 512
+    luks_header_size = 20480 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
     default_file_system = 'ext4'
