@@ -225,7 +225,7 @@ def check_snapshot_array_fail():
     return snapshot_array_fail
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size, decryption_failed
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
 
