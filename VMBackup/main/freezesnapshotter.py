@@ -107,16 +107,16 @@ class FreezeSnapshotter(object):
         all_failed = False
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
-            run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed = self.takeSnapshotFromGuest()
+            run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromGuest()
         elif(self.takeSnapshotFrom == CommonVariables.firstGuestThenHost):
-            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromFirstGuestThenHost()
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstGuestThenHost()
         elif(self.takeSnapshotFrom == CommonVariables.firstHostThenGuest):
-            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromFirstHostThenGuest()
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
-            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
 
         if (run_result == CommonVariables.success):
-            run_result, run_status = self.updateErrorCode(blob_snapshot_info_array, all_failed)
+            run_result, run_status = self.updateErrorCode(blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent)
 
         snapshot_info_array = self.update_snapshotinfoarray(blob_snapshot_info_array)
 
@@ -136,12 +136,23 @@ class FreezeSnapshotter(object):
 
         return snapshot_info_array
 
-    def updateErrorCode(self, blob_snapshot_info_array, all_failed):
+    def updateErrorCode(self, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent):
         run_result = CommonVariables.success
         any_failed = False
         run_status = 'success'
 
-        if blob_snapshot_info_array != None:
+        if unable_to_sleep:
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'T:S Machine unable to sleep'
+            self.logger.log(error_msg, True, 'Error')
+        elif is_inconsistent == True :
+            run_result = CommonVariables.error
+            run_status = 'error'
+            error_msg = 'Snapshots are inconsistent'
+            self.logger.log(error_msg, True, 'Error')
+
+        elif blob_snapshot_info_array != None:
             for blob_snapshot_info in blob_snapshot_info_array:
                 if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
                     if 'The rate of snapshot blob calls is exceeded' in blob_snapshot_info.errorMessage:
@@ -228,6 +239,7 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
+        unable_to_sleep = False
         blob_snapshot_info_array = None
         all_snapshots_failed = False
         try:
@@ -247,18 +259,8 @@ class FreezeSnapshotter(object):
                 time_after_snapshot = datetime.datetime.now()
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
                 self.logger.log('T:S snapshotall ends...', True)
-                if(snapshot_result is not None and len(snapshot_result.errors) > 0):
-                    if unable_to_sleep:
-                        run_result = CommonVariables.error
-                        run_status = 'error'
-                        error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
-                        self.logger.log(error_msg, True, 'Warning')
-                    elif is_inconsistent == True :
-                        run_result = CommonVariables.error
-                        run_status = 'error'
-                        error_msg = 'T:S Enable failed with error: ' + str(snapshot_result)
-                        self.logger.log(error_msg, True, 'Warning')
-                elif self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
+
+                if self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
                     run_result = CommonVariables.error
                     run_status = 'error'
                     error_msg = 'T:S Enable failed with error in snapshot_array index'
@@ -269,7 +271,7 @@ class FreezeSnapshotter(object):
             run_result = CommonVariables.error
             run_status = 'error'
 
-        return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
     def takeSnapshotFromFirstGuestThenHost(self):
         run_result = CommonVariables.success
@@ -277,17 +279,18 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
+        unable_to_sleep = False
         blob_snapshot_info_array = None
         all_snapshots_failed = False
 
-        run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
+        run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent  = self.takeSnapshotFromGuest()
 
         time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
 
         if(all_snapshots_failed):
-            run_result, run_status, blob_snapshot_info_array,all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array,all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
 
-        return run_result, run_status, blob_snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
 
     def takeSnapshotFromFirstHostThenGuest(self):
 
@@ -296,27 +299,29 @@ class FreezeSnapshotter(object):
 
         all_failed= False
         is_inconsistent =  False
+        unable_to_sleep = False
         blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger, self.hostIp)
         pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
-            run_result, run_status, blob_snapshot_info_array, all_failed = self.takeSnapshotFromOnlyHost()
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
         else:
-            run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed  = self.takeSnapshotFromGuest()
+            run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent  = self.takeSnapshotFromGuest()
 
             if all_snapshots_failed and run_result != CommonVariables.success:
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
             elif run_result != CommonVariables.success :
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork
 
-        return run_result, run_status, blob_snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
 
     def takeSnapshotFromOnlyHost(self):
         run_result = CommonVariables.success
         run_status = 'success'
         all_failed= False
         is_inconsistent =  False
+        unable_to_sleep = False
         blob_snapshot_info_array = None
         self.logger.log('Taking Snapshot through Host')
         HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.backupHostService)
@@ -332,4 +337,4 @@ class FreezeSnapshotter(object):
             HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
             self.logger.log('T:S snapshotall ends...', True)
 
-        return run_result, run_status, blob_snapshot_info_array, all_failed
+        return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
