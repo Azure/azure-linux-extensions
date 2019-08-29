@@ -91,6 +91,10 @@ class FreezeSnapshotter(object):
                         self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
                         self.takeSnapshotFrom = CommonVariables.onlyGuest
 
+                #Not hitting host when snapshot uri has special characters
+                if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
+                    self.takeSnapshotFrom = CommonVariables.onlyGuest
+
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
                     self.taskId = customSettings["backupTaskId"]
@@ -250,6 +254,9 @@ class FreezeSnapshotter(object):
                         run_status = 'error'
                         error_msg = 'T:S taking snapshot failed as blobs are empty or none'
                         self.logger.log(error_msg, True, 'Error')
+                        all_failed = True
+                        all_snapshots_failed = True
+
             if(run_result == CommonVariables.success):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)

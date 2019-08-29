@@ -693,6 +693,19 @@ class HandlerUtility:
             self.log("removing the protected settings")
             waagent.SetFileContents(self._context._settings_file,json.dumps(self._context._config))
 
+    def UriHasSpecialCharacters(self, blobs):
+        uriHasSpecialCharacters = False
+
+        if blobs is not None:
+            for blob in blobs:
+                blobUri = str(blob.split("?")[0])
+                if '%' in blobUri:
+                    self.log(blobUri + " URI has special characters")
+                    uriHasSpecialCharacters = True
+
+        return uriHasSpecialCharacters
+
+
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj,'convertToDictionary'):
