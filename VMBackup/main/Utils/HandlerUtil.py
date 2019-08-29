@@ -705,7 +705,6 @@ class HandlerUtility:
 
         return uriHasSpecialCharacters
 
-
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj,'convertToDictionary'):
