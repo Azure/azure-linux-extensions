@@ -18,6 +18,7 @@
 
 import os
 import os.path
+import signal
 import pwd
 import grp
 import re
@@ -226,7 +227,7 @@ def check_disk_space_availability():
     Check if there is the required space on the machine.
     """
     try:
-        if get_free_space_mb("/var") < 200 or get_free_space_mb("/etc") < 200:
+        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500:
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             return 52
@@ -374,9 +375,20 @@ def uninstall():
     hutil_log_info('Running command "{0}"'.format(cmd))
 
     # Retry, since uninstall can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(cmd, retries = 5,
-                                         retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
-                                         final_check = final_check_if_dpkg_locked)
+    try:
+        exit_code, output = run_command_with_retries_output(cmd, retries = 5,
+                                            retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
+                                            final_check = final_check_if_dpkg_locked)
+    except Exception as e:
+        # try to force clean the installation
+        try:
+            check_kill_process("omsagent")
+            exit_code = 0
+        except Exception as e:
+            exit_code = 1
+            message = 'Uninstall failed with error: {0}\n' \
+                    'Stacktrace: {1}'.format(e, traceback.format_exc())
+
     if IsUpgrade:
         IsUpgrade = False
     else:
@@ -384,6 +396,11 @@ def uninstall():
 
     return exit_code, output
 
+def check_kill_process(pstring):
+    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
+        fields = line.split()
+        pid = fields[0]
+        os.kill(int(pid), signal.SIGKILL)
 
 def enable():
     """
@@ -514,8 +531,16 @@ def enable():
                 hutil_log_info('Created extension marker file ' \
                                '{0}'.format(extension_marker_path))
             except IOError as e:
-                hutil_log_error('Error creating {0} with error: ' \
-                               '{1}'.format(extension_marker_path, e))
+                try:
+                    open(extension_marker_path, 'w+').close()
+                    hutil_log_info('Created extension marker file ' \
+                               '{0}'.format(extension_marker_path))
+                except IOError as e:
+                    hutil_log_error('Error creating {0} with error: ' \
+                                '{1}'.format(extension_marker_path, e))
+                    # we are having some kind of permissions issue creating the marker file
+                    output = "Couldn't create marker file"
+                    exit_code = 52 # since it is a missing dependency
 
         # Sleep to prevent bombarding the processes, then restart all processes
         # to resolve any issues with auto-started processes from --upgrade
@@ -1018,11 +1043,24 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         if exit_code is not 0:	
             sys.stderr.write(output[-500:])        
 
-        if exit_code is 19 and "rpmdb" in output:
-            # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-            # 52 is the exit code for missing dependency i.e. rpmdb
-            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-            exit_code = 52
+        if exit_code is 19:
+            if "rpmdb" in output or "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "cannot open Packages database" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
+                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+        if exit_code is 33:
+            if "Permission denied" in output:
+                # Enable failures
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52        
+        if exit_code is 5:
+            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader":
+                # Enable failures
+                # 53 is the exit code for configuration errors
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 53        
     except:	
         hutil_log_info('Failed to write output to STDERR')	
   
