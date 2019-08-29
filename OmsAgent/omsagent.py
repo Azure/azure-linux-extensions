@@ -360,6 +360,12 @@ def install():
     
     return exit_code, output
 
+def check_kill_process(pstring):
+    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
+        fields = line.split()
+        pid = fields[0]
+        os.kill(int(pid), signal.SIGKILL)
+
 def uninstall():
     """
     Uninstall the OMSAgent shell bundle.
@@ -395,12 +401,6 @@ def uninstall():
         remove_workspace_configuration()
 
     return exit_code, output
-
-def check_kill_process(pstring):
-    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
-        fields = line.split()
-        pid = fields[0]
-        os.kill(int(pid), signal.SIGKILL)
 
 def enable():
     """
