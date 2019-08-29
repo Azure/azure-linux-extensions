@@ -60,7 +60,7 @@ import platform
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed,decryption_failed
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -69,6 +69,7 @@ def main():
         snapshot_info_array = None
         total_used_size = 0
         size_calculation_failed = False
+        decryption_failed = False
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
 ##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -129,16 +130,19 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     global MyPatching,backup_logger,hutil,para_parser,total_used_size,size_calculation_failed
     blob_report_msg = None
     file_report_msg = None
+    number_of_blobs = 0
     try:
         if total_used_size == -1 :
             sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
-            number_of_blobs = len(para_parser.blobs)
+            if para_parser.blobs:
+                number_of_blobs = len(para_parser.blobs)
+
             maximum_possible_size = number_of_blobs * 1099511627776
             if(total_used_size>maximum_possible_size):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        if para_parser is not None:
             blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
@@ -221,7 +225,7 @@ def check_snapshot_array_fail():
     return snapshot_array_fail
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size, decryption_failed
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
 
@@ -297,10 +301,8 @@ def daemon():
 
         if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
             error_msg = "unable to load certificate"
-            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
-            temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
-            temp_status= 'error'
-            exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+            backup_logger.log((error_msg), True, 'Error')
+            decryption_failed = True
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
             utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
@@ -332,7 +334,7 @@ def daemon():
             run_result = CommonVariables.success
             backup_logger.log(error_msg)
         elif(CommonVariables.iaas_vmbackup_command in commandToExecute.lower()):
-            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'
@@ -439,6 +441,14 @@ def daemon():
                     for error in post_plugin_errors:
                         if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
                             hutil.SetExtErrorCode(error.errorCode)
+
+                if decryption_failed and not (run_result == CommonVariables.success):
+                    run_status = 'error'
+                    run_result = CommonVariables.FailedHandlerGuestAgentCertificateNotFound
+                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
+                    error_msg = 'unable to load certificate'
+                    backup_logger.log(error_msg, True, 'Error')
+
 
                 if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
                     run_status = 'success'
