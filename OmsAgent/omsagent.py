@@ -1056,7 +1056,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52        
         if exit_code is 5:
-            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader":
+            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
