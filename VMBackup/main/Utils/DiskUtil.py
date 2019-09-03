@@ -280,6 +280,7 @@ class DiskUtil(object):
             for line in lines:
                 line = line.strip()
                 if(line != ""):
+                    deviceName = line.split()[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):
@@ -296,9 +297,11 @@ class DiskUtil(object):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
                             # If there is a duplicate, keep only the first instance
                             if(mount_point not in mount_points):
-                                self.logger.log("mount command mount :" + str(mount_point) + ": and fstype :"+ str(fs_type) + ":", True) 
+                                self.logger.log("mount command, adding mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True) 
                                 fs_types.append(fs_type)
                                 mount_points.append(mount_point)
+                            else:
+                                self.logger.log("mount command, not adding duplicate mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True)
         #Now reverse the mount_points & fs_types lists to make them in the same order as mount command output order
         mount_points.reverse()
         fs_types.reverse()
