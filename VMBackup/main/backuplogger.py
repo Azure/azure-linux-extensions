@@ -60,19 +60,26 @@ class Backuplogger(object):
                 C.write(message.encode('ascii','ignore'))
         except IOError as e:
             pass
+        except Exception as e:
+            log_msg = "Excetion in log_to_con_py3"
+            C.write(log_msg)
     
     def log_to_con_py3(self, msg, level='Info'):
-        if type(msg) is not str:
-            msg = str(msg, errors="backslashreplace")
-        time = datetime.datetime.now().strftime(u'%Y/%m/%d %H:%M:%S.%f')
-        log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
-        log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
-                        encoding="ascii")
+        log_msg = ""
         try:
+            if type(msg) is not str:
+                msg = str(msg, errors="backslashreplace")
+            time = datetime.datetime.now().strftime(u'%Y/%m/%d %H:%M:%S.%f')
+            log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
+            log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
+                         encoding="ascii")
             with open(self.con_path, "w") as C :
                 C.write(log_msg)
         except IOError:
             pass
+        except Exception as e:
+            log_msg = "Excetion in log_to_con_py3"
+            C.write(log_msg)
         return log_msg
 
     def commit(self, logbloburi):

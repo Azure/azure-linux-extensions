@@ -275,6 +275,8 @@ class DiskUtil(object):
         if (out_mount_output is not None):
             #Extract the list of mnt_point in order
             lines = out_mount_output.splitlines()
+            #Reverse the mount command output to go-through from last-to-first mounts in output
+            lines.reverse()
             for line in lines:
                 line = line.strip()
                 if(line != ""):
@@ -297,6 +299,9 @@ class DiskUtil(object):
                                 self.logger.log("mount command mount :" + str(mount_point) + ": and fstype :"+ str(fs_type) + ":", True) 
                                 fs_types.append(fs_type)
                                 mount_points.append(mount_point)
+        #Now reverse the mount_points & fs_types lists to make them in the same order as mount command output order
+        mount_points.reverse()
+        fs_types.reverse()
         for fstype in fs_types:
             if ("fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower()):
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
@@ -306,8 +311,11 @@ class DiskUtil(object):
     def get_mount_file_systems(self):
         out_mount_output = self.get_mount_output()
         file_systems_info = []
+        mount_points = []
         if (out_mount_output is not None):
             lines = out_mount_output.splitlines()
+            #Reverse the mount command output to go-through from last-to-first mounts in output
+            lines.reverse()
             for line in lines:
                 self.logger.log("print line by line :" + line , True)
                 line = line.strip()
@@ -327,9 +335,12 @@ class DiskUtil(object):
                                 fstypeEnd = line.find(" ", fstypeStart+1)
                                 if(fstypeEnd >=0):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
-                            # If there is a duplicate, keep only the first instance
-                    if (file_system,fs_type,mount_point) not in file_systems_info:
+                    # If there is a duplicate, keep only the first instance
+                    if ((mount_point not in mount_points) and ((file_system,fs_type,mount_point) not in file_systems_info)):
                         file_systems_info.append((file_system,fs_type,mount_point))
+                        mount_points.append(mount_point)
+        #Now reverse the file_systems_info list to make them in the same order as mount command output order
+        file_systems_info.reverse()
         return file_systems_info
 
     def get_mount_output(self):
