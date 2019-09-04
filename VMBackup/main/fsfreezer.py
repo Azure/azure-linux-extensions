@@ -124,6 +124,7 @@ class FsFreezer:
     def freeze_safe(self,timeout):
         self.root_seen = False
         error_msg=''
+        timedout = False
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
@@ -156,15 +157,21 @@ class FsFreezer:
                             self.logger.log(line.rstrip(), True)
                         else:
                             break
-                error_msg="freeze failed for some mount"
-                freeze_result.errors.append(error_msg)
-                self.logger.log(error_msg, True, 'Error')
+                if (sig_handle == 0):
+                    timedout = True
+                    error_msg="freeze timed-out"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+                else:
+                    error_msg="freeze failed for some mount"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
         except Exception as e:
             self.logger.enforce_local_flag(True)
             error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
-        return freeze_result
+        return freeze_result,timedout
 
     def thaw_safe(self):
         thaw_result = FreezeResult()

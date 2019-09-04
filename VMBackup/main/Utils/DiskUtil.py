@@ -269,6 +269,7 @@ class DiskUtil(object):
         return is_mount_path_wrong, out_mount_output, error_msg
 
     def get_mount_points(self):
+        mount_points_info = []
         mount_points = []
         fs_types = []
         out_mount_output = self.get_mount_output()
@@ -296,20 +297,21 @@ class DiskUtil(object):
                                 if(fstypeEnd >=0):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
                             # If there is a duplicate, keep only the first instance
-                            if(mount_point not in mount_points):
+                            if ((mount_point not in mount_points) and ((mount_point,deviceName,fs_type) not in mount_points_info)):
                                 self.logger.log("mount command, adding mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True) 
                                 fs_types.append(fs_type)
                                 mount_points.append(mount_point)
+                                mount_points_info.append((mount_point,deviceName,fs_type))
                             else:
                                 self.logger.log("mount command, not adding duplicate mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True)
         #Now reverse the mount_points & fs_types lists to make them in the same order as mount command output order
+        mount_points_info.reverse()
         mount_points.reverse()
-        fs_types.reverse()
         for fstype in fs_types:
             if ("fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower()):
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypePresentInMount","True")
                 break
-        return mount_points, fs_types
+        return mount_points,mount_points_info
 
     def get_mount_file_systems(self):
         out_mount_output = self.get_mount_output()

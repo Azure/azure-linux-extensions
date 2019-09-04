@@ -195,7 +195,7 @@ class FreezeSnapshotter(object):
                 timeout_int = 60
                 timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
-            freeze_result = self.freezer.freeze_safe(timeout) 
+            freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()
             freezeTimeTaken = time_after_freeze-time_before_freeze
             self.logger.log('T:S freeze, time_before_freeze=' + str(time_before_freeze) + ", time_after_freeze=" + str(time_after_freeze) + ", freezeTimeTaken=" + str(freezeTimeTaken))
@@ -204,21 +204,21 @@ class FreezeSnapshotter(object):
             run_status = 'success'
             all_failed= False
             is_inconsistent =  False
-            self.logger.log('T:S freeze result ' + str(freeze_result))
-            if(freeze_result is not None and len(freeze_result.errors) > 0):
-                run_result = CommonVariables.FailedFsFreezeFailed
-                run_status = 'error'
-                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
-                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed
-                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
-                self.logger.log(error_msg, True, 'Warning')
-            elif (freezeTimeTaken > datetime.timedelta(seconds=timeout_int)):
+            self.logger.log('T:S freeze result ' + str(freeze_result) + ', timedout :' + str(timedout))
+            if (timedout == True):
                 run_result = CommonVariables.FailedFsFreezeTimeout
                 run_status = 'error'
                 error_msg = 'T:S Enable failed with error: freeze took longer than timeout'
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout
                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Error')
+            elif(freeze_result is not None and len(freeze_result.errors) > 0):
+                run_result = CommonVariables.FailedFsFreezeFailed
+                run_status = 'error'
+                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+                self.logger.log(error_msg, True, 'Warning')
         except Exception as e:
             errMsg = 'Failed to do the freeze with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
