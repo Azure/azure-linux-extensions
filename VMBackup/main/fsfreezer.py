@@ -183,7 +183,7 @@ class FsFreezer:
                 else:
                     break
             self.logger.enforce_local_flag(True)
-            self.logger.log("Binary output after process end: ", True)
+            self.logger.log("============== Binary output traces start ================= ", True)
             while True:
                 line=self.freeze_handler.child.stdout.readline()
                 if sys.version_info > (3,):
@@ -194,6 +194,7 @@ class FsFreezer:
                     self.logger.log(line.rstrip(), True)
                 else:
                     break
+            self.logger.log("============== Binary output traces end ================= ", True)
             if(self.freeze_handler.child.returncode!=0):
                 error_msg = 'snapshot result inconsistent as child returns with failure'
                 thaw_result.errors.append(error_msg)

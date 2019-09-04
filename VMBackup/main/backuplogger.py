@@ -35,6 +35,10 @@ class Backuplogger(object):
 
     def enforce_local_flag(self, enforced_local):
         self.enforced_local_flag_value = enforced_local
+        if (self.enforced_local_flag_value == False):
+            self.msg = self.msg + "================== Logs during Freeze ==============" + "\n"
+        elif (self.enforced_local_flag_value == True):
+            self.commit_to_local()
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
@@ -46,8 +50,9 @@ class Backuplogger(object):
             else:
                 log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
                 self.log_to_con(log_msg)
-            if self.enforced_local_flag_value != None:
-                local = self.enforced_local_flag_value
+            local = True
+            if self.enforced_local_flag_value == False:
+                local = False
             if(local):
                 self.hutil.log(str(msg),level)
             else:
@@ -86,6 +91,7 @@ class Backuplogger(object):
         #commit to local file system first, then commit to the network.
         try:
             self.hutil.log(self.msg)
+            self.msg = ''
         except Exception as e:
             pass 
         try:
@@ -95,6 +101,7 @@ class Backuplogger(object):
 
     def commit_to_local(self):
         self.hutil.log(self.msg)
+        self.msg = ''
 
     def commit_to_blob(self, logbloburi):
         UploadStatusAndLog = self.hutil.get_value_from_configfile('UploadStatusAndLog')
