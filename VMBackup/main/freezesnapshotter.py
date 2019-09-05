@@ -93,6 +93,7 @@ class FreezeSnapshotter(object):
 
                 #Not hitting host when snapshot uri has special characters
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
+                    self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
 
                 self.isManaged = customSettings['isManagedVm']
@@ -118,6 +119,8 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
+
+        self.logger.log('doFreezeSnapshot : run_result - {0} run_status - {1} all_failed - {2} unable_to_sleep - {3} is_inconsistent - {4} values post snapshot'.format(str(run_result), str(run_status), str(all_failed), str(unable_to_sleep), str(is_inconsistent)))
 
         if (run_result == CommonVariables.success):
             run_result, run_status = self.updateErrorCode(blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent)
@@ -155,7 +158,6 @@ class FreezeSnapshotter(object):
             run_status = 'error'
             error_msg = 'Snapshots are inconsistent'
             self.logger.log(error_msg, True, 'Error')
-
         elif blob_snapshot_info_array != None:
             for blob_snapshot_info in blob_snapshot_info_array:
                 if blob_snapshot_info != None and blob_snapshot_info.errorMessage != None :
