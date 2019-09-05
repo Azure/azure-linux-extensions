@@ -1734,7 +1734,6 @@ else:
     waagent.Error("ActivateResourceDisk: Failed to activate swap at " + mountpoint + "/swapfile")
 """
 
-
 class FreeBSDDistro(AbstractDistro):
     """
     """
@@ -2105,6 +2104,14 @@ class FreeBSDDistro(AbstractDistro):
 
     def routeAdd(self, net, mask, gateway):
         Run("/sbin/route add -net " + net + " " + mask + " " + gateway, chk_err=False)
+
+
+class NSBSDDistro(FreeBSDDistro):
+    """
+    """
+
+    def __init__(self):
+        super(NSBSDDistro, self).__init__()
 
 
 ############################################################
@@ -4476,6 +4483,7 @@ def GetMyDistro(dist_class_name=''):
         else:  # I know this is not Linux!
             if 'FreeBSD' in platform.system():
                 Distro = platform.system()
+                Distro = Distro.strip('-')
         Distro = Distro.strip('"')
         Distro = Distro.strip(' ')
         dist_class_name = Distro + 'Distro'

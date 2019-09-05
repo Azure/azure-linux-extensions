@@ -37,6 +37,10 @@ def DistInfo():
             release = re.sub('\-.*\Z', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
+        if 'NS-BSD' in platform.system():
+            release = re.sub('\-.*\Z', '', ustr(platform.release()))
+            distinfo = ['NS-BSD', release]
+            return distinfo
         if 'linux_distribution' in dir(platform):
             distinfo = list(platform.linux_distribution(full_distribution_name=0))
             # remove trailing whitespace in distro name
@@ -71,6 +75,9 @@ def GetMyPatching(logger):
     else: # I know this is not Linux!
         if 'FreeBSD' in platform.system():
             Distro = platform.system()
+        if 'NS-BSD' in platform.system():
+            Distro = platform.system()
+            Distro = Distro.strip('-')
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
     orig_distro = Distro
