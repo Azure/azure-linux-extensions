@@ -89,7 +89,7 @@ class FreezeHandler(object):
                 time.sleep(2)
             else:
                 break
-        self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
+        ##self.logger.log("Binary output for signal handled: "+str(self.sig_handle))
         return self.sig_handle
 
     def signal_receiver(self):
