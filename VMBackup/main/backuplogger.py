@@ -34,11 +34,12 @@ class Backuplogger(object):
         self.prev_log = ''
 
     def enforce_local_flag(self, enforced_local):
-        self.enforced_local_flag_value = enforced_local
-        if (self.enforced_local_flag_value == False):
-            self.msg = self.msg + "================== Logs during Freeze ==============" + "\n"
-        elif (self.enforced_local_flag_value == True):
+        if (self.enforced_local_flag_value != False and enforced_local == False):
+            self.msg = self.msg + "================== Logs during Freeze Start ==============" + "\n"
+        elif (self.enforced_local_flag_value == False and enforced_local == True):
+            self.msg = self.msg + "================== Logs during Freeze End ==============" + "\n"
             self.commit_to_local()
+        self.enforced_local_flag_value = enforced_local
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
@@ -50,13 +51,10 @@ class Backuplogger(object):
             else:
                 log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
                 self.log_to_con(log_msg)
-            local = True
-            if self.enforced_local_flag_value == False:
-                local = False
-            if(local):
-                self.hutil.log(str(msg),level)
-            else:
+            if(self.enforced_local_flag_value == False):
                 self.msg += log_msg
+            else:
+                self.hutil.log(str(msg),level)
 
     def log_to_con(self, msg):
         try:
@@ -66,9 +64,8 @@ class Backuplogger(object):
         except IOError as e:
             pass
         except Exception as e:
-            log_msg = "Excetion in log_to_con_py3"
-            C.write(log_msg)
-    
+            pass
+
     def log_to_con_py3(self, msg, level='Info'):
         log_msg = ""
         try:
@@ -83,8 +80,7 @@ class Backuplogger(object):
         except IOError:
             pass
         except Exception as e:
-            log_msg = "Excetion in log_to_con_py3"
-            C.write(log_msg)
+            log_msg = "Exception in log_to_con_py3"
         return log_msg
 
     def commit(self, logbloburi):

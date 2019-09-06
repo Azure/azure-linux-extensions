@@ -275,6 +275,7 @@ class FreezeSnapshotter(object):
                 self.logger.log(error_msg, True, 'Error')
                 all_failed = True
                 all_snapshots_failed = True
+
             if(run_result == CommonVariables.success):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)

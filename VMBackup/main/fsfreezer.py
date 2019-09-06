@@ -145,18 +145,10 @@ class FsFreezer:
             self.logger.log("proceeded for accepting signals", True)
             self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
+            self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
-                    while True:
-                        line=self.freeze_handler.child.stdout.readline()
-                        if sys.version_info > (3,):
-                            line = str(line,encoding='utf-8', errors="backslashreplace")
-                        else:
-                            line = str(line)
-                        if(line != ''):
-                            self.logger.log(line.rstrip(), True)
-                        else:
-                            break
+                    self.log_binary_output()
                 if (sig_handle == 0):
                     timedout = True
                     error_msg="freeze timed-out"
@@ -190,18 +182,7 @@ class FsFreezer:
                 else:
                     break
             self.logger.enforce_local_flag(True)
-            self.logger.log("============== Binary output traces start ================= ", True)
-            while True:
-                line=self.freeze_handler.child.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
-                if(line != ''):
-                    self.logger.log(line.rstrip(), True)
-                else:
-                    break
-            self.logger.log("============== Binary output traces end ================= ", True)
+            self.log_binary_output()
             if(self.freeze_handler.child.returncode!=0):
                 error_msg = 'snapshot result inconsistent as child returns with failure'
                 thaw_result.errors.append(error_msg)
@@ -216,18 +197,23 @@ class FsFreezer:
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
             self.logger.enforce_local_flag(True)
-            while True:
-                line=self.freeze_handler.child.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
-                if(line != ''):
-                    self.logger.log(line.rstrip(), True)
-                else:
-                    break
+            self.log_binary_output()
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
         return thaw_result, unable_to_sleep
+
+    def log_binary_output(self):
+        self.logger.log("============== Binary output traces start ================= ", True)
+        while True:
+            line=self.freeze_handler.child.stdout.readline()
+            if sys.version_info > (3,):
+                line = str(line, encoding='utf-8', errors="backslashreplace")
+            else:
+                line = str(line)
+            if(line != ''):
+                self.logger.log(line.rstrip(), True)
+            else:
+                break
+        self.logger.log("============== Binary output traces end ================= ", True)
 
 

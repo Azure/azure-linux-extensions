@@ -297,7 +297,7 @@ class DiskUtil(object):
                                 if(fstypeEnd >=0):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
                             # If there is a duplicate, keep only the first instance
-                            if ((mount_point not in mount_points) and ((mount_point,deviceName,fs_type) not in mount_points_info)):
+                            if (mount_point not in mount_points):
                                 self.logger.log("mount command, adding mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True) 
                                 fs_types.append(fs_type)
                                 mount_points.append(mount_point)
@@ -341,7 +341,7 @@ class DiskUtil(object):
                                 if(fstypeEnd >=0):
                                     fs_type = line[fstypeStart+1:fstypeEnd]
                     # If there is a duplicate, keep only the first instance
-                    if ((mount_point not in mount_points) and ((file_system,fs_type,mount_point) not in file_systems_info)):
+                    if (mount_point not in mount_points):
                         file_systems_info.append((file_system,fs_type,mount_point))
                         mount_points.append(mount_point)
         #Now reverse the file_systems_info list to make them in the same order as mount command output order
