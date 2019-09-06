@@ -390,10 +390,10 @@ def uninstall():
         try:
             check_kill_process("omsagent")
             exit_code = 0
-        except Exception as e:
+        except Exception as ex:
             exit_code = 1
             message = 'Uninstall failed with error: {0}\n' \
-                    'Stacktrace: {1}'.format(e, traceback.format_exc())
+                    'Stacktrace: {1}'.format(ex, traceback.format_exc())
 
     if IsUpgrade:
         IsUpgrade = False
@@ -535,9 +535,9 @@ def enable():
                     open(extension_marker_path, 'w+').close()
                     hutil_log_info('Created extension marker file ' \
                                '{0}'.format(extension_marker_path))
-                except IOError as e:
+                except IOError as ex:
                     hutil_log_error('Error creating {0} with error: ' \
-                                '{1}'.format(extension_marker_path, e))
+                                '{1}'.format(extension_marker_path, ex))
                     # we are having some kind of permissions issue creating the marker file
                     output = "Couldn't create marker file"
                     exit_code = 52 # since it is a missing dependency
@@ -1056,7 +1056,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52        
         if exit_code is 5:
-            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader":
+            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
