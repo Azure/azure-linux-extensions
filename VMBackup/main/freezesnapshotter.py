@@ -215,7 +215,7 @@ class FreezeSnapshotter(object):
             freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()
             freezeTimeTaken = time_after_freeze-time_before_freeze
-            self.logger.log('T:S ****** freeze, time_before_freeze=' + str(time_before_freeze) + ", time_after_freeze=" + str(time_after_freeze) + ", freezeTimeTaken=" + str(freezeTimeTaken))
+            self.logger.log('T:S ***** freeze, time_before_freeze=' + str(time_before_freeze) + ", time_after_freeze=" + str(time_after_freeze) + ", freezeTimeTaken=" + str(freezeTimeTaken))
             HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
             run_result = CommonVariables.success
             run_status = 'success'
@@ -284,7 +284,7 @@ class FreezeSnapshotter(object):
                 snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
-                self.logger.log('T:S ****** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
+                self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(snapshotTimeTaken))
                 self.logger.log('T:S snapshotall ends...', True)
 
