@@ -142,6 +142,8 @@ int main(int argc, char *argv[])
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
+    logger("****** 2. Binary Freeze Started \n");
+
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
@@ -154,6 +156,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    logger("****** 3. Binary Freeze Completed \n");
 
     if (kill(getppid(), SIGUSR1) != 0)
     {
@@ -168,6 +171,7 @@ int main(int argc, char *argv[])
     {
         if (gThaw == 1 )
         {
+            logger("****** 8. Binary Thaw Signal Received \n");
             break;
         }
         else

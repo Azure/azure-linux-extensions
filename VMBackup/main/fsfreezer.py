@@ -31,6 +31,7 @@ def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
     time.sleep(5)
     self.logger.log("Waited in thread for 5 seconds",True)
+    self.logger.log("****** 1. Starting Freeze Binary ",True)
     self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.logger.log("Binary subprocess Created",True)
 
@@ -61,12 +62,14 @@ class FreezeHandler(object):
 
     def sigusr1_handler(self,signal,frame):
         self.logger.log('freezed',False)
+        self.logger.log("****** 4. Freeze Completed (Signal=1 received)",False)
         self.sig_handle=1
 
     def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
         if(self.child is not None and self.child.poll() is not None):
             self.logger.log("binary child terminated",True)
+            self.logger.log("****** 9. Binary Process completed (Signal=2 received)",True)
             self.sig_handle=2
 
     def reset_signals(self):
@@ -170,10 +173,12 @@ class FsFreezer:
         unable_to_sleep = False
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
+            self.logger.log("****** 7. Error - Binary Process Already Completed", True)
             error_msg = 'snapshot result inconsistent'
             thaw_result.errors.append(error_msg)
         elif(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
+            self.logger.log("****** 7. Sending Thaw Signal to Binary")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
             for i in range(0,30):
                 if(self.freeze_handler.child.poll() is None):
