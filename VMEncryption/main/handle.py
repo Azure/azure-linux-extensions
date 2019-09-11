@@ -570,8 +570,9 @@ def enable():
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
             logger.log("handle.py found query operation")
 
-            if is_daemon_running():
-                logger.log("A daemon is already running, exiting without status report")
+            encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
+            if is_daemon_running() or (encryption_marker and not encryption_marker.config_file_exists()):
+                logger.log("A daemon is already running or no operation in progress, exiting without status report")
                 hutil.redo_last_status()
                 exit_without_status_report()
             else:
