@@ -115,7 +115,7 @@ class EncryptionSettingsUtil(object):
                     })
         return array
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util):
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
@@ -130,7 +130,7 @@ class EncryptionSettingsUtil(object):
             machine_name = ''
 
         # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
-        existing_crypt_items = disk_util.get_crypt_items()
+        existing_crypt_items = crypt_mount_config_util.get_crypt_items()
         existing_crypt_dev_items = self.get_disk_items_from_crypt_items(existing_crypt_items, disk_util)
 
         all_device_items = existing_crypt_dev_items + extra_device_items

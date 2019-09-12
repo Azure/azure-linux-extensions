@@ -37,10 +37,11 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, passphrase_filename, public_settings, distro_info):
+    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
         self.disk_util = disk_util
+        self.crypt_mount_config_util = crypt_mount_config_util
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
         self.distro_info = distro_info
@@ -256,9 +257,9 @@ class ResourceDiskUtil(object):
         with open("/etc/fstab") as f:
             lines = f.readlines()
 
-        if not self.disk_util.is_bek_in_fstab_file(lines):
-            lines.append(self.disk_util.get_fstab_bek_line())
-            self.disk_util.add_bek_to_default_cryptdisks()
+        if not self.crypt_mount_config_util.is_bek_in_fstab_file(lines):
+            lines.append(self.crypt_mount_config_util.get_fstab_bek_line())
+            self.crypt_mount_config_util.add_bek_to_default_cryptdisks()
 
         if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
             if self.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):
@@ -282,14 +283,14 @@ class ResourceDiskUtil(object):
         if not self._mount_resource_disk(self.RD_MAPPER_PATH):
             self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
-        if not self.disk_util.should_use_azure_crypt_mount():
+        if not self.crypt_mount_config_util.should_use_azure_crypt_mount():
             self.logger.log("Adding resource disk to the crypttab file")
             crypt_item = CryptItem()
             crypt_item.dev_path = self.RD_DEV_PATH
             crypt_item.mapper_name = self.RD_MAPPER_NAME
             crypt_item.uses_cleartext_key = False
-            self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
-            self.disk_util.add_crypt_item_to_crypttab(crypt_item)
+            self.crypt_mount_config_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
+            self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item)
             self.add_to_fstab()
         return True
 
