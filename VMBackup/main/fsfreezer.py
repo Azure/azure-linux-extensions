@@ -29,8 +29,8 @@ import threading
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
-    time.sleep(5)
-    self.logger.log("Waited in thread for 5 seconds",True)
+    time.sleep(3)
+    self.logger.log("Waited in thread for 3 seconds",True)
     self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.logger.log("Binary subprocess Created",True)
 

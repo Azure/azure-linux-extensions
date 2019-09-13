@@ -199,8 +199,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(5)
+        for i in range(0, self.timeoutInSeconds +10): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(1)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.preScriptCompleted[j]
@@ -246,8 +246,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(5)
+        for i in range(0,self.timeoutInSeconds +1): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(1)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.postScriptCompleted[j]
