@@ -316,26 +316,27 @@ class HandlerUtility:
         else:
             # retrieve the settings file corresponding to the current sequence number 
             last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
-            # if not found, attempt to fall back to an archived settings file
+
+        # if not found, attempt to fall back to an archived settings file
+        if not os.path.isfile(last_config_path):
+            self.log('settings file not found, checking for archived settings')
+            last_config_path = os.path.join(self.config_archive_folder, "lnq.settings")
             if not os.path.isfile(last_config_path):
-                self.log('settings file not found, checking for archived settings')
-                last_config_path = os.path.join(self.config_archive_folder, "lnq.settings")
-                if not os.path.isfile(last_config_path):
-                    self.error('archived settings file not found, unable to get last config')
-                    return None
-            
-            # settings file was found, parse config and return config object 
-            config_txt = waagent.GetFileContents(last_config_path)
-            if not config_txt:
-                self.error('configuration settings empty, unable to get last config')
+                self.error('archived settings file not found, unable to get last config')
                 return None
             
-            config_obj = self._parse_config(config_txt)
-            if not config_obj:
-                self.error('failed to parse configuration settings, unable to get last config')
-                return None  
-            else:
-                return config_obj
+        # settings file was found, parse config and return config object 
+        config_txt = waagent.GetFileContents(last_config_path)
+        if not config_txt:
+            self.error('configuration settings empty, unable to get last config')
+            return None
+            
+        config_obj = self._parse_config(config_txt)
+        if not config_obj:
+            self.error('failed to parse configuration settings, unable to get last config')
+            return None  
+        else:
+            return config_obj
 
     def get_handler_env(self):
         # load environment variables from HandlerEnvironment.json 
