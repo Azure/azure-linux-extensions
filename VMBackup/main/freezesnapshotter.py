@@ -225,7 +225,7 @@ class FreezeSnapshotter(object):
             if (timedout == True):
                 run_result = CommonVariables.FailedFsFreezeTimeout
                 run_status = 'error'
-                error_msg = 'T:S Enable failed with error: freeze took longer than timeout'
+                error_msg = 'T:S ###### Enable failed with error: freeze took longer than timeout'
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout
                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Error')

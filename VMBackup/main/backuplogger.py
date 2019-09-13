@@ -80,7 +80,7 @@ class Backuplogger(object):
         except IOError:
             pass
         except Exception as e:
-            log_msg = "Exception in log_to_con_py3"
+            log_msg = "###### Exception in log_to_con_py3"
         return log_msg
 
     def commit(self, logbloburi):

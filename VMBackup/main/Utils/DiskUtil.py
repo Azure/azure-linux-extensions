@@ -303,7 +303,7 @@ class DiskUtil(object):
                                 mount_points.append(mount_point)
                                 mount_points_info.append((mount_point,deviceName,fs_type))
                             else:
-                                self.logger.log("mount command, not adding duplicate mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True)
+                                self.logger.log("####### mount command, not adding duplicate mount :" + str(mount_point) + ":  device :" + str(deviceName) + ": fstype :"+ str(fs_type) + ":", True)
         #Now reverse the mount_points & fs_types lists to make them in the same order as mount command output order
         mount_points_info.reverse()
         mount_points.reverse()

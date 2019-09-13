@@ -73,7 +73,7 @@ class Mounts:
                 try:
                     lsblk_mounts_index = lsblk_unique_names.index(uniqueName)
                 except ValueError as e:
-                    logger.log("UniqueName not found in lsblk list :" + str(uniqueName), True)
+                    logger.log("######## UniqueName not found in lsblk list :" + str(uniqueName), True)
                     lsblk_mounts_index = lsblk_mount_points.index(mountPoint)
                 mountObj = lsblk_mounts[lsblk_mounts_index]
                 if(mountObj.fstype is None or mountObj.fstype == "" or mountObj.fstype == " "):
