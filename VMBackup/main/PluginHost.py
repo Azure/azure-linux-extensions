@@ -71,6 +71,7 @@ class PluginHost(object):
         self.preScriptResult = []
         self.postScriptCompleted = []
         self.postScriptResult = []
+        self.pollTime = 3
 
     def pre_check(self):
         self.logger.log('Loading script modules now...',True,'Info')
@@ -144,7 +145,8 @@ class PluginHost(object):
                     plugin = __import__(pname)
 
                     self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
-                    errorCode,dobackup,fsFreeze_on = self.plugins[self.noOfPlugins].validate_scripts()
+                    errorCode,dobackup,fsFreeze_on, self.pollTime = self.plugins[self.noOfPlugins].validate_scripts()
+                    self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup, fsFreeze_on, self.pollTime), True)
                     self.noOfPlugins = self.noOfPlugins + 1
                     self.pluginName.append(pname)
                     self.preScriptCompleted.append(False)
@@ -199,8 +201,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0, self.timeoutInSeconds +10): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(1)
+        for i in range(0, int(self.timeoutInSeconds/self.pollTime) + 2): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(self.pollTime)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.preScriptCompleted[j]
@@ -246,8 +248,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,self.timeoutInSeconds +1): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(1)
+        for i in range(0, int(self.timeoutInSeconds/self.pollTime) + 2): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(self.pollTime)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.postScriptCompleted[j]
