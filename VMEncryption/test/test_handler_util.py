@@ -22,6 +22,7 @@ import unittest
 import os
 import console_logger
 import patch
+import glob
 from Utils import HandlerUtil
 from tempfile import mkstemp
 
@@ -63,7 +64,22 @@ class TestHandlerUtil(unittest.TestCase):
         
     def test_do_parse_context_disable(self):
         self.assertIsNotNone(self.hutil.do_parse_context('Disable'))
-    
+
+    def test_do_parse_context_disable_nosettings(self):
+        # simulate missing settings file by adding .bak extension
+        config_dir = os.path.join(os.getcwd(), 'config')
+        settings_files = glob.glob(os.path.join(config_dir, '*.settings'))
+        for settings_file in settings_files:
+            os.rename(settings_file, settings_file + '.bak')
+        try:
+            # test to simulate disable when no settings are available
+            self.hutil.do_parse_context('Disable')
+            self.hutil.archive_old_configs()
+        finally:
+            # restore settings files back to original name
+            for settings_file in settings_files:
+                os.rename(settings_file + '.bak', settings_file)
+
     def test_do_parse_context_uninstall(self):
         self.assertIsNotNone(self.hutil.do_parse_context('Uninstall'))
 
