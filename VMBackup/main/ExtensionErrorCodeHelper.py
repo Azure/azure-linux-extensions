@@ -18,6 +18,7 @@ class ExtensionErrorCodeEnum():
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
 
     FailedRetryableFsFreezeFailed = 201
+    FailedRetryableFsFreezeTimeout = 202
 
     FailedPrepostPreScriptFailed = 300
     FailedPrepostPostScriptFailed = 301
@@ -51,6 +52,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : Status.ExtVmHealthStateEnum.yellow,
 
@@ -90,6 +92,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : "SuccessAlreadyProcessedInput",
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
+            ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : "FailedRetryableFsFreezeTimeout",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
 

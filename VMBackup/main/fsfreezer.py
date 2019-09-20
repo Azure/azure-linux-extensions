@@ -31,6 +31,7 @@ def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
     time.sleep(3)
     self.logger.log("Waited in thread for 3 seconds",True)
+    self.logger.log("****** 1. Starting Freeze Binary ",True)
     self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.logger.log("Binary subprocess Created",True)
 
@@ -61,12 +62,14 @@ class FreezeHandler(object):
 
     def sigusr1_handler(self,signal,frame):
         self.logger.log('freezed',False)
+        self.logger.log("****** 4. Freeze Completed (Signal=1 received)",False)
         self.sig_handle=1
 
     def sigchld_handler(self,signal,frame):
         self.logger.log('some child process terminated')
         if(self.child is not None and self.child.poll() is not None):
             self.logger.log("binary child terminated",True)
+            self.logger.log("****** 9. Binary Process completed (Signal=2 received)",True)
             self.sig_handle=2
 
     def reset_signals(self):
@@ -124,6 +127,7 @@ class FsFreezer:
     def freeze_safe(self,timeout):
         self.root_seen = False
         error_msg=''
+        timedout = False
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
@@ -144,37 +148,37 @@ class FsFreezer:
             self.logger.log("proceeded for accepting signals", True)
             self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
+            self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
-                    while True:
-                        line=self.freeze_handler.child.stdout.readline()
-                        if sys.version_info > (3,):
-                            line = str(line,encoding='utf-8', errors="backslashreplace")
-                        else:
-                            line = str(line)
-                        if(line != ''):
-                            self.logger.log(line.rstrip(), True)
-                        else:
-                            break
-                error_msg="freeze failed for some mount"
-                freeze_result.errors.append(error_msg)
-                self.logger.log(error_msg, True, 'Error')
+                    self.log_binary_output()
+                if (sig_handle == 0):
+                    timedout = True
+                    error_msg="freeze timed-out"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+                else:
+                    error_msg="freeze failed for some mount"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
         except Exception as e:
             self.logger.enforce_local_flag(True)
             error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             freeze_result.errors.append(error_msg)
             self.logger.log(error_msg, True, 'Error')
-        return freeze_result
+        return freeze_result,timedout
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
+            self.logger.log("****** 7. Error - Binary Process Already Completed", True)
             error_msg = 'snapshot result inconsistent'
             thaw_result.errors.append(error_msg)
         elif(self.freeze_handler.child.poll() is None):
             self.logger.log("child process still running")
+            self.logger.log("****** 7. Sending Thaw Signal to Binary")
             self.freeze_handler.child.send_signal(signal.SIGUSR1)
             for i in range(0,30):
                 if(self.freeze_handler.child.poll() is None):
@@ -183,17 +187,7 @@ class FsFreezer:
                 else:
                     break
             self.logger.enforce_local_flag(True)
-            self.logger.log("Binary output after process end: ", True)
-            while True:
-                line=self.freeze_handler.child.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
-                if(line != ''):
-                    self.logger.log(line.rstrip(), True)
-                else:
-                    break
+            self.log_binary_output()
             if(self.freeze_handler.child.returncode!=0):
                 error_msg = 'snapshot result inconsistent as child returns with failure'
                 thaw_result.errors.append(error_msg)
@@ -208,18 +202,23 @@ class FsFreezer:
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
             self.logger.enforce_local_flag(True)
-            while True:
-                line=self.freeze_handler.child.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
-                if(line != ''):
-                    self.logger.log(line.rstrip(), True)
-                else:
-                    break
+            self.log_binary_output()
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
         return thaw_result, unable_to_sleep
+
+    def log_binary_output(self):
+        self.logger.log("============== Binary output traces start ================= ", True)
+        while True:
+            line=self.freeze_handler.child.stdout.readline()
+            if sys.version_info > (3,):
+                line = str(line, encoding='utf-8', errors="backslashreplace")
+            else:
+                line = str(line)
+            if(line != ''):
+                self.logger.log(line.rstrip(), True)
+            else:
+                break
+        self.logger.log("============== Binary output traces end ================= ", True)
 
 

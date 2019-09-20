@@ -203,16 +203,33 @@ class FreezeSnapshotter(object):
             timeout = self.hutil.get_value_from_configfile('timeout')
             if(timeout == None):
                 timeout = str(60)
+            self.logger.log('T:S freeze, timeout value ' + str(timeout))
+            timeout_int = 60
+            try:
+                timeout_int = int(timeout)
+            except ValueError:
+                self.logger.log('T:S freeze, timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
+                timeout_int = 60
+                timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
-            freeze_result = self.freezer.freeze_safe(timeout) 
+            freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()
+            freezeTimeTaken = time_after_freeze-time_before_freeze
+            self.logger.log('T:S ***** freeze, time_before_freeze=' + str(time_before_freeze) + ", time_after_freeze=" + str(time_after_freeze) + ", freezeTimeTaken=" + str(freezeTimeTaken))
             HandlerUtil.HandlerUtility.add_to_telemetery_data("FreezeTime", str(time_after_freeze-time_before_freeze-datetime.timedelta(seconds=5)))
             run_result = CommonVariables.success
             run_status = 'success'
             all_failed= False
             is_inconsistent =  False
-            self.logger.log('T:S freeze result ' + str(freeze_result))
-            if(freeze_result is not None and len(freeze_result.errors) > 0):
+            self.logger.log('T:S freeze result ' + str(freeze_result) + ', timedout :' + str(timedout))
+            if (timedout == True):
+                run_result = CommonVariables.FailedFsFreezeTimeout
+                run_status = 'error'
+                error_msg = 'T:S ###### Enable failed with error: freeze took longer than timeout'
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+                self.logger.log(error_msg, True, 'Error')
+            elif(freeze_result is not None and len(freeze_result.errors) > 0):
                 run_result = CommonVariables.FailedFsFreezeFailed
                 run_status = 'error'
                 error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
@@ -252,12 +269,12 @@ class FreezeSnapshotter(object):
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
             if( self.para_parser.blobs == None or len(self.para_parser.blobs) == 0) :
-                        run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-                        run_status = 'error'
-                        error_msg = 'T:S taking snapshot failed as blobs are empty or none'
-                        self.logger.log(error_msg, True, 'Error')
-                        all_failed = True
-                        all_snapshots_failed = True
+                run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
+                run_status = 'error'
+                error_msg = 'T:S taking snapshot failed as blobs are empty or none'
+                self.logger.log(error_msg, True, 'Error')
+                all_failed = True
+                all_snapshots_failed = True
 
             if(run_result == CommonVariables.success):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
@@ -266,7 +283,9 @@ class FreezeSnapshotter(object):
                 time_before_snapshot = datetime.datetime.now()
                 snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
+                snapshotTimeTaken = time_after_snapshot-time_before_snapshot
+                self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(snapshotTimeTaken))
                 self.logger.log('T:S snapshotall ends...', True)
 
                 if self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
@@ -348,7 +367,9 @@ class FreezeSnapshotter(object):
             time_before_snapshot = datetime.datetime.now()
             blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep  = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, self.taskId)
             time_after_snapshot = datetime.datetime.now()
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(time_after_snapshot-time_before_snapshot))
+            snapshotTimeTaken = time_after_snapshot-time_before_snapshot
+            self.logger.log('T:S takeSnapshotFromHost, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(snapshotTimeTaken))
             self.logger.log('T:S snapshotall ends...', True)
 
         return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
