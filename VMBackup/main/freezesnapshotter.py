@@ -313,9 +313,14 @@ class FreezeSnapshotter(object):
 
         run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent  = self.takeSnapshotFromGuest()
 
-        time.sleep(60) #sleeping for 60 seconds so that previous binary execution completes
-
         if(all_snapshots_failed):
+            try:
+                #to make sure binary is thawed
+                self.logger.log('[takeSnapshotFromFirstGuestThenHost] : Thawing again post the guest snapshotting failure')
+                self.freezer.thaw_safe()
+            except Exception as e:
+                self.logger.log('[takeSnapshotFromFirstGuestThenHost] : Exception in Thaw %s, stack trace: %s' % (str(e), traceback.format_exc()))
+
             run_result, run_status, blob_snapshot_info_array,all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
 
         return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
