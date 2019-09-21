@@ -80,13 +80,22 @@ class FreezeHandler(object):
     def startproc(self,args):
         binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
         binary_thread.start()
+
+        SafeFreezeWaitInSecondsDefault = 66
         proc_sleep_time = self.hutil.get_value_from_configfile('SafeFreezeWaitInSeconds')
         if(proc_sleep_time == None or proc_sleep_time == ''):
-            proc_sleep_time = 66
+            proc_sleep_time = SafeFreezeWaitInSecondsDefault
 
-        self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time))
+        proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
+        try:
+            proc_sleep_time_int = int(proc_sleep_time)
+        except ValueError:
+            self.logger.log('T:S freeze startproc, SafeFreezeWaitInSeconds config value was not a number, defaulting to 66 seconds', True, 'Warning')
+            proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
 
-        for i in range(0,(int(proc_sleep_time/2))):
+        self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time_int))
+
+        for i in range(0,(int(proc_sleep_time_int/2))):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
