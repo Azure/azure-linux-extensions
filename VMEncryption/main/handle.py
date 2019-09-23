@@ -570,8 +570,9 @@ def enable():
         elif encryption_operation == CommonVariables.QueryEncryptionStatus:
             logger.log("handle.py found query operation")
 
-            if is_daemon_running():
-                logger.log("A daemon is already running, exiting without status report")
+            encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
+            if is_daemon_running() or (encryption_marker and not encryption_marker.config_file_exists()):
+                logger.log("A daemon is already running or no operation in progress, exiting without status report")
                 hutil.redo_last_status()
                 exit_without_status_report()
             else:
@@ -921,9 +922,14 @@ def encrypt_inplace_without_seperate_header_file(passphrase_file,
             logger.log(msg="the current phase is " + str(CommonVariables.EncryptionPhaseBackupHeader),
                        level=CommonVariables.InfoLevel)
 
-            if not ongoing_item_config.get_file_system().lower() in CommonVariables.inplace_supported_file_systems:
-                logger.log(msg="we only support ext file systems for centos 6.5/6.6/6.7 and redhat 6.7",
-                           level=CommonVariables.WarningLevel)
+            # log an appropriate warning if the file system type is not supported
+            device_fs = ongoing_item_config.get_file_system().lower()
+            if not device_fs in CommonVariables.inplace_supported_file_systems:
+                if device_fs in CommonVariables.format_supported_file_systems:
+                    msg = "Encrypting {0} file system is not supported for data-preserving encryption. Consider using the encrypt-format-all option.".format(device_fs)
+                else:
+                    msg = "AzureDiskEncryption does not support the {0} file system".format(device_fs)
+                logger.log(msg=msg, level=CommonVariables.WarningLevel)
 
                 ongoing_item_config.clear_config()
                 return current_phase
@@ -1608,7 +1614,8 @@ def daemon_encrypt():
         if (((distro_name == 'redhat' and distro_version == '7.3') or
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
-             (distro_name == 'redhat' and distro_version == '7.6')) and
+             (distro_name == 'redhat' and distro_version == '7.6') or
+             (distro_name == 'redhat' and distro_version == '7.7')) and
            (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1618,7 +1625,8 @@ def daemon_encrypt():
         elif (((distro_name == 'centos' and distro_version == '7.3.1611') or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
-              (distro_name == 'centos' and distro_version.startswith('7.6'))) and
+              (distro_name == 'centos' and distro_version.startswith('7.6')) or
+              (distro_name == 'centos' and distro_version.startswith('7.7'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1630,6 +1638,8 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.4') or
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
+              (distro_name == 'redhat' and distro_version == '7.7') or
+              (distro_name == 'centos' and distro_version.startswith('7.7')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
