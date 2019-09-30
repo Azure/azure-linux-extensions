@@ -244,18 +244,6 @@ class FreezeSnapshotter(object):
         
         return run_result, run_status
 
-    def check_snapshot_array_fail(self, snapshot_info_array):
-        snapshot_array_fail = False
-        if snapshot_info_array is not None and snapshot_info_array !=[]:
-            for snapshot_index in range(len(snapshot_info_array)):
-                if(snapshot_info_array[snapshot_index].isSuccessful == False):
-                    backup_logger.log('T:S  snapshot failed at index ' + str(snapshot_index), True)
-                    snapshot_array_fail = True
-                    break
-        else:
-            snapshot_array_fail = True
-        return snapshot_array_fail
-
     def takeSnapshotFromGuest(self):
         run_result = CommonVariables.success
         run_status = 'success'
@@ -288,11 +276,6 @@ class FreezeSnapshotter(object):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("snapshotTimeTaken", str(snapshotTimeTaken))
                 self.logger.log('T:S snapshotall ends...', True)
 
-                if self.check_snapshot_array_fail(blob_snapshot_info_array) == True:
-                    run_result = CommonVariables.error
-                    run_status = 'error'
-                    error_msg = 'T:S Enable failed with error in snapshot_array index'
-                    self.logger.log(error_msg, True, 'Error')
         except Exception as e:
             errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
