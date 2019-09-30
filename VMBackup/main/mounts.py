@@ -69,19 +69,22 @@ class Mounts:
             uniqueName = str(mountPoint) + "_" + str(deviceNameParts[len(deviceNameParts)-1])
             fsType = mount_point_info[2]
             if((mountPoint in lsblk_mount_points) and (mountPoint not in added_mount_point_names)):
-                lsblk_mounts_index = 0
-                try:
-                    lsblk_mounts_index = lsblk_unique_names.index(uniqueName)
-                except ValueError as e:
-                    logger.log("######## UniqueName not found in lsblk list :" + str(uniqueName), True)
-                    lsblk_mounts_index = lsblk_mount_points.index(mountPoint)
-                mountObj = lsblk_mounts[lsblk_mounts_index]
-                if(mountObj.fstype is None or mountObj.fstype == "" or mountObj.fstype == " "):
-                    logger.log("fstype empty from lsblk for mount" + str(mountPoint), True)
-                    mountObj.fstype = fsType
-                self.mounts.append(mountObj)
-                added_mount_point_names.append(mountPoint)
-                logger.log("mounts list item added, mount point "+str(mountObj.mount_point)+", device-name "+str(mountObj.name)+", fs-type "+str(mountObj.fstype)+", unique-name "+str(mountObj.unique_name), True)
+                if (self.should_skip_fstype(str(fsType))):
+                    logger.log("######## mounts list item Skipped due to fsType, mountPoint "+str(mountPoint)+", fsType "+str(fsType)+" and unique-name "+str(uniqueName), True)
+                else:
+                    lsblk_mounts_index = 0
+                    try:
+                        lsblk_mounts_index = lsblk_unique_names.index(uniqueName)
+                    except ValueError as e:
+                        logger.log("######## UniqueName not found in lsblk list :" + str(uniqueName), True)
+                        lsblk_mounts_index = lsblk_mount_points.index(mountPoint)
+                    mountObj = lsblk_mounts[lsblk_mounts_index]
+                    if(mountObj.fstype is None or mountObj.fstype == "" or mountObj.fstype == " "):
+                        logger.log("fstype empty from lsblk for mount" + str(mountPoint), True)
+                        mountObj.fstype = fsType
+                    self.mounts.append(mountObj)
+                    added_mount_point_names.append(mountPoint)
+                    logger.log("mounts list item added, mount point "+str(mountObj.mount_point)+", device-name "+str(mountObj.name)+", fs-type "+str(mountObj.fstype)+", unique-name "+str(mountObj.unique_name), True)
         # Append all the lsblk devices corresponding to lsblk_mounts_not_in_mount list mount-points
         for mount_point in lsblk_mounts_not_in_mount:
             if((mount_point in lsblk_mount_points) and (mount_point not in added_mount_point_names)):
@@ -92,3 +95,9 @@ class Mounts:
         logger.log("added_mount_point_names :" + str(added_mount_point_names), True)
         # Reverse the mounts list
         self.mounts.reverse()
+
+    def should_skip_fstype(self, fstype):
+        if (fstype == 'ext3' or fstype == 'ext4' or fstype == 'xfs' or fstype == 'btrfs'):
+            return False
+        else:
+            return True
