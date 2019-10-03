@@ -31,6 +31,7 @@ class ProcessLock(object):
         try:
             self.fd = open(self.lock_file_path, "w") 
             fcntl.flock(self.fd, fcntl.LOCK_EX)
+            self.logger.log("Acquired Lock: {0}".format(self.lock_file_path))
             return True
         except Exception as e:
             self.logger.log("could not acquire a lock, error: {0}".format(str(e)))
