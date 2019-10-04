@@ -45,6 +45,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\check_util.py" />
+    <Compile Include="main\CryptMountConfigUtil.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="main\CommandExecutor.py">
       <SubType>Code</SubType>
     </Compile>
@@ -153,7 +156,9 @@
     <Compile Include="setup.py" />
     <Compile Include="test\console_logger.py" />
     <Compile Include="test\test_check_util.py" />
+    <Compile Include="test\test_command_executor.py" />
     <Compile Include="test\test_encryption_settings_util.py" />
+    <Compile Include="test\test_handler_util.py" />
     <Compile Include="test\test_resource_disk_util.py" />
     <Compile Include="test\__init__.py" />
   </ItemGroup>

@@ -383,6 +383,7 @@ class DiskUtil(object):
         encryption_marker = EncryptionMarkConfig(self.logger, self.encryption_environment)
         decryption_marker = DecryptionMarkConfig(self.logger, self.encryption_environment)
         if decryption_marker.config_file_exists():
+            print(decryption_marker.config_file_exists)
             encryption_status["data"] = "DecryptionInProgress"
         elif encryption_marker.config_file_exists():
             encryption_config = EncryptionConfig(self.encryption_environment, self.logger)

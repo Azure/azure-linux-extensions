@@ -256,3 +256,37 @@ class CryptItem(object):
                 " luks_header_path:" + str(self.luks_header_path) +
                 " uses_cleartext_key:" + str(self.uses_cleartext_key) +
                 " current_luks_slot:" + str(self.current_luks_slot))
+
+    def __eq__(self, other):
+        if not isinstance(other, CryptItem):
+            return NotImplemented
+
+        def _consolidate_luks_header_path(crypt_item):
+            if crypt_item.luks_header_path:
+                return crypt_item.luks_header_path
+            return crypt_item.dev_path
+
+        def _consolidate_luks_slot(crypt_item):
+            if crypt_item.current_luks_slot == -1:
+                return None
+            return crypt_item.current_luks_slot
+
+        def _consolidate_file_system(crypt_item):
+            if not crypt_item.file_system:
+                return "auto"
+            return crypt_item.file_system
+
+        def _consolidate_cleartext_key(crypt_item):
+            if not crypt_item.uses_cleartext_key or crypt_item.uses_cleartext_key in ["False", "None"]:
+                return False
+            return True
+
+        return self.mapper_name == other.mapper_name and\
+            self.dev_path == other.dev_path and\
+            self.file_system == other.file_system and\
+            self.mount_point == other.mount_point and\
+            _consolidate_luks_header_path(self) == _consolidate_luks_header_path(other) and \
+            _consolidate_luks_slot(self) == _consolidate_luks_slot(other) and\
+            _consolidate_file_system(self) == _consolidate_file_system(other) and\
+            _consolidate_cleartext_key(self) == _consolidate_cleartext_key(other)
+

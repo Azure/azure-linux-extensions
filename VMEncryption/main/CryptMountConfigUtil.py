@@ -30,13 +30,9 @@ from Common import CryptItem, CommonVariables
 class CryptMountConfigUtil(object):
     """A utility to modify the config files that mount or unlock encrypted disks"""
 
-    def __init__(self, hutil, patching, logger, encryption_environment):
+    def __init__(self, logger, encryption_environment):
         self.encryption_environment = encryption_environment
-        self.hutil = hutil
-        self.distro_patcher = patching
         self.logger = logger
-        self.ide_class_id = "{32412632-86cb-44a2-9b5c-50d1417354f5}"
-        self.vmbus_sys_path = '/sys/bus/vmbus/devices'
 
         self.command_executor = CommandExecutor(self.logger)
 
@@ -200,7 +196,7 @@ class CryptMountConfigUtil(object):
 
         if self.should_use_azure_crypt_mount():
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-                for line in f:
+                for line in f.readlines():
                     if not line.strip():
                         continue
 
@@ -218,15 +214,15 @@ class CryptMountConfigUtil(object):
 
             with open("/etc/fstab", "r") as f:
                 for line in f.readlines():
-                    fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+                    fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
                     if fstab_device is not None:
-                        fstab_items.append((fstab_device, fstab_mount_point))
+                        fstab_items.append((fstab_device, fstab_mount_point, fstab_fs))
 
             if not os.path.exists(crypttab_path):
                 self.logger.log("{0} does not exist".format(crypttab_path))
             else:
                 with open(crypttab_path, 'r') as f:
-                    for line in f:
+                    for line in f.readlines():
                         if not line.strip():
                             continue
 
@@ -237,9 +233,10 @@ class CryptMountConfigUtil(object):
                         if crypt_item.mapper_name == CommonVariables.osmapper_name:
                             rootfs_crypt_item_found = True
 
-                        for device_path, mount_path in fstab_items:
+                        for device_path, mount_path, fs in fstab_items:
                             if crypt_item.mapper_name in device_path:
                                 crypt_item.mount_point = mount_path
+                                crypt_item.file_system = fs
                         crypt_items.append(crypt_item)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
@@ -252,7 +249,6 @@ class CryptMountConfigUtil(object):
 
             proc_comm = ProcessCommunicator()
             grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
-
             if grep_result == 0:
                 crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
             else:
@@ -266,7 +262,7 @@ class CryptMountConfigUtil(object):
                         crypt_item.dev_path = '/dev/' + src_device.name
                         break
 
-            rootfs_dev = next((m for m in self.get_mount_items() if m["dest"] == "/"))
+            rootfs_dev = next((m for m in disk_util.get_mount_items() if m["dest"] == "/"))
             crypt_item.file_system = rootfs_dev["fs"]
 
             if not crypt_item.dev_path:
@@ -291,7 +287,7 @@ class CryptMountConfigUtil(object):
 
         non_os_entry_found = False
         with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-            for line in f:
+            for line in f.readlines():
                 if not line.strip():
                     continue
 
@@ -341,7 +337,7 @@ class CryptMountConfigUtil(object):
                 fstab_backup_line = None
                 with open("/etc/fstab") as f:
                     for line in f.readlines():
-                        device, mountpoint = self.parse_fstab_line(line)
+                        device, mountpoint, fs = self.parse_fstab_line(line)
                         if mountpoint == crypt_item.mount_point and crypt_item.mapper_name in device:
                             fstab_backup_line = line
                 if fstab_backup_line is not None:
@@ -440,7 +436,7 @@ class CryptMountConfigUtil(object):
 
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
-            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
             if fstab_mount_point == CommonVariables.encryption_key_mount_point:
                 return True
         return False
@@ -448,15 +444,16 @@ class CryptMountConfigUtil(object):
     def parse_fstab_line(self, line):
         fstab_parts = line.strip().split()
 
-        if len(fstab_parts) < 2:  # Line should have enough content
-            return None, None
+        if len(fstab_parts) < 3:  # Line should have enough content
+            return None, None, None
 
         if fstab_parts[0].startswith("#"):  # Line should not be a comment
-            return None, None
+            return None, None, None
 
         fstab_device = fstab_parts[0]
         fstab_mount_point = fstab_parts[1]
-        return fstab_device, fstab_mount_point
+        fstab_file_system = fstab_parts[2]
+        return fstab_device, fstab_mount_point, fstab_file_system
 
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
@@ -473,7 +470,7 @@ class CryptMountConfigUtil(object):
         relevant_line = None
         for i in range(len(lines)):
             line = lines[i]
-            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
 
             if fstab_mount_point != mount_point:  # Not the line we are looking for
                 continue
