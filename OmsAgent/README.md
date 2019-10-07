@@ -92,41 +92,7 @@ azure vm extension list
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
-#### 2.2.1 Classic
-
-You can login to your Azure account (Azure Service Management mode) by running:
-
-```powershell
-Add-AzureAccount
-```
-
-You can deploy the OmsAgent Extension by running:
-
-```powershell
-$VmName = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
-
-$ExtensionName = 'OmsAgentForLinux'
-$Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
-$Version = '<version>'
-
-$PublicConf = '{
-    "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
-}'
-$PrivateConf = '{
-    "workspaceKey": "<workspace key>",
-    "proxy": "<proxy string>",
-    "vmResourceId": "<vm resource id>"
-}'
-
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
-  -Publisher $Publisher -Version $Version `
-  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
-  Update-AzureVM
-```
-
-#### 2.2.2 Resource Manager
+#### 2.2.1 Resource Manager
 
 You can login to your Azure account (Azure Resource Manager mode) by running:
 
@@ -162,6 +128,41 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   -ExtensionType $ExtensionName -TypeHandlerVersion $Version `
   -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
+
+#### 2.2.2 Classic
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
+```powershell
+Add-AzureAccount
+```
+
+You can deploy the OmsAgent Extension by running:
+
+```powershell
+$VmName = '<vm-name>'
+$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
+
+$ExtensionName = 'OmsAgentForLinux'
+$Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
+$Version = '<version>'
+
+$PublicConf = '{
+    "workspaceId": "<workspace id>",
+    "stopOnMultipleConnections": true/false
+}'
+$PrivateConf = '{
+    "workspaceKey": "<workspace key>",
+    "proxy": "<proxy string>",
+    "vmResourceId": "<vm resource id>"
+}'
+
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
+  -Publisher $Publisher -Version $Version `
+  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
+  Update-AzureVM
+```
+
 
 ### 2.3. Using [**ARM Template**][arm-template]
 ```json
