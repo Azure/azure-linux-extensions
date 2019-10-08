@@ -27,12 +27,12 @@ import traceback
 import uuid
 import glob
 
-from EncryptionConfig import EncryptionConfig
-from DecryptionMarkConfig import DecryptionMarkConfig
-from EncryptionMarkConfig import EncryptionMarkConfig
-from TransactionalCopyTask import TransactionalCopyTask
-from CommandExecutor import CommandExecutor, ProcessCommunicator
-from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
+from .EncryptionConfig import EncryptionConfig
+from .DecryptionMarkConfig import DecryptionMarkConfig
+from .EncryptionMarkConfig import EncryptionMarkConfig
+from .TransactionalCopyTask import TransactionalCopyTask
+from .CommandExecutor import CommandExecutor, ProcessCommunicator
+from .Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
 
 class DiskUtil(object):
@@ -618,8 +618,8 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = filter(lambda l: "key slot" in l.lower(), proc_comm.stdout.split("\n"))
-        keyslots = map(lambda l: "enabled" in l.lower(), lines)
+        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
+        keyslots = ["enabled" in l.lower() for l in lines]
 
         return keyslots
 
@@ -1338,7 +1338,7 @@ class DiskUtil(object):
             DiskUtil.os_disk_lvm = False
             return False
 
-        lvm_items = filter(lambda item: item.vg_name == "rootvg", self.get_lvm_items())
+        lvm_items = [item for item in self.get_lvm_items() if item.vg_name == "rootvg"]
 
         current_lv_names = set([item.lv_name for item in lvm_items])
 

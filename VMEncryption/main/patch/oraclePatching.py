@@ -29,7 +29,7 @@ import time
 import traceback
 import datetime
 import subprocess
-from redhatPatching import redhatPatching
+from .redhatPatching import redhatPatching
 from Common import *
 
 

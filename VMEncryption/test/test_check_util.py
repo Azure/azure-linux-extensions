@@ -3,8 +3,8 @@ import mock
 
 from main.check_util import CheckUtil
 from main.Common import CommonVariables
-from StringIO import StringIO
-from console_logger import ConsoleLogger
+from io import StringIO
+from .console_logger import ConsoleLogger
 
 
 class MockDistroPatcher:

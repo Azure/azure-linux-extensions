@@ -144,7 +144,7 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.context.logger.log("Processes using {0}:\n{1}".format(mountpoint, proc_comm.stdout))
 
-        procs_to_kill = filter(lambda p: p.isdigit(), proc_comm.stdout.split())
+        procs_to_kill = [p for p in proc_comm.stdout.split() if p.isdigit()]
         procs_to_kill = reversed(sorted(procs_to_kill))
 
         for victim in procs_to_kill:

@@ -107,10 +107,11 @@ if [ -z "$PYTHON" ]; then
    exit 51 # Not Supported
 else
     PYTHON_VER=`${PYTHON} --version 2>&1`
-    if [[ "$PYTHON_VER" =~ "Python 2.6" ]] || [[ "$PYTHON_VER" =~ "Python 2.7" ]]; then
+    
+    if [[ "$PYTHON_VER" =~ "Python 2.6" ]] || [[ "$PYTHON_VER" =~ "Python 2.7" ]] || [[ "$PYTHON_VER" =~ "Python 3" ]]; then
         echo $PYTHON_VER
     else
-        echo "Expected Python 2.7, found $PYTHON_VER" >&2
+        echo "Expected Python 2.6, 2.7, or 3.x, found $PYTHON_VER" >&2
         exit 51 # Not Supported
     fi
 fi

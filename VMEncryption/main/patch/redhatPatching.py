@@ -32,7 +32,7 @@ import datetime
 import subprocess
 import inspect
 
-from AbstractPatching import AbstractPatching
+from .AbstractPatching import AbstractPatching
 from Common import *
 from CommandExecutor import *
 

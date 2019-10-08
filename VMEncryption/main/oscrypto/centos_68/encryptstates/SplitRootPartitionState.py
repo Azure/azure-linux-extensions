@@ -192,7 +192,9 @@ class SplitRootPartitionState(OSEncryptionState):
             "YiB":  1024**8  # yobibyte
         }
 
-        if unit not in exponents.keys():
+        #P2 - if unit not in exponents.keys():
+        #P3 - if unit not in list(exponents.keys()):
+        if unit not in list(exponents.keys()):
             raise SyntaxError("{:} is not a valid SI or IEC byte unit".format(unit))
         else:
             return bytes_ * exponents[unit] // sector_size

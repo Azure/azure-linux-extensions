@@ -131,11 +131,12 @@ setup(name = CommonVariables.extension_name,
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
-      author_email='andliu@microsoft.com',
+      author_email='opensource@microsoft.com',
       url='https://github.com/Azure/azure-linux-extensions',
       classifiers = ['Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
@@ -157,11 +158,11 @@ def dos2unix(src):
     args = ["dos2unix", src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-    print('dos2unix %s ' % (src))
+    print(('dos2unix %s ' % (src)))
     child.wait()
 
 def remove_utf8_bom(src):
-    print('removing utf-8 bom from %s ' % (src))
+    print(('removing utf-8 bom from %s ' % (src)))
 
     contents = None
 
@@ -186,12 +187,12 @@ def zip(src, dst):
             dos2unix(absname)
             remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
-            print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
+            print(('zipping %s as %s' % (os.path.join(dirname, filename), arcname)))
             zf.write(absname, arcname)
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
 # Manually add SupportedOS.json file as setup seems to only copy py file
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
-zip(final_folder_path, target_zip_file_path)
-
+#P3
+list(zip(final_folder_path, target_zip_file_path))

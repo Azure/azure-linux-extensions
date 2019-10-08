@@ -198,14 +198,14 @@ class HandlerUtility:
 
             # skip unnecessary decryption of protected settings for query status 
             # operations, to avoid timeouts in case of multiple settings files
-            if handlerSettings.has_key('publicSettings'):
+            if 'publicSettings' in handlerSettings:
                 ps = handlerSettings.get('publicSettings')
                 op = ps.get(CommonVariables.EncryptionEncryptionOperationKey)
                 if op == CommonVariables.QueryEncryptionStatus:
                     return config
             
-            if handlerSettings.has_key('protectedSettings') and \
-                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+            if 'protectedSettings' in handlerSettings and \
+                    "protectedSettingsCertThumbprint" in handlerSettings and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 thumb = handlerSettings['protectedSettingsCertThumbprint']
@@ -253,7 +253,7 @@ class HandlerUtility:
             public_settings_str = config_obj['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
             # if not json already, load string as json 
-            if isinstance(public_settings_str, basestring):
+            if isinstance(public_settings_str, str):
                 public_settings = json.loads(public_settings_str)
             else:
                 public_settings = public_settings_str
@@ -485,7 +485,7 @@ class HandlerUtility:
             if message is None:
                 message = ""
                 
-            message = filter(lambda c: c in string.printable, message)
+            message = [c for c in message if c in string.printable]
             message = message.encode('ascii', 'ignore')
             
             self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))

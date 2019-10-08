@@ -19,8 +19,8 @@
 import os
 import os.path
 import traceback
-from ConfigUtil import *
-from Common import CommonVariables
+from .ConfigUtil import *
+from .Common import CommonVariables
 
 class DecryptionMarkConfig(object):
     def __init__(self, logger, encryption_environment):

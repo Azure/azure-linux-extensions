@@ -17,8 +17,8 @@
 # limitations under the License.
 
 import os.path
-from Common import *
-from ConfigParser import *
+from .Common import *
+from configparser import *
 
 class ConfigKeyValuePair(object):
     def __init__(self, prop_name, prop_value):

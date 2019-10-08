@@ -2,8 +2,8 @@ import unittest
 import mock
 from main import EncryptionSettingsUtil
 from main import Common
-from StringIO import StringIO
-import console_logger
+from io import StringIO
+from . import console_logger
 
 class TestEncryptionSettingsUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """

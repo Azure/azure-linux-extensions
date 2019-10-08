@@ -20,12 +20,12 @@
 
 import os
 import os.path
-import urlparse
+import urllib.parse
 import re
 import json
-from Common import CommonVariables
-from MetadataUtil import MetadataUtil
-from CommandExecutor import CommandExecutor
+from .Common import CommonVariables
+from .MetadataUtil import MetadataUtil
+from .CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
 
 class CheckUtil(object):
@@ -85,7 +85,7 @@ class CheckUtil(object):
             raise Exception(message + '\nNo URL supplied')
 
         try:
-            parse_result = urlparse.urlparse(test_url)
+            parse_result = urllib.parse.urlparse(test_url)
         except:
             raise Exception(message + '\nMalformed URL: ' + test_url)
 
@@ -187,7 +187,7 @@ class CheckUtil(object):
         else:
             supported_volume_types = CommonVariables.SupportedVolumeTypes
 
-        if not volume_type.lower() in map(lambda x: x.lower(), supported_volume_types) :
+        if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
     def validate_lvm_os(self, public_settings):

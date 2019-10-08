@@ -24,7 +24,7 @@ import mock
 from main.ResourceDiskUtil import ResourceDiskUtil
 from main.DiskUtil import DiskUtil
 from main.Common import CommonVariables
-from console_logger import ConsoleLogger
+from .console_logger import ConsoleLogger
 
 
 class TestResourceDiskUtil(unittest.TestCase):

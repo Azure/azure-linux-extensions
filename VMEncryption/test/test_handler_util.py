@@ -20,7 +20,7 @@
 
 import unittest
 import os
-import console_logger
+from . import console_logger
 import patch
 import glob
 from Utils import HandlerUtil

@@ -22,10 +22,10 @@ import os.path
 import sys
 import shlex
 from subprocess import *
-from CommandExecutor import CommandExecutor
-from Common import CommonVariables
-from ConfigUtil import ConfigUtil
-from OnGoingItemConfig import *
+from .CommandExecutor import CommandExecutor
+from .Common import CommonVariables
+from .ConfigUtil import ConfigUtil
+from .OnGoingItemConfig import *
 
 
 class TransactionalCopyTask(object):

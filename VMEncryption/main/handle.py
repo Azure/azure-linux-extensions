@@ -29,24 +29,24 @@ import traceback
 import uuid
 import shutil
 
-from Utils import HandlerUtil
-from Common import CommonVariables, CryptItem
-from ExtensionParameter import ExtensionParameter
-from DiskUtil import DiskUtil
-from ResourceDiskUtil import ResourceDiskUtil
-from BackupLogger import BackupLogger
-from EncryptionSettingsUtil import EncryptionSettingsUtil
-from EncryptionConfig import EncryptionConfig
-from patch import GetDistroPatcher
-from BekUtil import BekUtil
-from check_util import CheckUtil
-from DecryptionMarkConfig import DecryptionMarkConfig
-from EncryptionMarkConfig import EncryptionMarkConfig
-from EncryptionEnvironment import EncryptionEnvironment
-from OnGoingItemConfig import OnGoingItemConfig
-from ProcessLock import ProcessLock
-from CommandExecutor import CommandExecutor, ProcessCommunicator
-from __builtin__ import int
+from .Utils import HandlerUtil
+from .Common import CommonVariables, CryptItem
+from .ExtensionParameter import ExtensionParameter
+from .DiskUtil import DiskUtil
+from .ResourceDiskUtil import ResourceDiskUtil
+from .BackupLogger import BackupLogger
+from .EncryptionSettingsUtil import EncryptionSettingsUtil
+from .EncryptionConfig import EncryptionConfig
+from .patch import GetDistroPatcher
+from .BekUtil import BekUtil
+from .check_util import CheckUtil
+from .DecryptionMarkConfig import DecryptionMarkConfig
+from .EncryptionMarkConfig import EncryptionMarkConfig
+from .EncryptionEnvironment import EncryptionEnvironment
+from .OnGoingItemConfig import OnGoingItemConfig
+from .ProcessLock import ProcessLock
+from .CommandExecutor import CommandExecutor, ProcessCommunicator
+from builtins import int
 
 
 def install():
@@ -216,14 +216,14 @@ def are_disks_stamped_with_current_config(encryption_config):
 
 def get_public_settings():
     public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-    if isinstance(public_settings_str, basestring):
+    if isinstance(public_settings_str, str):
         return json.loads(public_settings_str)
     else:
         return public_settings_str
 
 def get_protected_settings():
     protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-    if isinstance(protected_settings_str, basestring):
+    if isinstance(protected_settings_str, str):
         return json.loads(protected_settings_str)
     else:
         return protected_settings_str
@@ -302,7 +302,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
                 logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
-                new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+                new_keyslot = list([x[0] != x[1] for x in zip(before_keyslots, after_keyslots)]).index(True)
 
                 logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
@@ -846,9 +846,9 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
     for encryption_item in encryption_format_items:
         dev_path_in_query = None
 
-        if encryption_item.has_key("scsi") and encryption_item["scsi"] != '':
+        if "scsi" in encryption_item and encryption_item["scsi"] != '':
             dev_path_in_query = disk_util.query_dev_sdx_path_by_scsi_id(encryption_item["scsi"])
-        if encryption_item.has_key("dev_path") and encryption_item["dev_path"] != '':
+        if "dev_path" in encryption_item and encryption_item["dev_path"] != '':
             dev_path_in_query = encryption_item["dev_path"]
 
         if not dev_path_in_query:
@@ -896,7 +896,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             #TODO: let customer specify the default file system in the
             #parameter
             file_system = None
-            if encryption_item.has_key("file_system") and encryption_item["file_system"] != "":
+            if "file_system" in encryption_item and encryption_item["file_system"] != "":
                 file_system = encryption_item["file_system"]
             else:
                 file_system = CommonVariables.default_file_system
@@ -912,13 +912,13 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, for
             crypt_item_to_update.uses_cleartext_key = False
             crypt_item_to_update.current_luks_slot = 0
 
-            if encryption_item.has_key("name") and encryption_item["name"] != "":
+            if "name" in encryption_item and encryption_item["name"] != "":
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
             else:
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
 
             #allow override through the new full_mount_point field
-            if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
+            if "full_mount_point" in encryption_item and encryption_item["full_mount_point"] != "":
                 crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
             disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
@@ -1457,7 +1457,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, force=False
         encryption_format_item["file_system"] = str(device_item.file_system)
         return encryption_format_item
 
-    encryption_format_items = map(device_item_to_encryption_format_item, device_items)
+    encryption_format_items = list(map(device_item_to_encryption_format_item, device_items))
 
     return enable_encryption_format(passphrase, encryption_format_items, disk_util, force, os_items_to_stamp=os_items_to_stamp)
 
@@ -1711,9 +1711,11 @@ def daemon_encrypt():
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
              (distro_name == 'redhat' and distro_version == '7.6') or
-             (distro_name == 'redhat' and distro_version == '7.7')) and
+             (distro_name == 'redhat' and distro_version == '7.7')) or
+             (distro_name == 'redhat' and distro_version == '8.0')) or
+             (distro_name == 'redhat' and distro_version == '8.1')) and
             (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
-            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+            from .oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                             distro_patcher=DistroPatcher,
                                                             logger=logger,
@@ -1722,9 +1724,12 @@ def daemon_encrypt():
                (distro_name == 'centos' and distro_version.startswith('7.4')) or
                (distro_name == 'centos' and distro_version.startswith('7.5')) or
                (distro_name == 'centos' and distro_version.startswith('7.6')) or
-               (distro_name == 'centos' and distro_version.startswith('7.7'))) and
+               (distro_name == 'centos' and distro_version.startswith('7.6')) or
+               (distro_name == 'centos' and distro_version.startswith('7.7')) or
+               (distro_name == 'centos' and distro_version.startswith('8.0')) or
+               (distro_name == 'centos' and distro_version.startswith('8.1'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
-            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+            from .oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                             distro_patcher=DistroPatcher,
                                                             logger=logger,
@@ -1735,37 +1740,41 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
               (distro_name == 'redhat' and distro_version == '7.7') or
+              (distro_name == 'redhat' and distro_version == '8.0') or
+              (distro_name == 'redhat' and distro_version == '8.1') or
+              (distro_name == 'centos' and distro_version.startswith('8.1')) or
+              (distro_name == 'centos' and distro_version.startswith('8.0')) or
               (distro_name == 'centos' and distro_version.startswith('7.7')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
               (distro_name == 'centos' and distro_version == '7.3.1611') or
               (distro_name == 'centos' and distro_version == '7.2.1511')):
-            from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
+            from .oscrypto.rhel_72 import RHEL72EncryptionStateMachine
             os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
         elif distro_name == 'redhat' and distro_version == '6.8':
-            from oscrypto.rhel_68 import RHEL68EncryptionStateMachine
+            from .oscrypto.rhel_68 import RHEL68EncryptionStateMachine
             os_encryption = RHEL68EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)
         elif distro_name == 'centos' and (distro_version == '6.8' or distro_version == '6.9'):
-            from oscrypto.centos_68 import CentOS68EncryptionStateMachine
+            from .oscrypto.centos_68 import CentOS68EncryptionStateMachine
             os_encryption = CentOS68EncryptionStateMachine(hutil=hutil,
                                                            distro_patcher=DistroPatcher,
                                                            logger=logger,
                                                            encryption_environment=encryption_environment)
         elif distro_name == 'Ubuntu' and distro_version in ['16.04', '18.04']:
-            from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
+            from .oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
             os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
         elif distro_name == 'Ubuntu' and distro_version == '14.04':
-            from oscrypto.ubuntu_1404 import Ubuntu1404EncryptionStateMachine
+            from .oscrypto.ubuntu_1404 import Ubuntu1404EncryptionStateMachine
             os_encryption = Ubuntu1404EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,

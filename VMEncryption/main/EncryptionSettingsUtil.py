@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import httplib
+import http.client
 import json
 import os
 import os.path
@@ -25,7 +25,7 @@ import base64
 
 from shutil import copyfile
 import uuid
-from Common import CommonVariables
+from .Common import CommonVariables
 
 
 class EncryptionSettingsUtil(object):
@@ -225,7 +225,7 @@ class EncryptionSettingsUtil(object):
         And HttpUtil imports WAAgentUtil internally (again, causing unittests to fail very unproductively).
         Therefore putting the import here and mocking this method in the test helps the test proceed productively.
         """
-        from HttpUtil import HttpUtil
+        from .HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
     def _post_to_wireserver_helper(self, msg_data, http_util):
@@ -247,7 +247,7 @@ class EncryptionSettingsUtil(object):
                     self.logger.log("result_content is {0}".format(result_content))
 
                     http_util.connection.close()
-                    if result.status != httplib.OK and result.status != httplib.ACCEPTED:
+                    if result.status != http.client.OK and result.status != http.client.ACCEPTED:
                         raise Exception("Encryption settings post request was not accepted")
                     return
                 else:

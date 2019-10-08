@@ -52,6 +52,10 @@ class PrereqState(OSEncryptionState):
            (distro_info[0] == 'redhat' and distro_info[1] == '7.5') or
            (distro_info[0] == 'redhat' and distro_info[1] == '7.6') or
            (distro_info[0] == 'redhat' and distro_info[1] == '7.7') or
+           (distro_info[0] == 'redhat' and distro_info[1] == '8.0') or
+           (distro_info[0] == 'redhat' and distro_info[1] == '8.1') or
+           (distro_info[0] == 'centos' and distro_info[1].startswith('8.1')) or
+           (distro_info[0] == 'centos' and distro_info[1].startswith('8.0')) or
            (distro_info[0] == 'centos' and distro_info[1].startswith('7.7')) or
            (distro_info[0] == 'centos' and distro_info[1].startswith('7.6')) or
            (distro_info[0] == 'centos' and distro_info[1].startswith('7.5')) or
