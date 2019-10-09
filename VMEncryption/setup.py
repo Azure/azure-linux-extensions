@@ -194,5 +194,4 @@ def zip(src, dst):
 final_folder_path = target_zip_file_location + target_folder_name
 # Manually add SupportedOS.json file as setup seems to only copy py file
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
-#P3
-list(zip(final_folder_path, target_zip_file_path))
+zip(final_folder_path, target_zip_file_path)
