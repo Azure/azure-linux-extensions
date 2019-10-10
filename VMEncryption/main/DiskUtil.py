@@ -51,6 +51,9 @@ class DiskUtil(object):
 
         self.command_executor = CommandExecutor(self.logger)
 
+        self._LUN_PREFIX = "lun"
+        self._SCSI_PREFIX = "scsi"
+
     def copy(self, ongoing_item_config, status_prefix=''):
         copy_task = TransactionalCopyTask(logger=self.logger,
                                           disk_util=self,
@@ -132,7 +135,7 @@ class DiskUtil(object):
 
         return crypt_item
 
-    def get_crypt_items(self):
+    def get_crypt_items(self, skip_root_device=False):
         crypt_items = []
         rootfs_crypt_item_found = False
 
@@ -146,6 +149,8 @@ class DiskUtil(object):
 
                     if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name:
                         rootfs_crypt_item_found = True
+                        if skip_root_device:
+                            continue
 
                     crypt_items.append(crypt_item)
         else:
@@ -156,9 +161,9 @@ class DiskUtil(object):
 
             with open("/etc/fstab", "r") as f:
                 for line in f.readlines():
-                    fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+                    fstab_device, fstab_mount_point, fstab_file_system = self.parse_fstab_line(line)
                     if fstab_device is not None:
-                        fstab_items.append((fstab_device, fstab_mount_point))
+                        fstab_items.append((fstab_device, fstab_mount_point, fstab_file_system))
 
             if not os.path.exists(crypttab_path):
                 self.logger.log("{0} does not exist".format(crypttab_path))
@@ -174,15 +179,18 @@ class DiskUtil(object):
 
                         if crypt_item.mapper_name == CommonVariables.osmapper_name:
                             rootfs_crypt_item_found = True
+                            if skip_root_device:
+                                continue
 
-                        for device_path, mount_path in fstab_items:
+                        for device_path, mount_path, file_system in fstab_items:
                             if crypt_item.mapper_name in device_path:
                                 crypt_item.mount_point = mount_path
+                                crypt_item.file_system = file_system
                         crypt_items.append(crypt_item)
 
         encryption_status = json.loads(self.get_encryption_status())
 
-        if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
+        if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found and not skip_root_device:
             crypt_item = CryptItem()
             crypt_item.mapper_name = CommonVariables.osmapper_name
 
@@ -541,7 +549,16 @@ class DiskUtil(object):
 
         return self.command_executor.Execute(cryptsetup_cmd)
 
-    # TODO error handling.
+    def luks_test_passphrase(self, dev_path, passphrase_file, header_file):
+        self.logger.log("Testing passphrase for device " + dev_path)
+        if header_file:
+            cryptsetup_cmd = "{0} --test-passphrase --key-file {1} --header {2} luksOpen {3}".format(self.distro_patcher.cryptsetup_path, passphrase_file, header_file, dev_path)
+        else:
+            cryptsetup_cmd = "{0} --test-passphrase --key-file {1} luksOpen {2}".format(self.distro_patcher.cryptsetup_path, passphrase_file, dev_path)
+
+        return self.command_executor.Execute(cryptsetup_cmd)
+
+    #TODO error handling.
     def append_mount_info(self, dev_path, mount_point):
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
         mount_content_item = dev_path + " " + mount_point + "  auto defaults 0 0"
@@ -554,7 +571,7 @@ class DiskUtil(object):
 
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
-            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_file_system = self.parse_fstab_line(line)
             if fstab_mount_point == CommonVariables.encryption_key_mount_point:
                 return True
         return False
@@ -562,15 +579,16 @@ class DiskUtil(object):
     def parse_fstab_line(self, line):
         fstab_parts = line.strip().split()
 
-        if len(fstab_parts) < 2:  # Line should have enough content
-            return None, None
+        if len(fstab_parts) < 2: # Line should have enough content
+            return None, None, None
 
-        if fstab_parts[0].startswith("#"):  # Line should not be a comment
-            return None, None
+        if fstab_parts[0].startswith("#"): # Line should not be a comment
+            return None, None, None
 
         fstab_device = fstab_parts[0]
         fstab_mount_point = fstab_parts[1]
-        return fstab_device, fstab_mount_point
+        fstab_file_system = fstab_parts[2]
+        return fstab_device, fstab_mount_point, fstab_file_system
 
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
@@ -587,8 +605,8 @@ class DiskUtil(object):
         relevant_line = None
         for i in range(len(lines)):
             line = lines[i]
-            fstab_device, fstab_mount_point = self.parse_fstab_line(line)
-            if fstab_mount_point != mount_point:  # Not the line we are looking for
+            fstab_device, fstab_mount_point, fstab_file_system = self.parse_fstab_line(line)
+            if fstab_mount_point != mount_point: # Not the line we are looking for
                 continue
 
             self.logger.log("Found the relevant fstab line: " + line)
@@ -751,11 +769,14 @@ class DiskUtil(object):
         return self.command_executor.Execute(umount_cmd)
 
     def umount_all_crypt_items(self):
-        for crypt_item in self.get_crypt_items():
+        for crypt_item in self.get_crypt_items(skip_root_device=True):
             self.logger.log("Unmounting {0}".format(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)))
             self.umount(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def mount_all(self):
+        systemd_present = self.command_executor.Execute('pidof systemd')
+        if systemd_present == 0:
+            self.command_executor.Execute('systemctl daemon-reload')
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 
@@ -979,6 +1000,64 @@ class DiskUtil(object):
             else:
                 table[os.path.realpath(top_level_item_full_path)] = top_level_item_full_path
         return table
+
+    def is_parent_of_any(self, parent_dev_path, children_dev_path_set):
+        """
+        check if the device whose path is parent_dev_path is actually a parent of any of the children in children_dev_path_set
+        All the paths need to be "realpaths" (not symlinks)
+        """
+        actual_children_dev_items = self.get_device_items(parent_dev_path)
+        actual_children_dev_path_set = set([os.path.realpath(self.get_device_path(di.name)) for di in actual_children_dev_items])
+        # the sets being disjoint would mean the candidate parent is not parent of any of the candidate children. So we return the opposite of that
+        return not actual_children_dev_path_set.isdisjoint(children_dev_path_set)
+
+    def get_all_azure_data_disk_controller_and_lun_numbers(self):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
+        """
+        list_devices = []
+        azure_links_dir = CommonVariables.azure_symlinks_dir
+
+        if not os.path.exists(azure_links_dir):
+            return list_devices
+
+        for top_level_item in os.listdir(azure_links_dir):
+            top_level_item_full_path = os.path.join(azure_links_dir, top_level_item)
+            if os.path.isdir(top_level_item_full_path) and top_level_item.startswith(self._SCSI_PREFIX):
+                # this works because apparently all data disks go int a scsi[x] where x is one of [1,2,3,4]
+                try:
+                    controller_id = int(top_level_item[4:]) # strip the first 4 letters of the folder
+                except ValueError:
+                    # if its not an integer, probably just best to skip it
+                    continue
+
+                for symlink in os.listdir(top_level_item_full_path):
+                    if symlink.startswith(self._LUN_PREFIX):
+                        try:
+                            lun_number = int(symlink[3:])
+                        except ValueError:
+                            # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
+                            continue # so just ignore it
+                        list_devices.append((controller_id, lun_number))
+        return list_devices
+
+    def get_azure_data_disk_controller_and_lun_numbers(self, dev_items_real_paths):
+        """
+        Return the controller ids and lun numbers for data disks that show up in the dev_items
+        """
+
+        all_controller_and_lun_numbers = self.get_all_azure_data_disk_controller_and_lun_numbers()
+
+        list_devices = []
+        azure_links_dir = CommonVariables.azure_symlinks_dir
+
+        for controller_id, lun_number in all_controller_and_lun_numbers:
+            scsi_dir = os.path.join(azure_links_dir, self._SCSI_PREFIX + str(controller_id))
+            symlink = os.path.join(scsi_dir, self._LUN_PREFIX + str(lun_number))
+            if self.is_parent_of_any(os.path.realpath(symlink), dev_items_real_paths):
+                list_devices.append((controller_id, lun_number))
+
+        return list_devices
 
     def get_azure_symlinks(self):
         azure_udev_links = {}

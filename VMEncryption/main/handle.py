@@ -47,6 +47,7 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from __builtin__ import int
+from EncryptionSettingsUtil import EncryptionSettingsUtil
 
 
 def install():
@@ -101,13 +102,14 @@ def disable_encryption():
 
         encryption_status = json.loads(disk_util.get_encryption_status())
 
+        # Remove this blocker when powershell disable cmdlet handles this scenario.
         if encryption_status["os"] != "NotEncrypted":
             raise Exception("Disabling encryption is not supported when OS volume is encrypted")
 
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        crypt_items = disk_util.get_crypt_items()
+        crypt_items = disk_util.get_crypt_items(skip_root_device=True)
 
         logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
 
@@ -157,6 +159,51 @@ def disable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
+def stamp_disks_with_settings(items_to_encrypt, encryption_config):
+
+    disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+    bek_util = BekUtil(disk_util, logger)
+    current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
+
+    # post new encryption settings via wire server protocol
+    settings = EncryptionSettingsUtil(logger)
+    new_protector_name = settings.get_new_protector_name()
+    settings.create_protector_file(current_passphrase_file, new_protector_name)
+
+    data = settings.get_settings_data(
+        protector_name=new_protector_name,
+        kv_url=extension_parameter.KeyVaultURL,
+        kv_id=extension_parameter.KeyVaultResourceId,
+        kek_url=extension_parameter.KeyEncryptionKeyURL,
+        kek_kv_id=extension_parameter.KekVaultResourceId,
+        kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
+        extra_device_items=items_to_encrypt,
+        disk_util=disk_util)
+
+    settings.post_to_wireserver(data)
+
+    filenames = []
+    for disk in data.get("Disks", []):
+        for volume in disk.get("Volumes", []):
+            for tag in volume.get("SecretTags", []):
+                if tag.get("Name") == 'DiskEncryptionKeyFileName':
+                    if tag.get("Value") is not None:
+                        filenames.append(str(tag["Value"]))
+
+    for filename in filenames:
+        filepath = os.path.join(CommonVariables.encryption_key_mount_point, filename)
+        if filepath != current_passphrase_file:
+            shutil.copyfile(current_passphrase_file, filepath)
+
+    settings.remove_protector_file(new_protector_name)
+
+    # exit transitioning state by issuing a status report indicating
+    # that the necessary encryption settings are stamped successfully
+    hutil.do_status_report(operation='Migration',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message='Encryption settings stamped. Migration Allowed.')
 
 def get_public_settings():
     public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
@@ -412,9 +459,14 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
+    public_settings = get_public_settings()
+    stored_encryption_command = None
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    if extension_parameter.config_file_exists():
+        stored_encryption_command = extension_parameter.get_command()
     volume_type = encryption_config.get_volume_type().lower()
     if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, public_settings, DistroPatcher.distro_info, stored_encryption_command)
         resource_disk_util.automount()
         logger.log("mounted encrypted resource disk")
 
@@ -519,6 +571,7 @@ def enable():
         bek_util = BekUtil(disk_util, logger)
         existing_passphrase_file = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
@@ -534,7 +587,8 @@ def enable():
 
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher)
+            if not encryption_operation == CommonVariables.Migrate:
+                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -556,8 +610,6 @@ def enable():
         except Exception:
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
-
-        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
@@ -588,6 +640,38 @@ def enable():
             else:
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
+
+        elif encryption_operation == CommonVariables.Migrate:
+            try:
+                logger.log("Migrate operation found. Starting migration flow.")
+                encryption_status = json.loads(disk_util.get_encryption_status())
+                if (encryption_status['data'] == 'NotEncrypted' or encryption_status['data'] == 'NotMounted') and encryption_status['os'] == 'NotEncrypted':
+                    logger.log("No device encrypted. Migration allowed")
+                    hutil.do_exit(exit_code=CommonVariables.success,
+                                  operation='Migrate',
+                                  status=CommonVariables.extension_success_status,
+                                  code=(CommonVariables.success),
+                                  message="Migration Allowed")
+                    migration_allowed, error = is_migration_allowed(disk_util, existing_passphrase_file)
+                    if not migration_allowed:
+                        hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                                      operation='Migrate',
+                                      status=CommonVariables.extension_error_status,
+                                      code=(CommonVariables.configuration_error),
+                                      message=error)
+
+                logger.log("Trying to stamp disk with encryption settings.")
+                stamp_disks_with_settings([], encryption_config)
+                exit_without_status_report()
+            except Exception as e:
+                logger.log("Migration: Fatal Exception thrown during migration")
+                logger.log(traceback.format_exc())
+                msg = e.message
+                hutil.do_exit(exit_code=CommonVariables.unknown_error,
+                              operation='Migrate',
+                              status=CommonVariables.extension_error_status,
+                              code=(CommonVariables.unknown_error),
+                              message=msg)
 
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
@@ -789,6 +873,38 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
+def is_migration_allowed(disk_util, existing_passphrase_file):
+    detached_header = False
+    detached_header_with_xfs = False
+    wrong_passphrase = False
+    crypt_items = disk_util.get_crypt_items()
+    for crypt_item in crypt_items:
+        if crypt_item.mount_point == "/":
+            return_code = disk_util.luks_test_passphrase(crypt_item.dev_path, existing_passphrase_file, crypt_item.luks_header_path)
+            if return_code != 0:
+                logger.log("Passphrase validation failed for device " + crypt_item.dev_path)
+                wrong_passphrase = True
+            continue
+        if crypt_item.luks_header_path:
+            if crypt_item.file_system == "xfs":
+                logger.log("Found device with detached header and xfs: " + crypt_item.dev_path)
+                detached_header_with_xfs = True
+            else:
+                logger.log("Found device with detached header " + crypt_item.dev_path)
+                detached_header = True
+        else:
+            return_code = disk_util.luks_test_passphrase(crypt_item.dev_path, existing_passphrase_file, None)
+            if return_code != 0:
+                logger.log("Passphrase validation failed for device " + crypt_item.dev_path)
+                wrong_passphrase = True
+
+    if wrong_passphrase:
+        return False, CommonVariables.migration_wrong_passphrase
+    if detached_header_with_xfs:
+        return False, CommonVariables.migration_detached_header_xfs
+    if detached_header:
+        return False, CommonVariables.migration_detached_header
+    return True, None
 
 def enable_encryption_format(passphrase, disk_format_query, disk_util, force=False):
     logger.log('enable_encryption_format')
@@ -1484,7 +1600,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     logger.log(msg="executing disable_encryption_all_in_place")
 
     device_items = disk_util.get_device_items(None)
-    crypt_items = disk_util.get_crypt_items()
+    crypt_items = disk_util.get_crypt_items(skip_root_device=True)
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
     logger.log(msg)
@@ -1499,10 +1615,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
         def raw_device_item_match(device_item):
             sdx_device_name = os.path.join("/dev/", device_item.name)
-            if crypt_item.dev_path.startswith(CommonVariables.disk_by_id_root):
-                return crypt_item.dev_path == disk_util.query_dev_id_path_by_sdx_path(sdx_device_name)
-            else:
-                return crypt_item.dev_path == sdx_device_name
+            return os.path.realpath(sdx_device_name) == os.path.realpath(crypt_item.dev_path)
 
         def mapped_device_item_match(device_item):
             return crypt_item.mapper_name == device_item.name
@@ -1866,7 +1979,12 @@ def daemon_decrypt():
                           code=CommonVariables.encryption_failed,
                           message='Decryption failed for {0}'.format(failed_item))
         else:
-            encryption_config.clear_config()
+            encryption_status = json.loads(disk_util.get_encryption_status())
+            if encryption_status['os'] == "Encrypted":
+                encryption_config.volume_type = CommonVariables.VolumeTypeOS
+                encryption_config.commit()
+            else:
+                encryption_config.clear_config(clear_parameter_file=True)
             logger.log("clearing the decryption mark after successful decryption")
             decryption_marker.clear_config()
 

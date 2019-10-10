@@ -51,6 +51,8 @@ class ExtensionParameter(object):
         self.KeyVaultURL = public_settings.get(CommonVariables.KeyVaultURLKey)
         self.AADClientID = public_settings.get(CommonVariables.AADClientIDKey)
         self.AADClientCertThumbprint = public_settings.get(CommonVariables.AADClientCertThumbprintKey)
+        self.KeyVaultResourceId = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
+        self.KekVaultResourceId = public_settings.get(CommonVariables.KekVaultResourceIdKey)
 
         keyEncryptionAlgorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
         if keyEncryptionAlgorithm is not None and keyEncryptionAlgorithm !="":
