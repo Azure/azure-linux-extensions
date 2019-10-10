@@ -35,8 +35,12 @@ python hello.py --install
 function find_python(){
     local python_exec_command=$1
 
-    # Check if there is python defined.
-    if command -v python >/dev/null 2>&1 ; then
+    # Find python3, python2, or default python in that order
+    if command -v python3 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python3"
+    elif command -v python2 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python2"
+    elif command -v python >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python"
     fi
 }
