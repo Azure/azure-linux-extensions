@@ -110,6 +110,7 @@ class CommonVariables:
     UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
+    Migrate = 'Migrate'
 
     """
     encryption config keys

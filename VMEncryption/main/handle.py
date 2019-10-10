@@ -505,10 +505,15 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+    public_settings = get_public_settings()
+    stored_encryption_command = None
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    if extension_parameter.config_file_exists():
+        stored_encryption_command = extension_parameter.get_command()
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+            resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, public_settings, DistroPatcher.distro_info, stored_encryption_command)
             resource_disk_util.automount()
             logger.log("mounted resource disk")
     else:
@@ -650,9 +655,12 @@ def enable():
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+            if not encryption_operation == CommonVariables.Migrate:
+                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -678,8 +686,6 @@ def enable():
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
-        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
 
@@ -688,6 +694,45 @@ def enable():
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
             disable_encryption()
+
+        elif encryption_operation == CommonVariables.Migrate:
+            logger.log("Migrate operation found. Starting migration flow.")
+            hutil.exit_if_same_seq()
+            if (encryption_status['data'] == 'NotEncrypted' or encryption_status['data'] == 'NotMounted') and encryption_status['os'] == 'NotEncrypted':
+                logger.log("No device encrypted. Nothing to do.")
+                hutil.save_seq()
+                hutil.do_exit(exit_code=CommonVariables.success,
+                              operation='Migrate',
+                              status=CommonVariables.extension_success_status,
+                              code=(CommonVariables.success),
+                              message="Migration Succeeded")
+
+            extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
+            extension_parameter.command = extension_parameter.get_command()
+            extension_parameter.VolumeType = encryption_config.get_volume_type() # After migration config file has current volume type
+
+            encryption_config.volume_type = encryption_config.get_volume_type()
+            encryption_config.passphrase_file_name = encryption_config.get_bek_filename()
+            encryption_config.secret_seq_num = encryption_config.get_secret_seq_num()
+
+            # Clear 2 pass params and save a new 1 pass config
+            encryption_config.clear_config()
+            extension_parameter.clear_config()
+            encryption_config.commit()
+            extension_parameter.commit()
+
+            for crypt_item in disk_util.get_crypt_items():
+                if crypt_item.mount_point == "/":
+                    continue
+                backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+                disk_util.update_crypt_item(crypt_item, backup_folder=backup_folder)
+
+            hutil.save_seq()
+            hutil.do_exit(exit_code=CommonVariables.success,
+                          operation='Migrate',
+                          status=CommonVariables.extension_success_status,
+                          code=(CommonVariables.success),
+                          message="Migration Succeeded")
 
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)

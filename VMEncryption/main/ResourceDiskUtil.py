@@ -37,7 +37,7 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
+    def __init__(self, logger, disk_util, passphrase_filename, public_settings, distro_info, stored_encryption_command):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
         self.disk_util = disk_util
@@ -45,11 +45,15 @@ class ResourceDiskUtil(object):
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
         self.distro_info = distro_info
+        self.stored_encryption_command = stored_encryption_command
 
     def _is_encrypt_format_all(self):
         """ return true if current encryption operation is EncryptFormatAll """
-        encryption_operation = self.public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-        if encryption_operation in [CommonVariables.EnableEncryptionFormatAll]:
+        if self.stored_encryption_command and self.stored_encryption_command in [CommonVariables.EnableEncryptionFormatAll]:
+            self.logger.log("Extension parameter file has EncryptFormatAll")
+            return True
+        if self.public_settings.get(CommonVariables.EncryptionEncryptionOperationKey) in [CommonVariables.EnableEncryptionFormatAll]:
+            self.logger.log("Current settings file has EncryptFormatAll")
             return True
         self.logger.log("Current encryption operation is not EnableEncryptionFormatAll")
         return False
