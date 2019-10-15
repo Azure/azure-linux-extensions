@@ -398,7 +398,7 @@ class HandlerUtility:
 
     def _change_log_file(self):
         #self.log("Logging to " + self._context._log_file)
-        LoggerInit(self._context._log_file,'/dev/stdout')
+        waagent.LoggerInit(self._context._log_file,'/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 

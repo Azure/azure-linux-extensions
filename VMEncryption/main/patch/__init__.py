@@ -20,12 +20,12 @@ import os
 import re
 import platform
 
-from UbuntuPatching import UbuntuPatching
-from debianPatching import debianPatching
-from redhatPatching import redhatPatching
-from centosPatching import centosPatching
-from SuSEPatching import SuSEPatching
-from oraclePatching import oraclePatching
+from .UbuntuPatching import UbuntuPatching
+from .debianPatching import debianPatching
+from .redhatPatching import redhatPatching
+from .centosPatching import centosPatching
+from .SuSEPatching import SuSEPatching
+from .oraclePatching import oraclePatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():

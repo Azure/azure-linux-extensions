@@ -528,7 +528,6 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
-    HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
