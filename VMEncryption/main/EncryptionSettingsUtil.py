@@ -25,7 +25,7 @@ import base64
 
 from shutil import copyfile
 import uuid
-from .Common import CommonVariables
+from Common import CommonVariables
 
 
 class EncryptionSettingsUtil(object):
@@ -225,7 +225,7 @@ class EncryptionSettingsUtil(object):
         And HttpUtil imports WAAgentUtil internally (again, causing unittests to fail very unproductively).
         Therefore putting the import here and mocking this method in the test helps the test proceed productively.
         """
-        from .HttpUtil import HttpUtil
+        from HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
     def _post_to_wireserver_helper(self, msg_data, http_util):

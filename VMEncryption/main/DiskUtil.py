@@ -27,12 +27,12 @@ import traceback
 import uuid
 import glob
 
-from .EncryptionConfig import EncryptionConfig
-from .DecryptionMarkConfig import DecryptionMarkConfig
-from .EncryptionMarkConfig import EncryptionMarkConfig
-from .TransactionalCopyTask import TransactionalCopyTask
-from .CommandExecutor import CommandExecutor, ProcessCommunicator
-from .Common import CommonVariables, CryptItem, LvmItem, DeviceItem
+from EncryptionConfig import EncryptionConfig
+from DecryptionMarkConfig import DecryptionMarkConfig
+from EncryptionMarkConfig import EncryptionMarkConfig
+from TransactionalCopyTask import TransactionalCopyTask
+from CommandExecutor import CommandExecutor, ProcessCommunicator
+from Common import CommonVariables, CryptItem, LvmItem, DeviceItem
 
 
 class DiskUtil(object):

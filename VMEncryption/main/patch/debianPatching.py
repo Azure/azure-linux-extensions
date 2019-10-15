@@ -29,7 +29,7 @@ import time
 import traceback
 import datetime
 import subprocess
-from .AbstractPatching import AbstractPatching
+from AbstractPatching import AbstractPatching
 from Common import *
 
 

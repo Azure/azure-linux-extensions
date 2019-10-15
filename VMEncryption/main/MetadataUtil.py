@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .Common import *
+from Common import *
 
 import re
 import traceback

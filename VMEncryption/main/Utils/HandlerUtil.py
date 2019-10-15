@@ -68,8 +68,8 @@ import time
 
 from Common import *
 from os.path import join
-from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
+from Utils.waagentloader import load_waagent
+waagent = load_waagent()
 import logging
 import logging.handlers
 from ProcessLock import ProcessLock

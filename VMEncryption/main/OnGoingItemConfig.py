@@ -21,10 +21,10 @@ import os.path
 import uuid
 import time
 import datetime
-from .Common import CommonVariables
+from Common import CommonVariables
 from configparser import ConfigParser
-from .ConfigUtil import ConfigUtil
-from .ConfigUtil import ConfigKeyValuePair
+from ConfigUtil import ConfigUtil
+from ConfigUtil import ConfigKeyValuePair
 
 
 class OnGoingItemConfig(object):

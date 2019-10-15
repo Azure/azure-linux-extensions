@@ -27,9 +27,9 @@ oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
 sys.path.append(oscryptodir)
 
 from OSEncryptionState import *
-from .PrereqState import *
-from .StripdownState import *
-from .UnmountOldrootState import *
-from .SplitRootPartitionState import *
-from .EncryptBlockDeviceState import *
-from .PatchBootSystemState import *
+from PrereqState import *
+from StripdownState import *
+from UnmountOldrootState import *
+from SplitRootPartitionState import *
+from EncryptBlockDeviceState import *
+from PatchBootSystemState import *

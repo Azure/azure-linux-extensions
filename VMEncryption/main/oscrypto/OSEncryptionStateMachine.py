@@ -31,7 +31,7 @@ sys.path.append(maindir)
 transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
-from .OSEncryptionState import *
+from OSEncryptionState import *
 from Common import *
 from CommandExecutor import *
 from DiskUtil import *

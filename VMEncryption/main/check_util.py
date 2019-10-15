@@ -23,9 +23,9 @@ import os.path
 import urllib.parse
 import re
 import json
-from .Common import CommonVariables
-from .MetadataUtil import MetadataUtil
-from .CommandExecutor import CommandExecutor
+from Common import CommonVariables
+from MetadataUtil import MetadataUtil
+from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
 
 class CheckUtil(object):

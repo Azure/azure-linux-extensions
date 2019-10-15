@@ -18,7 +18,7 @@
 
 import os.path
 import fcntl
-from .Common import CommonVariables
+from Common import CommonVariables
 
 
 class ProcessLock(object):

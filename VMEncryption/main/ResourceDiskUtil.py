@@ -21,8 +21,8 @@
 import time
 import os
 
-from .CommandExecutor import CommandExecutor
-from .Common import CommonVariables, CryptItem
+from CommandExecutor import CommandExecutor
+from Common import CommonVariables, CryptItem
 
 
 class ResourceDiskUtil(object):

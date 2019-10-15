@@ -20,10 +20,10 @@ import os
 import datetime
 import os.path
 
-from .Common import CommonVariables
+from Common import CommonVariables
 from configparser import ConfigParser
-from .ConfigUtil import ConfigUtil
-from .ConfigUtil import ConfigKeyValuePair
+from ConfigUtil import ConfigUtil
+from ConfigUtil import ConfigKeyValuePair
 
 class EncryptionConfig(object):
     def __init__(self, encryption_environment, logger):

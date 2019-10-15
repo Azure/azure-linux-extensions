@@ -19,14 +19,14 @@
 import hashlib
 import xml.parsers.expat
 
-from .DiskUtil import DiskUtil
-from .BekUtil import BekUtil
-from .EncryptionConfig import EncryptionConfig
-from .Utils import HandlerUtil
-from .Common import *
+from DiskUtil import DiskUtil
+from BekUtil import BekUtil
+from EncryptionConfig import EncryptionConfig
+from Utils import HandlerUtil
+from Common import *
 from configparser import ConfigParser
-from .ConfigUtil import ConfigUtil
-from .ConfigUtil import ConfigKeyValuePair
+from ConfigUtil import ConfigUtil
+from ConfigUtil import ConfigKeyValuePair
 import os.path
 
 # parameter format should be like this:

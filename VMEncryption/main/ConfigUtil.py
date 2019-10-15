@@ -17,7 +17,7 @@
 # limitations under the License.
 
 import os.path
-from .Common import *
+from Common import *
 from configparser import *
 
 class ConfigKeyValuePair(object):

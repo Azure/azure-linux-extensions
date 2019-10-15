@@ -23,9 +23,9 @@ import urllib.parse
 import http.client
 import shlex
 import subprocess
-from .Common import CommonVariables
+from Common import CommonVariables
 from subprocess import *
-from .Utils.WAAgentUtil import waagent
+from Utils.WAAgentUtil import waagent
 
 class HttpUtil(object):
     """description of class"""
