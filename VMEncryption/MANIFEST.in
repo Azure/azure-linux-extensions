@@ -7,5 +7,5 @@ recursive-include main/oscrypto/ubuntu_1604/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1604/encryptscripts *.sh
 recursive-include main/oscrypto/ubuntu_1404/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1404/encryptscripts *.sh
-recursive-include main/Util waagent
+recursive-include main/Utils waagent
 prune test
