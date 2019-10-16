@@ -462,7 +462,7 @@ class DiskUtil(object):
 
                     filtered_mount_lines.append(line)
 
-            with open(crypt_file_path, 'w') as wf:
+            with open(crypt_file_path, 'wb') as wf:
                 wf.write(''.join(filtered_mount_lines))
 
             if backup_folder is not None:
@@ -658,7 +658,7 @@ class DiskUtil(object):
         with open("/etc/fstab",'r') as f:
             existing_content = f.read()
             new_mount_content = existing_content + "\n" + mount_content_item
-        with open("/etc/fstab",'w') as wf:
+        with open("/etc/fstab",'wb') as wf:
             wf.write(new_mount_content)
 
     def is_bek_in_fstab_file(self, lines):
@@ -718,7 +718,7 @@ class DiskUtil(object):
             lines.append(self.get_fstab_bek_line())
             self.add_bek_to_default_cryptdisks()
 
-        with open('/etc/fstab', 'w') as f:
+        with open('/etc/fstab', 'wb') as f:
             f.writelines(lines)
 
         if relevant_line is not None:
@@ -761,7 +761,7 @@ class DiskUtil(object):
 
                 filtered_contents.append(line)
 
-        with open('/etc/fstab', 'w') as f:
+        with open('/etc/fstab', 'wb') as f:
             f.write('\n')
             f.write('\n'.join(filtered_contents))
             f.write('\n')
@@ -797,7 +797,7 @@ class DiskUtil(object):
 
                 lines_to_keep_in_backup_fstab.append(line)
 
-        with open('/etc/fstab.azure.backup', 'w') as f:
+        with open('/etc/fstab.azure.backup', 'wb') as f:
             f.write('\n'.join(lines_to_keep_in_backup_fstab))
             f.write('\n')
 
@@ -814,7 +814,7 @@ class DiskUtil(object):
                     continue
                 lines_that_remain_in_fstab.append(line)
 
-        with open('/etc/fstab', 'w') as f:
+        with open('/etc/fstab', 'wb') as f:
             f.write('\n'.join(lines_that_remain_in_fstab + lines_to_put_back_to_fstab))
             f.write('\n')
 
@@ -881,8 +881,10 @@ class DiskUtil(object):
     def get_mount_items(self):
         items = []
 
-        for line in file('/proc/mounts'):
-            line = [s.decode('string_escape') for s in line.split()]
+        for line in open('/proc/mounts'):
+            #P3TODO - used to be s.decode('string_escape') need to update this to be both python2 and 3 compatible
+            #P3STR - string sensitive change 
+            line = [s for s in line.split()]
             item = {
                 "src": line[0],
                 "dest": line[1],
@@ -894,7 +896,7 @@ class DiskUtil(object):
 
     def is_in_memfs_root(self):
         # TODO: make this more robust. This could fail due to mount paths with spaces and tmpfs (e.g. '/mnt/ tmpfs')
-        mounts = file('/proc/mounts', 'r').read()
+        mounts = open('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
     def get_encryption_status(self):
@@ -1035,6 +1037,7 @@ class DiskUtil(object):
 
     def get_device_path(self, dev_name):
         device_path = None
+        dev_name = str(dev_name)
 
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
@@ -1047,7 +1050,7 @@ class DiskUtil(object):
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
-        match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
+        match = re.findall(r'"{(.*)}"', str(proc_comm.stdout).strip())
         return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
@@ -1246,7 +1249,7 @@ class DiskUtil(object):
                 if line:
                     device_item = DeviceItem()
 
-                    for disk_info_property in line.split():
+                    for disk_info_property in str(line).split():
                         property_item_pair = disk_info_property.split('=')
                         if property_item_pair[0] == 'SIZE':
                             device_item.size = int(property_item_pair[1].strip('"'))
@@ -1306,7 +1309,7 @@ class DiskUtil(object):
 
             lvm_item = LvmItem()
 
-            for pair in line.strip().split():
+            for pair in str(line).strip().split():
                 if len(pair.split('=')) != 2:
                     continue
 

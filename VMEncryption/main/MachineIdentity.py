@@ -35,7 +35,7 @@ class MachineIdentity:
             return identity
 
     def save_identity(self):
-        with open(self.store_identity_file,'w') as file:
+        with open(self.store_identity_file,'wb') as file:
             machine_identity = self.current_identity()
             file.write(machine_identity)
 

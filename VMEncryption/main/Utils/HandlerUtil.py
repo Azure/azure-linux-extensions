@@ -485,8 +485,7 @@ class HandlerUtility:
             if message is None:
                 message = ""
                 
-            message = [c for c in message if c in string.printable]
-            message = message.encode('ascii', 'ignore')
+            message = [c.encode('ascii', 'ignore') for c in message if c in string.printable]
             
             self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
             self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))

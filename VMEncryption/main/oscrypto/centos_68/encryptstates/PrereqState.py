@@ -73,7 +73,7 @@ class PrereqState(OSEncryptionState):
 
         contents = re.sub(r'ResourceDisk.EnableSwap=.', 'ResourceDisk.EnableSwap=n', contents)
 
-        with open('/etc/waagent.conf', 'w') as f:
+        with open('/etc/waagent.conf', 'wb') as f:
             f.write(contents)
 
         self.context.logger.log("waagent patched successfully")

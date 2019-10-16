@@ -211,7 +211,7 @@ class EncryptionSettingsUtil(object):
     def write_settings_file(self, data):
         """ Dump encryption settings data to JSON formatted file on key volume """
         self.increment_index()
-        with open(self.get_settings_file_path(), 'w', 0) as outfile:
+        with open(self.get_settings_file_path(), 'wb', 0) as outfile:
             json.dump(data, outfile)
             outfile.flush()
             os.fsync(outfile.fileno())

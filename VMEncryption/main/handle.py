@@ -767,7 +767,7 @@ def enable_encryption():
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
-    if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout):
+    if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), str(ps_stdout)):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
         hutil.redo_last_status()
@@ -1359,7 +1359,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
     executor = CommandExecutor(logger)
     executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
 
-    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
+    luks_header_size = int(re.findall(r"Payload.*?(\d+)", str(proc_comm.stdout))[0]) * CommonVariables.sector_size
 
     if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
@@ -2057,7 +2057,7 @@ def start_daemon(operation):
 
     #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
     #throw broken pipe exception when parent process exit.
-    devnull = open(os.devnull, 'w')
+    devnull = open(os.devnull, 'wb')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
     encryption_config = EncryptionConfig(encryption_environment, logger)

@@ -59,7 +59,7 @@ class ConfigUtil(object):
         for key_value_pair in key_value_pairs:
             if key_value_pair.prop_value is not None:
                 config.set(self.azure_crypt_config_section, key_value_pair.prop_name, key_value_pair.prop_value)
-        with open(self.config_file_path, 'wb') as configfile:
+        with open(self.config_file_path, 'w') as configfile:
             config.write(configfile)
 
     def get_config(self, prop_name):
@@ -75,5 +75,5 @@ class ConfigUtil(object):
                 self.logger.log(msg="value of prop_name:{0} not found.".format(prop_name))
                 return None
         else:
-            self.logger.log("the config file {0} not exists.".format(self.config_file_path))
+            self.logger.log("the config file {0} does not exist".format(self.config_file_path))
             return None

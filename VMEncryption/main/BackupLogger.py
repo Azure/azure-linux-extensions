@@ -22,6 +22,7 @@ import urllib.parse
 import http.client
 import os
 import string
+from builtins import str
 
 class BackupLogger(object):
     def __init__(self, hutil):
@@ -32,7 +33,7 @@ class BackupLogger(object):
     def log(self, msg, level='Info'):
         log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
         log_msg = [c for c in log_msg if c in string.printable]
-        log_msg = log_msg.encode('ascii', 'ignore')
+        log_msg = ''.join(log_msg)
 
         self.hutil.log(log_msg)
         self.log_to_console(log_msg)
@@ -41,6 +42,7 @@ class BackupLogger(object):
         try:
             with open('/dev/console', 'w') as f:
                 msg = [c for c in msg if c in string.printable]
+                msg = ''.join(msg)
                 f.write('[AzureDiskEncryption] ' + msg + '\n')
         except IOError as e:
             pass

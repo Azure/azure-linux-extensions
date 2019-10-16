@@ -74,8 +74,8 @@ class CommandExecutor(object):
 
         if int(return_code) != 0:
             msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
-            msg += "\nstdout:\n" + stdout
-            msg += "\nstderr:\n" + stderr
+            msg += "\nstdout:\n" + str(stdout)
+            msg += "\nstderr:\n" + str(stderr)
 
             if not suppress_logging:
                 self.logger.log(msg)
