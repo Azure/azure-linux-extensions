@@ -306,6 +306,14 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Enable:
+            if hutil.is_current_config_seq_greater_inused():
+                configurator = create_core_components_configs()
+                dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+                if dependencies_err != 0:
+                    g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+                    hutil.do_status_report(g_ext_op_type, "error", '-1', "Enablecd  failed")
+                    return
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
                 RunGetOutput('systemctl enable mdsd-lde')
