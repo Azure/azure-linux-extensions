@@ -1163,7 +1163,8 @@ class DiskUtil(object):
         lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
-        self.logger.log('\n' + str(proc_comm.stdout) + '\n')
+        output = str(proc.comm.stdout).decode("utf-8")
+        self.logger.log('\n' + output + '\n')
 
     def get_device_items_sles(self, dev_path):
         if dev_path:
@@ -1376,7 +1377,8 @@ class DiskUtil(object):
         # IDE devices (in Gen 1) include Resource disk and BEK VOLUME. This check works pretty wel in Gen 1, but not in Gen 2.
         for azure_blk_item in special_azure_devices_to_skip:
             if azure_blk_item.name == device_item.name:
-                self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
+                if device_item.name:
+                    self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
                 return False
 
         return True

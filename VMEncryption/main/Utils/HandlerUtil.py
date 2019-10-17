@@ -529,7 +529,7 @@ class HandlerUtility:
                 if "VMRestartPending" in encryption_status:
                     stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
                     
-            stat_rept = json.dumps(stat)
+            stat_rept = json.dumps(stat, ensure_ascii=False)
             # rename all other status files, or the WALA would report the wrong
             # # status file.
             # # because the wala choose the status file with the highest sequence
@@ -539,7 +539,7 @@ class HandlerUtility:
             # Hence, any status update from n.settings also needs to go to n+1.status.
             if self._context._status_file:
                 with open(self._context._status_file,'w+') as f:
-                    f.write(stat_rept)
+                    f.write(unicode(stat_rept))
         except Exception as e:
             self.log('Exception occured while writing status: '+ str(e))
         finally:
