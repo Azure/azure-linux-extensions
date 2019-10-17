@@ -283,25 +283,32 @@ class ResourceDiskUtil(object):
             self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
         if not self.disk_util.should_use_azure_crypt_mount():
-            self.logger.log("Adding resource disk to the crypttab file")
-            crypt_item = CryptItem()
-            crypt_item.dev_path = self.RD_DEV_PATH
-            crypt_item.mapper_name = self.RD_MAPPER_NAME
-            crypt_item.uses_cleartext_key = False
-            self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
-            self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
-            self.add_to_fstab()
+            self.add_resource_disk_to_crypttab()
         return True
+
+    def add_resource_disk_to_crypttab(self):
+        self.logger.log("Adding resource disk to the crypttab file")
+        crypt_item = CryptItem()
+        crypt_item.dev_path = self.RD_DEV_PATH
+        crypt_item.mapper_name = self.RD_MAPPER_NAME
+        crypt_item.uses_cleartext_key = False
+        self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
+        self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
+        self.add_to_fstab()
 
     def automount(self):
         """ encrypt resource disk """
+        rd_mounted = False
         # try to remount if the disk was previously encrypted and is still valid
         if self.try_remount():
-            return True
-
+            rd_mounted = True
         # unencrypted or unusable
-        if self._is_encrypt_format_all():
-            return self.encrypt_format_mount()
+        elif self._is_encrypt_format_all():
+            rd_mounted = self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
-            return False
+        
+        if rd_mounted and self._is_crypt_mounted() and self.disk_util.should_use_azure_crypt_mount():
+            self.add_resource_disk_to_crypttab()
+        
+        return rd_mounted

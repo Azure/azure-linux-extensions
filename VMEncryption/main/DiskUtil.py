@@ -26,6 +26,7 @@ import shutil
 import traceback
 import uuid
 import glob
+from datetime import datetime
 
 from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
@@ -330,6 +331,38 @@ class DiskUtil(object):
         self.logger.log("Updating entry for crypt item {0}".format(crypt_item))
         self.remove_crypt_item(crypt_item)
         self.add_crypt_item(crypt_item, key_file_path)
+
+    def migrate_crypt_items(self, passphrase_file):
+        crypt_items = self.get_crypt_items()
+         # Archive azure_crypt_mount file
+        try:
+            if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+                self.logger.log(msg="archiving azure crypt mount file: {0}".format(self.encryption_environment.azure_crypt_mount_config_path))
+                time_stamp = datetime.now()
+                new_name = "{0}_{1}".format(self.encryption_environment.azure_crypt_mount_config_path, time_stamp)
+                os.rename(self.encryption_environment.azure_crypt_mount_config_path, new_name)
+            else:
+                self.logger.log(msg=("the azure crypt mount file not exist: {0}".format(self.encryption_environment.azure_crypt_mount_config_path)), level = CommonVariables.InfoLevel)
+        except OSError as e:
+            self.logger.log("Failed to archive encryption mount file with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+
+        for crypt_item in crypt_items:
+            self.logger.log("Migrating crypt item: {0}".format(crypt_item))
+            if crypt_item.mount_point == "/":
+                self.logger.log("Skipping OS disk")
+                continue
+
+            if crypt_item.mount_point and crypt_item.mount_point != "None":
+                self.logger.log(msg="restoring entry for {0} drive in fstab".format(crypt_item.mount_point), level=CommonVariables.InfoLevel)
+                self.restore_mount_info(crypt_item.mount_point)
+            elif crypt_item.mapper_name:
+                self.logger.log(msg="restoring entry for {0} drive in fstab".format(crypt_item.mapper_name), level=CommonVariables.InfoLevel)
+                self.restore_mount_info(crypt_item.mapper_name)
+            else:
+                self.logger.log(msg=crypt_item.dev_path + " was not in fstab when encryption was enabled, no need to restore",
+                                level=CommonVariables.InfoLevel)
+            self.modify_fstab_entry_encrypt(crypt_item.mount_point, os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
+            self.add_crypt_item_to_crypttab(crypt_item, passphrase_file)
 
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
