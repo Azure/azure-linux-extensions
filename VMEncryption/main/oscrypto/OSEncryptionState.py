@@ -85,8 +85,8 @@ class OSEncryptionState(object):
                     self.bootfs_block_device = self.rootfs_disk + '2'
         elif not self.rootfs_sdx_path:
             self.rootfs_disk = '/dev/sda'
-            self.rootfs_block_device = '/dev/sda2'
-            self.bootfs_block_device = '/dev/sda1'
+            self.rootfs_block_device = '/dev/sda4'
+            self.bootfs_block_device = '/dev/sda3'
         elif self.rootfs_sdx_path == '/dev/mapper/osencrypt' or self.rootfs_sdx_path.startswith('/dev/dm-'):
             self.rootfs_block_device = '/dev/mapper/osencrypt'
             bootfs_uuid = self._parse_uuid_from_fstab('/boot')

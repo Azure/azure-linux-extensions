@@ -47,7 +47,7 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from __builtin__ import int
-
+# EDHACK import pydevd
 
 def install():
     hutil.do_parse_context('Install')
@@ -528,6 +528,8 @@ def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_confi
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
+# EDHACK     if os.path.exists('/tmp/PYCHARM_DEBUG_ME'):
+# EDHACK         pydevd.settrace('localhost', port=8282, stdoutToServer=True, stderrToServer=True)
     HandlerUtil.LoggerInit('/var/log/waagent.log','/dev/stdout')
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
@@ -641,7 +643,8 @@ def enable():
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             logger.log("handle.py found enable encryption operation")
-
+# EDHACK             if os.path.exists('/tmp/PYCHARM_DEBUG_ME'):
+# EDHACK                 pydevd.settrace('localhost', port=8282, stdoutToServer=True, stderrToServer=True)
             handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
 
         elif encryption_operation == CommonVariables.DisableEncryption:
@@ -1619,6 +1622,9 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     return None
 
 def daemon_encrypt():
+# EDHACK     if os.path.exists('/tmp/PYCHARM_DEBUG_ME'):
+# EDHACK         pydevd.settrace('localhost', port=8282, stdoutToServer=True, stderrToServer=True)
+
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
     # TODO Remount all
@@ -1760,6 +1766,12 @@ def daemon_encrypt():
         elif distro_name == 'Ubuntu' and distro_version == '14.04':
             from oscrypto.ubuntu_1404 import Ubuntu1404EncryptionStateMachine
             os_encryption = Ubuntu1404EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
+        elif distro_name == 'SuSE' and distro_version in ['12', '15']:
+            from oscrypto.suse_12_upwards import Suse12EncryptionStateMachine
+            os_encryption = Suse12EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
