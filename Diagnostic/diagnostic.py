@@ -311,7 +311,7 @@ def main(command):
                 dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
                 if dependencies_err != 0:
                     g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
-                    hutil.do_status_report(g_ext_op_type, "error", '-1', "Enablecd  failed")
+                    hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
 
             if g_dist_config.use_systemd():
@@ -644,7 +644,21 @@ def restart_omi_if_crashed(omi_installed, mdsd):
                         "Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
             omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
             hutil.log("OMI restart result: " + omi_restart_msg)
-            time.sleep(5)
+            time.sleep(10)
+
+            # Query OMI once again to make sure restart fixed the issue.
+            # If not, attempt to re-install OMI as last resort.
+            cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+            should_reinstall_omi = cmd_exit_status is not 0
+            if should_reinstall_omi:
+                hutil.error("OMI noop query failed even after OMI was restarted. Attempting to re-install the components.")
+                configurator = create_core_components_configs()
+                dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+                if dependencies_err != 0:
+                    hutil.error("Re-installing the components failed with error code: " + dependencies_err + ", error message: " +  dependencies_msg)
+                    return omi_installed
+                else:
+                    omi_reinstalled = True
 
     # mdsd needs to be signaled if OMI was restarted or reinstalled because mdsd used to give up connecting to OMI
     # if it fails first time, and never retried until signaled. mdsd was fixed to retry now, but it's still
