@@ -54,6 +54,10 @@ install_times = {}
 
 runwith = '--verbose'
 
+os.system('touch ./omsfiles/omsresults.log')
+os.system('touch ./omsfiles/omsresults.html')
+os.system('touch ./omsfiles/omsresults.status')
+
 vms_list = []
 if len(sys.argv) > 0:
     options = sys.argv[1:]
