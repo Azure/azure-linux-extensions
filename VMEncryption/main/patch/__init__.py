@@ -27,6 +27,30 @@ from centosPatching import centosPatching
 from SuSEPatching import SuSEPatching
 from oraclePatching import oraclePatching
 
+def _suse_parse_os_release_file():
+    """
+    Useful for SUSE15 distro that uses "/etc/os-release" file and when
+    the Python "platform" packages fails to return the proper distro
+    identification.
+    The Python "platform" package has been deprecated in future python 3.7+ releases.
+    A generic solution for all distributions will need to be implemented
+    at that time.
+    """
+    try:
+        with open("/etc/os-release") as f:
+            os_release = {}
+            for line in f:
+                k,v = line.rstrip().split("=")
+                os_release[k] = v.strip('" ')
+
+        if os_release['NAME'].lower() == 'sles':
+            return ['SuSE', os_release['VERSION'], '']
+
+    except:
+        # ignore all errors and return empty list
+        return ['','','']
+
+
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
     if 'FreeBSD' in platform.system():
@@ -37,6 +61,16 @@ def DistInfo():
         distinfo = list(platform.linux_distribution(full_distribution_name=0))
         # remove trailing whitespace in distro name
         distinfo[0] = distinfo[0].strip()
+        if distinfo[0] == '':
+            # Unable to resolve the distro name using the python "platform" package...
+            # this might be a SLES15+ image which uses a "/etc/os-release"
+            # file instead.
+            # The Python "platform" package has been deprecated in future python 3.7+ releases.
+            # A generic solution for all distributions will need to be implemented
+            # at that time.
+
+            distinfo = _suse_parse_os_release_file()
+
         return distinfo
     else:
         return platform.dist()
