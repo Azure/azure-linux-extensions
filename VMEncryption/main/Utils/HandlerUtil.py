@@ -485,7 +485,7 @@ class HandlerUtility:
             if message is None:
                 message = ""
                 
-            message = [c.encode('ascii', 'ignore') for c in message if c in string.printable]
+            message = ''.join(filter(lambda x: x in string.printable, message))
             
             self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
             self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
@@ -539,7 +539,7 @@ class HandlerUtility:
             # Hence, any status update from n.settings also needs to go to n+1.status.
             if self._context._status_file:
                 with open(self._context._status_file,'w+') as f:
-                    f.write(unicode(stat_rept))
+                    f.write(stat_rept)
         except Exception as e:
             self.log('Exception occured while writing status: '+ str(e))
         finally:

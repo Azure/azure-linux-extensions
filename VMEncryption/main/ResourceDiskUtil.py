@@ -267,7 +267,7 @@ class ResourceDiskUtil(object):
                 lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
 
         with open('/etc/fstab', 'wb') as f:
-            f.writelines(lines)
+            f.writelines(lines.encode('utf8'))
 
     def encrypt_format_mount(self):
         if not self.prepare():

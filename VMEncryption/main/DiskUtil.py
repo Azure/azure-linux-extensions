@@ -306,12 +306,12 @@ class DiskUtil(object):
             grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
 
             if grep_result == 0:
-                crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
+                crypt_item.dev_path = proc_comm.stdout.decode("utf-8").strip().split()[1]
             else:
                 proc_comm = ProcessCommunicator()
                 self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
-                for line in proc_comm.stdout.splitlines():
+                for line in proc_comm.stdout.decode("utf-8").splitlines():
                     if CommonVariables.osmapper_name in line:
                         majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
                         src_device = filter(lambda d: d.majmin == majmin, self.get_device_items(None))[0]
@@ -543,7 +543,7 @@ class DiskUtil(object):
             proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
             self.command_executor.Execute(passphrase_cmd, communicator=proc_comm)
-            passphrase = proc_comm.stdout
+            passphrase = proc_comm.stdout.decode("utf-8")
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path, dev_path)
             return self.command_executor.Execute(cryptsetup_cmd, input=passphrase)
@@ -618,7 +618,7 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
+        lines = [l for l in proc_comm.stdout.decode("utf-8").split("\n") if "key slot" in l.lower()]
         keyslots = ["enabled" in l.lower() for l in lines]
 
         return keyslots
@@ -1050,7 +1050,7 @@ class DiskUtil(object):
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
-        match = re.findall(r'"{(.*)}"', str(proc_comm.stdout).strip())
+        match = re.findall(r'"{(.*)}"', proc_comm.stdout.decode("utf-8").strip())
         return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
@@ -1066,14 +1066,14 @@ class DiskUtil(object):
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
-            property_value = proc_comm.stdout.strip()
+            property_value = proc_comm.stdout.decode("utf-8").strip()
         elif property_name == "DEVICE_ID":
             property_value = self.get_device_id(device_path)
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            for line in proc_comm.stdout.splitlines():
+            for line in proc_comm.stdout.decode("utf-8").splitlines():
                 if line.strip():
                     disk_info_item_array = line.strip().split()
                     if dev_name == disk_info_item_array[0]:
@@ -1163,9 +1163,8 @@ class DiskUtil(object):
         lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
-        output = str(proc.comm.stdout).decode("utf-8")
+        output = proc_comm.stdout.decode("utf-8")
         self.logger.log('\n' + output + '\n')
-
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
@@ -1181,7 +1180,7 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
 
-        for line in proc_comm.stdout.splitlines():
+        for line in proc_comm.stdout.decode("utf-8").splitlines():
             item_value_str = line.strip()
             if item_value_str:
                 device_item = DeviceItem()
@@ -1246,7 +1245,7 @@ class DiskUtil(object):
             
             device_items = []
             lvm_items = self.get_lvm_items()
-            for line in proc_comm.stdout.splitlines():
+            for line in proc_comm.stdout.decode("utf-8").splitlines():
                 if line:
                     device_item = DeviceItem()
 
