@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
+  <ProviderNameSpace>Microsoft.Azure.Monitor</ProviderNameSpace>
+  <Type>AzureMonitorAgent</Type>
+  <Version>1.0</Version>
+  <Label>Microsoft Azure Monitoring Agent for Linux</Label>
+  <HostingResources>VmRole</HostingResources>
+  <MediaLink></MediaLink>
+  <Description>Microsoft Azure Monitoring Agent for Linux</Description>
+  <IsInternalExtension>true</IsInternalExtension>
+  <Eula>https://msazure.visualstudio.com/DefaultCollection/One/_git/Compute-Runtime-Tux?path=%2FLICENSE</Eula>
+  <PrivacyUri>http://www.microsoft.com/privacystatement/en-us/OnlineServices/Default.aspx</PrivacyUri>
+  <HomepageUri>https://msazure.visualstudio.com/DefaultCollection/One/_git/Compute-Runtime-Tux</HomepageUri>
+  <IsJsonExtension>true</IsJsonExtension>
+  <SupportedOS>Linux</SupportedOS>
+  <CompanyName>Microsoft</CompanyName>
+  <!--%REGIONS%-->
+</ExtensionImage>

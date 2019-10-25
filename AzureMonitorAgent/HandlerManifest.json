@@ -1,0 +1,16 @@
+[
+  {
+    "name":  "AzureMonitorAgent",
+    "version": "1.0",
+    "handlerManifest": {
+      "installCommand": "oneagent.py -install",
+      "uninstallCommand": "oneagent.py -uninstall",
+      "updateCommand": "oneagent.py -update",
+      "enableCommand": "oneagent.py -enable",
+      "disableCommand": "oneagent.py -disable",
+      "rebootAfterInstall": false,
+      "reportHeartbeat": false,
+      "updateMode": "UpdateWithInstall"
+    }
+  }
+]
