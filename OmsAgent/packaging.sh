@@ -31,7 +31,9 @@ cp ../Common/WALinuxAgent-2.0.16/waagent .
 # cleanup packages
 rm -rf packages
 mkdir -p packages
-#copy shell bundle to packages/
+# copy shell bundle to packages/
 cp $bundle_path packages/
+# sync the file copy
+sync
 
 zip -r $output_path/$PACKAGE_NAME * 
