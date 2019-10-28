@@ -28,7 +28,23 @@ from Common import CryptItem, CommonVariables
 
 
 class CryptMountConfigUtil(object):
-    """A utility to modify the config files that mount or unlock encrypted disks"""
+    """
+    A utility to modify the config files that mount or unlock encrypted disks
+
+    There are effectively two "config file systems" that we use:
+    1) The "old" azure_crypt_mount system
+        A file that does the job of fstab (mounting) and crypttab (unlocking) both.
+        The extension does the job of parsing this file and mounting-unlocking the drives.
+        As the extension is run a while after the boot process completes, the disks get ready a little bit late
+    2) The "new" crypttab system
+        We use the standard system files (fstab and crypttab).
+        The system is supposed to mount the drives for us before the extension even starts.
+        In case the system fails to do so, the extension still parses and unlock-mounts the drives when it is run.
+        In this system the disks should be ready at boot.
+
+    As of now, if any non-OS disks are present in the old system, we stick to the old system.
+    Otherwise the old system is considered unused and we use the new system.
+    """
 
     def __init__(self, logger, encryption_environment):
         self.encryption_environment = encryption_environment
