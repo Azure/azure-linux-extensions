@@ -25,12 +25,13 @@ import shlex
 import subprocess
 from Common import CommonVariables
 from subprocess import *
-from Utils.WAAgentUtil import waagent
+from Utils.waagentloader import load_waagent
 
 class HttpUtil(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
+        waagent = load_waagent()
         try:
             waagent.MyDistro = waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)

@@ -56,8 +56,9 @@ class EncryptionSettingsUtil(object):
         # specify buffering = 0 and then use os.fsync to flush
         # https://docs.python.org/2/library/functions.html#open
         # https://linux.die.net/man/2/fsync
-        with open(CommonVariables.encryption_settings_counter_path, "w", 0) as outfile:
-            outfile.write(str(index + 1) + "\n")
+        with open(CommonVariables.encryption_settings_counter_path, "wb", 0) as outfile:
+            output = str(index + 1) + "\n"
+            outfile.write(output.encode())
             outfile.flush()
             os.fsync(outfile.fileno())
         return
@@ -182,10 +183,10 @@ class EncryptionSettingsUtil(object):
                 })
 
         full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
-        with open(full_protector_path) as protector_file:
+        with open(full_protector_path, "rb") as protector_file:
             protector = protector_file.read()
             protector_base64 = base64.standard_b64encode(protector)
-            protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
+            protectors = [{"Name": protector_name, "Base64Key": protector_base64.decode('UTF-8')}]
 
         protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
 
@@ -211,8 +212,9 @@ class EncryptionSettingsUtil(object):
     def write_settings_file(self, data):
         """ Dump encryption settings data to JSON formatted file on key volume """
         self.increment_index()
+        output = json.dumps(data)
         with open(self.get_settings_file_path(), 'wb', 0) as outfile:
-            json.dump(data, outfile)
+            outfile.write(output.encode())
             outfile.flush()
             os.fsync(outfile.fileno())
 
