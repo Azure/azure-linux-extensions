@@ -34,7 +34,6 @@ class EncryptionSettingsUtil(object):
     def __init__(self, logger):
         self.logger = logger
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
-        self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
     def get_new_protector_name(self):
         """get a new guid to use as the protector name to pass to host"""
