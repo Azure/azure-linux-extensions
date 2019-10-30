@@ -312,7 +312,7 @@ class EncryptionSettingsUtil(object):
                     }]
                 }
 
-        protectors_null = [{"Name": "nullProtector.bek", "Base64Key": ""}]
+        protectors_null = []
 
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
@@ -326,5 +326,6 @@ class EncryptionSettingsUtil(object):
                 "KekVaultResourceId": "",
                 "KeyVaultResourceId": "",
                 "KeyVaultUrl": ""}
+        self.logger.log("Settings to be sent for clear_encryption_settings: " + json.dumps(data, sort_keys=True, indent=4))
         self.post_to_wireserver(data)
         return

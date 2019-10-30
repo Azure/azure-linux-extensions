@@ -584,7 +584,7 @@ def is_daemon_running():
     return False
 
 def enable():
-    while True:
+    try:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
 
@@ -618,6 +618,9 @@ def enable():
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
+            # Reject settings if fatal exception occurs while a daemon is running
+            if is_daemon_running():
+                hutil.reject_settings()
             msg = str(e)
             hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
@@ -648,17 +651,6 @@ def enable():
             logger.log("handle.py found disable encryption operation")
             disable_encryption()
 
-        elif encryption_operation == CommonVariables.QueryEncryptionStatus:
-            logger.log("handle.py found query operation")
-
-            if is_daemon_running():
-                logger.log("A daemon is already running, exiting without status report")
-                hutil.redo_last_status()
-                exit_without_status_report()
-            else:
-                logger.log("No daemon found, trying to find the last non-query operation")
-                hutil.find_last_nonquery_operation = True
-
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
             logger.log(msg)
@@ -667,6 +659,16 @@ def enable():
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.configuration_error),
                           message=msg)
+
+    except Exception as e:
+        msg = "Unexpected Error during enable. Error message {0}\n Stacktrace: {1}".format(str(e), traceback.format_exc())
+        logger.log(msg)
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
+                      operation='Enable',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.unknown_error),
+                      message=msg)
+
 
 def are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation):
     are_data_disk_encrypted = True if encryption_status['data'] == 'Encrypted' else False
@@ -705,6 +707,10 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
+        # If a daemon is already running reject and exit an update encryption settings request
+        if is_daemon_running():
+            logger.log("An operation already running. Cannot accept an update settings request.")
+            hutil.reject_settings()
         are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
         if not are_devices_encrypted:
             logger.log('Required devices not encrypted for volume type {0}. Calling update to stamp encryption settings.'.format(volume_type))
@@ -765,6 +771,7 @@ def enable_encryption():
     if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
+        hutil.redo_last_status()
         exit_without_status_report()
 
     # handle the re-call scenario.  the re-call would resume?

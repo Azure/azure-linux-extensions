@@ -75,10 +75,29 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.ExecuteInBash('for i in dev proc sys boot; do mount --move /oldroot/$i /$i; done')
 
             extension_full_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name
+            extension_versioned_name = 'Microsoft.Azure.Security.' + CommonVariables.extension_name + '-' + CommonVariables.extension_version
+            test_extension_full_name = CommonVariables.test_extension_publisher + CommonVariables.test_extension_name
+            test_extension_versioned_name = CommonVariables.test_extension_publisher + CommonVariables.test_extension_name + '-' + CommonVariables.extension_version
             self.command_executor.Execute('cp -ax' +
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
-                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name),
-                                          True)
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(extension_versioned_name) +
+                                          ' /oldroot/var/lib/waagent/{0}/config'.format(extension_versioned_name))
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(extension_versioned_name) +
+                                          ' /oldroot/var/lib/waagent/{0}/status'.format(extension_versioned_name))
+            self.command_executor.Execute('cp -ax' +
+                                          ' /var/log/azure/{0}'.format(test_extension_full_name) +
+                                          ' /oldroot/var/log/azure/{0}.Stripdown'.format(test_extension_full_name), suppress_logging=True)
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(test_extension_versioned_name) +
+                                          ' /oldroot/var/lib/waagent/{0}/config'.format(test_extension_versioned_name), suppress_logging=True)
+            self.command_executor.ExecuteInBash('cp -ax' +
+                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(test_extension_versioned_name) +
+                                          ' /oldroot/var/lib/waagent/{0}/status'.format(test_extension_versioned_name), suppress_logging=True)
+            # Preserve waagent log from pivot root env
+            self.command_executor.Execute('cp -ax /var/log/waagent.log /oldroot/var/log/waagent.log.pivotroot')
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
 
