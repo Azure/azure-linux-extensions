@@ -35,7 +35,7 @@ class CommonVariables:
     luks_header_size = 4096 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
-    #TODO for the sles 11, we should use the ext3
+    # TODO for the sles 11, we should use the ext3
     default_file_system = 'ext4'
     format_supported_file_systems = ['ext4', 'ext3', 'ext2', 'xfs', 'btrfs']
     inplace_supported_file_systems = ['ext4', 'ext3', 'ext2']
@@ -54,22 +54,12 @@ class CommonVariables:
     wire protocol message format
     """
     encryption_key_file_name = 'LinuxPassPhraseFileName'
-    encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
-    default_encryption_algorithm = 'RSA-OAEP'
-    encryption_settings_file_name_pattern = 'settings_{0}.json'
-    encryption_settings_counter_file = 'counter.txt'
-    encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
     wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
     wireprotocol_msg_headers = {
         "Content-Type": "text/xml",
         "x-ms-version": "2015-04-05"
     }
-    wireprotocol_msg_template_v2 = """<?xml version="1.0"?>
-    <DiskEncryptionData version="2.0">
-        <DiskEncryptionSettingsFile>{settings_file_name}</DiskEncryptionSettingsFile>
-    </DiskEncryptionData>
-    """
     wireprotocol_msg_template_v3 = """<?xml version="1.0"?>
     <DiskEncryptionData version="3.0">
         <DiskEncryptionDetailsAsJson>{settings_json_blob}</DiskEncryptionDetailsAsJson>

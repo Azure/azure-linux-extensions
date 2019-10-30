@@ -873,6 +873,7 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
+
 def is_migration_allowed(disk_util, existing_passphrase_file):
     detached_header = False
     detached_header_with_xfs = False
@@ -885,9 +886,12 @@ def is_migration_allowed(disk_util, existing_passphrase_file):
                 logger.log("Passphrase validation failed for device " + crypt_item.dev_path)
                 wrong_passphrase = True
             continue
-        if crypt_item.luks_header_path:
-            if crypt_item.file_system == "xfs":
-                logger.log("Found device with detached header and xfs: " + crypt_item.dev_path)
+        if crypt_item.luks_header_path and os.path.realpath(crypt_item.luks_header_path) != os.path.realpath(crypt_item.dev_path):
+            device_items = disk_util.get_device_items(crypt_item.dev_path)
+            if device_items and len(device_items) > 0:
+                device_item = device_items[0]
+            if not device_item or device_item.file_system not in CommonVariables.inplace_supported_file_systems:
+                logger.log("Found device with detached header and {0} file system: " + device_item.file_system if device_item else "unknown")
                 detached_header_with_xfs = True
             else:
                 logger.log("Found device with detached header " + crypt_item.dev_path)

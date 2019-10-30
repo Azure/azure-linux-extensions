@@ -36,32 +36,6 @@ class EncryptionSettingsUtil(object):
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
         self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
-    def get_index(self):
-        """get the integer value of the current index in the counter"""
-        index = 0
-        if os.path.isfile(CommonVariables.encryption_settings_counter_path):
-            with open(CommonVariables.encryption_settings_counter_path, "r") as infile:
-                index_string = infile.readline().strip()
-            try:
-                index = int(index_string)
-            except ValueError:
-                self.logger.log("counter file contents were invalid, returning index value 0")
-        else:
-            self.logger.log("encryption settings counter file not found, returning index value 0")
-        return abs(index)
-
-    def increment_index(self):
-        """increment the internal counter used to index the encryption settings json file"""
-        index = self.get_index()
-        # specify buffering = 0 and then use os.fsync to flush
-        # https://docs.python.org/2/library/functions.html#open
-        # https://linux.die.net/man/2/fsync
-        with open(CommonVariables.encryption_settings_counter_path, "w", 0) as outfile:
-            outfile.write(str(index + 1) + "\n")
-            outfile.flush()
-            os.fsync(outfile.fileno())
-        return
-
     def get_new_protector_name(self):
         """get a new guid to use as the protector name to pass to host"""
         # https://docs.microsoft.com/en-us/powershell/module/azurerm.keyvault/add-azurekeyvaultkey
@@ -82,15 +56,6 @@ class EncryptionSettingsUtil(object):
         """remove temporary protector file corresponding to protector name parameter"""
         os.remove(os.path.join(CommonVariables.encryption_key_mount_point, protector_name))
         return
-
-    def get_settings_file_path(self):
-        """get the full path to the current encryption settings file"""
-        return os.path.join(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
-
-    def get_settings_file_name(self):
-        """get the base file name of the current encryption settings file"""
-        padded_index = str(self.get_index()).zfill(2)
-        return CommonVariables.encryption_settings_file_name_pattern.format(padded_index)
 
     def get_disk_items_from_crypt_items(self, crypt_items, disk_util):
         crypt_dev_items = []
@@ -126,7 +91,7 @@ class EncryptionSettingsUtil(object):
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
+        if re.match('^[\\w-]+$', machine_name) is None:
             machine_name = ''
 
         # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
@@ -187,7 +152,7 @@ class EncryptionSettingsUtil(object):
             protector_base64 = base64.standard_b64encode(protector)
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
-        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
+        protectors_name_only = [{"Name": protector_obj["Name"], "Base64Key": "REDACTED"} for protector_obj in protectors]
 
         data = {
             "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
@@ -207,16 +172,6 @@ class EncryptionSettingsUtil(object):
         data["Protectors"] = protectors
 
         return data
-
-    def write_settings_file(self, data):
-        """ Dump encryption settings data to JSON formatted file on key volume """
-        self.increment_index()
-        with open(self.get_settings_file_path(), 'w', 0) as outfile:
-            json.dump(data, outfile)
-            outfile.flush()
-            os.fsync(outfile.fileno())
-
-        return
 
     def get_http_util(self):
         """
@@ -266,65 +221,4 @@ class EncryptionSettingsUtil(object):
 
         # V3 message content
         msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
-        try:
-            self._post_to_wireserver_helper(msg_data, http_util)
-        except Exception:
-            self.logger.log("Falling back on old Wire Server protocol")
-            data_copy = data.copy()
-            data_copy.pop("Protectors")
-            data_copy["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
-
-            self.write_settings_file(data_copy)
-            if not os.path.isfile(self.get_settings_file_path()):
-                raise Exception(
-                    'Disk encryption settings file not found: ' + self.get_settings_file_path())
-
-            msg_data = CommonVariables.wireprotocol_msg_template_v2.format(settings_file_name=self.get_settings_file_name())
-            self._post_to_wireserver_helper(msg_data, http_util)
-
-    def clear_encryption_settings(self, disk_util):
-        """
-        Clear settings by calling DisableEncryption operation via wire server
-
-        finds all azure data disks and clears their encryption settings
-        """
-
-        self.logger.log("Clearing encryption settings for all data drives")
-
-        data_disk_controller_ids_and_luns = disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
-
-        # validate machine name string or use empty string
-        machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
-            machine_name = ''
-
-        def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
-            return {
-                "ControllerType": "SCSI",
-                "ControllerId": scsi_controller,
-                "SlotId": lun_number,
-                "Volumes": [{
-                    "VolumeType": "DataVolume",
-                    "ProtectorFileName": "nullProtector.bek",
-                    "SecretTags": self._dict_to_name_value_array({
-                        "DiskEncryptionKeyFileName": "nullProtector.bek",
-                        "MachineName": machine_name})
-                    }]
-                }
-
-        protectors_null = [{"Name": "nullProtector.bek", "Base64Key": ""}]
-
-        data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
-                                    for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
-
-        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
-                "DiskEncryptionOperation": "DisableEncryption",
-                "Disks": data_disks_settings_data,
-                "KekAlgorithm": "",
-                "Protectors": protectors_null,
-                "KekUrl": "",
-                "KekVaultResourceId": "",
-                "KeyVaultResourceId": "",
-                "KeyVaultUrl": ""}
-        self.post_to_wireserver(data)
-        return
+        self._post_to_wireserver_helper(msg_data, http_util)
