@@ -462,7 +462,7 @@ class DiskUtil(object):
 
                     filtered_mount_lines.append(line)
 
-            with open(crypt_file_path, 'wb') as wf:
+            with open(crypt_file_path, 'w') as wf:
                 wf.write(''.join(filtered_mount_lines))
 
             if backup_folder is not None:
@@ -658,7 +658,7 @@ class DiskUtil(object):
         with open("/etc/fstab",'r') as f:
             existing_content = f.read()
             new_mount_content = existing_content + "\n" + mount_content_item
-        with open("/etc/fstab",'wb') as wf:
+        with open("/etc/fstab",'w') as wf:
             wf.write(new_mount_content)
 
     def is_bek_in_fstab_file(self, lines):
@@ -718,7 +718,7 @@ class DiskUtil(object):
             lines.append(self.get_fstab_bek_line())
             self.add_bek_to_default_cryptdisks()
 
-        with open('/etc/fstab', 'wb') as f:
+        with open('/etc/fstab', 'w') as f:
             f.writelines(lines)
 
         if relevant_line is not None:
@@ -761,7 +761,7 @@ class DiskUtil(object):
 
                 filtered_contents.append(line)
 
-        with open('/etc/fstab', 'wb') as f:
+        with open('/etc/fstab', 'w') as f:
             f.write('\n')
             f.write('\n'.join(filtered_contents))
             f.write('\n')
@@ -797,7 +797,7 @@ class DiskUtil(object):
 
                 lines_to_keep_in_backup_fstab.append(line)
 
-        with open('/etc/fstab.azure.backup', 'wb') as f:
+        with open('/etc/fstab.azure.backup', 'w') as f:
             f.write('\n'.join(lines_to_keep_in_backup_fstab))
             f.write('\n')
 
@@ -814,7 +814,7 @@ class DiskUtil(object):
                     continue
                 lines_that_remain_in_fstab.append(line)
 
-        with open('/etc/fstab', 'wb') as f:
+        with open('/etc/fstab', 'w') as f:
             f.write('\n'.join(lines_that_remain_in_fstab + lines_to_put_back_to_fstab))
             f.write('\n')
 
