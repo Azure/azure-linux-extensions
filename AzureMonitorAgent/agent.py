@@ -65,22 +65,7 @@ DisableOneAgentServiceCommand = ''
 
 # Error codes
 DPKGLockedErrorCode = 56
-InstallErrorCurlNotInstalled = 64
-EnableErrorOMSReturned403 = 5
-EnableErrorOMSReturnedNon200 = 6
-EnableErrorResolvingHost = 7
-EnableErrorOnboarding = 8
-EnableCalledBeforeSuccessfulInstall = 52 
-UnsupportedOpenSSL = 60
-# OneClick error codes
-OneClickErrorCode = 40
-ManagedIdentityExtMissingErrorCode = 41
-ManagedIdentityExtErrorCode = 42
-MetadataAPIErrorCode = 43
-OMSServiceOneClickErrorCode = 44
 MissingorInvalidParameterErrorCode = 11
-UnwantedMultipleConnectionsErrorCode = 10
-CannotConnectToOMSErrorCode = 55
 UnsupportedOperatingSystem = 51
 
 # Configuration
@@ -148,15 +133,8 @@ def main():
         if exit_code is 1 and operation == 'Install':
             message = 'Install failed with exit code 1. Please check that ' \
                       'dependencies are installed. For details, check logs ' \
-                      'in /var/log/azure/Microsoft.EnterpriseCloud.' \
-                      'Monitoring.OmsAgentForLinux'
-        elif exit_code is 127 and operation == 'Install':
-            # happens if shell bundle couldn't be extracted due to low space or missing dependency
-            exit_code = 52 # since it is a missing dependency
-            message = 'Install failed with exit code 127. Please check that ' \
-                      'dependencies are installed. For details, check logs ' \
-                      'in /var/log/azure/Microsoft.EnterpriseCloud.' \
-                      'Monitoring.OmsAgentForLinux'
+                      'in /var/log/azure/Microsoft.Azure.Monitor' \
+                      '.AzureMonitorLinuxAgent'
         elif exit_code is DPKGLockedErrorCode and operation == 'Install':
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
@@ -165,7 +143,7 @@ def main():
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
 
-    except OmsAgentForLinuxException as e:
+    except AzureMonitorAgentForLinuxException as e:
         exit_code = e.error_code
         message = e.get_error_message(operation)
     except Exception as e:
@@ -292,8 +270,8 @@ def update():
     Uninstall the existing installation on the machine and 
     install the bundle included in the package
     """
-    pass
-
+    uninstall()
+    install()
 
 
 # Dictionary of operations strings to methods
@@ -378,11 +356,11 @@ def find_vm_distro(operation):
 
 def is_vm_supported_for_extension(operation):
     """
-    Checks if the VM this extension is running on is supported by OMSAgent
+    Checks if the VM this extension is running on is supported by AzureMonitorAgent
     Returns for platform.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match
-    The supported distros of the OMSAgent-for-Linux are allowed to utilize
+    The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
     supported_dists = {'redhat' : ['6', '7'], # CentOS
@@ -432,7 +410,7 @@ def is_vm_supported_for_extension(operation):
 
 def exit_if_vm_not_supported(operation):
     """
-    Check if this VM distro and version are supported by the OMSAgent.
+    Check if this VM distro and version are supported by the AzureMonitorLinuxAgent.
     If VM is supported, find the package manager present in this distro
     If this VM is not supported, log the proper error code and exit.
     """
@@ -462,25 +440,12 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         if exit_code is not 0:	
             sys.stderr.write(output[-500:])        
 
-        if exit_code is 19:
-            if "rpmdb" in output or "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "cannot open Packages database" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
-                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-        if exit_code is 33:
-            if "Permission denied" in output:
-                # Enable failures
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52        
-        if exit_code is 5:
-            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
-                # Enable failures
-                # 53 is the exit code for configuration errors
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53        
-    except:	
+        if "Permission denied" in output:
+            # Enable failures
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52        
+ 
+     except:	
         hutil_log_info('Failed to write output to STDERR')	
   
     return exit_code, output
@@ -658,7 +623,7 @@ def update_status_file(operation, exit_code, exit_status, message):
         "version" : extension_version,
         "timestampUTC" : time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status" : {
-            "name" : "Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux",
+            "name" : "Microsoft.Azure.Monitor.AzureMonitorLinuxAgent",
             "operation" : operation,
             "status" : exit_status,
             "code" : exit_code,
@@ -854,7 +819,7 @@ def log_and_exit(operation, exit_code = 1, message = ''):
 # If these exceptions are expected to be caught by the main method, they
 # include an error_code field with an integer with which to exit from main
 
-class OmsAgentForLinuxException(Exception):
+class AzureMonitorAgentForLinuxException(Exception):
     """
     Base exception class for all exceptions; as such, its error code is the
     basic error code traditionally returned in Linux: 1
@@ -868,9 +833,9 @@ class OmsAgentForLinuxException(Exception):
                                                       self.error_code)
 
 
-class ParameterMissingException(OmsAgentForLinuxException):
+class ParameterMissingException(AzureMonitorAgentForLinuxException):
     """
-    There is a missing parameter for the OmsAgentForLinux Extension
+    There is a missing parameter for the AzureMonitorLinuxAgent Extension
     """
     error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.Azure.Monitor</ProviderNameSpace>
-  <Type>AzureMonitorAgent</Type>
+  <Type>AzureMonitorLinuxAgent</Type>
   <Version>1.0</Version>
   <Label>Microsoft Azure Monitoring Agent for Linux</Label>
   <HostingResources>VmRole</HostingResources>
