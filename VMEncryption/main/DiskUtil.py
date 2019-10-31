@@ -111,10 +111,10 @@ class DiskUtil(object):
             return return_code
         else:
             return_code = self.luks_open(passphrase_file=passphrase_file,
-                                        dev_path=dev_path,
-                                        mapper_name=mapper_name,
-                                        header_file=header_file,
-                                        uses_cleartext_key=False)
+                                         dev_path=dev_path,
+                                         mapper_name=mapper_name,
+                                         header_file=header_file,
+                                         uses_cleartext_key=False)
             if return_code != CommonVariables.process_success:
                 self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
             return return_code
@@ -138,7 +138,7 @@ class DiskUtil(object):
     def check_shrink_fs(self, dev_path, size_shrink_to):
         return_code = self.check_fs(dev_path)
         if return_code == CommonVariables.process_success:
-            return_code = self.shrink_fs(dev_path = dev_path, size_shrink_to = size_shrink_to)
+            return_code = self.shrink_fs(dev_path=dev_path, size_shrink_to=size_shrink_to)
             return return_code
         else:
             return return_code
@@ -148,7 +148,7 @@ class DiskUtil(object):
         return the return code of the process for error handling.
         """
         self.hutil.log("dev path to cryptsetup luksFormat {0}".format(dev_path))
-        #walkaround for sles sp3
+        # walkaround for sles sp3
         if self.distro_patcher.distro_info[0].lower() == 'suse' and self.distro_patcher.distro_info[1] == '11':
             proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
@@ -159,12 +159,12 @@ class DiskUtil(object):
             return self.command_executor.Execute(cryptsetup_cmd, input=passphrase)
         else:
             if header_file is not None:
-                cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , header_file , passphrase_file)
+                cryptsetup_cmd = "{0} luksFormat {1} --header {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, header_file, passphrase_file)
             else:
-                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path , dev_path , passphrase_file)
-            
+                cryptsetup_cmd = "{0} luksFormat {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
+
             return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_add_key(self, passphrase_file, dev_path, mapper_name, header_file, new_key_path):
         """
         return the return code of the process for error handling.
@@ -181,7 +181,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksAddKey {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, new_key_path, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_remove_key(self, passphrase_file, dev_path, header_file):
         """
         return the return code of the process for error handling.
@@ -194,7 +194,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksRemoveKey {1} -d {2} -q".format(self.distro_patcher.cryptsetup_path, dev_path, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_kill_slot(self, passphrase_file, dev_path, header_file, keyslot):
         """
         return the return code of the process for error handling.
@@ -207,7 +207,7 @@ class DiskUtil(object):
             cryptsetup_cmd = "{0} luksKillSlot {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, keyslot, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
-        
+
     def luks_add_cleartext_key(self, passphrase_file, dev_path, mapper_name, header_file):
         """
         return the return code of the process for error handling.
@@ -245,9 +245,9 @@ class DiskUtil(object):
         self.hutil.log("keyfile: " + (passphrase_file))
 
         if header_file:
-            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name, header_file , passphrase_file)
+            cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path, dev_path, mapper_name, header_file, passphrase_file)
         else:
-            cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path , dev_path , mapper_name , passphrase_file)
+            cryptsetup_cmd = "{0} luksOpen {1} {2} -d {3} -q".format(self.distro_patcher.cryptsetup_path, dev_path, mapper_name, passphrase_file)
 
         return self.command_executor.Execute(cryptsetup_cmd)
 
@@ -286,7 +286,7 @@ class DiskUtil(object):
         self.make_sure_path_exists(mount_point)
         if file_system is None:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point
-        else: 
+        else:
             mount_cmd = self.distro_patcher.mount_path + ' ' + dev_path + ' ' + mount_point + ' -t ' + file_system
 
         return self.command_executor.Execute(mount_cmd)
@@ -402,7 +402,7 @@ class DiskUtil(object):
 
         return json.dumps(encryption_status)
 
-    def query_dev_sdx_path_by_scsi_id(self, scsi_number): 
+    def query_dev_sdx_path_by_scsi_id(self, scsi_number):
         p = Popen([self.distro_patcher.lsscsi_path, scsi_number], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         identity, err = p.communicate()
         # identity sample: [5:0:0:0] disk Msft Virtual Disk 1.0 /dev/sdc
@@ -519,7 +519,7 @@ class DiskUtil(object):
     def get_block_device_to_azure_udev_table(self):
         table = {}
         azure_links_dir = CommonVariables.azure_symlinks_dir
-        
+
         if not os.path.exists(azure_links_dir):
             return table
 
@@ -559,7 +559,7 @@ class DiskUtil(object):
             if os.path.isdir(top_level_item_full_path) and top_level_item.startswith(self._SCSI_PREFIX):
                 # this works because apparently all data disks go int a scsi[x] where x is one of [1,2,3,4]
                 try:
-                    controller_id = int(top_level_item[4:]) # strip the first 4 letters of the folder
+                    controller_id = int(top_level_item[4:])  # strip the first 4 letters of the folder
                 except ValueError:
                     # if its not an integer, probably just best to skip it
                     continue
@@ -570,7 +570,7 @@ class DiskUtil(object):
                             lun_number = int(symlink[3:])
                         except ValueError:
                             # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
-                            continue # so just ignore it
+                            continue  # so just ignore it
                         list_devices.append((controller_id, lun_number))
         return list_devices
 
@@ -604,7 +604,7 @@ class DiskUtil(object):
         device_items_to_return = []
         device_items = []
 
-        #first get all the device names
+        # first get all the device names
         if dev_path is None:
             lsblk_command = 'lsblk -b -nl -o NAME'
         else:
@@ -672,10 +672,10 @@ class DiskUtil(object):
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN'
             else:
                 lsblk_command = 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN ' + dev_path
-            
+
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            
+
             device_items = []
             lvm_items = self.get_lvm_items()
             for line in proc_comm.stdout.splitlines():
@@ -695,7 +695,7 @@ class DiskUtil(object):
 
                         if property_item_pair[0] == 'FSTYPE':
                             device_item.file_system = property_item_pair[1].strip('"')
-                        
+
                         if property_item_pair[0] == 'MOUNTPOINT':
                             device_item.mount_point = property_item_pair[1].strip('"')
 
@@ -804,7 +804,6 @@ class DiskUtil(object):
             self.logger.log(msg="skipping BEK VOLUME", level=CommonVariables.WarningLevel)
             return False
 
-
         # We let the caller specify a list of devices to skip. Usually its just a list of IDE devices.
         # IDE devices (in Gen 1) include Resource disk and BEK VOLUME. This check works pretty wel in Gen 1, but not in Gen 2.
         for azure_blk_item in special_azure_devices_to_skip:
@@ -826,7 +825,7 @@ class DiskUtil(object):
         """
 
         if encrypt_volume_type.lower() == 'data' and not self.is_data_disk(device_item, special_azure_devices_to_skip):
-            return True # Skip non-data disks
+            return True  # Skip non-data disks
 
         if device_item.file_system is None or device_item.file_system == "":
             self.logger.log(msg=("there's no file system on this device: {0}, so skip it.").format(device_item))
@@ -836,7 +835,7 @@ class DiskUtil(object):
                 self.logger.log(msg="the device size is too small," + str(device_item.size) + " so skip it.", level=CommonVariables.WarningLevel)
                 return True
 
-            supported_device_type = ["disk","part","raid0","raid1","raid5","raid10","lvm"]
+            supported_device_type = ["disk", "part", "raid0", "raid1", "raid5", "raid10", "lvm"]
             if device_item.type not in supported_device_type:
                 self.logger.log(msg="the device type: " + str(device_item.type) + " is not supported yet, so skip it.", level=CommonVariables.WarningLevel)
                 return True
@@ -890,10 +889,10 @@ class DiskUtil(object):
 
     def find_block_sdx_path(self, vmbus):
         device = None
-        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path , vmbus)):
+        for root, dirs, files in os.walk(os.path.join(self.vmbus_sys_path, vmbus)):
             if root.endswith("/block"):
                 device = dirs[0]
-            else : #older distros
+            else:  # older distros
                 for d in dirs:
                     if ':' in d and "block" == d.split(':')[0]:
                         device = d.split(':')[1]
