@@ -311,9 +311,6 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
                 logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
-                #crypt_item.current_luks_slot = new_keyslot
-
-                #crypt_mount_config_util.update_crypt_item(crypt_item)
                 updated_crypt_items.append(crypt_item)
 
             logger.log("New key successfully added to all encrypted devices")

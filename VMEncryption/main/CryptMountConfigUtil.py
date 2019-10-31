@@ -366,7 +366,6 @@ class CryptMountConfigUtil(object):
 
     def add_crypt_item_to_azure_crypt_mount(self, crypt_item, backup_folder=None):
         """
-        TODO we should judge that the second time.
         format is like this:
         <target name> <source device> <key file> <options>
         """
@@ -441,7 +440,7 @@ class CryptMountConfigUtil(object):
         self.add_crypt_item(crypt_item, backup_folder)
 
     def append_mount_info(self, dev_path, mount_point):
-        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(uuid.uuid4()))
         mount_content_item = dev_path + " " + mount_point + "  auto defaults 0 0"
         new_mount_content = ""
         with open("/etc/fstab", 'r') as f:
@@ -478,7 +477,7 @@ class CryptMountConfigUtil(object):
             self.logger.log("modify_fstab_entry_encrypt: mount_point is empty")
             return
 
-        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(uuid.uuid4()))
 
         with open('/etc/fstab', 'r') as f:
             lines = f.readlines()
@@ -513,6 +512,8 @@ class CryptMountConfigUtil(object):
 
         if relevant_line is not None:
             with open('/etc/fstab.azure.backup', 'a+') as f:
+                # The backup file contains the fstab entries from before encryption.
+                # the file is used during disable to restore the original fstab entry
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):

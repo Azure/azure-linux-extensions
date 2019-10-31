@@ -34,7 +34,6 @@ class EncryptionSettingsUtil(object):
     def __init__(self, logger):
         self.logger = logger
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
-        self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -126,7 +125,7 @@ class EncryptionSettingsUtil(object):
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
+        if re.match('^[\\w-]+$', machine_name) is None:
             machine_name = ''
 
         # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
@@ -183,11 +182,11 @@ class EncryptionSettingsUtil(object):
 
         full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
         with open(full_protector_path) as protector_file:
-            protector = protector_file.read()
-            protector_base64 = base64.standard_b64encode(protector)
+            protector_content = protector_file.read()
+            protector_base64 = base64.standard_b64encode(protector_content)
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
-        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
+        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors]
 
         data = {
             "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
@@ -295,7 +294,7 @@ class EncryptionSettingsUtil(object):
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
+        if re.match('^[\\w-]+$', machine_name) is None:
             machine_name = ''
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
