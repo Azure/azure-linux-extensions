@@ -348,7 +348,7 @@ class DiskUtil(object):
 
         for crypt_item in crypt_items:
             self.logger.log("Migrating crypt item: {0}".format(crypt_item))
-            if crypt_item.mount_point == "/":
+            if crypt_item.mount_point == "/" or CommonVariables.osmapper_name == crypt_item.mapper_name:
                 self.logger.log("Skipping OS disk")
                 continue
 
