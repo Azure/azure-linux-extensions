@@ -103,7 +103,7 @@ class CryptMountConfigUtil(object):
         self.logger.log("Consolidating azure_crypt_mount")
 
         device_items = disk_util.get_device_items(None)
-        crypt_items = self.get_crypt_items()
+        crypt_items = self.get_crypt_items(disk_util)
         azure_name_table = disk_util.get_block_device_to_azure_udev_table()
 
         for device_item in device_items:
