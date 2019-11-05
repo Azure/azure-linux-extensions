@@ -85,7 +85,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         self.context.logger.log("Passphrase:")
-        self.context.logger.log(proc_comm.stdout)
+        self.context.logger.log(proc_comm.stdout.decode("utf-8"))
 
     def _find_bek_and_execute_action(self, callback_method_name):
         callback_method = getattr(self, callback_method_name)

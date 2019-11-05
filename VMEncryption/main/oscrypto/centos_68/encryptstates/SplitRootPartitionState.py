@@ -204,7 +204,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.Execute(command_to_execute="blkid -s UUID -o value {0}".format(partition_name),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        return proc_comm.stdout.strip()
+        return proc_comm.stdout.decode("utf-8").strip()
 
     def _append_boot_partition_uuid_to_fstab(self, boot_partition_uuid):
         self.context.logger.log("Updating fstab")
@@ -229,8 +229,8 @@ class SplitRootPartitionState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
-        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)
+        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
+        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
 
         if not root_fs_block_count or not root_fs_block_size:
             raise Exception("Error parsing dumpe2fs output, count={0}, size={1}".format(root_fs_block_count,

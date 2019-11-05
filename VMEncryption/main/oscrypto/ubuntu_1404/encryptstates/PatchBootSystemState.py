@@ -152,7 +152,7 @@ class PatchBootSystemState(OSEncryptionState):
                                             raise_exception_on_failure=True,
                                             communicator=proc_comm)
 
-        if not "azure_crypt_key.sh" in proc_comm.stdout or not "osluksheader" in proc_comm.stdout:
+        if not "azure_crypt_key.sh" in proc_comm.stdout or not "osluksheader" in proc_comm.stdout.decode("utf-8"):
             raise Exception("initramfs update failed")
 
         self.command_executor.Execute('update-grub', True)
@@ -163,4 +163,4 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute(command_to_execute="blkid -s UUID -o value {0}".format(partition_name),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        return proc_comm.stdout.strip()
+        return proc_comm.stdout.decode("utf-8").strip()

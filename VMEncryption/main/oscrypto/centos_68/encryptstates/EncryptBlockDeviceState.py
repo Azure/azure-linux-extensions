@@ -92,7 +92,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         self.context.logger.log("Passphrase:")
-        self.context.logger.log(proc_comm.stdout)
+        self.context.logger.log(proc_comm.stdout.decode("utf-8"))
 
     def _find_bek_and_execute_action(self, callback_method_name):
         callback_method = getattr(self, callback_method_name)
@@ -108,8 +108,8 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
-        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)
+        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
+        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
 
         if not root_fs_block_count or not root_fs_block_size:
             raise Exception("Error parsing dumpe2fs output, count={0}, size={1}".format(root_fs_block_count,

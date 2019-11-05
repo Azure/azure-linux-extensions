@@ -53,7 +53,7 @@ class UnmountOldrootState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        for line in proc_comm.stdout.split('\n'):
+        for line in proc_comm.stdout.decode("utf-8").split('\n'):
             if not "running" in line:
                 continue
 
@@ -86,8 +86,8 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute(command_to_execute="fuser -vm /oldroot",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout))
-        procs_to_kill = [p for p in proc_comm.stdout.split() if p.isdigit()]
+        self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout.decode("utf-8")))
+        procs_to_kill = [p for p in proc_comm.stdout.decode("utf-8").split() if p.isdigit()]
         procs_to_kill = reversed(sorted(procs_to_kill))
 
         for victim in procs_to_kill:
@@ -132,7 +132,7 @@ class UnmountOldrootState(OSEncryptionState):
                 command_to_execute="grep {0} /proc/*/task/*/mountinfo | grep -v grep".format(self.rootfs_sdx_path),
                 raise_exception_on_failure=False,
                 communicator=proc_comm)
-        procs_to_kill = [path for path in proc_comm.stdout.split() if path.startswith('/proc/')]
+        procs_to_kill = [path for path in proc_comm.stdout.decode("utf-8").split() if path.startswith('/proc/')]
         procs_to_kill = [int(path.split('/')[2]) for path in procs_to_kill]
         procs_to_kill = list(reversed(sorted(procs_to_kill)))
         self.context.logger.log("Processes with tasks using {0}:\n{1}".format(self.rootfs_sdx_path, procs_to_kill))

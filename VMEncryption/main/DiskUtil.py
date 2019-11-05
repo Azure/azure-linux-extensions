@@ -1303,7 +1303,7 @@ class DiskUtil(object):
 
         lvm_items = []
 
-        for line in proc_comm.stdout.splitlines():
+        for line in proc_comm.stdout.decode("utf-8").splitlines():
             if not line:
                 continue
 
