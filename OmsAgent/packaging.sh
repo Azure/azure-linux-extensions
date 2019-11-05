@@ -24,7 +24,6 @@ if [[ "$output_path" == "" ]]; then
     output_path="../"
 fi
 echo "Packaging extension $PACKAGE_NAME to $output_path"
-rm -rf Fairfax/ Mooncake/ test/ extension-test/ references
 cp -r ../Utils .
 cp ../Common/WALinuxAgent-2.0.16/waagent .
 
@@ -36,4 +35,4 @@ cp $bundle_path packages/
 # sync the file copy
 sync
 
-zip -r $output_path/$PACKAGE_NAME * 
+zip -r $output_path/$PACKAGE_NAME * -x packaging.sh apply_version.sh update_version.sh "./Fairfax/*" "./Mooncake/*" "./test/*" "./extension-test/*" "./references"
