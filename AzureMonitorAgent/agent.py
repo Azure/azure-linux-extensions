@@ -234,7 +234,7 @@ def uninstall():
                                             final_check = final_check_if_dpkg_locked)
     except Exception as ex:
         exit_code = 1
-        message = 'Uninstall failed with error: {0}\n' \
+        output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
 
@@ -270,8 +270,15 @@ def update():
     Uninstall the existing installation on the machine and 
     install the bundle included in the package
     """
-    uninstall()
-    install()
+    print ("Uinstalling the curretn mdsd")
+    exit_code, output = uninstall()
+    if exit_code != 0:
+        return exit_code, output
+    print ("installing the curretn mdsd")
+    exit_code, output = install()
+    print ("Update finished")
+    return exit_code, output
+
 
 
 # Dictionary of operations strings to methods
@@ -445,7 +452,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             exit_code = 52        
  
-     except:	
+    except:	
         hutil_log_info('Failed to write output to STDERR')	
   
     return exit_code, output
