@@ -289,7 +289,7 @@ class ResourceDiskUtil(object):
             crypt_item.dev_path = self.RD_DEV_PATH
             crypt_item.mapper_name = self.RD_MAPPER_NAME
             crypt_item.uses_cleartext_key = False
-            self.crypt_mount_config_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
+            self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
             self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item)
             self.add_to_fstab()
         return True

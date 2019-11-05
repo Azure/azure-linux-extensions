@@ -46,10 +46,10 @@ class CryptMountConfigUtil(object):
     Otherwise the old system is considered unused and we use the new system.
     """
 
-    def __init__(self, logger, encryption_environment):
+    def __init__(self, logger, encryption_environment, disk_util):
         self.encryption_environment = encryption_environment
         self.logger = logger
-
+        self.disk_util = disk_util
         self.command_executor = CommandExecutor(self.logger)
 
     def parse_crypttab_line(self, line):
@@ -96,15 +96,15 @@ class CryptMountConfigUtil(object):
 
         return crypt_item
 
-    def consolidate_azure_crypt_mount(self, passphrase_file, disk_util):
+    def consolidate_azure_crypt_mount(self, passphrase_file):
         """
         Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
         """
         self.logger.log("Consolidating azure_crypt_mount")
 
-        device_items = disk_util.get_device_items(None)
-        crypt_items = self.get_crypt_items(disk_util)
-        azure_name_table = disk_util.get_block_device_to_azure_udev_table()
+        device_items = self.disk_util.get_device_items(None)
+        crypt_items = self.get_crypt_items(self.disk_util)
+        azure_name_table = self.disk_util.get_block_device_to_azure_udev_table()
 
         for device_item in device_items:
             if device_item.file_system == "crypto_LUKS":
@@ -112,7 +112,7 @@ class CryptMountConfigUtil(object):
                 # Check this by comparing the dev paths
                 self.logger.log("Found an encrypted device at {0}".format(device_item.name))
                 found_in_crypt_mount = False
-                device_item_path = disk_util.get_device_path(device_item.name)
+                device_item_path = self.disk_util.get_device_path(device_item.name)
                 device_item_real_path = os.path.realpath(device_item_path)
                 for crypt_item in crypt_items:
                     if os.path.realpath(crypt_item.dev_path) == device_item_real_path:
@@ -140,22 +140,22 @@ class CryptMountConfigUtil(object):
                 crypttab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/crypttab_line")
 
                 # try to open to the temp mapper name generated above
-                return_code = disk_util.luks_open(passphrase_file=passphrase_file,
-                                                  dev_path=device_item_real_path,
-                                                  mapper_name=crypt_item.mapper_name,
-                                                  header_file=None,
-                                                  uses_cleartext_key=False)
+                return_code = self.disk_util.luks_open(passphrase_file=passphrase_file,
+                                                       dev_path=device_item_real_path,
+                                                       mapper_name=crypt_item.mapper_name,
+                                                       header_file=None,
+                                                       uses_cleartext_key=False)
                 if return_code != CommonVariables.process_success:
                     self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     continue
 
-                return_code = disk_util.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), temp_mount_point)
+                return_code = self.disk_util.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), temp_mount_point)
                 if return_code != CommonVariables.process_success:
                     self.logger.log(msg=('Mount failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
                     # this can happen with disks without file systems (lvm, raid or simply empty disks)
                     # in this case just add an entry to the azure_crypt_mount without a mount point (for lvm/raid scenarios)
                     self.add_crypt_item(crypt_item)
-                    disk_util.luks_close(crypt_item.mapper_name)
+                    self.disk_util.luks_close(crypt_item.mapper_name)
                     continue
 
                 if not os.path.exists(azure_crypt_mount_backup_location) and not os.path.exists(crypttab_backup_location):
@@ -195,10 +195,10 @@ class CryptMountConfigUtil(object):
                                 f.writelines([fstab_backup_line])
 
                 # close the file and then unmount and close
-                disk_util.umount(temp_mount_point)
-                disk_util.luks_close(crypt_item.mapper_name)
+                self.disk_util.umount(temp_mount_point)
+                self.disk_util.luks_close(crypt_item.mapper_name)
 
-    def get_crypt_items(self, disk_util):
+    def get_crypt_items(self):
         """
         Reads the central azure_crypt_mount file and parses it into an array of CryptItem()s
         If the root partition is encrypted but not present in the file it generates a CryptItem() for the root partition and appends it to the list.
@@ -255,7 +255,7 @@ class CryptMountConfigUtil(object):
                                 crypt_item.file_system = fs
                         crypt_items.append(crypt_item)
 
-        encryption_status = json.loads(disk_util.get_encryption_status())
+        encryption_status = json.loads(self.disk_util.get_encryption_status())
 
         if encryption_status["os"] == "Encrypted" and not rootfs_crypt_item_found:
             # If the OS partition looks encrypted but we didn't find an OS partition in the crypt_mount_file
@@ -274,11 +274,11 @@ class CryptMountConfigUtil(object):
                 for line in proc_comm.stdout.splitlines():
                     if CommonVariables.osmapper_name in line:
                         majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                        src_device = filter(lambda d: d.majmin == majmin, disk_util.get_device_items(None))[0]
+                        src_device = filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None))[0]
                         crypt_item.dev_path = '/dev/' + src_device.name
                         break
 
-            rootfs_dev = next((m for m in disk_util.get_mount_items() if m["dest"] == "/"))
+            rootfs_dev = next((m for m in self.disk_util.get_mount_items() if m["dest"] == "/"))
             crypt_item.file_system = rootfs_dev["fs"]
 
             if not crypt_item.dev_path:
@@ -326,7 +326,7 @@ class CryptMountConfigUtil(object):
             key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
-            scsi_lun_numbers = self.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
+            scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
             if len(scsi_lun_numbers) == 0:
                 # The default in case we didn't get any scsi/lun numbers
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)

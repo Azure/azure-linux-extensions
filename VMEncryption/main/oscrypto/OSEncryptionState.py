@@ -48,10 +48,9 @@ class OSEncryptionState(object):
                                   logger=self.context.logger,
                                   encryption_environment=self.context.encryption_environment)
 
-        self.crypt_mount_config_util = CryptMountConfigUtil(hutil=self.context.hutil,
-                                                            patching=self.context.distro_patcher,
-                                                            logger=self.context.logger,
-                                                            encryption_environment=self.context.encryption_environment)
+        self.crypt_mount_config_util = CryptMountConfigUtil(logger=self.context.logger,
+                                                            encryption_environment=self.context.encryption_environment,
+                                                            disk_util=self.disk_util)
 
         self.bek_util = BekUtil(disk_util=self.disk_util,
                                 logger=self.context.logger)
@@ -79,7 +78,7 @@ class OSEncryptionState(object):
         self.rootfs_disk = None
         self.rootfs_block_device = None
         self.bootfs_block_device = None
-        
+
         if self.disk_util.is_os_disk_lvm():
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute('pvs', True, communicator=proc_comm)
@@ -114,7 +113,7 @@ class OSEncryptionState(object):
         self.context.logger.log("rootfs_disk: {0}".format(self.rootfs_disk))
         self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
         self.context.logger.log("bootfs_block_device: {0}".format(self.bootfs_block_device))
-        
+
     def should_enter(self):
         self.context.logger.log("OSEncryptionState.should_enter() called for {0}".format(self.state_name))
 
@@ -184,6 +183,7 @@ class OSEncryptionState(object):
             return False
         else:
             return True
+
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',

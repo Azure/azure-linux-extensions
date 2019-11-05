@@ -1,18 +1,17 @@
 import unittest
 import mock
 
-from main.Common import CommonVariables, CryptItem
+from main.Common import CryptItem
 from main.EncryptionEnvironment import EncryptionEnvironment
 from main.CryptMountConfigUtil import CryptMountConfigUtil
 from console_logger import ConsoleLogger
-from StringIO import StringIO
 
 
 class Test_crypt_mount_config_util(unittest.TestCase):
     """ unit tests for functions in the CryptMountConfig module """
     def setUp(self):
         self.logger = ConsoleLogger()
-        self.crypt_mount_config_util = CryptMountConfigUtil(self.logger, EncryptionEnvironment(None, self.logger))
+        self.crypt_mount_config_util = CryptMountConfigUtil(self.logger, EncryptionEnvironment(None, self.logger), None)
 
     def _mock_open_with_read_data_dict(self, open_mock, read_data_dict):
         def _open_side_effect(filename, mode, *args, **kwargs):
@@ -142,7 +141,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
         pc_mock.return_value.stdout = "osencrypt /dev/dev_path"  # The grep find this line in there
         mock.mock_open(open_mock, "")  # No content in the azure crypt mount file
-        disk_util_mock.get_mount_items.return_value = [{"src":"/dev/mapper/osencrypt", "dest":"/", "fs":"ext4"}]
+        disk_util_mock.get_mount_items.return_value = [{"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
         exists_mock.return_value = False  # No luksheader file found
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
         self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
@@ -153,8 +152,8 @@ class Test_crypt_mount_config_util(unittest.TestCase):
 
         use_acm_mock.return_value = False  # Now, use the /etc/crypttab file
         exists_mock.return_value = True  # Crypttab file found
-        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab":"/dev/mapper/osencrypt / ext4 defaults,nofail 0 0",
-                                                        "/etc/crypttab":"osencrypt /dev/sda1 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard"})
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/osencrypt / ext4 defaults,nofail 0 0",
+                                                        "/etc/crypttab": "osencrypt /dev/sda1 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
         self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/sda1",
@@ -164,7 +163,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
 
         # if there was no crypttab entry for osencrypt
         exists_mock.side_effect = [True, False]  # Crypttab file found but luksheader not found
-        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab":"/dev/mapper/osencrypt / ext4 defaults,nofail 0 0", "/etc/crypttab":""})
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/osencrypt / ext4 defaults,nofail 0 0", "/etc/crypttab": ""})
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
         pc_mock.return_value.stdout = "osencrypt /dev/sda1"  # The grep find this line in there
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
@@ -177,20 +176,20 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         exists_mock.side_effect = None  # Crypttab file found
         exists_mock.return_value = True  # Crypttab file found
         disk_util_mock.get_encryption_status.return_value = "{\"os\" : \"NotEncrypted\"}"
-        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab":"",
-                                                        "/etc/crypttab":""})
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "",
+                                                        "/etc/crypttab": ""})
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
         self.assertListEqual([],
                              crypt_items)
 
-        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab":"/dev/mapper/encrypteddatadisk /mnt/datadisk auto defaults,nofail 0 0",
-                                                        "/etc/crypttab":"encrypteddatadisk /dev/disk/azure/scsi1/lun0 /someplainfile luks"})
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/encrypteddatadisk /mnt/datadisk auto defaults,nofail 0 0",
+                                                        "/etc/crypttab": "encrypteddatadisk /dev/disk/azure/scsi1/lun0 /someplainfile luks"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
         self.assertListEqual([],
                              crypt_items)
 
-        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab":"/dev/mapper/encrypteddatadisk /mnt/datadisk auto defaults,nofail 0 0",
-                                                        "/etc/crypttab":"encrypteddatadisk /dev/disk/azure/scsi1/lun0 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/headerfile"})
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/encrypteddatadisk /mnt/datadisk auto defaults,nofail 0 0",
+                                                        "/etc/crypttab": "encrypteddatadisk /dev/disk/azure/scsi1/lun0 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/headerfile"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items(disk_util_mock)
         self.assertListEqual([self._create_expected_crypt_item(mapper_name="encrypteddatadisk",
                                                                dev_path="/dev/disk/azure/scsi1/lun0",
