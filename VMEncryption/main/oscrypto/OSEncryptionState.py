@@ -78,7 +78,7 @@ class OSEncryptionState(object):
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute('pvs', True, communicator=proc_comm)
 
-            for line in proc_comm.stdout.split("\n"):
+            for line in proc_comm.stdout.decode("utf-8").split("\n"):
                 if "rootvg" in line:
                     self.rootfs_block_device = line.strip().split()[0]
                     self.rootfs_disk = self.rootfs_block_device[:-1]
@@ -144,19 +144,19 @@ class OSEncryptionState(object):
         result = None
         dev = os.lstat(fs).st_dev
 
-        for line in file('/proc/mounts'):
-            line = [s.decode('string_escape') for s in line.split()[:3]]
+        for line in open('/proc/mounts'):
+            line = [bytes(s,'utf-8').decode('unicode_escape') for s in line.split()[:3]]
             if dev == os.lstat(line[1]).st_dev:
                 result = tuple(line)
 
         return result
 
     def _is_in_memfs_root(self):
-        mounts = file('/proc/mounts', 'r').read()
+        mounts = open('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
     def _parse_uuid_from_fstab(self, mountpoint):
-        contents = file('/etc/fstab', 'r').read()
+        contents = open('/etc/fstab', 'r').read()
         matches = re.findall(r'UUID=(.*?)\s+{0}\s+'.format(mountpoint), contents)
         if matches:
             return matches[0]
@@ -169,7 +169,7 @@ class OSEncryptionState(object):
         self.command_executor.Execute('blockdev --getsize64 {0}'.format(dev),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        return int(proc_comm.stdout.strip())
+        return int(proc_comm.stdout.decode("utf-8").strip())
 
     def _is_uuid(self, s):
         try:

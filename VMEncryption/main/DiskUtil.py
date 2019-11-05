@@ -1412,7 +1412,7 @@ class DiskUtil(object):
             if device_item.uuid is None or device_item.uuid == "":
                 self.logger.log(msg="the device do not have the related uuid, so skip it.", level=CommonVariables.WarningLevel)
                 return True
-            sub_items = self.get_device_items("/dev/" + device_item.name)
+            sub_items = self.get_device_items(self.get_device_path(device_item.name))
             if len(sub_items) > 1:
                 self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)), level=CommonVariables.WarningLevel)
                 return True
