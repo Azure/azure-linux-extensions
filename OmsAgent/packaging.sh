@@ -35,4 +35,8 @@ cp $bundle_path packages/
 # sync the file copy
 sync
 
-zip -r $output_path/$PACKAGE_NAME * -x packaging.sh apply_version.sh update_version.sh "./Fairfax/*" "./Mooncake/*" "./test/*" "./extension-test/*" "./references"
+excluded_files="omsagent.version packaging.sh apply_version.sh update_version.sh"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./Fairfax/*" "./Mooncake/*" "./test/*" "./extension-test/*" "./references"
+
+# cleanup newly added dir or files
+rm -rf Utils/ waagent
