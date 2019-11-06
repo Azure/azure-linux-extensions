@@ -51,9 +51,9 @@ def check_e2e(hostname, timespan = 'PT30M'):
     url = ENDPOINT.format(subscription, resource_group, workspace)
 
     sources = ['Heartbeat', 'Syslog', 'Perf', 'ApacheAccess_CL', 'MySQL_CL', 'Custom_Log_CL']
-    distro = hostname.split('-')[0]
+    distro = hostname
     results = {}
-    results[distro] = {}
+    results[hostname] = {}
 
     print('Verifying data from computer {}'.format(hostname))
     for s in sources:

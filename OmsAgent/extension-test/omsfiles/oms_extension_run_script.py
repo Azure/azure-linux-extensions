@@ -38,6 +38,13 @@ if not os.path.isdir('/home/scratch/'):
 out_file = '/home/scratch/omsresults.log'
 open_file = open(out_file, 'w+')
 
+def get_vm_name(distname, uid):
+    return distname.lower() + '-omstest' + uid
+
+def get_distname(name):
+    name_splitted = name.split('-omstest')[0]
+    return name_splitted[0]
+
 def main():
     # Determine the operation being executed
     vm_supported, vm_dist, vm_ver = is_vm_supported_for_extension()
@@ -92,7 +99,7 @@ def is_vm_supported_for_extension():
             for line in fp:
                 if line.startswith('ID='):
                     vm_dist = line.split('=')[1]
-                    vm_dist = vm_dist.split('-')[0]
+                    vm_dist = get_distname(vm_dist)
                     vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                 elif line.startswith('VERSION_ID='):
                     vm_ver = line.split('=')[1]
@@ -177,6 +184,10 @@ def install_additional_packages():
 def enable_dsc():
     """Enable DSC"""
     os.system('/opt/microsoft/omsconfig/Scripts/OMS_MetaConfigHelper.py --enable')
+
+def run_dsc():
+    """Run DSC"""
+    os.system('su omsagent -c "/opt/microsoft/omsconfig/Scripts/PerformRequiredConfigurationChecks.py"')
 
 def disable_dsc():
     """Disable DSC"""
@@ -279,7 +290,8 @@ def inject_logs():
 def config_start_oms_services():
     """Orchestrate overall configuration prior to agent start."""
     os.system('/opt/omi/bin/omiserver -d')
-    disable_dsc()
+    enable_dsc()
+    run_dsc()
     copy_config_files()
     apache_mysql_conf()
 

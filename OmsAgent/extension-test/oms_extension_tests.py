@@ -18,35 +18,53 @@ import os.path
 import subprocess
 import re
 import sys
-import rstr
+import getpass
 import glob
 import shutil
+
+try:
+    import rstr
+    from json2html import *
+except:
+    print("You should install required libraries: pip install requests adal json2html rstr")
 
 from time import sleep
 from datetime import datetime, timedelta
 from platform import system
 from collections import OrderedDict
 from verify_e2e import check_e2e
+  
+def prRed(skk): print("\033[91m{}\033[00m" .format(skk)) 
+def prGreen(skk): print("\033[92m{}\033[00m" .format(skk)) 
+def prYellow(skk): print("\033[93m{}\033[00m" .format(skk)) 
+def prLightPurple(skk): print("\033[94m{}\033[00m" .format(skk)) 
+def prPurple(skk): print("\033[95m{}\033[00m" .format(skk)) 
+def prCyan(skk): print("\033[96m{}\033[00m" .format(skk)) 
+def prLightGray(skk): print("\033[97m{}\033[00m" .format(skk)) 
+def prBlack(skk): print("\033[98m{}\033[00m" .format(skk)) 
 
-from json2html import *
-
-E2E_DELAY = 15 # Delay (minutes) before checking for data
+E2E_DELAY = 10 # Delay (minutes) before checking for data
 AUTOUPGRADE_DELAY = 15 # Delay (minutes) before rechecking the extension version
-LONG_DELAY = 250 # Delay (minutes) before rechecking extension
+LONG_DELAY = 15 # Delay (minutes) before rechecking extension
 
 images_list = { 'ubuntu14': 'Canonical:UbuntuServer:14.04.5-LTS:14.04.201808180',
          'ubuntu16': 'Canonical:UbuntuServer:16.04-LTS:latest',
-         'ubuntu18': 'Canonical:UbuntuServer:18.04-LTS:latest',
+         'ubuntu18-04': 'Canonical:UbuntuServer:18.04-LTS:latest',
          'debian8': 'credativ:Debian:8:latest',
          'debian9': 'credativ:Debian:9:latest',
-         'redhat6': 'RedHat:RHEL:6.9:latest',
-         'redhat7': 'RedHat:RHEL:7.3:latest',
-         'centos6': 'OpenLogic:CentOS:6.9:latest',
-         'centos7': 'OpenLogic:CentOS:7.5:latest',
+         'redhat6-9': 'RedHat:RHEL:6.9:latest',
+        #  'redhat7-3': 'RedHat:RHEL:7.3:latest',
+        #  'redhat7-4': 'RedHat:RHEL:7.4:latest',
+         'redhat7-5': 'RedHat:RHEL:7.5:latest',
+        #  'redhat7-6': 'RedHat:RHEL:7.6:latest',
+        #  'redhat7-7': 'RedHat:RHEL:7.7:latest',
+         'centos6-9': 'OpenLogic:CentOS:6.9:latest',
+         'centos7-5': 'OpenLogic:CentOS:7.5:latest',
          # 'oracle6': 'Oracle:Oracle-Linux:6.9:latest',
-         'oracle7': 'Oracle:Oracle-Linux:7.5:latest',
-         'sles12': 'SUSE:SLES:12-SP3:latest',
-         'sles15': 'SUSE:SLES:15:latest'}
+         'oracle7-5': 'Oracle:Oracle-Linux:7.5:latest',
+        #  'sles12-sp3': 'SUSE:SLES:12-SP3:latest',
+         'sles15': 'SUSE:SLES:15:latest'
+}
 
 vmnames = []
 images = {}
@@ -79,7 +97,7 @@ if vms_list:
 else:
     images = images_list
 
-print("List of VMs & Image Sources added for testing: {}".format(images))
+prYellow("List of VMs & Image Sources added for testing: {}".format(images))
 
 with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
     parameters = f.read()
@@ -91,6 +109,11 @@ with open('{0}/parameters.json'.format(os.getcwd()), 'r') as f:
 resource_group = parameters['resource group']
 location = parameters['location']
 username = parameters['username']
+
+if username == "":
+    username =  getpass.getuser()
+    print("Using current username: '%s'" % username)
+
 nsg = parameters['nsg']
 nsg_resource_group = parameters['nsg resource group']
 size = parameters['size'] # Preferred: 'Standard_B1ms'
@@ -134,6 +157,13 @@ os.system('rm -rf ./*.log ./*.html ./results 2> /dev/null')
 
 result_html_file = open("finalresult.html", 'a+')
 
+def get_vm_name(distname, uid):
+    return distname.lower() + '-omstest' + uid
+
+def get_distname(name):
+    name_splitted = name.split('-omstest')[0]
+    return name_splitted[0]
+
 # Common logic to save command itself
 def write_log_command(log, cmd):
     print(cmd)
@@ -162,8 +192,33 @@ def copy_from_vm(dnsname, username, ssh_private, location, filename):
     os.system("scp -i {0} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -r {1}@{2}.{3}.cloudapp.azure.com:/home/scratch/{4} omsfiles/.".format(ssh_private, username, dnsname.lower(), location, filename))
 
 # Run scripts on vm using AZ CLI
-def run_command(resource_group, vmname, commandid, script):
-    os.system('az vm run-command invoke -g {0} -n {1} --command-id {2} --scripts "{3}" {4}'.format(resource_group, vmname, commandid, script, runwith))
+def run_az_command(resource_group, vmname, commandid, script):
+    cmd = 'az vm run-command invoke -g {0} -n {1} --command-id {2} --scripts "{3}" {4}'.format(resource_group, vmname, commandid, script, runwith)
+    prLightGray("Running command: %s" % cmd)
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    (out, err) = proc.communicate()
+    try:
+        jsonout = json.loads(out)
+        for val in jsonout['value']:
+            prLightGray(val['message'])
+    except:
+        prLightGray("out: %s" % out)
+    if err is not None:
+        prRed("err: %s" % err)
+
+def run_ssh_command(target, username, script):
+    try:
+        cmd = "ssh -oStrictHostKeyChecking=no {0}@{1} '{2}'".format(username, target, script)
+        prLightPurple("Running command: %s" % cmd)
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        (out, err) = proc.communicate()
+        prLightPurple(out)
+        if err is not None:
+            prRed("err: %s" % err)
+    except ex as Exception:
+        prRed(ex)
 
 # Create vm using AZ CLI
 def create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, vmsize, nsg_uri):
@@ -185,6 +240,15 @@ def get_vm_resources(resource_group, vmname):
     ip_list = json.loads(subprocess.check_output('az vm list-ip-addresses -n {0} -g {1}'.format(vmname, resource_group), shell=True))
     ip_name = ip_list[0]['virtualMachine']['network']['publicIpAddresses'][0]['name']
     return os_disk, nic_name, ip_name
+
+def get_vm_ip(resource_group, vmname):
+    ip = None
+    try:
+        ip_list = json.loads(subprocess.check_output('az vm list-ip-addresses -n {0} -g {1}'.format(vmname, resource_group), shell=True))
+        ip = ip_list[0]['virtualMachine']['network']['publicIpAddresses'][0]['ipAddress']
+    except ex as Exception:
+        prRed(ex);
+    return ip
 
 def get_extension_version_now(resource_group, vmname, extension):
     vm_ext_out = json.loads(subprocess.check_output('az vm extension show --resource-group {0} --vm-name {1} --name {2} --expand instanceView'.format(resource_group, vmname, extension), shell=True))
@@ -246,7 +310,7 @@ def main():
         instantupgrade_verify_msg = verify_data()
     else:
         instantupgrade_verify_msg, instantupgrade_status_msg = None, None
-        install_oms_msg = create_vm_and_install_extension()
+        install_oms_msg = create_all_vms_and_install_extension()
         verify_oms_msg = verify_data()
 
     if is_autoupgrade:
@@ -272,49 +336,65 @@ def main():
     create_report(messages)
     mv_result_files()
 
+def create_vm_and_install_extension(distname, image, vmname):
+    update_option = ""
+    message = ""
+    dnsname = vmname
+    vm_log_file = distname.lower() + "result.log"
+    vm_html_file = distname.lower() + "result.html"
+    log_open = open(vm_log_file, 'a+')
+    html_open = open(vm_html_file, 'a+')
+    print("\nCreate VM and Install Extension - {0}: {1} \n".format(vmname, image))
+    create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
+    copy_to_vm(dnsname, username, ssh_private, location)
+    ip = get_vm_ip(resource_group, vmname)
+    delete_extension(extension, vmname, resource_group)
+    if ip is not None:
+        run_ssh_command(ip, username, 'sudo python -u /tmp/oms_extension_run_script.py -preinstall')
+    else:
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
+    add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
 
-def create_vm_and_install_extension():
+    if ip is not None:
+        run_ssh_command(ip, username, 'sudo python -u /home/scratch/oms_extension_run_script.py -postinstall')
+    else:
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+    # install_times.update({vmname: datetime.now()})
+    if ip is not None:
+        run_ssh_command(ip, username, 'sudo python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+    else:
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+    copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
+    write_log_command(log_open, 'Status After Creating VM and Adding OMS Extension')
+    html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
+    html_open.write("<h2> Install OMS Agent </h2>")
+    append_file('omsfiles/omsresults.log', log_open)
+    append_file('omsfiles/omsresults.html', html_open)
+    log_open.close()
+    html_open.close()
+    status = open('omsfiles/omsresults.status', 'r').read()
+    if status == "Agent Found":
+        message += """
+                        <td><span style='background-color: #66ff99'>Install Success</span></td>"""
+    elif status == "Onboarding Failed":
+        message += """
+                        <td><span style='background-color: red; color: white'>Onboarding Failed</span></td>"""
+    elif status == "Agent Not Found":
+        message += """
+                        <td><span style='background-color: red; color: white'>Install Failed</span></td>"""
+    return message
+
+def create_all_vms_and_install_extension():
     """Create vm and install the extension, returning HTML results."""
 
     message = ""
-    update_option = ""
     install_times.clear()
     for distname, image in images.iteritems():
         uid = rstr.xeger(r'[0-9a-f]{8}')
-        vmname = distname.lower() + '-' + uid
+        vmname = get_vm_name(distname, uid)
         vmnames.append(vmname)
-        dnsname = vmname
-        vm_log_file = distname.lower() + "result.log"
-        vm_html_file = distname.lower() + "result.html"
-        log_open = open(vm_log_file, 'a+')
-        html_open = open(vm_html_file, 'a+')
-        print("\nCreate VM and Install Extension - {0}: {1} \n".format(vmname, image))
-        create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
-        copy_to_vm(dnsname, username, ssh_private, location)
-        delete_extension(extension, vmname, resource_group)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
-        add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        message += create_vm_and_install_extension(distname, image, vmname)
         install_times.update({vmname: datetime.now()})
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
-        copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
-        write_log_command(log_open, 'Status After Creating VM and Adding OMS Extension')
-        html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
-        html_open.write("<h2> Install OMS Agent </h2>")
-        append_file('omsfiles/omsresults.log', log_open)
-        append_file('omsfiles/omsresults.html', html_open)
-        log_open.close()
-        html_open.close()
-        status = open('omsfiles/omsresults.status', 'r').read()
-        if status == "Agent Found":
-            message += """
-                            <td><span style='background-color: #66ff99'>Install Success</span></td>"""
-        elif status == "Onboarding Failed":
-            message += """
-                            <td><span style='background-color: red; color: white'>Onboarding Failed</span></td>"""
-        elif status == "Agent Not Found":
-            message += """
-                            <td><span style='background-color: red; color: white'>Install Failed</span></td>"""
     return message
 
 def create_vm_and_install_old_extension():
@@ -325,7 +405,7 @@ def create_vm_and_install_old_extension():
     install_times.clear()
     for distname, image in images.iteritems():
         uid = rstr.xeger(r'[0-9a-f]{8}')
-        vmname = distname.lower() + '-' + uid
+        vmname = get_vm_name(distname, uid)
         vmnames.append(vmname)
         dnsname = vmname
         vm_log_file = distname.lower() + "result.log"
@@ -336,11 +416,11 @@ def create_vm_and_install_old_extension():
         create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
         copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         install_times.update({vmname: datetime.now()})
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, "Status After Creating VM and Adding OMS Extension version: {0}".format(old_version))
         html_open.write('<h1 id="{0}"> VM: {0} <h1>'.format(distname))
@@ -368,7 +448,7 @@ def force_upgrade_extension():
     update_option = '--force-update'
     install_times.clear()
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
@@ -376,9 +456,9 @@ def force_upgrade_extension():
         dnsname = vmname
         print("\n Force Upgrade Extension: {0} \n".format(vmname))
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         install_times.update({vmname: datetime.now()})
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Force Upgrading OMS Extension')
         html_open.write('<h2> Force Upgrade Extension: {0} <h2>'.format(vmname))
@@ -403,7 +483,7 @@ def verify_data():
 
     message = ""
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
@@ -466,16 +546,16 @@ def autoupgrade():
                     If a new version is deployed, please check for any errors and re-run""")
                 break
 
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
         print("\n Checking Status After AutoUpgrade: {0} \n".format(vmname))
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         install_times.update({vmname: datetime.now()})
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After AutoUpgrade OMS Extension')
         html_open.write('<h2> Status After AutoUpgrade OMS Extension: {0} <h2>'.format(vmname))
@@ -500,16 +580,16 @@ def remove_extension():
 
     message = ""
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
         print("\nRemove Extension: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Removing OMS Extension')
         html_open.write('<h2> Remove Extension: {0} <h2>'.format(vmname))
@@ -536,7 +616,7 @@ def reinstall_extension():
     update_option = '--force-update'
     message = ""
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
@@ -544,7 +624,7 @@ def reinstall_extension():
         dnsname = vmname
         print("\n Reinstall Extension: {0} \n".format(vmname))
         add_extension(extension, publisher, vmname, resource_group, private_settings, public_settings, update_option)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -postinstall')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Reinstall OMS Extension')
         html_open.write('<h2> Reinstall Extension: {0} <h2>'.format(vmname))
@@ -570,16 +650,16 @@ def check_status():
     message = ""
     install_times.clear()
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         vm_log_file = distname + "result.log"
         vm_html_file = distname + "result.html"
         log_open = open(vm_log_file, 'a+')
         html_open = open(vm_html_file, 'a+')
         dnsname = vmname
         print("\n Checking Status: {0} \n".format(vmname))
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -status')
         install_times.update({vmname: datetime.now()})
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -injectlogs')
         copy_from_vm(dnsname, username, ssh_private, location, 'omsresults.*')
         write_log_command(log_open, 'Status After Long Run OMS Extension')
         html_open.write('<h2> Status After Long Run OMS Extension: {0} <h2>'.format(vmname))
@@ -603,15 +683,15 @@ def remove_extension_and_delete_vm():
     """Remove extension and delete vm."""
 
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_ditro_name(vmname)
         vm_log_file = distname + "result.log"
         log_open = open(vm_log_file, 'a+')
         dnsname = vmname
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyomslogs')
         copy_from_vm(dnsname, username, ssh_private, location, '{0}-omsagent.log'.format(distname))
         print("\n Remove extension and Delete VM: {0} \n".format(vmname))
         delete_extension(extension, vmname, resource_group)
-        run_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyextlogs')
+        run_az_command(resource_group, vmname, 'RunShellScript', 'python -u /home/scratch/oms_extension_run_script.py -copyextlogs')
         copy_from_vm(dnsname, username, ssh_private, location, '{0}-extnwatcher.log'.format(distname))
         disk, nic, ip = get_vm_resources(resource_group, vmname)
         delete_vm(resource_group, vmname)
@@ -632,7 +712,7 @@ def create_report(messages):
     diststh = ""
     resultsth = ""
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         diststh += """
                 <th>{0}</th>""".format(distname)
         resultsth += """
@@ -717,7 +797,7 @@ def create_report(messages):
 
     # Create final html & log file
     for vmname in vmnames:
-        distname = vmname.split('-')[0]
+        distname = get_distname(vmname)
         append_file(distname + "result.log", result_log_file)
         append_file(distname + "result.html", result_html_file)
     

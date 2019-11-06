@@ -1,14 +1,16 @@
 {
   "resource": "https://management.azure.com",
   "authority host url": "https://login.microsoftonline.com",
-  "resource group": "<resource-group-name>",
-  "location": "<location>",
-  "username": "<username>",
-  "ssh private": "<ssh-private-keyfile-path>",
-  "nsg resource group": "<nsg-resource-group>",
-  "nsg": "<nsg>",
-  "size": "<size>",
-  "workspace": "<workspace-name>",
-  "key vault": "<key-vault-name>",
-  "old version": "<old-extesion-version>"
+  "resource group": "omslinuxagent",
+  "location": "eastus2euap",
+  "username": "",
+  "ssh private": "~/.ssh/id_rsa",
+  "nsg resource group": "omslinuxagent",
+  "nsg": "omslinux-automation-eastus2euap-nsg",
+  "size": "Standard_D2s_v3",
+  "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+  "extension": "OmsAgentForLinux",
+  "workspace": "omslinux-automation",
+  "key vault": "omslinux-automation-kv",
+  "old version": ""
 }
