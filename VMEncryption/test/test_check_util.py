@@ -11,6 +11,7 @@ from console_logger import ConsoleLogger
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
+
     def setUp(self):
         self.logger = ConsoleLogger()
         self.cutil = CheckUtil(self.logger)

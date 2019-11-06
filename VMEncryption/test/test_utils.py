@@ -1,5 +1,4 @@
-import mock
-import unittest
+import os
 
 
 class MockDistroPatcher:
@@ -47,4 +46,3 @@ def mock_dir_structure(artificial_dir_structure, isdir_mock, listdir_mock, exist
 
         return string in artificial_dir_structure
     exists_mock.side_effect = mock_exists
-
