@@ -129,7 +129,7 @@ class EncryptionSettingsUtil(object):
             machine_name = ''
 
         # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
-        existing_crypt_items = crypt_mount_config_util.get_crypt_items(disk_util)
+        existing_crypt_items = crypt_mount_config_util.get_crypt_items()
         existing_crypt_dev_items = self.get_disk_items_from_crypt_items(existing_crypt_items, disk_util)
 
         all_device_items = existing_crypt_dev_items + extra_device_items

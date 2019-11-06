@@ -103,7 +103,7 @@ class CryptMountConfigUtil(object):
         self.logger.log("Consolidating azure_crypt_mount")
 
         device_items = self.disk_util.get_device_items(None)
-        crypt_items = self.get_crypt_items(self.disk_util)
+        crypt_items = self.get_crypt_items()
         azure_name_table = self.disk_util.get_block_device_to_azure_udev_table()
 
         for device_item in device_items:
@@ -343,7 +343,7 @@ class CryptMountConfigUtil(object):
 
         if backup_folder is not None:
             crypttab_backup_file = os.path.join(backup_folder, "crypttab_line")
-            self.make_sure_path_exists(backup_folder)
+            self.disk_util.make_sure_path_exists(backup_folder)
             with open(crypttab_backup_file, "w") as wf:
                 wf.write(crypttab_line)
             self.logger.log("Added crypttab item {0} to {1}".format(crypt_item.mapper_name, crypttab_backup_file))
@@ -385,7 +385,7 @@ class CryptMountConfigUtil(object):
 
             if backup_folder is not None:
                 backup_file = os.path.join(backup_folder, "azure_crypt_mount_line")
-                self.make_sure_path_exists(backup_folder)
+                self.disk_util.make_sure_path_exists(backup_folder)
                 with open(backup_file, "w") as wf:
                     wf.write(mount_content_item)
                 self.logger.log("Added crypt item {0} to {1}".format(crypt_item.mapper_name, backup_file))
@@ -517,7 +517,7 @@ class CryptMountConfigUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1].startswith('14'):
+        if self.disk_util.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.disk_util.distro_patcher.distro_info[1].startswith('14'):
             return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
         else:
             return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)

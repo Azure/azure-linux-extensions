@@ -100,8 +100,8 @@ def disable_encryption():
         bek_util = BekUtil(disk_util, logger)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file, disk_util)
-        crypt_items = crypt_mount_config_util.get_crypt_items(disk_util)
+        crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file)
+        crypt_items = crypt_mount_config_util.get_crypt_items()
 
         logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
 
@@ -288,8 +288,8 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             temp_keyfile.write(extension_parameter.passphrase)
             temp_keyfile.close()
 
-            crypt_mount_config_util.consolidate_azure_crypt_mount(existing_passphrase_file, disk_util)
-            for crypt_item in crypt_mount_config_util.get_crypt_items(disk_util):
+            crypt_mount_config_util.consolidate_azure_crypt_mount(existing_passphrase_file)
+            for crypt_item in crypt_mount_config_util.get_crypt_items():
                 if not crypt_item:
                     continue
 
@@ -353,7 +353,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             temp_oldkeyfile.write(old_passphrase)
             temp_oldkeyfile.close()
 
-            for crypt_item in crypt_mount_config_util.get_crypt_items(disk_util):
+            for crypt_item in crypt_mount_config_util.get_crypt_items():
                 if not crypt_item:
                     continue
 
@@ -423,30 +423,30 @@ def clear_new_luks_keys(disk_util, old_passphrase, new_passphrase, bek_util, enc
         for crypt_item in updated_crypt_items:
             if not crypt_item:
                 continue
-            
+
             logger.log('Removing new passphrase from {0}'.format(crypt_item.dev_path))
             before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
             logger.log("Keyslots before removal: {0}".format(before_keyslots))
-            
+
             luks_remove_result = disk_util.luks_remove_key(passphrase_file=temp_keyfile.name,
                                                            dev_path=crypt_item.dev_path,
                                                            header_file=crypt_item.luks_header_path)
-            
+
             logger.log("luks remove result is {0}".format(luks_remove_result))
-            
+
             after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
             logger.log("Keyslots after removal: {0}".format(after_keyslots))
-            
+
         if DistroPatcher.distro_info[0] == "Ubuntu":
             executor.Execute("update-initramfs -u -k all", True)
-                
+
         if DistroPatcher.distro_info[0] == "redhat" or DistroPatcher.distro_info[0] == "centos":
             distro_version = DistroPatcher.distro_info[1]
-                    
+
             if distro_version.startswith('7.'):
                 executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
                 logger.log("Update initrd image with new osluksheader.")
-                
+
         bek_util.store_bek_passphrase(encryption_config, old_passphrase)
         os.unlink(temp_keyfile.name)
         logger.log("Cleared new luks keys.")
@@ -520,7 +520,7 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
             encryption_environment.disable_se_linux()
 
     # mount any data disks - make sure the azure disk config path exists.
-    for crypt_item in crypt_mount_config_util.get_crypt_items(disk_util):
+    for crypt_item in crypt_mount_config_util.get_crypt_items():
         if not crypt_item:
             continue
 
@@ -619,7 +619,7 @@ def enable():
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
-            crypt_mount_config_util.consolidate_azure_crypt_mount(existing_passphrase_file, disk_util)
+            crypt_mount_config_util.consolidate_azure_crypt_mount(existing_passphrase_file)
             mount_encrypted_disks(disk_util=disk_util,
                                   crypt_mount_config_util=crypt_mount_config_util,
                                   bek_util=bek_util,
@@ -1595,7 +1595,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     logger.log(msg="executing disable_encryption_all_in_place")
 
     device_items = disk_util.get_device_items(None)
-    crypt_items = crypt_mount_config_util.get_crypt_items(disk_util)
+    crypt_items = crypt_mount_config_util.get_crypt_items()
 
     msg = 'Decrypting {0} data volumes'.format(len(crypt_items))
     logger.log(msg)
@@ -1987,7 +1987,7 @@ def daemon_decrypt():
                           bek_util=None,
                           encryption_config=encryption_config,
                           passphrase_file=None)
-    for crypt_item in crypt_mount_config_util.get_crypt_items(disk_util):
+    for crypt_item in crypt_mount_config_util.get_crypt_items():
         logger.log("Unmounting {0}".format(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)))
         disk_util.umount(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
