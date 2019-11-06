@@ -27,6 +27,7 @@ from centosPatching import centosPatching
 from SuSEPatching import SuSEPatching
 from oraclePatching import oraclePatching
 
+
 def _suse_parse_os_release_file():
     """
     Useful for SUSE15 distro that uses "/etc/os-release" file and when
@@ -68,8 +69,9 @@ def DistInfo():
             # The Python "platform" package has been deprecated in future python 3.7+ releases.
             # A generic solution for all distributions will need to be implemented
             # at that time.
-
             distinfo = _suse_parse_os_release_file()
+            if distinfo[0].lower() == 'suse':
+                distinfo[0] = 'SuSE'
 
         return distinfo
     else:

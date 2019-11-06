@@ -124,6 +124,7 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf')
 
         # self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
-        self.command_executor.ExecuteInBash("/usr/bin/dracut -f -v --kver `dmesg | grep -Po -m 1 '.*BOOT_IMAGE=/vmlinuz-\K.*?( )'`", True)
+        self.command_executor.ExecuteInBash("/usr/bin/dracut -f -v --kver `dmesg | grep -Po -m 1 '.*BOOT_IMAGE=.*/vmlinuz-\K.*?( )'", True)
+        # self.command_executor.ExecuteInBash("/usr/bin/dracut -f -v --kver `dmesg | grep -Po -m 1 '.*BOOT_IMAGE=*/vmlinuz-\K.*?( )'`", True)
         self.command_executor.Execute('grub2-install --recheck --force {0}'.format(self.rootfs_disk), True)
         self.command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
