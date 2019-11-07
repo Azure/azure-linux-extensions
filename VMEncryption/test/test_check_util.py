@@ -4,18 +4,14 @@ import mock
 from main.check_util import CheckUtil
 from main.Common import CommonVariables
 from StringIO import StringIO
+
+from test_utils import MockDistroPatcher
 from console_logger import ConsoleLogger
 
 
-class MockDistroPatcher:
-    def __init__(self, name, version, kernel):
-        self.distro_info = [None] * 2
-        self.distro_info[0] = name
-        self.distro_info[1] = version
-        self.kernel_version = kernel
-
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
+
     def setUp(self):
         self.logger = ConsoleLogger()
         self.cutil = CheckUtil(self.logger)
@@ -255,46 +251,40 @@ class TestCheckUtil(unittest.TestCase):
             CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
             }, { "os": "NotEncrypted" })
-        try:
-            self.cutil.validate_memory_os_encryption( {
-            CommonVariables.VolumeTypeKey: "ALL",
-            CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
-            }, { "os": "Encrypted" })
-        except Exception as e:
-            self.fail("validate_memory_os_encryption threw unexpected exception.\nException message was:\n" + str(e))
-        try:
-            output = "8000000"
-            os_popen.return_value = self.get_mock_filestream(output)
-            self.cutil.validate_memory_os_encryption( {
-            CommonVariables.VolumeTypeKey: "ALL",
-            CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
-            }, { "os": "Encrypted" })
-        except Exception as e:
-            self.fail("validate_memory_os_encryption threw unexpected exception.\nException message was:\n" + str(e))
-        try:
-            output = "8000000"
-            os_popen.return_value = self.get_mock_filestream(output)
-            self.cutil.validate_memory_os_encryption( {
-            CommonVariables.VolumeTypeKey: "ALL",
-            CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
-            CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
-            CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
-            CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
-            }, { "os": "NotEncrypted" })
-        except Exception as e:
-            self.fail("validate_memory_os_encryption threw unexpected exception.\nException message was:\n" + str(e))
+
+        self.cutil.validate_memory_os_encryption( {
+        CommonVariables.VolumeTypeKey: "ALL",
+        CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+        CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+        CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
+        }, { "os": "Encrypted" })
+
+        output = "8000000"
+        os_popen.return_value = self.get_mock_filestream(output)
+        self.cutil.validate_memory_os_encryption( {
+        CommonVariables.VolumeTypeKey: "ALL",
+        CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+        CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+        CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
+        }, { "os": "Encrypted" })
+
+        output = "8000000"
+        os_popen.return_value = self.get_mock_filestream(output)
+        self.cutil.validate_memory_os_encryption( {
+        CommonVariables.VolumeTypeKey: "ALL",
+        CommonVariables.KeyVaultURLKey: "https://vaultname.vault.azure.net/",
+        CommonVariables.KeyVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionKeyURLKey: "https://vaultname.vault.azure.net/keys/keyname/ver",
+        CommonVariables.KekVaultResourceIdKey: "/subscriptions/subid/resourceGroups/rgname/providers/Microsoft.KeyVault/vaults/vaultname",
+        CommonVariables.KeyEncryptionAlgorithmKey: 'rsa-OAEP-25600',
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
+        }, { "os": "NotEncrypted" })
 
     def test_supported_os(self):
         # test exception is raised for Ubuntu 14.04 kernel version
@@ -302,65 +292,37 @@ class TestCheckUtil(unittest.TestCase):
             CommonVariables.VolumeTypeKey: "ALL"
             }, MockDistroPatcher('Ubuntu', '14.04', '4.4'), {"os" : "NotEncrypted"})
         # test exception is not raised for Ubuntu 14.04 kernel version 4.15
-        try:
-            self.cutil.is_supported_os( {
+        self.cutil.is_supported_os({
             CommonVariables.VolumeTypeKey: "ALL"
             }, MockDistroPatcher('Ubuntu', '14.04', '4.15'), {"os" : "NotEncrypted"})
-        except Exception as e:
-            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
         # test exception is not raised for already encrypted OS volume
-        try:
-            self.cutil.is_supported_os( {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('Ubuntu', '14.04', '4.4'), {"os" : "Encrypted"})
-        except Exception as e:
-            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                   MockDistroPatcher('Ubuntu', '14.04', '4.4'), {"os" : "Encrypted"})
         # test exception is raised for unsupported OS
-        self.assertRaises(Exception, self.cutil.is_supported_os, {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('Ubuntu', '12.04', ''), {"os" : "NotEncrypted"})
-        self.assertRaises(Exception, self.cutil.is_supported_os, {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('redhat', '6.7', ''), {"os" : "NotEncrypted"})
-        self.assertRaises(Exception, self.cutil.is_supported_os, {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('centos', '7.9', ''), {"os" : "NotEncrypted"})
+        self.assertRaises(Exception, self.cutil.is_supported_os, {CommonVariables.VolumeTypeKey: "ALL"},
+                          MockDistroPatcher('Ubuntu', '12.04', ''), {"os" : "NotEncrypted"})
+        self.assertRaises(Exception, self.cutil.is_supported_os, {CommonVariables.VolumeTypeKey: "ALL"},
+                          MockDistroPatcher('redhat', '6.7', ''), {"os" : "NotEncrypted"})
+        self.assertRaises(Exception, self.cutil.is_supported_os, {CommonVariables.VolumeTypeKey: "ALL"},
+                          MockDistroPatcher('centos', '7.9', ''), {"os" : "NotEncrypted"})
         # test exception is not raised for supported OS
-        try:
-            self.cutil.is_supported_os( {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('Ubuntu', '18.04', ''), {"os" : "NotEncrypted"})
-        except Exception as e:
-            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
-        try:
-            self.cutil.is_supported_os( {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('centos', '7.2.1511', ''), {"os" : "NotEncrypted"})
-        except Exception as e:
-            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                   MockDistroPatcher('Ubuntu', '18.04', ''), {"os" : "NotEncrypted"})
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                   MockDistroPatcher('centos', '7.2.1511', ''), {"os" : "NotEncrypted"})
         # test exception is not raised for DATA volume
-        try:
-            self.cutil.is_supported_os( {
-            CommonVariables.VolumeTypeKey: "DATA"
-            }, MockDistroPatcher('SuSE', '12.4', ''), {"os" : "NotEncrypted"})
-        except Exception as e:
-            self.fail("is_unsupported_os threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "DATA"},
+                                   MockDistroPatcher('SuSE', '12.4', ''), {"os" : "NotEncrypted"})
 
     def test_volume_type_enable_common(self):
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.QueryEncryptionStatus
+        self.cutil.validate_volume_type_for_enable({
+                CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.QueryEncryptionStatus
             }, "data")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
 
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "All",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        self.cutil.validate_volume_type_for_enable({
+                CommonVariables.VolumeTypeKey: "All",
+                CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
             }, None)
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
 
     def test_volume_type_enable_from_data(self):
         self.assertRaises(Exception, self.cutil.validate_volume_type_for_enable, {
@@ -368,21 +330,15 @@ class TestCheckUtil(unittest.TestCase):
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormat
             }, "Data")
         
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "All",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
-            }, "Data")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.validate_volume_type_for_enable({
+        CommonVariables.VolumeTypeKey: "All",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }, "Data")
 
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "Data",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
-            }, "data")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.validate_volume_type_for_enable({
+        CommonVariables.VolumeTypeKey: "Data",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }, "data")
 
     def test_volume_type_enable_from_os(self):
         self.assertRaises(Exception, self.cutil.validate_volume_type_for_enable, {
@@ -390,30 +346,21 @@ class TestCheckUtil(unittest.TestCase):
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
             }, "Os")
 
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "All",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
-            }, "Os")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.validate_volume_type_for_enable({
+        CommonVariables.VolumeTypeKey: "All",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }, "Os")
 
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "Os",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
-            }, "OS")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.validate_volume_type_for_enable({
+        CommonVariables.VolumeTypeKey: "Os",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }, "OS")
         
     def test_volume_type_enable_from_all(self):
-        try:
-            self.cutil.validate_volume_type_for_enable({
-            CommonVariables.VolumeTypeKey: "All",
-            CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
-            }, "All")
-        except Exception as e:
-            self.fail("validate_volume_type_for_enable threw unexpected exception.\nException message was:\n" + str(e))
+        self.cutil.validate_volume_type_for_enable({
+        CommonVariables.VolumeTypeKey: "All",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }, "All")
         self.assertRaises(Exception, self.cutil.validate_volume_type_for_enable, {
             CommonVariables.VolumeTypeKey: "OS",
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
@@ -423,4 +370,3 @@ class TestCheckUtil(unittest.TestCase):
             CommonVariables.VolumeTypeKey: "Data",
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
             }, "All")   
-

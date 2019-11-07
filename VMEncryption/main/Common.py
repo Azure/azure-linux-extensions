@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '1.1.0.44'
+    extension_version = '1.1.0.45'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
@@ -204,14 +204,16 @@ class CommonVariables:
                     VolumeTypeAll.lower(): 'Encryption succeeded for all volumes'
                 }
 
+
 class TestHooks:
     search_not_only_ide = False
     use_hard_code_passphrase = False
     hard_code_passphrase = "Quattro!"
 
+
 class DeviceItem(object):
     def __init__(self):
-        #NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN
+        # NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE,MAJ:MIN
         self.name = None
         self.type = None
         self.file_system = None
@@ -222,6 +224,7 @@ class DeviceItem(object):
         self.size = None
         self.majmin = None
         self.device_id = None
+
     def __str__(self):
         return ("name:" + str(self.name) + " type:" + str(self.type) +
                 " fstype:" + str(self.file_system) + " mountpoint:" + str(self.mount_point) +
@@ -229,16 +232,19 @@ class DeviceItem(object):
                 " size:" + str(self.size) + " majmin:" + str(self.majmin) +
                 " device_id:" + str(self.device_id))
 
+
 class LvmItem(object):
     def __init__(self):
-        #lv_name,vg_name,lv_kernel_major,lv_kernel_minor
+        # lv_name,vg_name,lv_kernel_major,lv_kernel_minor
         self.lv_name = None
         self.vg_name = None
         self.lv_kernel_major = None
         self.lv_kernel_minor = None
+
     def __str__(self):
         return ("lv_name:" + str(self.lv_name) + " vg_name:" + str(self.vg_name) +
                 " lv_kernel_major:" + str(self.lv_kernel_major) + " lv_kernel_minor:" + str(self.lv_kernel_minor))
+
 
 class CryptItem(object):
     def __init__(self):
@@ -249,10 +255,60 @@ class CryptItem(object):
         self.luks_header_path = None
         self.uses_cleartext_key = None
         self.current_luks_slot = None
-        
+
     def __str__(self):
         return ("name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) +
                 " mount_point:" + str(self.mount_point) + " file_system:" + str(self.file_system) +
                 " luks_header_path:" + str(self.luks_header_path) +
                 " uses_cleartext_key:" + str(self.uses_cleartext_key) +
                 " current_luks_slot:" + str(self.current_luks_slot))
+
+    def __eq__(self, other):
+        """
+        Override method for "==" operation, useful for making CryptItem comparison a little logically consistent
+        For example a luks_slot value of "-1" and "None" are logically equivalent, so this method, treats them the same
+        This is done by "consolidating" both values to "None".
+        """
+        if not isinstance(other, CryptItem):
+            return NotImplemented
+
+        def _consolidate_luks_header_path(crypt_item):
+            """
+            if luks_header_path is absent, then it implies that the header is attached so the header path might as well be the device path (dev_path)
+            """
+            if crypt_item.luks_header_path and not crypt_item.luks_header_path == "None":
+                return crypt_item.luks_header_path
+            return crypt_item.dev_path
+
+        def _consolidate_luks_slot(crypt_item):
+            """
+            -1 for luks_slot implies "None"
+            """
+            if crypt_item.current_luks_slot == -1:
+                return None
+            return crypt_item.current_luks_slot
+
+        def _consolidate_file_system(crypt_item):
+            """
+            "None" and "auto" are functionally identical for "file_system" field
+            """
+            if not crypt_item.file_system:
+                return "auto"
+            return crypt_item.file_system
+
+        def _consolidate_cleartext_key(crypt_item):
+            """
+            "False", "None", "" and None are equivalent to False
+            """
+            if not crypt_item.uses_cleartext_key or crypt_item.uses_cleartext_key in ["False", "None"]:
+                return False
+            return True
+
+        return self.mapper_name == other.mapper_name and\
+            self.dev_path == other.dev_path and\
+            self.file_system == other.file_system and\
+            self.mount_point == other.mount_point and\
+            _consolidate_luks_header_path(self) == _consolidate_luks_header_path(other) and \
+            _consolidate_luks_slot(self) == _consolidate_luks_slot(other) and\
+            _consolidate_file_system(self) == _consolidate_file_system(other) and\
+            _consolidate_cleartext_key(self) == _consolidate_cleartext_key(other)
