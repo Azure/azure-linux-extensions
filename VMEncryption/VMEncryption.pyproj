@@ -25,8 +25,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="MANIFEST.in" />
-    <Content Include="README.txt" />
-    <Content Include="Test-AzureRmVMDiskEncryptionExtension.ps1" />
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
@@ -45,6 +43,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\check_util.py" />
+    <Compile Include="main\CryptMountConfigUtil.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="main\CommandExecutor.py">
       <SubType>Code</SubType>
     </Compile>
@@ -68,6 +69,7 @@
     <Compile Include="main\patch\debianPatching.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="main\patch\oraclePatching.py" />
     <Compile Include="main\ResourceDiskUtil.py" />
     <Compile Include="main\TransactionalCopyTask.py">
       <SubType>Code</SubType>
@@ -153,8 +155,13 @@
     <Compile Include="setup.py" />
     <Compile Include="test\console_logger.py" />
     <Compile Include="test\test_check_util.py" />
+    <Compile Include="test\test_command_executor.py" />
+    <Compile Include="test\test_crypt_mount_config_util.py" />
+    <Compile Include="test\test_disk_util.py" />
     <Compile Include="test\test_encryption_settings_util.py" />
+    <Compile Include="test\test_handler_util.py" />
     <Compile Include="test\test_resource_disk_util.py" />
+    <Compile Include="test\test_utils.py" />
     <Compile Include="test\__init__.py" />
   </ItemGroup>
   <ItemGroup>

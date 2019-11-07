@@ -34,7 +34,6 @@ class EncryptionSettingsUtil(object):
     def __init__(self, logger):
         self.logger = logger
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
-        self._DISK_ENCRYPTION_DATA_VERSION_V3 = "3.0"
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -115,7 +114,7 @@ class EncryptionSettingsUtil(object):
                     })
         return array
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util):
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
@@ -126,11 +125,11 @@ class EncryptionSettingsUtil(object):
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
+        if re.match('^[\\w-]+$', machine_name) is None:
             machine_name = ''
 
         # Get all the currently encrypted items from the Azure Crypt Mount file (hopefully this has been consolidated by now)
-        existing_crypt_items = disk_util.get_crypt_items()
+        existing_crypt_items = crypt_mount_config_util.get_crypt_items()
         existing_crypt_dev_items = self.get_disk_items_from_crypt_items(existing_crypt_items, disk_util)
 
         all_device_items = existing_crypt_dev_items + extra_device_items
@@ -183,11 +182,11 @@ class EncryptionSettingsUtil(object):
 
         full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
         with open(full_protector_path) as protector_file:
-            protector = protector_file.read()
-            protector_base64 = base64.standard_b64encode(protector)
+            protector_content = protector_file.read()
+            protector_base64 = base64.standard_b64encode(protector_content)
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
-        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors ]
+        protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors]
 
         data = {
             "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
@@ -295,7 +294,7 @@ class EncryptionSettingsUtil(object):
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
-        if re.match('^[\w-]+$', machine_name) is None:
+        if re.match('^[\\w-]+$', machine_name) is None:
             machine_name = ''
 
         def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
