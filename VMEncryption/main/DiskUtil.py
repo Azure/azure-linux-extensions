@@ -137,13 +137,13 @@ class DiskUtil(object):
 
         if self.should_use_azure_crypt_mount():
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-                for line in f:
+                for line in f.readlines():
                     if not line.strip():
                         continue
 
                     crypt_item = self.parse_azure_crypt_mount_line(line)
 
-                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name :
+                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name:
                         rootfs_crypt_item_found = True
 
                     crypt_items.append(crypt_item)
@@ -163,7 +163,7 @@ class DiskUtil(object):
                 self.logger.log("{0} does not exist".format(crypttab_path))
             else:
                 with open(crypttab_path, 'r') as f:
-                    for line in f:
+                    for line in f.readlines():
                         if not line.strip():
                             continue
 
@@ -171,7 +171,7 @@ class DiskUtil(object):
                         if crypt_item is None:
                             continue
 
-                        if crypt_item.mapper_name == CommonVariables.osmapper_name :
+                        if crypt_item.mapper_name == CommonVariables.osmapper_name:
                             rootfs_crypt_item_found = True
 
                         for device_path, mount_path in fstab_items:
@@ -226,7 +226,7 @@ class DiskUtil(object):
 
         non_os_entry_found = False
         with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
-            for line in f:
+            for line in f.readlines():
                 if not line.strip():
                     continue
 
@@ -334,7 +334,7 @@ class DiskUtil(object):
 
     def migrate_crypt_items(self, passphrase_file):
         crypt_items = self.get_crypt_items()
-         # Archive azure_crypt_mount file
+        # Archive azure_crypt_mount file
         try:
             if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
                 self.logger.log(msg="archiving azure crypt mount file: {0}".format(self.encryption_environment.azure_crypt_mount_config_path))
