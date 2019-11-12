@@ -125,7 +125,7 @@ def main():
     # Invoke operation
     try:
         global HUtilObject
-        # HUtilObject = parse_context(operation)
+        HUtilObject = parse_context(operation)
         exit_code, output = operations[operation]()
 
         # Exit code 1 indicates a general problem that doesn't have a more
@@ -204,6 +204,18 @@ def install():
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)
+
+    try:
+        if os.path.isfile("/etc/default/mdsd"):
+            with open("/etc/default/mdsd", "a") as f:
+                f.write("\n")
+                f.write("export ENABLE_MCS=true\n")
+                f.write("export MCS_ENDPOINT=mcs.azure.com\n")
+                f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
+        else:
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
+    except:
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )        
     return exit_code, output
 
 def check_kill_process(pstring):
