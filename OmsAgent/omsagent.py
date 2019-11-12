@@ -1060,7 +1060,13 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53        
+                exit_code = 53     
+        if exit_code is 8:
+            if "Check the correctness of the workspace ID and shared key" in output:
+                # Enable failures
+                # 53 is the exit code for configuration errors
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 53                   
     except:	
         hutil_log_info('Failed to write output to STDERR')	
   
