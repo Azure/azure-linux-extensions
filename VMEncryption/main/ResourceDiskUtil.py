@@ -216,7 +216,11 @@ class ResourceDiskUtil(object):
         return self.executor.Execute(cmd) == CommonVariables.process_success
 
     def try_remount(self):
-        """ mount the resource disk if not already mounted"""
+        """
+        Mount the resource disk if not already mounted
+        Returns true if the resource disk is mounted, false otherwise
+        Throws an exception if anything goes wrong
+        """
         self.logger.log("In try_remount")
 
         if self.passphrase_filename:
@@ -303,7 +307,13 @@ class ResourceDiskUtil(object):
         self.add_to_fstab()
 
     def automount(self):
-        """ encrypt resource disk """
+        """
+        Mount the resource disk (encrypted or not)
+        or
+        encrypt the resource disk and mount it if enable was called with EFA
+
+        If False is returned, the resource disk is not mounted.
+        """
         # try to remount if the disk was previously encrypted and is still valid
         if self.try_remount():
             return True
@@ -313,4 +323,4 @@ class ResourceDiskUtil(object):
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
 
-        return True
+        return self._is_crypt_mounted() or self._is_plain_mounted()

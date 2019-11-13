@@ -123,6 +123,7 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), False)
 
         mock_mount.assert_not_called()
+        mock_add_rd_to_crypttab.assert_not_called()
 
         # Case 2, resource disk is encrypted but not mounted
         mock_is_luks.return_value = True
@@ -168,9 +169,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(ResourceDiskUtil.RD_DEV_PATH)
 
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted', return_value=False)
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted', return_value=True)
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
-    def test_automount(self, mock_try_remount, mock_encrypt_format_mount):
+    def test_automount(self, mock_try_remount, mock_encrypt_format_mount, mock_is_plain_mounted, mock_is_crypt_mounted):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
@@ -206,4 +209,3 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_encrypt_format_mount.return_value = False
         self.assertEqual(self.resource_disk.automount(), False)
         mock_encrypt_format_mount.assert_called_once()
-
