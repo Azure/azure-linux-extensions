@@ -278,18 +278,19 @@ def disable():
 
 def update():
     """
-    Update the current installation of OneAgent
-    Uninstall the existing installation on the machine and 
-    install the bundle included in the package
+    Update the current installation of AzureMonitorLinuxAgent
+    No logic to install the agent as agent -> install() will be called 
+    with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    print ("Uinstalling the curretn mdsd")
-    exit_code, output = uninstall()
-    if exit_code != 0:
-        return exit_code, output
-    print ("installing the curretn mdsd")
-    exit_code, output = install()
-    print ("Update finished")
-    return exit_code, output
+    # print ("Uinstalling the current mdsd")
+    # exit_code, output = uninstall()
+    # if exit_code != 0:
+    #     return exit_code, output
+    # print ("installing the curretn mdsd")
+    # exit_code, output = install()
+    # print ("Update finished")
+    
+    return 0, ""
 
 
 

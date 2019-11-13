@@ -1,13 +1,13 @@
 [
   {
     "name":  "AzureMonitorLinuxAgent",
-    "version": "1.3",
+    "version": "1.4",
     "handlerManifest": {
-      "installCommand": "./agent -install",
-      "uninstallCommand": "./agent -uninstall",
-      "updateCommand": "./agent -update",
-      "enableCommand": "./agent -enable",
-      "disableCommand": "./agent -disable",
+      "installCommand": "agent.py -install",
+      "uninstallCommand": "agent.py -uninstall",
+      "updateCommand": "agent.py -update",
+      "enableCommand": "agent.py -enable",
+      "disableCommand": "agent.py -disable",
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
       "updateMode": "UpdateWithInstall"
