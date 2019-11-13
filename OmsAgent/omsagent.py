@@ -1043,25 +1043,30 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         if exit_code is not 0:	
             sys.stderr.write(output[-500:])        
 
-        if exit_code is 19:
-            if "rpmdb" in output or "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "cannot open Packages database" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
+        if exit_code is 17:
+            if "Failed dependencies:" in output or "waiting for transaction lock" in output or "dpkg: error processing package systemd" in output:
+                # 52 is the exit code for missing dependency
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+        elif exit_code is 19:
+            if "rpmdb" in output or "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "cannot open Packages database" in output or "exited with status 52" in output or "/bin/sh is needed" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "error: dpkg status database is locked by another process" in output:
                 # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-        if exit_code is 33:
+        elif exit_code is 33:
             if "Permission denied" in output:
                 # Enable failures
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52        
-        if exit_code is 5:
+        elif exit_code is 5:
             if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 53     
-        if exit_code is 8:
+        elif exit_code is 8:
             if "Check the correctness of the workspace ID and shared key" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
