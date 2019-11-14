@@ -165,13 +165,13 @@ def linux_detect_installer():
 def install_additional_packages():
     """Install additional packages command here."""
     if INSTALLER == 'APT':
-        os.system('apt-get -y update && apt-get -y install wget apache2 git dos2unix \
+        os.system('apt-get -y update && apt-get -y install wget apache2 git \
                 && service apache2 start')
     elif INSTALLER == 'YUM':
-        os.system('yum install -y wget httpd git dos2unix \
+        os.system('yum update -y && yum install -y wget httpd git \
                 && service httpd start')
     elif INSTALLER == 'ZYPPER':
-        os.system('zypper install -y wget httpd git dos2unix\
+        os.system('zypper update -y && zypper install -y wget httpd git \
                 && service apache2 start')
 
 def enable_dsc():
@@ -189,14 +189,7 @@ def disable_dsc():
 
 def copy_config_files():
     """Convert, copy, and set permissions for agent configuration files."""
-    os.system('dos2unix /home/scratch/perf.conf \
-            && dos2unix /home/scratch/rsyslog-oms.conf \
-            && dos2unix /home/scratch/apache_access.log \
-            && dos2unix /home/scratch/custom.log \
-            && dos2unix /home/scratch/error.log \
-            && dos2unix /home/scratch/mysql-slow.log \
-            && dos2unix /home/scratch/mysql.log \
-            && cat /home/scratch/perf.conf >> /etc/opt/microsoft/omsagent/{0}/conf/omsagent.conf \
+    os.system('cat /home/scratch/perf.conf >> /etc/opt/microsoft/omsagent/{0}/conf/omsagent.conf \
             && cp /home/scratch/rsyslog-oms.conf /etc/opt/omi/conf/omsconfig/rsyslog-oms.conf \
             && cp /home/scratch/rsyslog-oms.conf /etc/rsyslog.d/95-omsagent.conf \
             && chown omsagent:omiusers /etc/rsyslog.d/95-omsagent.conf \
@@ -258,18 +251,15 @@ def inject_logs():
     if INSTALLER == 'APT':
         os.system('cat /home/scratch/apache_access.log >> /var/log/apache2/access.log \
                 && chown root:root /var/log/apache2/access.log \
-                && chmod 644 /var/log/apache2/access.log \
-                && dos2unix /var/log/apache2/access.log')
+                && chmod 644 /var/log/apache2/access.log')
     elif INSTALLER == 'YUM':
         os.system('cat /home/scratch/apache_access.log >> /var/log/httpd/access_log \
                 && chown root:root /var/log/httpd/access_log \
-                && chmod 644 /var/log/httpd/access_log \
-                && dos2unix /var/log/httpd/access_log')
+                && chmod 644 /var/log/httpd/access_log')
     elif INSTALLER == 'ZYPPER':
         os.system('cat /home/scratch/apache_access.log >> /var/log/apache2/access_log \
                 && chown root:root /var/log/apache2/access_log \
-                && chmod 644 /var/log/apache2/access_log \
-                && dos2unix /var/log/apache2/access_log')
+                && chmod 644 /var/log/apache2/access_log')
 
     os.system('cat /home/scratch/mysql.log >> /var/log/mysql/mysql.log \
             && cat /home/scratch/error.log >> /var/log/mysql/error.log \
