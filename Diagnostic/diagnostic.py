@@ -263,6 +263,7 @@ def main(command):
     global g_ext_op_type
 
     g_ext_op_type = get_extension_operation_type(command)
+    waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
     if not check_for_supported_waagent_and_distro_version():
         return
