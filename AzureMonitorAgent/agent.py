@@ -49,12 +49,11 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
+# TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
 BundleFileNameDeb = 'azure-mdsd_1.5.118-build.master.54_x86_64.deb'
 BundleFileNameRpm = 'azure-mdsd_1.5.118-build.master.54_x86_64.rpm'
 BundleFileName = ''
-PostOnboardingSleepSeconds = 5
 InitialRetrySleepSeconds = 30
-IsUpgrade = False
 PackageManager = ''
 
 # Commands
@@ -65,7 +64,7 @@ DisableOneAgentServiceCommand = ''
 
 # Error codes
 DPKGLockedErrorCode = 56
-MissingorInvalidParameterErrorCode = 11
+MissingorInvalidParameterErrorCode = 53
 UnsupportedOperatingSystem = 51
 
 # Configuration
@@ -91,7 +90,6 @@ def main():
     """
     init_waagent_logger()
     waagent_log_info('Azure Monitoring Agent for Linux started to handle.')
-    global IsUpgrade
 
     # Determine the operation being executed
     operation = None
@@ -182,7 +180,7 @@ def get_free_space_mb(dirname):
 def install():
     """
     Ensure that this VM distro and version are supported.
-    Install the OneAgent package, using retries.
+    Install the Azure Monitor Linux Agent package, using retries.
     Note: install operation times out from WAAgent at 15 minutes, so do not
     wait longer.
     """
@@ -226,7 +224,7 @@ def check_kill_process(pstring):
 
 def uninstall():
     """
-    Uninstall the ONeAgent.
+    Uninstall the Azure Monitor Linux Agent.
     This is a somewhat soft uninstall. It is not a purge.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
@@ -252,7 +250,7 @@ def uninstall():
 
 def enable():
     """
-    Start the OneAgent Service
+    Start the Azure Monitor Linux Agent Service
     This call will return non-zero or throw an exception if
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
@@ -267,10 +265,10 @@ def enable():
 
 def disable():
     """
-    Disable oneagent process on the VM.
+    Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    #stop the oneagent service
+    #stop the Azure Monitor Linux Agent service
     DisableOneAgentServiceCommand = "systemctl stop mdsd"
 
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
