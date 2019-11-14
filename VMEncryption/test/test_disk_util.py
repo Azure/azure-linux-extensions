@@ -15,10 +15,27 @@ class TestDiskUtil(unittest.TestCase):
         self.disk_util = DiskUtil(None, MockDistroPatcher('Ubuntu', '14.04', '4.15'), self.logger, EncryptionEnvironment(None, self.logger))
 
     def _mock_open_with_read_data_dict(self, open_mock, read_data_dict):
+        open_mock.content_dict = read_data_dict
+
         def _open_side_effect(filename, mode, *args, **kwargs):
-            read_data = read_data_dict.get(filename)
+            read_data = open_mock.content_dict.get(filename)
             mock_obj = mock.mock_open(read_data=read_data)
-            return mock_obj.return_value
+            handle = mock_obj.return_value
+
+            def write_handle(data, *args, **kwargs):
+                if 'a' in mode:
+                    open_mock.content_dict[filename] += data
+                else:
+                    open_mock.content_dict[filename] = data
+
+            def write_lines_handle(data, *args, **kwargs):
+                if 'a' in mode:
+                    open_mock.content_dict[filename] += "\n".join(data)
+                else:
+                    open_mock.content_dict[filename] = "\n".join(data)
+            handle.write.side_effect = write_handle
+            handle.writelines.side_effect = write_lines_handle
+            return handle
 
         open_mock.side_effect = _open_side_effect
 
@@ -200,3 +217,66 @@ class TestDiskUtil(unittest.TestCase):
                                                                luks_header_path="/headerfile",
                                                                mount_point="/mnt/datadisk")],
                              crypt_items)
+
+    @mock.patch('shutil.copy2', return_value=True)
+    @mock.patch('os.rename', return_value=True)
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('__builtin__.open')
+    @mock.patch('main.DiskUtil.DiskUtil.should_use_azure_crypt_mount', return_value=True)
+    @mock.patch('main.DiskUtil.DiskUtil.get_encryption_status')
+    def test_migrate_crypt_items(self, get_enc_status_mock, use_acm_mock, open_mock, exists_mock, rename_mock, shutil_mock):
+
+        def rename_side_effect(name1, name2):
+            use_acm_mock.return_value = False
+            return True
+        rename_mock.side_effect = rename_side_effect
+        get_enc_status_mock.return_value = "{\"os\" : \"NotEncrypted\"}"
+
+        # Test 1: migrate an entry
+        self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": "mapper_name /dev/dev_path None /mnt/point ext4 False 0",
+                                                        "/etc/fstab.azure.backup": "/dev/dev_path /mnt/point ext4 defaults,nofail 0 0",
+                                                        "/etc/fstab": "",
+                                                        "/etc/crypttab": ""})
+        self.disk_util.migrate_crypt_items("/test_passphrase_path")
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("mapper_name /dev/dev_path /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
+
+        # Test 2: migrate no entry
+        use_acm_mock.return_value = True
+        self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": "",
+                                                        "/etc/fstab.azure.backup": "",
+                                                        "/etc/fstab": "",
+                                                        "/etc/crypttab": ""})
+        self.disk_util.migrate_crypt_items("/test_passphrase_path")
+        self.assertTrue("" == open_mock.content_dict["/etc/fstab"].strip())
+        self.assertTrue("" == open_mock.content_dict["/etc/crypttab"].strip())
+
+        # Test 3: skip migrating the OS entry
+        use_acm_mock.return_value = True
+        self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": "osencrypt /dev/dev_path None / ext4 False 0",
+                                                        "/etc/fstab.azure.backup": "/dev/dev_path / ext4 defaults 0 0",
+                                                        "/etc/fstab": "",
+                                                        "/etc/crypttab": ""})
+        self.disk_util.migrate_crypt_items("/test_passphrase_path")
+        self.assertTrue("" == open_mock.content_dict["/etc/fstab"].strip())
+        self.assertTrue("" == open_mock.content_dict["/etc/crypttab"].strip())
+
+        # Test 4: migrate many entries
+        use_acm_mock.return_value = True
+        acm_contents = """
+        mapper_name /dev/dev_path None /mnt/point ext4 False 0
+        mapper_name2 /dev/dev_path2 None /mnt/point2 ext4 False 0
+        """
+        fstab_backup_contents = """
+        /dev/dev_path /mnt/point ext4 defaults,nofail 0 0
+        /dev/dev_path2 /mnt/point2 ext4 defaults,nofail 0 0
+        """
+        self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": acm_contents,
+                                                        "/etc/fstab.azure.backup": fstab_backup_contents,
+                                                        "/etc/fstab": "",
+                                                        "/etc/crypttab": ""})
+        self.disk_util.migrate_crypt_items("/test_passphrase_path")
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("mapper_name /dev/dev_path /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("mapper_name2 /dev/dev_path2 /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
