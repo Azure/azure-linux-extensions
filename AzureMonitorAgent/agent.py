@@ -194,7 +194,7 @@ def install():
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
-    print (PackageManager, "and", BundleFileName)
+    print (PackageManager, " and ", BundleFileName)
     OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
@@ -337,10 +337,14 @@ def find_package_manager(operation):
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
             BundleFileName = BundleFileNameDeb
+            break
+
     for rpm_dist in rpm_set:
         if dist.lower().startswith(rpm_dist):
             PackageManager = "rpm"
             BundleFileName = BundleFileNameRpm
+            break
+
     if PackageManager == "":
         log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     
