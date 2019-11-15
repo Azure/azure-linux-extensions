@@ -30,9 +30,9 @@ class TestDiskUtil(unittest.TestCase):
 
             def write_lines_handle(data, *args, **kwargs):
                 if 'a' in mode:
-                    open_mock.content_dict[filename] += "\n".join(data)
+                    open_mock.content_dict[filename] += "".join(data)
                 else:
-                    open_mock.content_dict[filename] = "\n".join(data)
+                    open_mock.content_dict[filename] = "".join(data)
             handle.write.side_effect = write_handle
             handle.writelines.side_effect = write_lines_handle
             return handle
@@ -276,7 +276,7 @@ class TestDiskUtil(unittest.TestCase):
                                                         "/etc/fstab": "",
                                                         "/etc/crypttab": ""})
         self.disk_util.migrate_crypt_items("/test_passphrase_path")
-        self.assertTrue("/dev/mapper/mapper_name /mnt/point ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
-        self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
-        self.assertTrue("mapper_name /dev/dev_path /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
-        self.assertTrue("mapper_name2 /dev/dev_path2 /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point ext4 defaults,nofail 0 0\n" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("\n/dev/mapper/mapper_name2 /mnt/point2 ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("\nmapper_name /dev/dev_path /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("\nmapper_name2 /dev/dev_path2 /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])

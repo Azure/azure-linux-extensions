@@ -582,7 +582,7 @@ class DiskUtil(object):
         for i in range(len(lines)):
             line = lines[i]
             fstab_device, fstab_mount_point = self.parse_fstab_line(line)
-            if fstab_mount_point != mount_point: # Not the line we are looking for
+            if fstab_mount_point != mount_point:  # Not the line we are looking for
                 continue
 
             self.logger.log("Found the relevant fstab line: " + line)
@@ -606,7 +606,7 @@ class DiskUtil(object):
 
         if relevant_line is not None:
             with open('/etc/fstab.azure.backup', 'a+') as f:
-                f.write(relevant_line)
+                f.write("\n" + relevant_line)
 
     def get_fstab_bek_line(self):
         if self.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.distro_patcher.distro_info[1].startswith('14'):
@@ -620,7 +620,7 @@ class DiskUtil(object):
                 lines = f.readlines()
             if not any(["azure_bek_disk" in line for line in lines]):
                 with open("/etc/default/cryptdisks", 'a') as f:
-                    f.write(CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
+                    f.write('\n' + CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
 
     def remove_mount_info(self, mount_point):
         if not mount_point:
@@ -670,7 +670,7 @@ class DiskUtil(object):
 
         with open('/etc/fstab.azure.backup', 'r') as f:
             for line in f.readlines():
-                line = line.strip()
+                line = line.strip() + '\n'
                 pattern = '\s' + re.escape(mount_point_or_mapper_name) + '\s'
 
                 if re.search(pattern, line):
@@ -681,14 +681,14 @@ class DiskUtil(object):
                 lines_to_keep_in_backup_fstab.append(line)
 
         with open('/etc/fstab.azure.backup', 'w') as f:
-            f.write('\n'.join(lines_to_keep_in_backup_fstab))
+            f.writelines(lines_to_keep_in_backup_fstab)
 
         self.logger.log("fstab.azure.backup updated successfully")
 
         lines_that_remain_in_fstab = []
         with open('/etc/fstab', 'r') as f:
             for line in f.readlines():
-                line = line.strip()
+                line = line.strip() + '\n'
                 pattern = '\s' + re.escape(mount_point_or_mapper_name) + '\s'
                 if re.search(pattern, line):
                     # This line should not remain in the fstab.
