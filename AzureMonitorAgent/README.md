@@ -31,12 +31,12 @@ az vm extension set \
 
 
 ## Supported Linux Distributions 
- Currently Tested only on -
+ Currently Manually tested only on -
 * CentOS Linux 6, and 7 (x64)
 * Red Hat Enterprise Linux Server 6 and 7 (x64)
 * Ubuntu 16.04 LTS, 18.04 LTS(x64)
 
-Will Add more distros once they  manually tested
+Will Add more distros once they are tested
 
 ## Troubleshooting
 
