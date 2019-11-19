@@ -205,7 +205,7 @@ def install():
 
     try:
         if os.path.isfile("/etc/default/mdsd"):
-            with open("/etc/default/mdsd", "r+") as f:
+            with open("/etc/default/mdsd", "a+") as f:
                 data = f.read()
                 if "ENABLE_MCS=true" not in data:
                     f.write("\n")
