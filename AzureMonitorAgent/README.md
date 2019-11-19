@@ -21,13 +21,10 @@ You can deploy it using Azure CLI
 
 You can deploy the OmsAgent Extension by running:
 ```
-az vm extension set \
-  --resource-group myResourceGroup \
-  --vm-name myVM \
-  --name AzureMonitorLinuxAgent \
-  --publisher Microsoft.Azure.Monitor \
-  --version <version> \
+az vm extension set --name AzureMonitorLinuxAgent --publisher Microsoft.Azure.Monitor --version <version> --resource-group <My Resource Group> --vm-name <My VM Name>
 ```
+
+To update the version of the esisting installation of Azure Monitor Linux Agent extension on a VM, please add "--force-update" flag to the above command. (Currenty Waagent only supports this way of upgrading. Will update once we have more info from them.)
 
 
 ## Supported Linux Distributions 
