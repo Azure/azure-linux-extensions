@@ -205,11 +205,15 @@ def install():
 
     try:
         if os.path.isfile("/etc/default/mdsd"):
-            with open("/etc/default/mdsd", "a") as f:
-                f.write("\n")
-                f.write("export ENABLE_MCS=true\n")
-                f.write("export MCS_ENDPOINT=mcs.azure.com\n")
-                f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
+            with open("/etc/default/mdsd", "r+") as f:
+                data = f.read()
+                if "ENABLE_MCS=true" not in data:
+                    f.write("\n")
+                    f.write("export ENABLE_MCS=true\n")
+                if "MCS_ENDPOINT=mcs.azure.com" not in data:
+                    f.write("export MCS_ENDPOINT=mcs.azure.com\n")
+                if "AZURE_ENDPOINT=https://management.azure.com/" not in data:
+                    f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
@@ -230,7 +234,7 @@ def uninstall():
     """
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
-        OneAgentUninstallCommand = "dpkg -r azure-mdsd"
+        OneAgentUninstallCommand = "dpkg -P azure-mdsd"
     elif PackageManager == "rpm":
         OneAgentUninstallCommand = "rpm -e azure-mdsd"
     else:
