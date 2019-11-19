@@ -1,7 +1,7 @@
 # AzureMonitorLinuxAgent Extension
 Allow the owner of the Azure Virtual Machines to install the Azure Monitor Linux Agent
 
-The extension is currently in test versions 0.*
+The extension is currently in Canary. The test versions naming scheme is 0.* . The latest version is 0.4
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
@@ -19,7 +19,13 @@ You can deploy it using Azure CLI
  
 ### 1.1. Using Azure CLI Resource Manager
 
-You can deploy the OmsAgent Extension by running:
+You can view the availability of the Azure Monitor Linux Agent extension versions in each region by running:
+
+```
+az vm extension image list-versions -l <region> --name AzureMonitorLinuxAgent -p Microsoft.Azure.Monitor
+```
+
+You can deploy the Azure Monitor Linux Agent Extension by running:
 ```
 az vm extension set --name AzureMonitorLinuxAgent --publisher Microsoft.Azure.Monitor --version <version> --resource-group <My Resource Group> --vm-name <My VM Name>
 ```
