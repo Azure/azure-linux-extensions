@@ -79,7 +79,7 @@ class PrereqState(OSEncryptionState):
 
         contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
 
-        with open('/lib/systemd/system/walinuxagent.service', 'wb') as f:
+        with open('/lib/systemd/system/walinuxagent.service', 'w') as f:
             f.write(contents)
 
         self.context.logger.log("walinuxagent patched successfully")
