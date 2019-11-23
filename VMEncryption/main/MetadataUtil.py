@@ -61,8 +61,8 @@ class MetadataUtil(object):
                 all_info = "http://169.254.169.254/metadata/instance?api-version=2017-08-01"
                 request = urllib.request.Request(all_info)
                 request.add_header('Metadata', 'true')
-                response = urllib.request.urlopen(request)
-                self.metadata = json.load(response.decode("utf-8"))
+                response = urllib.request.urlopen(request).read().decode('UTF-8')
+                self.metadata = json.load(response)
             except:
                 message = "Metadata request failed: {0}".format(
                     traceback.format_exc())
