@@ -84,6 +84,7 @@ class UbuntuPatching(AbstractPatching):
         packages = ['at',
                     'cryptsetup-bin',
                     'lsscsi',
+                    'python3-parted',
                     'python-parted',
                     'python-six',
                     'procps',
