@@ -199,6 +199,7 @@ class GuestSnapshotter(object):
                 # initialize blob_snapshot_info_array
                 mp_jobs = []
                 blob_index = 0
+                self.logger.log('****** 5. Snaphotting (Guest-parallel) Started')
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
@@ -230,6 +231,7 @@ class GuestSnapshotter(object):
 
                 for job in mp_jobs:
                     job.join()
+                self.logger.log('****** 6. Snaphotting (Guest-parallel) Completed')
                 thaw_result = None
                 if g_fsfreeze_on and thaw_done_local == False:
                     time_before_thaw = datetime.datetime.now()
@@ -292,6 +294,7 @@ class GuestSnapshotter(object):
             blobs = paras.blobs
             if blobs is not None:
                 blob_index = 0
+                self.logger.log('****** 5. Snaphotting (Guest-seq) Started')
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
@@ -305,6 +308,7 @@ class GuestSnapshotter(object):
                         all_failed = False
                     blob_index = blob_index + 1
 
+                self.logger.log('****** 6. Snaphotting (Guest-seq) Completed')
                 all_snapshots_failed = all_failed
                 self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
 

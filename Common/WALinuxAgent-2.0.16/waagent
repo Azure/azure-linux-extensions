@@ -6509,9 +6509,12 @@ def DistInfo(fullname=0):
         distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
         if not distinfo[0]:
             distinfo = dist_info_SLES15()
+        if not distinfo[0]:
+            distinfo = dist_info_opensuse15()
         return distinfo
     else:
         return platform.dist()
+
 
 def dist_info_SLES15():
     os_release_filepath = "/etc/os-release"
@@ -6534,6 +6537,27 @@ def dist_info_SLES15():
         return "SuSE", version_id, "suse"
     return ["","",""]
 
+
+def dist_info_opensuse15():
+    os_release_filepath = "/etc/os-release"
+    if not os.path.isfile(os_release_filepath):
+        return ["","",""]
+    info = open(os_release_filepath).readlines()
+    found_name_opensuse_leap = False
+    found_id_opensuse_leap = False
+    version_id = ""
+    for line in info:
+        if "NAME=\"openSUSE" in line and "Leap" in line:
+            found_name_opensuse_leap = True
+        if "ID=\"opensuse-leap\"" in line:
+            found_id_opensuse_leap = True
+        if "VERSION_ID" in line:
+            match = re.match(r'VERSION_ID="([.0-9]+)"', line)
+            if match:
+                version_id = match.group(1)
+    if found_name_opensuse_leap and found_id_opensuse_leap and version_id:
+        return "SuSE", version_id, "suse"
+    return ["","",""]
 
 
 def PackagedInstall(buildroot):

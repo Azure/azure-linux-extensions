@@ -1,8 +1,8 @@
 ﻿#!/usr/bin/env python
 #
-# VM Backup extension
+# Azure Disk Encryption For Linux Extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2019 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999339'
+    extension_version = '0.1.0.999341'
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
