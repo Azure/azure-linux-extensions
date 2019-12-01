@@ -54,6 +54,10 @@ install_times = {}
 
 runwith = '--verbose'
 
+os.system('touch ./omsfiles/omsresults.log')
+os.system('touch ./omsfiles/omsresults.html')
+os.system('touch ./omsfiles/omsresults.status')
+
 vms_list = []
 if len(sys.argv) > 0:
     options = sys.argv[1:]
@@ -148,6 +152,10 @@ def get_time_diff(timevalue1, timevalue2):
     timediff = timevalue2 - timevalue1
     minutes, seconds = divmod(timediff.days * 86400 + timediff.seconds, 60)
     return minutes, seconds
+
+# Correct potential windows line endings with dos2unix command
+def dos_2_unix():
+    os.system('dos2unix ./omsfiles/*')
 
 # Secure copy required files from local to vm
 def copy_to_vm(dnsname, username, ssh_private, location):
@@ -286,6 +294,7 @@ def create_vm_and_install_extension():
         html_open = open(vm_html_file, 'a+')
         print("\nCreate VM and Install Extension - {0}: {1} \n".format(vmname, image))
         create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
+        dos_2_unix()
         copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')
@@ -330,6 +339,7 @@ def create_vm_and_install_old_extension():
         html_open = open(vm_html_file, 'a+')
         print("\nCreate VM and Install Extension {0} v-{1} - {2}: {3} \n".format(extension, old_version, vmname, image))
         create_vm(resource_group, vmname, image, username, ssh_public, location, dnsname, size, nsg_uri)
+        dos_2_unix()
         copy_to_vm(dnsname, username, ssh_private, location)
         delete_extension(extension, vmname, resource_group)
         run_command(resource_group, vmname, 'RunShellScript', 'python -u /tmp/oms_extension_run_script.py -preinstall')

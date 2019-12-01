@@ -244,7 +244,7 @@ class DiskUtil(object):
 
     def add_crypt_item_to_crypttab(self, crypt_item, key_file):
         if key_file is None and crypt_item.uses_cleartext_key:
-            line_key_file = self.encryption_environment.cleartext_key_base_path + mapper_name
+            line_key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
         else:
             line_key_file = key_file
 
@@ -743,7 +743,7 @@ class DiskUtil(object):
 
         mount_items = self.get_mount_items()
         device_items = self.get_device_items(None)
-        device_items_dict = {device_item.mount_point: device_item for device_item in device_items}
+        device_items_dict = dict([(device_item.mount_point, device_item) for device_item in device_items])
 
         os_drive_encrypted = False
         data_drives_found = False

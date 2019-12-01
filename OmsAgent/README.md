@@ -1,7 +1,7 @@
 # OmsAgent Extension
 Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboard to Operations Management Suite
 
-Latest version is 1.9.1.
+Latest version is 1.12.1.
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
@@ -48,23 +48,36 @@ Schema for the protected configuration file looks like this:
 
 You can deploy it using Azure CLI, Azure Powershell and ARM template.
 
-> **NOTE:** Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
-In different models, the deploying commands have different syntaxes. Please select the right
-one in section 2.1 and 2.2 below.
+
  
 ### 2.1. Using [**Azure CLI**][azure-cli]
 Before deploying OmsAgent Extension, you should configure your `public.json` and `protected.json`
 (in section 1.1 and 1.2 above).
 
-#### 2.1.1 Classic
-The Classic mode is also called Azure Service Management mode. You can change to it by running:
+#### 2.1.1 Resource Manager
+
+You can deploy the OmsAgent Extension by running:
 ```
-$ azure config mode asm
+az vm extension set \
+  --resource-group myResourceGroup \
+  --vm-name myVM \
+  --name OmsAgentForLinux \
+  --publisher Microsoft.EnterpriseCloud.Monitoring \
+  --version <version> --protected-settings '{"workspaceKey": "omskey"}' \
+  --settings '{"workspaceId": "omsid"}'
+
+```
+
+#### 2.1.2 Classic
+Classic mode is used to managed legacy resources created outside of Resource Manager, and requires the [classic cli][azure-cli-classic] to manage via the command line.
+You need to enable Classic Mode (also called Azure Service Management mode) in the cli by running:
+```
+azure config mode asm
 ```
 
 You can deploy the OmsAgent Extension by running:
 ```
-$ azure vm extension set <vm-name> \
+azure vm extension set <vm-name> \
 OmsAgentForLinux Microsoft.EnterpriseCloud.Monitoring <version> \
 --public-config-path public.json  \
 --private-config-path protected.json
@@ -74,63 +87,12 @@ In the command above, you can change version with `'*'` to use latest
 version available, or `'1.*'` to get newest version that does not introduce non-
 breaking schema changes. To learn the latest version available, run:
 ```
-$ azure vm extension list
+azure vm extension list
 ```
-
-#### 2.1.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
-```
-$ azure config mode arm
-```
-
-You can deploy the OmsAgent Extension by running:
-```
-$ azure vm extension set <resource-group> <vm-name> \
-OmsAgentForLinux Microsoft.EnterpriseCloud.Monitoring <version> \
---public-config-path public.json  \
---private-config-path protected.json
-```
-
-> **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
-
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
-#### 2.2.1 Classic
-
-You can login to your Azure account (Azure Service Management mode) by running:
-
-```powershell
-Add-AzureAccount
-```
-
-You can deploy the OmsAgent Extension by running:
-
-```powershell
-$VmName = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
-
-$ExtensionName = 'OmsAgentForLinux'
-$Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
-$Version = '<version>'
-
-$PublicConf = '{
-    "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
-}'
-$PrivateConf = '{
-    "workspaceKey": "<workspace key>",
-    "proxy": "<proxy string>",
-    "vmResourceId": "<vm resource id>"
-}'
-
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
-  -Publisher $Publisher -Version $Version `
-  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
-  Update-AzureVM
-```
-
-#### 2.2.2 Resource Manager
+#### 2.2.1 Resource Manager
 
 You can login to your Azure account (Azure Resource Manager mode) by running:
 
@@ -166,6 +128,41 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   -ExtensionType $ExtensionName -TypeHandlerVersion $Version `
   -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
 ```
+
+#### 2.2.2 Classic
+
+You can login to your Azure account (Azure Service Management mode) by running:
+
+```powershell
+Add-AzureAccount
+```
+
+You can deploy the OmsAgent Extension by running:
+
+```powershell
+$VmName = '<vm-name>'
+$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
+
+$ExtensionName = 'OmsAgentForLinux'
+$Publisher = 'Microsoft.EnterpriseCloud.Monitoring'
+$Version = '<version>'
+
+$PublicConf = '{
+    "workspaceId": "<workspace id>",
+    "stopOnMultipleConnections": true/false
+}'
+$PrivateConf = '{
+    "workspaceKey": "<workspace key>",
+    "proxy": "<proxy string>",
+    "vmResourceId": "<vm resource id>"
+}'
+
+Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
+  -Publisher $Publisher -Version $Version `
+  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
+  Update-AzureVM
+```
+
 
 ### 2.3. Using [**ARM Template**][arm-template]
 ```json
@@ -246,6 +243,7 @@ Additional error codes and troubleshooting information can be found on the [OMS-
 
 
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
-[azure-cli]: https://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
+[azure-cli-classic]: https://docs.microsoft.com/en-us/cli/azure/install-classic-cli
+[azure-cli]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/

@@ -263,6 +263,7 @@ def main(command):
     global g_ext_op_type
 
     g_ext_op_type = get_extension_operation_type(command)
+    waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
     if not check_for_supported_waagent_and_distro_version():
         return
@@ -293,11 +294,27 @@ def main(command):
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
+            # Install dependencies (omsagent, which includes omi, scx).
+            configurator = create_core_components_configs()
+            dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+            if dependencies_err != 0:
+                g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+                hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
+                return
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Enable:
+            if hutil.is_current_config_seq_greater_inused():
+                configurator = create_core_components_configs()
+                dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+                if dependencies_err != 0:
+                    g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
+                    hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
+                    return
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
                 RunGetOutput('systemctl enable mdsd-lde')
@@ -373,13 +390,6 @@ def start_mdsd(configurator):
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    # We first need to install dependencies (omsagent, which includes omi) because even running 'mdsd -v'
-    # requires omi client library (/opt/omi/lib/libmicxx.so).
-    dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
-    if dependencies_err != 0:
-        g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
-        return
-
     # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
     tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
@@ -397,8 +407,9 @@ def start_mdsd(configurator):
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
     # Don't check if starting succeeded, as it'll be done in the loop below anyway.
-    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running")[0] is 1
+    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running", should_log=False)[0] is 1
     if not omi_running:
+        hutil.log("OMI is not running. Restarting it.")
         RunGetOutput("/opt/omi/bin/service_control restart")
 
     log_dir = hutil.get_log_dir()
@@ -634,7 +645,21 @@ def restart_omi_if_crashed(omi_installed, mdsd):
                         "Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
             omi_restart_msg = RunGetOutput("/opt/omi/bin/service_control restart")[1]
             hutil.log("OMI restart result: " + omi_restart_msg)
-            time.sleep(5)
+            time.sleep(10)
+
+            # Query OMI once again to make sure restart fixed the issue.
+            # If not, attempt to re-install OMI as last resort.
+            cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
+            should_reinstall_omi = cmd_exit_status is not 0
+            if should_reinstall_omi:
+                hutil.error("OMI noop query failed even after OMI was restarted. Attempting to re-install the components.")
+                configurator = create_core_components_configs()
+                dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
+                if dependencies_err != 0:
+                    hutil.error("Re-installing the components failed with error code: " + dependencies_err + ", error message: " +  dependencies_msg)
+                    return omi_installed
+                else:
+                    omi_reinstalled = True
 
     # mdsd needs to be signaled if OMI was restarted or reinstalled because mdsd used to give up connecting to OMI
     # if it fails first time, and never retried until signaled. mdsd was fixed to retry now, but it's still
