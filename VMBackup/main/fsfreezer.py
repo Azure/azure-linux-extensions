@@ -137,20 +137,28 @@ class FsFreezer:
         self.root_seen = False
         error_msg=''
         timedout = False
+        self.skip_freeze = True 
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
             args=[freezebin,str(timeout)]
-            arg=[]
+            no_mount_found = True
             for mount in self.mounts.mounts:
                 self.logger.log("fsfreeze mount :" + str(mount.mount_point), True)
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
                 elif(mount.mount_point and not self.should_skip(mount)):
+                    if(self.skip_freeze == True):
+                        self.skip_freeze = False
                     args.append(str(mount.mount_point))
-            if(self.root_seen):
+            if(self.root_seen and not self.should_skip(self.root_mount)):
+                if(self.skip_freeze == True):
+                    self.skip_freeze = False
                 args.append('/')
+            self.logger.log("skip freeze is : " + str(self.skip_freeze), True)
+            if(self.skip_freeze == True):
+                return freeze_result,timedout
             self.logger.log("arg : " + str(args),True)
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
@@ -180,6 +188,8 @@ class FsFreezer:
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
+        if(self.skip_freeze == True):
+            return thaw_result, unable_to_sleep
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
             self.logger.log("****** 7. Error - Binary Process Already Completed", True)
