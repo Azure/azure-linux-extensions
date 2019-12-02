@@ -174,6 +174,10 @@ class FsFreezer:
                     error_msg="freeze timed-out"
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
+                elif (self.mount_open_failed == True):
+                    error_msg="file open failed for some mount"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
                 else:
                     error_msg="freeze failed for some mount"
                     freeze_result.errors.append(error_msg)
@@ -234,10 +238,11 @@ class FsFreezer:
                 line = str(line, encoding='utf-8', errors="backslashreplace")
             else:
                 line = str(line)
+            if("Failed to open:" in line):
+                self.mount_open_failed = True
             if(line != ''):
                 self.logger.log(line.rstrip(), True)
             else:
                 break
         self.logger.log("============== Binary output traces end ================= ", True)
-
 

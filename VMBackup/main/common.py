@@ -87,6 +87,7 @@ class CommonVariables:
     FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
     FailedFsFreezeTimeout = 122
+    FailedUnableToOpenMount = 123
 
     """
     Pre-Post Plugin error code definitions
