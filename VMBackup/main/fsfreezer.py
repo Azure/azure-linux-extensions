@@ -26,6 +26,7 @@ import sys
 import signal
 import traceback
 import threading
+from common import CommonVariables
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
@@ -125,7 +126,7 @@ class FsFreezer:
         self.frozen_items = set()
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
-
+        self.mount_open_failed = False
 
     def should_skip(self, mount):
         if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
@@ -175,7 +176,7 @@ class FsFreezer:
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
                 elif (self.mount_open_failed == True):
-                    error_msg="file open failed for some mount"
+                    error_msg=CommonVariables.unable_to_open_err_string
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
                 else:
