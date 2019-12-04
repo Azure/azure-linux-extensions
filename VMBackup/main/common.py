@@ -66,6 +66,8 @@ class CommonVariables:
     status_success = 'success'
     status_error = 'error'
 
+    unable_to_open_err_string= 'file open failed for some mount'
+
     """
     error code definitions
     """
@@ -87,6 +89,7 @@ class CommonVariables:
     FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
     FailedFsFreezeTimeout = 122
+    FailedUnableToOpenMount = 123
 
     """
     Pre-Post Plugin error code definitions

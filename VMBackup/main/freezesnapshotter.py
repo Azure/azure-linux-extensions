@@ -229,6 +229,13 @@ class FreezeSnapshotter(object):
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout
                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Error')
+            elif(freeze_result is not None and len(freeze_result.errors) > 0 and CommonVariables.unable_to_open_err_string in str(freeze_result)):
+                run_result = CommonVariables.FailedUnableToOpenMount
+                run_status = 'error'
+                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+                self.logger.log(error_msg, True, 'Warning')
             elif(freeze_result is not None and len(freeze_result.errors) > 0):
                 run_result = CommonVariables.FailedFsFreezeFailed
                 run_status = 'error'
