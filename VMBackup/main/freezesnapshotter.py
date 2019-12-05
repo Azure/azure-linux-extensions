@@ -60,6 +60,7 @@ class FreezeSnapshotter(object):
         self.hostIp = '168.63.129.16'
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
         self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
+        self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
 
         #implement in next release
         '''
@@ -262,8 +263,6 @@ class FreezeSnapshotter(object):
         blob_snapshot_info_array = None
         all_snapshots_failed = False
         try:
-            if self.g_fsfreeze_on :
-                run_result, run_status = self.freeze()
             if( self.para_parser.blobs == None or len(self.para_parser.blobs) == 0) :
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 run_status = 'error'
@@ -271,8 +270,12 @@ class FreezeSnapshotter(object):
                 self.logger.log(error_msg, True, 'Error')
                 all_failed = True
                 all_snapshots_failed = True
+                return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
-            if(run_result == CommonVariables.success):
+            if self.g_fsfreeze_on :
+                run_result, run_status = self.freeze()
+
+            if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
@@ -352,7 +355,7 @@ class FreezeSnapshotter(object):
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()
-        if(run_result == CommonVariables.success):
+        if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
             snap_shotter = HostSnapshotter(self.logger, self.hostIp)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()

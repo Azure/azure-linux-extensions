@@ -220,6 +220,24 @@ def check_snapshot_array_fail():
                 break
     return snapshot_array_fail
 
+def get_key_value(jsonObj, key)
+    value = None
+    if(key in jsonObj.keys()):
+        value = jsonObj[ey]
+    return value
+
+def can_take_crash_consistent_snapshot(para_parser):
+    global backup_logger
+    if(para_parser != None and para_parser.customSettings != None and para_parser.customSettings != ''):
+        customSettings = json.loads(para_parser.customSettings)
+        isManagedVm = get_key_value(customSettings, 'isManagedVm')
+        canTakeCrashConsistentSnapshot = get_key_value(customSettings, 'canTakeCrashConsistentSnapshot')
+        backupRetryCount = get_key_value(customSettings, 'backupRetryCount')
+        numberOfDisks = len(para_parser.includeLunList)
+        if(isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
+            return True
+    return False
+
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
     #this is using the most recent file timestamp.
