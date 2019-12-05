@@ -50,8 +50,8 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.118-build.master.54_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.118-build.master.54_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.119-build.dev_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.119-build.dev_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
@@ -210,10 +210,18 @@ def install():
                 if "ENABLE_MCS=true" not in data:
                     f.write("\n")
                     f.write("export ENABLE_MCS=true\n")
+                    
+                # for integration testing
                 if "MCS_ENDPOINT=mcs.azure.com" not in data:
-                    f.write("export MCS_ENDPOINT=mcs.azure.com\n")
+                    f.write("export MCS_ENDPOINT=eastus.amcs.ppe.control.monitor.azure.com\n")
                 if "AZURE_ENDPOINT=https://management.azure.com/" not in data:
                     f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
+                if "ADD_REGION_TO_MCS_ENDPOINT" not in data:
+                    f.write("export ADD_REGION_TO_MCS_ENDPOINT=false\n")
+                if "OMS_TLD" not in data:
+                    f.write("export OMS_TLD=int2.microsoftatlanta-int.com\n")
+                if "customResourceId" not in data:
+                    f.write("export customResourceId=/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM\n")
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
