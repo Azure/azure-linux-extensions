@@ -75,3 +75,19 @@ class ExtVmHealthStateEnum():
     green = 0
     yellow = 128
     red = 256
+
+class SnapshotConsistencyType():
+    none = 0
+    fileSystemConsistent = 1
+    applicationConsistent = 2
+    crashConsistent = 3
+
+class ExtensionResponse:
+    def __init__(self, messageStr, snapshotUri, errorMessage):
+        self.messageStr = messageStr
+        self.snapshotConsistency = snapshotConsistency
+        self.jobMessage = jobMessage
+
+    def convertToDictionary(self):
+        return dict(messageStr = self.messageStr, snapshotConsistency = self.snapshotConsistency, jobMessage = self.jobMessage)
+

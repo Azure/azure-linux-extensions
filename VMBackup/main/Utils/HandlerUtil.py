@@ -90,6 +90,8 @@ class HandlerUtility:
     telemetry_data = {} 
     serializable_telemetry_data = []
     ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
+    SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
+    HealthStatusCode = -1
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -140,18 +142,24 @@ class HandlerUtility:
             sys.exit(0)
 
     def log(self, message,level='Info'):
-        WriteLog = self.get_value_from_configfile('WriteLog')
-        if (WriteLog == None or WriteLog == 'True'):
-            if sys.version_info > (3,):
-                if self.logging_file is not None:
-                    self.log_py3(message)
+        try:
+            WriteLog = self.get_value_from_configfile('WriteLog')
+            if (WriteLog == None or WriteLog == 'True'):
+                if sys.version_info > (3,):
+                    if self.logging_file is not None:
+                        self.log_py3(message)
+                    else:
+                        pass
+                    #self.log_to_file() 
                 else:
-                    pass
-                #self.log_to_file() 
-            else:
-                self._log(self._get_log_prefix() + message)
-            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
-        self.log_message = self.log_message + message
+                    self._log(self._get_log_prefix() + message)
+                message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+            self.log_message = self.log_message + message
+        except IOError:
+            pass
+        except Exception as e:
+            errMsg='Exception in hutil.log'
+            self.log(errMsg, 'Warning')
 
     def log_py3(self, msg):
         if type(msg) is not str:
@@ -430,6 +438,12 @@ class HandlerUtility:
         if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
             self.ExtErrorCode = extErrorCode
 
+    def SetSnaphotConsistencyType(self, snapshotConsistency):
+        self.SnapshotConsistency == snapshotConsistency
+
+    def SetHealthStatusCode(self, healthStatusCode):
+        self.HealthStatusCode == healthStatusCode
+
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Utils.Status.FormattedMessage("en-US",message)
@@ -569,10 +583,28 @@ class HandlerUtility:
 
         if CommonVariables.statusBlobUploadError in HandlerUtility.telemetry_data.keys():
             message = "{0} {1}={2}, ".format(message , CommonVariables.statusBlobUploadError , HandlerUtility.telemetry_data[CommonVariables.statusBlobUploadError])
+        message = message + snapshotTelemetry
 
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
+
+        consistencyTypeStr = 'crashConsistent'
+        if HandlerUtility.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent
+            if status_code == CommonVariables.success_appconsistent
+                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.applicationConsistent
+                consistencyTypeStr = 'applicationConsistent'
+            elif status_code == CommonVariables.success
+                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.fileSystemConsistent
+                consistencyTypeStr = 'fileSystemConsistent'
+            else
+                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
+                consistencyTypeStr = 'none'
+        HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
+
+        extensionResponseObj = Utils.Status.ExtensionResponse(message, HandlerUtility.SnapshotConsistencyHandler, "")
+        message = json.dumps(extensionResponseObj, cls = ComplexEncoder)
+
         self.convert_telemetery_data_to_bcm_serializable_format()
-        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message + snapshotTelemetry, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
+        stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
         time_span = self.timedelta_total_seconds(time_delta) * 1000
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
@@ -585,7 +617,7 @@ class HandlerUtility:
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
             status = CommonVariables.status_success
-        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message + snapshotTelemetry, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
+        stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
         # rename all other status files, or the WALA would report the wrong

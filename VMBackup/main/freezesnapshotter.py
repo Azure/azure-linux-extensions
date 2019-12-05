@@ -44,7 +44,7 @@ import ExtensionErrorCodeHelper
 
 class FreezeSnapshotter(object):
     """description of class"""
-    def __init__(self, logger, hutil , freezer, g_fsfreeze_on, para_parser):
+    def __init__(self, logger, hutil , freezer, g_fsfreeze_on, para_parser, takeCrashConsistentSnapshot):
         self.logger = logger
         self.configfile = '/etc/azure/vmbackup.conf'
         self.hutil = hutil
@@ -59,6 +59,7 @@ class FreezeSnapshotter(object):
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
+        self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
 
         #implement in next release
         '''
