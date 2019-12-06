@@ -197,9 +197,15 @@ def freeze_snapshot(timeout):
             hutil.set_value_to_configfile('seqsnapshot', '0')
         seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
         backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
-        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
+        canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
+        if (canTakeCrashConsistentSnapshot == True and run_result != CommonVariables.success and run_result != CommonVariables.success_appconsistent):
+            if (snapshot_info_array is not None and snapshot_info_array !=[] and check_snapshot_array_fail() == False and len(snapshot_info_array) == 1):
+                run_status = CommonVariables.status_success
+                run_result = CommonVariables.success
+                hutil.SetConsistencyType(Status.SnapshotConsistencyType.crashConsistent)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -220,7 +226,7 @@ def check_snapshot_array_fail():
                 break
     return snapshot_array_fail
 
-def get_key_value(jsonObj, key)
+def get_key_value(jsonObj, key):
     value = None
     if(key in jsonObj.keys()):
         value = jsonObj[ey]

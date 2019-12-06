@@ -588,19 +588,19 @@ class HandlerUtility:
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
 
         consistencyTypeStr = 'crashConsistent'
-        if HandlerUtility.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent
-            if status_code == CommonVariables.success_appconsistent
-                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.applicationConsistent
+        if (self.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent):
+            if (status_code == CommonVariables.success_appconsistent):
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.applicationConsistent
                 consistencyTypeStr = 'applicationConsistent'
-            elif status_code == CommonVariables.success
-                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.fileSystemConsistent
+            elif (status_code == CommonVariables.success):
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.fileSystemConsistent
                 consistencyTypeStr = 'fileSystemConsistent'
-            else
-                HandlerUtility.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
+            else:
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
                 consistencyTypeStr = 'none'
         HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
 
-        extensionResponseObj = Utils.Status.ExtensionResponse(message, HandlerUtility.SnapshotConsistencyHandler, "")
+        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")
         message = json.dumps(extensionResponseObj, cls = ComplexEncoder)
 
         self.convert_telemetery_data_to_bcm_serializable_format()

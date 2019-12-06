@@ -83,7 +83,7 @@ class SnapshotConsistencyType():
     crashConsistent = 3
 
 class ExtensionResponse:
-    def __init__(self, messageStr, snapshotUri, errorMessage):
+    def __init__(self, messageStr, snapshotConsistency, jobMessage):
         self.messageStr = messageStr
         self.snapshotConsistency = snapshotConsistency
         self.jobMessage = jobMessage
