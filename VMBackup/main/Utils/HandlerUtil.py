@@ -438,11 +438,11 @@ class HandlerUtility:
         if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
             self.ExtErrorCode = extErrorCode
 
-    def SetSnaphotConsistencyType(self, snapshotConsistency):
-        self.SnapshotConsistency == snapshotConsistency
+    def SetSnapshotConsistencyType(self, snapshotConsistency):
+        self.SnapshotConsistency = snapshotConsistency
 
     def SetHealthStatusCode(self, healthStatusCode):
-        self.HealthStatusCode == healthStatusCode
+        self.HealthStatusCode = healthStatusCode
 
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
@@ -601,7 +601,7 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
 
         extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")
-        message = json.dumps(extensionResponseObj, cls = ComplexEncoder)
+        message = str(json.dumps(extensionResponseObj, cls = ComplexEncoder))
 
         self.convert_telemetery_data_to_bcm_serializable_format()
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
