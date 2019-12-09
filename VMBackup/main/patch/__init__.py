@@ -72,6 +72,20 @@ def GetMyPatching(logger):
     Distro = Distro.strip(' ')
     patching_class_name = Distro + 'Patching'
     if patching_class_name not in globals():
+        if ('SuSE'.lower() in Distro.lower()):
+            Distro = 'SuSE'
+        elif ('Ubuntu'.lower() in Distro.lower()):
+            Distro = 'Ubuntu'
+        elif ('centos'.lower() in Distro.lower()):
+            Distro = 'centos'
+        elif ('debian'.lower() in Distro.lower()):
+            Distro = 'debian'
+        elif ('oracle'.lower() in Distro.lower()):
+            Distro = 'oracle'
+        elif ('redhat'.lower() in Distro.lower()):
+            Distro = 'redhat'
+        patching_class_name = Distro + 'Patching'
+    if patching_class_name not in globals():
         logger.log('{0} is not a supported distribution.'.format(Distro))
         return None
     patchingInstance = globals()[patching_class_name](logger,dist_info)

@@ -228,55 +228,59 @@ class HandlerUtility:
         config = None
         ctxt = None
         code = 0
-        # get the HandlerEnvironment.json.  According to the extension handler
-        # spec, it is always in the ./ directory
-        self.log('cwd is ' + os.path.realpath(os.path.curdir))
-        handler_env_file = './HandlerEnvironment.json'
-        if not os.path.isfile(handler_env_file):
-            self.error("Unable to locate " + handler_env_file)
-            return None
-        ctxt = waagent.GetFileContents(handler_env_file)
-        if ctxt == None :
-            self.error("Unable to read " + handler_env_file)
         try:
-            handler_env = json.loads(ctxt)
-        except:
-            pass
-        if handler_env == None :
-            self.log("JSON error processing " + handler_env_file)
-            return None
-        if type(handler_env) == list:
-            handler_env = handler_env[0]
-        self._context._name = handler_env['name']
-        self._context._version = str(handler_env['version'])
-        self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
-        self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
-        self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
-        self.logging_file=self._context._log_file
-        self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
-        self._change_log_file()
-        self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
-        self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-        self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
-        if self._context._seq_no < 0:
-            self.error("Unable to locate a .settings file!")
-            return None
-        self._context._seq_no = str(self._context._seq_no)
-        self.log('sequence number is ' + self._context._seq_no)
-        self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
-        self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-        self.log("setting file path is" + self._context._settings_file)
-        ctxt = None
-        ctxt = waagent.GetFileContents(self._context._settings_file)
-        if ctxt == None :
-            error_msg = 'Unable to read ' + self._context._settings_file + '. '
-            self.error(error_msg)
-            return None
-        else:
-            if(self.operation is not None and self.operation.lower() == "enable"):
-                # we should keep the current status file
-                self.backup_settings_status_file(self._context._seq_no)
-        self._context._config = self._parse_config(ctxt)
+            # get the HandlerEnvironment.json.  According to the extension handler
+            # spec, it is always in the ./ directory
+            self.log('cwd is ' + os.path.realpath(os.path.curdir))
+            handler_env_file = './HandlerEnvironment.json'
+            if not os.path.isfile(handler_env_file):
+                self.error("Unable to locate " + handler_env_file)
+                return None
+            ctxt = waagent.GetFileContents(handler_env_file)
+            if ctxt == None :
+                self.error("Unable to read " + handler_env_file)
+            try:
+                handler_env = json.loads(ctxt)
+            except:
+                pass
+            if handler_env == None :
+                self.log("JSON error processing " + handler_env_file)
+                return None
+            if type(handler_env) == list:
+                handler_env = handler_env[0]
+            self._context._name = handler_env['name']
+            self._context._version = str(handler_env['version'])
+            self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
+            self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
+            self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+            self.logging_file=self._context._log_file
+            self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
+            self._change_log_file()
+            self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
+            self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
+            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if self._context._seq_no < 0:
+                self.error("Unable to locate a .settings file!")
+                return None
+            self._context._seq_no = str(self._context._seq_no)
+            self.log('sequence number is ' + self._context._seq_no)
+            self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
+            self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
+            self.log("setting file path is" + self._context._settings_file)
+            ctxt = None
+            ctxt = waagent.GetFileContents(self._context._settings_file)
+            if ctxt == None :
+                error_msg = 'Unable to read ' + self._context._settings_file + '. '
+                self.error(error_msg)
+                return None
+            else:
+                if(self.operation is not None and self.operation.lower() == "enable"):
+                    # we should keep the current status file
+                    self.backup_settings_status_file(self._context._seq_no)
+            self._context._config = self._parse_config(ctxt)
+        except Exception as e:
+            errorMsg = "Unable to parse context, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Error')
         return self._context
 
     def _change_log_file(self):
