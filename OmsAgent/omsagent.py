@@ -32,7 +32,8 @@ import base64
 import inspect
 import urllib
 import urllib2
-import watcherutilimport shutil
+import watcherutil
+import shutil
 
 from threading import Thread
 
@@ -1106,7 +1107,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
                 output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            if "conflicts with file from package" in output or "Failed dependencies:" in output or "Please install curl" in output "is needed by" in output or "check_version_installable" in output or "Error: curl was not installed" in output or "Please install the ctypes package" in output "gpg is not installed" in output:
+            if "conflicts with file from package" in output or "Failed dependencies:" in output or "Please install curl" in output "is needed by" in output or "check_version_installable" in output or "Error: curl was not installed" in output or "Please install the ctypes package" in output or "gpg is not installed" in output:
                 # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
