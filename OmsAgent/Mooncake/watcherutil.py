@@ -45,7 +45,8 @@ MemoryThresholdToWatchFor = 20
 OmsAgentPidFile = "/var/opt/microsoft/omsagent/run/omsagent.pid"
 OmsAgentLogFile = "/var/opt/microsoft/omsagent/log/omsagent.log"
 reg_ex = re.compile('([0-9]{4}-[0-9]{2}-[0-9]{2}.*)\[(\w+)\]:(.*)')
-
+maxMessageSize = 100
+OMSExtensionVersion = '1.12.15'
 """
 We can add to the list below with more error messages to identify non recoverable errors.
 """
@@ -173,7 +174,7 @@ class Watcher:
                         {{
 
             			"name": "Version",
-            			"value": "1.8.11"
+            			"value": \"""" + OMSExtensionVersion + """\"
              		}},
 
                         {{
@@ -207,20 +208,21 @@ class Watcher:
                 "/var/opt/microsoft/omsagent/log/ODSIngestionAPI.status",
                 "/var/opt/microsoft/omsconfig/status/dscperformconsistency",
                 "/var/opt/microsoft/omsconfig/status/dscperforminventory",
-                "/var/opt/microsoft/omsconfig/status/dscsetlcm"
+                "/var/opt/microsoft/omsconfig/status/dscsetlcm",
+                "/var/opt/microsoft/omsconfig/status/omsconfighost"
             ]            
         for sf in status_files:
             if os.path.isfile(sf):
                 mod_time = os.path.getmtime(sf)
                 curr_time = int(time.time())
                 if (curr_time - mod_time < 300):
-
                     with open(sf) as json_file:
                         try:
                             status_data = json.load(json_file)
                             operation = status_data["operation"]
                             operation_success = status_data["success"]
-                            message = status_data["message"]
+                            # Truncating the message to prevent flooding the system
+                            message = status_data["message"][:maxMessageSize]
 
                             event = self.create_telemetry_event(operation,operation_success,message,"300000")
                             self._hutil_log("Writing telemetry event: "+event)
@@ -229,7 +231,14 @@ class Watcher:
 
                         except Exception as e:
                             self._hutil_log("Error parsing telemetry status file: "+sf)
-                            self._hutil_log("Exception info: "+traceback.format_exc())                            
+                            self._hutil_log("Exception info: "+traceback.format_exc())
+                    if sf.startswith("/var/opt/microsoft/omsconfig/status"):
+                        try:
+                            self._hutil_log("Cleaning up: " + sf)
+                            os.remove(sf)
+                        except Exception as e:
+                            self._hutil_log("Error removing telemetry status file: "+  sf)
+                            self._hutil_log("Exception info: " + traceback.format_exc())
                 else:
                     self._hutil_log("Telemetry status file not updated in last 5 mins: "+sf)
             else:
