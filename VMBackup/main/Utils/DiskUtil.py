@@ -203,7 +203,7 @@ class DiskUtil(object):
                      lsblk_path = str(out_which_output)
                      is_lsblk_path_wrong, out_lsblk_output, error_msg = self.get_lsblk_pairs_output(lsblk_path, dev_path)
             # if error_msg contains "invalid option", then get device_items using method get_device_items_from_lsblk_list
-            if (error_msg is not None and error_msg.strip() != "" and 'invalid option' in error_msg):
+            if (error_msg is not None and error_msg.strip() != "" and ('invalid option' in error_msg or 'P' in error_msg)):
                 device_items = self.get_device_items_from_lsblk_list(lsblk_path, dev_path)
             # else get device_items from parsing the lsblk command output
             elif (out_lsblk_output is not None):

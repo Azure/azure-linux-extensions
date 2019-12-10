@@ -133,12 +133,12 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
         if total_used_size == -1 :
             sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
-            number_of_blobs = len(para_parser.blobs)
+            number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
             if(total_used_size>maximum_possible_size):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        if(para_parser is not None):
             blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
@@ -197,9 +197,15 @@ def freeze_snapshot(timeout):
             hutil.set_value_to_configfile('seqsnapshot', '0')
         seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
         backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
-        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
+        canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
+        if (canTakeCrashConsistentSnapshot == True and run_result != CommonVariables.success and run_result != CommonVariables.success_appconsistent):
+            if (snapshot_info_array is not None and snapshot_info_array !=[] and check_snapshot_array_fail() == False and len(snapshot_info_array) == 1):
+                run_status = CommonVariables.status_success
+                run_result = CommonVariables.success
+                hutil.SetSnapshotConsistencyType(Status.SnapshotConsistencyType.crashConsistent)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -219,6 +225,26 @@ def check_snapshot_array_fail():
                 snapshot_array_fail = True
                 break
     return snapshot_array_fail
+
+def get_key_value(jsonObj, key):
+    value = None
+    if(key in jsonObj.keys()):
+        value = jsonObj[key]
+    return value
+
+def can_take_crash_consistent_snapshot(para_parser):
+    global backup_logger
+    takeCrashConsistentSnapshot = False
+    if(para_parser != None and para_parser.customSettings != None and para_parser.customSettings != ''):
+        customSettings = json.loads(para_parser.customSettings)
+        isManagedVm = get_key_value(customSettings, 'isManagedVm')
+        canTakeCrashConsistentSnapshot = get_key_value(customSettings, 'canTakeCrashConsistentSnapshot')
+        backupRetryCount = get_key_value(customSettings, 'backupRetryCount')
+        numberOfDisks = len(para_parser.includeLunList)
+        if(isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
+            takeCrashConsistentSnapshot = True
+        backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
+    return takeCrashConsistentSnapshot
 
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
@@ -295,7 +321,7 @@ def daemon():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
         hutil.update_settings_file()
 
-        if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
+        if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
             temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
@@ -332,7 +358,7 @@ def daemon():
             run_result = CommonVariables.success
             backup_logger.log(error_msg)
         elif(CommonVariables.iaas_vmbackup_command in commandToExecute.lower()):
-            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'

@@ -4467,6 +4467,20 @@ def GetMyDistro(dist_class_name=''):
         Distro = Distro.strip('"')
         Distro = Distro.strip(' ')
         dist_class_name = Distro + 'Distro'
+        if dist_class_name not in globals():
+            if ('SuSE'.lower() in Distro.lower()):
+                Distro = 'SuSE'
+            elif ('Ubuntu'.lower() in Distro.lower()):
+                Distro = 'Ubuntu'
+            elif ('centos'.lower() in Distro.lower()):
+                Distro = 'centos'
+            elif ('debian'.lower() in Distro.lower()):
+                Distro = 'debian'
+            elif ('oracle'.lower() in Distro.lower()):
+                Distro = 'oracle'
+            elif ('redhat'.lower() in Distro.lower()):
+                Distro = 'redhat'
+            dist_class_name = Distro + 'Distro'
     else:
         Distro = dist_class_name
     if dist_class_name not in globals():
