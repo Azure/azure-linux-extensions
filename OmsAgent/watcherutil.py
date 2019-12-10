@@ -46,7 +46,7 @@ OmsAgentPidFile = "/var/opt/microsoft/omsagent/run/omsagent.pid"
 OmsAgentLogFile = "/var/opt/microsoft/omsagent/log/omsagent.log"
 reg_ex = re.compile('([0-9]{4}-[0-9]{2}-[0-9]{2}.*)\[(\w+)\]:(.*)')
 maxMessageSize = 100
-OMSExtensionVersion = '1.12.15'
+OMSExtensionVersion = '1.12.17'
 """
 We can add to the list below with more error messages to identify non recoverable errors.
 """
