@@ -60,7 +60,7 @@ import platform
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -70,13 +70,9 @@ def main():
         total_used_size = 0
         size_calculation_failed = False
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
-##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
-        backup_logger.log("patch_class_name: "+patch_class_name+" and orig_distro: "+orig_distro,True)
-        if(MyPatching is None):
-            backup_logger.log("invalid distro",True)
         hutil.patching = MyPatching
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
@@ -250,12 +246,13 @@ def can_take_crash_consistent_snapshot(para_parser):
     return takeCrashConsistentSnapshot
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
 
     try:
         backup_logger.log('starting daemon', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
@@ -536,11 +533,12 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
     try:
         hutil.do_parse_context('Enable')
 
         backup_logger.log('starting enable', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
         hutil.exit_if_same_seq()
 

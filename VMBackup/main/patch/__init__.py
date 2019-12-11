@@ -27,6 +27,7 @@ from patch.centosPatching import centosPatching
 from patch.SuSEPatching import SuSEPatching
 from patch.oraclePatching import oraclePatching
 from patch.KaliPatching import KaliPatching
+from patch.DefaultPatching import DefaultPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
@@ -88,9 +89,8 @@ def GetMyPatching(logger):
             Distro = 'redhat'
         elif ("Kali".lower() in Distro.lower()):
             Distro = 'Kali'
+        else:
+            Distro = 'Default'
         patching_class_name = Distro + 'Patching'
-    if patching_class_name not in globals():
-        logger.log('{0} is not a supported distribution.'.format(Distro))
-        return None, patching_class_name, orig_distro
     patchingInstance = globals()[patching_class_name](logger,dist_info)
     return patchingInstance, patching_class_name, orig_distro
