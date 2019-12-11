@@ -71,6 +71,7 @@ def GetMyPatching(logger):
             Distro = platform.system()
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
+    orig_distro = Distro
     patching_class_name = Distro + 'Patching'
     if patching_class_name not in globals():
         if ('SuSE'.lower() in Distro.lower()):
@@ -85,9 +86,11 @@ def GetMyPatching(logger):
             Distro = 'oracle'
         elif ('redhat'.lower() in Distro.lower()):
             Distro = 'redhat'
+        elif ("Kali".lower() in Distro.lower()):
+            Distro = 'Kali'
         patching_class_name = Distro + 'Patching'
     if patching_class_name not in globals():
         logger.log('{0} is not a supported distribution.'.format(Distro))
-        return None
+        return None, patching_class_name, orig_distro
     patchingInstance = globals()[patching_class_name](logger,dist_info)
-    return patchingInstance
+    return patchingInstance, patching_class_name, orig_distro

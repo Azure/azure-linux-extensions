@@ -73,7 +73,10 @@ def main():
 ##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
-        MyPatching = GetMyPatching(backup_logger)
+        MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
+        backup_logger.log("patch_class_name: "+patch_class_name+" and orig_distro: "+orig_distro,True)
+        if(MyPatching is None):
+            backup_logger.log("invalid distro",True)
         hutil.patching = MyPatching
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
