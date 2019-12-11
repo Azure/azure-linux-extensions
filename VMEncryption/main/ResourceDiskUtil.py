@@ -228,6 +228,10 @@ class ResourceDiskUtil(object):
 
             if self._is_crypt_mounted():
                 self.logger.log("Resource disk already encrypted and mounted")
+                # Add resource disk to crypttab if crypt mount is used
+                # Scenario: RD is alreday crypt mounted and crypt mount to crypttab migration is initiated
+                if not self.disk_util.should_use_azure_crypt_mount():
+                    self.add_resource_disk_to_crypttab()
                 return True
 
             if self._resource_disk_partition_exists() and self._is_luks_device():
