@@ -33,7 +33,7 @@ from patch.AbstractPatching import AbstractPatching
 from common import *
 
 
-class Default(AbstractPatching):
+class DefaultPatching(AbstractPatching):
     def __init__(self,logger,distro_info):
         super(DefaultPatching,self).__init__(distro_info)
         self.logger = logger
