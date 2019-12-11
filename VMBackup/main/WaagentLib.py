@@ -1494,6 +1494,18 @@ class LinuxMintDistro(UbuntuDistro):
     def __init__(self):
         super(LinuxMintDistro, self).__init__()
 
+############################################################
+#      DefaultDistro
+############################################################
+
+class DefaultDistro(UbuntuDistro):
+    """
+    Default Distro concrete class
+    Put Default distro specific behavior here...
+    """
+
+    def __init__(self):
+        super(DefaultDistro, self).__init__()
 
 ############################################################
 #	fedoraDistro
@@ -4480,6 +4492,10 @@ def GetMyDistro(dist_class_name=''):
                 Distro = 'oracle'
             elif ('redhat'.lower() in Distro.lower()):
                 Distro = 'redhat'
+            elif ('Kali'.lower() in Distro.lower()):
+                Distro = 'Kali'
+            else:
+                Distro = 'Default'
             dist_class_name = Distro + 'Distro'
     else:
         Distro = dist_class_name
