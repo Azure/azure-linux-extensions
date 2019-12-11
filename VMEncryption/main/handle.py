@@ -519,6 +519,9 @@ def enable():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
+            # Migrate to early unlock if using crypt mount
+            if disk_util.should_use_azure_crypt_mount():
+                disk_util.migrate_crypt_items(existing_passphrase_file)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
 
