@@ -669,17 +669,6 @@ def enable():
             logger.log("handle.py found disable encryption operation")
             disable_encryption()
 
-        elif encryption_operation == CommonVariables.QueryEncryptionStatus:
-            logger.log("handle.py found query operation")
-
-            if is_daemon_running():
-                logger.log("A daemon is already running, exiting without status report")
-                hutil.redo_last_status()
-                exit_without_status_report()
-            else:
-                logger.log("No daemon found, trying to find the last non-query operation")
-                hutil.find_last_nonquery_operation = True
-
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
             logger.log(msg)
@@ -1656,6 +1645,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
                                                                                    raw_device_item=raw_device_item,
                                                                                    mapper_device_item=mapper_device_item,
                                                                                    disk_util=disk_util,
+                                                                                   crypt_mount_config_util=crypt_mount_config_util,
                                                                                    status_prefix=status_prefix)
 
         if decryption_result_phase == CommonVariables.DecryptionPhaseDone:

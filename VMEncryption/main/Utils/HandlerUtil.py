@@ -72,6 +72,7 @@ from Utils.WAAgentUtil import waagent
 from waagent import LoggerInit
 import logging
 import logging.handlers
+from ProcessLock import ProcessLock
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -91,6 +92,8 @@ class HandlerUtility:
         self.find_last_nonquery_operation = False
         self.config_archive_folder = '/var/lib/azure_disk_encryption_archive'
         self._context = HandlerContext(self._short_name)
+        self.config_folder = '/var/lib/azure_disk_encryption_config'
+        self.status_lock_file_path = '/var/lib/azure_disk_encryption_config/status_lock_file.lck'
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -104,6 +107,8 @@ class HandlerUtility:
                 try:
                     if file.endswith('.settings'):
                         cur_seq_no = int(os.path.basename(file).split('.')[0])
+                        if os.path.exists(join(config_folder, str(cur_seq_no) + '.settings.rejected')):
+                            continue
                         if freshest_time == None:
                             freshest_time = os.path.getmtime(join(config_folder, file))
                             seq_no = cur_seq_no
@@ -175,15 +180,20 @@ class HandlerUtility:
         self._error(self._get_log_prefix() + ': ' + message)
 
     def _parse_config(self, config_txt):
+        # pre : config_txt is a text string containing JSON configuration settings 
+        # post: handlerSettings is initialized with these settings and the config 
+        #       object is returned.  If an error occurs, None is returned. 
+        if not config_txt:
+            self.error('empty config, nothing to parse')
+            return None
+        
         config = None
         try:
             config = json.loads(config_txt)
         except:
-            self.error('JSON exception decoding ' + config_txt)
+            self.error('invalid config, could not parse: ' + str(config_txt))
 
-        if config == None:
-            self.error("JSON error processing settings file:" + config_txt)
-        else:
+        if config:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
 
             # skip unnecessary decryption of protected settings for query status 
@@ -215,6 +225,7 @@ class HandlerUtility:
                 except:
                     self.error('JSON exception loading protected settings')
                 handlerSettings['protectedSettings'] = jctxt
+
         return config
 
     def do_parse_context(self, operation):
@@ -261,7 +272,7 @@ class HandlerUtility:
         
         # validate that internal preconditions are satisfied and internal variables are initialized
         if self._context._seq_no < 0:
-            self.error("current context sequence number must be initialized and non-negative") 
+            self.error("current context sequence number must be initialized and non-negative")
         if not self._context._config_dir or not os.path.isdir(self._context._config_dir):
             self.error("current context config dir must be initialized and point to a path that exists")
         if not self._context._settings_file or not os.path.exists(self._context._settings_file):
@@ -271,8 +282,8 @@ class HandlerUtility:
         curr_path = self._context._settings_file
         last_path = os.path.join(self.config_archive_folder, "lnq.settings")
         
-        # if an archived nonquery settings file exists, use it if it is newer than current settings
-        if os.path.exists(last_path) and (os.stat(last_path).st_mtime > os.stat(curr_path).st_mtime):
+        # if an archived nonquery settings file exists, use it if no current settings file exists, or it is newer than current settings
+        if os.path.exists(last_path) and ((not os.path.exists(curr_path)) or (os.path.exists(curr_path) and (os.stat(last_path).st_mtime > os.stat(curr_path).st_mtime))):
             return last_path
         else:
             # reverse iterate through numbered settings files in config dir
@@ -308,11 +319,29 @@ class HandlerUtility:
         if nonquery:
             last_config_path = self.get_last_nonquery_config_path()
         else:
-            last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings') 
+            # retrieve the settings file corresponding to the current sequence number 
+            last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
 
+        # if not found, attempt to fall back to an archived settings file
+        if not os.path.isfile(last_config_path):
+            self.log('settings file not found, checking for archived settings')
+            last_config_path = os.path.join(self.config_archive_folder, "lnq.settings")
+            if not os.path.isfile(last_config_path):
+                self.error('archived settings file not found, unable to get last config')
+                return None
+            
+        # settings file was found, parse config and return config object 
         config_txt = waagent.GetFileContents(last_config_path)
+        if not config_txt:
+            self.error('configuration settings empty, unable to get last config')
+            return None
+            
         config_obj = self._parse_config(config_txt)
-        return config_obj
+        if not config_obj:
+            self.error('failed to parse configuration settings, unable to get last config')
+            return None  
+        else:
+            return config_obj
 
     def get_handler_env(self):
         # load environment variables from HandlerEnvironment.json 
@@ -403,72 +432,120 @@ class HandlerUtility:
                               stat[0]["status"]["code"],
                               stat[0]["status"]["formattedMessage"]["message"])
 
+    #This function marks a settings as rejected in following cases:
+    #1. If an update encryption settings operation is received when an enable is already running
+    #2. If a fatal exception occurs while a daemon is running
+    def reject_settings(self):
+        try:
+            previous_seq = str(self.get_latest_seq() - 1)
+            previous_status_file = os.path.join(self._context._status_dir, previous_seq + '.status')
+            
+            stat_rept = waagent.GetFileContents(previous_status_file)
+            stat = json.loads(stat_rept)
+            
+            self.do_status_report(stat[0]["status"]["operation"],
+                                  stat[0]["status"]["status"],
+                                  stat[0]["status"]["code"],
+                                  "An operation is already in progress. Please wait for it to complete.")
+
+            status_file = os.path.join(self._context._status_dir, str(self._context._seq_no) + '.status')
+            settings_file = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
+            backup_status_file = os.path.join(self._context._status_dir, str(self._context._seq_no) + '.status.rejected')
+            backup_settings_file = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings.rejected')
+            shutil.copyfile(status_file, backup_status_file)
+            shutil.copyfile(settings_file, backup_settings_file)
+        except Exception as e:
+            self.log("Failed to reject settings: " + str(e))
+            # Do status report to maintain consistency. 
+            # Do not fail extension as another process is running
+            self.do_status_report("Enable",
+                                  CommonVariables.extension_success_status,
+                                  str(CommonVariables.success),
+                                  "An operation is already in progress. Please wait for it to complete.")
+        sys.exit(0)
+
     def do_status_report(self, operation, status, status_code, message):
-        latest_seq_num = self.get_latest_seq()
-        if (latest_seq_num >= 0): 
-            latest_seq = str(self.get_latest_seq())
-        else:
-            self.log("sequence number could not be derived from settings files, using 0.status")
-            latest_seq = "0"
+        lock = None
+        try:
+            if not os.path.exists(self.config_folder):
+                os.makedirs(self.config_folder)
+            lock = ProcessLock(self, self.status_lock_file_path)
+            while not lock.try_lock():
+                self.log("Cannot acquire lock to write status.")
+                time.sleep(0.1)
 
-        self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+            latest_seq_num = self.get_latest_seq()
+            if (latest_seq_num >= 0): 
+                latest_seq = str(self.get_latest_seq())
+            else:
+                self.log("sequence number could not be derived from settings files, using 0.status")
+                latest_seq = "0"
 
-        if message is None:
-            message = ""
-
-        message = filter(lambda c: c in string.printable, message)
-        message = message.encode('ascii', 'ignore')
-
-        self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
-        self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
-        self.log("[StatusReport ({0})] code: {1}".format(latest_seq, status_code))
-        self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, message))
-
-        tstamp = time.strftime(DateTimeFormat, time.gmtime())
-        stat = [{
-            "version" : self._context._version,
-            "timestampUTC" : tstamp,
-            "status" : {
-                "name" : self._context._name,
-                "operation" : operation,
-                "status" : status,
-                "code" : status_code,
-                "formattedMessage" : {
-                    "lang" : "en-US",
-                    "message" : message
-                }
-            }
-        }]
-
-        if self.disk_util:
-            encryption_status = self.disk_util.get_encryption_status()
-
-            self.log("[StatusReport ({0})] substatus: {1}".format(latest_seq, encryption_status))
-
-            substat = [{
-                "name" : self._context._name,
-                "operation" : operation,
-                "status" : status,
-                "code" : status_code,
-                "formattedMessage" : {
-                    "lang" : "en-US",
-                    "message" : encryption_status
+            self._context._status_file = os.path.join(self._context._status_dir, latest_seq + '.status')
+            if message is None:
+                message = ""
+                
+            message = filter(lambda c: c in string.printable, message)
+            message = message.encode('ascii', 'ignore')
+            
+            self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
+            self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
+            self.log("[StatusReport ({0})] code: {1}".format(latest_seq, status_code))
+            self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, message))
+            
+            tstamp = time.strftime(DateTimeFormat, time.gmtime())
+            stat = [{
+                "version" : self._context._version,
+                "timestampUTC" : tstamp,
+                "status" : {
+                    "name" : self._context._name,
+                    "operation" : operation,
+                    "status" : status,
+                    "code" : status_code,
+                    "formattedMessage" : {
+                        "lang" : "en-US",
+                        "message" : message
+                    }
                 }
             }]
-
-            stat[0]["status"]["substatus"] = substat
-
-            if "VMRestartPending" in encryption_status:
-                stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
-
-        stat_rept = json.dumps(stat)
-        # rename all other status files, or the WALA would report the wrong
-        # status file.
-        # because the wala choose the status file with the highest sequence
-        # number to report.
-        if self._context._status_file:
-            with open(self._context._status_file,'w+') as f:
-                f.write(stat_rept)
+            
+            if self.disk_util:
+                encryption_status = self.disk_util.get_encryption_status()
+                
+                self.log("[StatusReport ({0})] substatus: {1}".format(latest_seq, encryption_status))
+                
+                substat = [{
+                    "name" : self._context._name,
+                    "operation" : operation,
+                    "status" : status,
+                    "code" : status_code,
+                    "formattedMessage" : {
+                        "lang" : "en-US",
+                        "message" : encryption_status
+                    }
+                }]
+                
+                stat[0]["status"]["substatus"] = substat
+                
+                if "VMRestartPending" in encryption_status:
+                    stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
+                    
+            stat_rept = json.dumps(stat)
+            # rename all other status files, or the WALA would report the wrong
+            # # status file.
+            # # because the wala choose the status file with the highest sequence
+            # # number to report.
+            # If an operation for n.settings is executing and an n+1.settings 
+            # is received in between then the guest agent only reports n+1.status. 
+            # Hence, any status update from n.settings also needs to go to n+1.status.
+            if self._context._status_file:
+                with open(self._context._status_file,'w+') as f:
+                    f.write(stat_rept)
+        except Exception as e:
+            self.log('Exception occured while writing status: '+ str(e))
+        finally:
+            if lock:
+                lock.release_lock()
 
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
