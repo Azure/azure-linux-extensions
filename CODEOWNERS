@@ -4,11 +4,14 @@
 # It uses the same pattern rule for gitignore file
 # https://git-scm.com/docs/gitignore#_pattern_format
 
+# Azure Monitor Agent Extension
+/AzureMonitorAgent/ @Azure/geneva-linux-agents
+
 # Diagnostics (LAD) Extension
-/Diagnostics @Azure/geneva-linux-agents
+/Diagnostics/ @Azure/geneva-linux-agents
 
 # OMS Agent Extension
-/OmsAgent @Azure/geneva-linux-agents
+/OmsAgent/ @Azure/geneva-linux-agents
 
 # VMAccess Extension
-/VMAccess @D1v38om83r @nkuchta @vrdmr
+/VMAccess/ @D1v38om83r @nkuchta @vrdmr
