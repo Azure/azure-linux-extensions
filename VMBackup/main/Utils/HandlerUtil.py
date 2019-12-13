@@ -143,23 +143,28 @@ class HandlerUtility:
 
     def log(self, message,level='Info'):
         try:
-            WriteLog = self.get_value_from_configfile('WriteLog')
-            if (WriteLog == None or WriteLog == 'True'):
-                if sys.version_info > (3,):
-                    if self.logging_file is not None:
-                        self.log_py3(message)
-                    else:
-                        pass
-                    #self.log_to_file() 
-                else:
-                    self._log(self._get_log_prefix() + message)
-                message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
-            self.log_message = self.log_message + message
+            self.log_with_no_try_except(message, level)
         except IOError:
             pass
         except Exception as e:
-            errMsg='Exception in hutil.log'
-            self.log(errMsg, 'Warning')
+            try:
+                errMsg='Exception in hutil.log'
+                self.log_with_no_try_except(errMsg, 'Warning')
+            except Exception as e:
+                pass
+
+    def log_with_no_try_except(self, message, level='Info'):
+        WriteLog = self.get_value_from_configfile('WriteLog')
+        if (WriteLog == None or WriteLog == 'True'):
+            if sys.version_info > (3,):
+                if self.logging_file is not None:
+                    self.log_py3(message)
+                else:
+                    pass
+            else:
+                self._log(self._get_log_prefix() + message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+        self.log_message = self.log_message + message
 
     def log_py3(self, msg):
         if type(msg) is not str:
@@ -281,6 +286,7 @@ class HandlerUtility:
         except Exception as e:
             errorMsg = "Unable to parse context, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.log(errorMsg, 'Error')
+            raise
         return self._context
 
     def _change_log_file(self):
@@ -591,17 +597,17 @@ class HandlerUtility:
 
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
 
-        consistencyTypeStr = 'crashConsistent'
+        consistencyTypeStr = CommonVariables.consistency_crashConsistent
         if (self.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent):
             if (status_code == CommonVariables.success_appconsistent):
                 self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.applicationConsistent
-                consistencyTypeStr = 'applicationConsistent'
+                consistencyTypeStr = CommonVariables.consistency_applicationConsistent
             elif (status_code == CommonVariables.success):
                 self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.fileSystemConsistent
-                consistencyTypeStr = 'fileSystemConsistent'
+                consistencyTypeStr = CommonVariables.consistency_fileSystemConsistent
             else:
                 self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
-                consistencyTypeStr = 'none'
+                consistencyTypeStr = CommonVariables.consistency_none
         HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
 
         extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")

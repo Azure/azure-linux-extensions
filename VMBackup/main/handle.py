@@ -239,8 +239,11 @@ def can_take_crash_consistent_snapshot(para_parser):
         isManagedVm = get_key_value(customSettings, 'isManagedVm')
         canTakeCrashConsistentSnapshot = get_key_value(customSettings, 'canTakeCrashConsistentSnapshot')
         backupRetryCount = get_key_value(customSettings, 'backupRetryCount')
-        numberOfDisks = len(para_parser.includeLunList)
-        if(isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
+        numberOfDisks = 0
+        if (para_parser.includeLunList is not None):
+            numberOfDisks = len(para_parser.includeLunList)
+        isAnyNone = (isManagedVm is None or canTakeCrashConsistentSnapshot is None or backupRetryCount is None)
+        if (isAnyNone == False and isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
             takeCrashConsistentSnapshot = True
         backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
     return takeCrashConsistentSnapshot

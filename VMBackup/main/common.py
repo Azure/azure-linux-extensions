@@ -120,6 +120,14 @@ class CommonVariables:
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
 
+    """
+    Consistency-Types
+    """
+    consistency_none = 'none'
+    consistency_crashConsistent = 'crashConsistent'
+    consistency_fileSystemConsistent = 'fileSystemConsistent'
+    consistency_applicationConsistent = 'applicationConsistent'
+
     @staticmethod
     def isTerminalStatus(status):
         return (status==CommonVariables.status_success or status==CommonVariables.status_error)
