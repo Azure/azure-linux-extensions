@@ -4484,7 +4484,7 @@ def GetMyDistro(dist_class_name=''):
                 Distro = 'SuSE'
             elif ('Ubuntu'.lower() in Distro.lower()):
                 Distro = 'Ubuntu'
-            elif ('centos'.lower() in Distro.lower()):
+            elif ('centos'.lower() in Distro.lower()  or 'big-ip'.lower() in Distro.lower()):
                 Distro = 'centos'
             elif ('debian'.lower() in Distro.lower()):
                 Distro = 'debian'
@@ -4494,6 +4494,8 @@ def GetMyDistro(dist_class_name=''):
                 Distro = 'redhat'
             elif ('Kali'.lower() in Distro.lower()):
                 Distro = 'Kali'
+            elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):
+                Distro = 'FreeBSD'
             else:
                 Distro = 'Default'
             dist_class_name = Distro + 'Distro'

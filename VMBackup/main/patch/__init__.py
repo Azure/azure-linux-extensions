@@ -28,6 +28,7 @@ from patch.SuSEPatching import SuSEPatching
 from patch.oraclePatching import oraclePatching
 from patch.KaliPatching import KaliPatching
 from patch.DefaultPatching import DefaultPatching
+from patch.FreeBSDPatching import FreeBSDPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
@@ -79,7 +80,7 @@ def GetMyPatching(logger):
             Distro = 'SuSE'
         elif ('Ubuntu'.lower() in Distro.lower()):
             Distro = 'Ubuntu'
-        elif ('centos'.lower() in Distro.lower()):
+        elif ('centos'.lower() in Distro.lower() or 'big-ip'.lower() in Distro.lower()):
             Distro = 'centos'
         elif ('debian'.lower() in Distro.lower()):
             Distro = 'debian'
@@ -89,6 +90,8 @@ def GetMyPatching(logger):
             Distro = 'redhat'
         elif ("Kali".lower() in Distro.lower()):
             Distro = 'Kali'
+        elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):
+            Distro = 'FreeBSD'
         else:
             Distro = 'Default'
         patching_class_name = Distro + 'Patching'
