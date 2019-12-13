@@ -1,7 +1,6 @@
 # OmsAgent Extension
-Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboard to Operations Management Suite
 
-Latest version is 1.12.1.
+[See the latest version and extension-bundle mapping.](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux#agent-and-vm-extension-version)
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
@@ -208,13 +207,7 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 }
 ```
 
-## Supported Linux Distributions
-* CentOS Linux 5,6, and 7 (x86/x64)
-* Oracle Linux 5,6, and 7 (x86/x64)
-* Red Hat Enterprise Linux Server 5,6 and 7 (x86/x64)
-* Debian GNU/Linux 6, 7, and 8 (x86/x64)
-* Ubuntu 12.04 LTS, 14.04 LTS, 15.04, 15.10, 16.04 LTS (x86/x64)
-* SUSE Linux Enteprise Server 11 and 12 (x86/x64)
+## [Supported Linux Distributions](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/log-analytics-agent#supported-linux-operating-systems)
 
 ## Troubleshooting
 
