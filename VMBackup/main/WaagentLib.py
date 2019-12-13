@@ -1734,6 +1734,7 @@ else:
     waagent.Error("ActivateResourceDisk: Failed to activate swap at " + mountpoint + "/swapfile")
 """
 
+
 class FreeBSDDistro(AbstractDistro):
     """
     """
@@ -2108,6 +2109,7 @@ class FreeBSDDistro(AbstractDistro):
 
 class NSBSDDistro(FreeBSDDistro):
     """
+    Stormhield NS-BSD OS
     """
 
     def __init__(self):
@@ -4483,7 +4485,9 @@ def GetMyDistro(dist_class_name=''):
         else:  # I know this is not Linux!
             if 'FreeBSD' in platform.system():
                 Distro = platform.system()
-                Distro = Distro.strip('-')
+            if 'NS-BSD' in platform.system():
+                Distro = platform.system()
+                Distro = Distro.replace("-", "")
         Distro = Distro.strip('"')
         Distro = Distro.strip(' ')
         dist_class_name = Distro + 'Distro'
@@ -4519,6 +4523,10 @@ def DistInfo(fullname=0):
         if 'FreeBSD' in platform.system():
             release = re.sub('\-.*\Z', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
+            return distinfo
+        if 'NS-BSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
             distinfo = list(platform.linux_distribution(full_distribution_name=0))

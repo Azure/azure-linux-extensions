@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 pwdcommand=`pwd`
 pwdstr="$pwdcommand"
 output=`cat $pwdstr'/HandlerEnvironment.json'`
@@ -55,6 +55,11 @@ elif [ -f "/usr/bin/python" ]
 then
     echo "`date`- python path exists" >> $logfile
     /usr/bin/python main/handle.py -$1
+    rc=$?
+elif [ -f "`which python`" ]
+then
+    echo "`date`- python path exists" >> $logfile
+    /usr/bin/env python main/handle.py -$1
     rc=$?
 else
     echo "`date`- python version unknown" >> $logfile
