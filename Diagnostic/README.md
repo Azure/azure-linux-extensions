@@ -24,13 +24,13 @@ Please note that the distros/versions listed below apply only to Azure-endorsed 
 images. 3rd party BYOL/BYOS images (e.g., appliances) are not generally supported for the
 Linux Diagnostic extension.
 
-- Ubuntu 14.04 and higher.
-- CentOS 6.5 and higher
-- Oracle Linux 6.4.0.0.0 and higher
-- OpenSUSE 13.1 and higher
-- SUSE Linux Enterprise Server 11 and higher
-- Debian 7 and higher (7 is now supported with static mdsd build)
-- RHEL 6.7 and higher
+- Ubuntu 14.04, 16.04, 18.04
+- CentOS 6.5+, 7
+- Oracle Linux 6.4.0.0.0+, 7
+- OpenSUSE 13.1+
+- SUSE Linux Enterprise Server 11, 12
+- Debian 7, 8, 9
+- RHEL 6.7+, 7
 
 ## Debug
 
