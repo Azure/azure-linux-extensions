@@ -34,16 +34,21 @@ import sys
 class HttpUtil(object):
     """description of class"""
     def __init__(self, hutil):
+        Config = None
+        self.proxyHost = None
+        self.proxyPort = None
         try:
             waagent.MyDistro = waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
         except Exception as e:
             errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             hutil.log(errorMsg)
-            Config = waagent.ConfigurationProvider()
+            Config = None
         self.logger = hutil
-        self.proxyHost = Config.get("HttpProxy.Host")
-        self.proxyPort = Config.get("HttpProxy.Port")
+        if Config != None:
+            self.proxyHost = Config.get("HttpProxy.Host")
+            self.proxyPort = Config.get("HttpProxy.Port")
+
         self.tmpFile = './tmp_file_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
     """
