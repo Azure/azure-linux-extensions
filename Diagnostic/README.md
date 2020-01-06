@@ -26,7 +26,7 @@ Linux Diagnostic extension.
 
 - Ubuntu 14.04, 16.04, 18.04
 - CentOS 6.5+, 7
-- Oracle Linux 6.4.0.0.0+, 7
+- Oracle Linux 6.4+, 7
 - OpenSUSE 13.1+
 - SUSE Linux Enterprise Server 11, 12
 - Debian 7, 8, 9
