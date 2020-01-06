@@ -33,15 +33,15 @@
 ###############################################################################
 
 # Abandoned?
-/AzureEnhancedMonitor/ 
-/OSPatching/ 
-/RDMAUpdate/
-/SampleExtension/
-/TestHandlerLinux/
-/docs/
-/registration-scripts/
-/script/
-/ui-extension-packages/
+# /AzureEnhancedMonitor/ 
+# /OSPatching/ 
+# /RDMAUpdate/
+# /SampleExtension/
+# /TestHandlerLinux/
+# /docs/
+# /registration-scripts/
+# /script/
+# /ui-extension-packages/
 
 # WALinuxAgent
 /Common/ @D1v38om83r @nkuchta @vrdmr
