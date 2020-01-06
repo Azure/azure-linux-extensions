@@ -7,11 +7,45 @@
 # Azure Monitor Agent Extension
 /AzureMonitorAgent/ @Azure/geneva-linux-agents
 
+# CustomScript Extension
+/CustomScript/ @D1v38om83r @nkuchta @vrdmr
+
 # Diagnostics (LAD) Extension
 /Diagnostics/ @Azure/geneva-linux-agents
 
 # OMS Agent Extension
 /OmsAgent/ @Azure/geneva-linux-agents
 
+# OpenCensus Translator Extension
+/opencensus-service/ @Azure/geneva-linux-agents
+
 # VMAccess Extension
 /VMAccess/ @D1v38om83r @nkuchta @vrdmr
+
+# VMBackup Extension
+/VMBackup/ @bpramod @soumyapattnaik @vityagi
+
+# VMEncryption Extension
+/VMEncryption/ @vimish @ejarvi @vermashi
+
+###############################################################################
+# BELOW THIS LINE IS UNCONFIRMED
+###############################################################################
+
+# Abandoned?
+/AzureEnhancedMonitor/ 
+/OSPatching/ 
+/RDMAUpdate/
+/SampleExtension/
+/TestHandlerLinux/
+/docs/
+/registration-scripts/
+/script/
+/ui-extension-packages/
+
+# WALinuxAgent
+/Common/ @D1v38om83r @nkuchta @vrdmr
+/Utils/ @D1v38om83r @nkuchta @vrdmr
+
+# DSCForLinux Extension
+/DSC/ @vrdmr
