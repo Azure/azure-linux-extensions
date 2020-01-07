@@ -37,9 +37,9 @@
 # VMEncryption Extension
 /VMEncryption/ @vimish @ejarvi @vermashi
 
-###############################################################################
-# BELOW THIS LINE IS UNCONFIRMED
-###############################################################################
+# WALinuxAgent
+/Common/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
+/Utils/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
 
 # Abandoned?
 # /AzureEnhancedMonitor/ 
@@ -51,7 +51,3 @@
 # /registration-scripts/
 # /script/
 # /ui-extension-packages/
-
-# WALinuxAgent
-/Common/ @D1v38om83r @nkuchta @vrdmr
-/Utils/ @D1v38om83r @nkuchta @vrdmr
