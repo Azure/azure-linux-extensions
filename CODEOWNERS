@@ -19,6 +19,9 @@
 # Diagnostics (LAD) Extension
 /Diagnostics/ @Azure/geneva-linux-agents
 
+# DSCForLinux Extension
+/DSC/ @nitinbps @kwirkykat
+
 # OMS Agent Extension
 /OmsAgent/ @Azure/geneva-linux-agents
 
@@ -52,6 +55,3 @@
 # WALinuxAgent
 /Common/ @D1v38om83r @nkuchta @vrdmr
 /Utils/ @D1v38om83r @nkuchta @vrdmr
-
-# DSCForLinux Extension
-/DSC/ @nitinbps @kwirkykat
