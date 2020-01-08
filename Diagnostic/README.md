@@ -29,7 +29,7 @@ Any distro specified below with major version only (e.g. Debian 7) is supported 
 - Ubuntu 14.04, 16.04, 18.04
 - CentOS 6.5+, 7
 - Oracle Linux 6.4+, 7
-- OpenSUSE 13.1+
+- OpenSUSE 13.1+, 15
 - SUSE Linux Enterprise Server 11, 12
 - Debian 7, 8, 9
 - RHEL 6.7+, 7
