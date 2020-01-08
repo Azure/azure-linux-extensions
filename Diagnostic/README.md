@@ -22,7 +22,9 @@ Please refer to [this document](https://docs.microsoft.com/azure/virtual-machine
 
 Please note that the distros/versions listed below apply only to Azure-endorsed Linux vendor
 images. 3rd party BYOL/BYOS images (e.g., appliances) are not generally supported for the
-Linux Diagnostic extension.
+Linux Diagnostic extension. 
+
+Any distro specified below with major version only (e.g. Debian 7) is supported for all minor versions as well. If a specific minor version is specified, only that specific version is supported; if "+" is appended, minor versions equal to or greater than that specified version are supported.
 
 - Ubuntu 14.04, 16.04, 18.04
 - CentOS 6.5+, 7
