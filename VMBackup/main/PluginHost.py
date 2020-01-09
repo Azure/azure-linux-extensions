@@ -180,7 +180,7 @@ class PluginHost(object):
         permissions = '777'
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
         except Exception as err:
             errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
