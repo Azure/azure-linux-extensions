@@ -204,7 +204,11 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                if 'NS-BSD' in platform.system():
+                    # base64 tool is not available with NSBSD, use openssl
+                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                else:
+                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
