@@ -140,7 +140,9 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.Execute("service rsyslog restart", True)
         self.command_executor.Execute("service udev restart", True)
         self.command_executor.Execute("umount /oldroot/boot", True)
-		self.command_executor.Execute("umount /oldroot", True)
+        self.command_executor.Execute('service walinuxagent stop', True)
+        self.command_executor.Execute("umount /oldroot", True)
+        self.command_executor.Execute('service walinuxagent start', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
