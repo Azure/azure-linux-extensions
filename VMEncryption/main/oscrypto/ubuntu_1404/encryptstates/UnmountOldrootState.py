@@ -109,12 +109,11 @@ class UnmountOldrootState(OSEncryptionState):
             self.context.logger.log("Killing process: {0} ({1})".format(proc_name, victim))
 
             if int(victim) == os.getpid():
-                self.context.logger.log("Restarting WALA in before committing suicide")
+                self.context.logger.log("Restarting walinuxagent in 30 seconds")
 
                 # Kill any other daemons that are blocked and would be executed after this process commits
                 # suicide
-                self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
-                self.command_executor.ExecuteInBash('pkill -f .*ForLinux.*handle.py.*daemon.*', True)
+                self.command_executor.ExecuteInBash('sleep 30 && pkill -f .*ForLinux.*handle.py.*daemon.* && service walinuxagent start &', True)
 
             if int(victim) == 1:
                 self.context.logger.log("Skipping init")
