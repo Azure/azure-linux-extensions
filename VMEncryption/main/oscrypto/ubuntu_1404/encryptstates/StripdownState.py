@@ -24,6 +24,7 @@ import re
 import sys
 
 from time import sleep
+from CommandExecutor import *
 from OSEncryptionState import *
 
 class StripdownState(OSEncryptionState):
@@ -60,7 +61,6 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
-        self.command_executor.Execute('service walinuxagent stop', True)
         self.command_executor.Execute('pivot_root /tmp/tmproot /tmp/tmproot/oldroot', True)
         self.command_executor.ExecuteInBash('for i in dev proc sys run; do mount --move /oldroot/$i /$i; done', True)
 
@@ -74,7 +74,11 @@ class StripdownState(OSEncryptionState):
             super(StripdownState, self).should_exit()
 
             # the restarted process shall see the marker and advance the state machine
-            self.command_executor.ExecuteInBash('sleep 30 && service walinuxagent start &', True)
+            self.command_executor.Execute('service atd restart', True)
+            os.chdir('/')
+            with open("/restart-wala.sh", "w") as f:
+                f.write("service walinuxagent restart\n")
+            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
             self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                                        operation='EnableEncryptionOSVolume',

@@ -24,6 +24,7 @@ import os
 import sys
 
 from time import sleep
+from CommandExecutor import *
 from OSEncryptionState import *
 
 class PatchBootSystemState(OSEncryptionState):
@@ -99,7 +100,7 @@ class PatchBootSystemState(OSEncryptionState):
             self.command_executor.Execute('cp -ax /var/log/waagent.log /oldroot/var/log/waagent.log.pivotroot')
             self.command_executor.Execute('umount /boot')
             self.command_executor.Execute('umount /oldroot')
-            self.command_executor.Execute('service walinuxagent restart')
+
             self.context.logger.log("Pivoted back into memroot successfully")
 
     def should_exit(self):
