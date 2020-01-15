@@ -122,37 +122,14 @@ class SplitRootPartitionState(OSEncryptionState):
 
         # Move stuff from /oldroot/boot to new partition, make new partition mountable at the same spot
         self.command_executor.Execute("mount {0} /oldroot".format(self.rootfs_block_device), True)
-        self.command_executor.Execute("mkdir /oldroot/memroot", True)
-        self.command_executor.Execute("mount --make-rprivate /", True)
-        self.command_executor.Execute("pivot_root /oldroot /oldroot/memroot", True)
-        self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /memroot/$i /$i; done", True)
-        self.command_executor.Execute("mv /boot /boot.backup", True)
-        self.command_executor.Execute("mkdir /boot", True)
+        self.command_executor.Execute("mkdir -p /boot", True)
+        self.command_executor.Execute("cp /oldroot/etc/fstab /etc/fstab", True)
         self._append_boot_partition_uuid_to_fstab(boot_partition_uuid)
-        self.command_executor.Execute("cp /etc/fstab /memroot/etc/fstab", True)
+        self.command_executor.Execute("cp /etc/fstab /oldroot/etc/fstab", True)
         self.command_executor.Execute("mount /boot", True)
-        self.command_executor.ExecuteInBash("mv /boot.backup/* /boot/", True)
-        self.command_executor.Execute("rmdir /boot.backup", True)
-        self.command_executor.Execute("mount --make-rprivate /", True)
-        self.command_executor.Execute("pivot_root /memroot /memroot/oldroot", True)
-        self.command_executor.Execute("rmdir /oldroot/memroot", True)
-        self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /oldroot/$i /$i; done", True)
-        self.command_executor.Execute("service rsyslog restart", True)
-        self.command_executor.Execute("service udev restart", True)
-        self.command_executor.Execute("umount /oldroot/boot", True)
-
-        try:
-            self.command_executor.Execute("umount /oldroot", True)
-        except:
-            self.context.logger.log("Could not unmount /oldroot, attempting to restart WALA and unmount again")
-
-            self.should_exit()
-            
-            self.context.logger.log("Removing marker for UnmountOldrootState")
-            os.unlink(os.path.join(self.context.encryption_environment.os_encryption_markers_path, 'UnmountOldrootState'))
-
-            self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
-            self.command_executor.Execute('service walinuxagent stop', True)
+        self.command_executor.ExecuteInBash("mv /oldroot/boot/* /boot/", True)
+        self.command_executor.Execute("umount /boot", True)
+        self.command_executor.Execute("umount /oldroot", True)
         
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit split_root_partition state")
