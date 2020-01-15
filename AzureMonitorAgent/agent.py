@@ -35,6 +35,7 @@ import urllib2
 import shutil
 import crypt
 import xml.dom.minidom
+import re
 from distutils.version import LooseVersion
 
 
@@ -203,25 +204,41 @@ def install():
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)
 
+    default_configs = {
+        "ENABLE_MCS" : "true",
+        "MCS_ENDPOINT" : "eastus.amcs.ppe.control.monitor.azure.com",
+        "AZURE_ENDPOINT" : "https://management.azure.com/",
+        "ADD_REGION_TO_MCS_ENDPOINT" : "false",
+        "OMS_TLD" : "int2.microsoftatlanta-int.com",
+        "customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM"
+    }
+    config_file = "/etc/default/mdsd"
+    config_updated = False
     try:
-        if os.path.isfile("/etc/default/mdsd"):
-            with open("/etc/default/mdsd", "a+") as f:
+        if os.path.isfile(config_file):
+            data = ""
+            with open(config_file, "r") as f:
                 data = f.read()
-                if "ENABLE_MCS=true" not in data:
-                    f.write("\n")
-                    f.write("export ENABLE_MCS=true\n")
-                    
-                # for integration testing
-                if "MCS_ENDPOINT=mcs.azure.com" not in data:
-                    f.write("export MCS_ENDPOINT=eastus.amcs.ppe.control.monitor.azure.com\n")
-                if "AZURE_ENDPOINT=https://management.azure.com/" not in data:
-                    f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
-                if "ADD_REGION_TO_MCS_ENDPOINT" not in data:
-                    f.write("export ADD_REGION_TO_MCS_ENDPOINT=false\n")
-                if "OMS_TLD" not in data:
-                    f.write("export OMS_TLD=int2.microsoftatlanta-int.com\n")
-                if "customResourceId" not in data:
-                    f.write("export customResourceId=/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM\n")
+                for var in default_configs.keys():
+                    pattern = "(#*)export " + str(var) + "=.*$"
+                    r_obj = re.compile(pattern, flags=re.MULTILINE)
+                    value = "export " + var + "=" + default_configs[var]
+                    if var in data:
+                        im = r_obj.sub(value, data)
+                        data = im
+                    else:
+                        data += value+"\n"
+
+            with open("/etc/default/mdsd_temp", "w") as f:
+                f.write(data)
+                config_updated = True if len(data) > 0 else False 
+
+            if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
+                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
+
+            os.remove(config_file)
+            os.rename("/etc/default/mdsd_temp", config_file)
+
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
@@ -292,13 +309,6 @@ def update():
     No logic to install the agent as agent -> install() will be called 
     with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    # print ("Uinstalling the current mdsd")
-    # exit_code, output = uninstall()
-    # if exit_code != 0:
-    #     return exit_code, output
-    # print ("installing the curretn mdsd")
-    # exit_code, output = install()
-    # print ("Update finished")
     
     return 0, ""
 
