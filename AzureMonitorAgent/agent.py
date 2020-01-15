@@ -224,8 +224,8 @@ def install():
                     r_obj = re.compile(pattern, flags=re.MULTILINE)
                     value = "export " + var + "=" + default_configs[var]
                     if var in data:
-                        im = r_obj.sub(value, data)
-                        data = im
+                        new_data = r_obj.sub(value, data)
+                        data = new_data
                     else:
                         data += value+"\n"
 
