@@ -34,6 +34,7 @@ import urllib
 import urllib2
 import watcherutil
 import shutil
+import stat
 
 from threading import Thread
 
@@ -112,15 +113,21 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 VMResourceIDMetadataHost = '169.254.169.254'
 VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
 
-# agent permissions
+# Agent Permissions
 AgentUser='omsagent'
 AgentGroup='omiusers'
+
+# File Permissions
+Mode100 = stat.S_IXUSR
+Mode640 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP
+Mode700 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+Mode750 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
     ext_log_path = '/var/log/azure/'
     if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
+        os.chmod(ext_log_path, Mode700)
 except:
     pass
 
@@ -348,7 +355,7 @@ def install():
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
 
-    os.chmod(bundle_path, 100)
+    os.chmod(bundle_path, Mode100)
     cmd = InstallCommandTemplate.format(bundle_path)
     hutil_log_info('Running command "{0}"'.format(cmd))
 
@@ -375,7 +382,7 @@ def uninstall():
     bundle_path = os.path.join(package_directory, BundleFileName)
     global IsUpgrade
 
-    os.chmod(bundle_path, 100)
+    os.chmod(bundle_path, Mode100)
     cmd = UninstallCommandTemplate.format(bundle_path)
     hutil_log_info('Running command "{0}"'.format(cmd))
 
@@ -492,27 +499,15 @@ def enable():
             uid = pwd.getpwnam(AgentUser).pw_uid
             gid = grp.getgrnam(AgentGroup).gr_gid
             os.chown(etc_final_path, uid, gid)
-
-            # octal numbers are represented differently in python 2.6+
-            # https://docs.python.org/3/whatsnew/2.6.html#pep-3127-integer-literal-support-and-syntax
-            if sys.version_info >= (2,6):
-                os.chmod(etc_final_path, 0o750)
-            else:    
-                os.chmod(etc_final_path, 0750)
+            os.chmod(etc_final_path, Mode750)
 
             for root, dirs, files in os.walk(etc_final_path):
                 for d in dirs:
                     os.chown(os.path.join(root, d), uid, gid)
-                    if sys.version_info >= (2,6):
-                        os.chmod(os.path.join(root, d), 0o750)
-                    else:    
-                        os.chmod(os.path.join(root, d), 0750)                
+                    os.chmod(os.path.join(root, d), Mode750)
                 for f in files:
-                    os.chown(os.path.join(root, f), uid, gid)                  
-                    if sys.version_info >= (2,6):
-                        os.chmod(os.path.join(root, f), 0o640)
-                    else:    
-                        os.chmod(os.path.join(root, f), 0640)                           
+                    os.chown(os.path.join(root, f), uid, gid)
+                    os.chmod(os.path.join(root, f), Mode640)
     except:
         hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
