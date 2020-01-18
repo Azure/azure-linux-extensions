@@ -46,7 +46,7 @@ except Exception as e:
 
 # Global Variables
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.12.15-0.universal.x64.sh'
+BundleFileName = 'omsagent-1.12.25-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -492,27 +492,15 @@ def enable():
             uid = pwd.getpwnam(AgentUser).pw_uid
             gid = grp.getgrnam(AgentGroup).gr_gid
             os.chown(etc_final_path, uid, gid)
-
-            # octal numbers are represented differently in python 2.6+
-            # https://docs.python.org/3/whatsnew/2.6.html#pep-3127-integer-literal-support-and-syntax
-            if sys.version_info >= (2,6):
-                os.chmod(etc_final_path, 0o750)
-            else:    
-                os.chmod(etc_final_path, 0750)
+            os.system('chmod {1} {0}'.format(etc_final_path, 750))            
 
             for root, dirs, files in os.walk(etc_final_path):
                 for d in dirs:
                     os.chown(os.path.join(root, d), uid, gid)
-                    if sys.version_info >= (2,6):
-                        os.chmod(os.path.join(root, d), 0o750)
-                    else:    
-                        os.chmod(os.path.join(root, d), 0750)                
+                    os.system('chmod {1} {0}'.format(os.path.join(root, d), 750))                    
                 for f in files:
-                    os.chown(os.path.join(root, f), uid, gid)                  
-                    if sys.version_info >= (2,6):
-                        os.chmod(os.path.join(root, f), 0o640)
-                    else:    
-                        os.chmod(os.path.join(root, f), 0640)                           
+                    os.chown(os.path.join(root, f), uid, gid)
+                    os.system('chmod {1} {0}'.format(os.path.join(root, f), 640))                                      
     except:
         hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
@@ -827,9 +815,13 @@ def detect_multiple_connections(workspace_id):
     """
     other_connection_exists = False
     if os.path.exists(OMSAdminPath):
-        exit_code, output = run_get_output(WorkspaceCheckCommand,
+        exit_code, asciioutput = run_get_output(WorkspaceCheckCommand,
                                            chk_err = False)
 
+        # output may contain unicode characters not supported by ascii
+        # for e.g., gnerates the following error if used without conversion: UnicodeDecodeError: 'ascii' codec can't decode byte 0xc3 in position 18: ordinal not in range(128)
+        # default encoding in python is ascii
+        output = asciioutput.decode('utf8').encode('utf8')
         if output.strip().lower() != 'no workspace':
             for line in output.split('\n'):
                 if workspace_id in line:
