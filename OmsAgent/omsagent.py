@@ -815,13 +815,13 @@ def detect_multiple_connections(workspace_id):
     """
     other_connection_exists = False
     if os.path.exists(OMSAdminPath):
-        exit_code, asciioutput = run_get_output(WorkspaceCheckCommand,
+        exit_code, utfoutput = run_get_output(WorkspaceCheckCommand,
                                            chk_err = False)
 
         # output may contain unicode characters not supported by ascii
         # for e.g., gnerates the following error if used without conversion: UnicodeDecodeError: 'ascii' codec can't decode byte 0xc3 in position 18: ordinal not in range(128)
         # default encoding in python is ascii
-        output = asciioutput.decode('utf8').encode('utf8')
+        output = utfoutput.decode('utf8').encode('utf8')
         if output.strip().lower() != 'no workspace':
             for line in output.split('\n'):
                 if workspace_id in line:
