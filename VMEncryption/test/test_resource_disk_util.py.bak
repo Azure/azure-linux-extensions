@@ -23,19 +23,17 @@ import mock
 
 from main.ResourceDiskUtil import ResourceDiskUtil
 from main.DiskUtil import DiskUtil
-from main.CryptMountConfigUtil import CryptMountConfigUtil
 from main.Common import CommonVariables
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 
 
 class TestResourceDiskUtil(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
         self.mock_disk_util = mock.create_autospec(DiskUtil)
-        self.mock_crypt_mount_config_util = mock.create_autospec(CryptMountConfigUtil)
         self.mock_passhprase_filename = "mock_passphrase_filename"
         mock_public_settings = {}
-        self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_crypt_mount_config_util, self.mock_passhprase_filename, mock_public_settings, ["ubuntu", "16"])
+        self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_passhprase_filename, mock_public_settings, ["ubuntu", "16"])
 
     def _test_resource_disk_partition_dependant_method(self, method, mock_partition_exists, mock_execute):
         """

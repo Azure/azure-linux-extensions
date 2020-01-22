@@ -510,8 +510,9 @@ class HandlerUtility:
             
             if self.disk_util:
                 encryption_status = self.disk_util.get_encryption_status()
-                
-                self.log("[StatusReport ({0})] substatus: {1}".format(latest_seq, encryption_status))
+
+                encryption_status_dict = json.loads(encryption_status)
+                self.log("[StatusReport ({0})] substatus : OS : {1}  Data : {2}".format(latest_seq, encryption_status_dict['os'], encryption_status_dict['data']))
                 
                 substat = [{
                     "name" : self._context._name,

@@ -135,7 +135,7 @@ class SplitRootPartitionState(OSEncryptionState):
         self.command_executor.ExecuteInBash("for i in dev proc sys; do mount --move /memroot/$i /$i; done", True)
         self.command_executor.Execute("mv /boot /boot.backup", True)
         self.command_executor.Execute("mkdir /boot", True)
-        self.disk_util.remove_mount_info("/boot")
+        self.crypt_mount_config_util.remove_mount_info("/boot")
         self._append_boot_partition_uuid_to_fstab(boot_partition_uuid)
         self.command_executor.Execute("cp /etc/fstab /memroot/etc/fstab", True)
         self.command_executor.Execute("mount /boot", True)

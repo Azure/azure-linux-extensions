@@ -122,8 +122,8 @@ class PatchBootSystemState(OSEncryptionState):
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
 
-        self.disk_util.remove_mount_info('/')
-        self.disk_util.append_mount_info('/dev/mapper/osencrypt', '/')
+        self.crypt_mount_config_util.remove_mount_info('/')
+        self.crypt_mount_config_util.append_mount_info('/dev/mapper/osencrypt', '/')
 
         self.command_executor.ExecuteInBash('patch -b -d /usr/share/dracut/modules.d/90crypt -p1 <{0}'.format(patchpath), True)
 
