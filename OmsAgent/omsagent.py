@@ -1,4 +1,4 @@
-s_vm_supported_for_extension#!/usr/bin/env python
+#!/usr/bin/env python
 #
 # OmsAgentForLinux Extension
 #
