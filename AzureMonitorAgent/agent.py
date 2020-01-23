@@ -256,7 +256,8 @@ def install():
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
         if MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
-            default_configs["ENABLE_MCS"] = "true"
+            waagent_log_error('Not all required GCS parameters are provided')
+            raise ParameterMissingException
         else:
             # set the values for GCS
             default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
@@ -269,13 +270,20 @@ def install():
             default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
 
             # write the certificate and key to disk
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            
             fh = open("/etc/mdsd.d/gcscert.pem", "wb")
             fh.write(MONITORING_GCS_CERT_CERTFILE)
             fh.close()
+            os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 750))  
 
             fh = open("/etc/mdsd.d/gcskey.pem", "wb")
             fh.write(MONITORING_GCS_CERT_KEYFILE)
             fh.close()
+            os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 750))  
 
     config_file = "/etc/default/mdsd"
     config_updated = False
@@ -303,6 +311,11 @@ def install():
 
             os.remove(config_file)
             os.rename("/etc/default/mdsd_temp", config_file)
+
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            os.chown(config_file, uid, gid)
+            os.system('chmod {1} {0}'.format(config_file, 750))  
 
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
