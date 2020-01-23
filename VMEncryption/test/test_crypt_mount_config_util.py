@@ -4,7 +4,7 @@ import mock
 from main.Common import CryptItem
 from main.EncryptionEnvironment import EncryptionEnvironment
 from main.CryptMountConfigUtil import CryptMountConfigUtil
-from console_logger import ConsoleLogger
+from .console_logger import ConsoleLogger
 
 
 class Test_crypt_mount_config_util(unittest.TestCase):
@@ -84,7 +84,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         crypt_item = self.crypt_mount_config_util.parse_crypttab_line(line)
         self.assertEquals(str(expected_crypt_item), str(crypt_item))
 
-    @mock.patch('__builtin__.open')
+    @mock.patch('builtins.open')
     @mock.patch('os.path.exists', return_value=True)
     def test_should_use_azure_crypt_mount(self, exists_mock, open_mock):
         # if the acm file exists and has only a root disk
@@ -115,7 +115,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('main.CryptMountConfigUtil.ProcessCommunicator')
     @mock.patch('main.CommandExecutor.CommandExecutor', autospec=True)
-    @mock.patch('__builtin__.open')
+    @mock.patch('builtins.open')
     @mock.patch('main.CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount')
     @mock.patch('main.DiskUtil.DiskUtil', autospec=True)
     def test_get_crypt_items(self, disk_util_mock, use_acm_mock, open_mock, ce_mock, pc_mock, exists_mock):

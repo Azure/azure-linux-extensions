@@ -3,12 +3,12 @@ import mock
 from main import EncryptionSettingsUtil
 from main import Common
 from io import StringIO
-from . import console_logger
+from .console_logger import ConsoleLogger
 
 class TestEncryptionSettingsUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
     def setUp(self):
-        self.logger = console_logger.ConsoleLogger()
+        self.logger = ConsoleLogger()
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
     @mock.patch('time.sleep') # To speed up this test.

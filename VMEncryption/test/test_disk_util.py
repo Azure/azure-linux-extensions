@@ -7,8 +7,8 @@ from main.DiskUtil import DiskUtil
 from main.EncryptionEnvironment import EncryptionEnvironment
 from main.Common import DeviceItem
 
-from console_logger import ConsoleLogger
-from test_utils import mock_dir_structure, MockDistroPatcher
+from .console_logger import ConsoleLogger
+from .test_utils import mock_dir_structure, MockDistroPatcher
 
 
 class Test_Disk_Util(unittest.TestCase):
