@@ -277,13 +277,13 @@ def install():
             fh.write(MONITORING_GCS_CERT_CERTFILE)
             fh.close()
             os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
-            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 750))  
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
 
             fh = open("/etc/mdsd.d/gcskey.pem", "wb")
             fh.write(MONITORING_GCS_CERT_KEYFILE)
             fh.close()
             os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
-            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 750))  
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
 
     config_file = "/etc/default/mdsd"
     config_updated = False
@@ -315,7 +315,7 @@ def install():
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             os.chown(config_file, uid, gid)
-            os.system('chmod {1} {0}'.format(config_file, 750))  
+            os.system('chmod {1} {0}'.format(config_file, 400))  
 
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
