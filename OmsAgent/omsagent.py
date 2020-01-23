@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+s_vm_supported_for_extension#!/usr/bin/env python
 #
 # OmsAgentForLinux Extension
 #
@@ -681,10 +681,10 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], # CentOS
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
+                       'oracle' : ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'] # SLES

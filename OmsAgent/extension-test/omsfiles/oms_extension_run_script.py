@@ -74,10 +74,10 @@ def main():
 def is_vm_supported_for_extension():
 
     global vm_supported, vm_dist, vm_ver
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], # CentOS
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
+                       'oracle' : ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15']} # SLES
