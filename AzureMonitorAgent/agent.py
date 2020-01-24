@@ -212,9 +212,10 @@ def install():
         "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://management.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
+        "ENABLE_MCS" : "false",
+        "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         #"OMS_TLD" : "int2.microsoftatlanta-int.com",
-        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",
-        #"ENABLE_MCS" : "true",
+        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
 
     # decide the mode
