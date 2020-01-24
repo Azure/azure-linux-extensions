@@ -656,7 +656,7 @@ def restart_omi_if_crashed(omi_installed, mdsd):
                 configurator = create_core_components_configs()
                 dependencies_err, dependencies_msg = setup_dependencies_and_mdsd(configurator)
                 if dependencies_err != 0:
-                    hutil.error("Re-installing the components failed with error code: " + dependencies_err + ", error message: " +  dependencies_msg)
+                    hutil.error("Re-installing the components failed with error code: " + str(dependencies_err) + ", error message: " +  dependencies_msg)
                     return omi_installed
                 else:
                     omi_reinstalled = True
