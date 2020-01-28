@@ -290,22 +290,28 @@ def install():
     config_updated = False
     try:
         if os.path.isfile(config_file):
-            data = ""
+            data = []
+            new_data = ""
+            export_dict = {}
+            vars_set = set()
             with open(config_file, "r") as f:
-                data = f.read()
-                for var in default_configs.keys():
-                    pattern = "(#*)export " + str(var) + "=.*$"
-                    r_obj = re.compile(pattern, flags=re.MULTILINE)
-                    value = "export " + var + "=" + default_configs[var]
-                    if var in data:
-                        new_data = r_obj.sub(value, data)
-                        data = new_data
-                    else:
-                        data += value+"\n"
+                data = f.readlines()
+                for line in data:
+                    for var in default_configs.keys():
+                        export_dict[var] = "export " + var + "=" + default_configs[var] + "\n"
+                        if var in line:
+                            line = export_dict[var]
+                            vars_set.add(var)
+                            break
+                    new_data += line
+            
+            for var in default_configs.keys():
+                if var not in vars_set:
+                    new_data += export_dict[var]
 
             with open("/etc/default/mdsd_temp", "w") as f:
-                f.write(data)
-                config_updated = True if len(data) > 0 else False 
+                f.write(new_data)
+                config_updated = True if len(new_data) > 0 else False 
 
             if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
                 log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
