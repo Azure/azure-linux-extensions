@@ -292,22 +292,20 @@ def install():
         if os.path.isfile(config_file):
             data = []
             new_data = ""
-            export_dict = {}
             vars_set = set()
             with open(config_file, "r") as f:
                 data = f.readlines()
                 for line in data:
                     for var in default_configs.keys():
-                        export_dict[var] = "export " + var + "=" + default_configs[var] + "\n"
                         if var in line:
-                            line = export_dict[var]
+                            line = "export " + var + "=" + default_configs[var] + "\n"
                             vars_set.add(var)
                             break
                     new_data += line
             
             for var in default_configs.keys():
                 if var not in vars_set:
-                    new_data += export_dict[var]
+                    new_data += "export " + var + "=" + default_configs[var] + "\n"
 
             with open("/etc/default/mdsd_temp", "w") as f:
                 f.write(new_data)
