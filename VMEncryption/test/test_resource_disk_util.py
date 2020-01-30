@@ -19,7 +19,7 @@
 """ Unit tests for the ResourceDiskUtil module """
 
 import unittest
-import mock
+import unittest.mock
 
 from main.ResourceDiskUtil import ResourceDiskUtil
 from main.DiskUtil import DiskUtil
@@ -31,8 +31,8 @@ from .console_logger import ConsoleLogger
 class TestResourceDiskUtil(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
-        self.mock_disk_util = mock.create_autospec(DiskUtil)
-        self.mock_crypt_mount_config_util = mock.create_autospec(CryptMountConfigUtil)
+        self.mock_disk_util = unittest.mock.create_autospec(DiskUtil)
+        self.mock_crypt_mount_config_util = unittest.mock.create_autospec(CryptMountConfigUtil)
         self.mock_passhprase_filename = "mock_passphrase_filename"
         mock_public_settings = {}
         self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_crypt_mount_config_util, self.mock_passhprase_filename, mock_public_settings, ["ubuntu", "16"])
@@ -50,7 +50,7 @@ class TestResourceDiskUtil(unittest.TestCase):
 
         # case 2: partition exists but call fails
         mock_partition_exists.return_value = True
-        mock_execute.return_value = -1  # simulate that the internal execute call failed.
+        mock_execute.return_value = False # simulate that the internal execute call failed.
         self.assertEqual(method(), False)
 
         # case 3: partition exists and call succeeds
@@ -58,18 +58,18 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_execute.return_value = CommonVariables.process_success  # simulate that the internal execute call succeeded
         self.assertEqual(method(), True)
 
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @unittest.mock.patch('main.CommandExecutor.CommandExecutor.Execute')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     def test_is_luks_device(self, mock_partition_exists, mock_execute):
         self._test_resource_disk_partition_dependant_method(self.resource_disk._is_luks_device, mock_partition_exists, mock_execute)
 
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
+    @unittest.mock.patch('main.CommandExecutor.CommandExecutor.Execute')
     def test_configure_waagent(self, mock_execute):
         mock_execute.side_effect = [-1,
                                     0,
                                     0]
         self.assertEqual(self.resource_disk._configure_waagent(), False)
-        mock_execute.assert_called_once()
+        self.assertEqual(mock_execute.call_count, 1) 
         self.assertEqual(self.resource_disk._configure_waagent(), True)
 
     def test_is_plain_mounted(self):
@@ -107,11 +107,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
         self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
     def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists):
 
         # Case 1, when there is a passphrase and the resource disk is not already encrypted and mounted.
@@ -167,13 +167,13 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(ResourceDiskUtil.RD_DEV_PATH)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
+    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
     def test_automount(self, mock_try_remount, mock_encrypt_format_mount):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
-        mock_try_remount.assert_called_once()
+        self.assertEqual(mock_try_remount.call_count, 1)
 
         # Case 2: try_remount fails and public settings is non-EFA:
         mock_try_remount.return_value = False
@@ -198,4 +198,4 @@ class TestResourceDiskUtil(unittest.TestCase):
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll}
         mock_encrypt_format_mount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
-        mock_encrypt_format_mount.assert_called_once()
+        self.assertEqual(mock_encrypt_format_mount.call_count, 1)

@@ -33,25 +33,33 @@ class TestHandlerUtil(unittest.TestCase):
         self.hutil = HandlerUtil.HandlerUtility(self.logger.log, self.logger.error, "AzureDiskEncryptionForLinux")
         self.hutil.patching = self.distro_patcher
         # invoke unit test from within main for setup (to avoid having to change dependencies)
-        # then move cwd to parent to emulate calling convention of guest agent 
-        if os.getcwd().endswith('main'):
-            os.chdir(os.path.dirname(os.getcwd()))
-        else:
-            self.logger.log(os.getcwd())
+        handlerPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        handlerEnvPath = os.path.join(handlerPath, "HandlerEnvironment.json")
+        handlerManPath = os.path.join(handlerPath, "HandlerManifest.json")
+        configPath = os.path.join(handlerPath, "config")
+        settingsFilePath = os.path.join(configPath,"0.settings")
+        handlerEnvJson = '[{"handlerEnvironment":{"statusFolder":"/tmp","logFolder":"/tmp","configFolder":"' + configPath + '","heartbeatFile":"/tmp/heartbeat.log"},"version":1.0,"name":"Microsoft.Azure.Security.AzureDiskEncryptionForLinux"}]'
+        handlerManJson = '[{"handlerManifest":{"disableCommand":"disable","enableCommand":"enable","installCommand":"install","rebootAfterInstall":false,"reportHeartbeat":false,"uninstallCommand":"uninstall","updateCommand":"update"},"name":"AzureDiskEncryptionForLinux","version":"1.0"}]'
+        settingsFileJson = '{"runtimeSettings": [{"handlerSettings": {"protectedSettings": null, "publicSettings": {"VolumeType": "OS", "KeyEncryptionKeyURL": "", "KekVaultResourceId": "", "KeyEncryptionAlgorithm": "RSA-OAEP", "KeyVaultURL": "https://testkv.vault.azure.net/", "KeyVaultResourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrg/providers/Microsoft.KeyVault/vaults/testkv", "EncryptionOperation": "EnableEncryption"}, "protectedSettingsCertThumbprint": null} }]}'
+        if not os.path.isfile(handlerEnvPath):
+            with open(handlerEnvPath, "w") as outfile:
+                outfile.write(handlerEnvJson)
+        if not os.path.isfile(handlerManPath):
+            with open(handlerManPath, "w") as outfile:
+                outfile.write(handlerManJson)
+        if not os.path.isdir(configPath):
+            os.mkdir(configPath)
+        if not os.path.isfile(settingsFilePath):
+            with open(settingsFilePath, "w") as outfile:
+                outfile.write(settingsFileJson)
+        self.hutil._context._seq_no = 0
+        self.hutil._context._settings_file = settingsFilePath
+        self.hutil._context._config_dir = configPath
             
     def test_parse_config_sp(self):
         # test 0.1 sp config syntax
         test_sp = '{"runtimeSettings": [{"handlerSettings": {"protectedSettings": null, "publicSettings": {"VolumeType": "OS", "KeyEncryptionKeyURL": "", "KekVaultResourceId": "", "KeyEncryptionAlgorithm": "RSA-OAEP", "KeyVaultURL": "https://testkv.vault.azure.net/", "KeyVaultResourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrg/providers/Microsoft.KeyVault/vaults/testkv", "EncryptionOperation": "EnableEncryption"}, "protectedSettingsCertThumbprint": null} }]}'
         self.assertIsNotNone(self.hutil._parse_config(test_sp))
-
-    def test_parse_config_dp_enable(self):
-        # test 1.1 dp config syntax 
-        test_dp = '{"runtimeSettings": [{"handlerSettings": {"protectedSettings": "MIIB8AYJKoZIhvcNAQcDoIIB4TCCAd0CAQAxggFpMIIBZQIBADBNMDkxNzA1BgoJkiaJk/IsZAEZFidXaW5kb3dzIEF6dXJlIENSUCBDZXJ0aWZpY2F0ZSBHZW5lcmF0b3ICEG5XyHr6J9qxRLVe/RzaobIwDQYJKoZIhvcNAQEBBQAEggEASDt5QPp0i8R408Ho2JNs0gEAKmjo17qg7Wk+Ihy5I3krCHY4pGGzWAXafvZ3Y1rLh7m/k1+uwK94o3taI27NEvz4YAbCkzLdgiNZx3yZdn5KkRzSbakztnf1a/MTEXY0dYjEjK9ZN5H5XiS8OLhpXaOgayaz1ZFS5MnOufBFXWuL2qeYK/txfBXIJujBHru80b+YahwnHU7/nislCslYVxENn9Jp9VpKGEcCeDFo/KKi0BTbpkxPj3OScNcsPuSRUP9xgT/b96bARJKeLjrxHQa398gzp291OlDYTr4sKBPqGNk8wER0aSpOm6igE857YAc0tShKQhGI14jcEHUu2jBrBgkqhkiG9w0BBwEwFAYIKoZIhvcNAwcECPpjFE+mGCN7gEj0rWo00NbAoQ6VhMnzdnZ3MnKOCjdWr/NTOdTgHMXU732rfDL89dMHLmUnBHq4SyTqIAi0M6sPEJ38anxx/msIQl15/w8qmL8=", "publicSettings": {"AADClientID": "00000000-0000-0000-0000-000000000000", "VolumeType": "DATA", "KeyEncryptionKeyURL": "https://testkv.vault.azure.net/keys/adelpackek/a022ed2b1eba4befb0dc9dc07bf33578", "KeyEncryptionAlgorithm": "RSA-OAEP", "KeyVaultURL": "https://testkv.vault.azure.net", "SequenceVersion": "eec80fc4-e0a2-434e-9007-974a150c3407", "AADClientCertThumbprint": null, "EncryptionOperation": "EnableEncryption"}, "protectedSettingsCertThumbprint": "45E4EC25EECAD03EC81F8177CEF16CD3CAF6297A"} }]}'
-        self.assertIsNotNone(self.hutil._parse_config(test_dp))
-
-    def test_parse_config_dp_query(self):
-        test_dpq = '{"runtimeSettings": [{"handlerSettings": {"protectedSettings": "MIIBsAYJKoZIhvcNAQcDoIIBoTCCAZ0CAQAxggFpMIIBZQIBADBNMDkxNzA1BgoJkiaJk/IsZAEZFidXaW5kb3dzIEF6dXJlIENSUCBDZXJ0aWZpY2F0ZSBHZW5lcmF0b3ICEG5XyHr6J9qxRLVe/RzaobIwDQYJKoZIhvcNAQEBBQAEggEAE92LccPctK0h52F+WOjKPWat5O3nxjQpsLKquMtwiKsc5BMot8dLEAE1h7V7SJJ8kiGRLS232mwvVbOA+nOs3l1lCUNDnckbzvvuu/rgz+if1sHvYIn0Xd/kXHSMNm9loh9lTLagGblEFxGupcBcsAEptcjL0f7zUG1NrlnKPVDGceOw7I3dQK6X8rPrMHJ8m6wiHpTvjpa/xmG0mrVyOGjJv7cEDnJ0A8pvRHUrZGGuqi/4WeGPGDKQzmVc6O5oGFfke3bAOd9GJxFWhLwZ1lb1XrKNImVDT2vnWWFiy2lKDwUvKSdqRpaqRNr6f7tZcDWiB+v+vZ6V4GC33kT0mDArBgkqhkiG9w0BBwEwFAYIKoZIhvcNAwcECJeXx+KpPZqdgAgiUsAz+Acz6A==", "publicSettings": {"SequenceVersion": "3838692e-4827-4175-8286-86828d199f85", "EncryptionOperation": "QueryEncryptionStatus"}, "protectedSettingsCertThumbprint": "45E4EC25EECAD03EC81F8177CEF16CD3CAF6297A"} }]}'
-        self.assertIsNotNone(self.hutil._parse_config(test_dpq))
 
     def test_do_parse_context_install(self):
         self.assertIsNotNone(self.hutil.do_parse_context('Install'))

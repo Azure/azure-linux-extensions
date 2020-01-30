@@ -267,21 +267,7 @@ class EncryptionSettingsUtil(object):
 
         # V3 message content
         msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
-        try:
-            self._post_to_wireserver_helper(msg_data, http_util)
-        except Exception:
-            self.logger.log("Falling back on old Wire Server protocol")
-            data_copy = data.copy()
-            data_copy.pop("Protectors")
-            data_copy["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
-
-            self.write_settings_file(data_copy)
-            if not os.path.isfile(self.get_settings_file_path()):
-                raise Exception(
-                    'Disk encryption settings file not found: ' + self.get_settings_file_path())
-
-            msg_data = CommonVariables.wireprotocol_msg_template_v2.format(settings_file_name=self.get_settings_file_name())
-            self._post_to_wireserver_helper(msg_data, http_util)
+        self._post_to_wireserver_helper(msg_data, http_util)
 
     def clear_encryption_settings(self, disk_util):
         """

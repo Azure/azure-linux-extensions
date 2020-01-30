@@ -107,13 +107,13 @@ class HandlerUtility:
                 try:
                     if file.endswith('.settings'):
                         cur_seq_no = int(os.path.basename(file).split('.')[0])
-                        if os.path.exists(join(config_folder, str(cur_seq_no) + '.settings.rejected')):
+                        if os.path.exists(os.path.join(config_folder, str(cur_seq_no) + '.settings.rejected')):
                             continue
                         if freshest_time == None:
-                            freshest_time = os.path.getmtime(join(config_folder, file))
+                            freshest_time = os.path.getmtime(os.path.join(config_folder, file))
                             seq_no = cur_seq_no
                         else:
-                            current_file_m_time = os.path.getmtime(join(config_folder, file))
+                            current_file_m_time = os.path.getmtime(os.path.join(config_folder, file))
                             if current_file_m_time > freshest_time:
                                 freshest_time = current_file_m_time
                                 seq_no = cur_seq_no
@@ -319,6 +319,12 @@ class HandlerUtility:
         if nonquery:
             last_config_path = self.get_last_nonquery_config_path()
         else:
+            if self._context is None:
+                raise Exception("_context is not set")
+            if (self._context._config_dir is None) or (not os.path.isdir(self._context._config_dir)):
+                raise Exception("_context._config_dir is not set or is not a directory")
+            if (self._context._seq_no is None) or (self._context._seq_no < 0):
+                raise Exception("_context._seq_no is not set")
             # retrieve the settings file corresponding to the current sequence number 
             last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
 
@@ -347,7 +353,8 @@ class HandlerUtility:
         # load environment variables from HandlerEnvironment.json 
         # according to spec, it is always in the ./ directory
         #self.log('cwd is ' + os.path.realpath(os.path.curdir))
-        handler_env_file = './HandlerEnvironment.json'
+        handler_env_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+        handler_env_file = os.path.join(handler_env_dir, 'HandlerEnvironment.json')
         if not os.path.isfile(handler_env_file):
             self.error("Unable to locate " + handler_env_file)
             return None
@@ -377,7 +384,7 @@ class HandlerUtility:
         handler_env = self.get_handler_env()
         self._context._name = handler_env['name']
         self._context._version = str(handler_env['version'])
-        self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
+        self._context._config_dir = str(handler_env['handlerEnvironment']['configFolder'])
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
         self._change_log_file()
