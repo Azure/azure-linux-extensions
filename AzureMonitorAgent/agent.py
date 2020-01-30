@@ -52,7 +52,7 @@ except Exception as e:
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
 BundleFileNameDeb = 'azure-mdsd_1.5.119-build.dev_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.119-build.dev_x86_64.rpm
+BundleFileNameRpm = 'azure-mdsd_1.5.119-build.dev_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
