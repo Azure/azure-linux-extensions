@@ -51,8 +51,8 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.119-build.develop.805_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.119-build.develop.805_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.119-build.dev_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.119-build.dev_x86_64.rpm
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
@@ -224,7 +224,7 @@ def install():
     else:
         # look for LA protected settings
         for var in protected_settings.keys():
-            if "_key" in var:
+            if "_key" in var or "_id" in var:
                 default_configs[var] = protected_settings.get(var)
         
         # check if required GCS params are available
