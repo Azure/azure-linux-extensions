@@ -45,7 +45,9 @@ except Exception as e:
     print('Importing utils failed with error: {0}'.format(e))
 
 # Global Variables
+ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
+keysDirectory = 'keys'
 BundleFileName = 'omsagent-1.12.25-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
@@ -124,6 +126,53 @@ try:
 except:
     pass
 
+"""
+What need to be packaged to make the signing work:
+├── keys
+│   ├── dscgpgkey.asc
+│   └── msgpgkey.asc
+├── packages
+│   ├── omsagent-*.universal.x64.asc
+│   ├── omsagent-*.universal.x64.sha256sums
+"""
+def verifyShellBundleSigningAndChecksum():
+    cert_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    keys_directory = os.path.join(os.getcwd(), keysDirectory)
+    # import GPG key
+    dscGPGKeyFilePath = os.path.join(keys_directory, 'dscgpgkey.asc')
+    if not os.path.isfile(dscGPGKeyFilePath):
+        raise Exception("Unable to find the dscgpgkey.asc file at " + dscGPGKeyFilePath)
+    
+    importGPGKeyCommand = "sh ImportGPGkey.sh " + dscGPGKeyFilePath
+    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip)
+
+    # Check that we can find the keyring file
+    keyringFilePath = os.path.join(keys_directory, 'keyring.gpg')
+    if not os.path.isfile(keyringFilePath):
+        raise Exception("Unable to find the Extension keyring file at " + keyringFilePath)
+
+    # Check that we can find the asc file
+    bundleFileName, file_ext = os.path.splitext(BundleFileName)
+    ascFilePath = os.path.join(cert_directory, bundleFileName + ".asc")
+    if not os.path.isfile(ascFilePath):
+        raise Exception("Unable to find the OMS shell bundle asc file at " + ascFilePath)
+
+    # check that we can find the SHA256 sums file
+    sha256SumsFilePath = os.path.join(cert_directory, bundleFileName + ".sha256sums")
+    if not os.path.isfile(sha256SumsFilePath):
+        raise Exception("Unable to find the OMS shell bundle SHA256 sums file at " + sha256SumsFilePath)
+
+    # Verify the SHA256 sums file with the keyring and asc files
+    verifySha256SumsCommand = "HOME=" + keysDirectory + " gpg --no-default-keyring --keyring " + keyringFilePath + " --verify " + ascFilePath  + " " + sha256SumsFilePath
+    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip)
+    if exit_code != 0:
+        raise Exception("Failed to verify SHA256 sums file at " + sha256SumsFilePath)
+
+    # Perform SHA256 sums to verify shell bundle
+    performSha256SumsCommand = "cd %s; sha256sum -c %s" % (cert_directory, sha256SumsFilePath)
+    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip)
+    if exit_code != 0:
+        raise Exception("Failed to verify shell bundle with the SHA256 sums file at " + sha256SumsFilePath)
 
 def main():
     """
@@ -181,6 +230,15 @@ def main():
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)   
+
+    # Verify shell bundle signing
+    try:
+        verifyShellBundleSigningAndChecksum()
+    except Exception as ex:
+        if ProceedOnSigningVerificationFailure:
+            hutil_log_error(ex.message)
+        else:
+            log_and_exit(operation, ex.message)
 
     # Invoke operation
     try:
@@ -1219,6 +1277,11 @@ def was_curl_found(exit_code, output):
         return False
     return True
 
+def retry_skip(exit_code, output):
+    """
+    skip retires
+    """
+    return False, '', False
 
 def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     """
