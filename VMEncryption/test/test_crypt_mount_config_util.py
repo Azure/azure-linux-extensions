@@ -112,6 +112,22 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertFalse(self.crypt_mount_config_util.should_use_azure_crypt_mount())
         open_mock.assert_not_called()
 
+    def test_add_nofail_if_absent_to_fstab_line(self):
+        test_line = "/dev/sdc /somefolder auto defaults,discard 0 0"
+        test_line_with_nofail = "/dev/sdc /somefolder auto nofail,defaults,discard 0 0"
+
+        new_line = self.crypt_mount_config_util.add_nofail_if_absent_to_fstab_line(test_line)
+        self.assertEqual(test_line_with_nofail, new_line)
+
+        new_line = self.crypt_mount_config_util.add_nofail_if_absent_to_fstab_line(test_line_with_nofail)
+        self.assertEqual(test_line_with_nofail, new_line)
+
+        new_line = self.crypt_mount_config_util.add_nofail_if_absent_to_fstab_line("")
+        self.assertEqual("", new_line)
+
+        new_line = self.crypt_mount_config_util.add_nofail_if_absent_to_fstab_line("#THIS LINE IS A COMMENT")
+        self.assertEqual("#THIS LINE IS A COMMENT", new_line)
+
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('main.CryptMountConfigUtil.ProcessCommunicator')
     @mock.patch('main.CommandExecutor.CommandExecutor', autospec=True)
