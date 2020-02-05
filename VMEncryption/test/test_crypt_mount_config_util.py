@@ -16,7 +16,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
     def _mock_open_with_read_data_dict(self, open_mock, read_data_dict):
         def _open_side_effect(filename, mode, *args, **kwargs):
             read_data = read_data_dict.get(filename)
-            mock_obj = mock.mock_open(read_data=read_data)
+            mock_obj = unittest.mock.mock_open(read_data=read_data)
             return mock_obj.return_value
 
         open_mock.side_effect = _open_side_effect
@@ -131,13 +131,13 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         """
         unittest.mock.mock_open(open_mock, acm_contents)
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
-        self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
+        self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/dev_path",
                                                                uses_cleartext_key=True,
                                                                mount_point="/",
                                                                file_system="ext4",
-                                                               current_luks_slot=0)],
-                             crypt_items)
+                                                               current_luks_slot=0)),
+                             str(crypt_items[0]))
 
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
         pc_mock.return_value.stdout = "osencrypt /dev/dev_path"  # The grep find this line in there
@@ -145,22 +145,25 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         disk_util_mock.get_mount_items.return_value = [{"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
         exists_mock.return_value = False  # No luksheader file found
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
-        self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
+        self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/dev_path",
                                                                mount_point="/",
-                                                               file_system="ext4")],
-                             crypt_items)
+                                                               file_system="ext4",
+                                                               luks_header_path="/dev/dev_path",
+                                                               uses_cleartext_key="False",
+                                                               current_luks_slot="-1")),
+                             str(crypt_items[0]))
 
         use_acm_mock.return_value = False  # Now, use the /etc/crypttab file
         exists_mock.return_value = True  # Crypttab file found
         self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/osencrypt / ext4 defaults,nofail 0 0",
                                                         "/etc/crypttab": "osencrypt /dev/sda1 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
-        self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
+        self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/sda1",
                                                                file_system="ext4",
-                                                               mount_point="/")],
-                             crypt_items)
+                                                               mount_point="/")),
+                             str(crypt_items[0]))
 
         # if there was no crypttab entry for osencrypt
         exists_mock.side_effect = [True, False]  # Crypttab file found but luksheader not found
@@ -168,11 +171,14 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
         pc_mock.return_value.stdout = "osencrypt /dev/sda1"  # The grep find this line in there
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
-        self.assertListEqual([self._create_expected_crypt_item(mapper_name="osencrypt",
+        self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/sda1",
                                                                file_system="ext4",
-                                                               mount_point="/")],
-                             crypt_items)
+                                                               mount_point="/",
+                                                               luks_header_path="/dev/sda1",
+                                                               uses_cleartext_key="False",
+                                                               current_luks_slot="-1")),
+                             str(crypt_items[0]))
 
         exists_mock.side_effect = None  # Crypttab file found
         exists_mock.return_value = True  # Crypttab file found
@@ -192,9 +198,9 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self._mock_open_with_read_data_dict(open_mock, {"/etc/fstab": "/dev/mapper/encrypteddatadisk /mnt/datadisk auto defaults,nofail 0 0",
                                                         "/etc/crypttab": "encrypteddatadisk /dev/disk/azure/scsi1/lun0 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/headerfile"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
-        self.assertListEqual([self._create_expected_crypt_item(mapper_name="encrypteddatadisk",
+        self.assertEqual(str(self._create_expected_crypt_item(mapper_name="encrypteddatadisk",
                                                                dev_path="/dev/disk/azure/scsi1/lun0",
                                                                file_system="auto",
                                                                luks_header_path="/headerfile",
-                                                               mount_point="/mnt/datadisk")],
-                             crypt_items)
+                                                               mount_point="/mnt/datadisk")),
+                             str(crypt_items[0]))

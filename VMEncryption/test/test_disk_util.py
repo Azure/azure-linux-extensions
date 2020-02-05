@@ -75,6 +75,7 @@ class Test_Disk_Util(unittest.TestCase):
 
         # Let's mount the data disk now but keep it non-encrypted
         get_mount_items_mock.return_value.append({"src": "/dev/sdd1", "dest": "/mnt/disk1", "fs": "ext4"})
+        status = self.disk_util.get_encryption_status()
         self.assertDictEqual({u"os": u"NotEncrypted", u"data": u"NotEncrypted"}, json.loads(status))
 
         # Let's make it encrypted now
