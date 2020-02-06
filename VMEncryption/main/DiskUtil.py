@@ -94,7 +94,7 @@ class DiskUtil(object):
         """ checks if the device is set up with a luks header """
         path_var = device_header_path if device_header_path else device_path
         cmd = 'cryptsetup isLuks ' + path_var
-        return (int)(self.executor.Execute(cmd)) == CommonVariables.process_success
+        return (int)(self.command_executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
