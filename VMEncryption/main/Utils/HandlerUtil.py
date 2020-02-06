@@ -73,6 +73,7 @@ waagent = load_waagent()
 import logging
 import logging.handlers
 from ProcessLock import ProcessLock
+from builtins import str
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -492,7 +493,7 @@ class HandlerUtility:
             if message is None:
                 message = ""
                 
-            message = ''.join(filter(lambda x: x in string.printable, message))
+            message = ''.join([x for x in message if x in string.printable])
             
             self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
             self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
@@ -536,8 +537,10 @@ class HandlerUtility:
                 
                 if "VMRestartPending" in encryption_status:
                     stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
-                    
-            stat_rept = json.dumps(stat, ensure_ascii=False)
+
+            # use default encode_ascii of true, then decode for python2 + python3 compat
+            stat_rept = json.dumps(stat).decode('utf-8')
+            
             # rename all other status files, or the WALA would report the wrong
             # # status file.
             # # because the wala choose the status file with the highest sequence

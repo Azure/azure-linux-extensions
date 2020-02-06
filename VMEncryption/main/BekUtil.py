@@ -47,6 +47,7 @@ class BekUtil(object):
 
     def store_bek_passphrase(self, encryption_config, passphrase):
 
+        # use str() to ensure bek_filename is a string type on python3+
         bek_filename = str(encryption_config.get_bek_filename())
 
         try:
@@ -86,6 +87,7 @@ class BekUtil(object):
                     return os.path.join(self.bek_filesystem_mount_point, filename)
 
         except Exception as e:
+            # use str() to convert exception to string on python 3+
             message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
             self.logger.log(message)
 

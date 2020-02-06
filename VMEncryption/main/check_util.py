@@ -27,6 +27,8 @@ from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
+from future.standard_library import install_aliases
+install_aliases()
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""

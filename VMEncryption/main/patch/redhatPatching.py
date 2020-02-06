@@ -166,14 +166,14 @@ class redhatPatching(AbstractPatching):
 
         crypt_cmd = "cryptsetup status osencrypt | grep device:"
         command_executor.ExecuteInBash(crypt_cmd, communicator=proc_comm, suppress_logging=True)
-        matches = re.findall(r'device:(.*)', proc_comm.stdout.decode("utf-8"))
+        matches = re.findall(r'device:(.*)', proc_comm.stdout)
         if not matches:
             raise Exception("Could not find device in cryptsetup output")
         root_device = matches[0].strip()
 
         udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(root_device)
         command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
-        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout.decode("utf-8"))
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
         if not matches:
             raise Exception("Could not parse ATTR{partition} from udevadm info")
         partition = matches[0]

@@ -83,7 +83,7 @@ class OSEncryptionState(object):
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute('pvs', True, communicator=proc_comm)
 
-            for line in proc_comm.stdout.decode("utf-8").split("\n"):
+            for line in proc_comm.stdout.split("\n"):
                 if "rootvg" in line:
                     self.rootfs_block_device = line.strip().split()[0]
                     self.rootfs_disk = self.rootfs_block_device[:-1]
@@ -150,7 +150,8 @@ class OSEncryptionState(object):
         dev = os.lstat(fs).st_dev
 
         for line in open('/proc/mounts'):
-            line = [bytes(s,'utf-8').decode('unicode_escape') for s in line.split()[:3]]
+            # python2 and python3 compatible conversion to unicode (consider replacing with call to DiskUtil.get_mount_items)
+            line = [bytes(s,'utf-8').decode('unicode-escape').encode('latin1').decode('utf-8') for s in line.split()[:3]]
             if dev == os.lstat(line[1]).st_dev:
                 result = tuple(line)
 
@@ -174,7 +175,7 @@ class OSEncryptionState(object):
         self.command_executor.Execute('blockdev --getsize64 {0}'.format(dev),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        return int(proc_comm.stdout.decode("utf-8").strip())
+        return int(proc_comm.stdout.strip())
 
     def _is_uuid(self, s):
         try:

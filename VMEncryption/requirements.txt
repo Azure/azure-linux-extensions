@@ -1,4 +1,11 @@
+autopep8==1.4.4
+enum34==1.1.6
+flake8==3.6.0
 funcsigs==1.0.2
+mccabe==0.6.1
 mock==2.0.0
 pbr==4.3.0
+pycodestyle==2.4.0
+pyflakes==2.0.0
 six==1.11.0
+future=0.18.2

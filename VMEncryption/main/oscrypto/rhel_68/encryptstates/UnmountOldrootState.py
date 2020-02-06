@@ -61,7 +61,7 @@ class UnmountOldrootState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        for line in proc_comm.stdout.decode("utf-8").split('\n'):
+        for line in proc_comm.stdout.split('\n'):
             if not "running" in line:
                 continue
 
@@ -106,9 +106,9 @@ class UnmountOldrootState(OSEncryptionState):
                                       raise_exception_on_failure=False,
                                       communicator=proc_comm)
 
-        self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout.decode("utf-8")))
+        self.context.logger.log("Processes using oldroot:\n{0}".format(proc_comm.stdout))
 
-        procs_to_kill = [p for p in proc_comm.stdout.decode("utf-8").split() if p.isdigit()]
+        procs_to_kill = [p for p in proc_comm.stdout.split() if p.isdigit()]
         procs_to_kill = reversed(sorted(procs_to_kill))
 
         for victim in procs_to_kill:

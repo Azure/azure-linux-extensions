@@ -25,7 +25,8 @@ import shlex
 import subprocess
 from Common import CommonVariables
 from subprocess import *
-from Utils.waagentloader import load_waagent
+# waagentloader is a python3+ compatible loader embedded in this extension, cloned from VMAccess
+from Utils.waagentloader import load_waagent  
 
 class HttpUtil(object):
     """description of class"""

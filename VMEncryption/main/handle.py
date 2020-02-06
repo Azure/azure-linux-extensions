@@ -48,7 +48,8 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from builtins import int
-
+from builtins import str
+from io import open 
 
 def install():
     hutil.do_parse_context('Install')
@@ -787,6 +788,8 @@ def enable_encryption():
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
+
+    # ps_stdout is data, so decode to string prior to regex for python2 and python3 compat
     if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout.decode("utf-8")):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
@@ -1388,7 +1391,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
     executor = CommandExecutor(logger)
     executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
 
-    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout.decode("utf-8"))[0]) * CommonVariables.sector_size
+    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
 
     if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
@@ -1751,15 +1754,10 @@ def daemon_encrypt():
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
              (distro_name == 'redhat' and distro_version == '7.6') or
-<<<<<<< HEAD
              (distro_name == 'redhat' and distro_version == '7.7') or
              (distro_name == 'redhat' and distro_version == '8.0') or
              (distro_name == 'redhat' and distro_version == '8.1')) and
             (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
-=======
-             (distro_name == 'redhat' and distro_version == '7.7')) and
-                (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
->>>>>>> ade-singlepass-dev
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                             distro_patcher=DistroPatcher,
@@ -2116,6 +2114,7 @@ def start_daemon(operation):
 
     #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
     #throw broken pipe exception when parent process exit.
+    #use 'wb' for python3 compat since stdout and stderr are bytes not strings
     devnull = open(os.devnull, 'wb')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 

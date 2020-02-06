@@ -26,7 +26,7 @@ import base64
 from shutil import copyfile
 import uuid
 from Common import CommonVariables
-
+from io import open
 
 class EncryptionSettingsUtil(object):
     """ Provides capability to update encryption settings via wire server """
@@ -55,9 +55,10 @@ class EncryptionSettingsUtil(object):
         # specify buffering = 0 and then use os.fsync to flush
         # https://docs.python.org/2/library/functions.html#open
         # https://linux.die.net/man/2/fsync
-        with open(CommonVariables.encryption_settings_counter_path, "wb", 0) as outfile:
-            output = str(index + 1) + "\n"
-            outfile.write(output.encode())
+        # use mode = "w" and encoding = "ascii" since writing text only
+        with open(CommonVariables.encryption_settings_counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
+            output = str(index + 1) + "\n"  # str from builtins allows for a python2 + python3 compatible integer to string conversion
+            outfile.write(output)
             outfile.flush()
             os.fsync(outfile.fileno())
         return
@@ -182,9 +183,10 @@ class EncryptionSettingsUtil(object):
                 })
 
         full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        # b64encode takes a bytes like object, so read as binary data
         with open(full_protector_path, "rb") as protector_file:
-            protector_content = protector_file.read()
-            protector_base64 = base64.standard_b64encode(protector_content)
+            protector_data = protector_file.read()
+            protector_base64 = base64.standard_b64encode(protector_data).decode('utf_8')
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
         protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors]

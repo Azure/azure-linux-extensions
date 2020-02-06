@@ -19,6 +19,7 @@
 import os.path
 from Common import *
 from configparser import *
+from io import open
 
 class ConfigKeyValuePair(object):
     def __init__(self, prop_name, prop_value):
@@ -59,6 +60,8 @@ class ConfigUtil(object):
         for key_value_pair in key_value_pairs:
             if key_value_pair.prop_value is not None:
                 config.set(self.azure_crypt_config_section, str(key_value_pair.prop_name), str(key_value_pair.prop_value))
+        #the configparser module write method reads and writes as text, not binary
+        #open the file in text mode using 'w' for python2 and python3+ compat
         with open(self.config_file_path, 'w') as configfile:
             config.write(configfile)
 

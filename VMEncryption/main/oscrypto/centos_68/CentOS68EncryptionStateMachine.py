@@ -148,7 +148,7 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
         self.command_executor.Execute(command_to_execute="mount",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        if '/dev/mapper/osencrypt' in proc_comm.stdout.decode("utf-8"):
+        if '/dev/mapper/osencrypt' in proc_comm.stdout:
             self.logger.log("OS volume is already encrypted")
 
             self.skip_encryption()

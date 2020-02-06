@@ -31,7 +31,8 @@ from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
-
+from io import open
+from builtins import str
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -153,7 +154,7 @@ class DiskUtil(object):
             proc_comm = ProcessCommunicator()
             passphrase_cmd = self.distro_patcher.cat_path + ' ' + passphrase_file
             self.command_executor.Execute(passphrase_cmd, communicator=proc_comm)
-            passphrase = proc_comm.stdout.decode("utf-8")
+            passphrase = proc_comm.stdout
 
             cryptsetup_cmd = "{0} luksFormat {1} -q".format(self.distro_patcher.cryptsetup_path, dev_path)
             return self.command_executor.Execute(cryptsetup_cmd, input=passphrase)
@@ -228,7 +229,7 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = [l for l in proc_comm.stdout.decode("utf-8").split("\n") if "key slot" in l.lower()]
+        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
         keyslots = ["enabled" in l.lower() for l in lines]
 
         return keyslots
@@ -313,26 +314,35 @@ class DiskUtil(object):
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 
+    def unescape(self, s):
+        # python2 and python3+ compatible function for converting escaped unicode bytes to unicode string
+        if s is None:
+            return None
+        else: 
+            # decode unicode escape sequences, encode back to latin1, then decode all as 
+            return s.decode('unicode-escape').encode('latin1').decode('utf-8')
+
     def get_mount_items(self):
         items = []
-
-        for line in open('/proc/mounts'):
-            #P3TODO - used to be s.decode('string_escape') need to update this to be both python2 and 3 compatible
-            #P3STR - string sensitive change 
-            line = [s for s in line.split()]
-            item = {
-                "src": line[0],
-                "dest": line[1],
-                "fs": line[2]
+        # open as binary in both python2 and python3+ prior to unescape
+        for line in open('/proc/mounts','rb'):
+            mp_line = self.unescape(line)
+            mp_list = [s for s in mp_line.split()]
+            mp_item = {
+                "src": mp_list[0],
+                "dest": mp_list[1],
+                "fs": mp_list[2]
             }
-            items.append(item)
-
+            items.append(mp_item)
         return items
 
     def is_in_memfs_root(self):
         # TODO: make this more robust. This could fail due to mount paths with spaces and tmpfs (e.g. '/mnt/ tmpfs')
-        mounts = open('/proc/mounts', 'r').read()
-        return bool(re.search(r'/\s+tmpfs', mounts))
+        mounts_file = open('/proc/mounts', 'rb')
+        mounts_data = mounts_file.read()
+        mounts_text = self.unescape(mounts_data)
+
+        return bool(re.search(r'/\s+tmpfs', mounts_text))
 
     def get_encryption_status(self):
         encryption_status = {
@@ -473,6 +483,7 @@ class DiskUtil(object):
 
     def get_device_path(self, dev_name):
         device_path = None
+        # ensure the use of a string representation for python2 + python3 compat
         dev_name = str(dev_name)
 
         if os.path.exists("/dev/" + dev_name):
@@ -486,7 +497,7 @@ class DiskUtil(object):
         udev_cmd = "udevadm info -a -p $(udevadm info -q path -n {0}) | grep device_id".format(dev_path)
         proc_comm = ProcessCommunicator()
         self.command_executor.ExecuteInBash(udev_cmd, communicator=proc_comm, suppress_logging=True)
-        match = re.findall(r'"{(.*)}"', proc_comm.stdout.decode("utf-8").strip())
+        match = re.findall(r'"{(.*)}"', proc_comm.stdout.strip())
         return match[0] if match else ""
 
     def get_device_items_property(self, dev_name, property_name):
@@ -502,14 +513,14 @@ class DiskUtil(object):
             get_property_cmd = self.distro_patcher.blockdev_path + " --getsize64 " + device_path
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, suppress_logging=True)
-            property_value = proc_comm.stdout.decode("utf-8").strip()
+            property_value = proc_comm.stdout.strip()
         elif property_name == "DEVICE_ID":
             property_value = self.get_device_id(device_path)
         else:
             get_property_cmd = self.distro_patcher.lsblk_path + " " + device_path + " -b -nl -o NAME," + property_name
             proc_comm = ProcessCommunicator()
             self.command_executor.Execute(get_property_cmd, communicator=proc_comm, raise_exception_on_failure=True, suppress_logging=True)
-            for line in proc_comm.stdout.decode("utf-8").splitlines():
+            for line in proc_comm.stdout.splitlines():
                 if line.strip():
                     disk_info_item_array = line.strip().split()
                     if dev_name == disk_info_item_array[0]:
@@ -599,7 +610,7 @@ class DiskUtil(object):
         lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
-        output = proc_comm.stdout.decode("utf-8")
+        output = proc_comm.stdout
         self.logger.log('\n' + output + '\n')
     def get_device_items_sles(self, dev_path):
         if dev_path:
@@ -616,7 +627,7 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm, raise_exception_on_failure=True)
 
-        for line in proc_comm.stdout.decode("utf-8").splitlines():
+        for line in proc_comm.stdout.splitlines():
             item_value_str = line.strip()
             if item_value_str:
                 device_item = DeviceItem()
@@ -681,7 +692,7 @@ class DiskUtil(object):
 
             device_items = []
             lvm_items = self.get_lvm_items()
-            for line in proc_comm.stdout.decode("utf-8").splitlines():
+            for line in proc_comm.stdout.splitlines():
                 if line:
                     device_item = DeviceItem()
 
@@ -739,7 +750,7 @@ class DiskUtil(object):
 
         lvm_items = []
 
-        for line in proc_comm.stdout.decode("utf-8").splitlines():
+        for line in proc_comm.stdout.splitlines():
             if not line:
                 continue
 

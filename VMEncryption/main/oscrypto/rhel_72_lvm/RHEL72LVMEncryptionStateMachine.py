@@ -141,7 +141,7 @@ class RHEL72LVMEncryptionStateMachine(OSEncryptionStateMachine):
                                       communicator=proc_comm)
 
         patch_boot_system_state_marker = os.path.join(self.encryption_environment.os_encryption_markers_path, 'PatchBootSystemState')
-        if '/dev/mapper/osencrypt' in proc_comm.stdout.decode("utf-8") and os.path.exists(patch_boot_system_state_marker):
+        if '/dev/mapper/osencrypt' in proc_comm.stdout and os.path.exists(patch_boot_system_state_marker):
             self.logger.log("OS volume is already encrypted")
 
             self.skip_encryption()

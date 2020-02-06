@@ -15,14 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-import datetime
-import traceback
-import urllib.parse
-import http.client
 import os
 import string
-from builtins import str
 
 class BackupLogger(object):
     def __init__(self, hutil):
@@ -44,5 +38,5 @@ class BackupLogger(object):
                 msg = [c for c in msg if c in string.printable]
                 msg = ''.join(msg)
                 f.write('[AzureDiskEncryption] ' + msg + '\n')
-        except IOError as e:
+        except IOError:
             pass

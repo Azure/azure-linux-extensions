@@ -53,10 +53,8 @@ class EncryptBlockDeviceState(OSEncryptionState):
         desired_rootfs_size = current_rootfs_size - 8192
         
         self.command_executor.Execute('e2fsck -yf {0}'.format(self.rootfs_block_device), True)
-        self.command_executor.Execute('resize2fs {0} {1}s'.format(self.rootfs_block_device, desired_rootfs_size), True)
-        
+        self.command_executor.Execute('resize2fs {0} {1}s'.format(self.rootfs_block_device, desired_rootfs_size), True)        
         self.command_executor.Execute('mount /boot', False)
-        # self._find_bek_and_execute_action('_dump_passphrase')
 
         self.context.hutil.do_status_report(operation='EnableEncryptionDataVolumes',
                                             status=CommonVariables.extension_success_status,
@@ -85,15 +83,6 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                                                                                                          self.rootfs_block_device),
                                             raise_exception_on_failure=True)
 
-    def _dump_passphrase(self, bek_path):
-        proc_comm = ProcessCommunicator()
-
-        self.command_executor.Execute(command_to_execute="od -c {0}".format(bek_path),
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
-        self.context.logger.log("Passphrase:")
-        self.context.logger.log(proc_comm.stdout.decode("utf-8"))
-
     def _find_bek_and_execute_action(self, callback_method_name):
         callback_method = getattr(self, callback_method_name)
         if not ismethod(callback_method):
@@ -108,8 +97,8 @@ class EncryptBlockDeviceState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
-        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout.decode("utf-8"))
+        root_fs_block_count = re.findall(r'Block count:\s*(\d+)', proc_comm.stdout)
+        root_fs_block_size = re.findall(r'Block size:\s*(\d+)', proc_comm.stdout)
 
         if not root_fs_block_count or not root_fs_block_size:
             raise Exception("Error parsing dumpe2fs output, count={0}, size={1}".format(root_fs_block_count,

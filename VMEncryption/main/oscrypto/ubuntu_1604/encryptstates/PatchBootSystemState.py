@@ -155,4 +155,4 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute(command_to_execute="blkid -s UUID -o value {0}".format(partition_name),
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
-        return proc_comm.stdout.decode("utf-8").strip()
+        return proc_comm.stdout.strip()

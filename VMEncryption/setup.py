@@ -162,7 +162,7 @@ def dos2unix(src):
     child.wait()
 
 def remove_utf8_bom(src):
-    print(('removing utf-8 bom from %s ' % (src)))
+    print('removing utf-8 bom from %s ' % (src))
 
     contents = None
 
@@ -187,7 +187,7 @@ def zip(src, dst):
             dos2unix(absname)
             remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
-            print(('zipping %s as %s' % (os.path.join(dirname, filename), arcname)))
+            print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
             zf.write(absname, arcname)
     zf.close()
 

@@ -19,13 +19,10 @@
 # Requires Python 2.7+
 #
 
-import os
-import os.path
 import shlex
-import sys
-
-from subprocess import *
 from threading import Timer
+from builtins import str
+from subprocess import Popen, PIPE
 
 class ProcessCommunicator(object):
     def __init__(self):
@@ -70,12 +67,17 @@ class CommandExecutor(object):
             return_code = proc.returncode
 
         if isinstance(communicator, ProcessCommunicator):
-            communicator.stdout, communicator.stderr = stdout, stderr
+            # for python2 and python3 compatibility, first decode 
+            # std[out|err] bytes, then convert from data to string
+            communicator.stdout = str(stdout.decode('utf-8'))
+            communicator.stderr = str(stderr.decode('utf-8'))
 
         if int(return_code) != 0:
             msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
-            msg += "\nstdout:\n" + stdout.decode("utf-8")
-            msg += "\nstderr:\n" + stderr.decode("utf-8")
+            # for python2 and python3 compatibility, first decode 
+            # std[out|err] bytes, then convert from data to string 
+            msg += "\nstdout:\n" + str(stdout.decode('utf-8'))
+            msg += "\nstderr:\n" + str(stderr.decode('utf-8'))
 
             if not suppress_logging:
                 self.logger.log(msg)

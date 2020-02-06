@@ -174,9 +174,9 @@ class PatchBootSystemState(OSEncryptionState):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
 
-        self.context.logger.log("Processes using {0}:\n{1}".format(mountpoint, proc_comm.stdout.decode("utf-8")))
+        self.context.logger.log("Processes using {0}:\n{1}".format(mountpoint, proc_comm.stdout))
 
-        procs_to_kill = [p for p in proc_comm.stdout.decode("utf-8").split() if p.isdigit()]
+        procs_to_kill = [p for p in proc_comm.stdout.split() if p.isdigit()]
         procs_to_kill = reversed(sorted(procs_to_kill))
 
         for victim in procs_to_kill:
@@ -228,7 +228,7 @@ class PatchBootSystemState(OSEncryptionState):
         udevadm_cmd = "udevadm info --attribute-walk --name={0}".format(self.rootfs_block_device)
         self.command_executor.Execute(command_to_execute=udevadm_cmd, raise_exception_on_failure=True, communicator=proc_comm)
 
-        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout.decode("utf-8"))
+        matches = re.findall(r'ATTR{partition}=="(.*)"', proc_comm.stdout)
         if not matches:
             raise Exception("Could not parse ATTR{partition} from udevadm info")
         partition = matches[0]
