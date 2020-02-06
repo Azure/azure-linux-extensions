@@ -54,12 +54,14 @@ class BekUtil(object):
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()
 
+            # ensure base64 encoded passphrase string is encoded as utf-8 in both
+            # python2 and python3 environments for consistency in output format
             with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
-                f.write(passphrase)
+                f.write(passphrase.encode('utf-8'))
             for bek_file in os.listdir(self.bek_filesystem_mount_point):
                 if bek_filename in bek_file and bek_filename != bek_file:
                     with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
-                        f.write(passphrase)
+                        f.write(passphrase.encode('utf-8'))
         except Exception as e:
             message = "Failed to store BEK in BEK VOLUME with error: {0}".format(str(e))
             self.logger.log(message)
