@@ -192,8 +192,7 @@ class SplitRootPartitionState(OSEncryptionState):
             "YiB":  1024**8  # yobibyte
         }
 
-        #P2 - if unit not in exponents.keys():
-        #P3 - if unit not in list(exponents.keys()):
+        # list() syntax provides python2 + python3 compat and avoids lazy iterable
         if unit not in list(exponents.keys()):
             raise SyntaxError("{:} is not a valid SI or IEC byte unit".format(unit))
         else:

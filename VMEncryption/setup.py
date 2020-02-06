@@ -158,7 +158,7 @@ def dos2unix(src):
     args = ["dos2unix", src]
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
-    print(('dos2unix %s ' % (src)))
+    print('dos2unix %s ' % (src))
     child.wait()
 
 def remove_utf8_bom(src):
