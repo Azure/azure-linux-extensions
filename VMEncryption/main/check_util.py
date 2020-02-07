@@ -20,15 +20,16 @@
 
 import os
 import os.path
-import urllib.parse
 import re
 import json
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
-from future.standard_library import install_aliases
-install_aliases()
+try:
+    from urllib.parse import urlparse #python3+
+except ImportError:
+    from urlparse import urlparse #python2
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -87,7 +88,7 @@ class CheckUtil(object):
             raise Exception(message + '\nNo URL supplied')
 
         try:
-            parse_result = urllib.parse.urlparse(test_url)
+            parse_result = urlparse(test_url)
         except:
             raise Exception(message + '\nMalformed URL: ' + test_url)
 

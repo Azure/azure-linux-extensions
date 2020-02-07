@@ -214,8 +214,9 @@ class EncryptionSettingsUtil(object):
         """ Dump encryption settings data to JSON formatted file on key volume """
         self.increment_index()
         output = json.dumps(data)
+        # encode as utf-8 and write as binary data for consistency across python2 + python3
         with open(self.get_settings_file_path(), 'wb', 0) as outfile:
-            outfile.write(output.encode())
+            outfile.write(output.encode('utf-8')) 
             outfile.flush()
             os.fsync(outfile.fileno())
 
@@ -250,7 +251,7 @@ class EncryptionSettingsUtil(object):
                     self.logger.log("result_content is {0}".format(result_content))
 
                     http_util.connection.close()
-                    if result.status != http.client.OK and result.status != http.client.ACCEPTED:
+                    if result.status != httpclient.OK and result.status != httpclient.ACCEPTED:
                         raise Exception("Encryption settings post request was not accepted")
                     return
                 else:

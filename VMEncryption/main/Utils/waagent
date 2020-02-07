@@ -49,13 +49,15 @@ import datetime
 import xml.sax.saxutils
 from distutils.version import LooseVersion
 
-if sys.version_info[0] == 3:
-    import http.client as httpclient
-    from urllib.parse import urlparse
+try:
+    from urllib.parse import urlparse #python3+
+except ImportError:
+    from urlparse import urlparse #python2
 
-elif sys.version_info[0] == 2:
-    import httplib as httpclient
-    from urlparse import urlparse
+try:
+    import http.client as httpclient #python3+
+except ImportError:
+    import httplib as httpclient #python2
 
 if not hasattr(subprocess, 'check_output'):
     def check_output(*popenargs, **kwargs):

@@ -37,7 +37,7 @@ class MachineIdentity:
     def save_identity(self):
         with open(self.store_identity_file,'wb') as file:
             machine_identity = self.current_identity()
-            file.write(machine_identity)
+            file.write(machine_identity.encode('utf-8'))
 
     def stored_identity(self):
         identity_stored = None
