@@ -17,7 +17,7 @@
 /CustomScript/ @D1v38om83r @nkuchta @vrdmr
 
 # Diagnostics (LAD) Extension
-/Diagnostics/ @Azure/geneva-linux-agents
+/Diagnostic/ @Azure/geneva-linux-agents
 
 # DSCForLinux Extension
 /DSC/ @nitinbps @kwirkykat
