@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import http.client
 import json
 import os
 import os.path
@@ -251,7 +250,8 @@ class EncryptionSettingsUtil(object):
                     self.logger.log("result_content is {0}".format(result_content))
 
                     http_util.connection.close()
-                    if result.status != httpclient.OK and result.status != httpclient.ACCEPTED:
+                    # cast to httpclient constants to int for python2 + python3 compatibility
+                    if result.status != int(httpclient.OK) and result.status != int(httpclient.ACCEPTED):
                         raise Exception("Encryption settings post request was not accepted")
                     return
                 else:

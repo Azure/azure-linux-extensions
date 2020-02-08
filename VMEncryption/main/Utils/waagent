@@ -74,7 +74,6 @@ if not hasattr(subprocess, 'check_output'):
             raise subprocess.CalledProcessError(retcode, cmd, output=output)
         return output
 
-
     # Exception classes used by this module.
     class CalledProcessError(Exception):
         def __init__(self, returncode, cmd, output=None):
@@ -3210,11 +3209,12 @@ class Util(object):
                                  secure=secure, headers=headers,
                                  proxyHost=proxyHost, proxyPort=proxyPort)
         for retry in range(0, maxRetry):
+            # cast httpclient constants to int for python2 + python3 compatibility
             if resp is not None and \
-                    (resp.status == httpclient.OK or \
-                     resp.status == httpclient.CREATED or \
-                     resp.status == httpclient.ACCEPTED):
-                return resp;
+                    (resp.status == int(httpclient.OK) or \
+                     resp.status == int(httpclient.CREATED) or \
+                     resp.status == int(httpclient.ACCEPTED)):
+                return resp
 
             if resp is not None and resp.status == httpclient.GONE:
                 raise HttpResourceGoneError("Http resource gone.")
