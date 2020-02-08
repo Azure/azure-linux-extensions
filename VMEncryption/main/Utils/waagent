@@ -3216,7 +3216,7 @@ class Util(object):
                      resp.status == int(httpclient.ACCEPTED)):
                 return resp
 
-            if resp is not None and resp.status == httpclient.GONE:
+            if resp is not None and resp.status == int(httpclient.GONE):
                 raise HttpResourceGoneError("Http resource gone.")
 
             Error("Retry={0}".format(retry))

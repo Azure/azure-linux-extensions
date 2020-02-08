@@ -50,7 +50,7 @@ class TestResourceDiskUtil(unittest.TestCase):
 
         # case 2: partition exists but call fails
         mock_partition_exists.return_value = True
-        mock_execute.return_value = False # simulate that the internal execute call failed.
+        mock_execute.return_value = 1 # simulate that the internal execute call failed.
         self.assertEqual(method(), False)
 
         # case 3: partition exists and call succeeds
@@ -58,12 +58,12 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_execute.return_value = CommonVariables.process_success  # simulate that the internal execute call succeeded
         self.assertEqual(method(), True)
 
-    @unittest.mock.patch('main.CommandExecutor.CommandExecutor.Execute')
+    @unittest.mock.patch('CommandExecutor.CommandExecutor.Execute')
     @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     def test_is_luks_device(self, mock_partition_exists, mock_execute):
         self._test_resource_disk_partition_dependant_method(self.resource_disk._is_luks_device, mock_partition_exists, mock_execute)
 
-    @unittest.mock.patch('main.CommandExecutor.CommandExecutor.Execute')
+    @unittest.mock.patch('CommandExecutor.CommandExecutor.Execute')
     def test_configure_waagent(self, mock_execute):
         mock_execute.side_effect = [-1,
                                     0,
