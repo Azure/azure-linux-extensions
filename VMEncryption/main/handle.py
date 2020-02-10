@@ -116,8 +116,8 @@ def disable_encryption():
                 if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
                     raise Exception("luksAdd failed with return code {0}".format(add_result))
                 else:
-                    self.logger.log("luksAdd failed with return code {0}".format(add_result))
-                    self.logger.log("Ignoring for now, as device ({0}) does not seem to be a luks device".format(crypt_item.dev_path))
+                    logger.log("luksAdd failed with return code {0}".format(add_result))
+                    logger.log("Ignoring for now, as device ({0}) does not seem to be a luks device".format(crypt_item.dev_path))
 
             if crypt_item.dev_path.startswith("/dev/sd"):
                 logger.log('Updating crypt item entry to use mapper name')
