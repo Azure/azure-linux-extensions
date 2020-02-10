@@ -25,7 +25,6 @@ from Common import CommonVariables
 from configparser import ConfigParser
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
-from builtins import int
 
 class OnGoingItemConfig(object):
     def __init__(self, encryption_environment, logger):

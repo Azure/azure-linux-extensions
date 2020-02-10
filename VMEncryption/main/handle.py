@@ -47,8 +47,6 @@ from EncryptionEnvironment import EncryptionEnvironment
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
-from builtins import int
-from builtins import str
 from io import open 
 
 def install():
@@ -256,7 +254,11 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
-    current_secret_seq_num = int(config_secret_seq if config_secret_seq else -1)
+    if config_secret_seq is None:
+        current_secret_seq_num = -1
+    else:
+        current_secret_seq_num = int(config_secret_seq)
+
     update_call_seq_num = hutil.get_current_seq()
 
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
@@ -635,11 +637,11 @@ def enable():
             cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
-            logger.log(traceback.format_exc())
+            logger.log(traceback.format_exc(e))
             # Reject settings if fatal exception occurs while a daemon is running
             if is_daemon_running():
                 hutil.reject_settings()
-            msg = str(e)
+            msg = str(traceback.format_exc(e))
             hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
@@ -654,9 +656,9 @@ def enable():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
-        except Exception:
+        except Exception as e:
             logger.log("PRECHECK: Exception thrown during precheck")
-            logger.log(traceback.format_exc())
+            logger.log(traceback.format_exc(e))
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
 
@@ -679,7 +681,7 @@ def enable():
                           message=msg)
 
     except Exception as e:
-        msg = "Unexpected Error during enable. Error message {0}\n Stacktrace: {1}".format(str(e), traceback.format_exc())
+        msg = "Unexpected Error during enable: {0}".format(traceback.format_exc(e))
         logger.log(msg)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='Enable',

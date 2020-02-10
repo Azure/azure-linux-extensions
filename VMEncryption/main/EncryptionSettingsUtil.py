@@ -56,7 +56,7 @@ class EncryptionSettingsUtil(object):
         # https://linux.die.net/man/2/fsync
         # use mode = "w" and encoding = "ascii" since writing text only
         with open(CommonVariables.encryption_settings_counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
-            output = str(index + 1) + "\n"  # str from builtins allows for a python2 + python3 compatible integer to string conversion
+            output = str(index + 1) + "\n"  # str allows for a python2 + python3 compatible integer to string conversion
             outfile.write(output)
             outfile.flush()
             os.fsync(outfile.fileno())

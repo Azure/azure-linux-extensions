@@ -73,7 +73,6 @@ waagent = load_waagent()
 import logging
 import logging.handlers
 from ProcessLock import ProcessLock
-from builtins import str
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 

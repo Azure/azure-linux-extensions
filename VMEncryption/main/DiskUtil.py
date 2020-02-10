@@ -32,7 +32,6 @@ from TransactionalCopyTask import TransactionalCopyTask
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
 from io import open
-from builtins import str
 
 class DiskUtil(object):
     os_disk_lvm = None

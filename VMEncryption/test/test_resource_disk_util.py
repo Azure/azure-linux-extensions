@@ -19,20 +19,22 @@
 """ Unit tests for the ResourceDiskUtil module """
 
 import unittest
-import unittest.mock
 
 from main.ResourceDiskUtil import ResourceDiskUtil
 from main.DiskUtil import DiskUtil
 from main.CryptMountConfigUtil import CryptMountConfigUtil
 from main.Common import CommonVariables
 from .console_logger import ConsoleLogger
-
+try:
+    import unittest.mock as mock # python3+
+except ImportError:
+    import mock # python2
 
 class TestResourceDiskUtil(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
-        self.mock_disk_util = unittest.mock.create_autospec(DiskUtil)
-        self.mock_crypt_mount_config_util = unittest.mock.create_autospec(CryptMountConfigUtil)
+        self.mock_disk_util = mock.create_autospec(DiskUtil)
+        self.mock_crypt_mount_config_util = mock.create_autospec(CryptMountConfigUtil)
         self.mock_passhprase_filename = "mock_passphrase_filename"
         mock_public_settings = {}
         self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_crypt_mount_config_util, self.mock_passhprase_filename, mock_public_settings, ["ubuntu", "16"])
@@ -58,12 +60,12 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_execute.return_value = CommonVariables.process_success  # simulate that the internal execute call succeeded
         self.assertEqual(method(), True)
 
-    @unittest.mock.patch('CommandExecutor.CommandExecutor.Execute')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     def test_is_luks_device(self, mock_partition_exists, mock_execute):
         self._test_resource_disk_partition_dependant_method(self.resource_disk._is_luks_device, mock_partition_exists, mock_execute)
 
-    @unittest.mock.patch('CommandExecutor.CommandExecutor.Execute')
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
     def test_configure_waagent(self, mock_execute):
         mock_execute.side_effect = [-1,
                                     0,
@@ -107,11 +109,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
         self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
     def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists):
 
         # Case 1, when there is a passphrase and the resource disk is not already encrypted and mounted.
@@ -167,8 +169,8 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(ResourceDiskUtil.RD_DEV_PATH)
 
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
-    @unittest.mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
     def test_automount(self, mock_try_remount, mock_encrypt_format_mount):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True

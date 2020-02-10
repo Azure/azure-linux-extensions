@@ -19,7 +19,7 @@
 from Common import TestHooks
 import base64
 import os.path
-from builtins import str
+import traceback 
 
 """
 add retry-logic to the network api call.
@@ -47,8 +47,8 @@ class BekUtil(object):
 
     def store_bek_passphrase(self, encryption_config, passphrase):
 
-        # use str() to ensure bek_filename is a string type on python3+
-        bek_filename = str(encryption_config.get_bek_filename())
+        # convert filename to string for consistency across python2 python3+
+        bek_filename = str(encryption_config.get_bek_filename().decode('utf-8'))
 
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
@@ -63,7 +63,7 @@ class BekUtil(object):
                     with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
                         f.write(passphrase.encode('utf-8'))
         except Exception as e:
-            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(str(e))
+            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc(e))
             self.logger.log(message)
             raise e
         else:
@@ -89,8 +89,8 @@ class BekUtil(object):
                     return os.path.join(self.bek_filesystem_mount_point, filename)
 
         except Exception as e:
-            # use str() to convert exception to string on python 3+
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
+            # use traceback to convert exception to string on both python2 and python3+
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(traceback.format_exc(e))
             self.logger.log(message)
 
         return None

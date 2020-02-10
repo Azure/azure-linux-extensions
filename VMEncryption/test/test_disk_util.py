@@ -1,5 +1,4 @@
 import unittest
-import unittest.mock
 import os.path
 import json
 
@@ -9,7 +8,10 @@ from main.Common import DeviceItem
 
 from .console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
-
+try:
+    import unittest.mock as mock # python 3+
+except ImportError:
+    import mock # python2
 
 class Test_Disk_Util(unittest.TestCase):
     def setUp(self):
@@ -25,9 +27,9 @@ class Test_Disk_Util(unittest.TestCase):
         device_item.type = type
         return device_item
 
-    @unittest.mock.patch("os.path.isdir")
-    @unittest.mock.patch("os.listdir")
-    @unittest.mock.patch("os.path.exists")
+    @mock.patch("os.path.isdir")
+    @mock.patch("os.listdir")
+    @mock.patch("os.path.exists")
     def test_get_controller_and_lun_numbers(self, exists_mock, listdir_mock, isdir_mock):
 
         artifical_dir_structure = {
@@ -52,13 +54,13 @@ class Test_Disk_Util(unittest.TestCase):
         controller_and_lun_numbers = self.disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
         self.assertListEqual([], controller_and_lun_numbers)
 
-    @unittest.mock.patch("os.path.exists", return_value=False)
-    @unittest.mock.patch("main.DiskUtil.EncryptionMarkConfig.config_file_exists", return_value=False)
-    @unittest.mock.patch("main.DiskUtil.DecryptionMarkConfig.config_file_exists", return_value=False)
-    @unittest.mock.patch("main.DiskUtil.DiskUtil.get_azure_devices")
-    @unittest.mock.patch("main.DiskUtil.DiskUtil.is_os_disk_lvm", return_value=False)
-    @unittest.mock.patch("main.DiskUtil.DiskUtil.get_mount_items")
-    @unittest.mock.patch("main.DiskUtil.DiskUtil.get_device_items")
+    @mock.patch("os.path.exists", return_value=False)
+    @mock.patch("main.DiskUtil.EncryptionMarkConfig.config_file_exists", return_value=False)
+    @mock.patch("main.DiskUtil.DecryptionMarkConfig.config_file_exists", return_value=False)
+    @mock.patch("main.DiskUtil.DiskUtil.get_azure_devices")
+    @mock.patch("main.DiskUtil.DiskUtil.is_os_disk_lvm", return_value=False)
+    @mock.patch("main.DiskUtil.DiskUtil.get_mount_items")
+    @mock.patch("main.DiskUtil.DiskUtil.get_device_items")
     def test_get_encryption_status(self, get_device_items_mock, get_mount_items_mock, is_os_disk_lvm_mock, get_azure_devices_mock, decryption_mark_config, encryption_mark_config, exists_mock):
 
         # First test with just a special device

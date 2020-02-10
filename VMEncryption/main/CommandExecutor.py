@@ -21,8 +21,8 @@
 
 import shlex
 from threading import Timer
-from builtins import str
 from subprocess import Popen, PIPE
+import traceback
 
 class ProcessCommunicator(object):
     def __init__(self):
@@ -49,7 +49,8 @@ class CommandExecutor(object):
                 raise
             else:
                 if not suppress_logging:
-                    self.logger.log("Process creation failed: " + str(e))
+                    # traceback format_exc converts exception to string 
+                    self.logger.log("Process creation failed: " + traceback.format_exc(e))
                 return -1
 
         def timeout_process():
@@ -68,14 +69,14 @@ class CommandExecutor(object):
 
         if isinstance(communicator, ProcessCommunicator):
             # for python2 and python3 compatibility, first decode 
-            # std[out|err] bytes, then convert from data to string
+            # std[out|err] bytes, converting from data to string
             communicator.stdout = str(stdout.decode('utf-8'))
             communicator.stderr = str(stderr.decode('utf-8'))
 
         if int(return_code) != 0:
             msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
             # for python2 and python3 compatibility, first decode 
-            # std[out|err] bytes, then convert from data to string 
+            # std[out|err] bytes, converting from data to string
             msg += "\nstdout:\n" + str(stdout.decode('utf-8'))
             msg += "\nstderr:\n" + str(stderr.decode('utf-8'))
 

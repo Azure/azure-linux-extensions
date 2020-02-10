@@ -1,11 +1,16 @@
 import unittest
-import unittest.mock
 
 from main.Common import CryptItem
 from main.EncryptionEnvironment import EncryptionEnvironment
 from main.CryptMountConfigUtil import CryptMountConfigUtil
 from .console_logger import ConsoleLogger
 
+try:
+    builtins_open = "builtins.open"
+    import unittest.mock as mock # python3+
+except ImportError:
+    builtins_open = "__builtins__.open"
+    import mock # python2
 
 class Test_crypt_mount_config_util(unittest.TestCase):
     """ unit tests for functions in the CryptMountConfig module """
@@ -16,7 +21,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
     def _mock_open_with_read_data_dict(self, open_mock, read_data_dict):
         def _open_side_effect(filename, mode, *args, **kwargs):
             read_data = read_data_dict.get(filename)
-            mock_obj = unittest.mock.mock_open(read_data=read_data)
+            mock_obj = mock.mock_open(read_data=read_data)
             return mock_obj.return_value
 
         open_mock.side_effect = _open_side_effect
@@ -84,14 +89,14 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         crypt_item = self.crypt_mount_config_util.parse_crypttab_line(line)
         self.assertEqual(str(expected_crypt_item), str(crypt_item))
 
-    @unittest.mock.patch('builtins.open')
-    @unittest.mock.patch('os.path.exists', return_value=True)
+    @mock.patch(builtins_open)
+    @mock.patch('os.path.exists', return_value=True)
     def test_should_use_azure_crypt_mount(self, exists_mock, open_mock):
         # if the acm file exists and has only a root disk
         acm_contents = """
         osencrypt /dev/dev_path None / ext4 False 0
         """
-        unittest.mock.mock_open(open_mock, acm_contents)
+        mock.mock_open(open_mock, acm_contents)
         self.assertFalse(self.crypt_mount_config_util.should_use_azure_crypt_mount())
 
         # if the acm file exists and has a data disk
@@ -99,11 +104,11 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         mapper_name /dev/dev_path None /mnt/point ext4 False 0
         mapper_name2 /dev/dev_path2 None /mnt/point2 ext4 False 0
         """
-        unittest.mock.mock_open(open_mock, acm_contents)
+        mock.mock_open(open_mock, acm_contents)
         self.assertTrue(self.crypt_mount_config_util.should_use_azure_crypt_mount())
 
         # empty file
-        unittest.mock.mock_open(open_mock, "")
+        mock.mock_open(open_mock, "")
         self.assertFalse(self.crypt_mount_config_util.should_use_azure_crypt_mount())
 
         # no file
@@ -112,12 +117,12 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertFalse(self.crypt_mount_config_util.should_use_azure_crypt_mount())
         open_mock.assert_not_called()
 
-    @unittest.mock.patch('os.path.exists', return_value=True)
-    @unittest.mock.patch('main.CryptMountConfigUtil.ProcessCommunicator')
-    @unittest.mock.patch('CommandExecutor.CommandExecutor', autospec=True)
-    @unittest.mock.patch('builtins.open')
-    @unittest.mock.patch('main.CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount')
-    @unittest.mock.patch('main.DiskUtil.DiskUtil', autospec=True)
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('main.CryptMountConfigUtil.ProcessCommunicator')
+    @mock.patch('CommandExecutor.CommandExecutor', autospec=True)
+    @mock.patch('.open')
+    @mock.patch('main.CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount')
+    @mock.patch('main.DiskUtil.DiskUtil', autospec=True)
     def test_get_crypt_items(self, disk_util_mock, use_acm_mock, open_mock, ce_mock, pc_mock, exists_mock):
 
         self.crypt_mount_config_util.command_executor = ce_mock
@@ -129,7 +134,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         acm_contents = """
         osencrypt /dev/dev_path None / ext4 True 0
         """
-        unittest.mock.mock_open(open_mock, acm_contents)
+        mock.mock_open(open_mock, acm_contents)
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
                                                                dev_path="/dev/dev_path",
@@ -141,7 +146,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
 
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
         pc_mock.return_value.stdout = "osencrypt /dev/dev_path"  # The grep find this line in there
-        unittest.mock.mock_open(open_mock, "")  # No content in the azure crypt mount file
+        mock.mock_open(open_mock, "")  # No content in the azure crypt mount file
         disk_util_mock.get_mount_items.return_value = [{"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
         exists_mock.return_value = False  # No luksheader file found
         crypt_items = self.crypt_mount_config_util.get_crypt_items()

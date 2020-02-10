@@ -1,5 +1,4 @@
 import unittest
-import unittest.mock
 import os
 
 from main.check_util import CheckUtil
@@ -7,6 +6,12 @@ from main.Common import CommonVariables
 from io import StringIO
 from .console_logger import ConsoleLogger
 from .test_utils import MockDistroPatcher
+try:
+    builtins_open = "builtins.open"
+    import unittest.mock as mock # python3+
+except ImportError:
+    builtins_open = "__builtins__.open"
+    import mock # python2
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -22,18 +27,18 @@ class TestCheckUtil(unittest.TestCase):
         stream.seek(0)
         return stream
 
-    @unittest.mock.patch('os.path.isfile', return_value=False)
-    @unittest.mock.patch('os.path.isdir', return_value=False)
+    @mock.patch('os.path.isfile', return_value=False)
+    @mock.patch('os.path.isdir', return_value=False)
     def test_appcompat(self, os_path_isdir, os_path_isfile):
         self.assertFalse(self.cutil.is_app_compat_issue_detected())
 
-    @unittest.mock.patch('os.popen')
+    @mock.patch('os.popen')
     def test_memory(self, os_popen):
         output = "8000000"
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertFalse(self.cutil.is_insufficient_memory())
 
-    @unittest.mock.patch('os.popen')
+    @mock.patch('os.popen')
     def test_memory_low_memory(self, os_popen):
         output = "6000000"
         os_popen.return_value = self.get_mock_filestream(output)
@@ -61,7 +66,7 @@ class TestCheckUtil(unittest.TestCase):
         # self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.vault.azure.com/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://", "")
 
-    @unittest.mock.patch('MetadataUtil.MetadataUtil.is_vmss')
+    @mock.patch('MetadataUtil.MetadataUtil.is_vmss')
     def test_validate_volume_type_single_vm(self, mock_is_vmss):
         # First test for normal VMs
         mock_is_vmss.return_value = False
@@ -81,7 +86,7 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "123"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
-    @unittest.mock.patch('MetadataUtil.MetadataUtil.is_vmss')
+    @mock.patch('MetadataUtil.MetadataUtil.is_vmss')
     def test_validate_volume_type_vmss(self, mock_is_vmss):
         # Then test for VMSS
         mock_is_vmss.return_value = True
@@ -98,9 +103,9 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
-    @unittest.mock.patch('main.check_util.CheckUtil.validate_memory_os_encryption')
-    @unittest.mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
-    @unittest.mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
+    @mock.patch('main.check_util.CheckUtil.validate_memory_os_encryption')
+    @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
+    @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
     def test_fatal_checks(self, mock_is_vmss, mock_exec, mock_validate_memory):
         mock_is_vmss.return_value = False
         mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
@@ -167,7 +172,7 @@ class TestCheckUtil(unittest.TestCase):
         /dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
         /dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0
         """
-        with unittest.mock.patch("builtins.open", unittest.mock.mock_open(read_data=proc_mounts_output)) as mock_open:
+        with mock.patch(builtins_open, mock.mock_open(read_data=proc_mounts_output)) as mock_open:
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
             self.assertEqual(mock_open.call_count,1)
 
@@ -200,47 +205,47 @@ class TestCheckUtil(unittest.TestCase):
         # skip lvm detection if no volume type specified
         self.cutil.validate_lvm_os({CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll})
 
-    @unittest.mock.patch("os.system", return_value=-1)
+    @mock.patch("os.system", return_value=-1)
     def test_no_lvm_no_config(self, os_system):
         # simulate no LVM OS, no config 
         self.cutil.validate_lvm_os({})
 
-    @unittest.mock.patch("os.system", return_value=0)
+    @mock.patch("os.system", return_value=0)
     def test_lvm_no_config(self, os_system):
         # simulate valid LVM OS, no config
         self.cutil.validate_lvm_os({})
 
-    @unittest.mock.patch("os.system", side_effect=[0, -1])
+    @mock.patch("os.system", side_effect=[0, -1])
     def test_invalid_lvm_no_config(self, os_system):
         # simulate invalid LVM naming scheme, but no config setting to encrypt OS
         self.cutil.validate_lvm_os({})
 
-    @unittest.mock.patch("os.system", return_value=-1)
+    @mock.patch("os.system", return_value=-1)
     def test_lvm_os_lvm_absent(self, os_system):
         # using patched return value of -1, simulate no LVM OS 
         self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
 
-    @unittest.mock.patch("os.system", return_value=0)
+    @mock.patch("os.system", return_value=0)
     def test_lvm_os_valid(self, os_system):
         # simulate a valid LVM OS and a valid naming scheme by always returning 0
         self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
 
-    @unittest.mock.patch("os.system", side_effect=[0, -1])
+    @mock.patch("os.system", side_effect=[0, -1])
     def test_lvm_os_lv_missing_expected_name(self, os_system):
         # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
         self.assertRaises(Exception, self.cutil.validate_lvm_os, {CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
     
-    @unittest.mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
     def test_vfat(self, mocked_exec):
         # simulate call to modprobe vfat that succeeds and returns cleanly from execute 
         self.cutil.validate_vfat()
 
-    @unittest.mock.patch("CommandExecutor.CommandExecutor.Execute", side_effect=Exception())
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", side_effect=Exception())
     def test_no_vfat(self, mocked_exec):
         # simulate call to modprobe vfat that fails and raises exception from execute 
         self.assertRaises(Exception, self.cutil.validate_vfat) 
       
-    @unittest.mock.patch('os.popen')
+    @mock.patch('os.popen')
     def test_minimum_memory(self, os_popen):
         output = "6000000"
         os_popen.return_value = self.get_mock_filestream(output)

@@ -1,9 +1,12 @@
 import unittest
-import unittest.mock
 from main import EncryptionSettingsUtil
 from main import Common
 from io import StringIO
 from .console_logger import ConsoleLogger
+try:
+    import unittest.mock as mock # python 3+ 
+except ImportError:
+    import mock # python2
 
 class TestEncryptionSettingsUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -11,12 +14,12 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.logger = ConsoleLogger()
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
-    @unittest.mock.patch('time.sleep') # To speed up this test.
-    @unittest.mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
-    @unittest.mock.patch('os.path.isfile', return_value=True)
-    @unittest.mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
+    @mock.patch('time.sleep') # To speed up this test.
+    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
+    @mock.patch('os.path.isfile', return_value=True)
+    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
     def test_post_to_wire_server(self, get_http_util, os_path_isfile, get_index, time_sleep):
-        get_http_util.return_value = unittest.mock.MagicMock() # Return a mock object
+        get_http_util.return_value = mock.MagicMock() # Return a mock object
         get_index.return_value = 0
         data = {"Protectors" : "mock data"}
 
