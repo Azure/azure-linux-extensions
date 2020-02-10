@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import os
 import os.path
 import signal
@@ -1397,8 +1398,8 @@ def get_settings():
             hutil_log_error('Unable to load handler settings from ' \
                             '{0}'.format(settings_path))
 
-        if (h_settings.has_key('protectedSettings')
-                and h_settings.has_key('protectedSettingsCertThumbprint')
+        if ('protectedSettings' in h_settings
+                and 'protectedSettingsCertThumbprint' in h_settings
                 and h_settings['protectedSettings'] is not None
                 and h_settings['protectedSettingsCertThumbprint'] is not None):
             encoded_settings = h_settings['protectedSettings']
