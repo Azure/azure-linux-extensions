@@ -1623,8 +1623,9 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         mapper_device_item = next((d for d in device_items if mapped_device_item_match(d)), None)
 
         if not raw_device_item:
-            logger.log("raw device not found for crypt_item {0}".format(crypt_item))
-            return crypt_item
+            logger.log("raw device not found for crypt_item {0}".format(crypt_item), level='Warn')
+            logger.log("Skipping device", level='Warn')
+            continue
 
         if not mapper_device_item:
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
