@@ -35,7 +35,6 @@ import json
 import base64
 import inspect
 import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
 import watcherutil
 import shutil
 
@@ -304,7 +303,7 @@ def get_free_space_mb(dirname):
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return st.f_bavail * st.f_frsize / 1024 / 1024
+    return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
@@ -843,6 +842,9 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
 
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
+        if sys.version_info >= (3,): # in python 3, base64.b64encode will return bytes, so decode to str for comparison
+            encoded_key = encoded_key.decode()
+
         if encoded_key != workspace_key:
             raise InvalidParameterError('Workspace key is invalid')
     except TypeError:
