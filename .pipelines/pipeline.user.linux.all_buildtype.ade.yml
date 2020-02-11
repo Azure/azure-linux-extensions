@@ -21,7 +21,5 @@ build:
       fail_on_stderr: true
       artifacts:
         - from: 'VMEncryption'
-          to: 'AzureDiskEncryption'
           include:
             - 'dist/*.zip'
-            - 'dist/**/manifest.xml'
