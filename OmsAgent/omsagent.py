@@ -17,6 +17,9 @@
 # limitations under the License.
 
 from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
 import os
 import os.path
 import signal
@@ -31,8 +34,8 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import watcherutil
 import shutil
 
@@ -619,11 +622,11 @@ def remove_workspace_configuration():
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
-    req = urllib2.Request(VMResourceIDMetadataEndpoint)
+    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
-        response = json.loads(urllib2.urlopen(req).read())
+        response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
             return None #classic vm
@@ -633,7 +636,7 @@ def get_vmresourceid_from_metadata():
         else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from Metadata service: ' \
@@ -772,7 +775,7 @@ def is_vm_supported_for_extension():
             return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
-    for supported_dist in supported_dists.keys():
+    for supported_dist in list(supported_dists.keys()):
         if not vm_dist.lower().startswith(supported_dist):
             continue
 
@@ -1579,15 +1582,15 @@ def get_tenant_id_from_metadata_api(vm_resource_id):
     """
     tenant_id = None
     metadata_endpoint = get_metadata_api_endpoint(vm_resource_id)
-    metadata_request = urllib2.Request(metadata_endpoint)
+    metadata_request = urllib.request.Request(metadata_endpoint)
     try:
         # This request should fail with code 401
-        metadata_response = urllib2.urlopen(metadata_request)
+        metadata_response = urllib.request.urlopen(metadata_request)
         hutil_log_info('Request to Metadata API did not fail as expected; ' \
                        'attempting to use headers from response to ' \
                        'determine Tenant ID')
         metadata_headers = metadata_response.headers
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         metadata_headers = e.headers
 
     if metadata_headers is not None and 'WWW-Authenticate' in metadata_headers:
@@ -1631,7 +1634,7 @@ def get_metadata_api_endpoint(vm_resource_id):
     metadata_url = 'https://management.azure.com/subscriptions/{0}' \
                    '/resourceGroups/{1}'.format(subscription_id,
                                                 resource_group)
-    metadata_data = urllib.urlencode({'api-version' : '2016-09-01'})
+    metadata_data = urllib.parse.urlencode({'api-version' : '2016-09-01'})
     metadata_endpoint = '{0}?{1}'.format(metadata_url, metadata_data)
     return metadata_endpoint
 
@@ -1657,13 +1660,13 @@ def get_access_token(tenant_id, resource):
                                 '{0}'.format(tenant_id),
                   'resource' : resource
     }
-    oauth_request = urllib2.Request(listening_url + '/oauth2/token',
-                                    urllib.urlencode(oauth_data))
+    oauth_request = urllib.request.Request(listening_url + '/oauth2/token',
+                                    urllib.parse.urlencode(oauth_data))
     oauth_request.add_header('Metadata', 'true')
     try:
-        oauth_response = urllib2.urlopen(oauth_request)
+        oauth_response = urllib.request.urlopen(oauth_request)
         oauth_response_txt = oauth_response.read()
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to ManagedIdentity extension listening URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from ManagedIdentity extension: ' \
@@ -1698,7 +1701,7 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
                 'JwtToken' : access_token
     }
     oms_request_json = json.dumps(oms_data)
-    oms_request = urllib2.Request(OMSServiceValidationEndpoint)
+    oms_request = urllib.request.Request(OMSServiceValidationEndpoint)
     oms_request.add_header('Content-Type', 'application/json')
 
     retries = 5
@@ -1711,9 +1714,9 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
     # provisioning has been accepted
     while try_count <= retries:
         try:
-            oms_response = urllib2.urlopen(oms_request, oms_request_json)
+            oms_response = urllib.request.urlopen(oms_request, oms_request_json)
             oms_response_txt = oms_response.read()
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
             hutil_log_info('Response from OMS: {0}'.format(e.read()))
             raise OMSServiceOneClickException('ValidateMachineIdentity ' \
