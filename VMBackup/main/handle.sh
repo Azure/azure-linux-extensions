@@ -11,6 +11,12 @@ logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
 
 rc=3
+
+if [ $1 != "enable"]
+then
+	echo "The command is not enable, exiting" >> $logfile
+	exit $rc
+
 if [ -f "/usr/bin/python2.7" ]
 then
     echo "`date`- python 2.7 path exists" >> $logfile
