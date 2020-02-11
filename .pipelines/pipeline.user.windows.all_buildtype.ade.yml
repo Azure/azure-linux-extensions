@@ -1,0 +1,34 @@
+environment:
+  host:
+    os: 'windows'
+    flavor: 'server'
+    version: '2016'
+  runtime:
+    provider: 'appcontainer'
+    image: 'cdpxwin.azurecr.io/global/vse2017u7/vse2017u7-external-winltsc2016-20190731:latest'
+    source_mode: 'map'
+
+workspace_options:                         # Metadata section
+  force_workspace_wipe: false              # Default is always true
+  enable_git_long_paths: true              # Default is always false
+  download_current_artifacts: true         # Default is always false
+  # downloaded artifacts from the previous phase(s) go here -- Windows: C:\temppriordrop\current Linux: /temppriordrop/current
+  show_global_sub_tasks: true              # DEPRECATED
+  show_user_sub_tasks: true                # DEPRECATED
+
+version:
+  name: 'Azure Disk Encryption for Linux'
+  major: 1                                                              
+  minor: 1                                                              
+  tag: 'buddy'
+  system: 'buildrevision'
+  
+build:
+  commands:
+    - !!buildcommand
+      name: 'No-op script'
+      command: 'VMEncryption\cdpx_windows_copy.cmd'
+      artifacts:
+        - from: 'cdpx-artifacts'
+          include:
+            - '**/*'
