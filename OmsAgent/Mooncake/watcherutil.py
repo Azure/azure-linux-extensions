@@ -464,7 +464,7 @@ class Watcher:
                 #  the last_pos rather continue from the begining.
                 
                 if (text != ''):				
-                    crc = hashlib.md5(text).hexdigest()										
+                    crc = hashlib.sha256(text).hexdigest()										
                     self._hutil_log("Last crc = {0}, current crc= {1} position = {2}".format(last_crc, crc, last_pos))                        
                     if (last_crc == crc):
                         
