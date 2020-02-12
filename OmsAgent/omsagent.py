@@ -337,7 +337,7 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
+    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
     watcher_thread = Thread(target = watcher.watch)
     self_mon_thread = Thread(target = watcher.monitor_health)

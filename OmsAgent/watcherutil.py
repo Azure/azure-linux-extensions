@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import object
 #!/usr/bin/env python
 #
 # OmsAgentForLinux Extension
@@ -52,7 +54,7 @@ We can add to the list below with more error messages to identify non recoverabl
 """
 ErrorStatements = ["Errono::ENOSPC error=", "Fatal error, can not clear buffer file", "No space left on the device"]
 
-class SelfMonitorInfo:
+class SelfMonitorInfo(object):
     """
         Class to hold self mon info for omsagent.
     """
@@ -103,7 +105,7 @@ class SelfMonitorInfo:
         else:
             return "Red"
 
-class LogFileMarker:
+class LogFileMarker(object):
     """
         Class to hold omsagent log file marker information.        
     """
@@ -115,35 +117,21 @@ class LogFileMarker:
         self._last_pos = 0
         self._last_crc = ""
 
-class Watcher:
+class Watcher(object):
     """
     A class that handles periodic monitoring activities.
     """
 
-    def __init__(self, hutil_error, hutil_log, log_to_console=False):
+    def __init__(self, hutil_error, hutil_log):
         """
         Constructor.
         :param hutil_error: Error logging function (e.g., hutil.error). This is not a stream.
         :param hutil_log: Normal logging function (e.g., hutil.log). This is not a stream.
-        :param log_to_console: Indicates whether to log any issues to /dev/console or not.
         """
         self._hutil_error = hutil_error
         self._hutil_log = hutil_log
-        self._log_to_console = log_to_console
         self._consecutive_error_count = 0
         self._consecutive_restarts_due_to_error = 0
-
-    def _do_log_to_console_if_enabled(self, message):
-        """
-        Write 'message' to console. Stolen from waagent LogToCon().
-        """
-        if self._log_to_console:
-            try:
-                with open('/dev/console', 'w') as console:
-                    message = filter(lambda x: x in string.printable, message)
-                    console.write(message.encode('ascii', 'ignore') + '\n')
-            except IOError as e:
-                self._hutil_error('Error writing to console. Exception={0}'.format(e))
 
     def write_waagent_event(self, event):
         offset = str(int(time.time() * 1000000))
@@ -229,14 +217,14 @@ class Watcher:
                             self.write_waagent_event(event)
                             self._hutil_log("Successfully processed telemetry status file: "+sf)
 
-                        except Exception as e:
+                        except Exception:
                             self._hutil_log("Error parsing telemetry status file: "+sf)
                             self._hutil_log("Exception info: "+traceback.format_exc())
                     if sf.startswith("/var/opt/microsoft/omsconfig/status"):
                         try:
                             self._hutil_log("Cleaning up: " + sf)
                             os.remove(sf)
-                        except Exception as e:
+                        except Exception:
                             self._hutil_log("Error removing telemetry status file: "+  sf)
                             self._hutil_log("Exception info: " + traceback.format_exc())
                 else:
@@ -303,9 +291,9 @@ class Watcher:
             """
                 If we are able to get the heartbeats, check omsagent logs
                 to identify if there are any error logs.
-            """                                                                    
-            self_mon_info.reset_error_info()   
-            self._consecutive_restarts_due_to_error = 0       
+            """
+            self_mon_info.reset_error_info()
+            self._consecutive_restarts_due_to_error = 0
 
     def received_heartbeat_recently(self):
         heartbeat_file = '/var/opt/microsoft/omsagent/log/ODSIngestion.status'
@@ -317,7 +305,7 @@ class Watcher:
             file_update_time = os.path.getmtime(heartbeat_file)
             self._hutil_log("File update time={0}, current time={1}".format(file_update_time, curr_time))
         else:
-            self._hutil_log("Heartbeat file is not present on the disk.")            
+            self._hutil_log("Heartbeat file is not present on the disk.")
             file_update_time = curr_time - 1000
 
         if (file_update_time + 360 < curr_time):
@@ -326,7 +314,7 @@ class Watcher:
             try:
                 with open(heartbeat_file) as json_file:
                     status_data = json.load(json_file)
-                    operation_success = status_data["success"]           
+                    operation_success = status_data["success"]
                     if (operation_success.lower() == "true"):
                         self._hutil_log("Found success message from ODS Ingestion.")
                         return_val = True
@@ -334,7 +322,7 @@ class Watcher:
                         self._hutil_log("Did not find success message in heart beat file. {0}".format(operation_success))
                         return_val = False
             except Exception as e:
-                self._hutil_log("Error parsing ODS Ingestion status file: "+sf)                
+                self._hutil_log("Error parsing ODS Ingestion status file: " + e)
             
                 # Return True in case we failed to parse the file. We do not want to go into recycle loop in this scenario. 
                 return_val = True
@@ -350,7 +338,7 @@ class Watcher:
 
         resource_usage = self.get_oms_agent_resource_usage()
         message = "Memory : {0}, CPU : {1}".format(resource_usage[0], resource_usage[1])
-        event = self.create_telemetry_event("agenttelemetry","True",message,"300000")        
+        event = self.create_telemetry_event("agenttelemetry","True",message,"300000")
         self.write_waagent_event(event)
 
         self_mon_info._memory_used_in_percent = resource_usage[0]
