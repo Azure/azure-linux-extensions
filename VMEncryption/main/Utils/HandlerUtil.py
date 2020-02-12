@@ -65,14 +65,15 @@ import base64
 import json
 import tempfile
 import time
-
-from Common import *
-from os.path import join
-from Utils.waagentloader import load_waagent
-waagent = load_waagent()
 import logging
 import logging.handlers
+
+from os.path import join
+
+from Common import *
 from ProcessLock import ProcessLock
+from .waagentloader import load_waagent
+waagent = load_waagent()
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 

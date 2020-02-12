@@ -13,4 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from RHEL68EncryptionStateMachine import *
+from .RHEL68EncryptionStateMachine import *

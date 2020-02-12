@@ -32,7 +32,7 @@ transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
 from oscrypto import *
-from encryptstates import *
+from .encryptstates import *
 from Common import *
 from CommandExecutor import *
 from DiskUtil import *

@@ -10,7 +10,7 @@ try:
     builtins_open = "builtins.open"
     import unittest.mock as mock # python3+
 except ImportError:
-    builtins_open = "__builtins__.open"
+    builtins_open = "__builtin__.open"
     import mock # python2
 
 class TestCheckUtil(unittest.TestCase):
@@ -34,13 +34,13 @@ class TestCheckUtil(unittest.TestCase):
 
     @mock.patch('os.popen')
     def test_memory(self, os_popen):
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertFalse(self.cutil.is_insufficient_memory())
 
     @mock.patch('os.popen')
     def test_memory_low_memory(self, os_popen):
-        output = "6000000"
+        output = u'6000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertTrue(self.cutil.is_insufficient_memory())
 
@@ -247,7 +247,7 @@ class TestCheckUtil(unittest.TestCase):
       
     @mock.patch('os.popen')
     def test_minimum_memory(self, os_popen):
-        output = "6000000"
+        output = u'6000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertRaises(Exception, self.cutil.validate_memory_os_encryption, {
             CommonVariables.VolumeTypeKey: "ALL",
@@ -269,7 +269,7 @@ class TestCheckUtil(unittest.TestCase):
         CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
         }, { "os": "Encrypted" })
 
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.cutil.validate_memory_os_encryption( {
         CommonVariables.VolumeTypeKey: "ALL",
@@ -281,7 +281,7 @@ class TestCheckUtil(unittest.TestCase):
         CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
         }, { "os": "Encrypted" })
 
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.cutil.validate_memory_os_encryption( {
         CommonVariables.VolumeTypeKey: "ALL",

@@ -26,7 +26,11 @@ from shutil import copyfile
 import uuid
 from Common import CommonVariables
 from io import open
-
+try:
+    import http.client as httpclient #python3+
+except ImportError:
+    import httplib as httpclient #python2
+    
 class EncryptionSettingsUtil(object):
     """ Provides capability to update encryption settings via wire server """
 

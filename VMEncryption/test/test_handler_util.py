@@ -21,10 +21,13 @@
 import unittest
 import os
 from . import console_logger
-import patch
 import glob
 from Utils import HandlerUtil
 from tempfile import mkstemp
+try:
+    import patch #python3+
+except ImportError:
+    from mock import patch # python2
 
 class TestHandlerUtil(unittest.TestCase):
     def setUp(self):
