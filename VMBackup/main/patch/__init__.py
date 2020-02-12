@@ -19,6 +19,7 @@
 import os
 import re
 import platform
+import traceback
 
 from patch.UbuntuPatching import UbuntuPatching
 from patch.debianPatching import debianPatching
@@ -26,20 +27,44 @@ from patch.redhatPatching import redhatPatching
 from patch.centosPatching import centosPatching
 from patch.SuSEPatching import SuSEPatching
 from patch.oraclePatching import oraclePatching
+from patch.KaliPatching import KaliPatching
+from patch.DefaultPatching import DefaultPatching
+from patch.FreeBSDPatching import FreeBSDPatching
+from patch.NSBSDPatching import NSBSDPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
-    if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['FreeBSD', release]
+    try:
+        if 'FreeBSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['FreeBSD', release]
+            return distinfo
+        if 'NS-BSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['NS-BSD', release]
+            return distinfo
+        if 'linux_distribution' in dir(platform):
+            distinfo = list(platform.linux_distribution(full_distribution_name=0))
+            # remove trailing whitespace in distro name
+            if(distinfo[0] == ''):
+                osfile= open("/etc/os-release", "r")
+                for line in osfile:
+                    lists=str(line).split("=")
+                    if(lists[0]== "NAME"):
+                        distname = lists[1].split("\"")
+                        distinfo[0] = distname[1]
+                        if(distinfo[0].lower() == "sles"):
+                            distinfo[0] = "SuSE"
+                osfile.close()
+            distinfo[0] = distinfo[0].strip()
+            return distinfo
+        else:
+            return platform.dist()
+    except Exception as e:
+        errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        logger.log(errMsg)
+        distinfo = ['Abstract','1.0']
         return distinfo
-    if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=0))
-        # remove trailing whitespace in distro name
-        distinfo[0] = distinfo[0].strip()
-        return distinfo
-    else:
-        return platform.dist()
 
 def GetMyPatching(logger):
     """
@@ -52,11 +77,32 @@ def GetMyPatching(logger):
     else: # I know this is not Linux!
         if 'FreeBSD' in platform.system():
             Distro = platform.system()
+        if 'NS-BSD' in platform.system():
+            Distro = platform.system()
+            Distro = Distro.replace("-", "")
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
+    orig_distro = Distro
     patching_class_name = Distro + 'Patching'
     if patching_class_name not in globals():
-        logger.log('{0} is not a supported distribution.'.format(Distro))
-        return None
+        if ('SuSE'.lower() in Distro.lower()):
+            Distro = 'SuSE'
+        elif ('Ubuntu'.lower() in Distro.lower()):
+            Distro = 'Ubuntu'
+        elif ('centos'.lower() in Distro.lower() or 'big-ip'.lower() in Distro.lower()):
+            Distro = 'centos'
+        elif ('debian'.lower() in Distro.lower()):
+            Distro = 'debian'
+        elif ('oracle'.lower() in Distro.lower()):
+            Distro = 'oracle'
+        elif ('redhat'.lower() in Distro.lower()):
+            Distro = 'redhat'
+        elif ("Kali".lower() in Distro.lower()):
+            Distro = 'Kali'
+        elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):
+            Distro = 'FreeBSD'
+        else:
+            Distro = 'Default'
+        patching_class_name = Distro + 'Patching'
     patchingInstance = globals()[patching_class_name](logger,dist_info)
-    return patchingInstance
+    return patchingInstance, patching_class_name, orig_distro

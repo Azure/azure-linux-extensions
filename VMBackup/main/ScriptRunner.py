@@ -102,6 +102,8 @@ class ScriptRunner(object):
                 self.postScriptNoOfRetries = configData['postScriptNoOfRetries']
             if 'fsFreezeEnabled' in configDataKeys:
                 self.fsFreeze_on = configData['fsFreezeEnabled']
+            if 'ScriptsExecutionPollTimeSeconds' in configDataKeys and int(configData['ScriptsExecutionPollTimeSeconds']) >= 1 and int(configData['ScriptsExecutionPollTimeSeconds']) <=5:
+                self.pollSleepTime = int(configData['ScriptsExecutionPollTimeSeconds'])
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
         except IOError:
@@ -128,7 +130,7 @@ class ScriptRunner(object):
         valid_permissions = True
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
             if int(permissions[1]) > 0 : #validating permissions for group
                 valid_permissions = False
             if int(permissions[2]) > 0 : #validating permissions for others
@@ -151,42 +153,42 @@ class ScriptRunner(object):
         if not self.configLoaded:
             errorCode = CommonVariables.FailedPrepostPluginConfigParsing
             self.logger.log('Cant run prescript for '+self.pluginName+' . Config File error.', True, 'Error')
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
         dobackup = self.continueBackupOnFailure
 
         if not os.path.isfile(self.preScriptLocation):
             self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptNotFound
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
         if not self.validate_permissions(self.preScriptLocation):
             self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
 
         if not self.find_owner(self.preScriptLocation) == 'root':
             self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
         if not os.path.isfile(self.postScriptLocation):
             self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptNotFound
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
         if not self.validate_permissions(self.postScriptLocation):
             self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
         if not self.find_owner(self.postScriptLocation) == 'root':
             self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
             errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on
+            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
-        return errorCode,dobackup,self.fsFreeze_on
+        return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
     def pre_script(self, pluginIndex, preScriptCompleted, preScriptResult):
 

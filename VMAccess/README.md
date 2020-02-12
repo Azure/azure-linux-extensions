@@ -1,7 +1,7 @@
 # VMAccess Extension
 Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
-Current version is 1.4.
+Current version is [1.5](https://github.com/Azure/azure-linux-extensions/releases/tag/VMAccess-1.5.1).
 
 You can read the User Guide below.
 * [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
@@ -14,7 +14,7 @@ VMAccess Extension can:
 * Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
 * Remove the existing user
 * Check disks
-* Repair added disk
+* Repair added disk.
 
 # Security Notes:
 * VMAccess Extension is designed for regaining access to a VM in the event that access is lost. 
@@ -23,9 +23,7 @@ VMAccess Extension can:
 * Instead, login to the VM and use built-in tools (e.g. usermod, chage, etc) to manage unprivileged users.
 
 # User Guide
-
 ## 1. Configuration schema
-
 ### 1.1. Public configuration
 
 Schema for the public configuration file looks like:

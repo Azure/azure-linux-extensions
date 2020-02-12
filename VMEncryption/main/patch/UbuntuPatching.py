@@ -57,20 +57,46 @@ class UbuntuPatching(AbstractPatching):
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
 
+    def install_adal(self):
+        return_code = self.command_executor.Execute('apt-get install -y python-pip')
+        # If install fails, try running apt-get update and then try install again
+        if return_code != 0:
+            self.logger.log('python-pip installation failed. Retrying installation after running update')
+            return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update', timeout=30)
+            # Fail early if apt-get update times out.
+            if return_code == -9:
+                msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
+                raise Exception(msg)
+            self.command_executor.Execute('apt-get install -y python-pip')
+        self.command_executor.Execute('python -m pip install --upgrade pip')
+        self.command_executor.Execute('python -m pip install --upgrade setuptools')
+        self.command_executor.Execute('python -m pip install adal')
+
     def install_extras(self):
         """
         install the sg_dd because the default dd do not support the sparse write
         """
-        cmd = " ".join(['apt-get', 'update'])
-        self.command_executor.Execute(cmd)
-
-        packages = ['at', 'cryptsetup-bin', 'lsscsi', 'python-six', 'python-parted', 'procps', 'psmisc', 'gcc', 'libssl-dev', 'libffi-dev', 'python-dev', 'python-pip']
+        packages = ['at',
+                    'cryptsetup-bin',
+                    'lsscsi',
+                    'python-parted',
+                    'python-six',
+                    'procps',
+                    'psmisc']
 
         cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-        self.command_executor.Execute(cmd)
-        
-        cmd = " ".join(['pip', 'install', 'adal'])
-        self.command_executor.Execute(cmd)
+        return_code = self.command_executor.Execute(cmd)
 
+        # If install fails, try running apt-get update and then try install again
+        if return_code != 0:
+            self.logger.log('prereq packages installation failed. Retrying installation after running update')
+            return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update')
+            # Fail early if apt-get update times out.
+            if return_code == -9:
+                msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
+                raise Exception(msg)
+            cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+            self.command_executor.Execute(cmd)
+        
     def update_prereq(self):
         pass

@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import httplib
-import urlparse
 import urllib
 import json
 import uuid
@@ -25,9 +24,10 @@ import base64
 import traceback
 import re
 import os
+import subprocess
 
+from tempfile import mkstemp 
 from HttpUtil import HttpUtil
-from Common import *
 from urlparse import urlparse
 
 class KeyVaultUtil(object):
@@ -94,46 +94,79 @@ class KeyVaultUtil(object):
             self.logger.log("Failed to create_kek_secret with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             raise
 
-    def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
-        if not AADClientSecret and not AADClientCertThumbprint:
-            raise Exception("Neither AADClientSecret nor AADClientCertThumbprint were specified")
+    def is_adal_available(self):
+        try:
+            import adal
+            self.logger.log('Python ADAL library is natively available on the system')
+            return True
+        except:            
+            self.logger.log('Python ADAL library is not natively available on the system')
+            return False
 
-        if AADClientSecret and AADClientCertThumbprint:
-            raise Exception("Both AADClientSecret nor AADClientCertThumbprint were specified")
+    def is_scl_adal_available(self):
+        try:
+            subprocess.check_call(['scl', 'enable', 'python27', "python -c 'import adal'"])
+            self.logger.log('Python ADAL library is available on the system via SCL')
+            return True
+        except:
+            self.logger.log('Python ADAL library is not available on the system via SCL')
+            return False
 
-        if AADClientCertThumbprint:
-            try:
-                import adal
-            except:
-                raise Exception("adal library is not available on the VM")
+    def get_access_token_with_certificate(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint):
+        # construct path to the private key file which is stored and managed by waagent inside of the lib directory
+        import waagent
+        prv_path = os.path.join(waagent.LibDir, AADClientCertThumbprint.upper() + '.prv')
 
-            import waagent
-
-            prv_path = os.path.join(waagent.LibDir, AADClientCertThumbprint.upper() + '.prv')
+        if self.is_adal_available():
+            import adal
             prv_data = waagent.GetFileContents(prv_path)
-
             context = adal.AuthenticationContext(AuthorizeUri)
             result_json = context.acquire_token_with_client_certificate(KeyVaultResourceName, AADClientID, prv_data, AADClientCertThumbprint)
             access_token = result_json["accessToken"]
             return access_token
+        elif self.is_scl_adal_available():
+            # On RHEL, support for python-pip and the adal library are made available outside of default python via SCL 
+            tmp_data = { "auth": AuthorizeUri, "resource": KeyVaultResourceName, "client": AADClientID, "certificate": prv_path, "thumbprint": AADClientCertThumbprint}
+            tmp_fd, tmp_path = mkstemp()
+            with open(tmp_path,'w') as tmp_file:
+                json.dump(tmp_data,tmp_file)
+            os.close(tmp_fd)
+            tok_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'TokenUtil.py')
+            scl_args = 'python ' + tok_path + ' ' + tmp_path
+            access_token = subprocess.check_output(['scl', 'enable', 'python27', scl_args]).rstrip()
+            if os.path.isfile(tmp_path): 
+                os.remove(tmp_path)
+            return access_token
+        else:
+            raise Exception('Python ADAL library required for client certificate authentication was not found')
 
+    def get_access_token(self, KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint, AADClientSecret):
+        if not AADClientSecret and not AADClientCertThumbprint:
+            raise ValueError("Missing Credentials.  Either AADClientSecret or AADClientCertThumbprint must be specified")
 
-        token_uri = AuthorizeUri + "/oauth2/token"
-        request_content = "resource=" + urllib.quote(KeyVaultResourceName) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
-        headers = {}
-        http_util = HttpUtil(self.logger)
-        result = http_util.Call(method='POST', http_uri=token_uri, data=request_content, headers=headers)
+        if AADClientSecret and AADClientCertThumbprint:
+            raise ValueError("Both AADClientSecret and AADClientCertThumbprint were supplied, when only one of these was expected.")
 
-        self.logger.log("{0} {1}".format(result.status, result.getheaders()))
-        result_content = result.read()
-        if result.status != httplib.OK and result.status != httplib.ACCEPTED:
-            self.logger.log(str(result_content))
-            return None
-        http_util.connection.close()
+        if AADClientCertThumbprint:
+            return self.get_access_token_with_certificate(KeyVaultResourceName, AuthorizeUri, AADClientID, AADClientCertThumbprint)
+        else:
+            # retrieve access token directly, adal library not required
+            token_uri = AuthorizeUri + "/oauth2/token"
+            request_content = "resource=" + urllib.quote(KeyVaultResourceName) + "&client_id=" + AADClientID + "&client_secret=" + urllib.quote(AADClientSecret) + "&grant_type=client_credentials"
+            headers = {}
+            http_util = HttpUtil(self.logger)
+            result = http_util.Call(method='POST', http_uri=token_uri, data=request_content, headers=headers)
 
-        result_json = json.loads(result_content)
-        access_token = result_json["access_token"]
-        return access_token
+            self.logger.log("{0} {1}".format(result.status, result.getheaders()))
+            result_content = result.read()
+            if result.status != httplib.OK and result.status != httplib.ACCEPTED:
+                self.logger.log(str(result_content))
+                return None
+            http_util.connection.close()
+
+            result_json = json.loads(result_content)
+            access_token = result_json["access_token"]
+            return access_token
 
     """
     return the encrypted secret uri if success. else return None
@@ -190,7 +223,7 @@ class KeyVaultUtil(object):
 
             self.logger.log("{0} {1}".format(result.status, result.getheaders()))
             result_content = result.read()
-            self.logger.log("result_content is {0}".format(result_content))
+            # Do NOT log the result_content. It contains the uploaded secret and we don't want that in the logs.
             result_json = json.loads(result_content)
             secret_id = result_json["id"]
             http_util.connection.close()
@@ -209,9 +242,9 @@ class KeyVaultUtil(object):
         try:
             self.logger.log("trying to get the authorize uri from: " + str(bearerHeader))
             bearerString = str(bearerHeader)
-            authoirzation_key = 'authorization="'
-            authoirzation_index = bearerString.index(authoirzation_key)
-            bearerString = bearerString[(authoirzation_index + len(authoirzation_key)):]
+            authorization_key = 'authorization="'
+            authoirzation_index = bearerString.index(authorization_key)
+            bearerString = bearerString[(authoirzation_index + len(authorization_key)):]
             bearerString = bearerString[0:bearerString.index('"')]
 
             return bearerString

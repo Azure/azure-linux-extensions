@@ -6,14 +6,12 @@ mkdir -p $MountPoint
 modprobe nls_utf8 >/dev/null 2>&1
 modprobe nls_cp437 >/dev/null 2>&1
 modprobe vfat >/dev/null 2>&1
-modprobe ntfs >/dev/null 2>&1
 sleep 2
 OPENED=0
 cd /sys/block
 for DEV in sd*; do
 	echo "> Trying device: $DEV ..." >&2
 	mount -t vfat -r /dev/${DEV}1 $MountPoint >&2 2>&1
-	mount -t ntfs -r /dev/${DEV}1 $MountPoint >&2 2>&1
 	if [ -f $MountPoint/$KeyFileName ]; then
 		cat $MountPoint/$KeyFileName && echo "Success loading keyfile!" >&2
 		umount $MountPoint 2>/dev/null

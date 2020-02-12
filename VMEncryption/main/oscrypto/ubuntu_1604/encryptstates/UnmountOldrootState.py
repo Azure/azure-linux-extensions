@@ -121,10 +121,6 @@ class UnmountOldrootState(OSEncryptionState):
                 self.context.logger.log("Skipping init")
                 continue
 
-            if "mount.ntfs" in proc_name:
-                self.context.logger.log("Skipping mount.ntfs")
-                continue
-
             self.command_executor.Execute('kill -9 {0}'.format(victim))
 
         self.command_executor.Execute('telinit u', True)
@@ -145,6 +141,8 @@ class UnmountOldrootState(OSEncryptionState):
             self.command_executor.Execute('systemctl restart systemd-udevd')
             self.context.logger.log("Restarting systemd-timesyncd")
             self.command_executor.Execute('systemctl restart systemd-timesyncd')
+            self.context.logger.log("Restarting systemd-networkd")
+            self.command_executor.Execute('systemctl restart systemd-networkd')
 
             sleep(10)
 

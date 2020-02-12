@@ -55,11 +55,12 @@ from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
 from PluginHost import PluginHostResult
+import platform
 
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -69,10 +70,9 @@ def main():
         total_used_size = 0
         size_calculation_failed = False
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
-##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
-        MyPatching = GetMyPatching(backup_logger)
+        MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
@@ -109,18 +109,20 @@ def status_report_to_file(file_report_msg):
 
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
-    try:
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-            blobWriter = BlobWriter(hutil)
-            if(blob_report_msg is not None):
-                blobWriter.WriteBlob(blob_report_msg,para_parser.statusBlobUri)
-                backup_logger.log("blob status report message:",True)
-                backup_logger.log(blob_report_msg,True)
-            else:
-                backup_logger.log("blob_report_msg is none",True)
-    except Exception as e:
-        err_msg='cannot write status to the status blob'+traceback.format_exc()
-        backup_logger.log(err_msg, True, 'Warning')
+    UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
+    if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
+        try:
+            if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+                blobWriter = BlobWriter(hutil)
+                if(blob_report_msg is not None):
+                    blobWriter.WriteBlob(blob_report_msg,para_parser.statusBlobUri)
+                    backup_logger.log("blob status report message:",True)
+                    backup_logger.log(blob_report_msg,True)
+                else:
+                    backup_logger.log("blob_report_msg is none",True)
+        except Exception as e:
+            err_msg='cannot write status to the status blob'+traceback.format_exc()
+            backup_logger.log(err_msg, True, 'Warning')
 
 def get_status_to_report(status, status_code, message, snapshot_info = None):
     global MyPatching,backup_logger,hutil,para_parser,total_used_size,size_calculation_failed
@@ -130,12 +132,12 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
         if total_used_size == -1 :
             sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
-            number_of_blobs = len(para_parser.blobs)
+            number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
             if(total_used_size>maximum_possible_size):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        if(para_parser is not None):
             blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
@@ -190,16 +192,20 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('doseq') == '2'):
-            hutil.set_value_to_configfile('doseq', '1')
-        if(hutil.get_value_from_configfile('doseq') != '1'):
-            hutil.set_value_to_configfile('doseq', '2')
-        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
+        if(hutil.get_value_from_configfile('seqsnapshot') == None):
+            hutil.set_value_to_configfile('seqsnapshot', '0')
+        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
+        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
+        canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
+        if (canTakeCrashConsistentSnapshot == True and run_result != CommonVariables.success and run_result != CommonVariables.success_appconsistent):
+            if (snapshot_info_array is not None and snapshot_info_array !=[] and check_snapshot_array_fail() == False and len(snapshot_info_array) == 1):
+                run_status = CommonVariables.status_success
+                run_result = CommonVariables.success
+                hutil.SetSnapshotConsistencyType(Status.SnapshotConsistencyType.crashConsistent)
     except Exception as e:
-        if(hutil.get_value_from_configfile('doseq') == '2'):
-            hutil.set_value_to_configfile('doseq', '0')
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         run_result = CommonVariables.error
@@ -219,11 +225,54 @@ def check_snapshot_array_fail():
                 break
     return snapshot_array_fail
 
+def get_key_value(jsonObj, key):
+    value = None
+    if(key in jsonObj.keys()):
+        value = jsonObj[key]
+    return value
+
+def can_take_crash_consistent_snapshot(para_parser):
+    global backup_logger
+    takeCrashConsistentSnapshot = False
+    if(para_parser != None and para_parser.customSettings != None and para_parser.customSettings != ''):
+        customSettings = json.loads(para_parser.customSettings)
+        isManagedVm = get_key_value(customSettings, 'isManagedVm')
+        canTakeCrashConsistentSnapshot = get_key_value(customSettings, 'canTakeCrashConsistentSnapshot')
+        backupRetryCount = get_key_value(customSettings, 'backupRetryCount')
+        numberOfDisks = 0
+        if (para_parser.includeLunList is not None):
+            numberOfDisks = len(para_parser.includeLunList)
+        isAnyNone = (isManagedVm is None or canTakeCrashConsistentSnapshot is None or backupRetryCount is None)
+        if (isAnyNone == False and isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
+            takeCrashConsistentSnapshot = True
+        backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
+    return takeCrashConsistentSnapshot
+
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
-    freezer = FsFreezer(patching= MyPatching, logger = backup_logger)
+
+    try:
+        backup_logger.log('starting daemon', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
+        # handle the restoring scenario.
+        mi = MachineIdentity()
+        stored_identity = mi.stored_identity()
+        if(stored_identity is None):
+            mi.save_identity()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = -1
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
+                hutil.set_last_seq(current_seq_no)
+                mi.save_identity()
+    except Exception as e:
+        errMsg = 'Failed to validate sequence number with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, True, 'Error')
+
+    freezer = FsFreezer(patching= MyPatching, logger = backup_logger, hutil = hutil)
     global_error_result = None
     # precheck
     freeze_called = False
@@ -237,6 +286,14 @@ def daemon():
         HandlerUtil.HandlerUtility.add_to_telemetery_data("pythonVersion", python_version)
     except Exception as e:
         errMsg = 'Failed to do retrieve python version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, True, 'Error')
+
+    #fetching platform architecture
+    try:
+        architecture = platform.architecture()[0]
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("platformArchitecture", architecture)
+    except Exception as e:
+        errMsg = 'Failed to do retrieve "platform architecture" with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
 
     try:
@@ -262,13 +319,37 @@ def daemon():
         WATCHOUT that, the _context_config are using the most freshest timestamp.
         if the time sync is alive, this should be right.
         """
-        if(hutil.is_prev_in_transition()):
-            backup_logger.log('retrieving the previous logs for this again inside daemon', True)
-            backup_logger.set_prev_log()
-
-        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+        hutil.update_settings_file()
+
+        if(bool(public_settings) == False and not protected_settings):
+            error_msg = "unable to load certificate"
+            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
+            temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
+            temp_status= 'error'
+            exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+
+        if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
+            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
+            commandStartTime = convert_time(utcTicksLong)
+            utcNow = datetime.datetime.utcnow()
+            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
+            timespan = utcNow - commandStartTime
+            MAX_TIMESPAN = 150 * 60 # in seconds
+            # handle the machine identity for the restoration scenario.
+            total_span_in_seconds = timedelta_total_seconds(timespan)
+            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+
+        if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            exit_if_same_taskId(para_parser.taskId) 
+            taskIdentity = TaskIdentity()
+            taskIdentity.save_identity(para_parser.taskId)
+        
+        hutil.save_seq()
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
@@ -280,7 +361,7 @@ def daemon():
             run_result = CommonVariables.success
             backup_logger.log(error_msg)
         elif(CommonVariables.iaas_vmbackup_command in commandToExecute.lower()):
-            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'
@@ -295,8 +376,7 @@ def daemon():
                 temp_result=CommonVariables.ExtensionTempTerminalState
                 temp_msg='Transitioning state in extension'
                 blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
-                if(hutil.is_status_file_exists()):
-                    status_report_to_file(file_report_msg)
+                status_report_to_file(file_report_msg)
                 status_report_to_blob(blob_report_msg)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -403,6 +483,7 @@ def daemon():
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
+        hutil.update_settings_file()
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
@@ -424,6 +505,7 @@ def daemon():
             run_status = 'error'
             error_msg  += ('Enable failed.' + str(global_error_result))
         status_report_msg = None
+        hutil.SetExtErrorCode(run_result) #setting extension errorcode at the end if missed somewhere
         HandlerUtil.HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeNameDict[hutil.ExtErrorCode]))
         total_used_size = -1
         blob_report_msg, file_report_msg = get_status_to_report(run_status,run_result,error_msg, snapshot_info_array)
@@ -454,80 +536,31 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser
-    hutil.do_parse_context('Enable')
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
     try:
-        backup_logger.log('starting to enable', True)
-        # handle the restoring scenario.
-        mi = MachineIdentity()
-        stored_identity = mi.stored_identity()
-        if(stored_identity is None):
-            mi.save_identity()
-        else:
-            current_identity = mi.current_identity()
-            if(current_identity != stored_identity):
-                current_seq_no = -1
-                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                hutil.set_last_seq(current_seq_no)
-                mi.save_identity()
+        hutil.do_parse_context('Enable')
+
+        backup_logger.log('starting enable', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
+
         hutil.exit_if_same_seq()
 
-        """
-        protectedSettings is the privateConfig passed from Powershell.
-        WATCHOUT that, the _context_config are using the most freshest timestamp.
-        if the time sync is alive, this should be right.
-        """
-        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
+        protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-        para_parser = ParameterParser(protected_settings, public_settings)
+        para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
-        if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
-            error_msg = "unable to load certificate"
-            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
-            temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
-            temp_status= 'error'
-            exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
-
-        if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
-            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
-            commandStartTime = convert_time(utcTicksLong)
-            utcNow = datetime.datetime.utcnow()
-            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
-            timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 150 * 60 # in seconds
-            # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timedelta_total_seconds(timespan)
-            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
-
-        if(para_parser.taskId is not None and para_parser.taskId != ""):
-            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            exit_if_same_taskId(para_parser.taskId) 
-            taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
-        hutil.save_seq()
-        temp_status= 'transitioning'
-        temp_result=CommonVariables.success
-        temp_msg='Transitioning state in enable'
+        temp_status= 'success'
+        temp_result=CommonVariables.ExtensionTempTerminalState
+        temp_msg='Transitioning state in extension'
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
-        file_status_upload_thread=Thread(target=status_report_to_file, args=(file_report_msg,))
-        file_status_upload_thread.start()
-        blob_status_upload_thread=Thread(target=status_report_to_blob, args=(blob_report_msg,))
-        blob_status_upload_thread.start()
-        if(hutil.is_prev_in_transition()):
-            backup_logger.log('retrieving the previous logs for this', True)
-            backup_logger.set_prev_log()
-        if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-            log_upload_thread=Thread(target=thread_for_log_upload)
-            log_upload_thread.start()
-            log_upload_thread.join(60)
-        file_status_upload_thread.join(30)
-        blob_status_upload_thread.join(60)
-        start_daemon();
+
+        status_report_to_file(file_report_msg)
+
+        start_daemon()
         sys.exit(0)
     except Exception as e:
+        hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-        backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
         temp_status= 'error'
         temp_result=CommonVariables.error
@@ -541,7 +574,6 @@ def thread_for_log_upload():
 
 def start_daemon():
     args = [os.path.join(os.getcwd(), "main/handle.sh"), "daemon"]
-    backup_logger.log("start_daemon with args: {0}".format(args), True)
     #This process will start a new background process by calling
     #    handle.py -daemon
     #to run the script and will exit itself immediatelly.

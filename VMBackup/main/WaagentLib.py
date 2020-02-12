@@ -1494,6 +1494,18 @@ class LinuxMintDistro(UbuntuDistro):
     def __init__(self):
         super(LinuxMintDistro, self).__init__()
 
+############################################################
+#      DefaultDistro
+############################################################
+
+class DefaultDistro(UbuntuDistro):
+    """
+    Default Distro concrete class
+    Put Default distro specific behavior here...
+    """
+
+    def __init__(self):
+        super(DefaultDistro, self).__init__()
 
 ############################################################
 #	fedoraDistro
@@ -2093,6 +2105,15 @@ class FreeBSDDistro(AbstractDistro):
 
     def routeAdd(self, net, mask, gateway):
         Run("/sbin/route add -net " + net + " " + mask + " " + gateway, chk_err=False)
+
+
+class NSBSDDistro(FreeBSDDistro):
+    """
+    Stormhield NS-BSD OS
+    """
+
+    def __init__(self):
+        super(NSBSDDistro, self).__init__()
 
 
 ############################################################
@@ -4464,9 +4485,32 @@ def GetMyDistro(dist_class_name=''):
         else:  # I know this is not Linux!
             if 'FreeBSD' in platform.system():
                 Distro = platform.system()
+            if 'NS-BSD' in platform.system():
+                Distro = platform.system()
+                Distro = Distro.replace("-", "")
         Distro = Distro.strip('"')
         Distro = Distro.strip(' ')
         dist_class_name = Distro + 'Distro'
+        if dist_class_name not in globals():
+            if ('SuSE'.lower() in Distro.lower()):
+                Distro = 'SuSE'
+            elif ('Ubuntu'.lower() in Distro.lower()):
+                Distro = 'Ubuntu'
+            elif ('centos'.lower() in Distro.lower()  or 'big-ip'.lower() in Distro.lower()):
+                Distro = 'centos'
+            elif ('debian'.lower() in Distro.lower()):
+                Distro = 'debian'
+            elif ('oracle'.lower() in Distro.lower()):
+                Distro = 'oracle'
+            elif ('redhat'.lower() in Distro.lower()):
+                Distro = 'redhat'
+            elif ('Kali'.lower() in Distro.lower()):
+                Distro = 'Kali'
+            elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):
+                Distro = 'FreeBSD'
+            else:
+                Distro = 'Default'
+            dist_class_name = Distro + 'Distro'
     else:
         Distro = dist_class_name
     if dist_class_name not in globals():
@@ -4474,22 +4518,38 @@ def GetMyDistro(dist_class_name=''):
         return None
     return globals()[dist_class_name]()  # the distro class inside this module.
 
-
 def DistInfo(fullname=0):
-    if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
-        distinfo = ['FreeBSD', release]
+    try:
+        if 'FreeBSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['FreeBSD', release]
+            return distinfo
+        if 'NS-BSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['NS-BSD', release]
+            return distinfo
+        if 'linux_distribution' in dir(platform):
+            distinfo = list(platform.linux_distribution(full_distribution_name=0))
+            # remove trailing whitespace in distro name
+            if(distinfo[0] == ''):
+                osfile= open("/etc/os-release", "r")
+                for line in osfile:
+                    lists=str(line).split("=")
+                    if(lists[0]== "NAME"):
+                        distname = lists[1].split("\"")
+                        distinfo[0] = distname[1]
+                        if(distinfo[0].lower() == "sles"):
+                            distinfo[0] = "SuSE"
+                osfile.close()
+            distinfo[0] = distinfo[0].strip()
+            return distinfo
+        else:
+            return platform.dist()
+    except Exception as e:
+        errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        logger.log(errMsg)
+        distinfo = ['Abstract','1.0']
         return distinfo
-
-    if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=fullname))
-        distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
-        if os.path.exists("/etc/euleros-release"):
-            distinfo[0] = "euleros"
-        return distinfo
-    else:
-        return platform.dist()
-
 
 def PackagedInstall(buildroot):
     """

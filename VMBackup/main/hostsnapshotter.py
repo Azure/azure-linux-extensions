@@ -38,13 +38,14 @@ from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 import sys
 
+
 class HostSnapshotter(object):
     """description of class"""
-    def __init__(self, logger):
+    def __init__(self, logger, hostIp):
         self.logger = logger
         self.configfile='/etc/azure/vmbackup.conf'
-        self.snapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
-        self.presnapshoturi = 'http://168.63.129.16/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
+        self.snapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
+        self.presnapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
@@ -74,17 +75,24 @@ class HostSnapshotter(object):
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                self.logger.log('****** 5. Snaphotting (Host) Started')
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
+                self.logger.log('****** 6. Snaphotting (Host) Completed')
                 self.logger.log("dosnapshot responseBody: " + responseBody)
                 if(httpResp != None):
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(httpResp.status))
-                    if(int(httpResp.status) == 200 or int(httpResp.status) == 201):
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(httpResp.status))
+                    if(int(httpResp.status) == 200 or int(httpResp.status) == 201) and (responseBody == None or responseBody == "") :
+                        self.logger.log("DoSnapshot: responseBody is empty but http status code is success")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(557))
+                        all_failed = True
+                    elif(int(httpResp.status) == 200 or int(httpResp.status) == 201):
                         blob_snapshot_info_array, all_failed = self.get_snapshot_info(responseBody)
                     if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(556))
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(556))
+                        all_failed = True
                 else:
                     # HttpCall failed
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodeDoSnapshot", str(555))
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(555))
                     self.logger.log("presnapshot Hitting wrong WireServer IP")
                 #performing thaw
                 if g_fsfreeze_on :
@@ -98,6 +106,7 @@ class HostSnapshotter(object):
         except Exception as e:
             errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
+            HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(558))
             all_failed = True
         return blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
@@ -122,23 +131,25 @@ class HostSnapshotter(object):
                 http_util = HttpUtil(self.logger)
                 self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHttpCall = True)
+                result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
-                    if(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
+                    if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
+                        self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
+                        statusCode = 557
+                    elif(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
                         self.logger.log("BHS is not runnning on host machine")
                         statusCode = 556
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
                 else:
                     # HttpCall failed
                     statusCode = 555
                     self.logger.log("presnapshot Hitting wrong WireServer IP")
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("hostStatusCodePreSnapshot", str(statusCode))
         except Exception as e:
             errorMsg = "Failed to do the pre snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
+            statusCode = 558
+        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodePreSnapshot, str(statusCode))
         return statusCode
 
     def get_snapshot_info(self, responseBody):

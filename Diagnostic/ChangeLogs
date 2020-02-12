@@ -1,3 +1,12 @@
+2019-08-14: LAD-3.0.123
+    - Fix a race condition in install. The dependencies were installed during "enable" step; which is not idempotent.
+
+2019-06-17: LAD-3.0.121
+    - Add logrotate policy to manage mdsd log files.
+
+2019-01-15: LAD-3.0.119
+    - Add blobEndpoint for storage accounts; bug fix for National clouds.
+
 2017-09-05: LAD-3.0.111
     - Ensure SAS storage token is supplied
     - Explicitly reject deprecated use of LAD 2.3's storageAccountKey

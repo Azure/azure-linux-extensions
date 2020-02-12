@@ -28,14 +28,11 @@ omsagent_universal_sh_cmd_template = 'sh omsagent-*.universal.x64.sh {op}'
 # args is either '-w LAD' or '-x LAD' or '-l'
 omsagent_lad_workspace_cmd_template = 'sh /opt/microsoft/omsagent/bin/omsadmin.sh {args}'
 omsagent_lad_dir = '/etc/opt/microsoft/omsagent/LAD/'
-# args is either 'install fluent-plugin-mdsd-*.gem' or 'uninstall fluent-plugin-mdsd -a'
-fluentd_ruby_gem_cmd_template = '/opt/microsoft/omsagent/ruby/bin/fluent-gem {args}'
 
 
 def setup_omsagent_for_lad(run_command):
     """
     Install omsagent by executing the universal shell bundle. Also onboard omsagent for LAD.
-    Also install the out_mdsd fluentd plugin.
     :param run_command: External command execution function (e.g., RunGetOutput)
     :rtype: int, str
     :return: 2-tuple of process exit code and output (run_command's return values as is)
@@ -57,12 +54,6 @@ def setup_omsagent_for_lad(run_command):
         cmd_exit_code, cmd_output = run_command(omsagent_lad_workspace_cmd_template.format(args='-w LAD'))
         if cmd_exit_code != 0:
             return 2, 'setup_omsagent_for_lad(): LAD workspace onboarding failed. Output: {0}'.format(cmd_output)
-
-    # 3. Install fluentd out_mdsd plugin (uninstall existing ones first)
-    run_command(fluentd_ruby_gem_cmd_template.format(args='uninstall fluent-plugin-mdsd -a'))
-    cmd_exit_code, cmd_output = run_command(fluentd_ruby_gem_cmd_template.format(args='install fluent-plugin-mdsd-*.gem'))
-    if cmd_exit_code != 0:
-        return 3, 'setup_omsagent_for_lad(): fluentd out_mdsd plugin install failed. Output: {0}'.format(cmd_output)
 
     # All succeeded
     return 0, 'setup_omsagent_for_lad() succeeded'
@@ -397,7 +388,7 @@ def setup_omsagent(configurator, run_command, logger_log, logger_error):
 
     logger_log("Begin omsagent setup.")
 
-    # 1. Install omsagent, onboard to LAD workspace, and install fluentd out_mdsd plugin
+    # 1. Install omsagent, onboard to LAD workspace
     # We now try to install/setup all the time. If it's already installed. Any additional install is a no-op.
     is_omsagent_setup_correctly = False
     maxTries = 5  # Try up to 5 times to install omsagent

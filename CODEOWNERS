@@ -1,0 +1,53 @@
+# See https://help.github.com/articles/about-codeowners/
+# for more info about CODEOWNERS file
+
+# It uses the same pattern rule for gitignore file
+# https://git-scm.com/docs/gitignore#_pattern_format
+
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# the following owners will be requested for
+# review when someone opens a pull request.
+* @nkuchta
+
+# Azure Monitor Agent Extension
+/AzureMonitorAgent/ @Azure/geneva-linux-agents
+
+# CustomScript Extension
+/CustomScript/ @D1v38om83r @nkuchta @vrdmr
+
+# Diagnostics (LAD) Extension
+/Diagnostic/ @Azure/geneva-linux-agents
+
+# DSCForLinux Extension
+/DSC/ @nitinbps @kwirkykat
+
+# OMS Agent Extension
+/OmsAgent/ @Azure/geneva-linux-agents
+
+# OpenCensus Translator Extension
+/opencensus-service/ @Azure/geneva-linux-agents
+
+# VMAccess Extension
+/VMAccess/ @D1v38om83r @nkuchta @vrdmr
+
+# VMBackup Extension
+/VMBackup/ @bpramod @soumyapattnaik @vityagi
+
+# VMEncryption Extension
+/VMEncryption/ @vimish @ejarvi @vermashi
+
+# WALinuxAgent
+/Common/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
+/Utils/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
+
+# Abandoned?
+# /AzureEnhancedMonitor/ 
+# /OSPatching/ 
+# /RDMAUpdate/
+# /SampleExtension/
+# /TestHandlerLinux/
+# /docs/
+# /registration-scripts/
+# /script/
+# /ui-extension-packages/

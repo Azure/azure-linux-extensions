@@ -51,6 +51,8 @@ coverage.xml
 
 # Django stuff:
 *.log
+!OmsAgent/extension-test/omsfiles/*.log
+oms*.zip
 
 # Sphinx documentation
 docs/_build/

@@ -22,7 +22,7 @@ import json
 import sys
 
 class ParameterParser(object):
-    def __init__(self, protected_settings, public_settings):
+    def __init__(self, protected_settings, public_settings, backup_logger):
         """
         TODO: we should validate the parameter first
         """
@@ -33,6 +33,8 @@ class ParameterParser(object):
         self.blobs = None
         self.customSettings = None
         self.snapshotTaskToken = ''
+        self.includedDisks = None
+        self.includeLunList = []    #To be shared with HP
 
         """
         get the public configuration
@@ -44,7 +46,11 @@ class ParameterParser(object):
         self.statusBlobUri = public_settings.get(CommonVariables.status_blob_uri)
         self.commandStartTimeUTCTicks = public_settings.get(CommonVariables.commandStartTimeUTCTicks)
         self.vmType = public_settings.get(CommonVariables.vmType)
-        if(CommonVariables.customSettings in protected_settings.keys()):
+        if(CommonVariables.customSettings in public_settings.keys() and public_settings.get(CommonVariables.customSettings) is not None and public_settings.get(CommonVariables.customSettings) != ""):
+            backup_logger.log("Reading customSettings from public_settings", True)
+            self.customSettings = public_settings.get(CommonVariables.customSettings)
+        elif(CommonVariables.customSettings in protected_settings.keys()):
+            backup_logger.log("Reading customSettings from protected_settings", True)
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
 
 
@@ -67,6 +73,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = self.public_config_obj[CommonVariables.snapshotTaskToken]
         elif(CommonVariables.snapshotTaskToken in protected_settings.keys()):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
+        if(CommonVariables.includedDisks in self.public_config_obj.keys()):
+            self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
 
         """
         first get the protected configuration
@@ -82,4 +90,15 @@ class ParameterParser(object):
             decoded_private_obj_string = decoded_private_obj_string.strip('\'')
             self.private_config_obj = json.loads(decoded_private_obj_string)
             self.blobs = self.private_config_obj['blobSASUri']
-
+        
+        try:
+            if(self.includedDisks != None):
+                if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
+                    self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
+                if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
+                    self.includeLunList.append(-1)
+                
+                    backup_logger.log("LUN list - " + str(self.includeLunList), True)
+        except Exception as e:
+            errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
+            backup_logger.log(errorMsg, True)

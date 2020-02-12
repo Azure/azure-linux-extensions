@@ -28,7 +28,7 @@ import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
-from Utils.misc_helpers import get_storage_endpoint_with_account, escape_nonalphanumerics
+from Utils.misc_helpers import get_storage_endpoints_with_account, escape_nonalphanumerics
 
 
 class LadConfigAll:
@@ -310,13 +310,13 @@ class LadConfigAll:
         """
         return self._encrypt_secret(self._cert_path, secret)
 
-    def _update_account_settings(self, account, token, endpoint):
+    def _update_account_settings(self, account, token, endpoints):
         """
         Update the MDSD configuration Account element with Azure table storage properties.
         Exactly one of (key, token) must be provided.
         :param account: Storage account to which LAD should write data
         :param token: SAS token to access the storage account
-        :param endpoint: Identifies the Azure instance (public or specific sovereign cloud) where the storage account is
+        :param endpoints: Identifies the Azure storage endpoints (public or specific sovereign cloud) where the storage account is
         """
         assert token, "Token must be given."
         assert self._mdsd_config_xml_tree is not None
@@ -330,7 +330,9 @@ class LadConfigAll:
         XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
                             "decryptKeyPath", self._pkey_path, ['isDefault', 'true'])
         XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
-                            "tableEndpoint", endpoint, ['isDefault', 'true'])
+                            "tableEndpoint", endpoints[0], ['isDefault', 'true'])
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Accounts/SharedAccessSignature',
+                            "blobEndpoint", endpoints[1], ['isDefault', 'true'])
         XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
 
     def _set_xml_attr(self, key, value, xml_path, selector=[]):
@@ -462,9 +464,9 @@ class LadConfigAll:
             return False, "Must specify storageAccountSasToken"
         if '?' == token[0]:
             token = token[1:]
-        endpoint = get_storage_endpoint_with_account(account,
+        endpoints = get_storage_endpoints_with_account(account,
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
-        self._update_account_settings(account, token, endpoint)
+        self._update_account_settings(account, token, endpoints)
 
         # 7. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
         self._set_event_volume(lad_cfg)

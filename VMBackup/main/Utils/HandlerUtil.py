@@ -90,6 +90,8 @@ class HandlerUtility:
     telemetry_data = {} 
     serializable_telemetry_data = []
     ExtErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
+    SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
+    HealthStatusCode = -1
     def __init__(self, log, error, short_name):
         self._log = log
         self._error = error
@@ -136,18 +138,32 @@ class HandlerUtility:
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
+            self.update_settings_file()
             sys.exit(0)
 
     def log(self, message,level='Info'):
-        if sys.version_info > (3,):
-            if self.logging_file is not None:
-                self.log_py3(message)
-            else:
+        try:
+            self.log_with_no_try_except(message, level)
+        except IOError:
+            pass
+        except Exception as e:
+            try:
+                errMsg='Exception in hutil.log'
+                self.log_with_no_try_except(errMsg, 'Warning')
+            except Exception as e:
                 pass
-            #self.log_to_file() 
-        else:
-            self._log(self._get_log_prefix() + message)
-        message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+
+    def log_with_no_try_except(self, message, level='Info'):
+        WriteLog = self.get_value_from_configfile('WriteLog')
+        if (WriteLog == None or WriteLog == 'True'):
+            if sys.version_info > (3,):
+                if self.logging_file is not None:
+                    self.log_py3(message)
+                else:
+                    pass
+            else:
+                self._log(self._get_log_prefix() + message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
@@ -188,7 +204,11 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                if 'NS-BSD' in platform.system():
+                    # base64 tool is not available with NSBSD, use openssl
+                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                else:
+                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
@@ -217,55 +237,60 @@ class HandlerUtility:
         config = None
         ctxt = None
         code = 0
-        # get the HandlerEnvironment.json.  According to the extension handler
-        # spec, it is always in the ./ directory
-        self.log('cwd is ' + os.path.realpath(os.path.curdir))
-        handler_env_file = './HandlerEnvironment.json'
-        if not os.path.isfile(handler_env_file):
-            self.error("Unable to locate " + handler_env_file)
-            return None
-        ctxt = waagent.GetFileContents(handler_env_file)
-        if ctxt == None :
-            self.error("Unable to read " + handler_env_file)
         try:
-            handler_env = json.loads(ctxt)
-        except:
-            pass
-        if handler_env == None :
-            self.log("JSON error processing " + handler_env_file)
-            return None
-        if type(handler_env) == list:
-            handler_env = handler_env[0]
-        self._context._name = handler_env['name']
-        self._context._version = str(handler_env['version'])
-        self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
-        self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
-        self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
-        self.logging_file=self._context._log_file
-        self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
-        self._change_log_file()
-        self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
-        self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-        self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
-        if self._context._seq_no < 0:
-            self.error("Unable to locate a .settings file!")
-            return None
-        self._context._seq_no = str(self._context._seq_no)
-        self.log('sequence number is ' + self._context._seq_no)
-        self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
-        self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-        self.log("setting file path is" + self._context._settings_file)
-        ctxt = None
-        ctxt = waagent.GetFileContents(self._context._settings_file)
-        if ctxt == None :
-            error_msg = 'Unable to read ' + self._context._settings_file + '. '
-            self.error(error_msg)
-            return None
-        else:
-            if(self.operation is not None and self.operation.lower() == "enable"):
-                # we should keep the current status file
-                self.backup_settings_status_file(self._context._seq_no)
-        self._context._config = self._parse_config(ctxt)
+            # get the HandlerEnvironment.json.  According to the extension handler
+            # spec, it is always in the ./ directory
+            self.log('cwd is ' + os.path.realpath(os.path.curdir))
+            handler_env_file = './HandlerEnvironment.json'
+            if not os.path.isfile(handler_env_file):
+                self.error("Unable to locate " + handler_env_file)
+                return None
+            ctxt = waagent.GetFileContents(handler_env_file)
+            if ctxt == None :
+                self.error("Unable to read " + handler_env_file)
+            try:
+                handler_env = json.loads(ctxt)
+            except:
+                pass
+            if handler_env == None :
+                self.log("JSON error processing " + handler_env_file)
+                return None
+            if type(handler_env) == list:
+                handler_env = handler_env[0]
+            self._context._name = handler_env['name']
+            self._context._version = str(handler_env['version'])
+            self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
+            self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
+            self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
+            self.logging_file=self._context._log_file
+            self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
+            self._change_log_file()
+            self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
+            self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
+            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if self._context._seq_no < 0:
+                self.error("Unable to locate a .settings file!")
+                return None
+            self._context._seq_no = str(self._context._seq_no)
+            self.log('sequence number is ' + self._context._seq_no)
+            self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
+            self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
+            self.log("setting file path is" + self._context._settings_file)
+            ctxt = None
+            ctxt = waagent.GetFileContents(self._context._settings_file)
+            if ctxt == None :
+                error_msg = 'Unable to read ' + self._context._settings_file + '. '
+                self.error(error_msg)
+                return None
+            else:
+                if(self.operation is not None and self.operation.lower() == "enable"):
+                    # we should keep the current status file
+                    self.backup_settings_status_file(self._context._seq_no)
+            self._context._config = self._parse_config(ctxt)
+        except Exception as e:
+            errorMsg = "Unable to parse context, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Error')
+            raise
         return self._context
 
     def _change_log_file(self):
@@ -282,6 +307,17 @@ class HandlerUtility:
         waagent.SetFileContents('mrseq', str(seq))
 
 
+    '''
+    Sample /etc/azure/vmbackup.conf
+ 
+    [SnapshotThread]
+    seqsnapshot = 1
+    isanysnapshotfailed = False
+    UploadStatusAndLog = True
+    WriteLog = True
+
+    seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
+    '''
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -292,17 +328,15 @@ class HandlerUtility:
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
                     value = config.get('SnapshotThread',key)
-                else:
-                    self.log("Config File doesn't have the key :" + key, 'Info')
         except Exception as e:
-            errorMsg = " Unable to get config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.log(errorMsg, 'Warning')
+            pass
+
         return value
  
     def set_value_to_configfile(self, key, value):
         configfile = '/etc/azure/vmbackup.conf'
         try :
-            self.log('setting doseq flag in config file', 'Info')
+            self.log('setting ' + str(key)  + 'in config file to ' + str(value) , 'Info')
             if not os.path.exists(os.path.dirname(configfile)):
                 os.makedirs(os.path.dirname(configfile))
             config = ConfigParsers.RawConfigParser()
@@ -342,7 +376,7 @@ class HandlerUtility:
                 file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg, False, 'Error')
+            self.log(errMsg, 'Error')
  
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
@@ -418,6 +452,12 @@ class HandlerUtility:
         if self.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success : 
             self.ExtErrorCode = extErrorCode
 
+    def SetSnapshotConsistencyType(self, snapshotConsistency):
+        self.SnapshotConsistency = snapshotConsistency
+
+    def SetHealthStatusCode(self, healthStatusCode):
+        self.HealthStatusCode = healthStatusCode
+
     def do_status_json(self, operation, status, sub_status, status_code, message, telemetrydata, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj,total_size,failure_flag):
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         formattedMessage = Utils.Status.FormattedMessage("en-US",message)
@@ -468,9 +508,13 @@ class HandlerUtility:
                 process_wait_time -= 1
             out = p.stdout.read()
             out = str(out)
-            out =  out.split(" ")
-            waagent = out[0]
-            waagent_version = waagent.split("-")[-1] #getting only version number
+            if "Goal state agent: " in out:
+                 waagent_version = out.split("Goal state agent: ")[1].strip()
+            else:
+                out =  out.split(" ")
+                waagent = out[0]
+                waagent_version = waagent.split("-")[-1] #getting only version number
+
             os.chdir(cur_dir)
             return waagent_version
         except Exception as e:
@@ -484,9 +528,22 @@ class HandlerUtility:
             if 'FreeBSD' in platform.system():
                 release = re.sub('\-.*\Z', '', str(platform.release()))
                 return "FreeBSD",release
+            if 'NS-BSD' in platform.system():
+                release = re.sub('\-.*\Z', '', str(platform.release()))
+                return "NS-BSD", release
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name
+                if(distinfo[0] == ''):
+                    osfile= open("/etc/os-release", "r")
+                    for line in osfile:
+                        lists=str(line).split("=")
+                        if(lists[0]== "NAME"):
+                            distroname = lists[1].split("\"")
+                        if(lists[0]=="VERSION"):
+                            distroversion = lists[1].split("\"")
+                    osfile.close()
+                    return distroname[1]+"-"+distroversion[1],platform.release()
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
@@ -514,7 +571,7 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
-        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version())
+        HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
@@ -532,8 +589,37 @@ class HandlerUtility:
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
+        snapshotTelemetry = ""
+
+        if CommonVariables.snapshotCreator in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.snapshotCreator , HandlerUtility.telemetry_data[CommonVariables.snapshotCreator])
+        if CommonVariables.hostStatusCodePreSnapshot in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.hostStatusCodePreSnapshot , HandlerUtility.telemetry_data[CommonVariables.hostStatusCodePreSnapshot])
+        if CommonVariables.hostStatusCodeDoSnapshot in HandlerUtility.telemetry_data.keys():
+            snapshotTelemetry = "{0}{1}={2}, ".format(snapshotTelemetry , CommonVariables.hostStatusCodeDoSnapshot , HandlerUtility.telemetry_data[CommonVariables.hostStatusCodeDoSnapshot])
+
+        if CommonVariables.statusBlobUploadError in HandlerUtility.telemetry_data.keys():
+            message = "{0} {1}={2}, ".format(message , CommonVariables.statusBlobUploadError , HandlerUtility.telemetry_data[CommonVariables.statusBlobUploadError])
+        message = message + snapshotTelemetry
 
         vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
+
+        consistencyTypeStr = CommonVariables.consistency_crashConsistent
+        if (self.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent):
+            if (status_code == CommonVariables.success_appconsistent):
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.applicationConsistent
+                consistencyTypeStr = CommonVariables.consistency_applicationConsistent
+            elif (status_code == CommonVariables.success):
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.fileSystemConsistent
+                consistencyTypeStr = CommonVariables.consistency_fileSystemConsistent
+            else:
+                self.SnapshotConsistency = Utils.Status.SnapshotConsistencyType.none
+                consistencyTypeStr = CommonVariables.consistency_none
+        HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
+
+        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")
+        message = str(json.dumps(extensionResponseObj, cls = ComplexEncoder))
+
         self.convert_telemetery_data_to_bcm_serializable_format()
         stat_rept = self.do_status_json(operation, status, sub_stat, status_code, message, HandlerUtility.serializable_telemetry_data, taskId, commandStartTimeUTCTicks, snapshot_info, vm_health_obj, total_size,failure_flag)
         time_delta = datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
@@ -649,6 +735,24 @@ class HandlerUtility:
         except Exception as e:
             self.log("Can't receive shell log file: " + str(e))
             return lines
+
+    def update_settings_file(self):
+        if(self._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings') != None):
+            del self._context._config['runtimeSettings'][0]['handlerSettings']['protectedSettings']
+            self.log("removing the protected settings")
+            waagent.SetFileContents(self._context._settings_file,json.dumps(self._context._config))
+
+    def UriHasSpecialCharacters(self, blobs):
+        uriHasSpecialCharacters = False
+
+        if blobs is not None:
+            for blob in blobs:
+                blobUri = str(blob.split("?")[0])
+                if '%' in blobUri:
+                    self.log(blobUri + " URI has special characters")
+                    uriHasSpecialCharacters = True
+
+        return uriHasSpecialCharacters
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):

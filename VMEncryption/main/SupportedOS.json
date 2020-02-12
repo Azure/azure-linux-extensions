@@ -1,0 +1,63 @@
+{
+  "redhat": [
+        {
+          "Version" : "7.7"
+        },
+        {
+          "Version" : "7.6"
+        },
+        {
+          "Version" : "7.5"
+        },
+        {
+          "Version" : "7.4"
+        },
+        {
+          "Version" : "7.3"
+        },
+        {
+          "Version" : "7.2"
+        },
+        {
+          "Version" : "6.8"
+        }
+    ],
+    "Ubuntu" : [
+        {
+          "Version" : "16.04"
+        },
+        {
+          "Version" : "18.04"
+        },
+        {
+          "Version" : "14.04",
+          "Kernel": "4.15"
+        }
+    ],
+    "centos" : [
+        {
+          "Version" : "7.7"
+        },
+        {
+          "Version" : "7.6"
+        },
+        {
+          "Version" : "7.5"
+        },
+        {
+          "Version" : "7.4"
+        },
+        {
+          "Version" : "7.3.1611"
+        },
+        {
+          "Version" : "7.2.1511"
+        },
+        {
+          "Version" : "6.9"
+        },
+        {
+          "Version" : "6.8"
+        }
+    ]
+}

@@ -211,3 +211,5 @@ class CentOS68EncryptionStateMachine(OSEncryptionStateMachine):
         
         self.stop_machine()
         self.log_machine_state()
+
+        self._reboot()

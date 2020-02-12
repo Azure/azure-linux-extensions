@@ -20,6 +20,12 @@
 
 import os
 import os.path
+import urlparse
+import re
+import json
+from Common import CommonVariables
+from CommandExecutor import CommandExecutor
+from distutils.version import LooseVersion
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -49,7 +55,7 @@ class CheckUtil(object):
         minsize = 7000000
         memtotal = int(os.popen("grep MemTotal /proc/meminfo | grep -o -E [0-9]+").read())
         if memtotal < minsize:
-            self.logger.log('WARNING: total memory [' + memtotal + 'kb] is less than 7GB')
+            self.logger.log('WARNING: total memory [' + str(memtotal) + 'kb] is less than 7GB')
             return True
         return False
 
@@ -71,26 +77,192 @@ class CheckUtil(object):
                     detected = True
         return detected
 
-    def is_invalid_lvm_os(self):
-        """ if an lvm os disk is present, check the lv names """
+    def check_kv_url(self, test_url, message):
+        """basic sanity check of the key vault url"""
+
+        if test_url is None:
+            raise Exception(message + '\nNo URL supplied')
+
+        try:
+            parse_result = urlparse.urlparse(test_url)
+        except:
+            raise Exception(message + '\nMalformed URL: ' + test_url)
+
+        if not parse_result.scheme.lower() == "https" :
+            raise Exception('\n' + message + '\n URL should be https: ' + test_url + "\n")
+
+        if not parse_result.netloc:
+            raise Exception(message + '\nMalformed URL: ' + test_url)
+
+        # Don't bother with explicit dns check, the host already does and should start returning better error messages.
+
+        # dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
+        # Add new suffixes here when a new national cloud is introduced.
+        # Relevant link: https://docs.microsoft.com/en-us/azure/key-vault/key-vault-access-behind-firewall#key-vault-operations
+
+        # dns_match = False
+        # for dns_suffix in dns_suffix_list:
+        #     escaped_dns_suffix = dns_suffix.replace(".","\.")
+        #     if re.match('[a-zA-Z0-9\-]+\.' + escaped_dns_suffix + '(:443)?$', parse_result.netloc):
+        #         # matched a valid dns, set matched to true
+        #         dns_match = True
+        # if not dns_match:
+        #     raise Exception('\n' + message + '\nProvided URL does not match known valid URL formats: ' + \
+        #         "\n\tProvided URL: " + test_url + \
+        #         "\n\tKnown valid formats:\n\t\t" + \
+        #         "\n\t\t".join(["https://<keyvault-name>." + dns_suffix + "/" for dns_suffix in dns_suffix_list]) )
+
+        return
+
+    def validate_key_vault_params(self, public_settings):
+
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            # No need to check the KV urls if its not an encryption operation
+            return
+
+        kek_url = public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        kv_url = public_settings.get(CommonVariables.KeyVaultURLKey)
+        kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
+
+        self.check_kv_url(kv_url, "Encountered an error while checking the Key Vault URL")
+        if kek_url:
+            self.check_kv_url(kek_url, "A KEK URL was specified, but was invalid")
+            if kek_algorithm is None or kek_algorithm.lower() not in [algo.lower() for algo in CommonVariables.encryption_algorithms]:
+                if kek_algorithm:
+                    raise Exception(
+                        "The KEK encryption algorithm requested was not recognized")
+                else:
+                    self.logger.log(
+                        "No KEK algorithm specified will default to {0}".format(
+                            CommonVariables.default_encryption_algorithm))
+
+    def validate_volume_type(self, public_settings):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
+            # No need to validate volume type for Query Encryption Status operation
+            self.logger.log(
+                "Ignore validating volume type for {0}".format(
+                CommonVariables.QueryEncryptionStatus))
+            return
+
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        supported_types = CommonVariables.SupportedVolumeTypes
+        if not volume_type.lower() in map(lambda x: x.lower(), supported_types) :
+            raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_types))
+
+    def validate_lvm_os(self, public_settings):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if not encryption_operation:
+            self.logger.log("LVM OS validation skipped (no encryption operation)")
+            return
+        elif encryption_operation.lower() == CommonVariables.QueryEncryptionStatus.lower():
+            self.logger.log("LVM OS validation skipped (Encryption Operation: QueryEncryptionStatus)")
+            return
+
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if not volume_type:
+            self.logger.log("LVM OS validation skipped (no volume type)")
+            return
+        elif volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("LVM OS validation skipped (Volume Type: DATA)")
+            return
+
+        #  run lvm check if volume type, encryption operation were specified and OS type is LVM
         detected = False
-        # run checks only when the root OS volume type is LVM
-        if os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0:
-            # LVM OS volume detected, check that required logical volume names exist
+        # first, check if the root OS volume type is LVM
+        if ( encryption_operation and volume_type and 
+             os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
+            # next, check that all required logical volume names exist  ( swaplv is not required )
             lvlist = ['rootvg-tmplv',
                       'rootvg-usrlv',
-                      'rootvg-swaplv',
                       'rootvg-optlv',
                       'rootvg-homelv',
                       'rootvg-varlv',
                       'rootvg-rootlv']
             for lvname in lvlist:
                 if not os.system("lsblk -o NAME | grep -q '" + lvname + "'") == 0:
-                    self.logger.log('WARNING: LVM OS scheme is missing LV [' + lvname + ']')
+                    self.logger.log('LVM OS scheme is missing LV [' + lvname + ']')
                     detected = True
-        return detected
+        if detected:
+            raise Exception("LVM OS disk layout does not satisfy prerequisites ( see https://aka.ms/adelvm )")
 
-    def is_precheck_failure(self):
+    def validate_vfat(self):
+        """ Check for vfat module using modprobe and raise exception if not found """
+        try:
+            executor = CommandExecutor(self.logger)
+            executor.Execute("modprobe vfat", True)
+        except:
+            raise RuntimeError('Incompatible system, prerequisite vfat module was not found.')
+
+    def validate_aad(self, public_settings):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            # skip if not an encryption operation, valid aad client id is only needed for encryption operations
+            return
+
+        aad_client_id = public_settings.get(CommonVariables.AADClientIDKey)
+        uuid_pattern = r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}){1}$"
+        if aad_client_id:                
+            if not re.match(uuid_pattern, aad_client_id, re.IGNORECASE):             
+                message = 'AADClientID value is missing or invalid.'
+                # provide an extra hint if Unicode curly quotes were pasted in
+                if (u'\u201c' in aad_client_id) or (u'\u201d' in aad_client_id): 
+                    message += ' Please remove Unicode quotation marks.'
+                raise Exception(message + '\nActual Value: [' + aad_client_id + ']\nExpected Format: [nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn]')
+        else: 
+            raise Exception(CommonVariables.AADClientIDKey + ' property was not found in settings')
+            
+    def validate_memory_os_encryption(self, public_settings, encryption_status):
+        is_enable_operation = False
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            is_enable_operation = True
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        if is_enable_operation and not volume_type.lower() == CommonVariables.VolumeTypeData.lower() and encryption_status["os"] == "NotEncrypted":
+            if self.is_insufficient_memory():
+                raise Exception("Not enough memory for enabling encryption on OS volume. 8 GB memory is recommended.")
+
+    def is_supported_os(self, public_settings, DistroPatcher, encryption_status):
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
+            self.logger.log("Query encryption operation detected. Skipping OS encryption validation check.")
+            return
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+        # If volume type is data allow the operation (At this point we are sure a patch file for the distro exist)
+        if volume_type.lower() == CommonVariables.VolumeTypeData.lower():
+            self.logger.log("Volume Type is DATA. Skipping OS encryption validation check.")
+            return
+        # If OS volume is already encrypted just return (Should not break already encryted VM's)
+        if encryption_status["os"] != "NotEncrypted":
+            self.logger.log("OS volume already encrypted. Skipping OS encryption validation check.")
+            return
+        distro_name = DistroPatcher.distro_info[0]
+        distro_version = DistroPatcher.distro_info[1]
+        supported_os_file = os.path.join(os.getcwd(), 'main/SupportedOS.json')
+        with open(supported_os_file) as json_file:
+            data = json.load(json_file)
+            if distro_name in data:
+                versions = data[distro_name]
+                for version in versions:
+                    if distro_version.startswith(version['Version']):
+                        if 'Kernel' in version and LooseVersion(DistroPatcher.kernel_version) < LooseVersion(version['Kernel']):
+                            raise Exception('Kernel version {0} is not supported. Upgrade to kernel version {1}'.format(DistroPatcher.kernel_version, version['Kernel']))
+                        else:
+                            return
+            raise Exception('Distro {0} {1} is not supported for OS encryption'.format(distro_name, distro_version))
+
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher):
+        """ run all fatal prechecks, they should throw an exception if anything is wrong """
+        self.validate_key_vault_params(public_settings)
+        self.validate_volume_type(public_settings)
+        self.validate_lvm_os(public_settings)
+        self.validate_vfat()
+        self.validate_aad(public_settings)
+        self.validate_memory_os_encryption(public_settings, encryption_status)
+        self.is_supported_os(public_settings, DistroPatcher, encryption_status)
+
+    def is_non_fatal_precheck_failure(self):
         """ run all prechecks """
         detected = False
         if self.is_app_compat_issue_detected():
@@ -102,7 +274,4 @@ class CheckUtil(object):
         if self.is_unsupported_mount_scheme():
             detected = True
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
-        if self.is_invalid_lvm_os():
-            detected = True
-            self.logger.log("PRECHECK: Invalid LVM OS scheme detected")
         return detected

@@ -34,6 +34,7 @@ import os
 import subprocess
 from distutils.core import setup
 from zipfile import ZipFile
+from shutil import copy2
 
 from main.Common import CommonVariables
 
@@ -83,11 +84,11 @@ manifest_obj = [{
   "name": CommonVariables.extension_name,
   "version": "1.0",
   "handlerManifest": {
-    "installCommand": main_entry + " -install",
-    "uninstallCommand": main_entry + " -uninstall",
-    "updateCommand": main_entry + " -update",
-    "enableCommand": main_entry + " -enable",
-    "disableCommand": main_entry + " -disable",
+    "installCommand": "extension_shim.sh -c {0} --install".format(main_entry),
+    "uninstallCommand": "extension_shim.sh -c {0} --uninstall".format(main_entry),
+    "updateCommand": "extension_shim.sh -c {0} --update".format(main_entry),
+    "enableCommand": "extension_shim.sh -c {0} --enable".format(main_entry),
+    "disableCommand": "extension_shim.sh -c {0} --disable".format(main_entry),
     "rebootAfterInstall": False,
     "reportHeartbeat": False
   }
@@ -192,5 +193,7 @@ def zip(src, dst):
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
+# Manually add SupportedOS.json file as setup seems to only copy py file
+copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 zip(final_folder_path, target_zip_file_path)
 

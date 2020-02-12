@@ -1,3 +1,7 @@
+## 1.5.1 (2018-10-31)
+- Support for Python3. Changing VMAccess to work for both Python 2 and Python 3 
+  interpreter.
+
 ## 1.4.6.0 (2016-09-16)
 - Forcibly reset ChallengeAuthenticationResponse to no.  This value was inadvertently set
   in previous releases, and is forcibly reset.
