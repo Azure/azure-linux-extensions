@@ -1,5 +1,5 @@
 import unittest
-from main.CommandExecutor import CommandExecutor
+from CommandExecutor import CommandExecutor
 from .console_logger import ConsoleLogger
 
 class TestCommandExecutor(unittest.TestCase):

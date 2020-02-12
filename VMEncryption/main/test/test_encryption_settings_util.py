@@ -1,6 +1,6 @@
 import unittest
-from main import EncryptionSettingsUtil
-from main import Common
+import EncryptionSettingsUtil
+import Common
 from io import StringIO
 from .console_logger import ConsoleLogger
 try:
@@ -15,9 +15,9 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
     @mock.patch('time.sleep') # To speed up this test.
-    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
     @mock.patch('os.path.isfile', return_value=True)
-    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
     def test_post_to_wire_server(self, get_http_util, os_path_isfile, get_index, time_sleep):
         get_http_util.return_value = mock.MagicMock() # Return a mock object
         get_index.return_value = 0

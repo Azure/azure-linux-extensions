@@ -1,17 +1,17 @@
 import unittest
 
-from main.Common import CryptItem
-from main.EncryptionEnvironment import EncryptionEnvironment
-from main.CryptMountConfigUtil import CryptMountConfigUtil
+from Common import CryptItem
+from EncryptionEnvironment import EncryptionEnvironment
+from CryptMountConfigUtil import CryptMountConfigUtil
 from .console_logger import ConsoleLogger
 from io import open
 
 try:
     import unittest.mock as mock # python3+
-    builtins_open = "io.open"
+    builtins_open = "builtins.open"
 except ImportError:
     import mock # python2
-    builtins_open = "__builtins__.open"
+    builtins_open = "__builtin__.open"
 
 class Test_crypt_mount_config_util(unittest.TestCase):
     """ unit tests for functions in the CryptMountConfig module """
@@ -119,11 +119,11 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         open_mock.assert_not_called()
 
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('main.CryptMountConfigUtil.ProcessCommunicator')
+    @mock.patch('CryptMountConfigUtil.ProcessCommunicator')
     @mock.patch('CommandExecutor.CommandExecutor', autospec=True)
     @mock.patch(builtins_open)
-    @mock.patch('main.CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount')
-    @mock.patch('main.DiskUtil.DiskUtil', autospec=True)
+    @mock.patch('CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount')
+    @mock.patch('DiskUtil.DiskUtil', autospec=True)
     def test_get_crypt_items(self, disk_util_mock, use_acm_mock, open_mock, ce_mock, pc_mock, exists_mock):
 
         self.crypt_mount_config_util.command_executor = ce_mock

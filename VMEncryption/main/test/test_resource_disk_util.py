@@ -20,10 +20,10 @@
 
 import unittest
 
-from main.ResourceDiskUtil import ResourceDiskUtil
-from main.DiskUtil import DiskUtil
-from main.CryptMountConfigUtil import CryptMountConfigUtil
-from main.Common import CommonVariables
+from ResourceDiskUtil import ResourceDiskUtil
+from DiskUtil import DiskUtil
+from CryptMountConfigUtil import CryptMountConfigUtil
+from Common import CommonVariables
 from .console_logger import ConsoleLogger
 try:
     import unittest.mock as mock # python3+
@@ -61,7 +61,7 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(method(), True)
 
     @mock.patch('CommandExecutor.CommandExecutor.Execute')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     def test_is_luks_device(self, mock_partition_exists, mock_execute):
         self._test_resource_disk_partition_dependant_method(self.resource_disk._is_luks_device, mock_partition_exists, mock_execute)
 
@@ -109,11 +109,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
         self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
     def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists):
 
         # Case 1, when there is a passphrase and the resource disk is not already encrypted and mounted.
@@ -169,8 +169,8 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(ResourceDiskUtil.RD_DEV_PATH)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil.try_remount')
     def test_automount(self, mock_try_remount, mock_encrypt_format_mount):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True
