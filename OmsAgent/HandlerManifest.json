@@ -3,11 +3,11 @@
     "name":  "OmsAgentForLinux",
     "version": "1.12.25",
     "handlerManifest": {
-      "installCommand": "shim.sh -install",
-      "uninstallCommand": "shim.sh -uninstall",
-      "updateCommand": "shim.sh -update",
-      "enableCommand": "shim.sh -enable",
-      "disableCommand": "shim.sh -disable",
+      "installCommand": "omsagent_shim.sh -install",
+      "uninstallCommand": "omsagent_shim.sh -uninstall",
+      "updateCommand": "omsagent_shim.sh -update",
+      "enableCommand": "omsagent_shim.sh -enable",
+      "disableCommand": "omsagent_shim.sh -disable",
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
       "updateMode": "UpdateWithInstall"
