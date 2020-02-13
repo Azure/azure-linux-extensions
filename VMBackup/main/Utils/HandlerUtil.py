@@ -487,14 +487,14 @@ class HandlerUtility:
                     waagent_version = line.split(':')[-1]
             if waagent_version[:-1]=="": #for removing the trailing '\n' character
                 waagent_version = self.get_wala_version_from_command()
-                return waagent_version
+                return bytearray(waagent_version)
             else:
                 waagent_version = waagent_version[:-1].split("-")[-1] #getting only version number
-                return waagent_version
+                return bytearray(waagent_version)
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
-            waagent_version="Unknown"
+            waagent_version="Unknown" 
             return waagent_version
 
     def get_wala_version_from_command(self):
