@@ -384,8 +384,8 @@ class HandlerUtility:
         # initialize handler environment context variables
         handler_env = self.get_handler_env()
         self._context._name = handler_env['name']
-        self._context._version = str(handler_env['version'])
-        self._context._config_dir = str(handler_env['handlerEnvironment']['configFolder'])
+        self._context._version = handler_env['version']
+        self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
         self._change_log_file()

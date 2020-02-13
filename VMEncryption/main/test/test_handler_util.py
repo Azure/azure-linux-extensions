@@ -36,7 +36,8 @@ class TestHandlerUtil(unittest.TestCase):
         self.hutil = HandlerUtil.HandlerUtility(self.logger.log, self.logger.error, "AzureDiskEncryptionForLinux")
         self.hutil.patching = self.distro_patcher
         # invoke unit test from within main for setup (to avoid having to change dependencies)
-        handlerPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        # handler path is three levels above current location ( ../main/test/test_handler.util )
+        handlerPath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))) 
         handlerEnvPath = os.path.join(handlerPath, "HandlerEnvironment.json")
         handlerManPath = os.path.join(handlerPath, "HandlerManifest.json")
         configPath = os.path.join(handlerPath, "config")
@@ -76,20 +77,25 @@ class TestHandlerUtil(unittest.TestCase):
     def test_do_parse_context_disable(self):
         self.assertIsNotNone(self.hutil.do_parse_context('Disable'))
 
-    def test_do_parse_context_disable_nosettings(self):
-        # simulate missing settings file by adding .bak extension
-        config_dir = os.path.join(os.getcwd(), 'config')
-        settings_files = glob.glob(os.path.join(config_dir, '*.settings'))
-        for settings_file in settings_files:
-            os.rename(settings_file, settings_file + '.bak')
-        try:
-            # test to simulate disable when no settings are available
-            self.hutil.do_parse_context('Disable')
-            self.hutil.archive_old_configs()
-        finally:
-            # restore settings files back to original name
-            for settings_file in settings_files:
-                os.rename(settings_file + '.bak', settings_file)
+	# the correct action to take in this case is undefined, currently we throw an error
+	#  - guest agent after updates can leave no settings files in the config folder
+	#  - this seems to go against the contract of always providing settings files prior to an operation
+    # def test_do_parse_context_disable_nosettings(self):
+    #     # simulate missing settings file by adding .bak extension
+    #     # handler path is three levels above current location ( ../main/test/test_handler.util )
+    #     handler_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))) 
+    #     config_dir = os.path.join(handler_dir, "config")
+    #     settings_files = glob.glob(os.path.join(config_dir, '*.settings'))
+    #     for settings_file in settings_files:
+    #         os.rename(settings_file, settings_file + '.bak')
+    #     try:
+    #         # test to simulate disable when no settings are available
+    #         self.hutil.do_parse_context('Disable')
+    #         self.hutil.archive_old_configs()
+    #     finally:
+    #         # restore settings files back to original name
+    #         for settings_file in settings_files:
+    #             os.rename(settings_file + '.bak', settings_file)
 
     def test_do_parse_context_uninstall(self):
         self.assertIsNotNone(self.hutil.do_parse_context('Uninstall'))

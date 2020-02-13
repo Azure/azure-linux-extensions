@@ -152,25 +152,23 @@ class TestCheckUtil(unittest.TestCase):
             }, { "os": "NotEncrypted" }, mock_distro_patcher, None)
 
     def test_mount_scheme(self):
-        proc_mounts_output = """
-        sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
-        proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
-        udev /dev devtmpfs rw,relatime,size=4070564k,nr_inodes=1017641,mode=755 0 0
-        devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
-        tmpfs /run tmpfs rw,nosuid,noexec,relatime,size=815720k,mode=755 0 0
-        /dev/sda1 / ext4 rw,relatime,discard,data=ordered 0 0
-        none /sys/fs/cgroup tmpfs rw,relatime,size=4k,mode=755 0 0
-        none /sys/fs/fuse/connections fusectl rw,relatime 0 0
-        none /sys/kernel/debug debugfs rw,relatime 0 0
-        none /sys/kernel/security securityfs rw,relatime 0 0
-        none /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k 0 0
-        none /run/shm tmpfs rw,nosuid,nodev,relatime 0 0
-        none /run/user tmpfs rw,nosuid,nodev,noexec,relatime,size=102400k,mode=755 0 0
-        none /sys/fs/pstore pstore rw,relatime 0 0
-        systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=systemd 0 0
-        /dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
-        /dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0
-        """
+        proc_mounts_output = """sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+udev /dev devtmpfs rw,relatime,size=4070564k,nr_inodes=1017641,mode=755 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,noexec,relatime,size=815720k,mode=755 0 0
+/dev/sda1 / ext4 rw,relatime,discard,data=ordered 0 0
+none /sys/fs/cgroup tmpfs rw,relatime,size=4k,mode=755 0 0
+none /sys/fs/fuse/connections fusectl rw,relatime 0 0
+none /sys/kernel/debug debugfs rw,relatime 0 0
+none /sys/kernel/security securityfs rw,relatime 0 0
+none /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k 0 0
+none /run/shm tmpfs rw,nosuid,nodev,relatime 0 0
+none /run/user tmpfs rw,nosuid,nodev,noexec,relatime,size=102400k,mode=755 0 0
+none /sys/fs/pstore pstore rw,relatime 0 0
+systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=systemd 0 0
+/dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
+/dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0"""
         with mock.patch(builtins_open, mock.mock_open(read_data=proc_mounts_output)) as mock_open:
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
             self.assertEqual(mock_open.call_count,1)
