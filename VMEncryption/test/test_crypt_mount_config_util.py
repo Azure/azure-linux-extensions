@@ -235,7 +235,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         disk_util_mock.get_encryption_status.return_value = "{\"os\" : \"NotEncrypted\"}"
         disk_util_mock.distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
         disk_util_mock.get_azure_data_disk_controller_and_lun_numbers.return_value = [(1, 0)]
-        disk_util_mock.get_device_path.return_value = "/dev/mapper/mapper_name"
+        disk_util_mock.get_device_items_property.return_value = "ext4"
 
         # Test 1: migrate an entry (BEK not in fstab)
         open_mock.reset_mock()
@@ -245,7 +245,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/mnt/point/.azure_ade_backup_mount_info/crypttab_line": "",
                                                         "/mnt/point/.azure_ade_backup_mount_info/fstab_line": ""})
         self.crypt_mount_config_util.migrate_crypt_items()
-        self.assertEqual(open_mock.call_count, 9)
+        self.assertEqual(open_mock.call_count, 8)
         self.assertTrue("LABEL=BEK\\040VOLUME /mnt/azure_bek_disk auto defaults,discard,nobootwait 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
@@ -263,7 +263,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         print(open_mock.content_dict["/etc/fstab"])
         print(open_mock.content_dict["/etc/crypttab"])
         self.crypt_mount_config_util.migrate_crypt_items()
-        self.assertEqual(open_mock.call_count, 8)
+        self.assertEqual(open_mock.call_count, 7)
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
@@ -307,7 +307,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/mnt/point2/.azure_ade_backup_mount_info/crypttab_line": "",
                                                         "/mnt/point2/.azure_ade_backup_mount_info/fstab_line": ""})
         self.crypt_mount_config_util.migrate_crypt_items()
-        self.assertEqual(open_mock.call_count, 15)
+        self.assertEqual(open_mock.call_count, 13)
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0\n" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("\nmapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0" in open_mock.content_dict["/etc/crypttab"])
@@ -317,10 +317,29 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict["/mnt/point2/.azure_ade_backup_mount_info/fstab_line"])
         self.assertTrue("mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/mnt/point2/.azure_ade_backup_mount_info/crypttab_line"])
 
-        # Test 6: skip if mapperpath not found
+        # Test 6: skip if filesystem not supported
         open_mock.reset_mock()
         use_acm_mock.return_value = True
-        disk_util_mock.get_device_path.return_value = None
+        disk_util_mock.get_device_items_property.return_value = "zfs"
+
+        open_mock.reset_mock()
+        self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": "mapper_name /dev/dev_path None /mnt/point ext4 False 0",
+                                                        "/etc/fstab": "",
+                                                        "/etc/crypttab": "",
+                                                        "/mnt/point/.azure_ade_backup_mount_info/crypttab_line": "",
+                                                        "/mnt/point/.azure_ade_backup_mount_info/fstab_line": ""})
+        self.crypt_mount_config_util.migrate_crypt_items()
+        self.assertEqual(open_mock.call_count, 3)
+        self.assertTrue("LABEL=BEK\\040VOLUME /mnt/azure_bek_disk auto defaults,discard,nobootwait 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point" not in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
+        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
+
+        # Test 7: skip if device does not exist
+        open_mock.reset_mock()
+        use_acm_mock.return_value = True
+        disk_util_mock.get_device_items_property.side_effect = Exception('mock exception')
 
         open_mock.reset_mock()
         self._mock_open_with_read_data_dict(open_mock, {"/var/lib/azure_disk_encryption_config/azure_crypt_mount": "mapper_name /dev/dev_path None /mnt/point ext4 False 0",

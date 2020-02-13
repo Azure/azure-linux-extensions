@@ -639,10 +639,14 @@ class CryptMountConfigUtil(object):
                 continue
 
             if crypt_item.mapper_name and crypt_item.mount_point and crypt_item.mount_point != "None":
-                self.logger.log(msg="Checking if device path exists for mapper name: {0}".format(crypt_item.mapper_name), level=CommonVariables.InfoLevel)
-                device_path = self.disk_util.get_device_path(crypt_item.mapper_name)
-                if not device_path:
-                    self.logger.log("Device path not found for mapper name: {0}. Skipping device".format(crypt_item.mapper_name))
+                self.logger.log(msg="Checking if device for mapper name: {0} has valid filesystem".format(crypt_item.mapper_name), level=CommonVariables.InfoLevel)
+                try:
+                    fstype = self.disk_util.get_device_items_property(crypt_item.mapper_name, 'FSTYPE')
+                    if fstype not in CommonVariables.format_supported_file_systems:
+                        self.logger.log("mapper name: {0} does not have a supported filesystem. Skipping device".format(crypt_item.mapper_name))
+                        continue
+                except Exception:
+                    self.logger.log("Exception occured while querying filesystem for mapper name {0}. Skipping device.".format(crypt_item.mapper_name))
                     continue
                 self.logger.log(msg="Adding entry for {0} drive in fstab with mount point {1}".format(crypt_item.mapper_name, crypt_item.mount_point), level=CommonVariables.InfoLevel)
                 self.append_mount_info_data_disk(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point)
