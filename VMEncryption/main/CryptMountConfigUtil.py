@@ -452,13 +452,9 @@ class CryptMountConfigUtil(object):
 
     def append_mount_info_data_disk(self, mapper_path, mount_point):
         shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(uuid.uuid4()))
-        mount_content_item = mapper_path + " " + mount_point + " auto defaults,nofail,discard 0 0"
-        new_mount_content = ""
-        with open("/etc/fstab", 'r') as f:
-            existing_content = f.read()
-            new_mount_content = existing_content + "\n" + mount_content_item
-        with open("/etc/fstab", 'w') as wf:
-            wf.write(new_mount_content)
+        mount_content_item = "\n#This line was added by Azure Disk Encryption\n" + mapper_path + " " + mount_point + " auto defaults,nofail,discard 0 0"
+        with open("/etc/fstab", 'a') as wf:
+            wf.write(mount_content_item)
 
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
@@ -622,6 +618,7 @@ class CryptMountConfigUtil(object):
 
         self.logger.log("fstab updated successfully")
 
+    # All encrypted devices are unlocked before this function is called
     def migrate_crypt_items(self):
         with open('/etc/fstab', 'r') as f:
             lines = f.readlines()
