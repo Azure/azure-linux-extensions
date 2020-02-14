@@ -113,7 +113,11 @@ def disable_encryption():
                                                           crypt_item.mapper_name,
                                                           crypt_item.luks_header_path)
             if add_result != CommonVariables.process_success:
-                raise Exception("luksAdd failed with return code {0}".format(add_result))
+                if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
+                    raise Exception("luksAdd failed with return code {0}".format(add_result))
+                else:
+                    logger.log("luksAdd failed with return code {0}".format(add_result))
+                    logger.log("Ignoring for now, as device ({0}) does not seem to be a luks device".format(crypt_item.dev_path))
 
             if crypt_item.dev_path.startswith("/dev/sd"):
                 logger.log('Updating crypt item entry to use mapper name')
@@ -625,6 +629,9 @@ def enable():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
+            # Migrate to early unlock if using crypt mount
+            if crypt_mount_config_util.should_use_azure_crypt_mount():
+                crypt_mount_config_util.migrate_crypt_items()
 
         encryption_status = json.loads(disk_util.get_encryption_status())
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
@@ -1619,12 +1626,18 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         mapper_device_item = next((d for d in device_items if mapped_device_item_match(d)), None)
 
         if not raw_device_item:
-            logger.log("raw device not found for crypt_item {0}".format(crypt_item))
-            return crypt_item
+            logger.log("raw device not found for crypt_item {0}".format(crypt_item), level='Warn')
+            logger.log("Skipping device", level='Warn')
+            continue
 
         if not mapper_device_item:
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
-            return crypt_item
+            if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
+                logger.log("Found a luks device for this device item, yet couldn't open mapper: {0}".format(crypt_item))
+                logger.log("Failing".format(crypt_item))
+                return crypt_item
+            else:
+                continue
 
         decryption_result_phase = None
 
