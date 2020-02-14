@@ -365,6 +365,12 @@ class DiskUtil(object):
             self.modify_fstab_entry_encrypt(crypt_item.mount_point, os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
             self.add_crypt_item_to_crypttab(crypt_item, passphrase_file)
 
+    def is_luks_device(self, device_path, device_header_path):
+        """ checks if the device is set up with a luks header """
+        path_var = device_header_path if device_header_path else device_path
+        cmd = 'cryptsetup isLuks ' + path_var
+        return (int)(self.command_executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if not os.path.exists(luks_header_file_path):
