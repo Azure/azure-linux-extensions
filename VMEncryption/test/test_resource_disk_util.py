@@ -107,12 +107,13 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.resource_disk.disk_util.get_mount_items.return_value = [{"src": "/dev/sdb2", "dest": "/mnt/resource"}]
         self.assertEqual(self.resource_disk._is_crypt_mounted(), False)
 
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.add_resource_disk_to_crypttab')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._resource_disk_partition_exists')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_luks_device')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._mount_resource_disk')
-    def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists):
+    def test_try_remount(self, mock_mount, mock_plain_mounted, mock_crypt_mounted, mock_is_luks, mock_partition_exists, mock_add_rd_to_crypttab):
 
         # Case 1, when there is a passphrase and the resource disk is not already encrypted and mounted.
         mock_partition_exists.return_value = True
@@ -124,6 +125,7 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), False)
 
         mock_mount.assert_not_called()
+        mock_add_rd_to_crypttab.assert_not_called()
 
         # Case 2, resource disk is encrypted but not mounted
         mock_is_luks.return_value = True
@@ -136,7 +138,7 @@ class TestResourceDiskUtil(unittest.TestCase):
                                                          mapper_name=ResourceDiskUtil.RD_MAPPER_NAME,
                                                          header_file=None,
                                                          uses_cleartext_key=False)
-        mock_mount.assert_called_with(ResourceDiskUtil.RD_MAPPER_PATH)
+        mock_add_rd_to_crypttab.assert_called()
 
         # Case 2, when the resoure disk mount fails
         mock_mount.return_value = False
@@ -147,9 +149,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         # Case 3, The RD is encrypted and mounted.
         mock_crypt_mounted.return_value = True
         mock_mount.reset_mock()
+        mock_add_rd_to_crypttab.reset_mock()
         mock_mount.return_value = True
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_not_called()
+        mock_add_rd_to_crypttab.assert_called()
 
         # Case 4, The RD is plain mounted already and there is no passphrase
         mock_plain_mounted.return_value = True
@@ -167,9 +171,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(ResourceDiskUtil.RD_DEV_PATH)
 
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted', return_value=False)
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted', return_value=True)
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
     @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.try_remount')
-    def test_automount(self, mock_try_remount, mock_encrypt_format_mount):
+    def test_automount(self, mock_try_remount, mock_encrypt_format_mount, mock_is_plain_mounted, mock_is_crypt_mounted):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
@@ -180,17 +186,17 @@ class TestResourceDiskUtil(unittest.TestCase):
 
         # Case 2.x: these are basically gonna be a bunch of tests for "is_encrypt_format"
         self.resource_disk.public_settings = {}
-        self.assertEqual(self.resource_disk.automount(), False)
+        self.assertEqual(self.resource_disk.automount(), True)
         mock_encrypt_format_mount.assert_not_called()
 
         self.resource_disk.public_settings = {
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}
-        self.assertEqual(self.resource_disk.automount(), False)
+        self.assertEqual(self.resource_disk.automount(), True)
         mock_encrypt_format_mount.assert_not_called()
 
         self.resource_disk.public_settings = {
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.DisableEncryption}
-        self.assertEqual(self.resource_disk.automount(), False)
+        self.assertEqual(self.resource_disk.automount(), True)
         mock_encrypt_format_mount.assert_not_called()
 
         # Case 3: EFA case. A try remount failure should lead to a hard encrypt_format_mount.
@@ -198,4 +204,10 @@ class TestResourceDiskUtil(unittest.TestCase):
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll}
         mock_encrypt_format_mount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
+        mock_encrypt_format_mount.assert_called_once()
+
+        # case 4: EFA case, but EFA fails for some reason
+        mock_encrypt_format_mount.reset_mock()
+        mock_encrypt_format_mount.return_value = False
+        self.assertEqual(self.resource_disk.automount(), False)
         mock_encrypt_format_mount.assert_called_once()
