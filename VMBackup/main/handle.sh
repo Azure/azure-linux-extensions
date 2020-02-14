@@ -12,10 +12,11 @@ logfile=$logfolder'/shell.log'
 
 rc=3
 
-if [ $1 != "enable"]
+if [ $1 != "enable" ]
 then
 	echo "The command is not enable, exiting" >> $logfile
 	exit $rc
+fi
 
 if [ -f "/usr/bin/python2.7" ]
 then
