@@ -1,16 +1,16 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-  <ProviderNameSpace>Microsoft.EnterpriseCloud.Monitoring</ProviderNameSpace>
-  <Type>OmsAgentForLinux</Type>
-  <Version>1.12.25</Version>
-  <Label>Microsoft Operations Management Suite Agent for Linux</Label>
+  <ProviderNameSpace>Microsoft.Azure.Monitor</ProviderNameSpace>
+  <Type>AzureMonitorLinuxAgent</Type>
+  <Version>0.9.001</Version>
+  <Label>Microsoft Azure Monitoring Agent for Linux</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>
-  <Description>Microsoft Operations Management Suite Agent for Linux</Description>
+  <Description>Microsoft Azure Monitoring Agent for Linux</Description>
   <IsInternalExtension>true</IsInternalExtension>
-  <Eula>https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/LICENSE</Eula>
+  <Eula>https://docs.microsoft.com/en-us/azure/azure-monitor/learn/quick-collect-linux-computer</Eula>
   <PrivacyUri>http://www.microsoft.com/privacystatement/en-us/OnlineServices/Default.aspx</PrivacyUri>
-  <HomepageUri>https://github.com/Microsoft/OMS-Agent-for-Linux</HomepageUri>
+  <HomepageUri>https://msazure.visualstudio.com/DefaultCollection/One/_git/Compute-Runtime-Tux</HomepageUri>
   <IsJsonExtension>true</IsJsonExtension>
   <SupportedOS>Linux</SupportedOS>
   <CompanyName>Microsoft</CompanyName>

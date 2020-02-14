@@ -95,8 +95,8 @@ class ParameterParser(object):
             if(self.includedDisks != None):
                 if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
                     self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
-                    if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
-                        self.includeLunList.append(-1)
+                if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
+                    self.includeLunList.append(-1)
                 
                     backup_logger.log("LUN list - " + str(self.includeLunList), True)
         except Exception as e:

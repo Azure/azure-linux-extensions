@@ -1,0 +1,5 @@
+packages
+keys/keyring.gpg
+keys/keyring.gpg~
+keys/.gnupg/
+.vscode/

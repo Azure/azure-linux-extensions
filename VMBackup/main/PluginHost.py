@@ -2,6 +2,7 @@ import time
 import sys
 import os
 import threading
+import platform
 try:
     import ConfigParser as ConfigParsers
 except ImportError:
@@ -78,6 +79,10 @@ class PluginHost(object):
         errorCode = CommonVariables.PrePost_PluginStatus_Success
         dobackup = True
         fsFreeze_on = True
+
+        # NS-BSD is already hardened, no checks and no freeze
+        if 'NS-BSD' in platform.system():
+            return errorCode, dobackup, False
 
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
@@ -180,7 +185,7 @@ class PluginHost(object):
         permissions = '777'
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
         except Exception as err:
             errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')

@@ -26,6 +26,7 @@ import sys
 import signal
 import traceback
 import threading
+from common import CommonVariables
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
@@ -125,7 +126,7 @@ class FsFreezer:
         self.frozen_items = set()
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
-
+        self.mount_open_failed = False
 
     def should_skip(self, mount):
         if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
@@ -137,20 +138,28 @@ class FsFreezer:
         self.root_seen = False
         error_msg=''
         timedout = False
+        self.skip_freeze = True 
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
             args=[freezebin,str(timeout)]
-            arg=[]
+            no_mount_found = True
             for mount in self.mounts.mounts:
                 self.logger.log("fsfreeze mount :" + str(mount.mount_point), True)
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
                 elif(mount.mount_point and not self.should_skip(mount)):
+                    if(self.skip_freeze == True):
+                        self.skip_freeze = False
                     args.append(str(mount.mount_point))
-            if(self.root_seen):
+            if(self.root_seen and not self.should_skip(self.root_mount)):
+                if(self.skip_freeze == True):
+                    self.skip_freeze = False
                 args.append('/')
+            self.logger.log("skip freeze is : " + str(self.skip_freeze), True)
+            if(self.skip_freeze == True):
+                return freeze_result,timedout
             self.logger.log("arg : " + str(args),True)
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
@@ -164,6 +173,10 @@ class FsFreezer:
                 if (sig_handle == 0):
                     timedout = True
                     error_msg="freeze timed-out"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+                elif (self.mount_open_failed == True):
+                    error_msg=CommonVariables.unable_to_open_err_string
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
                 else:
@@ -180,6 +193,8 @@ class FsFreezer:
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
+        if(self.skip_freeze == True):
+            return thaw_result, unable_to_sleep
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
             self.logger.log("****** 7. Error - Binary Process Already Completed", True)
@@ -224,10 +239,11 @@ class FsFreezer:
                 line = str(line, encoding='utf-8', errors="backslashreplace")
             else:
                 line = str(line)
+            if("Failed to open:" in line):
+                self.mount_open_failed = True
             if(line != ''):
                 self.logger.log(line.rstrip(), True)
             else:
                 break
         self.logger.log("============== Binary output traces end ================= ", True)
-
 

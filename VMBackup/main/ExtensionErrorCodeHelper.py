@@ -1,8 +1,10 @@
 from Utils import Status
 
 class ExtensionErrorCodeEnum():
-    success = 1
     success_appconsistent = 0
+    success = 1
+    error = 2
+    SuccessAlreadyProcessedInput = 3
     ExtensionTempTerminalState = 4
     error_parameter = 11
     error_12 = 12
@@ -11,14 +13,14 @@ class ExtensionErrorCodeEnum():
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
-    error = 2
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
 
-    FailedRetryableFsFreezeFailed = 201
-    FailedRetryableFsFreezeTimeout = 202
+    FailedRetryableFsFreezeFailed = 121
+    FailedRetryableFsFreezeTimeout = 122
+    FailedRetryableUnableToOpenMount = 123
 
     FailedPrepostPreScriptFailed = 300
     FailedPrepostPostScriptFailed = 301
@@ -39,7 +41,6 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
-    SuccessAlreadyProcessedInput = 3
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -53,6 +54,7 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : Status.ExtVmHealthStateEnum.yellow,
 
@@ -93,6 +95,7 @@ class ExtensionErrorCodeHelper:
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : "FailedRetryableFsFreezeTimeout",
+            ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : "FailedRetryableUnableToOpenMount",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
 

@@ -46,7 +46,7 @@ OmsAgentPidFile = "/var/opt/microsoft/omsagent/run/omsagent.pid"
 OmsAgentLogFile = "/var/opt/microsoft/omsagent/log/omsagent.log"
 reg_ex = re.compile('([0-9]{4}-[0-9]{2}-[0-9]{2}.*)\[(\w+)\]:(.*)')
 maxMessageSize = 100
-
+OMSExtensionVersion = '1.12.25'
 """
 We can add to the list below with more error messages to identify non recoverable errors.
 """
@@ -174,7 +174,7 @@ class Watcher:
                         {{
 
             			"name": "Version",
-            			"value": "1.11.15"
+            			"value": \"""" + OMSExtensionVersion + """\"
              		}},
 
                         {{
@@ -464,7 +464,7 @@ class Watcher:
                 #  the last_pos rather continue from the begining.
                 
                 if (text != ''):				
-                    crc = hashlib.md5(text).hexdigest()										
+                    crc = hashlib.sha256(text).hexdigest()										
                     self._hutil_log("Last crc = {0}, current crc= {1} position = {2}".format(last_crc, crc, last_pos))                        
                     if (last_crc == crc):
                         
