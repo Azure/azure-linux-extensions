@@ -79,6 +79,7 @@ import ExtensionErrorCodeHelper
 import traceback
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
+PY_VERSION_MAJOR = sys.version_info[0]
 
 class HandlerContext:
     def __init__(self,name):
@@ -330,7 +331,9 @@ class HandlerUtility:
                     value = config.get('SnapshotThread',key)
         except Exception as e:
             pass
-
+        
+        if PY_VERSION_MAJOR >2:
+            value = value.decode('utf-8')
         return value
  
     def set_value_to_configfile(self, key, value):
