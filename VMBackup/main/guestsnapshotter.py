@@ -228,7 +228,14 @@ class GuestSnapshotter(object):
                 timeout = self.get_value_from_configfile('timeout')
                 if timeout == None:
                     timeout = 60
-
+                
+                try:
+                    timeout_int = int(timeout)
+                except ValueError:
+                    self.logger.log('SnapshotTall : timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
+                    timeout_int = 60
+                    timeout = str(timeout_int)
+                
                 for job in mp_jobs:
                     job.join()
                 self.logger.log('****** 6. Snaphotting (Guest-parallel) Completed')
