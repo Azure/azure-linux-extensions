@@ -201,10 +201,10 @@ def freeze_snapshot(timeout):
             hutil.set_value_to_configfile('seqsnapshot', '0')
         seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
         try:
-            seqsnapshotflag_int = int(seqsnapshotflag)
+            seqsnapshotflag_int = int(seqsnapshotflag)           
         except ValueError:
             self.logger.log('Handle.py : Could not find a valid value for seqsnapshotflag, defaulting to 0', True, 'Warning')
-            seqsnapshotflag = str(seqsnapshotflag_int)
+            seqsnapshotflag = '0'
         backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
