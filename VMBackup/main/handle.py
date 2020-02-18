@@ -110,6 +110,11 @@ def status_report_to_file(file_report_msg):
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
     UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
+    try:
+        UploadStatusAndLog_str = str(UploadStatusAndLog)
+    except ValueError:
+        self.logger.log('BackupLogger : Could not find a valid value for UploadStatusAndLog, defaulting to True', True, 'Warning')
+        UploadStatusAndLog = 'True'        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
             if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -195,6 +200,11 @@ def freeze_snapshot(timeout):
         if(hutil.get_value_from_configfile('seqsnapshot') == None):
             hutil.set_value_to_configfile('seqsnapshot', '0')
         seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
+        try:
+            seqsnapshotflag_int = int(seqsnapshotflag)
+        except ValueError:
+            self.logger.log('Handle.py : Could not find a valid value for seqsnapshotflag, defaulting to 0', True, 'Warning')
+            seqsnapshotflag = str(seqsnapshotflag_int)
         backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)

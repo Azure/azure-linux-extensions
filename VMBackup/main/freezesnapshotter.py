@@ -82,6 +82,11 @@ class FreezeSnapshotter(object):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
                 snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
+                try:
+                    snapshotMethodConfigValue_str = str(snapshotMethodConfigValue)
+                except ValueError:
+                    self.logger.log('FreezeSnapshotter : Could not find a valid value for snapshotMethodConfigValue, defaulting to firstHostThenGuest', True, 'Warning')
+                    snapshotMethodConfigValue = 'firstHostThenGuest'
                 self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
                 if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
                     self.takeSnapshotFrom = snapshotMethodConfigValue
