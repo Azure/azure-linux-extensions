@@ -2,7 +2,7 @@
 #
 # Azure Disk Encryption For Linux extension
 #
-# Copyright 2016 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 import os
 
-def GetVersionFromFile():
+def get_build_version_from_file():
     # Note, version.txt is expected to be within the same directory as this file
     file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'version.txt')
     if not os.path.exists(file_path):
