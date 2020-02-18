@@ -156,6 +156,11 @@ class HandlerUtility:
 
     def log_with_no_try_except(self, message, level='Info'):
         WriteLog = self.get_value_from_configfile('WriteLog')
+        try:
+            WriteLog_str = str(WriteLog)
+        except ValueError:
+            self.logger.log('HandlerUtil : Could not find a valid value for WriteLog, defaulting to True', True, 'Warning')
+            WriteLog = 'True'
         if (WriteLog == None or WriteLog == 'True'):
             if sys.version_info > (3,):
                 if self.logging_file is not None:
