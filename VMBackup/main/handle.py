@@ -113,7 +113,7 @@ def status_report_to_blob(blob_report_msg):
     try:
         UploadStatusAndLog_str = str(UploadStatusAndLog)
     except ValueError:
-        self.logger.log('BackupLogger : Could not find a valid value for UploadStatusAndLog, defaulting to True', True, 'Warning')
+        self.logger.log('Handle.py : Could not find a valid value for UploadStatusAndLog, defaulting to True', True, 'Warning')
         UploadStatusAndLog = 'True'        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
