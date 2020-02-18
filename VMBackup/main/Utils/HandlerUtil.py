@@ -335,6 +335,7 @@ class HandlerUtility:
                     value = config.get('SnapshotThread',key)
         except Exception as e:
             pass
+            
         return value
  
     def set_value_to_configfile(self, key, value):
