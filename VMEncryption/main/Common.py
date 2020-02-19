@@ -21,7 +21,7 @@ import BuildVersion
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = BuildVersion.GetVersionFromFile()
+    extension_version = BuildVersion.get_build_version_from_file()
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
