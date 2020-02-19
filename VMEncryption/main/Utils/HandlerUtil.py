@@ -538,8 +538,8 @@ class HandlerUtility:
                 if "VMRestartPending" in encryption_status:
                     stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
 
-            # use default encode_ascii of true, then decode for python2 + python3 compat
-            stat_rept = json.dumps(stat).decode('utf-8')
+            # use default encode_ascii of true, then encode to utf-8 for python2 + python3 compat on output
+            stat_rept = json.dumps(stat).encode('utf-8')
             
             # rename all other status files, or the WALA would report the wrong
             # # status file.
@@ -549,7 +549,7 @@ class HandlerUtility:
             # is received in between then the guest agent only reports n+1.status. 
             # Hence, any status update from n.settings also needs to go to n+1.status.
             if self._context._status_file:
-                with open(self._context._status_file,'w+') as f:
+                with open(self._context._status_file,'wb+') as f:
                     f.write(stat_rept)
         except Exception as e:
             self.log('Exception occured while writing status: '+ str(e))

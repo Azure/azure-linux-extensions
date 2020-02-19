@@ -48,7 +48,7 @@ class BekUtil(object):
     def store_bek_passphrase(self, encryption_config, passphrase):
 
         # convert filename to string for consistency across python2 python3+
-        bek_filename = str(encryption_config.get_bek_filename().decode('utf-8'))
+        bek_filename = str(encryption_config.get_bek_filename().encode('utf-8'))
 
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
@@ -57,11 +57,11 @@ class BekUtil(object):
             # ensure base64 encoded passphrase string is encoded as utf-8 in both
             # python2 and python3 environments for consistency in output format
             with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
-                f.write(passphrase.encode('utf-8'))
+                f.write(str(passphrase).encode('utf-8'))
             for bek_file in os.listdir(self.bek_filesystem_mount_point):
                 if bek_filename in bek_file and bek_filename != bek_file:
                     with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
-                        f.write(passphrase.encode('utf-8'))
+                        f.write(str(passphrase).encode('utf-8'))
         except Exception as e:
             message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc(e))
             self.logger.log(message)
