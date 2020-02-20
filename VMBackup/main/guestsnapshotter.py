@@ -330,7 +330,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-        if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == '1' or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == '2' or (len(paras.blobs) <= 4)):
+        if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
