@@ -83,9 +83,6 @@ class FreezeHandler(object):
         binary_thread.start()
 
         SafeFreezeWaitInSecondsDefault = 66
-        proc_sleep_time = self.hutil.get_intvalue_from_configfile('SafeFreezeWaitInSeconds',SafeFreezeWaitInSecondsDefault)
-        if(proc_sleep_time == None or proc_sleep_time == ''):
-            proc_sleep_time = SafeFreezeWaitInSecondsDefault
 
         proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
         self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time_int))
