@@ -318,22 +318,7 @@ class HandlerUtility:
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
-
-    def get_value_from_configfile(self, key):
-        global backup_logger
-        value = None
-        configfile = '/etc/azure/vmbackup.conf'
-        try :
-            if os.path.exists(configfile):
-                config = ConfigParsers.ConfigParser()
-                config.read(configfile)
-                if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
-        except Exception as e:
-            pass
-
-        return value
-
+    
     def get_strvalue_from_configfile(self, key, default):
         global backup_logger
         value = default
