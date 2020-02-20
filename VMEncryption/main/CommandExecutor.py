@@ -34,6 +34,17 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
+    def get_text(self, s):
+        # decode bytes to string in python3 context
+        try:
+            basestring
+        except NameError:
+            basestring = str
+        if isinstance(s, basestring):
+            return s
+        else:
+            return s.decode('utf-8')
+
     def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False, timeout=0):
         if not suppress_logging:
             self.logger.log("Executing: {0}".format(command_to_execute))
@@ -70,15 +81,15 @@ class CommandExecutor(object):
         if isinstance(communicator, ProcessCommunicator):
             # for python2 and python3 compatibility, first decode 
             # std[out|err] bytes, converting from data to string
-            communicator.stdout = str(stdout.decode('utf-8'))
-            communicator.stderr = str(stderr.decode('utf-8'))
+            communicator.stdout = self.get_text(stdout)
+            communicator.stderr = self.get_text(stderr)
 
         if int(return_code) != 0:
             msg = "Command {0} failed with return code {1}".format(command_to_execute, return_code)
             # for python2 and python3 compatibility, first decode 
             # std[out|err] bytes, converting from data to string
-            msg += "\nstdout:\n" + str(stdout.decode('utf-8'))
-            msg += "\nstderr:\n" + str(stderr.decode('utf-8'))
+            msg += "\nstdout:\n" + self.get_text(stdout)
+            msg += "\nstderr:\n" + self.get_text(stderr)
 
             if not suppress_logging:
                 self.logger.log(msg)

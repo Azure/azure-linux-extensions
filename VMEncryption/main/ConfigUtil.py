@@ -19,9 +19,9 @@
 import os.path
 from Common import *
 try:
-    from configparser import ConfigParser #python3+
+    import configparser #python3+
 except ImportError:
-    import ConfigParser #python2
+    import ConfigParser as configparser #python2
 from io import open
 
 class ConfigKeyValuePair(object):
@@ -43,7 +43,7 @@ class ConfigUtil(object):
 
     def save_config(self, prop_name, prop_value):
         #TODO make the operation an transaction.
-        config = ConfigParser()
+        config = configparser.ConfigParser()
         if os.path.exists(self.config_file_path):
             config.read(self.config_file_path)
         # read values from a section
@@ -54,7 +54,7 @@ class ConfigUtil(object):
             config.write(configfile)
 
     def save_configs(self, key_value_pairs):
-        config = ConfigParser()
+        config = configparser.ConfigParser()
         if os.path.exists(self.config_file_path):
             config.read(self.config_file_path)
         # read values from a section
@@ -72,12 +72,12 @@ class ConfigUtil(object):
         # write the configs, the bek file name and so on.
         if os.path.exists(self.config_file_path):
             try:
-                config = ConfigParser()
+                config = configparser.ConfigParser()
                 config.read(self.config_file_path)
                 # read values from a section
                 prop_value = config.get(self.azure_crypt_config_section, prop_name)
                 return prop_value
-            except (NoSectionError, NoOptionError) as e:
+            except (configparser.NoSectionError, configparser.NoOptionError) as e:
                 self.logger.log(msg="value of prop_name:{0} not found.".format(prop_name))
                 return None
         else:
