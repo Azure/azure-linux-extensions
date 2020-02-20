@@ -109,12 +109,7 @@ def status_report_to_file(file_report_msg):
 
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
-    try:
-        UploadStatusAndLog_str = str(UploadStatusAndLog)
-    except ValueError:
-        self.logger.log('Handle.py : Could not find a valid value for UploadStatusAndLog, defaulting to True', True, 'Warning')
-        UploadStatusAndLog = 'True'        
+    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
             if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -197,15 +192,6 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('seqsnapshot') == None):
-            hutil.set_value_to_configfile('seqsnapshot', '0')
-        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
-        try:
-            seqsnapshotflag_int = int(seqsnapshotflag)           
-        except ValueError:
-            self.logger.log('Handle.py : Could not find a valid value for seqsnapshotflag, defaulting to 0', True, 'Warning')
-            seqsnapshotflag = '0'
-        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
@@ -355,7 +341,7 @@ def daemon():
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            exit_if_same_taskId(para_parser.taskId) 
+            #exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         
@@ -553,7 +539,7 @@ def enable():
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
-        hutil.exit_if_same_seq()
+        #hutil.exit_if_same_seq()
 
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
