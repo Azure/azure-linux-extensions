@@ -81,12 +81,7 @@ class FreezeSnapshotter(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
-                try:
-                    snapshotMethodConfigValue_str = str(snapshotMethodConfigValue)
-                except ValueError:
-                    self.logger.log('FreezeSnapshotter : Could not find a valid value for snapshotMethodConfigValue, defaulting to firstHostThenGuest', True, 'Warning')
-                    snapshotMethodConfigValue = 'firstHostThenGuest'
+                snapshotMethodConfigValue = self.hutil.get_strvalue_from_configfile(CommonVariables.SnapshotMethod,'firstHostThenGuest')
                 self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
                 if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
                     self.takeSnapshotFrom = snapshotMethodConfigValue
@@ -211,17 +206,8 @@ class FreezeSnapshotter(object):
 
     def freeze(self):
         try:
-            timeout = self.hutil.get_value_from_configfile('timeout')
-            if(timeout == None):
-                timeout = str(60)
+            timeout = self.hutil.get_intvalue_from_configfile('timeout',60)
             self.logger.log('T:S freeze, timeout value ' + str(timeout))
-            timeout_int = 60
-            try:
-                timeout_int = int(timeout)
-            except ValueError:
-                self.logger.log('T:S freeze, timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
-                timeout_int = 60
-                timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
             freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()

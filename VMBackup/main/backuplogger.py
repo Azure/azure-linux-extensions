@@ -43,12 +43,7 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
-        WriteLog = self.hutil.get_value_from_configfile('WriteLog')
-        try:
-            WriteLog_str = str(WriteLog)
-        except ValueError:
-            self.logger.log('BackupLogger : Could not find a valid value for WriteLog, defaulting to True', True, 'Warning')
-            WriteLog = 'True'
+        WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             log_msg = ""
             if sys.version_info > (3,):
@@ -105,12 +100,7 @@ class Backuplogger(object):
         self.msg = ''
 
     def commit_to_blob(self, logbloburi):
-        UploadStatusAndLog = self.hutil.get_value_from_configfile('UploadStatusAndLog')
-        try:
-            UploadStatusAndLog_str = str(UploadStatusAndLog)
-        except ValueError:
-            self.logger.log('BackupLogger : Could not find a valid value for UploadStatusAndLog, defaulting to True', True, 'Warning')
-            UploadStatusAndLog = 'True'
+        UploadStatusAndLog = self.hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')
         if (UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
             log_to_blob = ""
             blobWriter = BlobWriter(self.hutil)
