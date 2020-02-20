@@ -341,7 +341,7 @@ def daemon():
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            #exit_if_same_taskId(para_parser.taskId) 
+            exit_if_same_taskId(para_parser.taskId) 
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
         
@@ -539,7 +539,7 @@ def enable():
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
-        #hutil.exit_if_same_seq()
+        hutil.exit_if_same_seq()
 
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
