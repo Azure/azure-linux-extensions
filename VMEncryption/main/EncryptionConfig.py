@@ -21,7 +21,11 @@ import datetime
 import os.path
 
 from Common import CommonVariables
-from configparser import ConfigParser
+try:
+    from configparser import ConfigParser #python3+
+except ImportError:
+    import ConfigParser #python2
+
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
 

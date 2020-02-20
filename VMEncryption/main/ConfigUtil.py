@@ -18,7 +18,10 @@
 
 import os.path
 from Common import *
-from configparser import *
+try:
+    from configparser import ConfigParser #python3+
+except ImportError:
+    import ConfigParser #python2
 from io import open
 
 class ConfigKeyValuePair(object):
