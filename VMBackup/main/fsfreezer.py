@@ -84,7 +84,7 @@ class FreezeHandler(object):
 
         SafeFreezeWaitInSecondsDefault = 66
 
-        proc_sleep_time = self.hutil.get_intvalue_from_configfile('SafeFreezeWaitInSeconds',66)
+        proc_sleep_time = self.hutil.get_intvalue_from_configfile('SafeFreezeWaitInSeconds',SafeFreezeWaitInSecondsDefault)
         
         if(proc_sleep_time == None or proc_sleep_time == ''):
             proc_sleep_time = SafeFreezeWaitInSecondsDefault
