@@ -16,6 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
 import os
 import os.path
 import signal
@@ -30,8 +34,7 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 import watcherutil
 import shutil
 
@@ -68,12 +71,15 @@ SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 ExtensionStateSubdirectory = 'state'
 
 # Commands
-# Always use upgrade - will handle install if scx, omi are not installed or
-# upgrade if they are
+# Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
+# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
+# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
@@ -300,7 +306,7 @@ def get_free_space_mb(dirname):
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return st.f_bavail * st.f_frsize / 1024 / 1024
+    return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
@@ -334,7 +340,7 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
+    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
     watcher_thread = Thread(target = watcher.watch)
     self_mon_thread = Thread(target = watcher.monitor_health)
@@ -633,11 +639,11 @@ def remove_workspace_configuration():
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
-    req = urllib2.Request(VMResourceIDMetadataEndpoint)
+    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
-        response = json.loads(urllib2.urlopen(req).read())
+        response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
             return None #classic vm
@@ -647,7 +653,7 @@ def get_vmresourceid_from_metadata():
         else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from Metadata service: ' \
@@ -786,7 +792,7 @@ def is_vm_supported_for_extension():
             return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
-    for supported_dist in supported_dists.keys():
+    for supported_dist in list(supported_dists.keys()):
         if not vm_dist.lower().startswith(supported_dist):
             continue
 
@@ -854,6 +860,9 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
 
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
+        if sys.version_info >= (3,): # in python 3, base64.b64encode will return bytes, so decode to str for comparison
+            encoded_key = encoded_key.decode()
+
         if encoded_key != workspace_key:
             raise InvalidParameterError('Workspace key is invalid')
     except TypeError:
@@ -1412,8 +1421,8 @@ def get_settings():
             hutil_log_error('Unable to load handler settings from ' \
                             '{0}'.format(settings_path))
 
-        if (h_settings.has_key('protectedSettings')
-                and h_settings.has_key('protectedSettingsCertThumbprint')
+        if ('protectedSettings' in h_settings
+                and 'protectedSettingsCertThumbprint' in h_settings
                 and h_settings['protectedSettings'] is not None
                 and h_settings['protectedSettingsCertThumbprint'] is not None):
             encoded_settings = h_settings['protectedSettings']
@@ -1593,15 +1602,15 @@ def get_tenant_id_from_metadata_api(vm_resource_id):
     """
     tenant_id = None
     metadata_endpoint = get_metadata_api_endpoint(vm_resource_id)
-    metadata_request = urllib2.Request(metadata_endpoint)
+    metadata_request = urllib.request.Request(metadata_endpoint)
     try:
         # This request should fail with code 401
-        metadata_response = urllib2.urlopen(metadata_request)
+        metadata_response = urllib.request.urlopen(metadata_request)
         hutil_log_info('Request to Metadata API did not fail as expected; ' \
                        'attempting to use headers from response to ' \
                        'determine Tenant ID')
         metadata_headers = metadata_response.headers
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         metadata_headers = e.headers
 
     if metadata_headers is not None and 'WWW-Authenticate' in metadata_headers:
@@ -1645,7 +1654,7 @@ def get_metadata_api_endpoint(vm_resource_id):
     metadata_url = 'https://management.azure.com/subscriptions/{0}' \
                    '/resourceGroups/{1}'.format(subscription_id,
                                                 resource_group)
-    metadata_data = urllib.urlencode({'api-version' : '2016-09-01'})
+    metadata_data = urllib.parse.urlencode({'api-version' : '2016-09-01'})
     metadata_endpoint = '{0}?{1}'.format(metadata_url, metadata_data)
     return metadata_endpoint
 
@@ -1671,13 +1680,13 @@ def get_access_token(tenant_id, resource):
                                 '{0}'.format(tenant_id),
                   'resource' : resource
     }
-    oauth_request = urllib2.Request(listening_url + '/oauth2/token',
-                                    urllib.urlencode(oauth_data))
+    oauth_request = urllib.request.Request(listening_url + '/oauth2/token',
+                                    urllib.parse.urlencode(oauth_data))
     oauth_request.add_header('Metadata', 'true')
     try:
-        oauth_response = urllib2.urlopen(oauth_request)
+        oauth_response = urllib.request.urlopen(oauth_request)
         oauth_response_txt = oauth_response.read()
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to ManagedIdentity extension listening URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from ManagedIdentity extension: ' \
@@ -1712,7 +1721,7 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
                 'JwtToken' : access_token
     }
     oms_request_json = json.dumps(oms_data)
-    oms_request = urllib2.Request(OMSServiceValidationEndpoint)
+    oms_request = urllib.request.Request(OMSServiceValidationEndpoint)
     oms_request.add_header('Content-Type', 'application/json')
 
     retries = 5
@@ -1725,9 +1734,9 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
     # provisioning has been accepted
     while try_count <= retries:
         try:
-            oms_response = urllib2.urlopen(oms_request, oms_request_json)
+            oms_response = urllib.request.urlopen(oms_request, oms_request_json)
             oms_response_txt = oms_response.read()
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
             hutil_log_info('Response from OMS: {0}'.format(e.read()))
             raise OMSServiceOneClickException('ValidateMachineIdentity ' \
