@@ -148,7 +148,7 @@ def verifyShellBundleSigningAndChecksum():
     dscGPGKeyFilePath = os.path.join(keys_directory, 'dscgpgkey.asc')
     if not os.path.isfile(dscGPGKeyFilePath):
         raise Exception("Unable to find the dscgpgkey.asc file at " + dscGPGKeyFilePath)
-    
+
     importGPGKeyCommand = "sh ImportGPGkey.sh " + dscGPGKeyFilePath
     exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip)
 
@@ -235,7 +235,7 @@ def main():
     exit_code = check_disk_space_availability()
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
-        log_and_exit(operation, exit_code, message)   
+        log_and_exit(operation, exit_code, message)
 
     # Verify shell bundle signing
     try:
@@ -281,10 +281,10 @@ def main():
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
-     
+
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)   
-        
+    log_and_exit(operation, exit_code, message)
+
 def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
@@ -299,7 +299,7 @@ def check_disk_space_availability():
     except:
         print('Failed to check disk usage.')
         return 0
-        
+
 
 def get_free_space_mb(dirname):
     """
@@ -350,21 +350,21 @@ def telemetry():
 
     watcher_thread.join()
     self_mon_thread.join()
- 
-    return 0, ""   
+
+    return 0, ""
 
 def prepare_update():
     """
     Copy / move configuration directory to the backup
     """
 
-    # First check if backup directory was previously created for given workspace. 
-    # If it is created with all the files , we need not move the files again. 
+    # First check if backup directory was previously created for given workspace.
+    # If it is created with all the files , we need not move the files again.
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)        
-    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)        
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
+    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
 
@@ -378,10 +378,10 @@ def restore_state(workspaceId):
         etc_backup_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
         etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
         if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
-            shutil.move(etc_backup_path, etc_final_path)        
+            shutil.move(etc_backup_path, etc_final_path)
     except Exception as e:
         hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
-       
+
 
 def install():
     """
@@ -399,7 +399,7 @@ def install():
     workspaceId = public_settings.get('workspaceId')
     check_workspace_id(workspaceId)
 
-    # Take the backup of the state for given workspace. 
+    # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
@@ -420,7 +420,7 @@ def install():
     exit_code, output = run_command_with_retries_output(cmd, retries = 15,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
-    
+
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -556,15 +556,15 @@ def enable():
             uid = pwd.getpwnam(AgentUser).pw_uid
             gid = grp.getgrnam(AgentGroup).gr_gid
             os.chown(etc_final_path, uid, gid)
-            os.system('chmod {1} {0}'.format(etc_final_path, 750))            
+            os.system('chmod {1} {0}'.format(etc_final_path, 750))
 
             for root, dirs, files in os.walk(etc_final_path):
                 for d in dirs:
                     os.chown(os.path.join(root, d), uid, gid)
-                    os.system('chmod {1} {0}'.format(os.path.join(root, d), 750))                    
+                    os.system('chmod {1} {0}'.format(os.path.join(root, d), 750))
                 for f in files:
                     os.chown(os.path.join(root, f), uid, gid)
-                    os.system('chmod {1} {0}'.format(os.path.join(root, f), 640))                                      
+                    os.system('chmod {1} {0}'.format(os.path.join(root, f), 640))
     except:
         hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
@@ -618,7 +618,7 @@ def remove_workspace_configuration():
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
-    
+
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
@@ -720,7 +720,7 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            
+
             logFileName = 'extension.log'
             if (operation == 'Telemetry'):
                 logFileName = 'watcher.log'
@@ -890,7 +890,7 @@ def detect_multiple_connections(workspace_id):
         # default encoding in python is ascii in python < 3
         if sys.version_info < (3,):
             output = utfoutput.decode('utf8').encode('utf8')
-        
+
         if output.strip().lower() != 'no workspace':
             for line in output.split('\n'):
                 if workspace_id in line:
@@ -1097,15 +1097,15 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
-        
-    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
-    # take only the last 100 characters as extension cuts off after that	
-    try:	
-        if exit_code is not 0:	
-            sys.stderr.write(output[-500:])        
+
+    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB
+    # take only the last 100 characters as extension cuts off after that
+    try:
+        if exit_code is not 0:
+            sys.stderr.write(output[-500:])
 
         # For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log
-        if exit_code is 17:            
+        if exit_code is 17:
             if "Failed dependencies:" in output:
                 # 52 is the exit code for missing dependency
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
@@ -1115,17 +1115,17 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # 52 is the exit code for missing dependency
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
             elif "Errors were encountered while processing:" in output:
                 # 52 is the exit code for missing dependency
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "There seems to be an issue while processing triggers in systemd. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "There seems to be an issue while processing triggers in systemd. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
             elif "Cannot allocate memory" in output:
                 # 52 is the exit code for missing dependency
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 19:
             if "rpmdb" in output or "cannot open Packages database" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "error: dpkg status database is locked by another process" in output:
                 # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
@@ -1138,30 +1138,30 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 33:
             if "Permission denied" in output:
                 # Enable failures
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 5:
             if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53     
-                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                exit_code = 53
+                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 8:
             if "Check the correctness of the workspace ID and shared key" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53                   
-                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
-        
-        if exit_code is not 0 and exit_code is not 52:	
+                exit_code = 53
+                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+
+        if exit_code is not 0 and exit_code is not 52:
             if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output:
                 # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
@@ -1173,16 +1173,16 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
+                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
             if "Permission denied" in output:
                 # Enable failures
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"            
-    except:	
-        hutil_log_info('Failed to write output to STDERR')	
-  
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    except:
+        hutil_log_info('Failed to write output to STDERR')
+
     return exit_code, output
 
 
