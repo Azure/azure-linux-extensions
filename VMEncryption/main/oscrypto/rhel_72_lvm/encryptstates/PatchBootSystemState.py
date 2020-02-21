@@ -67,6 +67,8 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('mount /dev/rootvg/optlv /oldroot/opt', True)
 
         self.command_executor.Execute('mount /boot', False)
+        # Try mounting /boot/efi for UEFI image support
+        self.command_executor.Execute('mount /boot/efi', False)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('mkdir /oldroot/memroot', True)
         self.command_executor.Execute('pivot_root /oldroot /oldroot/memroot', True)
