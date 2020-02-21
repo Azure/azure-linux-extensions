@@ -35,7 +35,7 @@ class CommandExecutor(object):
         self.logger = logger
 
     def get_text(self, s):
-        # decode bytes to string in python3 context
+        # decode data to str in python3, or leave as str in python2
         try:
             basestring
         except NameError:

@@ -19,7 +19,8 @@
 import os
 import os.path
 import traceback
-from ConfigUtil import *
+from ConfigUtil import ConfigUtil
+from ConfigUtil import ConfigKeyValuePair
 from Common import CommonVariables
 
 class EncryptionMarkConfig(object):

@@ -19,13 +19,14 @@
 import os
 import datetime
 import os.path
+import sys
 
 from Common import CommonVariables
 try:
     from configparser import ConfigParser #python3+
 except ImportError:
     import ConfigParser #python2
-
+    
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
 
@@ -58,14 +59,33 @@ class EncryptionConfig(object):
     def get_secret_seq_num(self):
         return self.encryption_config.get_config(CommonVariables.SecretSeqNum)
 
+
+    def get_unicode(self, s):
+        if (sys.version_info > (3, 0)):
+            return s  #python 3+
+        else:
+            return s.decode('unicode-escape').encode('latin1').decode('utf-8')  # python2
+
     def commit(self):
         key_value_pairs = []
-        command = ConfigKeyValuePair(CommonVariables.PassphraseFileNameKey, self.passphrase_file_name)
+
+        # ensure unicode for python2 + python3 consistency
+        u_pfn_key = self.get_unicode(CommonVariables.PassphraseFileNameKey)
+        u_pfn_val = self.get_unicode(self.passphrase_file_name)
+        u_vol_key = self.get_unicode(CommonVariables.VolumeTypeKey)
+        u_vol_val = self.get_unicode(self.volume_type)
+        u_seq_key = self.get_unicode(CommonVariables.SecretSeqNum)
+        u_seq_val = self.get_unicode(self.secret_seq_num)
+        
+        # construct kvp collection
+        command = ConfigKeyValuePair(u_pfn_key, u_pfn_val)
         key_value_pairs.append(command)
-        volume_type = ConfigKeyValuePair(CommonVariables.VolumeTypeKey, self.volume_type)
+        volume_type = ConfigKeyValuePair(u_vol_key, u_vol_val)
         key_value_pairs.append(volume_type)
-        parameters = ConfigKeyValuePair(CommonVariables.SecretSeqNum, self.secret_seq_num)
+        parameters = ConfigKeyValuePair(u_seq_key, u_seq_val)
         key_value_pairs.append(parameters)
+
+        # save settings in the configuration file
         self.encryption_config.save_configs(key_value_pairs)
 
     def clear_config(self, clear_parameter_file=False):
