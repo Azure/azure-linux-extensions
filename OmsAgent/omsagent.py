@@ -71,12 +71,15 @@ SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 ExtensionStateSubdirectory = 'state'
 
 # Commands
-# Always use upgrade - will handle install if scx, omi are not installed or
-# upgrade if they are
+# Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
+# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
+# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
