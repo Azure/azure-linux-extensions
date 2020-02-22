@@ -134,12 +134,12 @@ except:
 
 """
 What need to be packaged to make the signing work:
-├── keys
-│   ├── dscgpgkey.asc
-│   └── msgpgkey.asc
-├── packages
-│   ├── omsagent-*.universal.x64.asc
-│   ├── omsagent-*.universal.x64.sha256sums
+    keys
+        dscgpgkey.asc
+        msgpgkey.asc
+    packages
+        omsagent-*.universal.x64.asc
+        omsagent-*.universal.x64.sha256sums
 """
 def verifyShellBundleSigningAndChecksum():
     cert_directory = os.path.join(os.getcwd(), PackagesDirectory)
