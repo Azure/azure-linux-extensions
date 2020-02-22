@@ -26,7 +26,7 @@ try:
     from configparser import ConfigParser #python3+
 except ImportError:
     import ConfigParser #python2
-    
+
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
 
@@ -61,6 +61,9 @@ class EncryptionConfig(object):
 
 
     def get_unicode(self, s):
+        if s is None:
+            return u""
+
         if (sys.version_info > (3, 0)):
             return s  #python 3+
         else:
