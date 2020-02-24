@@ -86,12 +86,7 @@ class FreezeHandler(object):
 
         proc_sleep_time = self.hutil.get_intvalue_from_configfile('SafeFreezeWaitInSeconds',SafeFreezeWaitInSecondsDefault)
         
-        if(proc_sleep_time == None or proc_sleep_time == ''):
-            proc_sleep_time = SafeFreezeWaitInSecondsDefault
-
-        proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
-        
-        for i in range(0,(int(proc_sleep_time_int/2))):
+        for i in range(0,(int(proc_sleep_time/2))):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
