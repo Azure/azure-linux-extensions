@@ -335,7 +335,6 @@ class HandlerUtility:
         return value
 
     def get_strvalue_from_configfile(self, key, default):
-        global backup_logger
         value = get_value_from_configfile(key)
         
         if (value == None or value == '')
@@ -350,13 +349,12 @@ class HandlerUtility:
         return value
 
     def get_intvalue_from_configfile(self, key, default):
-        global backup_logger
         value = default
         value = get_value_from_configfile(key)
         
         if (value == None or value == '')
             value = default
-        
+
         try :
             value_int = int(value)
         except ValueError :
