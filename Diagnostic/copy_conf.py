@@ -10,9 +10,9 @@ name_map = {
 "percentprivilegedtime" : {"plugin":"cpu", "field":"usage_system"},
 
 "bytesreceived" : {"plugin":"net", "field":"bytes_recv"},
-# "bytestotal" : {"plugin":"net", "field":""},
+# "bytestotal" : {"plugin":"net", "field":"butes_recv + bytes_sent"}, #Need to calculate sum
 "bytestransmitted" : {"plugin":"net", "field":"bytes_sent"},
-# "totalcollisions" : {"plugin":"net", "field":""},
+# "totalcollisions" : {"plugin":"net", "field":"drop_in + drop_out"}, #Need to calculate sum
 "totalrxerrors" : {"plugin":"net", "field":"err_in"},
 "packetstransmitted" : {"plugin":"net", "field":"packets_sent"},
 "packetsreceived" : {"plugin":"net", "field":"packets_recv"},
@@ -24,7 +24,7 @@ name_map = {
 "percentusedmemory" : {"plugin":"mem", "field":"used_percent"}, 
 
 "availableswap" : {"plugin":"swap", "field":"free"},
-# "percentavailableswap" : {"plugin":"swap", "field":"available"}, 
+# "percentavailableswap" : {"plugin":"swap", "field":"available"}, #Need to calculate percentage
 "usedswap" : {"plugin":"swap", "field":"used"}, 
 "percentusedswap" : {"plugin":"swap", "field":"used_percent"},
 
@@ -32,10 +32,32 @@ name_map = {
 # "pageswrittenpersec" : {"plugin":"kernel", "field":"disk_pages_out"},
 # "pagespersec" : {"plugin":"kernel", "field":""},
 
+#OMI Filesystem plugin
+"usedspace" : {"plugin":"disk", "field":"used"},
+"percentusedspace" : {"plugin":"disk", "field":"used_percent"},
+"freespace" : {"plugin":"disk", "field":"free"},
+# "percentfreespace" : {"plugin":"disk", "field":"disk_pages_in"}, #Need to calculate percentage
+# "percentfreeinodes" : {"plugin":"disk", "field":"inodes_free"}, #Need to calculate percentage
+# "percentusedinodes" : {"plugin":"disk", "field":"inodes_used"}, #Need to calculate percentage
+
+# "transferspersecond" : {"plugin":"diskio", "field":"reads + writes"}, #Need to calculate sum
+"bytesreadpersecond" : {"plugin":"diskio", "field":"read_bytes", "extra":"diff"}, #Need to calculate diff (but each second not each interval)
+# "bytespersecond" : {"plugin":"diskio", "field":"read_bytes + write_bytes"}, #Need to calculate diff and then sum
+"byteswrittenpersecond" : {"plugin":"diskio", "field":"write_bytes", "extra":"diff"}, #Need to calculate diff (but each second not each interval)
+"readspersecond" : {"plugin":"diskio", "field":"reads", "extra":"diff"}, #Need to calculate diff (but each second not each interval)
+"writespersecond" : {"plugin":"diskio", "field":"writes", "extra":"diff"}, #Need to calculate diff (but each second not each interval)
+
+#OMI Disk plugin 
+# "readbytespersecond" :
+# "writebytespersecond" :
+# "bytespersecond" :
+# "readspersecond" : 
+# "writespersecond" :
 # "transferspersecond" :
-# "usedspace" :
-# "percentfreespace" :
-# "percentusedspace" :
+# "averagereadtime" :
+# "averagewritetime" : 
+# "averagetransfertime" :
+# "averagediskqueuelength" : 
 
 }
 
@@ -150,6 +172,3 @@ Sample telegraf TOML file output
   interval = "15s"
 
 """
-
-
- 
