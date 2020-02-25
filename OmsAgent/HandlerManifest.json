@@ -10,7 +10,8 @@
       "disableCommand": "omsagent_shim.sh -disable",
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
-      "updateMode": "UpdateWithInstall"
+      "updateMode": "UpdateWithInstall",
+      "stopOnMultipleConnections": "true"
     }
   }
 ]
