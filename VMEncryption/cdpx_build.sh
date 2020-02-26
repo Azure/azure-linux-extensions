@@ -18,14 +18,14 @@ echo "ADE source folder: " + $PWD
 # BUGBUG: Keeping the static version until we figure out the versioning strategy (PBI 6218633)
 # echo CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS > main/version.txt
 
-# updating extension_name.txt file from CDPx environment variable if defined
-echo "Extension name variable: $ADE_EXTENSION_NAME_OVERRIDE"
+# Extension name overried if specified in the YAML file
+echo "Extension name: [$1]"
 
-if [ -v ADE_EXTENSION_NAME_OVERRIDE ]
+if [ "$1" ]
 then
-    echo $ADE_EXTENSION_NAME_OVERRIDE > main/extension_name.txt
+    echo "$1" > main/extension_name.txt
 else
-    echo "Variable ADE_EXTENSION_NAME_OVERRIDE doesn't have any value"
+    echo "No extension name specified"
 fi
 
 # invoking Python packaging
