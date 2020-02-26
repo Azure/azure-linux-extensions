@@ -142,6 +142,7 @@ class FsFreezer:
         mounts_to_skip = None
         try:
             mounts_to_skip = self.hutil.get_value_from_configfile('MountsToSkip')
+            self.logger.log("skipped mount :" + str(mounts_to_skip), True)
         except Exception as e:
             errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
@@ -170,7 +171,7 @@ class FsFreezer:
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
-            if(mounts_to_skip == '/'):
+            if(mounts_to_skip == '/'): #for continue logging to avoid out of memory issue
                 self.logger.enforce_local_flag(True)
             else:
                 self.logger.enforce_local_flag(False) 
