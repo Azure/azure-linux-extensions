@@ -18,11 +18,17 @@
 
 import os
 
-def get_build_version_from_file():
-    # Note, version.txt is expected to be within the same directory as this file
-    file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'version.txt')
+def get_config_value_from_file(file_name):
+    # Note,the config file is expected to be within the same directory as this file
+    file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name)
     if not os.path.exists(file_path):
         raise IOError('Unexpected: version.txt file cannot be found at [%s]' % file_path)
     
     with open(file_path) as text_file:
         return text_file.read()
+
+def get_build_version():
+    return get_config_value_from_file('version.txt')
+
+def get_extension_name():
+    return get_config_value_from_file('extension_name.txt')
