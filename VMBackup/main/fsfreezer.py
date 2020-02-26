@@ -139,6 +139,13 @@ class FsFreezer:
         error_msg=''
         timedout = False
         self.skip_freeze = True 
+        mounts_to_skip = None
+        try:
+            mounts_to_skip = self.hutil.get_value_from_configfile('MountsToSkip')
+            self.logger.log("skipped mount :" + str(mounts_to_skip), True)
+        except Exception as e:
+            errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg,True,'Warning')
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
@@ -149,7 +156,7 @@ class FsFreezer:
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.mount_point and not self.should_skip(mount)):
+                elif(mount.mount_point != mounts_to_skip and not self.should_skip(mount)):
                     if(self.skip_freeze == True):
                         self.skip_freeze = False
                     args.append(str(mount.mount_point))
@@ -164,7 +171,10 @@ class FsFreezer:
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
-            self.logger.enforce_local_flag(False) 
+            if(mounts_to_skip == '/'): #for continue logging to avoid out of memory issue
+                self.logger.enforce_local_flag(True)
+            else:
+                self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
