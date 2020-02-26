@@ -13,6 +13,9 @@ class TestConfigFromFile(unittest.TestCase):
         expected_extension_name = self.__get_expected_config_value_from_file('extension_name.txt')
         self.assertEquals(expected_extension_name, extension_name)
 
+    def test_config_file_missing(self):
+        self.assertRaises(IOError, self.__get_expected_config_value_from_file, 'foo.txt')
+
     def __get_expected_config_value_from_file(self, file_name):
         # note, the config text file is expected to be in the same folder as ConfigFromFile module.
         config_file_path = os.path.join(os.path.dirname(main.ConfigFromFile.__file__), file_name)

@@ -18,7 +18,7 @@ echo "ADE source folder: " + $PWD
 # BUGBUG: Keeping the static version until we figure out the versioning strategy (PBI 6218633)
 # echo CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS > main/version.txt
 
-# Extension name overried if specified in the YAML file
+# Extension name override if specified in the YAML file
 echo "Extension name: [$1]"
 
 if [ "$1" ]
