@@ -16,7 +16,7 @@ arc=0
 if [ $1 != "enable"]
 then
 	echo "`date`- The command is $1, exiting" >> $logfile
-	exit arc
+	exit $arc
 
 if [ -f "/usr/bin/python2.7" ]
 then
