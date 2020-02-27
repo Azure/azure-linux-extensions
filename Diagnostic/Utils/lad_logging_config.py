@@ -360,7 +360,7 @@ class LadLoggingConfig:
 {tag_regex_cfg_line}    num_threads 1
     buffer_chunk_limit 1000k
     buffer_type file
-    buffer_path /var/opt/microsoft/omsagent/state/out_mdsd*.buffer
+    buffer_path /var/opt/microsoft/omsagent/LAD/state/out_mdsd*.buffer
     buffer_queue_limit 128
     flush_interval 10s
     retry_limit 3

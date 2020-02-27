@@ -19,6 +19,7 @@
 import os
 import re
 import platform
+import traceback
 
 from patch.UbuntuPatching import UbuntuPatching
 from patch.debianPatching import debianPatching
@@ -29,6 +30,7 @@ from patch.oraclePatching import oraclePatching
 from patch.KaliPatching import KaliPatching
 from patch.DefaultPatching import DefaultPatching
 from patch.FreeBSDPatching import FreeBSDPatching
+from patch.NSBSDPatching import NSBSDPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
@@ -36,6 +38,10 @@ def DistInfo():
         if 'FreeBSD' in platform.system():
             release = re.sub('\-.*\Z', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
+            return distinfo
+        if 'NS-BSD' in platform.system():
+            release = re.sub('\-.*\Z', '', str(platform.release()))
+            distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
             distinfo = list(platform.linux_distribution(full_distribution_name=0))
@@ -71,6 +77,9 @@ def GetMyPatching(logger):
     else: # I know this is not Linux!
         if 'FreeBSD' in platform.system():
             Distro = platform.system()
+        if 'NS-BSD' in platform.system():
+            Distro = platform.system()
+            Distro = Distro.replace("-", "")
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
     orig_distro = Distro
