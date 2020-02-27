@@ -154,19 +154,22 @@ for plugin in telegraf_conf:
         if int(new_interval[:-1]) < int(min_interval[:-1]): 
             min_interval = new_interval
         
-        #Add respective rename processor plugin based on the displayname
-        rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
-        rename_str += " "*4 + "field = \"" + field + "\"\n"
-        rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["fields"][field]["displayName"] + "\"\n"
-
         #compute values for aggregator options
         if "op" in telegraf_conf[plugin]["fields"][field]:
             aggregate = True
             if telegraf_conf[plugin]["fields"][field]["op"] not in ops:
                 ops += "\"" +  telegraf_conf[plugin]["fields"][field]["op"] + "\", "
-            ops_fields += "\"" +  telegraf_conf[plugin]["fields"][field]["displayName"] + "\", "
+            ops_fields += "\"" +  field + "\", "
             twiceminperiod = str(int(min_interval[:-1])*2)
 
+        #Add respective rename processor plugin based on the displayname
+        rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
+        if "op" in telegraf_conf[plugin]["fields"][field]:
+            rename_str += " "*4 + "field = \"" + field + "_diff\"\n"
+            rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["fields"][field]["displayName"] + "\"\n"
+        else:
+            rename_str += " "*4 + "field = \"" + field + "\"\n"
+            rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["fields"][field]["displayName"] + "\"\n"
 
     #Add respective operations for aggregators
     if aggregate:
