@@ -1,7 +1,7 @@
 [
   {
     "name":  "AzureAttestationLinuxAgent",
-    "version": "0.1",
+    "version": "1.0",
     "handlerManifest": {
       "installCommand": "agent.py -install",
       "uninstallCommand": "agent.py -uninstall",
