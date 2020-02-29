@@ -9,28 +9,28 @@ name_map = {
 "percentidletime" : {"plugin":"cpu", "field":"usage_idle"},
 "percentprivilegedtime" : {"plugin":"cpu", "field":"usage_system"},
 
-"bytesreceived" : {"plugin":"net", "field":"bytes_recv"},
-# "bytestotal" : {"plugin":"net", "field":"butes_recv + bytes_sent"}, #Need to calculate sum
-"bytestransmitted" : {"plugin":"net", "field":"bytes_sent"},
-# "totalcollisions" : {"plugin":"net", "field":"drop_in + drop_out"}, #Need to calculate sum
-"totalrxerrors" : {"plugin":"net", "field":"err_in"},
-"packetstransmitted" : {"plugin":"net", "field":"packets_sent"},
-"packetsreceived" : {"plugin":"net", "field":"packets_recv"},
-"totaltxerrors" : {"plugin":"net", "field":"err_out"},
+# "bytesreceived" : {"plugin":"net", "field":"bytes_recv"},
+# # "bytestotal" : {"plugin":"net", "field":"butes_recv + bytes_sent"}, #Need to calculate sum
+# "bytestransmitted" : {"plugin":"net", "field":"bytes_sent"},
+# # "totalcollisions" : {"plugin":"net", "field":"drop_in + drop_out"}, #Need to calculate sum
+# "totalrxerrors" : {"plugin":"net", "field":"err_in"},
+# "packetstransmitted" : {"plugin":"net", "field":"packets_sent"},
+# "packetsreceived" : {"plugin":"net", "field":"packets_recv"},
+# "totaltxerrors" : {"plugin":"net", "field":"err_out"},
 
-"availablememory" : {"plugin":"mem", "field":"available"},
-"percentavailablememory" : {"plugin":"mem", "field":"available_percent"},
-"usedmemory" : {"plugin":"mem", "field":"used"},
-"percentusedmemory" : {"plugin":"mem", "field":"used_percent"}, 
+# "availablememory" : {"plugin":"mem", "field":"available"},
+# "percentavailablememory" : {"plugin":"mem", "field":"available_percent"},
+# "usedmemory" : {"plugin":"mem", "field":"used"},
+# "percentusedmemory" : {"plugin":"mem", "field":"used_percent"}, 
 
-"availableswap" : {"plugin":"swap", "field":"free"},
-# "percentavailableswap" : {"plugin":"swap", "field":"available"}, #Need to calculate percentage
-"usedswap" : {"plugin":"swap", "field":"used"}, 
-"percentusedswap" : {"plugin":"swap", "field":"used_percent"},
+# "availableswap" : {"plugin":"swap", "field":"free"},
+# # "percentavailableswap" : {"plugin":"swap", "field":"available"}, #Need to calculate percentage
+# "usedswap" : {"plugin":"swap", "field":"used"}, 
+# "percentusedswap" : {"plugin":"swap", "field":"used_percent"},
 
-# "pagesreadpersec": {"plugin":"kernel", "field":"disk_pages_in"},
-# "pageswrittenpersec" : {"plugin":"kernel", "field":"disk_pages_out"},
-# "pagespersec" : {"plugin":"kernel", "field":""},
+# "pagesreadpersec": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"diff"},
+# "pageswrittenpersec" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"diff"},
+# # "pagespersec" : {"plugin":"kernel", "field":""},
 
 #OMI Filesystem plugin
 "usedspace" : {"plugin":"disk", "field":"used"},
@@ -48,15 +48,15 @@ name_map = {
 "writespersecond" : {"plugin":"diskio", "field":"writes", "op":"diff"}, #Need to calculate diff (but each second not each interval)
 
 #OMI Disk plugin 
-# "readbytespersecond" :
-# "writebytespersecond" :
-# "bytespersecond" :
-# "readspersecond" : 
-# "writespersecond" :
+"readbytespersecond" : {"plugin":"diskio", "field":"read_bytes", "op":"diff"},
+"writebytespersecond" : {"plugin":"diskio", "field":"write_bytes", "op":"diff"},
+# "bytespersecond" : {"plugin":"diskio", "field":"read_bytes + write_bytes"},
+"readspersecond" : {"plugin":"diskio", "field":"reads", "op":"diff"}, #Need to calculate diff (but each second not each interval)
+"writespersecond" : {"plugin":"diskio", "field":"writes", "op":"diff"},
 # "transferspersecond" :
-# "averagereadtime" :
-# "averagewritetime" : 
-# "averagetransfertime" :
+"averagereadtime" : {"plugin":"diskio", "field":"read_time"},
+"averagewritetime" : {"plugin":"diskio", "field":"write_time"},
+"averagetransfertime" :{"plugin":"diskio", "field":"io_time"},
 # "averagediskqueuelength" : 
 
 }
@@ -77,7 +77,7 @@ Sample OMI metric json config taken from .settings file
 }
 """
 # settings = "/var/lib/waagent/Microsoft.Azure.Diagnostics.LinuxDiagnostic-3.0.125/config/0.settings"
-settings = "./test.settings"
+settings = "/home/nidhanda/git/azure-linux-extensions/Diagnostic/test.settings"
 data = ""
 telegraf_conf = {}
 with open(settings, 'r') as f:
@@ -85,18 +85,21 @@ with open(settings, 'r') as f:
     perfconf = data["runtimeSettings"][0]["handlerSettings"]["publicSettings"]["ladCfg"]["diagnosticMonitorConfiguration"]["performanceCounters"]["performanceCounterConfiguration"]
     for item in perfconf:
         counter = item["counter"]
+        print counter
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
-            if plugin not in telegraf_conf:
-                telegraf_conf[plugin] = {"fields" : {}, "displayName": item["class"]}
-            else:
-                telegraf_conf[plugin]["fields"][name_map[counter]["field"]] = {}
-                telegraf_conf[plugin]["fields"][name_map[counter]["field"]]["displayName"] = item["annotation"][0]["displayName"]
-                telegraf_conf[plugin]["fields"][name_map[counter]["field"]]["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S tp 15s
-                if "op" in name_map[counter]:
-                    telegraf_conf[plugin]["fields"][name_map[counter]["field"]]["op"] = name_map[counter]["op"]
-                # else:
-                #     telegraf_conf[plugin]["fields"][name_map[counter]["field"]]["op"] = ""
+            omiclass = item["class"]
+            if omiclass not in telegraf_conf:
+                telegraf_conf[omiclass] = {}
+            if plugin not in telegraf_conf[omiclass]:
+                telegraf_conf[omiclass][plugin] = {}
+            telegraf_conf[omiclass][plugin][name_map[counter]["field"]] = {}
+            telegraf_conf[omiclass][plugin][name_map[counter]["field"]]["displayName"] = item["annotation"][0]["displayName"]
+            telegraf_conf[omiclass][plugin][name_map[counter]["field"]]["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S tp 15s
+            if "op" in name_map[counter]:
+                telegraf_conf[omiclass][plugin][name_map[counter]["field"]]["op"] = name_map[counter]["op"]
+            # else:
+            #     telegraf_conf[plugin][plugin][name_map[counter]["field"]]["op"] = ""
 
 print telegraf_conf
 
@@ -135,54 +138,54 @@ Sample converted telegraf conf dict -
 input_str = ""
 rename_str = "[[processors.rename]]\n"
 aggregator_str = ""
-for plugin in telegraf_conf:
-    min_interval = "60s"
-    input_str += "[[inputs." + plugin + "]]\n"
-    rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-    rename_str += " "*4 + "measurement = \"" + str(plugin) +"\"\n" 
-    rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["displayName"] +"\"\n"
-    fields = ""
-    ops_fields = ""
-    ops = ""
-    twiceminperiod = ""
-    aggregate = False
-    for field in telegraf_conf[plugin]["fields"]:
-        fields += "\"" + field + "\", "
-        
-        #Use the shortest interval time for the whole plugin
-        new_interval = telegraf_conf[plugin]["fields"][field]["interval"]
-        if int(new_interval[:-1]) < int(min_interval[:-1]): 
-            min_interval = new_interval
-        
-        #compute values for aggregator options
-        if "op" in telegraf_conf[plugin]["fields"][field]:
-            aggregate = True
-            if telegraf_conf[plugin]["fields"][field]["op"] not in ops:
-                ops += "\"" +  telegraf_conf[plugin]["fields"][field]["op"] + "\", "
-            ops_fields += "\"" +  field + "\", "
-            twiceminperiod = str(int(min_interval[:-1])*2)
+for omiclass in telegraf_conf:
+    for plugin in telegraf_conf[omiclass]:
+        min_interval = "60s"
+        input_str += "[[inputs." + plugin + "]]\n"
+        input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
 
-        #Add respective rename processor plugin based on the displayname
-        rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
-        if "op" in telegraf_conf[plugin]["fields"][field]:
-            rename_str += " "*4 + "field = \"" + field + "_diff\"\n"
-            rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["fields"][field]["displayName"] + "\"\n"
-        else:
-            rename_str += " "*4 + "field = \"" + field + "\"\n"
-            rename_str += " "*4 + "dest = \"" + telegraf_conf[plugin]["fields"][field]["displayName"] + "\"\n"
+        fields = ""
+        ops_fields = ""
+        ops = ""
+        twiceminperiod = ""
+        aggregate = False
+        for field in telegraf_conf[omiclass][plugin]:
+            fields += "\"" + field + "\", "
+            
+            #Use the shortest interval time for the whole plugin
+            new_interval = telegraf_conf[omiclass][plugin][field]["interval"]
+            if int(new_interval[:-1]) < int(min_interval[:-1]): 
+                min_interval = new_interval
+            
+            #compute values for aggregator options
+            if "op" in telegraf_conf[omiclass][plugin][field]:
+                aggregate = True
+                if telegraf_conf[omiclass][plugin][field]["op"] not in ops:
+                    ops += "\"" +  telegraf_conf[omiclass][plugin][field]["op"] + "\", "
+                ops_fields += "\"" +  field + "\", "
+                twiceminperiod = str(int(min_interval[:-1])*2)
 
-    #Add respective operations for aggregators
-    if aggregate:
-        aggregator_str += "[[aggregators.basicstats]]\n"
-        aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
-        aggregator_str += " "*2 + "drop_original = false\n"
-        aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-        aggregator_str += " "*2 + "stats = [" + ops[:-2] + "]\n\n"  #-2 to strip the last comma and space
+            #Add respective rename processor plugin based on the displayname
+            rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
+            if "op" in telegraf_conf[omiclass][plugin][field]:
+                rename_str += " "*4 + "field = \"" + field + "_diff\"\n"
+                rename_str += " "*4 + "dest = \"" + telegraf_conf[omiclass][plugin][field]["displayName"] + "\"\n"
+            else:
+                rename_str += " "*4 + "field = \"" + field + "\"\n"
+                rename_str += " "*4 + "dest = \"" + telegraf_conf[omiclass][plugin][field]["displayName"] + "\"\n"
+
+        #Add respective operations for aggregators
+        if aggregate:
+            aggregator_str += "[[aggregators.basicstats]]\n"
+            aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
+            aggregator_str += " "*2 + "drop_original = false\n"
+            aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+            aggregator_str += " "*2 + "stats = [" + ops[:-2] + "]\n\n"  #-2 to strip the last comma and space
 
 
-    rename_str += "\n"
-    input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"  #Using fields[: -2] here to get rid of the last ", " at the end of the string
-    input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
+        rename_str += "\n"
+        input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"  #Using fields[: -2] here to get rid of the last ", " at the end of the string
+        input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
 
 
 
