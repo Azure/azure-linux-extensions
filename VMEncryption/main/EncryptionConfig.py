@@ -59,26 +59,29 @@ class EncryptionConfig(object):
     def get_secret_seq_num(self):
         return self.encryption_config.get_config(CommonVariables.SecretSeqNum)
 
-
-    def get_unicode(self, s):
+    def get_cfg_val(self, s):
+        # return a string type that is compatible with the version of config parser that is in use
         if s is None:
-            return u""
+            return ""
 
         if (sys.version_info > (3, 0)):
-            return s  #python 3+
+            return s  # python 3+ , preserve unicode
         else:
-            return s.decode('unicode-escape').encode('latin1').decode('utf-8')  # python2
+            if isinstance(s, unicode):
+                # python2 ConfigParser does not properly support unicode, convert to ascii
+                return s.encode('ascii', 'ignore')
+            else:
+                return s
 
     def commit(self):
         key_value_pairs = []
 
-        # ensure unicode for python2 + python3 consistency
-        u_pfn_key = self.get_unicode(CommonVariables.PassphraseFileNameKey)
-        u_pfn_val = self.get_unicode(self.passphrase_file_name)
-        u_vol_key = self.get_unicode(CommonVariables.VolumeTypeKey)
-        u_vol_val = self.get_unicode(self.volume_type)
-        u_seq_key = self.get_unicode(CommonVariables.SecretSeqNum)
-        u_seq_val = self.get_unicode(self.secret_seq_num)
+        u_pfn_key = CommonVariables.PassphraseFileNameKey
+        u_pfn_val = self.get_cfg_val(self.passphrase_file_name)
+        u_vol_key = CommonVariables.VolumeTypeKey
+        u_vol_val = self.get_cfg_val(self.volume_type)
+        u_seq_key = CommonVariables.SecretSeqNum
+        u_seq_val = self.get_cfg_val(self.secret_seq_num)
         
         # construct kvp collection
         command = ConfigKeyValuePair(u_pfn_key, u_pfn_val)
