@@ -23,7 +23,7 @@ echo "Extension name: [$1]"
 
 if [ "$1" ]
 then
-    echo "$1" > main/extension_name.txt
+    python -c "import main.CommonParameters; main.CommonParameters.inst.set_extension_name('$1'); main.CommonParameters.inst.save()"
 else
     echo "No extension name specified"
 fi
