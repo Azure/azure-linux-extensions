@@ -10,6 +10,6 @@
             "updateCommand": "main/handle.sh update"
         }, 
         "name": "MyBackupTestLinuxInt", 
-        "version": "1.0.9121.0"
+        "version": "1.0.9120.0"
     }
 ]
