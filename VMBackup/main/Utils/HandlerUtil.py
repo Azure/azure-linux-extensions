@@ -154,7 +154,7 @@ class HandlerUtility:
                 pass
 
     def log_with_no_try_except(self, message, level='Info'):
-        WriteLog = self.get_value_from_configfile('WriteLog')
+        WriteLog = self.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             if sys.version_info > (3,):
                 if self.logging_file is not None:
@@ -318,6 +318,7 @@ class HandlerUtility:
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
+
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -332,6 +333,35 @@ class HandlerUtility:
             pass
 
         return value
+
+    def get_strvalue_from_configfile(self, key, default):
+        value = get_value_from_configfile(key)
+        
+        if (value == None or value == '')
+            value = default
+
+        try :
+            value_str = str(value)
+        except ValueError :
+            self.log('Not able to parse the read value as string, falling back to default value', True, 'Warning')
+            value = default
+
+        return value
+
+    def get_intvalue_from_configfile(self, key, default):
+        value = default
+        value = get_value_from_configfile(key)
+        
+        if (value == None or value == '')
+            value = default
+
+        try :
+            value_int = int(value)
+        except ValueError :
+            self.log('Not able to parse the read value as int, falling back to default value', True, 'Warning')
+            value = default
+
+        return int(value)
  
     def set_value_to_configfile(self, key, value):
         configfile = '/etc/azure/vmbackup.conf'

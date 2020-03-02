@@ -81,7 +81,7 @@ class FreezeSnapshotter(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
+                snapshotMethodConfigValue = self.hutil.get_strvalue_from_configfile(CommonVariables.SnapshotMethod,'firstHostThenGuest')
                 self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
                 if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
                     self.takeSnapshotFrom = snapshotMethodConfigValue
@@ -122,6 +122,9 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
+        else :
+            self.logger.log('Snapshot method did not match any listed type, taking  firstHostThenGuest as default')
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
 
         self.logger.log('doFreezeSnapshot : run_result - {0} run_status - {1} all_failed - {2} unable_to_sleep - {3} is_inconsistent - {4} values post snapshot'.format(str(run_result), str(run_status), str(all_failed), str(unable_to_sleep), str(is_inconsistent)))
 
@@ -203,17 +206,8 @@ class FreezeSnapshotter(object):
 
     def freeze(self):
         try:
-            timeout = self.hutil.get_value_from_configfile('timeout')
-            if(timeout == None):
-                timeout = str(60)
+            timeout = self.hutil.get_intvalue_from_configfile('timeout',60)
             self.logger.log('T:S freeze, timeout value ' + str(timeout))
-            timeout_int = 60
-            try:
-                timeout_int = int(timeout)
-            except ValueError:
-                self.logger.log('T:S freeze, timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
-                timeout_int = 60
-                timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
             freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()

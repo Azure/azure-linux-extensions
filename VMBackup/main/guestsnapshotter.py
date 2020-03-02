@@ -224,11 +224,6 @@ class GuestSnapshotter(object):
                             set_next_backup_to_seq = True
                     counter = counter + 1
 
-                time_after_snapshot_start = datetime.datetime.now()
-                timeout = self.get_value_from_configfile('timeout')
-                if timeout == None:
-                    timeout = 60
-
                 for job in mp_jobs:
                     job.join()
                 self.logger.log('****** 6. Snaphotting (Guest-parallel) Completed')
@@ -333,25 +328,9 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
-    def get_value_from_configfile(self, key):
-        value = None
-        configfile = '/etc/azure/vmbackup.conf'
-        try :
-            if os.path.exists(configfile):
-                config = ConfigParsers.ConfigParser()
-                config.read(configfile)
-                if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
-                else:
-                    self.logger.log("Config File doesn't have the key :" + key)
-        except Exception as e:
-            errorMsg = " Unable to ed config file.key is "+ key +"with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(errorMsg)
-        return value
-
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-        if (self.get_value_from_configfile('seqsnapshot') == '1' or self.get_value_from_configfile('seqsnapshot') == '2' or (len(paras.blobs) <= 4)):
+        if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
