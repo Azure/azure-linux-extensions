@@ -131,7 +131,7 @@ class FsFreezer:
         self.skip_freeze = True 
         mounts_to_skip = None
         try:
-            mounts_to_skip = self.hutil.get_value_from_configfile('MountsToSkip')
+            mounts_to_skip = self.hutil.get_strvalue_from_configfile('MountsToSkip','')
             self.logger.log("skipped mount :" + str(mounts_to_skip), True)
         except Exception as e:
             errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
