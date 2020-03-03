@@ -16,20 +16,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import BuildVersion
+import CommonParameters
 
 class CommonVariables:
     utils_path_name = 'Utils'
-    extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = BuildVersion.get_build_version_from_file()
-    extension_type = extension_name
+    extension_name = CommonParameters.inst.get_extension_name()
+    extension_version = CommonParameters.inst.get_extension_version()
+    extension_type = CommonParameters.inst.get_extension_name()
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
     extension_description = extension_label
     extension_shim_filename = "extension_shim.sh"
     test_extension_publisher = 'Microsoft.Azure.Security.Edp.'
     # Change based on test pipeline used
-    test_extension_name = 'AzureDiskEncryptionForLinux'
+    test_extension_name = CommonParameters.inst.get_extension_name()
 
     """
     wire protocol message format
@@ -204,7 +204,6 @@ class CommonVariables:
                     VolumeTypeOS.lower(): 'Encryption succeeded for OS volume',
                     VolumeTypeAll.lower(): 'Encryption succeeded for all volumes'
                 }
-
 
 class TestHooks:
     search_not_only_ide = False
