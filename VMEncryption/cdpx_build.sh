@@ -18,5 +18,15 @@ echo "ADE source folder: " + $PWD
 # BUGBUG: Keeping the static version until we figure out the versioning strategy (PBI 6218633)
 # echo CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS > main/version.txt
 
+# Extension name override if specified in the YAML file
+echo "Extension name: [$1]"
+
+if [ "$1" ]
+then
+    python -c "import main.CommonParameters; main.CommonParameters.inst.set_extension_name('$1'); main.CommonParameters.inst.save()"
+else
+    echo "No extension name specified"
+fi
+
 # invoking Python packaging
 python setup.py sdist --formats=zip
