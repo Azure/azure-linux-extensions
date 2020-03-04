@@ -106,8 +106,16 @@ class UnmountOldrootState(OSEncryptionState):
 
         sleep(3)
 
+        # Extract rootfs partition name from rootfs block device path.
+        # Fallback to old sda2 if device path is not in expected format
+        rootfs_part_name = None
+        rootfs_part_split = self.rootfs_block_device.split('/')
+        if len(rootfs_part_split) == 3 and rootfs_part_split[2].startswith('sd'):
+            rootfs_part_name = rootfs_part_split[2]
+        else:
+            rootfs_part_name = 'sda2'
         self.command_executor.Execute('vgcfgbackup -f /volumes.lvm rootvg', True)
-        self.command_executor.Execute('sed -i.bak \'s/sda2/mapper\/osencrypt/g\' /volumes.lvm', True)
+        self.command_executor.Execute('sed -i.bak \'s/{0}/mapper\/osencrypt/g\' /volumes.lvm'.format(rootfs_part_name), True)
         self.command_executor.Execute('lvremove -f rootvg', True)
         self.command_executor.Execute('vgremove rootvg', True)
 
