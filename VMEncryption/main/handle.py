@@ -639,6 +639,7 @@ def enable():
 
             generated_passphrase = bek_util.generate_passphrase()
             bek_util.store_bek_passphrase(encryption_config, generated_passphrase)
+            generated_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
             mount_encrypted_disks(disk_util=disk_util,
                                   crypt_mount_config_util=crypt_mount_config_util,
                                   bek_util=bek_util,
