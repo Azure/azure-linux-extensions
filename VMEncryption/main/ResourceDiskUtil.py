@@ -20,6 +20,7 @@
 
 import time
 import os
+import tempfile
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables, CryptItem

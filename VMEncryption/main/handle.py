@@ -284,7 +284,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                extension_parameter.passphrase = bek_util.generate_passphrase()
 
             logger.log('Recreating secret to store in the KeyVault')
 
@@ -510,11 +510,11 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
             resource_disk_util.automount()
-            logger.log("mounted encrypted resource disk")
+            logger.log("mounted resource disk")
     else:
         # Probably a re-image scenario: Just do a best effort
         if resource_disk_util.try_remount():
-            logger.log("mounted encrypted resource disk")
+            logger.log("mounted resource disk")
 
     # add walkaround for the centos 7.0
     se_linux_status = None
@@ -632,6 +632,18 @@ def enable():
             # Migrate to early unlock if using crypt mount
             if crypt_mount_config_util.should_use_azure_crypt_mount():
                 crypt_mount_config_util.migrate_crypt_items()
+        elif ResourceDiskUtil.RD_MAPPER_NAME in [ci.mapper_name for ci in crypt_mount_config_util.get_crypt_items()]:
+            # If there are crypt items but no passphrase file. This might be a RD-Only scenario
+            # Generate password but don't push it
+            # Do a mount_all_disks
+
+            generated_passphrase = bek_util.generate_passphrase()
+            bek_util.store_bek_passphrase(encryption_config, generated_passphrase)
+            mount_encrypted_disks(disk_util=disk_util,
+                                  crypt_mount_config_util=crypt_mount_config_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=generated_passphrase_file)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
@@ -842,7 +854,7 @@ def enable_encryption():
                 # generate passphrase and passphrase file if needed
                 if existing_passphrase_file is None:
                     if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                        extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                        extension_parameter.passphrase = bek_util.generate_passphrase()
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
