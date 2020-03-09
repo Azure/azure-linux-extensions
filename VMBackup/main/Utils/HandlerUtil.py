@@ -337,7 +337,7 @@ class HandlerUtility:
     def get_strvalue_from_configfile(self, key, default):
         value = self.get_value_from_configfile(key)
         
-        if (value == None or value == ''):
+        if value == None or value == '':
             value = default
 
         try :
@@ -352,7 +352,7 @@ class HandlerUtility:
         value = default
         value = self.get_value_from_configfile(key)
         
-        if (value == None or value == ''):
+        if value == None or value == '':
             value = default
 
         try :
