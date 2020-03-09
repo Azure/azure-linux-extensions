@@ -13,7 +13,7 @@ logfile=$logfolder'/shell.log'
 rc=3
 arc=0
 
-if [ $1 != "enable" ]
+if [ [ $1 != "enable"  ] && [ $1 != "deamon" ] ]
 then
     echo "`date`- The command is $1, exiting" >> $logfile
     exit $arc

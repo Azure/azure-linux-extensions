@@ -335,9 +335,9 @@ class HandlerUtility:
         return value
 
     def get_strvalue_from_configfile(self, key, default):
-        value = get_value_from_configfile(key)
+        value = self.get_value_from_configfile(key)
         
-        if (value == None or value == '')
+        if (value == None or value == ''):
             value = default
 
         try :
@@ -350,9 +350,9 @@ class HandlerUtility:
 
     def get_intvalue_from_configfile(self, key, default):
         value = default
-        value = get_value_from_configfile(key)
+        value = self.get_value_from_configfile(key)
         
-        if (value == None or value == '')
+        if (value == None or value == ''):
             value = default
 
         try :
