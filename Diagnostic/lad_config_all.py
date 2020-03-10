@@ -432,7 +432,7 @@ class LadConfigAll:
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
                                                          self._pkey_path, self._cert_path, self._encrypt_secret)
-            mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config()
+            mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config(self._ext_settings.read_protected_config('disableStorageAccount') == True)
             mdsd_filelog_config = lad_logging_config_helper.get_mdsd_filelog_config()
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)

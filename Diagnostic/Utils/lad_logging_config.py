@@ -161,17 +161,17 @@ class LadLoggingConfig:
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._syslog_ng_config
 
-    def get_mdsd_syslog_config(self):
+    def get_mdsd_syslog_config(self, disableStorageAccount = False):
         """
         Get mdsd XML config string for syslog use with omsagent in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for syslog use with omsagent in LAD 3.0.
         """
         if not self._mdsd_syslog_config:
-            self._mdsd_syslog_config = self.__generate_mdsd_syslog_config()
+            self._mdsd_syslog_config = self.__generate_mdsd_syslog_config(disableStorageAccount)
         return self._mdsd_syslog_config
 
-    def __generate_mdsd_syslog_config(self):
+    def __generate_mdsd_syslog_config(self, disableStorageAccount = False):
         """
         Helper method to generate oms_mdsd_syslog_config
         """
@@ -180,7 +180,9 @@ class LadLoggingConfig:
 
         # For basic syslog conf (single dest table): Source name is unified as 'mdsd.syslog' and
         # dest table (eventName) is 'LinuxSyslog'. This is currently the only supported syslog conf scheme.
-        syslog_routeevents = mxt.per_RouteEvent_tmpl.format(event_name='LinuxSyslog', opt_store_type='')
+        syslog_routeevents = ''
+        if not disableStorageAccount:
+            syslog_routeevents = mxt.per_RouteEvent_tmpl.format(event_name='LinuxSyslog', opt_store_type='')
         # Add RouteEvent elements for specified "sinks" for "syslogEvents" feature
         # Also add EventStreamingAnnotation for EventHub sinks
         syslog_eh_urls = ''
