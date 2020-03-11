@@ -436,8 +436,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"debian", "ubuntu", "suse"}
-    rpm_set = {"oracle", "redhat", "centos", "red hat"}
+    dpkg_set = {"debian", "ubuntu"}
+    rpm_set = {"oracle", "redhat", "centos", "red hat", "suse"}
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
