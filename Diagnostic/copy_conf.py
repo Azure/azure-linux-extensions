@@ -9,28 +9,28 @@ name_map = {
 "percentidletime" : {"plugin":"cpu", "field":"usage_idle"},
 "percentprivilegedtime" : {"plugin":"cpu", "field":"usage_system"},
 
-# "bytesreceived" : {"plugin":"net", "field":"bytes_recv"},
-# # "bytestotal" : {"plugin":"net", "field":"butes_recv + bytes_sent"}, #Need to calculate sum
-# "bytestransmitted" : {"plugin":"net", "field":"bytes_sent"},
-# # "totalcollisions" : {"plugin":"net", "field":"drop_in + drop_out"}, #Need to calculate sum
-# "totalrxerrors" : {"plugin":"net", "field":"err_in"},
-# "packetstransmitted" : {"plugin":"net", "field":"packets_sent"},
-# "packetsreceived" : {"plugin":"net", "field":"packets_recv"},
-# "totaltxerrors" : {"plugin":"net", "field":"err_out"},
+"bytesreceived" : {"plugin":"net", "field":"bytes_recv"},
+# "bytestotal" : {"plugin":"net", "field":"butes_recv + bytes_sent"}, #Need to calculate sum
+"bytestransmitted" : {"plugin":"net", "field":"bytes_sent"},
+# "totalcollisions" : {"plugin":"net", "field":"drop_in + drop_out"}, #Need to calculate sum
+"totalrxerrors" : {"plugin":"net", "field":"err_in"},
+"packetstransmitted" : {"plugin":"net", "field":"packets_sent"},
+"packetsreceived" : {"plugin":"net", "field":"packets_recv"},
+"totaltxerrors" : {"plugin":"net", "field":"err_out"},
 
-# "availablememory" : {"plugin":"mem", "field":"available"},
-# "percentavailablememory" : {"plugin":"mem", "field":"available_percent"},
-# "usedmemory" : {"plugin":"mem", "field":"used"},
-# "percentusedmemory" : {"plugin":"mem", "field":"used_percent"}, 
+"availablememory" : {"plugin":"mem", "field":"available"},
+"percentavailablememory" : {"plugin":"mem", "field":"available_percent"},
+"usedmemory" : {"plugin":"mem", "field":"used"},
+"percentusedmemory" : {"plugin":"mem", "field":"used_percent"}, 
 
-# "availableswap" : {"plugin":"swap", "field":"free"},
-# # "percentavailableswap" : {"plugin":"swap", "field":"available"}, #Need to calculate percentage
-# "usedswap" : {"plugin":"swap", "field":"used"}, 
-# "percentusedswap" : {"plugin":"swap", "field":"used_percent"},
+"availableswap" : {"plugin":"swap", "field":"free"},
+# "percentavailableswap" : {"plugin":"swap", "field":"available"}, #Need to calculate percentage
+"usedswap" : {"plugin":"swap", "field":"used"}, 
+"percentusedswap" : {"plugin":"swap", "field":"used_percent"},
 
-# "pagesreadpersec": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"diff"},
-# "pageswrittenpersec" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"diff"},
-# # "pagespersec" : {"plugin":"kernel", "field":""},
+"pagesreadpersec": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"diff"},
+"pageswrittenpersec" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"diff"},
+# "pagespersec" : {"plugin":"kernel", "field":""},
 
 #OMI Filesystem plugin
 "usedspace" : {"plugin":"disk", "field":"used"},
@@ -106,32 +106,29 @@ print telegraf_conf
 """
 Sample converted telegraf conf dict -
 
-{
-  'mem': {
-    'fields': {
-      'used_percent': {  'interval': u'15s',  'displayName': u'Memory percentage'},
-      'used': {  'interval': u'15s',  'displayName': u'Memory used'},
-      'available_percent': {  'interval': u'15s',  'displayName': u'Mem. percent available'}
-    },
-    'displayName': u'memory'
-  },
-  'diskio': {
-    'fields': {
-      'reads': {  'interval': u'15s',  'displayName': u'Disk reads',  'op': 'diff'},
-      'writes': {  'interval': u'15s',  'displayName': u'Disk writes',  'op': 'diff'},
-      'write_bytes': {  'interval': u'15s',  'displayName': u'Filesystem write bytes/sec',  'op': 'diff'}
-    },
-    'displayName': u'filesystem'
-  },
-  'net': {
-    'fields': {
-      'err_out': {  'interval': u'15s',  'displayName': u'Packets sent errors'},
-      'packets_sent': {  'interval': u'15s',  'displayName': u'Packets sent'},
+  u'network': {
+    'net': {
       'err_in': {  'interval': u'15s',  'displayName': u'Packets received errors'},
-      'bytes_sent': {  'interval': u'15s',  'displayName': u'Network out guest OS'},
-      'packets_recv': {  'interval': u'5s',  'displayName': u'Packets received'}
+      'packets_sent': {  'interval': u'15s',  'displayName': u'Packets sent'},
+      'bytes_recv': {  'interval': u'5s',  'displayName': u'Network in guest OS'},
+      'packets_recv': {  'interval': u'5s',  'displayName': u'Packets received'},
+      'err_out': {  'interval': u'15s',  'displayName': u'Packets sent errors'},
+      'bytes_sent': {  'interval': u'15s',  'displayName': u'Network out guest OS'}
+    }
+  },
+  u'filesystem': {
+    'disk': {
+      'used_percent': {  'interval': u'15s',  'displayName': u'Filesystem % used space'},
+      'used': {  'interval': u'15s',
+        'displayName': u'Filesystem used space'},
+      'free': {  'interval': u'15s',  'displayName': u'Filesystem free space'}
     },
-    'displayName': u'network'
+    'diskio': {
+      'write_bytes': {  'interval': u'15s',  'displayName': u'Filesystem write bytes/sec',  'op': 'diff'},
+      'read_bytes': {  'interval': u'15s',  'displayName': u'Filesystem read bytes/sec',  'op': 'diff'},
+      'writes': {  'interval': u'15s',  'displayName': u'Filesystem writes/sec',  'op': 'diff'},
+      'reads': {  'interval': u'15s',  'displayName': u'Filesystem reads/sec',  'op': 'diff'}
+    }
   },
 """
 
