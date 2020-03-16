@@ -86,6 +86,8 @@ class LadConfigAll:
         self._fluentd_out_mdsd_config = None
         self._rsyslog_config = None
         self._syslog_ng_config = None
+        self._telegraf_config = None
+        self._intermediate_telegraf_config = None
 
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
@@ -430,6 +432,8 @@ class LadConfigAll:
         try:
             syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
+            # perf_settings = LadUtil.getDiagnosticsMonitorConfigurationElement(self.read_public_config('ladCfg'), 'performanceCounters')
+
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
                                                          self._pkey_path, self._cert_path, self._encrypt_secret)
             mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config()
@@ -441,6 +445,9 @@ class LadConfigAll:
             self._fluentd_out_mdsd_config = lad_logging_config_helper.get_fluentd_out_mdsd_config()
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
+
+            # self._telegraf_config, self._intermediate_telegraf_config = copy_conf(perf_settings)
+
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
@@ -474,6 +481,9 @@ class LadConfigAll:
         # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
+        #9. Write out the generated telegraf and intermediate telegraf conf to the ext_dir location
+
+        
         return True, ""
 
     @staticmethod
