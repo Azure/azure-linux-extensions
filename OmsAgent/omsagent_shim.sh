@@ -64,12 +64,12 @@ elif [ -f "/etc/os-release" ]; then # Possibly SLES, openSUSE
     if [ $? != 0 ]; then
         run_command "zypper --non-interactive install python-future" $ACTION
     fi
-elif [ -x "$(command -v apt-get)" ]
+elif [ -x "$(command -v apt-get)" ]; then
     run_command "apt-get update" "python-future preinstall"
     run_command "apt-get install -y python-future" $ACTION
-elif [ -x "$(command -v yum)" ]
+elif [ -x "$(command -v yum)" ]; then
     run_command "yum install -y python-future" $ACTION
-elif [ -x "$(command -v zypper)" ]
+elif [ -x "$(command -v zypper)" ]; then
     run_command "zypper --non-interactive install python-future" $ACTION
 else
     echo "Unsupported or indeterminable operating system" >&2
