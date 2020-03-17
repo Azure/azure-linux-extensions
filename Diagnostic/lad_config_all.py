@@ -26,6 +26,7 @@ import Utils.ProviderUtil as ProvUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
+import Utils.telegraf_config_parser as telconf
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
 from Utils.misc_helpers import get_storage_endpoints_with_account, escape_nonalphanumerics
@@ -79,6 +80,8 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
+        self._telegraf_conf_path = self._ext_dir +  "/telegraf.conf"
+        self._telegraf_int_json_path = self._ext_dir + "/intermediate_telegraf_conf.json"
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
@@ -432,7 +435,7 @@ class LadConfigAll:
         try:
             syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
-            # perf_settings = LadUtil.getDiagnosticsMonitorConfigurationElement(self.read_public_config('ladCfg'), 'performanceCounters')
+            perf_settings = LadUtil.getDiagnosticsMonitorConfigurationElement(self._ext_settings.read_public_config('ladCfg'), 'performanceCounters')
 
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
                                                          self._pkey_path, self._cert_path, self._encrypt_secret)
@@ -445,11 +448,10 @@ class LadConfigAll:
             self._fluentd_out_mdsd_config = lad_logging_config_helper.get_fluentd_out_mdsd_config()
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
-
-            # self._telegraf_config, self._intermediate_telegraf_config = copy_conf(perf_settings)
+            self._telegraf_config, self._intermediate_telegraf_config = telconf.parse_config(perf_settings)          
 
         except Exception as e:
-            self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
+            self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
                                .format(e, traceback.format_exc()))
             return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
@@ -481,7 +483,11 @@ class LadConfigAll:
         # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
-        #9. Write out the generated telegraf and intermediate telegraf conf to the ext_dir location
+        #9. Write out the generated telegraf and intermediate telegraf conf to the ext_dir location            
+        with open(self._telegraf_conf_path, "w+") as f:
+            f.write(self._telegraf_config)
+        with open(self._telegraf_int_json_path, "w+") as f:
+            f.write(self._intermediate_telegraf_config)
 
         
         return True, ""
