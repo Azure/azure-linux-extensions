@@ -210,7 +210,7 @@ def install():
 
     default_configs = {        
         "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
-        "AZURE_ENDPOINT" : "https://management.azure.com/",
+        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
