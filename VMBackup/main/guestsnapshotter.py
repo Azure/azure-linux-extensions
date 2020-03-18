@@ -86,10 +86,19 @@ class GuestSnapshotter(object):
                 snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
+                temp_logger=temp_logger + str(datetime.datetime.now()) + ' Taking snapshot for ' + sasuri + ' '
+                original_blob_metadata = GetBlobProperties(sasuri)
+                temp_logger=temp_logger + str(datetime.datetime.now()) + ' ' + len(original_blob_metadata) + ' retreived from the blob.'
                 start_time = datetime.datetime.utcnow()
                 body_content = ''
                 headers = {}
                 headers["Content-Length"] = '0'
+                if(original_blob_metadata is not None): 
+                    for meta in original_blob_metadata:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
+
                 if(meta_data is not None): 
                     for meta in meta_data:
                         key = meta['Key']
@@ -130,6 +139,7 @@ class GuestSnapshotter(object):
         result = None
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
+        fetch_attributes_per_blob(blobUri, paras.backup_metadata)
         if(sasuri is None):
             self.logger.log("Failed to do the snapshot because sasuri is none",False,'Error')
             snapshot_error.errorcode = CommonVariables.error
@@ -274,6 +284,23 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
+    def GetBlobProperties(self, blobUri):
+        blobProperties = None
+        if(blobUri is not None):     
+            try:
+                http_util = HttpUtil(self.hutil)
+                sasuri_obj = urlparse.urlparse(blobUri)
+                headers = {}
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
+                self.hutil.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
+                blobProperties = self.httpresponse_get_blob_properties(httpResp)
+                self.hutil.log("GetBlobProperties: blobProperties :" + str(blobProperties))
+                retry_times = 0
+            except Exception as e:
+                self.hutil.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+                self.hutil.log("GetBlobProperties: retry times is " + str(retry_times))
+                retry_times = retry_times - 1
+        return blobProperties
 
     def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on):
         exceptOccurred = False
@@ -367,6 +394,15 @@ class GuestSnapshotter(object):
             snapshot_error.sasuri = sasuri
 
         return snapshot_info_indexer, snapshot_error, message
+
+    def httpresponse_get_blob_properties(self, httpResp):
+        blobProperties = {}
+        if(httpResp != None):
+            self.hutil.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
+            if(httpResp.status == 200):
+                resp_headers = httpResp.getheaders()
+                blobProperties = resp_headers
+        return blobProperties
 
     def get_snapshot_info(self, snapshot_info_indexer, snapshot_info):
         if (snapshot_info_indexer != None):
