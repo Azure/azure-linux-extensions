@@ -36,7 +36,7 @@ then
     echo "No Python interpreter found, which is an OMS extension dependency. Please install either Python 2 or 3." >&2
     exit 52 # Missing Dependency
 else
-    `${PYTHON} --version`
+    ${PYTHON} --version
 fi
 
 # Install python-future dependency required for omsagent.py.
