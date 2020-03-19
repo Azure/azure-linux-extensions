@@ -1,0 +1,5 @@
+(1.1.0.48)
+-Fix disable after EFA encryption and stop-start
+-Fix missing Python-six module for CentOS 6.8
+-Add CDPx config
+-Migrate CryptMount to Crypttab
