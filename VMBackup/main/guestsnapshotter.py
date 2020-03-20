@@ -75,7 +75,7 @@ class GuestSnapshotter(object):
         if(blobUri is not None):     
             try:
                 http_util = HttpUtil(self.logger)
-                sasuri_obj = urlparser.urlparse(blobUri)
+                sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
                 headers = {}
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
                 self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
@@ -177,16 +177,46 @@ class GuestSnapshotter(object):
 
                 if(original_blob_metadata is not None): 
                     for meta in original_blob_metadata:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
+                        Key,Value = meta
+                        headers[Key] = Value
 
                 if(meta_data is not None):
                     for meta in meta_data:
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                self.logger.log(str(headers))
+                self.logger.log("Level 1 : " + str(headers))
+
+                isMetadataSizeLimitReached = CheckHeaderSize(headers)
+
+                if isMetadataSizeLimitReached is true:
+                    headers = {}
+                    if(original_blob_metadata is not None): 
+                        for meta in original_blob_metadata:
+                            Key,Value = meta
+                            if Key == "x-ms-meta-diskencryptionsettings" :
+                                headers[Key] = Value
+                                break
+
+                    if(meta_data is not None):
+                        for meta in meta_data:
+                            key = meta['Key']
+                            value = meta['Value']
+                            headers["x-ms-meta-" + key] = value
+
+                    self.logger.log("Level 2 : " + str(headers))
+
+                    isMetadataSizeLimitReached = CheckHeaderSize(headers)
+
+                    if isMetadataSizeLimitReached is true:
+                        headers = {}
+                        if(meta_data is not None):
+                            for meta in meta_data:
+                                key = meta['Key']
+                                value = meta['Value']
+                                headers["x-ms-meta-" + key] = value
+                        self.logger.log("Level 3 : " + str(headers))
+
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
