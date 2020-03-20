@@ -35,6 +35,7 @@ from Utils import Status
 from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 from Utils import HostSnapshotObjects
+import sys
 
 class SnapshotInfoIndexerObj():
     def __init__(self, index, isSuccessful, snapshotTs, errorMessage):
@@ -87,6 +88,9 @@ class GuestSnapshotter(object):
                 self.logger.log("GetBlobProperties: retry times is " + str(retry_times))
                 retry_times = retry_times - 1
         return blobProperties
+
+    def CheckHeaderSize(self, headers):
+        return sys.getsizeof(headers)
 
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         temp_logger=''
@@ -187,7 +191,7 @@ class GuestSnapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 self.logger.log("Level 1 : " + str(headers))
 
-                isMetadataSizeLimitReached = CheckHeaderSize(headers)
+                isMetadataSizeLimitReached = self.CheckHeaderSize(headers)
 
                 if isMetadataSizeLimitReached is true:
                     headers = {}
@@ -206,7 +210,7 @@ class GuestSnapshotter(object):
 
                     self.logger.log("Level 2 : " + str(headers))
 
-                    isMetadataSizeLimitReached = CheckHeaderSize(headers)
+                    isMetadataSizeLimitReached = self.CheckHeaderSize(headers)
 
                     if isMetadataSizeLimitReached is true:
                         headers = {}
