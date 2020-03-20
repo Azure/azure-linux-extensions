@@ -534,6 +534,7 @@ def update():
 def enable():
     global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
     try:
+        do_log_rotate('./main/config/extension.logrotate')
         hutil.do_parse_context('Enable')
 
         backup_logger.log('starting enable', True)
@@ -563,6 +564,17 @@ def enable():
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+
+def set_file_permission(file_path, permission):
+    os.system('chmod ' + permission + " " + file_path)
+
+def convert_dos_to_unix(file_path):
+    os.system('dos2unix ' + file_path)
+
+def do_log_rotate(config_file_path):
+    set_file_permission(config_file_path, "0644")
+    convert_dos_to_unix(config_file_path)
+    os.system('logrotate ' + config_file_path)
 
 def thread_for_log_upload():
     global para_parser,backup_logger
