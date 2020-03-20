@@ -51,8 +51,8 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.119-build.develop.835_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.119-build.develop.835_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.122-build.develop.930_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.122-build.develop.930_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
