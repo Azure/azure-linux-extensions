@@ -63,7 +63,7 @@ def DistInfo():
     except Exception as e:
         errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         logger.log(errMsg)
-        distinfo = ['Abstract','1.0']
+        distinfo = ['Default','1.0']
         return distinfo
 
 def GetMyPatching(logger):
