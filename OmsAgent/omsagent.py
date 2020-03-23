@@ -51,7 +51,7 @@ except Exception as e:
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
 keysDirectory = 'keys'
-BundleFileName = 'omsagent-1.12.25-0.universal.x64.sh'
+BundleFileName = 'omsagent-1.13.1-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -150,7 +150,7 @@ def verifyShellBundleSigningAndChecksum():
         raise Exception("Unable to find the dscgpgkey.asc file at " + dscGPGKeyFilePath)
 
     importGPGKeyCommand = "sh ImportGPGkey.sh " + dscGPGKeyFilePath
-    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip, check_error = False)
 
     # Check that we can find the keyring file
     keyringFilePath = os.path.join(keys_directory, 'keyring.gpg')
@@ -170,13 +170,14 @@ def verifyShellBundleSigningAndChecksum():
 
     # Verify the SHA256 sums file with the keyring and asc files
     verifySha256SumsCommand = "HOME=" + keysDirectory + " gpg --no-default-keyring --keyring " + keyringFilePath + " --verify " + ascFilePath  + " " + sha256SumsFilePath
-    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
     if exit_code != 0:
         raise Exception("Failed to verify SHA256 sums file at " + sha256SumsFilePath)
 
     # Perform SHA256 sums to verify shell bundle
+    hutil_log_info("Perform SHA256 sums to verify shell bundle")
     performSha256SumsCommand = "cd %s; sha256sum -c %s" % (cert_directory, sha256SumsFilePath)
-    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
     if exit_code != 0:
         raise Exception("Failed to verify shell bundle with the SHA256 sums file at " + sha256SumsFilePath)
 
@@ -237,19 +238,24 @@ def main():
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
 
-    # Verify shell bundle signing
-    try:
-        verifyShellBundleSigningAndChecksum()
-    except Exception as ex:
-        if ProceedOnSigningVerificationFailure:
-            hutil_log_error(ex.message)
-        else:
-            log_and_exit(operation, ex.message)
-
     # Invoke operation
     try:
         global HUtilObject
         HUtilObject = parse_context(operation)
+
+        # Verify shell bundle signing
+        try:
+            hutil_log_info("Start signing verification")
+            verifyShellBundleSigningAndChecksum()
+            hutil_log_info("ShellBundle signing verification succeeded")
+        except Exception as ex:
+            errmsg = "ShellBundle signing verification failed with '%s'" % ex.message
+            if ProceedOnSigningVerificationFailure:
+                hutil_log_error(errmsg)
+            else:
+                log_and_exit(operation, errmsg)
+        
+        # invoke operation
         exit_code, output = operations[operation]()
 
         # Exit code 1 indicates a general problem that doesn't have a more
@@ -760,9 +766,9 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
+    supported_dists = {'redhat' : ['6', '7', '8'], # RHEL
                        'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
