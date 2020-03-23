@@ -89,20 +89,26 @@ class GuestSnapshotter(object):
                 retry_times = retry_times - 1
         return blobProperties
 
-    def CheckHeaderSizeLimitReached(self, headers):
+    def GetHeaderSize(self, headers):
     # max size of blob metadata 
-        if sys.getsizeof(headers) > 8000 :
-            return True
-        return False;
+            return sys.getsizeof(headers)
+        
 
     def populate_snapshotreq_headers(self, sasuri, meta_data):
         headers= {}
         headers["Content-Length"] = '0'
+        blobMetdataMaxSizeBytes = 8000
+
+        # initialize metadata size at all levels to 0
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", 0)
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", 0)
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", 0)
 
         self.logger.log('Taking snapshot for ' + sasuri + ' ')
         original_blob_metadata = self.GetBlobProperties(sasuri)
         self.logger.log(str(len(original_blob_metadata)) + ' retreived from the blob.')
 
+        
         if(original_blob_metadata is not None): 
             for meta in original_blob_metadata:
                 Key,Value = meta
@@ -115,9 +121,10 @@ class GuestSnapshotter(object):
                 headers["x-ms-meta-" + key] = value
             self.logger.log("Level 1 : " + str(headers))
 
-        isMetadataSizeLimitReached = self.CheckHeaderSizeLimitReached(headers)
+        level1BlobMetadataSize = self.GetHeaderSize(headers)
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", level1BlobMetadataSize)
 
-        if isMetadataSizeLimitReached:
+        if level1BlobMetadataSize < blobMetdataMaxSizeBytes:
             headers = {}
             if(original_blob_metadata is not None): 
                 for meta in original_blob_metadata:
@@ -134,9 +141,10 @@ class GuestSnapshotter(object):
 
             self.logger.log("Level 2 : " + str(headers))
 
-            isMetadataSizeLimitReached = self.CheckHeaderSizeLimitReached(headers)
+            level2BlobMetadataSize = self.GetHeaderSize(headers)
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", level2BlobMetadataSize)
 
-            if isMetadataSizeLimitReached :
+            if level2BlobMetadataSize < blobMetdataMaxSizeBytes :
                 headers = {}
                 if(meta_data is not None):
                     for meta in meta_data:
@@ -144,6 +152,7 @@ class GuestSnapshotter(object):
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
                 self.logger.log("Level 3 : " + str(headers))
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", level3BlobMetadataSize)
 
         return headers
 
