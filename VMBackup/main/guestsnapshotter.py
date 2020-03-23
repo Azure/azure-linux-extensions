@@ -152,6 +152,7 @@ class GuestSnapshotter(object):
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
                 self.logger.log("Level 3 : " + str(headers))
+                level3BlobMetadataSize = self.GetHeaderSize(headers)
                 HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", level3BlobMetadataSize)
 
         return headers
