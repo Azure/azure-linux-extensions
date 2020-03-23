@@ -334,10 +334,15 @@ def daemon():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
             timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 150 * 60 # in seconds
+            MAX_TIMESPAN = 140 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+            
+            if total_span_in_seconds > MAX_TIMESPAN :
+                backup_logger.log('CRP timeout limit has reached, will not take snapshot.', True)
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.GuestAgentPluginTooLongToInvokeCommand)
+                sys.exit(0)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
