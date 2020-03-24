@@ -36,6 +36,7 @@ from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 from Utils import HostSnapshotObjects
 import sys
+import json
 
 class SnapshotInfoIndexerObj():
     def __init__(self, index, isSuccessful, snapshotTs, errorMessage):
@@ -268,11 +269,7 @@ class GuestSnapshotter(object):
             snapshot_info_indexer_queue = mp.Queue()
             time_before_snapshot_start = datetime.datetime.now()
             blobs = paras.blobs
-            # initialize metadata size at all levels to 0
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
-
+            
             if blobs is not None:
                 # initialize blob_snapshot_info_array
                 mp_jobs = []
@@ -307,10 +304,6 @@ class GuestSnapshotter(object):
                 self.logger.log('****** 6. Snaphotting (Guest-parallel) Completed')
                 thaw_result = None
                 
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel1"])
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel2"])
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel3"])
-
                 if g_fsfreeze_on and thaw_done_local == False:
                     time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
@@ -372,11 +365,7 @@ class GuestSnapshotter(object):
             if blobs is not None:
                 blob_index = 0
                 self.logger.log('****** 5. Snaphotting (Guest-seq) Started')
-                # initialize metadata size at all levels to 0
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
-
+                
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
@@ -393,9 +382,6 @@ class GuestSnapshotter(object):
                 self.logger.log('****** 6. Snaphotting (Guest-seq) Completed')
                 all_snapshots_failed = all_failed
                 self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel1"])
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel2"])
-                self.logger.log(HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel3"])
                 thaw_result= None
                 if g_fsfreeze_on and thaw_done_local== False:
                     time_before_thaw = datetime.datetime.now()
@@ -432,8 +418,8 @@ class GuestSnapshotter(object):
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
                 snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         
-        self.logger.log("Adding to the telemetry " + str(blobMetadataTelemetryMessage))
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", str(blobMetadataTelemetryMessage))
+        self.logger.log("Adding to the telemetry " + json.dumps(blobMetadataTelemetryMessage))
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", json.dumps(blobMetadataTelemetryMessage))
         return snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri, responseBody):
