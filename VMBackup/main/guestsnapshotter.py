@@ -100,7 +100,7 @@ class GuestSnapshotter(object):
         blobMetdataMaxSizeBytes = 8000
 
         if sasuri_index not in blobMetadataTelemetryMessage :
-            blobMetadataTelemetryMessage[index] = ""
+            blobMetadataTelemetryMessage[sasuri_index] = ""
 
         original_blob_metadata = self.GetBlobProperties(sasuri)
         
@@ -117,7 +117,7 @@ class GuestSnapshotter(object):
      
         level1BlobMetadataSize = self.GetHeaderSize(headers)
 
-        blobMetadataTelemetryMessage[index]+="Level 1 : " + str(level1BlobMetadataSize);
+        blobMetadataTelemetryMessage[sasuri_index]+="Level 1 : " + str(level1BlobMetadataSize);
 
         if level1BlobMetadataSize < blobMetdataMaxSizeBytes:
             headers = {}
@@ -136,7 +136,7 @@ class GuestSnapshotter(object):
 
             level2BlobMetadataSize = self.GetHeaderSize(headers)
 
-            blobMetadataTelemetryMessage[index]+= ", Level 2 : " + str(level2BlobMetadataSize);
+            blobMetadataTelemetryMessage[sasuri_index]+= ", Level 2 : " + str(level2BlobMetadataSize);
 
             if level2BlobMetadataSize < blobMetdataMaxSizeBytes :
                 headers = {}
@@ -148,7 +148,7 @@ class GuestSnapshotter(object):
                 self.logger.log("Level 3 : " + str(headers))
 
                 level3BlobMetadataSize = self.GetHeaderSize(headers)  
-                blobMetadataTelemetryMessage[index]+= ", Level 3 : " + str(level3BlobMetadataSize);
+                blobMetadataTelemetryMessage[sasuri_index]+= ", Level 3 : " + str(level3BlobMetadataSize);
                 
         return headers
 
