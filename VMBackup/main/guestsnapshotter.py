@@ -99,6 +99,9 @@ class GuestSnapshotter(object):
         headers["Content-Length"] = '0'
         blobMetdataMaxSizeBytes = 8000
 
+        if sasuri_index not in blobMetadataTelemetryMessage :
+            blobMetadataTelemetryMessage[index] = ""
+
         original_blob_metadata = self.GetBlobProperties(sasuri)
         
         if(original_blob_metadata is not None): 
@@ -113,8 +116,9 @@ class GuestSnapshotter(object):
                 headers["x-ms-meta-" + key] = value
      
         level1BlobMetadataSize = self.GetHeaderSize(headers)
-        HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel1"] += str(sasuri_index) + " - " + str(level1BlobMetadataSize) + " # "
-        
+
+        blobMetadataTelemetryMessage[index]+="Level 1 : " + str(level1BlobMetadataSize);
+
         if level1BlobMetadataSize < blobMetdataMaxSizeBytes:
             headers = {}
             if(original_blob_metadata is not None): 
@@ -132,8 +136,8 @@ class GuestSnapshotter(object):
 
             level2BlobMetadataSize = self.GetHeaderSize(headers)
 
-            HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel2"] += str(sasuri_index) + " - " + str(level2BlobMetadataSize) + " # "
-            
+            blobMetadataTelemetryMessage[index]+= ", Level 2 : " + str(level2BlobMetadataSize);
+
             if level2BlobMetadataSize < blobMetdataMaxSizeBytes :
                 headers = {}
                 if(meta_data is not None):
@@ -143,8 +147,9 @@ class GuestSnapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 self.logger.log("Level 3 : " + str(headers))
 
-                level3BlobMetadataSize = self.GetHeaderSize(headers)                
-                HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel3"] += str(sasuri_index) + " - " + str(level3BlobMetadataSize) + " # "
+                level3BlobMetadataSize = self.GetHeaderSize(headers)  
+                blobMetadataTelemetryMessage[index]+= ", Level 3 : " + str(level3BlobMetadataSize);
+                
         return headers
 
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
@@ -414,6 +419,10 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
+        #Dict <DiskIndex, Disk Metadata Size>
+        global blobMetadataTelemetryMessage
+        blobMetadataTelemetryMessage = {}
+
         if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
@@ -422,6 +431,8 @@ class GuestSnapshotter(object):
             if exceptOccurred and thaw_done == False and all_snapshots_failed:
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
                 snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
+        
+        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", str(blobMetadataTelemetryMessage))
         return snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri, responseBody):
