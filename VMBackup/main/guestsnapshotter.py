@@ -432,6 +432,7 @@ class GuestSnapshotter(object):
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
                 snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         
+        self.logger.log("Adding to the telemetry " + str(blobMetadataTelemetryMessage))
         HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", str(blobMetadataTelemetryMessage))
         return snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
