@@ -117,8 +117,8 @@ class GuestSnapshotter(object):
         self.logger.log("Level 1 : " + str(headers))
 
         level1BlobMetadataSize = self.GetHeaderSize(headers)
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel1"] + ' # ' + level1BlobMetadataSize)
-
+        HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel1"] += str(sasuri_index) + " - " + str(level1BlobMetadataSize) + " # "
+        
         if level1BlobMetadataSize < blobMetdataMaxSizeBytes:
             headers = {}
             if(original_blob_metadata is not None): 
@@ -137,8 +137,9 @@ class GuestSnapshotter(object):
             self.logger.log("Level 2 : " + str(headers))
 
             level2BlobMetadataSize = self.GetHeaderSize(headers)
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel2"] + ' # ' +  level2BlobMetadataSize)
 
+            HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel2"] += str(sasuri_index) + " - " + str(level2BlobMetadataSize) + " # "
+            
             if level2BlobMetadataSize < blobMetdataMaxSizeBytes :
                 headers = {}
                 if(meta_data is not None):
@@ -148,9 +149,8 @@ class GuestSnapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 self.logger.log("Level 3 : " + str(headers))
 
-                level3BlobMetadataSize = self.GetHeaderSize(headers)
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel3"] + ' # ' +  level3BlobMetadataSize)
-
+                level3BlobMetadataSize = self.GetHeaderSize(headers)                
+                HandlerUtil.HandlerUtility.telemetry_data["BlobMetadataSizeLevel3"] += str(sasuri_index) + " - " + str(level3BlobMetadataSize) + " # "
         return headers
 
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
@@ -172,7 +172,11 @@ class GuestSnapshotter(object):
                 start_time = datetime.datetime.utcnow()
                 
                 body_content = ''
-                headers = self.populate_snapshotreq_headers(sasuri,meta_data)
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
+
+                headers = self.populate_snapshotreq_headers(sasuri, sasuri_index, meta_data)
                
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
@@ -222,9 +226,9 @@ class GuestSnapshotter(object):
             else:
                 body_content = ''
                 # initialize metadata size at all levels to 0
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", 0)
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", 0)
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", 0)
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
 
                 headers = self.populate_snapshotreq_headers(sasuri,sasuri_index,meta_data)
                
