@@ -172,10 +172,7 @@ class GuestSnapshotter(object):
                 start_time = datetime.datetime.utcnow()
                 
                 body_content = ''
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
-
+                
                 headers = self.populate_snapshotreq_headers(sasuri, sasuri_index, meta_data)
                
                 temp_logger = temp_logger + str(headers)
@@ -225,11 +222,7 @@ class GuestSnapshotter(object):
                 snapshot_error.sasuri = sasuri
             else:
                 body_content = ''
-                # initialize metadata size at all levels to 0
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
-
+                
                 headers = self.populate_snapshotreq_headers(sasuri,sasuri_index,meta_data)
                
                 http_util = HttpUtil(self.logger)
@@ -276,6 +269,10 @@ class GuestSnapshotter(object):
             snapshot_info_indexer_queue = mp.Queue()
             time_before_snapshot_start = datetime.datetime.now()
             blobs = paras.blobs
+            # initialize metadata size at all levels to 0
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
 
             if blobs is not None:
                 # initialize blob_snapshot_info_array
@@ -371,6 +368,11 @@ class GuestSnapshotter(object):
             if blobs is not None:
                 blob_index = 0
                 self.logger.log('****** 5. Snaphotting (Guest-seq) Started')
+                # initialize metadata size at all levels to 0
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel1", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel2", "#")
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataSizeLevel3", "#")
+
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
