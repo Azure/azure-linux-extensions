@@ -389,7 +389,9 @@ class GuestSnapshotter(object):
                 self.logger.log('****** 6. Snaphotting (Guest-seq) Completed')
                 all_snapshots_failed = all_failed
                 self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
-
+                self.logger.log(HandlerUtil.HandlerUtility.telemetery_data["BlobMetadataSizeLevel1"])
+                self.logger.log(HandlerUtil.HandlerUtility.telemetery_data["BlobMetadataSizeLevel2"])
+                self.logger.log(HandlerUtil.HandlerUtility.telemetery_data["BlobMetadataSizeLevel3"])
                 thaw_result= None
                 if g_fsfreeze_on and thaw_done_local== False:
                     time_before_thaw = datetime.datetime.now()
