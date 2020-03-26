@@ -92,7 +92,7 @@ class GuestSnapshotter(object):
 
     def GetHeaderSize(self, headers):
     # max size of blob metadata 
-            return sys.getsizeof(headers)
+            return sys.getsizeof(json.dumps(headers))
         
 
     def populate_snapshotreq_headers(self, sasuri, sasuri_index, meta_data):
