@@ -83,11 +83,8 @@ class GuestSnapshotter(object):
                 self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                 blobProperties = self.httpresponse_get_blob_properties(httpResp)
                 self.logger.log("GetBlobProperties: blobProperties :" + str(blobProperties))
-                retry_times = 0
             except Exception as e:
                 self.logger.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-                self.logger.log("GetBlobProperties: retry times is " + str(retry_times))
-                retry_times = retry_times - 1
         return blobProperties
 
     def GetHeaderSize(self, headers):
