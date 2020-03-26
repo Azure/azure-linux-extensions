@@ -82,7 +82,6 @@ class GuestSnapshotter(object):
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
                 self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                 blobProperties = self.httpresponse_get_blob_properties(httpResp)
-                self.logger.log("GetBlobProperties: blobProperties :" + str(blobProperties))
             except Exception as e:
                 self.logger.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         return blobProperties
@@ -117,7 +116,7 @@ class GuestSnapshotter(object):
 
         blobMetadataTelemetryMessage[sasuri_index]+="Level 1 : " + str(level1BlobMetadataSize);
 
-        if level1BlobMetadataSize < blobMetdataMaxSizeBytes:
+        if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
             headers = {}
             if(original_blob_metadata is not None): 
                 for meta in original_blob_metadata:
@@ -136,7 +135,7 @@ class GuestSnapshotter(object):
 
             blobMetadataTelemetryMessage[sasuri_index]+= ", Level 2 : " + str(level2BlobMetadataSize);
 
-            if level2BlobMetadataSize < blobMetdataMaxSizeBytes :
+            if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
                 headers = {}
                 if(meta_data is not None):
                     for meta in meta_data:
