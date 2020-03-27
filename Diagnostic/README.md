@@ -2,7 +2,7 @@
 
 Allow the owner of a Linux-based Azure Virtual Machine to obtain diagnostic data.
 
-Current version is 3.0.123.
+Current version is 3.0.127.
 
 Linux Azure Diagnostic (LAD) extension version 3.0 is released with the following changes:
 
@@ -30,7 +30,7 @@ Any distro specified below with major version only (e.g. Debian 7) is supported 
 - CentOS 6.5+, 7
 - Oracle Linux 6.4+, 7
 - OpenSUSE 13.1+
-- SUSE Linux Enterprise Server 11, 12
+- SUSE Linux Enterprise Server 12
 - Debian 7, 8, 9
 - RHEL 6.7+, 7
 

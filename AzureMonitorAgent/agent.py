@@ -51,8 +51,8 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.119-build.develop.835_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.119-build.develop.835_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.122-build.develop.930_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.122-build.develop.930_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
@@ -210,7 +210,7 @@ def install():
 
     default_configs = {        
         "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
-        "AZURE_ENDPOINT" : "https://management.azure.com/",
+        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
@@ -436,8 +436,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"oracle", "debian", "ubuntu", "suse"}
-    rpm_set = {"redhat", "centos", "red hat"}
+    dpkg_set = {"debian", "ubuntu"}
+    rpm_set = {"oracle", "redhat", "centos", "red hat", "suse"}
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"

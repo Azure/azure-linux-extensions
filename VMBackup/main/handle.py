@@ -109,7 +109,7 @@ def status_report_to_file(file_report_msg):
 
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
+    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
             if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -192,10 +192,6 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('seqsnapshot') == None):
-            hutil.set_value_to_configfile('seqsnapshot', '0')
-        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
-        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
