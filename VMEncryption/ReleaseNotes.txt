@@ -1,5 +1,14 @@
-(0.1.0.999345)
+0.1.0.999346
+- adds yaml pipeline files to support cdpx test extension build
+- parameterizes version and extension name to support cdpx
+- fixes newline issue in telemetry for improved debugging
+- changes sparse mode from 64K to 16M to address LVM on xfs
+- tries mounting /boot/efi for UEFI image support
+- fixes lvm reliability issue by removing hardcoded device name
+- adds python-six module
+- unit test updates
 
--Fix disable after EFA encryption and stop-start
--Fix Ubuntu 14 unmount oldroot sequence
--Fix missing Python-six module for CentOS 6.8 
+0.1.0.999345
+- Fix disable after EFA encryption and stop-start
+- Fix Ubuntu 14 unmount oldroot sequence
+- Fix missing Python-six module for CentOS 6.8
