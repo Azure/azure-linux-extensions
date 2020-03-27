@@ -16,11 +16,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import CommonParameters
 
 class CommonVariables:
     utils_path_name = 'Utils'
-    extension_name = 'AzureDiskEncryptionForLinux'
-    extension_version = '0.1.0.999345'
+    extension_name = CommonParameters.inst.get_extension_name()
+    extension_version = CommonParameters.inst.get_extension_version()
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
