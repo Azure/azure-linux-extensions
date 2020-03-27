@@ -231,7 +231,7 @@ class CryptMountConfigUtil(object):
 
             with open("/etc/fstab", "r") as f:
                 for line in f.readlines():
-                    fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
+                    fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
                     if fstab_device is not None:
                         fstab_items.append((fstab_device, fstab_mount_point, fstab_fs))
 
@@ -354,7 +354,7 @@ class CryptMountConfigUtil(object):
                 fstab_backup_line = None
                 with open("/etc/fstab", "r") as f:
                     for line in f.readlines():
-                        device, mountpoint, fs = self.parse_fstab_line(line)
+                        device, mountpoint, fs, opts = self.parse_fstab_line(line)
                         if mountpoint == crypt_item.mount_point and crypt_item.mapper_name in device:
                             fstab_backup_line = line
                 if fstab_backup_line is not None:
@@ -458,7 +458,7 @@ class CryptMountConfigUtil(object):
 
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
-            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
             if fstab_mount_point == CommonVariables.encryption_key_mount_point:
                 return True
         return False
@@ -466,16 +466,29 @@ class CryptMountConfigUtil(object):
     def parse_fstab_line(self, line):
         fstab_parts = line.strip().split()
 
-        if len(fstab_parts) < 3:  # Line should have enough content
-            return None, None, None
+        if len(fstab_parts) < 4:  # Line should have enough content
+            return None, None, None, None
 
         if fstab_parts[0].startswith("#"):  # Line should not be a comment
-            return None, None, None
+            return None, None, None, None
 
         fstab_device = fstab_parts[0]
         fstab_mount_point = fstab_parts[1]
         fstab_file_system = fstab_parts[2]
-        return fstab_device, fstab_mount_point, fstab_file_system
+        fstab_options = fstab_parts[3]
+        fstab_options = fstab_options.strip().split(",")
+        return fstab_device, fstab_mount_point, fstab_file_system, fstab_options
+
+    def add_nofail_if_absent_to_fstab_line(self, line):
+        fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
+        if fstab_opts is None or "nofail" in fstab_opts:
+            return line
+
+        old_opts_string = ",".join(fstab_opts)
+        new_opts_string = ",".join(["nofail"] + fstab_opts)
+
+        return line.replace(old_opts_string, new_opts_string)
+
 
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
@@ -492,7 +505,7 @@ class CryptMountConfigUtil(object):
         relevant_line = None
         for i in range(len(lines)):
             line = lines[i]
-            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
 
             if fstab_mount_point != mount_point:  # Not the line we are looking for
                 continue
@@ -506,6 +519,7 @@ class CryptMountConfigUtil(object):
                 break
             else:
                 new_line = relevant_line.replace(fstab_device, mapper_path)
+                new_line = self.add_nofail_if_absent_to_fstab_line(new_line)
                 self.logger.log("Replacing that line with: " + new_line)
                 lines[i] = new_line
                 break
