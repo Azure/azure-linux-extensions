@@ -35,6 +35,7 @@ import urllib2
 import shutil
 import crypt
 import xml.dom.minidom
+import re
 from distutils.version import LooseVersion
 
 
@@ -50,8 +51,8 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.119-build.dev_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.119-build.dev_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.122-build.develop.930_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.122-build.develop.930_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
@@ -187,10 +188,14 @@ def install():
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
 
-    # public_settings, protected_settings = get_settings()
+    public_settings, protected_settings = get_settings()
+    
     # if public_settings is None:
     #     raise ParameterMissingException('Public configuration must be ' \
     #                                     'provided')
+    #public_settings.get('workspaceId')
+    #protected_settings.get('workspaceKey')
+    
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -203,25 +208,120 @@ def install():
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)
 
+    default_configs = {        
+        "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
+        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
+        "ADD_REGION_TO_MCS_ENDPOINT" : "true",
+        "ENABLE_MCS" : "false",
+        "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
+        #"OMS_TLD" : "int2.microsoftatlanta-int.com",
+        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
+    }
+
+    # decide the mode
+    if protected_settings is None or len(protected_settings) is 0:
+        default_configs["ENABLE_MCS"] = "true"
+    else:
+        # look for LA protected settings
+        for var in protected_settings.keys():
+            if "_key" in var or "_id" in var:
+                default_configs[var] = protected_settings.get(var)
+        
+        # check if required GCS params are available
+        MONITORING_GCS_CERT_CERTFILE = None
+        if protected_settings.has_key("certificate"):
+            MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
+
+        MONITORING_GCS_CERT_KEYFILE = None
+        if protected_settings.has_key("certificateKey"):
+            MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
+
+        MONITORING_GCS_ENVIRONMENT = ""
+        if protected_settings.has_key("monitoringGCSEnvironment"):
+            MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
+
+        MONITORING_GCS_NAMESPACE = ""
+        if protected_settings.has_key("namespace"):
+            MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
+
+        MONITORING_GCS_ACCOUNT = ""
+        if protected_settings.has_key("monitoringGCSAccount"):
+            MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
+
+        MONITORING_GCS_REGION = ""
+        if protected_settings.has_key("monitoringGCSRegion"):
+            MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
+
+        MONITORING_CONFIG_VERSION = ""
+        if protected_settings.has_key("configVersion"):
+            MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
+
+        if MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
+            waagent_log_error('Not all required GCS parameters are provided')
+            raise ParameterMissingException
+        else:
+            # set the values for GCS
+            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+            default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
+            default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
+            default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
+            default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
+            default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
+            default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
+            default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
+
+            # write the certificate and key to disk
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            
+            fh = open("/etc/mdsd.d/gcscert.pem", "wb")
+            fh.write(MONITORING_GCS_CERT_CERTFILE)
+            fh.close()
+            os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
+
+            fh = open("/etc/mdsd.d/gcskey.pem", "wb")
+            fh.write(MONITORING_GCS_CERT_KEYFILE)
+            fh.close()
+            os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
+
+    config_file = "/etc/default/mdsd"
+    config_updated = False
     try:
-        if os.path.isfile("/etc/default/mdsd"):
-            with open("/etc/default/mdsd", "a+") as f:
-                data = f.read()
-                if "ENABLE_MCS=true" not in data:
-                    f.write("\n")
-                    f.write("export ENABLE_MCS=true\n")
-                    
-                # for integration testing
-                if "MCS_ENDPOINT=mcs.azure.com" not in data:
-                    f.write("export MCS_ENDPOINT=eastus.amcs.ppe.control.monitor.azure.com\n")
-                if "AZURE_ENDPOINT=https://management.azure.com/" not in data:
-                    f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
-                if "ADD_REGION_TO_MCS_ENDPOINT" not in data:
-                    f.write("export ADD_REGION_TO_MCS_ENDPOINT=false\n")
-                if "OMS_TLD" not in data:
-                    f.write("export OMS_TLD=int2.microsoftatlanta-int.com\n")
-                if "customResourceId" not in data:
-                    f.write("export customResourceId=/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM\n")
+        if os.path.isfile(config_file):
+            data = []
+            new_data = ""
+            vars_set = set()
+            with open(config_file, "r") as f:
+                data = f.readlines()
+                for line in data:
+                    for var in default_configs.keys():
+                        if var in line:
+                            line = "export " + var + "=" + default_configs[var] + "\n"
+                            vars_set.add(var)
+                            break
+                    new_data += line
+            
+            for var in default_configs.keys():
+                if var not in vars_set:
+                    new_data += "export " + var + "=" + default_configs[var] + "\n"
+
+            with open("/etc/default/mdsd_temp", "w") as f:
+                f.write(new_data)
+                config_updated = True if len(new_data) > 0 else False 
+
+            if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
+                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
+
+            os.remove(config_file)
+            os.rename("/etc/default/mdsd_temp", config_file)
+
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            os.chown(config_file, uid, gid)
+            os.system('chmod {1} {0}'.format(config_file, 400))  
+
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
@@ -292,13 +392,6 @@ def update():
     No logic to install the agent as agent -> install() will be called 
     with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    # print ("Uinstalling the current mdsd")
-    # exit_code, output = uninstall()
-    # if exit_code != 0:
-    #     return exit_code, output
-    # print ("installing the curretn mdsd")
-    # exit_code, output = install()
-    # print ("Update finished")
     
     return 0, ""
 
@@ -343,8 +436,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"oracle", "debian", "ubuntu", "suse"}
-    rpm_set = {"redhat", "centos", "red hat"}
+    dpkg_set = {"debian", "ubuntu"}
+    rpm_set = {"oracle", "redhat", "centos", "red hat", "suse"}
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"

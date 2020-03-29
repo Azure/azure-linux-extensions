@@ -154,7 +154,7 @@ class HandlerUtility:
                 pass
 
     def log_with_no_try_except(self, message, level='Info'):
-        WriteLog = self.get_value_from_configfile('WriteLog')
+        WriteLog = self.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             if sys.version_info > (3,):
                 if self.logging_file is not None:
@@ -204,7 +204,11 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                if 'NS-BSD' in platform.system():
+                    # base64 tool is not available with NSBSD, use openssl
+                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                else:
+                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
@@ -314,6 +318,7 @@ class HandlerUtility:
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
+
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -328,6 +333,35 @@ class HandlerUtility:
             pass
 
         return value
+
+    def get_strvalue_from_configfile(self, key, default):
+        value = self.get_value_from_configfile(key)
+        
+        if value == None or value == '':
+            value = default
+
+        try :
+            value_str = str(value)
+        except ValueError :
+            self.log('Not able to parse the read value as string, falling back to default value', True, 'Warning')
+            value = default
+
+        return value
+
+    def get_intvalue_from_configfile(self, key, default):
+        value = default
+        value = self.get_value_from_configfile(key)
+        
+        if value == None or value == '':
+            value = default
+
+        try :
+            value_int = int(value)
+        except ValueError :
+            self.log('Not able to parse the read value as int, falling back to default value', True, 'Warning')
+            value = default
+
+        return int(value)
  
     def set_value_to_configfile(self, key, value):
         configfile = '/etc/azure/vmbackup.conf'
@@ -524,6 +558,9 @@ class HandlerUtility:
             if 'FreeBSD' in platform.system():
                 release = re.sub('\-.*\Z', '', str(platform.release()))
                 return "FreeBSD",release
+            if 'NS-BSD' in platform.system():
+                release = re.sub('\-.*\Z', '', str(platform.release()))
+                return "NS-BSD", release
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
                 # remove trailing whitespace in distro name

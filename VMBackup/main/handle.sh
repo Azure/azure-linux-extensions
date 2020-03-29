@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 pwdcommand=`pwd`
 pwdstr="$pwdcommand"
 output=`cat $pwdstr'/HandlerEnvironment.json'`
@@ -11,6 +11,14 @@ logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
 
 rc=3
+arc=0
+
+if [ $1 != "enable"  ] && [ $1 != "daemon" ]
+then
+    echo "`date`- The command is $1, exiting" >> $logfile
+    exit $arc
+fi
+
 if [ -f "/usr/bin/python2.7" ]
 then
     echo "`date`- python 2.7 path exists" >> $logfile
@@ -55,6 +63,11 @@ elif [ -f "/usr/bin/python" ]
 then
     echo "`date`- python path exists" >> $logfile
     /usr/bin/python main/handle.py -$1
+    rc=$?
+elif [ -f "`which python`" ]
+then
+    echo "`date`- python path exists" >> $logfile
+    /usr/bin/env python main/handle.py -$1
     rc=$?
 else
     echo "`date`- python version unknown" >> $logfile
