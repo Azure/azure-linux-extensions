@@ -32,9 +32,14 @@ class Backuplogger(object):
         self.enforced_local_flag_value = True
         self.hutil = hutil
         self.prev_log = ''
+        self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
-        if (self.enforced_local_flag_value != False and enforced_local == False):
+        if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
+            self.logging_off = True
+        if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):
+            pass
+        elif (self.enforced_local_flag_value != False and enforced_local == False):
             self.msg = self.msg + "================== Logs during Freeze Start ==============" + "\n"
         elif (self.enforced_local_flag_value == False and enforced_local == True):
             self.msg = self.msg + "================== Logs during Freeze End ==============" + "\n"
@@ -43,6 +48,8 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
+        if(self.enforced_local_flag_value == False and self.logging_off == True):
+            return
         WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             log_msg = ""
