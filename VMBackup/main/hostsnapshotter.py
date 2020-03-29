@@ -63,7 +63,7 @@ class HostSnapshotter(object):
                 self.logger.log("Failed to parse the snapshoturi",False,'Error')
                 all_failed = True
             else:
-                diskIds = []
+                diskIds = paras.includeLunList
                 body_content = ''
                 headers = {}
                 headers['Backup'] = 'true'
