@@ -601,10 +601,12 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
+        workloads = self.get_workload_running()
         HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("workloads",workloads)
     
     def convert_telemetery_data_to_bcm_serializable_format(self):
         HandlerUtility.serializable_telemetry_data = []
@@ -783,6 +785,22 @@ class HandlerUtility:
                     uriHasSpecialCharacters = True
 
         return uriHasSpecialCharacters
+
+    def get_workload_running(self):
+        workloads = []
+        dblist= ["mysqld","postgres","oracle","cassandra",",mongo"]
+        if os.path.isdir("/proc"):
+            pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+            for pid in pids:
+                pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
+                for db in dblist :
+                    if db in pname and db not in workloads :
+                        self.log("workload running found with command : " + str(pname))
+                        workloads.append(db)
+                    else :
+                        pass
+        return workloads
+
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
