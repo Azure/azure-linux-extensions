@@ -606,7 +606,7 @@ class HandlerUtility:
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
-        HandlerUtility.add_to_telemetery_data("workloads",workloads)
+        HandlerUtility.add_to_telemetery_data("workloads",str(workloads))
     
     def convert_telemetery_data_to_bcm_serializable_format(self):
         HandlerUtility.serializable_telemetry_data = []
