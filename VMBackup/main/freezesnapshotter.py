@@ -114,6 +114,8 @@ class FreezeSnapshotter(object):
         all_failed = False
         unable_to_sleep = False
 
+        http_util = HttpUtil(self.logger)
+
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromGuest()
         elif(self.takeSnapshotFrom == CommonVariables.firstGuestThenHost):
