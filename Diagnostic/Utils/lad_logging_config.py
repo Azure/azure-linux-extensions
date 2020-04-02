@@ -160,6 +160,46 @@ class LadLoggingConfig:
                                                                    syslog_name_to_rsyslog_name(sev))
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._syslog_ng_config
+    
+    def parse_lad_perf_settings(self, data): 
+        """
+        Sample OMI metric json config taken from .settings file
+        {
+            u'counterSpecifier': u'/builtin/network/packetstransmitted', 
+            u'counter': u'packetstransmitted', 
+            u'class': u'network', 
+            u'sampleRate': u'PT15S', 
+            u'type': u'builtin', 
+            u'annotation': [{
+                    u'locale': u'en-us', 
+                    u'displayName': u'Packets sent'
+                }],
+            u'unit': u'Count'
+        }
+        """
+
+        if "performanceCounterConfiguration" not in data or len(data["performanceCounterConfiguration"]) == 0:
+            return []
+        
+        parsed_settings = []
+        perfconf = data["performanceCounterConfiguration"]
+
+        for item in perfconf:
+            counter = {}
+            counter["displayName"] = item["class"] + "->" + item["annotation"][0]["displayName"]
+            counter["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S tp 15s
+            parsed_settings.append(counter)
+
+        """
+        Sample output after parsing the OMI metric 
+        [
+            {
+                "displayName" : "Network/Packets sent",
+                "interval" : "15s"
+            },
+        ]
+        """    
+        return parsed_settings
 
     def get_mdsd_syslog_config(self):
         """
