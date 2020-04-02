@@ -743,8 +743,7 @@ class AbstractDistro(object):
 
 class DefaultDistro(AbstractDistro):
     """
-    Asianux Distro concrete class
-    Put Asianux specific behavior here...
+    Default Distro concrete class: This class serves as a default OS behavior class.
     """
 
     def startDHCP(self):
