@@ -17,7 +17,7 @@
 #  OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 #  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os.path
+import os
 import traceback
 import xml.etree.ElementTree as ET
 
@@ -26,7 +26,7 @@ import Utils.ProviderUtil as ProvUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
-import Utils.telegraf_config_parser as telconf
+import Utils.telegraf_config_parser as telparser
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
 from Utils.misc_helpers import get_storage_endpoints_with_account, escape_nonalphanumerics
@@ -80,8 +80,7 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_conf_path = self._ext_dir +  "/telegraf.conf"
-        self._telegraf_int_json_path = self._ext_dir + "/intermediate_telegraf_conf.json"
+        self._telegraf_conf_path = self._ext_dir + "/telegraf_configs/"
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
@@ -90,7 +89,6 @@ class LadConfigAll:
         self._rsyslog_config = None
         self._syslog_ng_config = None
         self._telegraf_config = None
-        self._intermediate_telegraf_config = None
 
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
@@ -448,7 +446,8 @@ class LadConfigAll:
             self._fluentd_out_mdsd_config = lad_logging_config_helper.get_fluentd_out_mdsd_config()
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
-            self._telegraf_config, self._intermediate_telegraf_config = telconf.parse_config(perf_settings)          
+            parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
+            self._telegraf_config = telparser.parse_config(parsed_perf_settings)          
 
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
@@ -483,11 +482,14 @@ class LadConfigAll:
         # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
-        #9. Write out the generated telegraf and intermediate telegraf conf to the ext_dir location            
-        with open(self._telegraf_conf_path, "w+") as f:
-            f.write(self._telegraf_config)
-        with open(self._telegraf_int_json_path, "w+") as f:
-            f.write(self._intermediate_telegraf_config)
+        #9. Write out the generated telegraf configs and intermediate telegraf json to the ext_dir location 
+        if not os.path.exists(self._telegraf_conf_path):
+            os.makedir(self._telegraf_conf_path)
+
+        for configfile in self._telegraf_config:
+            path = self._telegraf_conf_path + configfile["filename"]
+            with open(path, "w") as f:
+                f.write(configfile["data"])
 
         
         return True, ""
@@ -562,3 +564,4 @@ class LadConfigAll:
         """
         LadConfigAll.__throw_if_output_is_none(self._syslog_ng_config)
         return self._syslog_ng_config
+
