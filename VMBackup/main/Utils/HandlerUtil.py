@@ -343,7 +343,7 @@ class HandlerUtility:
         try :
             value_str = str(value)
         except ValueError :
-            self.log('Not able to parse the read value as string, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as string, falling back to default value', 'Warning')
             value = default
 
         return value
@@ -358,7 +358,7 @@ class HandlerUtility:
         try :
             value_int = int(value)
         except ValueError :
-            self.log('Not able to parse the read value as int, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as int, falling back to default value', 'Warning')
             value = default
 
         return int(value)
