@@ -39,6 +39,9 @@ class HttpUtil(object):
         if(cls.__instance is None):
             hutil.log("Creating HttpUtil")
             cls.__instance = super(HttpUtil, cls).__new__(cls)
+            Config = None
+            cls.__instance.proxyHost = None
+            cls.__instance.proxyPort = None
             try:
                 waagent.MyDistro = waagent.GetMyDistro()
                 Config = waagent.ConfigurationProvider(None)
