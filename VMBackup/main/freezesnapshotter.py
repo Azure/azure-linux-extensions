@@ -114,6 +114,7 @@ class FreezeSnapshotter(object):
         all_failed = False
         unable_to_sleep = False
 
+        """ Do Not remove below HttpUtil object creation. This is to ensure HttpUtil singleton object is created before freeze."""
         http_util = HttpUtil(self.logger)
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
