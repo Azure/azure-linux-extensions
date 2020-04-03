@@ -788,18 +788,20 @@ class HandlerUtility:
 
     def get_workload_running(self):
         workloads = []
-        dblist= ["mysqld","postgres","oracle","cassandra",",mongo"]
-        if os.path.isdir("/proc"):
-            pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
-            for pid in pids:
-                pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
-                for db in dblist :
-                    if db in pname and db not in workloads :
-                        self.log("workload running found with command : " + str(pname))
-                        workloads.append(db)
-                    else :
-                        pass
-        return workloads
+        try:
+            dblist= ["mysqld","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            if os.path.isdir("/proc"):
+                pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+                for pid in pids:
+                    pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
+                    for db in dblist :
+                        if db in pname.lower() and db not in workloads :
+                            self.log("workload running found with command : " + str(pname))
+                            workloads.append(db)
+            return workloads
+        except Exception as e:
+            self.log("Unable to fetch running workloads" + str(e))
+            return workloads
 
 
 class ComplexEncoder(json.JSONEncoder):
