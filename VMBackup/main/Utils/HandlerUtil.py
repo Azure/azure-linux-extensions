@@ -803,7 +803,6 @@ class HandlerUtility:
             self.log("Unable to fetch running workloads" + str(e))
             return workloads
 
-
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj,'convertToDictionary'):
