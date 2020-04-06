@@ -50,7 +50,8 @@ class Backuplogger(object):
                 log_msg = self.log_to_con_py3(msg, level)
             else:
                 log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
-                self.log_to_con(log_msg)
+                if(self.enforced_local_flag_value != False):
+                    self.log_to_con(log_msg)
             if(self.enforced_local_flag_value == False):
                 self.msg += log_msg
             else:
@@ -75,8 +76,9 @@ class Backuplogger(object):
             log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
             log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
                          encoding="ascii")
-            with open(self.con_path, "w") as C :
-                C.write(log_msg)
+            if(self.enforced_local_flag_value != False):
+                with open(self.con_path, "w") as C :
+                    C.write(log_msg)
         except IOError:
             pass
         except Exception as e:
