@@ -48,9 +48,7 @@ class DiskUtil(object):
         self.logger = logger
         self.ide_class_id = "{32412632-86cb-44a2-9b5c-50d1417354f5}"
         self.vmbus_sys_path = '/sys/bus/vmbus/devices'
-
         self.command_executor = CommandExecutor(self.logger)
-
         self._LUN_PREFIX = "lun"
         self._SCSI_PREFIX = "scsi"
 
@@ -579,7 +577,7 @@ class DiskUtil(object):
     def parse_fstab_line(self, line):
         fstab_parts = line.strip().split()
 
-        if len(fstab_parts) < 2: # Line should have enough content
+        if len(fstab_parts) < 3: # Line should have enough content
             return None, None, None
 
         if fstab_parts[0].startswith("#"): # Line should not be a comment
@@ -774,9 +772,7 @@ class DiskUtil(object):
             self.umount(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 
     def mount_all(self):
-        systemd_present = self.command_executor.Execute('pidof systemd')
-        if systemd_present == 0:
-            self.command_executor.Execute('systemctl daemon-reload')
+        self.command_executor.Execute('systemctl daemon-reload')
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 

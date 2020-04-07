@@ -459,14 +459,9 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    public_settings = get_public_settings()
-    stored_encryption_command = None
-    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
-    if extension_parameter.config_file_exists():
-        stored_encryption_command = extension_parameter.get_command()
     volume_type = encryption_config.get_volume_type().lower()
     if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, public_settings, DistroPatcher.distro_info, stored_encryption_command)
+        resource_disk_util = ResourceDiskUtil(logger, disk_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
         resource_disk_util.automount()
         logger.log("mounted encrypted resource disk")
 
@@ -572,6 +567,10 @@ def enable():
         existing_passphrase_file = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        is_migrate_operation = False
+        if CommonVariables.MigrateKey in public_settings:
+            if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
+                is_migrate_operation = True
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
@@ -587,7 +586,7 @@ def enable():
 
         # run fatal prechecks, report error if exceptions are caught
         try:
-            if not encryption_operation == CommonVariables.Migrate:
+            if not is_migrate_operation:
                 cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
@@ -612,6 +611,9 @@ def enable():
             logger.log(traceback.format_exc())
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            if is_migrate_operation:
+                perform_migration(disk_util, existing_passphrase_file, encryption_config)
+                return #Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
 
             extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
@@ -640,38 +642,6 @@ def enable():
             else:
                 logger.log("No daemon found, trying to find the last non-query operation")
                 hutil.find_last_nonquery_operation = True
-
-        elif encryption_operation == CommonVariables.Migrate:
-            try:
-                logger.log("Migrate operation found. Starting migration flow.")
-                encryption_status = json.loads(disk_util.get_encryption_status())
-                if (encryption_status['data'] == 'NotEncrypted' or encryption_status['data'] == 'NotMounted') and encryption_status['os'] == 'NotEncrypted':
-                    logger.log("No device encrypted. Migration allowed")
-                    hutil.do_exit(exit_code=CommonVariables.success,
-                                  operation='Migrate',
-                                  status=CommonVariables.extension_success_status,
-                                  code=(CommonVariables.success),
-                                  message="Migration Allowed")
-                    migration_allowed, error = is_migration_allowed(disk_util, existing_passphrase_file)
-                    if not migration_allowed:
-                        hutil.do_exit(exit_code=CommonVariables.configuration_error,
-                                      operation='Migrate',
-                                      status=CommonVariables.extension_error_status,
-                                      code=(CommonVariables.configuration_error),
-                                      message=error)
-
-                logger.log("Trying to stamp disk with encryption settings.")
-                stamp_disks_with_settings([], encryption_config)
-                exit_without_status_report()
-            except Exception as e:
-                logger.log("Migration: Fatal Exception thrown during migration")
-                logger.log(traceback.format_exc())
-                msg = e.message
-                hutil.do_exit(exit_code=CommonVariables.unknown_error,
-                              operation='Migrate',
-                              status=CommonVariables.extension_error_status,
-                              code=(CommonVariables.unknown_error),
-                              message=msg)
 
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
@@ -891,7 +861,7 @@ def is_migration_allowed(disk_util, existing_passphrase_file):
             if device_items and len(device_items) > 0:
                 device_item = device_items[0]
             if not device_item or device_item.file_system not in CommonVariables.inplace_supported_file_systems:
-                logger.log("Found device with detached header and {0} file system: " + device_item.file_system if device_item else "unknown")
+                logger.log("Found device with detached header and file system: " + device_item.file_system if device_item else "unknown")
                 detached_header_with_xfs = True
             else:
                 logger.log("Found device with detached header " + crypt_item.dev_path)
@@ -909,6 +879,35 @@ def is_migration_allowed(disk_util, existing_passphrase_file):
     if detached_header:
         return False, CommonVariables.migration_detached_header
     return True, None
+
+def perform_migration(disk_util, existing_passphrase_file, encryption_config):
+    try:
+        logger.log("Migrate operation found. Starting migration flow.")
+        hutil.exit_if_same_seq()
+        migration_allowed, error = is_migration_allowed(disk_util, existing_passphrase_file)
+        if not migration_allowed:
+            hutil.save_seq()
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                          operation='Migrate',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.configuration_error),
+                          message=error)
+            return # Normal flow won't hit this. Added it for unit tests
+
+        logger.log("Trying to stamp disk with encryption settings.")
+        stamp_disks_with_settings([], encryption_config)
+        hutil.save_seq()
+        exit_without_status_report()
+    except Exception as e:
+        hutil.save_seq()
+        logger.log("Migration: Fatal Exception thrown during migration")
+        logger.log(traceback.format_exc())
+        msg = e.message
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
+                      operation='Migrate',
+                      status=CommonVariables.extension_error_status,
+                      code=(CommonVariables.unknown_error),
+                      message=msg)
 
 def enable_encryption_format(passphrase, disk_format_query, disk_util, force=False):
     logger.log('enable_encryption_format')
@@ -1983,8 +1982,11 @@ def daemon_decrypt():
                           code=CommonVariables.encryption_failed,
                           message='Decryption failed for {0}'.format(failed_item))
         else:
-            encryption_status = json.loads(disk_util.get_encryption_status())
-            if encryption_status['os'] == "Encrypted":
+            encryption_status = None
+            encryption_status_str = disk_util.get_encryption_status()
+            if encryption_status_str:
+                encryption_status = json.loads(disk_util.get_encryption_status())
+            if encryption_status and encryption_status['os'] == "Encrypted":
                 encryption_config.volume_type = CommonVariables.VolumeTypeOS
                 encryption_config.commit()
             else:

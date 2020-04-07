@@ -81,6 +81,8 @@ class CommonVariables:
     PassphraseKey = 'Passphrase'
     KeyVaultResourceIdKey = 'KeyVaultResourceId'
     KekVaultResourceIdKey = 'KekVaultResourceId'
+    MigrateKey = 'MigrateFlag'
+    MigrateValue = 'Migrate'
 
     """
     value for VolumeType could be OS or Data
@@ -105,7 +107,6 @@ class CommonVariables:
     UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
-    Migrate = 'Migrate'
 
     """
     encryption config keys
@@ -194,9 +195,9 @@ class CommonVariables:
     """
     error messages
     """
-    migration_detached_header = "One or more data disk use detached LUKS header. Migration cannot be done."
-    migration_detached_header_xfs = "One or more data disk use detached LUKS header with xfs filesystem. Migration cannot be done."
-    migration_wrong_passphrase = "Passphrase validation failed. Migration cannot be done."
+    migration_detached_header = "One or more data disk use detached LUKS header. Migration is not supported."
+    migration_detached_header_xfs = "One or more data disk use detached LUKS header with xfs filesystem. Migration is not supported."
+    migration_wrong_passphrase = "Passphrase validation failed. Please check your passphrase and try again."
 
 class TestHooks:
     search_not_only_ide = False

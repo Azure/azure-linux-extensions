@@ -66,10 +66,16 @@ import json
 import tempfile
 import time
 
-from Common import *
+try:
+    from Common import *
+except Exception:
+    from ..Common import * # Added for unit test
 from os.path import join
-from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
+from WAAgentUtil import waagent
+try:
+    from waagent import LoggerInit
+except Exception:
+    pass # Added for unit test where waagent might not be setup
 import logging
 import logging.handlers
 

@@ -63,6 +63,11 @@ class ExtensionParameter(object):
         self.VolumeType = public_settings.get(CommonVariables.VolumeTypeKey)
         self.DiskFormatQuery = public_settings.get(CommonVariables.DiskFormatQuerykey)
 
+        if CommonVariables.MigrateKey in public_settings:
+            self.MigrateFlag = public_settings.get(CommonVariables.MigrateKey)
+        else:
+            self.MigrateFlag = None
+
         """
         private settings
         """
