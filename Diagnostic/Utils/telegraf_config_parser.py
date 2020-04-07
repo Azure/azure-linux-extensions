@@ -127,7 +127,9 @@ def parse_config(data):
                 aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
                 aggregator_str += " "*2 + "drop_original = false\n"
                 aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [" + ops[:-2] + "]\n\n"  #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "stats = [" + ops[:-2] + "]\n"  #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "rate_period = \"" + twiceminperiod + "s\"\n\n"
+
 
 
             rename_str += "\n"
@@ -194,7 +196,7 @@ def parse_config(data):
     agentconf += "  flush_interval = \"10s\"\n"
     agentconf += "  flush_jitter = \"0s\"\n"
     agentconf += "  logtarget = \"file\"\n"
-    agentconf += "  logfile = \"" + logdir + "/telegraf.log\n"
+    agentconf += "  logfile = \"" + logdir + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
     agentconf += "  logfile_rotation_max_archives = 5\n"                
     agentconf += "\n# Configuration for sending metrics to InfluxD\n"
