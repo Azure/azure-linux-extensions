@@ -57,8 +57,8 @@ name_map = {
 # # "disk->Disk transfers" :
 "disk->Disk read time" : {"plugin":"diskio", "field":"read_time"},
 "disk->Disk write time" : {"plugin":"diskio", "field":"write_time"},
-"disk->Disk transfer time" :{"plugin":"diskio", "field":"io_time"},
-# # "disk->Disk queue length" : 
+"disk->Disk transfer time" : {"plugin":"diskio", "field":"io_time"},
+"disk->Disk queue length" : {"plugin":"diskio", "field":"iops_in_progress", "op":"mean"}
 
 
 ##### These are the counter keys and telegraf plugins for Azure Monitor Agent

@@ -115,7 +115,7 @@ def parse_config(data):
                 #Add respective rename processor plugin based on the displayname
                 rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
                 if "op" in telegraf_json[omiclass][plugin][field]:
-                    rename_str += " "*4 + "field = \"" + field + "_rate\"\n"
+                    rename_str += " "*4 + "field = \"" + field + "_" + telegraf_json[omiclass][plugin][field]["op"] + "\"\n"
                     rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
                 else:
                     rename_str += " "*4 + "field = \"" + field + "\"\n"
