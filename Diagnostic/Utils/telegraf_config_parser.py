@@ -134,6 +134,8 @@ def parse_config(data):
 
             rename_str += "\n"
             input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"  #Using fields[: -2] here to get rid of the last ", " at the end of the string
+            if plugin == "cpu":
+                input_str += " "*2 + "report_active = true\n"
             input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
         
             config_file["data"] = input_str + "\n" + rename_str + "\n" +aggregator_str
@@ -189,7 +191,7 @@ def parse_config(data):
     # Telegraf basic agent and output config 
     agentconf = "[agent]\n"
     agentconf += "  interval = \"10s\"\n"
-    agentconf += "  round_interval = true"
+    agentconf += "  round_interval = true\n"
     agentconf += "  metric_batch_size = 1000\n"
     agentconf += "  metric_buffer_limit = 10000\n"
     agentconf += "  collection_jitter = \"0s\"\n"
