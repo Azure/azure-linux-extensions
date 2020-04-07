@@ -89,6 +89,8 @@ class CommonVariables:
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
+    MigrateKey = 'MigrateFlag'
+    MigrateValue = 'Migrate'
 
     """
     value for VolumeType could be Data
@@ -110,7 +112,6 @@ class CommonVariables:
     UpdateEncryptionSettings = 'UpdateEncryptionSettings'
     DisableEncryption = 'DisableEncryption'
     QueryEncryptionStatus = 'QueryEncryptionStatus'
-    Migrate = 'Migrate'
 
     """
     encryption config keys

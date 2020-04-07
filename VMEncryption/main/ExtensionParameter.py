@@ -144,7 +144,7 @@ class ExtensionParameter(object):
                 new_name = "{0}_{1}".format(self.encryption_environment.extension_parameter_file_path, time_stamp)
                 os.rename(self.encryption_environment.extension_parameter_file_path, new_name)
             else:
-                self.logger.log(msg=("the params file not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level = CommonVariables.WarningLevel)
+                self.logger.log(msg=("the params file does not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level = CommonVariables.WarningLevel)
             return True
         except OSError as e:
             self.logger.log("Failed to archive encryption parameters with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
