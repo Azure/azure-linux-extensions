@@ -1,0 +1,31 @@
+<ExtensionInfo>
+    <Namespace>Microsoft.Azure.Security</Namespace>
+    <Type>AzureDiskEncryptionForLinux</Type>
+    <ExtensionShortName>AdeLinux</ExtensionShortName>
+    <Version>TO BE SET AT BUILDTIME</Version>
+    <SupportedOS>Linux</SupportedOS>
+    <ExtensionLabel>Windows Azure VMEncryption Extension for Linux IaaS</ExtensionLabel>
+    <ExtensionZipFileName>TO BE SET AT BUILDTIME</ExtensionZipFileName>
+    <ExtensionIsAlwaysInternal>False</ExtensionIsAlwaysInternal>
+    <CloudTypes>
+        <Public>
+            <SubscriptionId>e212dea4-8522-4baa-a5c4-aebc56450d8b</SubscriptionId>
+            <KVPathForCertSceret>https://ade-extensionpublishing.vault.azure.net/secrets/Extension-Publishing</KVPathForCertSceret>
+            <ClassicStorageAccountName>edpazuresecurity</ClassicStorageAccountName>
+            <ClassicContainerName>extensions</ClassicContainerName>
+            <StorageAccountSuffix>blob.core.windows.net</StorageAccountSuffix>
+            <KVClassicStorageConnection>https://ade-extensionpublishing.vault.azure.net/secrets/adeev2publishing</KVClassicStorageConnection>
+            <SDPRegions>
+                <Stage1>Central US EUAP</Stage1>
+                <Stage2>Central US EUAP;East US 2 EUAP</Stage2>
+                <Stage3>Central US EUAP;East US 2 EUAP;West Central US</Stage3>
+                <Stage4>Central US EUAP;East US 2 EUAP;West Central US;North Central US</Stage4>
+                <Stage5>Central US EUAP;East US 2 EUAP;West Central US;North Central US;West US</Stage5>
+                <Stage6>Central US EUAP;East US 2 EUAP;West Central US;North Central US;West US;East Asia;Australia East;Australia Central;Canada Central;North Europe;France Central;West India;Japan East;Korea Central;East US 2</Stage6>
+                <Stage7>Central US EUAP;East US 2 EUAP;West Central US;North Central US;West US;East Asia;Australia East;Australia Central;Canada Central;North Europe;France Central;West India;Japan East;Korea Central;East US 2;Brazil South;South Africa North;Switzerland North;UK West;UAE North;East US;Norway East;Central India;West US 2</Stage7>
+                <Stage8>Central US EUAP;East US 2 EUAP;West Central US;North Central US;West US;East Asia;Australia East;Australia Central;Canada Central;North Europe;France Central;West India;Japan East;Korea Central;East US 2;Brazil South;South Africa North;Switzerland North;UK West;UAE North;East US;Norway East;Central India;West US 2;Southeast Asia;Australia Southeast;South Central US;Canada East;Japan West;Korea South;Switzerland West;UAE Central</Stage8>
+                <Stage9>Central US EUAP;East US 2 EUAP;West Central US;North Central US;West US;East Asia;Australia East;Australia Central;Canada Central;North Europe;France Central;West India;Japan East;Korea Central;East US 2;Brazil South;South Africa North;Switzerland North;UK West;UAE North;East US;Norway East;Central India;West US 2;Southeast Asia;Australia Southeast;South Central US;Canada East;Japan West;Korea South;Switzerland West;UAE Central;Australia Central 2;France South;South India;West Europe;Central US;Norway West;South Africa West;UK South</Stage9>
+            </SDPRegions>
+        </Public>
+    </CloudTypes>
+</ExtensionInfo>
