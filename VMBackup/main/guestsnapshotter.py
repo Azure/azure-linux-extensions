@@ -35,8 +35,6 @@ from Utils import Status
 from Utils import HandlerUtil
 from fsfreezer import FsFreezer
 from Utils import HostSnapshotObjects
-import sys
-import json
 
 class SnapshotInfoIndexerObj():
     def __init__(self, index, isSuccessful, snapshotTs, errorMessage):
@@ -92,14 +90,12 @@ class GuestSnapshotter(object):
                 
                 body_content = ''
                 
-                headers = self.populate_snapshotreq_headers(sasuri, sasuri_index, meta_data)
-               
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = meta_data, responseBodyRequired = True)
                 temp_logger = temp_logger + str("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
@@ -367,15 +363,6 @@ class GuestSnapshotter(object):
             snapshot_error.sasuri = sasuri
 
         return snapshot_info_indexer, snapshot_error, message
-
-    def httpresponse_get_blob_properties(self, httpResp):
-        blobProperties = {}
-        if(httpResp != None):
-            self.hutil.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
-            if(httpResp.status == 200):
-                resp_headers = httpResp.getheaders()
-                blobProperties = resp_headers
-        return blobProperties
 
     def get_snapshot_info(self, snapshot_info_indexer, snapshot_info):
         if (snapshot_info_indexer != None):

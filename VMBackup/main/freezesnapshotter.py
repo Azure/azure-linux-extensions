@@ -39,6 +39,8 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
+import sys
+
 # need to be implemented in next release
 #from dhcpHandler import DhcpHandler
 
@@ -269,6 +271,15 @@ class FreezeSnapshotter(object):
     # max size of blob metadata 
             return sys.getsizeof(json.dumps(headers))
 
+
+    def httpresponse_get_blob_properties(self, httpResp):
+        blobProperties = {}
+        if(httpResp != None):
+            self.hutil.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
+            if(httpResp.status == 200):
+                resp_headers = httpResp.getheaders()
+                blobProperties = resp_headers
+        return blobProperties
 
     def populate_snapshotreq_headers_perblob(self, sasuri, sasuri_index, backup_meta_data):
         headers= {}
