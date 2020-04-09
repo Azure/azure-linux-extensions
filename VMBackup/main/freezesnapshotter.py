@@ -251,6 +251,101 @@ class FreezeSnapshotter(object):
         
         return run_result, run_status
 
+    def GetBlobProperties(self, blobUri):
+        blobProperties = None
+        if(blobUri is not None):     
+            try:
+                http_util = HttpUtil(self.logger)
+                sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
+                headers = {}
+                result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
+                self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
+                blobProperties = self.httpresponse_get_blob_properties(httpResp)
+            except Exception as e:
+                self.logger.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        return blobProperties
+
+    def GetHeaderSize(self, headers):
+    # max size of blob metadata 
+            return sys.getsizeof(json.dumps(headers))
+
+
+    def populate_snapshotreq_headers_perblob(self, sasuri, sasuri_index, backup_meta_data):
+        headers= {}
+        headers["Content-Length"] = '0'
+        blobMetdataMaxSizeBytes = 8000
+
+        original_blob_metadata = self.GetBlobProperties(sasuri)
+        
+        if(original_blob_metadata is not None): 
+            for meta in original_blob_metadata:
+                Key,Value = meta
+                headers[Key] = Value
+
+        if(backup_meta_data is not None):
+            for meta in backup_meta_data:
+                key = meta['Key']
+                value = meta['Value']
+                headers["x-ms-meta-" + key] = value
+     
+        level1BlobMetadataSize = self.GetHeaderSize(headers)
+        
+        if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
+            if sasuri_index not in blobMetadataTelemetryMessage :
+                blobMetadataTelemetryMessage[sasuri_index] = ""
+
+            blobMetadataTelemetryMessage[sasuri_index]+="Level 1 : " + str(level1BlobMetadataSize);
+
+            headers = {}
+            if(original_blob_metadata is not None): 
+                for meta in original_blob_metadata:
+                    Key,Value = meta
+                    if Key == "x-ms-meta-diskencryptionsettings" :
+                        headers[Key] = Value
+                        break
+
+            if(backup_meta_data is not None):
+                for meta in backup_meta_data:
+                    key = meta['Key']
+                    value = meta['Value']
+                    headers["x-ms-meta-" + key] = value
+
+            level2BlobMetadataSize = self.GetHeaderSize(headers)
+            
+            if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
+                blobMetadataTelemetryMessage[sasuri_index]+= ", Level 2 : " + str(level2BlobMetadataSize);
+
+                headers = {}
+                if(backup_meta_data is not None):
+                    for meta in backup_meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
+                
+        return headers
+
+
+    def populate_blob_metadata_all(self, paras):
+        blob_metadata = {}
+        try:
+            blobs = paras.blobs
+            if blobs is not None:
+                blob_index = 0
+                self.logger.log('****** Starting metadata retrieval for all blobs')
+                
+                for blob in blobs:
+                    blobUri = blob.split("?")[0]
+                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
+                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blobUri,blob_index,paras.backup_metadadata)
+                    self.logger.log("Metadata count added : " + str(len(blob_metadata[blob_index])))
+                    blob_index = blob_index + 1
+
+        except Exception as e:
+            errorMsg = " Unable to retreive metadata for blobs : %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg)
+
+        return blob_metadata
+     
     def takeSnapshotFromGuest(self):
         run_result = CommonVariables.success
         run_status = 'success'
@@ -270,6 +365,9 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
+            # populate metadata for all blobs
+            blob_metadata = self.populate_blob_metadata_all(self.para_parser)
+
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
@@ -278,7 +376,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, self.blob_metadata)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
                 self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))

@@ -72,83 +72,6 @@ class GuestSnapshotter(object):
         self.configfile='/etc/azure/vmbackup.conf'
         self.hutil = hutil
 
-    def GetBlobProperties(self, blobUri):
-        blobProperties = None
-        if(blobUri is not None):     
-            try:
-                http_util = HttpUtil(self.logger)
-                sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
-                headers = {}
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
-                self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
-                blobProperties = self.httpresponse_get_blob_properties(httpResp)
-            except Exception as e:
-                self.logger.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-        return blobProperties
-
-    def GetHeaderSize(self, headers):
-    # max size of blob metadata 
-            return sys.getsizeof(json.dumps(headers))
-        
-
-    def populate_snapshotreq_headers(self, sasuri, sasuri_index, meta_data):
-        headers= {}
-        headers["Content-Length"] = '0'
-        blobMetdataMaxSizeBytes = 8000
-
-        if sasuri_index not in blobMetadataTelemetryMessage :
-            blobMetadataTelemetryMessage[sasuri_index] = ""
-
-        original_blob_metadata = self.GetBlobProperties(sasuri)
-        
-        if(original_blob_metadata is not None): 
-            for meta in original_blob_metadata:
-                Key,Value = meta
-                headers[Key] = Value
-
-        if(meta_data is not None):
-            for meta in meta_data:
-                key = meta['Key']
-                value = meta['Value']
-                headers["x-ms-meta-" + key] = value
-     
-        level1BlobMetadataSize = self.GetHeaderSize(headers)
-
-        blobMetadataTelemetryMessage[sasuri_index]+="Level 1 : " + str(level1BlobMetadataSize);
-
-        if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
-            headers = {}
-            if(original_blob_metadata is not None): 
-                for meta in original_blob_metadata:
-                    Key,Value = meta
-                    if Key == "x-ms-meta-diskencryptionsettings" :
-                        headers[Key] = Value
-                        break
-
-            if(meta_data is not None):
-                for meta in meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
-
-            level2BlobMetadataSize = self.GetHeaderSize(headers)
-
-            blobMetadataTelemetryMessage[sasuri_index]+= ", Level 2 : " + str(level2BlobMetadataSize);
-
-            if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
-                headers = {}
-                if(meta_data is not None):
-                    for meta in meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
-                self.logger.log("Level 3 : " + str(headers))
-
-                level3BlobMetadataSize = self.GetHeaderSize(headers)  
-                blobMetadataTelemetryMessage[sasuri_index]+= ", Level 3 : " + str(level3BlobMetadataSize);
-                
-        return headers
-
     def snapshot(self, sasuri, sasuri_index, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         temp_logger=''
         error_logger=''
@@ -219,13 +142,12 @@ class GuestSnapshotter(object):
             else:
                 body_content = ''
                 
-                headers = self.populate_snapshotreq_headers(sasuri,sasuri_index,meta_data)
-               
+                
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = meta_data, responseBodyRequired = True)
                 self.logger.log("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
@@ -244,7 +166,7 @@ class GuestSnapshotter(object):
             snapshot_error.sasuri = sasuri
         return snapshot_error, snapshot_info_indexer
 
-    def snapshotall_parallel(self, paras, freezer, thaw_done, g_fsfreeze_on):
+    def snapshotall_parallel(self, paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata):
         self.logger.log("doing snapshotall now in parallel...")
         snapshot_result = SnapshotResult()
         blob_snapshot_info_array = []
@@ -276,7 +198,7 @@ class GuestSnapshotter(object):
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
                     try:
-                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, blob_metadata[blob_index], snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
                         self.logger.log("multiprocess queue creation failed")
                         all_snapshots_failed = True
@@ -346,7 +268,7 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
-    def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on):
+    def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata):
         exceptOccurred = False
         self.logger.log("doing snapshotall now in sequence...")
         snapshot_result = SnapshotResult()
@@ -366,7 +288,7 @@ class GuestSnapshotter(object):
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, blob_metadata[blob_index])
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update blob_snapshot_info_array element properties from snapshot_info_indexer object
@@ -399,20 +321,20 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
-    def snapshotall(self, paras, freezer, g_fsfreeze_on):
+    def snapshotall(self, paras, freezer, g_fsfreeze_on, blob_metadata):
         thaw_done = False
         #Dict <DiskIndex, Disk Metadata Size>
         global blobMetadataTelemetryMessage
         blobMetadataTelemetryMessage = {}
 
         if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
-            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
+            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
         else:
-            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
+            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
             self.logger.log("exceptOccurred : " + str(exceptOccurred) + " thaw_done : " + str(thaw_done) + " all_snapshots_failed : " + str(all_snapshots_failed))
             if exceptOccurred and thaw_done == False and all_snapshots_failed:
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
-                snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
+                snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
         
         self.logger.log("Adding to the telemetry " + json.dumps(blobMetadataTelemetryMessage))
         HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", json.dumps(blobMetadataTelemetryMessage))
