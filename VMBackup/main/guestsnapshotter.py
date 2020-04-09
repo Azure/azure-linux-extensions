@@ -319,10 +319,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, blob_metadata):
         thaw_done = False
-        #Dict <DiskIndex, Disk Metadata Size>
-        global blobMetadataTelemetryMessage
-        blobMetadataTelemetryMessage = {}
-
+       
         if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
         else:
@@ -332,8 +329,6 @@ class GuestSnapshotter(object):
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
                 snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
         
-        self.logger.log("Adding to the telemetry " + json.dumps(blobMetadataTelemetryMessage))
-        HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", json.dumps(blobMetadataTelemetryMessage))
         return snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri, responseBody):

@@ -377,7 +377,15 @@ class FreezeSnapshotter(object):
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
             # populate metadata for all blobs
+            
+            #Dict <DiskIndex, Disk Metadata Size>
+            global blobMetadataTelemetryMessage
+            blobMetadataTelemetryMessage = {}
+
             blob_metadata = self.populate_blob_metadata_all(self.para_parser)
+
+            self.logger.log("Adding to the telemetry " + json.dumps(blobMetadataTelemetryMessage))
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", json.dumps(blobMetadataTelemetryMessage))
 
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
