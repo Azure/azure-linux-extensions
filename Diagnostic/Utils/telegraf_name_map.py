@@ -31,7 +31,7 @@ name_map = {
 
 "memory->Page reads": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"rate"},
 "memory->Page writes" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"rate"},
-# "memory->Pages" : {"plugin":"kernel", "field":""},
+"memory->Pages" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate"},
 
 #OMI Filesystem plugin
 "filesystem->Filesystem used space" : {"plugin":"disk", "field":"used"},
@@ -41,9 +41,9 @@ name_map = {
 "filesystem->Filesystem % free inodes" : {"plugin":"disk", "field":"inodes_free_percent"}, #Need to calculate percentage
 "filesystem->Filesystem % used inodes" : {"plugin":"disk", "field":"inodes_used_percent"}, #Need to calculate percentage
 
-# # "filesystem->Filesystem transfers/sec" : {"plugin":"diskio", "field":"reads + writes"}, #Need to calculate sum
+"filesystem->Filesystem transfers/sec" : {"plugin":"diskio", "field":"total_transfers", "op":"rate"}, #Need to calculate sum
 "filesystem->Filesystem read bytes/sec" : {"plugin":"diskio", "field":"read_bytes", "op":"rate"}, #Need to calculate rate (but each second not each interval)
-# # "filesystem->Filesystem bytes/sec" : {"plugin":"diskio", "field":"read_bytes + write_bytes"}, #Need to calculate rate and then sum
+"filesystem->Filesystem bytes/sec" : {"plugin":"diskio", "field":"total_bytes", "op":"rate"}, #Need to calculate rate and then sum
 "filesystem->Filesystem write bytes/sec" : {"plugin":"diskio", "field":"write_bytes", "op":"rate"}, #Need to calculate rate (but each second not each interval)
 "filesystem->Filesystem reads/sec" : {"plugin":"diskio", "field":"reads", "op":"rate"}, #Need to calculate rate (but each second not each interval)
 "filesystem->Filesystem writes/sec" : {"plugin":"diskio", "field":"writes", "op":"rate"}, #Need to calculate rate (but each second not each interval)
@@ -51,10 +51,10 @@ name_map = {
 # #OMI Disk plugin 
 "disk->Disk read guest OS" : {"plugin":"diskio", "field":"read_bytes", "op":"rate"},
 "disk->Disk write guest OS" : {"plugin":"diskio", "field":"write_bytes", "op":"rate"},
-# # "disk->Disk total bytes" : {"plugin":"diskio", "field":"read_bytes + write_bytes"},
+"disk->Disk total bytes" : {"plugin":"diskio", "field":"total_bytes", "op":"rate"},
 "disk->Disk reads" : {"plugin":"diskio", "field":"reads", "op":"rate"}, #Need to calculate rate (but each second not each interval)
 "disk->Disk writes" : {"plugin":"diskio", "field":"writes", "op":"rate"},
-# # "disk->Disk transfers" :
+"disk->Disk transfers" : {"plugin":"diskio", "field":"total_transfers", "op":"rate"},
 "disk->Disk read time" : {"plugin":"diskio", "field":"read_time"},
 "disk->Disk write time" : {"plugin":"diskio", "field":"write_time"},
 "disk->Disk transfer time" : {"plugin":"diskio", "field":"io_time"},

@@ -18,9 +18,14 @@ Sample input data received by this script
 """
 
 
-def parse_config(data):
+def parse_config(data, me_port, mdsd_port):
 
     if len(data) == 0:
+        raise Exception("Empty config data received.")
+        return []
+
+    if me_port is None or mdsd_port is None:
+        raise Exception("No port provided for Influxdb output plugin to ME, AMA.")
         return []
 
     telegraf_json = {}
@@ -201,8 +206,15 @@ def parse_config(data):
     agentconf += "  logfile = \"" + logdir + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
     agentconf += "  logfile_rotation_max_archives = 5\n"                
-    agentconf += "\n# Configuration for sending metrics to InfluxD\n"
+    agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
+    agentconf += "  urls = [\"http:/localhost:" + str(me_port) + "\"]\n\n"
+    agentconf += "\n# Configuration for sending metrics to AMA\n"
+    agentconf += "[[outputs.influxdb]]\n"
+    agentconf += "  urls = [\"http:/localhost:" + str(mdsd_port) + "\"]\n\n"
+    agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
+    agentconf += "#[[outputs.file]]\n"
+    agentconf += "#  files = [\"./metrics_to_file.out\"]\n\n"
 
     agent_file = {"filename":"telegraf.conf", "data": agentconf}
     output.append(agent_file)
