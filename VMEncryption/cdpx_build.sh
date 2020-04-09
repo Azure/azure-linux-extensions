@@ -8,6 +8,7 @@ cd $DIR
 # moving to the source root folder
 cd ..
 echo "Source root folder: " + $PWD
+SRC_ROOT=$PWD
 
 # moving to the ADE source folder
 cd VMEncryption
@@ -18,15 +19,16 @@ echo "ADE source folder: " + $PWD
 # BUGBUG: Keeping the static version until we figure out the versioning strategy (PBI 6218633)
 # echo CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS > main/version.txt
 
-# Extension name override if specified in the YAML file
-echo "Extension name: [$1]"
-
-if [ "$1" ]
+if [ -z "$CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS" ]
 then
-    python -c "import main.CommonParameters; main.CommonParameters.inst.set_extension_name('$1'); main.CommonParameters.inst.save()"
-else
-    echo "No extension name specified"
+echo "Variable CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS must be set with the build version."
+    exit 1
 fi
 
-# invoking Python packaging
-python setup.py sdist --formats=zip
+# Building Public EV2 artifacts
+pwsh -Command $SRC_ROOT/VMEncryption/EV2/build_ev2_Linux.ps1 -srcRoot $SRC_ROOT/VMEncryption -outputDir $SRC_ROOT/VMEncryption/dist/EV2/Public -ExtensionInfoFile $SRC_ROOT/VMEncryption/EV2/ExtensionInfo.Public.xml -BuildVersion $CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS
+
+# Building Test EV2 artifacts
+pwsh -Command $SRC_ROOT/VMEncryption/EV2/build_ev2_Linux.ps1 -srcRoot $SRC_ROOT/VMEncryption -outputDir $SRC_ROOT/VMEncryption/dist/EV2/Test1 -ExtensionInfoFile $SRC_ROOT/VMEncryption/EV2/ExtensionInfo.Test1.xml -BuildVersion $CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS
+pwsh -Command $SRC_ROOT/VMEncryption/EV2/build_ev2_Linux.ps1 -srcRoot $SRC_ROOT/VMEncryption -outputDir $SRC_ROOT/VMEncryption/dist/EV2/Test2 -ExtensionInfoFile $SRC_ROOT/VMEncryption/EV2/ExtensionInfo.Test2.xml -BuildVersion $CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS
+pwsh -Command $SRC_ROOT/VMEncryption/EV2/build_ev2_Linux.ps1 -srcRoot $SRC_ROOT/VMEncryption -outputDir $SRC_ROOT/VMEncryption/dist/EV2/Test3 -ExtensionInfoFile $SRC_ROOT/VMEncryption/EV2/ExtensionInfo.Test3.xml -BuildVersion $CDP_FILE_VERSION_NUMERIC_NOLEADINGZEROS
