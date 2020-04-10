@@ -3,15 +3,21 @@
     Generate the artifacts required for EV2 deployment for all environments for publishing VM Extensions
 #>
 param(
-    [Parameter(Mandatory=$True)]
+    [Parameter(Mandatory=$True, HelpMessage="Output directory where ServiceGroupRoot is created.")]
     [string]$outputDir,
 
-    [parameter(mandatory=$True)]
+    [parameter(mandatory=$True, HelpMessage="The extension info file with file path.")]
     [ValidateScript({Test-Path $_})]
     [string] $ExtensionInfoFile,
 
-    [parameter(mandatory=$False)]
-    [string] $BuildVersion = "1.0.0.0"
+    [parameter(mandatory=$True, HelpMessage="The version of the build.")]
+    [string] $BuildVersion = "1.0.0.0",
+
+    [parameter(mandatory=$True, HelpMessage="True, if placeholder in zipFile name in ExtensionInfo file must be replaced with build version.")]
+    [bool] $ReplaceBuildVersionInFileName = $false,
+
+    [parameter(mandatory=$True, HelpMessage="True, if build version must be used as the VM extension version as well.")]
+    [bool] $UseBuildVersionForExtnVersion = $false
     )
 
 <#
@@ -27,9 +33,7 @@ function Get-UploadPayloadProperties
         [string] $ExtnStorageContainer,
         [string] $ExtnStorageAccountKVConnection
         )
-  
-    $UploadPayLoadProperties_hash = @{}
-    
+
     $AParametersValues_hash = [ordered]@{}
     $AParametersValues_hash = Add-ParameterToHashtable -ParametersHashtable $AParametersValues_hash -ParameterName "ExtensionOperationName" -ParameterValue "UploadExtension"
     $AParametersValues_hash = Add-ParameterToHashtable -ParametersHashtable $AParametersValues_hash -ParameterName "ContainerName" -ParameterValue "$($ExtnStorageContainer)"
@@ -273,27 +277,40 @@ function Get-RolloutParameterFile
     param(
         [string] $ServiceGroupRoot,
         [string] $CloudName,
-        [xml] $ExtnInfoXml
+        [xml] $ExtnInfoXml,
+        [bool] $ReplaceBuildVersionInFileName,
+        [string] $BuildVersion,
+        [bool] $UseBuildVersionForExtnVersion
         )
 
-    $KVCertificateSecretPath = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).KVPathForCertSceret
+    $KVCertificateSecretPath = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).KVPathForCertSecret
     $PublishingSubscriptionId = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SubscriptionId
     $ExtnStorageAccountKVConnection = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).KVClassicStorageConnection
     $ExtnStorageContainer = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).ClassicContainerName
     $ExtnNamespace = $ExtnInfoXml.ExtensionInfo.Namespace
     $ExtnType = $ExtnInfoXml.ExtensionInfo.Type
-    $ExtnVersion = $ExtnInfoXml.ExtensionInfo.Version
     $ExtnIsInternal = $ExtnInfoXml.ExtensionInfo.ExtensionIsAlwaysInternal
     $ExtnSupportedOS = $ExtnInfoXml.ExtensionInfo.SupportedOS
     $ExtnLabel = $ExtnInfoXml.ExtensionInfo.ExtensionLabel
-    $ExtnZipFileName = $ExtnInfoXml.ExtensionInfo.ExtensionZipFileName
     $ExtnShortName = $ExtnInfoXml.ExtensionInfo.ExtensionShortName
-    
-    $ExtnStorageAccountSuffix = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).StorageAccountSuffix
-    $ExtnStorageAccountName = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).ClassicStorageAccountName
-    $ExtnBlobUri = "https://$($ExtnStorageAccountName).$($ExtnStorageAccountSuffix)/$($ExtnStorageContainer)/$($ExtnZipFileName)"
 
-    $SDPStageCount = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions.ChildNodes.Count
+    $ExtnVersion = $ExtnInfoXml.ExtensionInfo.Version
+    if($UseBuildVersionForExtnVersion)
+    {
+        $ExtnVersion = $BuildVersion
+    }
+
+    $ExtnZipFileName = $ExtnInfoXml.ExtensionInfo.ExtensionZipFileName
+    if($ReplaceBuildVersionInFileName)
+    {
+        $ExtnZipFileName = $ExtnZipFileName -replace '==buildversion==', $BuildVersion
+    }
+
+    $ExtnStorageAccountEndpointSuffix = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).StorageAccountEndpointSuffix
+    $ExtnStorageAccountName = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).ClassicStorageAccountName
+    $ExtnBlobUri = "https://$($ExtnStorageAccountName).$($ExtnStorageAccountEndpointSuffix)/$($ExtnStorageContainer)/$($ExtnZipFileName)"
+
+    $SDPStageCount = ($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions | select -ExpandProperty childnodes | where {$_.name -like 'Stage*'}).Count
 
 
     Get-RolloutParameterFileForUpload -KVCertificateSecretPath $KVCertificateSecretPath `
@@ -321,7 +338,6 @@ function Get-RolloutParameterFile
                                         -ExtnShortName $ExtnShortName `
                                         -ServiceGroupRoot $ServiceGroupRoot `
                                         -CloudName $CloudName
-
 
     for($i=1; $i -le $SDPStageCount; $i++)
     {
@@ -628,31 +644,27 @@ function Get-ServiceModelFile
         "Public" 
             {
                 $Ev2Environment = "Public"
-                $AzureFunctionSubscriptionId = "f5f33a78-1adc-47d0-9a6c-756d3183d55a"
                 $AzureFunctionLocation = "Southeast Asia"
-                $AzureFunctionResourceGroup = "PublishPlatformExtensions-Public"
+                $AzureFunctionResourceGroup = "TBD"
                 break
             }
         "Blackforest"
             {
                 $Ev2Environment = "Blackforest"
-                $AzureFunctionSubscriptionId = "135bcc88-9733-4cad-b097-cb29fdb06735"
                 $AzureFunctionLocation = "Germany Central"
-                $AzureFunctionResourceGroup = "PublishPlatformExtensions-Blackforest"
+                $AzureFunctionResourceGroup = "TBD"
             }
         "Mooncake"
             {
                 $Ev2Environment = "Mooncake"
-                $AzureFunctionSubscriptionId = "9c9544b9-c10b-4c02-b38e-bf59697ca449"
                 $AzureFunctionLocation = "China East"
-                $AzureFunctionResourceGroup = "PublishPlatformExtensions-Mooncake"
+                $AzureFunctionResourceGroup = "TBD"
             }
         "Fairfax"
             {
                 $Ev2Environment = "Fairfax"
-                $AzureFunctionSubscriptionId = "ebcad2cc-bad6-4644-be64-e8492c0277aa"
                 $AzureFunctionLocation = "USDoD Central"
-                $AzureFunctionResourceGroup = "PublishPlatformExtensions-Fairfax"
+                $AzureFunctionResourceGroup = "TBD"
             }
         default
             {
@@ -665,8 +677,7 @@ function Get-ServiceModelFile
     }
 
     $ExtnShortName = $ExtnInfoXml.ExtensionInfo.ExtensionShortName
-
-
+    $AzureFunctionSubscriptionId = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SubscriptionId
     $ServiceModelTemplate = Get-ServiceModelTemplateFile -Ev2Environment $Ev2Environment
 
     $ServiceResourceGroups = @()
@@ -715,7 +726,7 @@ function Get-ServiceModelFile
     # =======================
     # Promote to regions
 
-    $SDPStageCount = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions.ChildNodes.Count
+    $SDPStageCount = ($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions | select -ExpandProperty childnodes | where {$_.name -like 'Stage*'}).Count
 
     for($i=1; $i -le $SDPStageCount; $i++)
     {
@@ -750,7 +761,7 @@ function Get-ServiceModelFile
 
     $ServiceModelTemplate.Add("ServiceResourceGroups", $ServiceResourceGroups)
 
-    $ServiceModelFile = Join-Path -Path $ServiceGroupRoot -ChildPath "$($CloudName)_ServiceModel.json"
+    $ServiceModelFile = Join-Path -Path $ServiceGroupRoot -ChildPath "$($CloudName)_$($ExtnShortName)_ServiceModel.json"
 
     $ServiceModelTemplate | ConvertTo-Json -Depth 30 | Out-File $ServiceModelFile -Encoding utf8 -Force
 }
@@ -807,12 +818,19 @@ function Get-AllRolloutSpecFiles
     param(
         [string] $ServiceGroupRoot,
         [string] $CloudName,
-        [xml] $ExtnInfoXml
+        [xml] $ExtnInfoXml,
+        [bool] $UseBuildVersionForExtnVersion,
+        [string] $BuildVersion
         )
 
     $ExtnVersion = $ExtnInfoXml.ExtensionInfo.Version
+    if($UseBuildVersionForExtnVersion)
+    {
+        $ExtnVersion = $BuildVersion
+    }
+
     $ExtnShortName = $ExtnInfoXml.ExtensionInfo.ExtensionShortName
-    $ServiceModelPath = "$($CloudName)_ServiceModel.json"
+    $ServiceModelPath = "$($CloudName)_$($ExtnShortName)_ServiceModel.json"
 
     # ===============================
     # List all extensions
@@ -865,7 +883,7 @@ function Get-AllRolloutSpecFiles
     # ===============================
     # Promote SDP stages
 
-    $SDPStageCount = $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions.ChildNodes.Count
+    $SDPStageCount = ($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions | select -ExpandProperty childnodes | where {$_.name -like 'Stage*'}).Count
 
     for($i=1; $i -le $SDPStageCount; $i++)
     {
@@ -963,8 +981,140 @@ function Get-RolloutSpecFile
     $hashTemplateRolloutSpec | ConvertTo-Json -Depth 30 | Out-File $RolloutSpecFileWithPath -Encoding utf8 -Force
 }
 
-# =================================================================================================
 
+<#
+.SYNOPSIS
+    Check if the input object is null or empty. If yes, Throw exception and exit
+#>
+function IfNullThrowAndExit
+{
+    [CmdletBinding()]
+    param(
+        $inputObject,
+
+        [string] $ErrorMessage
+        )
+
+    if([string]::IsNullOrWhiteSpace($inputObject))
+    {
+        throw $ErrorMessage
+        exit
+    }
+}
+
+<#
+.SYNOPSIS
+    Throw the give exception and exit
+#>
+function ThrowAndExit
+{
+    [CmdletBinding()]
+    param(
+        [string] $ErrorMessage
+        )
+
+    throw $ErrorMessage
+    exit
+}
+
+<#
+.SYNOPSIS
+    Validate the ExtensionInfo xml file
+#>
+function Validate-ExtensionInfoFile
+{
+    [CmdletBinding()]
+    param(
+        [xml] $ExtnInfoXml
+        )
+
+    IfNullThrowAndExit -inputObject $ExtnInfoXml -ErrorMessage "xml file is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo -ErrorMessage "ExtensionInfo node not found in XML."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.Namespace -ErrorMessage "Extension Namespace is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.Type.Trim() -ErrorMessage "Extension Type is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.Version.Trim() -ErrorMessage "Extension Version is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.ExtensionShortName.Trim() -ErrorMessage "Extension ShortName is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.SupportedOS.Trim() -ErrorMessage "Extension SupportedOS is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.ExtensionLabel.Trim() -ErrorMessage "Extension Label is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.ExtensionZipFileName.Trim() -ErrorMessage "Extension ZipFile is null."
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.ExtensionIsAlwaysInternal.Trim() -ErrorMessage "ExtensionIsAlwaysInternal is null."
+
+    # ExtensionIsAlwaysInternal must be True or False only
+    if(!($ExtnInfoXml.ExtensionInfo.ExtensionIsAlwaysInternal -ieq "True" -or $ExtnInfoXml.ExtensionInfo.ExtensionIsAlwaysInternal -ieq "False"))
+    {
+        ThrowAndExit -ErrorMessage "ExtensionIsAlwaysInternal must be True or False only."
+    }
+
+    # SupportedOS must be Windows or Linux only
+    if(!($ExtnInfoXml.ExtensionInfo.SupportedOS -ieq "Windows" -or $ExtnInfoXml.ExtensionInfo.SupportedOS -ieq "Linux"))
+    {
+        ThrowAndExit -ErrorMessage "SupportedOS must be Windows or Linux only."
+    }
+    
+    if ($ExtnInfoXml.ExtensionInfo.ExtensionShortName -contains " ")
+    {
+        ThrowAndExit -ErrorMessage "ShortName must not contain spaces."
+    }
+
+    IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes -ErrorMessage "CloudTypes node not found."
+
+    if($ExtnInfoXml.ExtensionInfo.CloudTypes.ChildNodes.Count -le 0)
+    {
+        ThrowAndExit -ErrorMessage "CloudTypes not specified. Check the ExtensionInfo file."
+    }
+
+    foreach ($CloudType in $ExtensionInfoXmlContent.ExtensionInfo.CloudTypes.ChildNodes)
+    {
+        $CloudName =  $CloudType.Name
+
+        if(!($CloudName -ieq "Public" -or $CloudName -ieq "Blackforest" -or $CloudName -ieq "Mooncake" -or $CloudName -ieq "Fairfax"))
+        {
+            ThrowAndExit -ErrorMessage "CloudTypes supported at this time are Public, Blackforest, Mooncake, Fairfax. Not '$($CloudName)'."
+        }
+
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SubscriptionId -ErrorMessage "SubscriptionId for Cloud $($CloudName) is not valid."
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).KVPathForCertSecret -ErrorMessage "KVPathForCertSecret for Cloud $($CloudName) is not valid."
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).ClassicStorageAccountName -ErrorMessage "ClassicStorageAccountName for Cloud $($CloudName) is not valid."
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).ClassicContainerName -ErrorMessage "ClassicContainerName for Cloud $($CloudName) is not valid."
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).StorageAccountEndpointSuffix -ErrorMessage "StorageAccountEndpointSuffix for Cloud $($CloudName) is not valid."
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).KVClassicStorageConnection -ErrorMessage "KVClassicStorageConnection for Cloud $($CloudName) is not valid."
+
+        IfNullThrowAndExit -inputObject $ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions -ErrorMessage "SDPRegions for Cloud $($CloudName) is not valid."
+
+        $SDPStageCount = ($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions | select -ExpandProperty childnodes | where {$_.name -like 'Stage*'}).Count
+        
+        if($SDPStageCount -lt 2)
+        {
+            ThrowAndExit -ErrorMessage "SDP is not being followed for $($CloudName)."
+        }
+
+        for($i=1; $i -lt $SDPStageCount; $i++)
+        {
+            $stageName = "Stage$($i)"
+            $ExtnRegions = $($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions.$stageName)
+
+            IfNullThrowAndExit -inputObject $ExtnRegions -ErrorMessage "Stage $($stageName) in $($CloudName) is not valid."
+
+            $nextStage = "Stage$($i + 1)"
+            $NextStageRegions = $($ExtnInfoXml.ExtensionInfo.CloudTypes.$($CloudName).SDPRegions.$nextStage)
+            IfNullThrowAndExit -inputObject $NextStageRegions -ErrorMessage "Stage $($nextStage) in $($CloudName) is not valid."
+
+            if($NextStageRegions.Length -le $ExtnRegions.Length)
+            {
+                ThrowAndExit -ErrorMessage "Regions in $($nextStage) must be more than $($stageName) in Cloud '$($CloudName)'."
+            }
+
+            if($NextStageRegions -notmatch $ExtnRegions)
+            {
+                ThrowAndExit -ErrorMessage "Regions in $($nextStage) must include the regions in $($stageName) in Cloud '$($CloudName)'."
+            }
+        }
+    }
+}
+
+# =================================================================================================
+# Main execution 
+# =================================================================================================
 # remove any extra \ at the end. This will cause errors in file paths
 $outputDir = $outputDir.TrimEnd('\')
 
@@ -977,6 +1127,9 @@ $ExtensionInfoFileName = Split-Path -Path $ExtensionInfoFile -Leaf
 
 $ExtensionInfoXmlContent = New-Object xml
 $ExtensionInfoXmlContent = [xml](Get-Content $ExtensionInfoFile -Encoding UTF8)
+
+# Validate the XML file
+Validate-ExtensionInfoFile -ExtnInfoXml $ExtensionInfoXmlContent
 
 # Add build version file. This is the build version and Not Extension version
 if(!$BuildVersion)
@@ -999,9 +1152,9 @@ foreach ($CloudType in $ExtensionInfoXmlContent.ExtensionInfo.CloudTypes.ChildNo
 {
     $CloudName =  $CloudType.Name
 
-    Get-RolloutParameterFile -ServiceGroupRoot "$($ServiceGroupRoot)" -CloudName $CloudName -ExtnInfoXml $ExtensionInfoXmlContent
+    Get-RolloutParameterFile -ServiceGroupRoot "$($ServiceGroupRoot)" -CloudName $CloudName -ExtnInfoXml $ExtensionInfoXmlContent -ReplaceBuildVersionInFileName $ReplaceBuildVersionInFileName -BuildVersion $BuildVersion -UseBuildVersionForExtnVersion $UseBuildVersionForExtnVersion
 
     Get-ServiceModelFile -ServiceGroupRoot $ServiceGroupRoot -CloudName $CloudName -ExtnInfoXml $ExtensionInfoXmlContent
 
-    Get-AllRolloutSpecFiles -ServiceGroupRoot $ServiceGroupRoot -CloudName $CloudName -ExtnInfoXml $ExtensionInfoXmlContent
+    Get-AllRolloutSpecFiles -ServiceGroupRoot $ServiceGroupRoot -CloudName $CloudName -ExtnInfoXml $ExtensionInfoXmlContent -UseBuildVersionForExtnVersion $UseBuildVersionForExtnVersion -BuildVersion $BuildVersion
 }
