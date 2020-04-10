@@ -10,13 +10,14 @@
     <CloudTypes>
         <Public>
             <SubscriptionId>e212dea4-8522-4baa-a5c4-aebc56450d8b</SubscriptionId>
-            <KVPathForCertSceret>https://ade-extensionpublishing.vault.azure.net/secrets/Extension-Publishing</KVPathForCertSceret>
+            <KVPathForCertSecret>https://ade-extensionpublishing.vault.azure.net/secrets/Extension-Publishing</KVPathForCertSecret>
             <ClassicStorageAccountName>edpazuresecurity</ClassicStorageAccountName>
             <ClassicContainerName>extensions</ClassicContainerName>
-            <StorageAccountSuffix>blob.core.windows.net</StorageAccountSuffix>
+            <StorageAccountEndpointSuffix>blob.core.windows.net</StorageAccountEndpointSuffix>
             <KVClassicStorageConnection>https://ade-extensionpublishing.vault.azure.net/secrets/adeev2publishing</KVClassicStorageConnection>
             <SDPRegions>
                 <Stage1>Central US EUAP</Stage1>
+                <Stage2>Central US EUAP;East US 2 EUAP</Stage2>
             </SDPRegions>
         </Public>
     </CloudTypes>

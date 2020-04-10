@@ -63,7 +63,7 @@ $temp_extension_info = "$outputDir/ExtensionInfo.xml"
 $extension_info.Save($temp_extension_info)
 
 # calling the packager
-& "$script_folder\EV2VMExtnPackager.ps1" -outputDir $outputDir -ExtensionInfoFile $temp_extension_info -BuildVersion $BuildVersion
+& "$script_folder\EV2VMExtnPackager.ps1" -outputDir $outputDir -ExtensionInfoFile $temp_extension_info -BuildVersion $BuildVersion -ReplaceBuildVersionInFileName $false -UseBuildVersionForExtnVersion $false
 
 # moving the ZIP file to the EV2 folder
 $original_zip_filepath = "$srcRoot\dist\$($common_parameters.extension_name)-$($common_parameters.extension_version).zip"
