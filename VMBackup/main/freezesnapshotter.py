@@ -282,10 +282,10 @@ class FreezeSnapshotter(object):
                 blobProperties = resp_headers
         return blobProperties
 
-    def populate_snapshotreq_headers_perblob(self, sasuri, sasuri_index, backup_meta_data):
+    def populate_snapshotreq_headers_perblob(self, sasuri, sasuri_index, backup_meta_data, blobMetadataTelemetryMessage):
         headers= {}
         headers["Content-Length"] = '0'
-        blobMetdataMaxSizeBytes = 8000
+        blobMetdataMaxSizeBytes = CommonVariables.blobMetdataMaxSizeBytes
 
         original_blob_metadata = self.GetBlobProperties(sasuri)
         
@@ -306,7 +306,7 @@ class FreezeSnapshotter(object):
             if sasuri_index not in blobMetadataTelemetryMessage :
                 blobMetadataTelemetryMessage[sasuri_index] = ""
 
-            blobMetadataTelemetryMessage[sasuri_index]+="Level 1 : " + str(level1BlobMetadataSize);
+            blobMetadataTelemetryMessage[sasuri_index]+= str(level1BlobMetadataSize) + ", ";
 
             headers = {}
             if(original_blob_metadata is not None): 
@@ -325,7 +325,7 @@ class FreezeSnapshotter(object):
             level2BlobMetadataSize = self.GetHeaderSize(headers)
             
             if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
-                blobMetadataTelemetryMessage[sasuri_index]+= ", Level 2 : " + str(level2BlobMetadataSize);
+                blobMetadataTelemetryMessage[sasuri_index]+= str(level2BlobMetadataSize) + ", ";
 
                 headers = {}
                 if(backup_meta_data is not None):
@@ -337,7 +337,7 @@ class FreezeSnapshotter(object):
         return headers
 
 
-    def populate_blob_metadata_all(self, paras):
+    def populate_blob_metadata_all(self, paras, blobMetadataTelemetryMessage):
         blob_metadata = {}
         try:
             blobs = paras.blobs
@@ -348,8 +348,13 @@ class FreezeSnapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blob,blob_index,paras.backup_metadata)
-                    self.logger.log("Metadata count added : " + str(len(blob_metadata[blob_index])))
+                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blob,blob_index,paras.backup_metadata, blobMetadataTelemetryMessage)
+                    self.logger.log("Metadata retreived : " + str(blob_metadata[blob_index]))
+
+                    # log if the metadata size was found to be greater than the max limit allowed
+                    if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0 :
+                        self.logger.log("Metadata was found to be greater than the max limit. The metadata size was : " + blobMetadataTelemetryMessage[blob_index])
+                    
                     blob_index = blob_index + 1
 
         except Exception as e:
@@ -380,13 +385,11 @@ class FreezeSnapshotter(object):
             # populate metadata for all blobs
             
             #Dict <DiskIndex, Disk Metadata Size>
-            global blobMetadataTelemetryMessage
             blobMetadataTelemetryMessage = {}
 
-            blob_metadata = self.populate_blob_metadata_all(self.para_parser)
+            blob_metadata = self.populate_blob_metadata_all(self.para_parser, blobMetadataTelemetryMessage)
 
-            self.logger.log("Adding to the telemetry " + json.dumps(blobMetadataTelemetryMessage))
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("BlobMetadataMessage", json.dumps(blobMetadataTelemetryMessage))
+            HandlerUtil.HandlerUtility.add_to_telemetery_data("MetadataSizeExceedBlobCount", str(len(blobMetadataTelemetryMessage)))
 
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
