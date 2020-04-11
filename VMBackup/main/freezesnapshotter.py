@@ -253,18 +253,18 @@ class FreezeSnapshotter(object):
         
         return run_result, run_status
 
-    def GetBlobProperties(self, blobUri):
+    def GetBlobProperties(self, blobUri, backup_meta_data):
         blobProperties = None
         if(blobUri is not None):     
             try:
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
-                headers = {}
+                headers = backup_meta_data
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
-                self.logger.log("GetBlobProperties: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
+                self.logger.log("FS : GetBlobMetadata: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                 blobProperties = self.httpresponse_get_blob_properties(httpResp)
             except Exception as e:
-                self.logger.log("GetBlobProperties: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+                self.logger.log("FS : GetBlobMetadata: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         return blobProperties
 
     def GetHeaderSize(self, headers):
@@ -286,7 +286,7 @@ class FreezeSnapshotter(object):
         headers["Content-Length"] = '0'
         blobMetdataMaxSizeBytes = 8000
 
-        original_blob_metadata = self.GetBlobProperties(sasuri)
+        original_blob_metadata = self.GetBlobProperties(sasuri, backup_meta_data)
         
         if(original_blob_metadata is not None): 
             for meta in original_blob_metadata:
@@ -298,7 +298,7 @@ class FreezeSnapshotter(object):
                 key = meta['Key']
                 value = meta['Value']
                 headers["x-ms-meta-" + key] = value
-     
+        
         level1BlobMetadataSize = self.GetHeaderSize(headers)
         
         if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
@@ -347,7 +347,7 @@ class FreezeSnapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blobUri,blob_index,paras.backup_metadadata)
+                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blobUri,blob_index,paras.backup_metadata)
                     self.logger.log("Metadata count added : " + str(len(blob_metadata[blob_index])))
                     blob_index = blob_index + 1
 
@@ -395,7 +395,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, self.blob_metadata)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, blob_metadata)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
                 self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
