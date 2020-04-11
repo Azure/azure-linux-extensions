@@ -253,7 +253,7 @@ class FreezeSnapshotter(object):
         
         return run_result, run_status
 
-    def GetBlobProperties(self, blobUri, backup_meta_data):
+    def GetBlobProperties(self, blobUri):
         blobProperties = None
         if(blobUri is not None):     
             try:
@@ -261,12 +261,6 @@ class FreezeSnapshotter(object):
                 sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
                 headers = {}
 
-                if backup_meta_data is not None:
-                    for meta in backup_meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
-                    
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
                 self.logger.log("FS : GetBlobMetadata: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                 blobProperties = self.httpresponse_get_blob_properties(httpResp)
@@ -293,7 +287,7 @@ class FreezeSnapshotter(object):
         headers["Content-Length"] = '0'
         blobMetdataMaxSizeBytes = 8000
 
-        original_blob_metadata = self.GetBlobProperties(sasuri, backup_meta_data)
+        original_blob_metadata = self.GetBlobProperties(sasuri)
         
         if(original_blob_metadata is not None): 
             for meta in original_blob_metadata:
@@ -354,7 +348,7 @@ class FreezeSnapshotter(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blobUri,blob_index,paras.backup_metadata)
+                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blob,blob_index,paras.backup_metadata)
                     self.logger.log("Metadata count added : " + str(len(blob_metadata[blob_index])))
                     blob_index = blob_index + 1
 
