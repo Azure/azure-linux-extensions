@@ -259,7 +259,14 @@ class FreezeSnapshotter(object):
             try:
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
-                headers = backup_meta_data
+                headers = {}
+
+                if backup_meta_data is not None:
+                    for meta in backup_meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
+                    
                 result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
                 self.logger.log("FS : GetBlobMetadata: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
                 blobProperties = self.httpresponse_get_blob_properties(httpResp)
