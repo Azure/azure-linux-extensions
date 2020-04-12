@@ -90,12 +90,13 @@ class GuestSnapshotter(object):
                 
                 body_content = ''
                 
+                headers = meta_data
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.now()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = meta_data, responseBodyRequired = True)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
                 temp_logger = temp_logger + str("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response

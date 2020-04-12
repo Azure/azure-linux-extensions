@@ -352,7 +352,7 @@ class FreezeSnapshotter(object):
                     self.logger.log("Metadata retreived : " + str(blob_metadata[blob_index]))
 
                     # log if the metadata size was found to be greater than the max limit allowed
-                    if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0 :
+                    if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0 and blob_index in blobMetadataTelemetryMessage :
                         self.logger.log("Metadata was found to be greater than the max limit. The metadata size was : " + blobMetadataTelemetryMessage[blob_index])
                     
                     blob_index = blob_index + 1
