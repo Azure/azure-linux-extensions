@@ -119,6 +119,7 @@ class CommonVariables:
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
+    FailedGuestAgentInvokedCommandTooLate = 319
 
     """
     Consistency-Types
