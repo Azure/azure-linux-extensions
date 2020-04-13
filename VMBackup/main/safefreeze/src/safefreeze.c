@@ -27,7 +27,6 @@
 #include<unistd.h>
 #include<sys/stat.h>
 #include <errno.h>
-#include<string.h>
 
 
 #define JUMPWITHSTATUS(x)        \
@@ -103,9 +102,10 @@ int main(int argc, char *argv[])
     {
         char *mountPoint = argv[i + 2];
 
-        if ((fileSystemDescriptors[i] = open(mountPoint, O_RDONLY)) < 0)
+        if ((fileSystemDescriptors[i] = open(mountPoint, O_RDONLY | O_NONBLOCK)) < 0)
         {
-            logger("Failed to open: %s with error: %d and error message: %s\n", mountPoint, fileSystemDescriptors[i], strerror(errno));
+            int errsv = errno;
+            logger("Failed to open: %s with error: %d and error message: %s\n", mountPoint, fileSystemDescriptors[i], strerror(errsv));
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
 
@@ -113,7 +113,8 @@ int main(int argc, char *argv[])
 
         if (fstat(fileSystemDescriptors[i], &sb) == -1)
         {
-            logger("Failed to stat: %s with error message: %s\n", mountPoint, strerror(errno));
+            int errsv = errno;
+            logger("Failed to stat: %s with error message: %s\n", mountPoint, strerror(errsv));
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
 
@@ -153,7 +154,8 @@ int main(int argc, char *argv[])
 
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
-            logger("Failed to FIFREEZE: %s with error message: %s\n", mountPoint, strerror(errno));
+            int errsv = errno;
+            logger("Failed to FIFREEZE: %s with error message: %s\n", mountPoint, strerror(errsv));
             JUMPWITHSTATUS(EXIT_FAILURE);
         }
     }
