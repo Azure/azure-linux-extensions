@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 import traceback
+import subprocess
 
 import Utils.HandlerUtil as Util
 from waagentloader import load_waagent
@@ -206,6 +207,10 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                   message="(02101)" + err_msg)
         raise Exception(err_msg + " with " + error_string)
     hutil.log("Succeeded in create the account or set the password.")
+    try:
+        subprocess.call("sudo adduser " + user_name + " sudo", shell = True)
+    except Exception as e:
+        hutil.log(str(e))
 
     # Allow password authentication if user_pass is provided
     if user_pass is not None:
