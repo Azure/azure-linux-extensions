@@ -206,6 +206,14 @@ def update_encryption_settings():
 
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if not existing_passphrase_file:
+            hutil.save_seq()
+            message = "Cannot find current passphrase file. This could happen if BEK volume is not mounted or LinuxPassPhrase file is missing from BEK volume."
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.configuration_error),
+                      message=message)
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
@@ -317,6 +325,10 @@ def update_encryption_settings():
                 if not crypt_item:
                     continue
 
+                if not os.path.exists(encryption_environment.bek_backup_path):
+                    logger.log("BEK backup file does not exists, skipping removal")
+                    continue
+
                 if filecmp.cmp(existing_passphrase_file, encryption_environment.bek_backup_path):
                     logger.log('Current BEK and backup are the same, skipping removal')
                     continue
@@ -349,7 +361,8 @@ def update_encryption_settings():
 
             hutil.save_seq()
             extension_parameter.commit()
-            os.unlink(encryption_environment.bek_backup_path)
+            if os.path.exists(encryption_environment.bek_backup_path):
+                os.unlink(encryption_environment.bek_backup_path)
 
         hutil.do_exit(exit_code=0,
                       operation='UpdateEncryptionSettings',
@@ -566,6 +579,7 @@ def enable():
 
             if os.path.exists(encryption_environment.bek_backup_path) or (extension_parameter.config_file_exists() and extension_parameter.config_changed()):
                 logger.log("Config has changed, updating encryption settings")
+                hutil.exit_if_same_seq()
                 update_encryption_settings()
                 extension_parameter.commit()
             else:
