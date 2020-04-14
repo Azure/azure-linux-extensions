@@ -41,7 +41,6 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
-    GuestAgentPluginTooLongToInvokeCommand = 319
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -58,8 +57,6 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.error_parameter : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.GuestAgentPluginTooLongToInvokeCommand : Status.ExtVmHealthStateEnum.yellow,
-
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : Status.ExtVmHealthStateEnum.yellow,
