@@ -341,6 +341,7 @@ def daemon():
 
             if total_span_in_seconds > MAX_TIMESPAN :
                 error_msg = "CRP timeout limit has reached, will not take snapshot."
+                errMsg = error_msg
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
                 temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
                 temp_status= 'error'
