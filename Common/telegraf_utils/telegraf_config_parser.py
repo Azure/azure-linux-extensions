@@ -1,6 +1,6 @@
 import json
 import os
-from Utils.telegraf_name_map import name_map
+from telegraf_utils.telegraf_name_map import name_map
 
 
 """
