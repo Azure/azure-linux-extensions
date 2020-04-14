@@ -41,7 +41,7 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
-    FailedGuestAgentInvokedCommandTooLate = 319
+    FailedGuestAgentInvokedCommandTooLate = 402
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
