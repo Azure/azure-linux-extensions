@@ -22,6 +22,17 @@
           "Version" : "6.8"
         }
     ],
+    "debian" : [
+      {
+        "Version" : "10.4"
+      },
+      {
+        "Version" : "10.3"
+      },
+      {
+        "Version" : "10.2"
+      }
+    ],
     "Ubuntu" : [
         {
           "Version" : "16.04"

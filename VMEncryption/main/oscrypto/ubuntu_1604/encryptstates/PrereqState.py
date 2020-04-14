@@ -53,6 +53,9 @@ class PrereqState(OSEncryptionState):
         if distro_info[0] == 'Ubuntu' and distro_info[1] in ['16.04', '18.04']:
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
+        elif distro_info[0] == 'debian':
+            self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
+                                                                                      distro_info[1]))
         else:
             raise Exception("Ubuntu1604EncryptionStateMachine called for distro {0} {1}".format(distro_info[0],
                                                                                                 distro_info[1]))
