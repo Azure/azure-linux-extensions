@@ -1690,6 +1690,12 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+       elif distro_name == 'debian' and distro_version in ['10.2', '10.3', '10.4']:
+           from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
+           os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
+                                                            distro_patcher=DistroPatcher,
+                                                            logger=logger,
+                                                            encryption_environment=encryption_environment)
         else:
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)
