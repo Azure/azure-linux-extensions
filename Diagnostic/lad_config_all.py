@@ -26,7 +26,7 @@ import Utils.ProviderUtil as ProvUtil
 import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
-import Utils.telegraf_config_parser as telparser
+import telegraf_utils.telegraf_config_handler as telhandler
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
 from Utils.misc_helpers import get_storage_endpoints_with_account, escape_nonalphanumerics
@@ -80,7 +80,8 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_conf_path = self._ext_dir + "/telegraf_configs/"
+        self._telegraf_me_url = "/var/run/me_out.sock"
+        self._telegraf_mdsd_url = "/var/run/mdsd_out.sock"
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
@@ -447,7 +448,7 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
-            self._telegraf_config = telparser.parse_config(parsed_perf_settings)          
+            self._telegraf_config = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url )          
 
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
@@ -481,16 +482,6 @@ class LadConfigAll:
 
         # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
-
-        #9. Write out the generated telegraf configs and intermediate telegraf json to the ext_dir location 
-        if not os.path.exists(self._telegraf_conf_path):
-            os.makedir(self._telegraf_conf_path)
-
-        for configfile in self._telegraf_config:
-            path = self._telegraf_conf_path + configfile["filename"]
-            with open(path, "w") as f:
-                f.write(configfile["data"])
-
         
         return True, ""
 

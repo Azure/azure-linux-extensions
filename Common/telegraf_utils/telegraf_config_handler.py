@@ -178,20 +178,8 @@ def parse_config(data, me_url, mdsd_url):
     stats = ["rate"]
 
     """
-
     ## Get the log folder directory from HandlerEnvironment.json and use that for the telegraf default logging
-    logdir = "./LADtelegraf.log"
-    handler_env_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'HandlerEnvironment.json'))
-    print handler_env_path
-    if os.path.exists(handler_env_path):
-        with open(handler_env_path, 'r') as handler_env_file:
-            handler_env_txt = handler_env_file.read()
-        handler_env = json.loads(handler_env_txt)
-        if type(handler_env) == list:
-            handler_env = handler_env[0]
-        print handler_env
-        if "handlerEnvironment" in handler_env and "logFolder" in handler_env["handlerEnvironment"]:
-                logdir = handler_env["handlerEnvironment"]["logFolder"]
+    logFolder, _ = get_handler_vars()
     
     # Telegraf basic agent and output config 
     agentconf = "[agent]\n"
@@ -203,7 +191,7 @@ def parse_config(data, me_url, mdsd_url):
     agentconf += "  flush_interval = \"10s\"\n"
     agentconf += "  flush_jitter = \"0s\"\n"
     agentconf += "  logtarget = \"file\"\n"
-    agentconf += "  logfile = \"" + logdir + "/telegraf.log\"\n"
+    agentconf += "  logfile = \"" + logFolder + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
     agentconf += "  logfile_rotation_max_archives = 5\n"                
     agentconf += "\n# Configuration for sending metrics to ME\n"
@@ -223,3 +211,89 @@ def parse_config(data, me_url, mdsd_url):
     return output
 
 
+def write_configs(configs):
+
+    _, configFolder = get_handler_vars()
+    telegraf_conf_dir = configFolder + "/telegraf_configs/"
+    if not os.path.exists(telegraf_conf_dir):
+        os.mkdir(telegraf_conf_dir)
+
+    for configfile in configs:
+        path = telegraf_conf_dir + configfile["filename"]
+        with open(path, "w") as f:
+            f.write(configfile["data"])
+
+
+
+def get_handler_vars():
+    logFolder = "./LADtelegraf.log"
+    configFolder = "./telegraf_configs"
+    handler_env_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'HandlerEnvironment.json'))
+    if os.path.exists(handler_env_path):
+        with open(handler_env_path, 'r') as handler_env_file:
+            handler_env_txt = handler_env_file.read()
+        handler_env = json.loads(handler_env_txt)
+        if type(handler_env) == list:
+            handler_env = handler_env[0]
+        if "handlerEnvironment" in handler_env:
+            if "logFolder" in handler_env["handlerEnvironment"]:
+                logFolder = handler_env["handlerEnvironment"]["logFolder"]
+            if "configFolder" in handler_env["handlerEnvironment"]:
+                configFolder = handler_env["handlerEnvironment"]["configFolder"]
+    
+    return logFolder, configFolder
+
+
+def setup_telegraf_service():
+
+    _, configFolder = get_handler_vars()
+    telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+    telegraf_bin = "/usr/sbin/telegraf"
+    telegraf_conf_dir = configFolder + "/telegraf_configs/"
+    telegraf_agent_conf = telegraf_conf_dir + "telegraf.conf"
+
+    if not os.path.exists(telegraf_conf_dir):
+        raise Exception("Telegraf config directory does not exist. Failed to setup telegraf service.")
+        return False
+
+    if not os.path.isfile(telegraf_agent_conf):
+        raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
+        return False
+    
+    if not os.path.isfile(telegraf_bin):
+        raise Exception("Telegraf binary does not exist. Failed to setup telegraf service.")
+        return False       
+
+    if os.path.isfile(telegraf_service_path):
+        os.system(r"sed -i 's+%TELEGRAF_BIN%+{1}+' {0}".format(telegraf_service_path, telegraf_bin)) 
+        os.system(r"sed -i 's+%TELEGRAF_AGENT_CONFIG%+{1}+' {0}".format(telegraf_service_path, telegraf_agent_conf))
+        os.system(r"sed -i 's+%TELEGRAF_CONFIG_DIR%+{1}+' {0}".format(telegraf_service_path, telegraf_conf_dir))
+    else:
+        raise Exception("Telegraf service file does not exist. Failed to setup telegraf service.")
+        return False
+
+    return True
+
+
+def handle_config(data, me_url, mdsd_url):
+    #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
+
+    #call the method to first parse the configs
+    output = parse_config(data, me_url, mdsd_url)
+
+    #call the method to write the configs
+    write_configs(output)
+
+    # call the method to setup the telegraf service file
+    telegraf_setup = setup_telegraf_service()
+
+    print telegraf_setup
+    #start telegraf service if it was set up correctly
+    out = 1
+    if telegraf_setup:
+        out = os.system("sudo systemctl start metrics-sourcer")
+    
+    if out != 0:
+        return False 
+    
+    return True
