@@ -459,7 +459,7 @@ class CryptMountConfigUtil(object):
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
             fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
-            if fstab_mount_point == CommonVariables.encryption_key_mount_point:
+            if fstab_mount_point and os.path.normpath(fstab_mount_point) == os.path.normpath(CommonVariables.encryption_key_mount_point):
                 return True
         return False
 

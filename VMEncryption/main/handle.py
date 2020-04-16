@@ -631,6 +631,11 @@ def enable():
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
         if encryption_config.config_file_exists():
             existing_volume_type = encryption_config.get_volume_type()
+        
+        is_migrate_operation = False
+        if CommonVariables.MigrateKey in public_settings:
+            if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
+                is_migrate_operation = True
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
@@ -661,9 +666,12 @@ def enable():
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+            if not is_migrate_operation:
+                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -689,9 +697,10 @@ def enable():
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc())
 
-        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            if is_migrate_operation:
+                perform_migration(encryption_config, crypt_mount_config_util)
+                return #Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
 
             handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
@@ -886,6 +895,36 @@ def enable_encryption():
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
                       message=message)
+
+def perform_migration(encryption_config, crypt_mount_config_util):
+    logger.log("Migrate operation found. Starting migration flow.")
+    hutil.exit_if_same_seq()
+
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
+    extension_parameter.VolumeType = encryption_config.get_volume_type() # After migration config file has current volume type
+
+    encryption_config.volume_type = encryption_config.get_volume_type()
+    encryption_config.passphrase_file_name = encryption_config.get_bek_filename()
+    encryption_config.secret_seq_num = encryption_config.get_secret_seq_num()
+
+    # Clear 2 pass params and save a new 1 pass config
+    encryption_config.clear_config()
+    extension_parameter.clear_config()
+    encryption_config.commit()
+    extension_parameter.commit()
+
+    for crypt_item in crypt_mount_config_util.get_crypt_items():
+        if crypt_item.mount_point == "/":
+            continue
+        backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+        crypt_mount_config_util.update_crypt_item(crypt_item, backup_folder=backup_folder)
+
+    hutil.save_seq()
+    hutil.do_exit(exit_code=CommonVariables.success,
+                  operation='Migrate',
+                  status=CommonVariables.extension_success_status,
+                  code=(CommonVariables.success),
+                  message="Migration Succeeded")
 
 
 def enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[]):
