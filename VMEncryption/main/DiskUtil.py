@@ -319,6 +319,11 @@ class DiskUtil(object):
         return self.command_executor.Execute(umount_cmd)
 
     def mount_all(self):
+        # Reload systemd daemon to get lastest changes from fstab
+        # pidof systemd seems unreliable on Ubuntu hence directly invoking systemctl
+        # This command will just fail without side effects on system without systemd
+        self.logger.log("Trying to reload fstab dependencies before mount all.")
+        self.command_executor.Execute('systemctl daemon-reload', suppress_logging=True)
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 
