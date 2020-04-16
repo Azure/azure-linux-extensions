@@ -250,6 +250,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
     try:
         DistroPatcher.install_cryptsetup()
     except Exception as e:
+        hutil.save_seq()
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         hutil.do_exit(exit_code=CommonVariables.missing_dependency,
                       operation='UpdateEncryptionSettings',
@@ -279,6 +280,15 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
         bek_util = BekUtil(disk_util, logger)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if not existing_passphrase_file:
+            hutil.save_seq()
+            message = "Cannot find current passphrase file. This could happen if BEK volume is not mounted or LinuxPassPhrase file is missing from BEK volume."
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.configuration_error),
+                      message=message)
+
         with open(existing_passphrase_file, 'r') as f:
             old_passphrase = f.read()
 
@@ -396,6 +406,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
                           code=str(CommonVariables.success),
                           message='Encryption settings updated')
     except Exception as e:
+        hutil.save_seq()
         if not settings_stamped:
             clear_new_luks_keys(disk_util, old_passphrase, extension_parameter.passphrase, bek_util, encryption_config, updated_crypt_items)
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -746,6 +757,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
+        hutil.exit_if_same_seq()
         # If a daemon is already running reject and exit an update encryption settings request
         if is_daemon_running():
             logger.log("An operation already running. Cannot accept an update settings request.")
