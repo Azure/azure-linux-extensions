@@ -31,3 +31,15 @@ OS.OpensslPath=None                     # If "None", the system default version 
 
 waagent_config_path = "/etc/waagent.conf"
 Openssl = "openssl"
+
+
+class WALAEventOperation:
+    HeartBeat = "HeartBeat"
+    Provision = "Provision"
+    Install = "Install"
+    UnIsntall = "UnInstall"
+    Disable = "Disable"
+    Enable = "Enable"
+    Download = "Download"
+    Upgrade = "Upgrade"
+    Update = "Update"
