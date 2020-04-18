@@ -137,8 +137,7 @@ class GuestSnapshotter(object):
                 snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
-                body_content = ''
-                
+                body_content = ''                
                 
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')

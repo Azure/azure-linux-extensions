@@ -309,6 +309,7 @@ class FreezeSnapshotter(object):
             blobMetadataTelemetryMessage[sasuri_index]+= str(level1BlobMetadataSize) + ", ";
 
             headers = {}
+            headers["Content-Length"] = '0'
             if(original_blob_metadata is not None): 
                 for meta in original_blob_metadata:
                     Key,Value = meta
@@ -328,6 +329,7 @@ class FreezeSnapshotter(object):
                 blobMetadataTelemetryMessage[sasuri_index]+= str(level2BlobMetadataSize) + ", ";
 
                 headers = {}
+                headers["Content-Length"] = '0'
                 if(backup_meta_data is not None):
                     for meta in backup_meta_data:
                         key = meta['Key']
@@ -337,8 +339,12 @@ class FreezeSnapshotter(object):
         return headers
 
 
-    def populate_blob_metadata_all(self, paras, blobMetadataTelemetryMessage):
+    def populate_blob_metadata_all(self, paras):
         blob_metadata = {}
+        
+        #Dict <DiskIndex, Disk Metadata Size>
+        blobMetadataTelemetryMessage = {}
+
         try:
             blobs = paras.blobs
             if blobs is not None:
@@ -361,6 +367,9 @@ class FreezeSnapshotter(object):
             errorMsg = " Unable to retreive metadata for blobs : %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
 
+        if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data("MetadataSizeExceedBlobCount", str(len(blobMetadataTelemetryMessage)))
+
         return blob_metadata
      
     def takeSnapshotFromGuest(self):
@@ -382,14 +391,8 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
-            # populate metadata for all blobs
-            
-            #Dict <DiskIndex, Disk Metadata Size>
-            blobMetadataTelemetryMessage = {}
-
-            blob_metadata = self.populate_blob_metadata_all(self.para_parser, blobMetadataTelemetryMessage)
-
-            HandlerUtil.HandlerUtility.add_to_telemetery_data("MetadataSizeExceedBlobCount", str(len(blobMetadataTelemetryMessage)))
+            # populate metadata for all blobs           
+            blob_metadata = self.populate_blob_metadata_all(self.para_parser)
 
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
