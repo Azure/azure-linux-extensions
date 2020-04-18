@@ -30,3 +30,4 @@ OS.OpensslPath=None                     # If "None", the system default version 
 """
 
 waagent_config_path = "/etc/waagent.conf"
+Openssl = "openssl"

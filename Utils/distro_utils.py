@@ -5,7 +5,7 @@ import random
 import crypt
 import string
 import Utils.constants as constants
-import Utils.extensionutils as ext_utils
+import Utils.ext_utils as ext_utils
 import Utils.openssutils as openssl_utils
 from Utils.logger import default_logger as logger
 
