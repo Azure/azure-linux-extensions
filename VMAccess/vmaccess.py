@@ -40,7 +40,7 @@ SshdConfigPath = '/etc/ssh/sshd_config'
 def main():
     waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.Log("%s started to handle." % (ExtensionShortName))
-    waagent.MyDistro = waagent.GetMyDistro()
+    waagent.MyDistro = waagent.GetMyDistro() ## Todo figure out what we can do without it
 
     try:
         for a in sys.argv[1:]:
