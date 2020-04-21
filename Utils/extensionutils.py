@@ -5,12 +5,13 @@ import traceback
 import time
 import sys
 import pwd
+import base64
 import Utils.constants as constants
 import xml.sax.saxutils as xml_utils
 from Utils.logger import default_logger as logger
 
 
-def change_owner(filepath, user):
+def change_owner(file_path, user):
     """
     Lookup user.  Attempt chown 'filepath' to 'user'.
     """
@@ -20,19 +21,19 @@ def change_owner(filepath, user):
     except:
         pass
     if p is not None:
-        os.chown(filepath, p[2], p[3])
+        os.chown(file_path, p[2], p[3])
 
 
-def create_dir(dirpath, user, mode):
+def create_dir(dir_path, user, mode):
     """
     Attempt os.makedirs, catch all exceptions.
     Call ChangeOwner afterwards.
     """
     try:
-        os.makedirs(dirpath, mode)
+        os.makedirs(dir_path, mode)
     except:
         pass
-    change_owner(dirpath, user)
+    change_owner(dir_path, user)
 
 
 def set_file_contents(file_path, contents):
@@ -75,14 +76,13 @@ def get_file_contents(file_path, as_bin=False):
     mode = 'r'
     if as_bin:
         mode += 'b'
-    c = None
     try:
         with open(file_path, mode) as F:
-            c = F.read()
+            contents = F.read()
+            return contents
     except IOError as e:
         logger.ErrorWithPrefix('GetFileContents', 'Reading from file ' + file_path + ' Exception is ' + str(e))
         return None
-    return c
 
 
 def replace_file_with_contents_atomic(filepath, contents):
@@ -103,7 +103,9 @@ def replace_file_with_contents_atomic(filepath, contents):
         os.rename(temp, filepath)
         return None
     except IOError as e:
-        logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Renaming ' + temp + ' to ' + filepath + ' Exception is ' + str(e))
+        logger.ErrorWithPrefix(
+            'ReplaceFileContentsAtomic', 'Renaming ' + temp + ' to ' + filepath + ' Exception is ' + str(e)
+        )
     try:
         os.remove(filepath)
     except IOError as e:
@@ -118,12 +120,12 @@ def replace_file_with_contents_atomic(filepath, contents):
 
 def run_command_and_write_stdout_to_file(command, output_file):
     # meant to replace commands of the nature command > output_file
-    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE);
+    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
         logger.Error('CalledProcessError.  Error Code is ' + str(p.returncode))
         logger.Error('CalledProcessError.  Command string was ' + ' '.join(command))
-        logger.Error('CalledProcessError.  Command result was stdout: ' + stdout + ' stderr: ' + stderr )
+        logger.Error('CalledProcessError.  Command result was stdout: ' + str(stdout) + ' stderr: ' + str(stderr))
         return p.returncode
     set_file_contents(output_file, stdout)
     return 0
@@ -168,6 +170,16 @@ def get_line_starting_with(prefix, filepath):
     return None
 
 
+def translate_custom_data(data, configuration):
+    """
+    Translate the custom data from a Base64 encoding. Default to no-op.
+    """
+    data_to_decode = configuration.get("Provisioning.DecodeCustomData")
+    if data_to_decode is not None and data_to_decode.lower().startswith("y"):
+        return base64.b64decode(data)
+    return data
+
+
 class WALAEvent(object):
     def __init__(self):
         self.providerId = ""
@@ -186,43 +198,43 @@ class WALAEvent(object):
         self.Processors = 0
 
     def to_xml(self):
-        strEventid = u'<Event id="{0}"/>'.format(self.eventId)
-        strProviderid = u'<Provider id="{0}"/>'.format(self.providerId)
-        strRecordFormat = u'<Param Name="{0}" Value="{1}" T="{2}" />'
-        strRecordNoQuoteFormat = u'<Param Name="{0}" Value={1} T="{2}" />'
-        strMtStr = u'mt:wstr'
-        strMtUInt64 = u'mt:uint64'
-        strMtBool = u'mt:bool'
-        strMtFloat = u'mt:float64'
-        strEventsData = u""
+        str_event_id = u'<Event id="{0}"/>'.format(self.eventId)
+        str_provider_id = u'<Provider id="{0}"/>'.format(self.providerId)
+        str_record_format = u'<Param Name="{0}" Value="{1}" T="{2}" />'
+        str_record_no_quote_format = u'<Param Name="{0}" Value={1} T="{2}" />'
+        str_mt_str = u'mt:wstr'
+        str_mt_u_int64 = u'mt:uint64'
+        str_mt_bool = u'mt:bool'
+        str_mt_float = u'mt:float64'
+        str_events_data = u""
 
         for attName in self.__dict__:
             if attName in ["eventId", "filedCount", "providerId"]:
                 continue
 
-            attValue = self.__dict__[attName]
-            if type(attValue) is int:
-                strEventsData += strRecordFormat.format(attName, attValue, strMtUInt64)
+            att_value = self.__dict__[attName]
+            if type(att_value) is int:
+                str_events_data += str_record_format.format(attName, att_value, str_mt_u_int64)
                 continue
-            if type(attValue) is str:
-                attValue = xml_utils.quoteattr(attValue)
-                strEventsData += strRecordNoQuoteFormat.format(attName, attValue, strMtStr)
+            if type(att_value) is str:
+                att_value = xml_utils.quoteattr(att_value)
+                str_events_data += str_record_no_quote_format.format(attName, att_value, str_mt_str)
                 continue
-            if str(type(attValue)).count("'unicode'") > 0:
-                attValue = xml_utils.quoteattr(attValue)
-                strEventsData += strRecordNoQuoteFormat.format(attName, attValue, strMtStr)
+            if str(type(att_value)).count("'unicode'") > 0:
+                att_value = xml_utils.quoteattr(att_value)
+                str_events_data += str_record_no_quote_format.format(attName, att_value, str_mt_str)
                 continue
-            if type(attValue) is bool:
-                strEventsData += strRecordFormat.format(attName, attValue, strMtBool)
+            if type(att_value) is bool:
+                str_events_data += str_record_format.format(attName, att_value, str_mt_bool)
                 continue
-            if type(attValue) is float:
-                strEventsData += strRecordFormat.format(attName, attValue, strMtFloat)
+            if type(att_value) is float:
+                str_events_data += str_record_format.format(attName, att_value, str_mt_float)
                 continue
 
-            logger.Log("Warning: property " + attName + ":" + str(type(attValue)) + ":type" + str(
-                type(attValue)) + "Can't convert to events data:" + ":type not supported")
+            logger.Log("Warning: property " + attName + ":" + str(type(att_value)) + ":type" + str(
+                type(att_value)) + "Can't convert to events data:" + ":type not supported")
 
-        return u"<Data>{0}{1}{2}</Data>".format(strProviderid, strEventid, strEventsData)
+        return u"<Data>{0}{1}{2}</Data>".format(str_provider_id, str_event_id, str_events_data)
 
     def save(self):
         event_folder = constants.LibDir + "/events"
@@ -258,14 +270,14 @@ class ConfigurationProvider(object):
     Parse amd store key:values in waagent.conf
     """
 
-    def __init__(self, walaConfigFile):
+    def __init__(self, wala_config_file):
         self.values = dict()
-        if walaConfigFile is None:
-            walaConfigFile = constants.waagent_config_path
-        if not os.path.isfile(walaConfigFile):
-            raise Exception("Missing configuration in {0}".format(walaConfigFile))
+        if wala_config_file is None:
+            wala_config_file = constants.waagent_config_path
+        if not os.path.isfile(wala_config_file):
+            raise Exception("Missing configuration in {0}".format(wala_config_file))
         try:
-            for line in get_file_contents(walaConfigFile).split('\n'):
+            for line in get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
                     parts = line.split()[0].split('=')
                     value = parts[1].strip("\" ")
@@ -273,8 +285,8 @@ class ConfigurationProvider(object):
                         self.values[parts[0]] = value
                     else:
                         self.values[parts[0]] = None
-        except:
-            logger.Error("Unable to parse {0}".format(walaConfigFile))
+        except Exception:
+            logger.Error("Unable to parse {0}".format(wala_config_file))
             raise
         return
 
@@ -296,7 +308,8 @@ class ConfigurationProvider(object):
             return False
 
 
-def add_extension_event(name, op, is_success, duration=0, version="1.0", message="", extension_type="", is_internal=False):
+def add_extension_event(name, op, is_success, duration=0, version="1.0", message="", extension_type="",
+                        is_internal=False):
     event = ExtensionEvent()
     event.Name = name
     event.Version = version
@@ -310,4 +323,3 @@ def add_extension_event(name, op, is_success, duration=0, version="1.0", message
         event.save()
     except IOError:
         logger.Error("Error " + traceback.format_exc())
-

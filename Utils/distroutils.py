@@ -5,7 +5,7 @@ import random
 import crypt
 import string
 import Utils.constants as constants
-import Utils.ext_utils as ext_utils
+import Utils.extensionutils as ext_utils
 import Utils.openssutils as openssl_utils
 from Utils.logger import default_logger as logger
 
@@ -53,11 +53,11 @@ class AbstractDistro(object):
         self.shadow_file_path = "/etc/shadow"
         self.dhcp_enabled = False
 
-    def isSelinuxSystem(self):
+    def is_se_linux_system(self):
         """
         Checks and sets self.selinux = True if SELinux is available on system.
         """
-        if self.selinux == None:
+        if self.selinux is None:
             if ext_utils.run(['which', 'getenforce'], chk_err=False):
                 self.selinux = False
             else:
@@ -83,7 +83,7 @@ class AbstractDistro(object):
         Calls shell 'chcon' with 'path' and 'cn' context.
         Returns exit result.
         """
-        if self.isSelinuxSystem():
+        if self.is_se_linux_system():
             return ext_utils.run(['chcon', 'cn', 'path'])
 
     def restart_ssh_service(self):
@@ -128,7 +128,7 @@ class AbstractDistro(object):
 
     def chpasswd(self, username, password, crypt_id=6, salt_len=10):
         passwd_hash = self.gen_password_hash(password, crypt_id, salt_len)
-        cmd = "usermod -p '{0}' {1}".format(passwd_hash, username)
+        cmd = ['usermod', '-p', passwd_hash, username]
         ret, output = ext_utils.run_command_get_output(cmd, log_cmd=False)
         if ret != 0:
             return "Failed to set password for {0}: {1}".format(username, output)

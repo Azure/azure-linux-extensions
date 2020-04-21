@@ -27,9 +27,10 @@ import traceback
 
 import Utils.HandlerUtil as Util
 import Utils.logger as logger
-import Utils.ext_utils as ext_utils
-import Utils.distro_utils as dist_utils
+import Utils.extensionutils as ext_utils
+import Utils.distroutils as dist_utils
 import Utils.constants as constants
+import Utils.ovfutils as ovf_utils
 
 # Define global variables
 ExtensionShortName = 'VMAccess'
@@ -39,11 +40,12 @@ OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
 
 Logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
+Configuration = ext_utils.ConfigurationProvider(None)
 MyDistro = dist_utils.AbstractDistro()  # TODO: set up other distros
 
 
 def main():
-    Logger.Log("%s started to handle." % (ExtensionShortName))
+    Logger.Log("%s started to handle." % ExtensionShortName)
 
     try:
         for a in sys.argv[1:]:
@@ -179,8 +181,13 @@ def _remove_user_account(user_name, hutil):
 
 def _set_user_account_pub_key(protect_settings, hutil):
     # TODO: Figure out what do do with ovf-env.xml
-    # ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
-    # ovf_env = waagent.OvfEnv().Parse(ovf_xml)
+    try:
+        ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
+        ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
+    except Exception as e:
+        # default ovf_env with empty data
+        ovf_env = ovf_utils.OvfEnv()
+        Logger.Warn("could not load ovf-env.xml %s" % str(e))
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
@@ -229,9 +236,9 @@ def _set_user_account_pub_key(protect_settings, hutil):
             ovf_env.UserName = user_name
             if no_convert:
                 if cert_txt:
-                    pub_path = ovf_env.PrepareDir(pub_path)
+                    pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
                     final_cert_txt = cert_txt
-                    if (not cert_txt.endswith("\n")):
+                    if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
                     ext_utils.append_file_contents(pub_path, final_cert_txt)
                     MyDistro.set_selinux_context(pub_path,
@@ -256,7 +263,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                 os.path.join(constants.LibDir, pkey[0] + '.crt'),
                                 os.path.join(os.getcwd(), 'temp.crt'))
                             break
-                pub_path = ovf_env.PrepareDir(pub_path)
+                pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
                 retcode = ext_utils.run_command_and_write_stdout_to_file(
                     [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout' '-pubkey'], "temp.pub")
                 if retcode > 0:
@@ -289,10 +296,10 @@ def _get_other_sudoers(user_name):
 
 
 def _save_other_sudoers(sudoers):
-    sudoersFile = '/etc/sudoers.d/waagent'
+    sudoers_file = '/etc/sudoers.d/waagent'
     if sudoers is None:
         return
-    ext_utils.append_file_contents(sudoersFile, "\n".join(sudoers))
+    ext_utils.append_file_contents(sudoers_file, "\n".join(sudoers))
     os.chmod("/etc/sudoers.d/waagent", 0o440)
 
 

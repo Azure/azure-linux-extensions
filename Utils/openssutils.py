@@ -4,7 +4,7 @@ import base64
 
 def number_to_bytes(i):
     """
-    Pack number into bytes.  Retun as string.
+    Pack number into bytes. Retun as string.
     """
     result = []
     while i:
@@ -14,7 +14,7 @@ def number_to_bytes(i):
     return ''.join(result)
 
 
-def bits_to_string(self, a):
+def bits_to_string(a):
     """
     Return string representation of bits in a.
     """
@@ -25,6 +25,7 @@ def bits_to_string(self, a):
         c = c | (bit << index)
         index = index - 1
         if index == -1:
+            # noinspection PyTypeChecker
             s = s + struct.pack('>B', c)
             c = 0
             index = 7
@@ -41,16 +42,15 @@ def openssl_publickey_to_ssh(file):
         k = der_decoder.decode(bits_to_string(der_decoder.decode(base64.b64decode(f))[0][1]))[0]
         n = k[0]
         e = k[1]
-        keydata = ""
-        keydata += struct.pack('>I', len("ssh-rsa"))
-        keydata += "ssh-rsa"
-        keydata += struct.pack('>I', len(number_to_bytes(e)))
-        keydata += number_to_bytes(e)
-        keydata += struct.pack('>I', len(number_to_bytes(n)) + 1)
-        keydata += "\0"
-        keydata += number_to_bytes(n)
+        key_data = ""
+        key_data += struct.pack('>I', len("ssh-rsa"))
+        key_data += "ssh-rsa"
+        key_data += struct.pack('>I', len(number_to_bytes(e)))
+        key_data += number_to_bytes(e)
+        key_data += struct.pack('>I', len(number_to_bytes(n)) + 1)
+        key_data += "\0"
+        key_data += number_to_bytes(n)
     except Exception as e:
         print("OpensslToSsh: Exception " + str(e))
         return None
-    return "ssh-rsa " + base64.b64encode(keydata) + "\n"
-
+    return "ssh-rsa " + base64.b64encode(key_data) + "\n"
