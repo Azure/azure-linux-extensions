@@ -4,7 +4,7 @@ import unittest
 import Utils.extensionutils as ext_utils
 import Utils.logger
 
-ext_utils.logger = Utils.logger.get_console_only_logger()
+ext_utils.logger = Utils.logger.TestLogger()
 
 
 class TestCodeInjection(unittest.TestCase):
@@ -21,7 +21,6 @@ class TestCodeInjection(unittest.TestCase):
         self.assertEquals("hello ; echo world\n", string_output, "unexpected output")
         exit_code, string_output = ext_utils.run_command_get_output(["echo", "hello", "world"])
         self.assertEquals(0, exit_code, "exit code == 0")
-
 
 
 if __name__ == '__main__':

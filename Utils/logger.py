@@ -159,7 +159,8 @@ class TestLogger(Logger):
         self.file_path = None
 
     def _log_to_stdout(self, message):
-        sys.stdout.write(message)
+        sys.stdout.writelines(message)
+        sys.stdout.write("\n")
 
     def write_to_file(self, message):
         self._log_to_stdout(message)
@@ -198,11 +199,5 @@ class TestLogger(Logger):
         self.error_with_prefix("", message)
 
 
-
-
 global default_logger
 default_logger = Logger('/var/log/waagent.log', '/dev/console')
-
-
-def get_console_only_logger():
-    return Logger('/dev/null', '/dev/console')
