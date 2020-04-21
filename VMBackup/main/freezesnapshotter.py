@@ -39,7 +39,7 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
-import sys
+from Utils.BlobUtil import BlobUtil
 
 # need to be implemented in next release
 #from dhcpHandler import DhcpHandler
@@ -252,125 +252,6 @@ class FreezeSnapshotter(object):
             run_status = 'error'
         
         return run_result, run_status
-
-    def GetBlobProperties(self, blobUri):
-        blobProperties = None
-        if(blobUri is not None):     
-            try:
-                http_util = HttpUtil(self.logger)
-                sasuri_obj = urlparser.urlparse(blobUri+ '&comp=metadata')
-                headers = {}
-
-                result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
-                self.logger.log("FS : GetBlobMetadata: HttpCallGetResponse : result :" + str(result) + ", errMsg :" + str(errMsg))
-                blobProperties = self.httpresponse_get_blob_properties(httpResp)
-            except Exception as e:
-                self.logger.log("FS : GetBlobMetadata: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-        return blobProperties
-
-    def GetHeaderSize(self, headers):
-    # max size of blob metadata 
-            return sys.getsizeof(json.dumps(headers))
-
-
-    def httpresponse_get_blob_properties(self, httpResp):
-        blobProperties = {}
-        if(httpResp != None):
-            self.hutil.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
-            if(httpResp.status == 200):
-                resp_headers = httpResp.getheaders()
-                blobProperties = resp_headers
-        return blobProperties
-
-    def populate_snapshotreq_headers_perblob(self, sasuri, sasuri_index, backup_meta_data, blobMetadataTelemetryMessage):
-        headers= {}
-        headers["Content-Length"] = '0'
-        blobMetdataMaxSizeBytes = CommonVariables.blobMetdataMaxSizeBytes
-
-        original_blob_metadata = self.GetBlobProperties(sasuri)
-        
-        if(original_blob_metadata is not None): 
-            for meta in original_blob_metadata:
-                Key,Value = meta
-                headers[Key] = Value
-
-        if(backup_meta_data is not None):
-            for meta in backup_meta_data:
-                key = meta['Key']
-                value = meta['Value']
-                headers["x-ms-meta-" + key] = value
-        
-        level1BlobMetadataSize = self.GetHeaderSize(headers)
-        
-        if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
-            if sasuri_index not in blobMetadataTelemetryMessage :
-                blobMetadataTelemetryMessage[sasuri_index] = ""
-
-            blobMetadataTelemetryMessage[sasuri_index]+= str(level1BlobMetadataSize) + ", ";
-
-            headers = {}
-            headers["Content-Length"] = '0'
-            if(original_blob_metadata is not None): 
-                for meta in original_blob_metadata:
-                    Key,Value = meta
-                    if Key == "x-ms-meta-diskencryptionsettings" :
-                        headers[Key] = Value
-                        break
-
-            if(backup_meta_data is not None):
-                for meta in backup_meta_data:
-                    key = meta['Key']
-                    value = meta['Value']
-                    headers["x-ms-meta-" + key] = value
-
-            level2BlobMetadataSize = self.GetHeaderSize(headers)
-            
-            if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
-                blobMetadataTelemetryMessage[sasuri_index]+= str(level2BlobMetadataSize) + ", ";
-
-                headers = {}
-                headers["Content-Length"] = '0'
-                if(backup_meta_data is not None):
-                    for meta in backup_meta_data:
-                        key = meta['Key']
-                        value = meta['Value']
-                        headers["x-ms-meta-" + key] = value
-                
-        return headers
-
-
-    def populate_blob_metadata_all(self, paras):
-        blob_metadata = {}
-        
-        #Dict <DiskIndex, Disk Metadata Size>
-        blobMetadataTelemetryMessage = {}
-
-        try:
-            blobs = paras.blobs
-            if blobs is not None:
-                blob_index = 0
-                self.logger.log('****** Starting metadata retrieval for all blobs')
-                
-                for blob in blobs:
-                    blobUri = blob.split("?")[0]
-                    self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blob,blob_index,paras.backup_metadata, blobMetadataTelemetryMessage)
-                    self.logger.log("Metadata retreived : " + str(blob_metadata[blob_index]))
-
-                    # log if the metadata size was found to be greater than the max limit allowed
-                    if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0 and blob_index in blobMetadataTelemetryMessage :
-                        self.logger.log("Metadata was found to be greater than the max limit. The metadata size was : " + blobMetadataTelemetryMessage[blob_index])
-                    
-                    blob_index = blob_index + 1
-
-        except Exception as e:
-            errorMsg = " Unable to retreive metadata for blobs : %s, stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(errorMsg)
-
-        if blobMetadataTelemetryMessage is not None and len(blobMetadataTelemetryMessage) > 0:
-                HandlerUtil.HandlerUtility.add_to_telemetery_data("MetadataSizeExceedBlobCount", str(len(blobMetadataTelemetryMessage)))
-
-        return blob_metadata
      
     def takeSnapshotFromGuest(self):
         run_result = CommonVariables.success
@@ -391,8 +272,9 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
-            # populate metadata for all blobs           
-            blob_metadata = self.populate_blob_metadata_all(self.para_parser)
+            # populate metadata for all blobs 
+            blob_util = BlobUtil(self.logger)          
+            blob_metadata = blob_util.populate_blobMetadata_allblobs(self.para_parser)
 
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
