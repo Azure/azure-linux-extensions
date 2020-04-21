@@ -18,7 +18,19 @@ Sample input data received by this script
 """
 
 
-def parse_config(data, me_url, mdsd_url):
+def parse_config(data, me_url, mdsd_url, is_lad):
+
+    lad_total_map = {
+        # "mem" : "mem",
+        "cpu" : "cpu_total",
+        "net" : "network_total",
+        "disk" : "disk_total",
+        "diskio" : "diskio_total",
+        # "swap" : "swap",
+        # "kernel_vmstat" : "kernel_vmstat"
+    }
+
+    lad_storage_namepass_list = ""
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -94,8 +106,16 @@ def parse_config(data, me_url, mdsd_url):
             input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
             rename_str += "\n[[processors.rename]]\n"
-            rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
-
+            rename_str += " "*2 + "namepass = [\"" + plugin + "\""
+            
+            # If it's a lad config then add the namepass fields for sending totals to storage
+            if is_lad:
+                if plugin in lad_total_map:
+                    rename_str += ", \"" + lad_total_map[plugin] + "\""
+                    lad_storage_namepass_list += "\"" + lad_total_map[plugin] + "\", "
+                else:
+                    lad_storage_namepass_list += "\"" + plugin + "\", "           
+            rename_str += "]\n"
             fields = ""
             ops_fields = ""
             ops = ""
@@ -199,6 +219,8 @@ def parse_config(data, me_url, mdsd_url):
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
     agentconf += "\n# Configuration for sending metrics to AMA\n"
     agentconf += "[[outputs.influxdb]]\n"
+    if is_lad:
+        agentconf += "  namepass = [" + lad_storage_namepass_list[:-2] + "]\n\n"
     agentconf += "  urls = [\"" + str(mdsd_url) + "\"]\n\n"
     agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
     agentconf += "#[[outputs.file]]\n"
@@ -275,11 +297,11 @@ def setup_telegraf_service():
     return True
 
 
-def handle_config(data, me_url, mdsd_url):
+def handle_config(data, me_url, mdsd_url, is_lad=False):
     #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
 
     #call the method to first parse the configs
-    output = parse_config(data, me_url, mdsd_url)
+    output = parse_config(data, me_url, mdsd_url, is_lad)
 
     #call the method to write the configs
     write_configs(output)
@@ -289,11 +311,13 @@ def handle_config(data, me_url, mdsd_url):
 
     print telegraf_setup
     #start telegraf service if it was set up correctly
-    out = 1
+    daemon_start = 1
+    daemon_reload_status = 1
     if telegraf_setup:
-        out = os.system("sudo systemctl start metrics-sourcer")
+        daemon_reload_status = os.system("sudo systemctl daemon-reload")
+        daemon_start = os.system("sudo systemctl start metrics-sourcer")
     
-    if out != 0:
+    if daemon_start != 0 or daemon_reload_status != 0:
         return False 
     
     return True

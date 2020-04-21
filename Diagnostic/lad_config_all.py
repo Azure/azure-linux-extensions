@@ -448,7 +448,7 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
-            self._telegraf_config = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url )          
+            self._telegraf_config = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)          
 
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
