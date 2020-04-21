@@ -343,7 +343,7 @@ class HandlerUtility:
         try :
             value_str = str(value)
         except ValueError :
-            self.log('Not able to parse the read value as string, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as string, falling back to default value', 'Warning')
             value = default
 
         return value
@@ -358,7 +358,7 @@ class HandlerUtility:
         try :
             value_int = int(value)
         except ValueError :
-            self.log('Not able to parse the read value as int, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as int, falling back to default value', 'Warning')
             value = default
 
         return int(value)
@@ -601,10 +601,12 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
+        workloads = self.get_workload_running()
         HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("workloads",str(workloads))
     
     def convert_telemetery_data_to_bcm_serializable_format(self):
         HandlerUtility.serializable_telemetry_data = []
@@ -783,6 +785,23 @@ class HandlerUtility:
                     uriHasSpecialCharacters = True
 
         return uriHasSpecialCharacters
+
+    def get_workload_running(self):
+        workloads = []
+        try:
+            dblist= ["mysqld","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            if os.path.isdir("/proc"):
+                pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+                for pid in pids:
+                    pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
+                    for db in dblist :
+                        if db in pname.lower() and db not in workloads :
+                            self.log("workload running found with command : " + str(pname))
+                            workloads.append(db)
+            return workloads
+        except Exception as e:
+            self.log("Unable to fetch running workloads" + str(e))
+            return workloads
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
