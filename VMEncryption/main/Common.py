@@ -35,7 +35,7 @@ class CommonVariables:
     luks_header_size = 4096 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
-    #TODO for the sles 11, we should use the ext3
+    # TODO for the sles 11, we should use the ext3
     default_file_system = 'ext4'
     format_supported_file_systems = ['ext4', 'ext3', 'ext2', 'xfs', 'btrfs']
     inplace_supported_file_systems = ['ext4', 'ext3', 'ext2']
@@ -51,6 +51,22 @@ class CommonVariables:
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
 
     """
+    wire protocol message format
+    """
+    encryption_key_file_name = 'LinuxPassPhraseFileName'
+
+    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    wireprotocol_msg_headers = {
+        "Content-Type": "text/xml",
+        "x-ms-version": "2015-04-05"
+    }
+    wireprotocol_msg_template_v3 = """<?xml version="1.0"?>
+    <DiskEncryptionData version="3.0">
+        <DiskEncryptionDetailsAsJson>{settings_json_blob}</DiskEncryptionDetailsAsJson>
+    </DiskEncryptionData>
+    """
+
+    """
     parameter key names
     """
     PassphraseFileNameKey = 'BekFileName'
@@ -63,6 +79,10 @@ class CommonVariables:
     default_encryption_algorithm = 'RSA-OAEP'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
+    KeyVaultResourceIdKey = 'KeyVaultResourceId'
+    KekVaultResourceIdKey = 'KekVaultResourceId'
+    MigrateKey = 'MigrateFlag'
+    MigrateValue = 'Migrate'
 
     """
     value for VolumeType could be OS or Data
@@ -171,6 +191,13 @@ class CommonVariables:
     unmount_oldroot_error = 22
     operation_lookback_failed = 23
     unknown_error = 100
+
+    """
+    error messages
+    """
+    migration_detached_header = "One or more data disk use detached LUKS header. Migration is not supported."
+    migration_detached_header_xfs = "One or more data disk use detached LUKS header with xfs filesystem. Migration is not supported."
+    migration_wrong_passphrase = "Passphrase validation failed. Please check your passphrase and try again."
 
 class TestHooks:
     search_not_only_ide = False

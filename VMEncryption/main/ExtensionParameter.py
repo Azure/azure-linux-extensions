@@ -51,6 +51,8 @@ class ExtensionParameter(object):
         self.KeyVaultURL = public_settings.get(CommonVariables.KeyVaultURLKey)
         self.AADClientID = public_settings.get(CommonVariables.AADClientIDKey)
         self.AADClientCertThumbprint = public_settings.get(CommonVariables.AADClientCertThumbprintKey)
+        self.KeyVaultResourceId = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
+        self.KekVaultResourceId = public_settings.get(CommonVariables.KekVaultResourceIdKey)
 
         keyEncryptionAlgorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
         if keyEncryptionAlgorithm is not None and keyEncryptionAlgorithm !="":
@@ -60,6 +62,11 @@ class ExtensionParameter(object):
 
         self.VolumeType = public_settings.get(CommonVariables.VolumeTypeKey)
         self.DiskFormatQuery = public_settings.get(CommonVariables.DiskFormatQuerykey)
+
+        if CommonVariables.MigrateKey in public_settings:
+            self.MigrateFlag = public_settings.get(CommonVariables.MigrateKey)
+        else:
+            self.MigrateFlag = None
 
         """
         private settings
