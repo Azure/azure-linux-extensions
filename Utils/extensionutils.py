@@ -8,7 +8,11 @@ import pwd
 import base64
 import Utils.constants as constants
 import xml.sax.saxutils as xml_utils
-from Utils.logger import default_logger as logger
+import Utils.logger
+
+global logger
+# overwrite the logger in the tests
+logger = Utils.logger.default_logger
 
 
 def change_owner(file_path, user):
@@ -120,8 +124,13 @@ def replace_file_with_contents_atomic(filepath, contents):
 
 def run_command_and_write_stdout_to_file(command, output_file):
     # meant to replace commands of the nature command > output_file
-    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
+    try:
+        p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+    except FileNotFoundError as e:
+        logger.Error('CalledProcessError.  Error message is ' + str(e))
+        # bash returns 127 for file not found error
+        return 127
     if p.returncode != 0:
         logger.Error('CalledProcessError.  Error Code is ' + str(p.returncode))
         logger.Error('CalledProcessError.  Command string was ' + ' '.join(command))
@@ -129,6 +138,7 @@ def run_command_and_write_stdout_to_file(command, output_file):
         return p.returncode
     set_file_contents(output_file, stdout)
     return 0
+
 
 
 def run_command_get_output(cmd, chk_err=True, log_cmd=True):
@@ -147,10 +157,10 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.Error('CalledProcessError.  Command string was ' + e.cmd)
             logger.Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
-    except Exception as e:
+    except FileNotFoundError as e:
         if chk_err and log_cmd:
             logger.Error('CalledProcessError.  Error message is ' + str(e))
-            return -1, str(e)
+            return 127, str(e)
     return 0, output.decode('latin-1')
 
 

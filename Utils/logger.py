@@ -159,4 +159,7 @@ class Logger(object):
 
 global default_logger
 default_logger = Logger('/var/log/waagent.log', '/dev/console')
-console_only_logger = Logger('/dev/null', '/dev/console')
+
+
+def get_console_only_logger():
+    return Logger('/dev/null', '/dev/console')
