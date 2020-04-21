@@ -93,7 +93,7 @@ class AbstractDistro(object):
         ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
         ret_code = ext_utils.run(ssh_restart_cmd)
         if ret_code > 0:
-            logger.Error("Failed to restart SSH service with return code:" + str(ret_code))
+            logger.error("Failed to restart SSH service with return code:" + str(ret_code))
         return ret_code
 
     def ssh_deploy_public_key(self, fprint, path):
@@ -105,12 +105,12 @@ class AbstractDistro(object):
         if ssh_pub_key is not None:
             ext_utils.append_file_contents(path, ssh_pub_key)
         else:
-            logger.Error("Failed: " + fprint + ".crt -> " + path)
+            logger.error("Failed: " + fprint + ".crt -> " + path)
             error = 1
         return error
 
     def change_password(self, user, password):
-        logger.Log("Change user password")
+        logger.log("Change user password")
         crypt_id = config.get("Provisioning.PasswordCryptId")
         if crypt_id is None:
             crypt_id = "6"
@@ -159,17 +159,17 @@ class AbstractDistro(object):
         if uid_min is None:
             uid_min = 100
         if user_entry is not None and user_entry[2] < uid_min:
-            logger.Error("CreateAccount: " + user + " is a system user. Will not set password.")
+            logger.error("CreateAccount: " + user + " is a system user. Will not set password.")
             return "Failed to set password for system user: " + user + " (0x06)."
         if user_entry is None:
             command = ['useradd', '-m', user]
             if expiration is not None:
                 command += ['-e', expiration.split('.')[0]]
             if ext_utils.run(command):
-                logger.Error("Failed to create user account: " + user)
+                logger.error("Failed to create user account: " + user)
                 return "Failed to create user account: " + user + " (0x07)."
         else:
-            logger.Log("CreateAccount: " + user + " already exists. Will update password.")
+            logger.log("CreateAccount: " + user + " already exists. Will update password.")
         if password is not None:
             self.change_password(user, password)
         try:
@@ -185,7 +185,7 @@ class AbstractDistro(object):
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
             os.chmod("/etc/sudoers.d/waagent", 0o440)
         except:
-            logger.Error("CreateAccount: Failed to configure sudo access for user.")
+            logger.error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = self.get_home()
         if thumbprint is not None:
@@ -199,7 +199,7 @@ class AbstractDistro(object):
                 ext_utils.change_owner(f, user)
             ext_utils.set_file_contents(ssh_dir + "/authorized_keys", ext_utils.get_file_contents(pub))
             ext_utils.change_owner(ssh_dir + "/authorized_keys", user)
-        logger.Log("Created user account: " + user)
+        logger.log("Created user account: " + user)
         return None
 
     def delete_account(self, user):
@@ -214,7 +214,7 @@ class AbstractDistro(object):
         except:
             pass
         if user_entry is None:
-            logger.Error("DeleteAccount: " + user + " not found.")
+            logger.error("DeleteAccount: " + user + " not found.")
             return
         uid_min = None
         try:
@@ -224,7 +224,7 @@ class AbstractDistro(object):
         if uid_min is None:
             uid_min = 100
         if user_entry[2] < uid_min:
-            logger.Error("DeleteAccount: " + user + " is a system user. Will not delete account.")
+            logger.error("DeleteAccount: " + user + " is a system user. Will not delete account.")
             return
         ext_utils.run(['rm', '-f', '/var/run/utmp'])  # Delete utmp to prevent error if we are the 'user' deleted
         ext_utils.run(['userdel', '-f', '-r', user])

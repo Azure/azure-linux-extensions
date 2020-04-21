@@ -3,6 +3,7 @@ import sys
 import string
 
 
+# noinspection PyMethodMayBeStatic
 class Logger(object):
     """
     The Agent's logging assumptions are:
@@ -22,13 +23,13 @@ class Logger(object):
         self.con_path = conpath
         self.verbose = verbose
 
-    def ThrottleLog(self, counter):
+    def throttle_log(self, counter):
         """
         Log everything up to 10, every 10 up to 100, then every 100.
         """
         return (counter < 10) or ((counter < 100) and ((counter % 10) == 0)) or ((counter % 100) == 0)
 
-    def WriteToFile(self, message):
+    def write_to_file(self, message):
         """
         Write 'message' to logfile.
         """
@@ -48,7 +49,7 @@ class Logger(object):
             except IOError as e:
                 pass
 
-    def WriteToConsole(self, message):
+    def write_to_console(self, message):
         """
         Write 'message' to /dev/console.
         This supports serial port logging if the /dev/console
@@ -70,83 +71,76 @@ class Logger(object):
             except IOError as e:
                 pass
 
-    def Log(self, message):
+    def log(self, message):
         """
         Standard Log function.
         Logs to self.file_path, and con_path
         """
-        self.LogWithPrefix("", message)
+        self.log_with_prefix("", message)
 
-    def LogToConsole(self, message):
+    def log_to_console(self, message):
         """
         Logs message to console by pre-pending each line of 'message' with current time.
         """
         log_prefix = self._get_log_prefix("")
         for line in message.split('\n'):
             line = log_prefix + line
-            self.WriteToConsole(line)
+            self.write_to_console(line)
 
-    def LogToFile(self, message):
+    def log_to_file(self, message):
         """
         Logs message to file by pre-pending each line of 'message' with current time.
         """
         log_prefix = self._get_log_prefix("")
         for line in message.split('\n'):
             line = log_prefix + line
-            self.WriteToFile(line)
+            self.write_to_file(line)
 
-    def NoLog(self, message):
+    def no_log(self, message):
         """
         Don't Log.
         """
         pass
 
-    def LogIfVerbose(self, message):
+    def log_if_verbose(self, message):
         """
         Only log 'message' if global Verbose is True.
         """
-        self.LogWithPrefixIfVerbose('', message)
+        self.log_with_prefix_if_verbose('', message)
 
-    def LogWithPrefix(self, prefix, message):
+    def log_with_prefix(self, prefix, message):
         """
         Prefix each line of 'message' with current time+'prefix'.
         """
         log_prefix = self._get_log_prefix(prefix)
         for line in message.split('\n'):
             line = log_prefix + line
-            self.WriteToFile(line)
-            self.WriteToConsole(line)
+            self.write_to_file(line)
+            self.write_to_console(line)
 
-    def LogWithPrefixIfVerbose(self, prefix, message):
+    def log_with_prefix_if_verbose(self, prefix, message):
         """
         Only log 'message' if global Verbose is True.
         Prefix each line of 'message' with current time+'prefix'.
         """
-        if self.verbose == True:
+        if self.verbose:
             log_prefix = self._get_log_prefix(prefix)
             for line in message.split('\n'):
                 line = log_prefix + line
-                self.WriteToFile(line)
-                self.WriteToConsole(line)
+                self.write_to_file(line)
+                self.write_to_console(line)
 
-    def Warn(self, message):
-        """
-        Prepend the text "WARNING:" for each line in 'message'.
-        """
-        self.LogWithPrefix("WARNING:", message)
+    def warning(self, message):
+        self.log_with_prefix("WARNING:", message)
 
-    def ErrorWithPrefix(self, prefix, message):
-        """
-        Prepend the text "ERROR:" to the prefix for each line in 'message'.
-        Errors written to logfile, and /dev/console
-        """
-        self.LogWithPrefix("ERROR:", message)
+    def error_with_prefix(self, prefix, message):
+        self.log_with_prefix("ERROR:", message)
 
-    def Error(self, message):
+    def error(self, message):
         """
         Call ErrorWithPrefix(message).
         """
-        self.ErrorWithPrefix("", message)
+        self.error_with_prefix("", message)
 
     def _get_log_prefix(self, prefix):
         """
@@ -155,6 +149,55 @@ class Logger(object):
         t = time.localtime()
         t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
         return t + prefix
+
+
+# noinspection PyMethodMayBeStatic
+class TestLogger(Logger):
+    def __init__(self):
+        self.verbose = True
+        self.con_path = None
+        self.file_path = None
+
+    def _log_to_stdout(self, message):
+        sys.stdout.write(message)
+
+    def write_to_file(self, message):
+        self._log_to_stdout(message)
+
+    def write_to_console(self, message):
+        self._log_to_stdout(message)
+
+    def log(self, message):
+        self._log_to_stdout(message)
+
+    def log_to_console(self, message):
+        self._log_to_stdout(message)
+
+    def log_to_file(self, message):
+        self._log_to_stdout(message)
+
+    def log_if_verbose(self, message):
+        self._log_to_stdout(message)
+
+    def log_with_prefix(self, prefix, message):
+        log_prefix = self._get_log_prefix(prefix)
+        for line in message.split('\n'):
+            line = log_prefix + line
+            self._log_to_stdout(line)
+
+    def log_with_prefix_if_verbose(self, prefix, message):
+        self.log_with_prefix(prefix, message)
+
+    def warning(self, message):
+        self.log_with_prefix("WARNING:", message)
+
+    def error_with_prefix(self, prefix, message):
+        self.log_with_prefix("ERROR:", message)
+
+    def error(self, message):
+        self.error_with_prefix("", message)
+
+
 
 
 global default_logger

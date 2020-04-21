@@ -50,7 +50,7 @@ def set_file_contents(file_path, contents):
         with open(file_path, "wb+") as F:
             F.write(contents)
     except OSError as e:
-        logger.ErrorWithPrefix('SetFileContents', 'Writing to file ' + file_path + ' Exception is ' + str(e))
+        logger.error_with_prefix('SetFileContents', 'Writing to file ' + file_path + ' Exception is ' + str(e))
         return None
     return 0
 
@@ -68,7 +68,7 @@ def append_file_contents(file_path, contents):
         with open(file_path, "a+") as F:
             F.write(contents)
     except OSError as e:
-        logger.ErrorWithPrefix('AppendFileContents', 'Appending to file ' + file_path + ' Exception is ' + str(e))
+        logger.error_with_prefix('AppendFileContents', 'Appending to file ' + file_path + ' Exception is ' + str(e))
         return None
     return 0
 
@@ -85,7 +85,7 @@ def get_file_contents(file_path, as_bin=False):
             contents = F.read()
             return contents
     except OSError as e:
-        logger.ErrorWithPrefix('GetFileContents', 'Reading from file ' + file_path + ' Exception is ' + str(e))
+        logger.error_with_prefix('GetFileContents', 'Reading from file ' + file_path + ' Exception is ' + str(e))
         return None
 
 
@@ -99,7 +99,7 @@ def replace_file_with_contents_atomic(filepath, contents):
     try:
         os.write(handle, contents)
     except OSError as e:
-        logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Writing to file ' + filepath + ' Exception is ' + str(e))
+        logger.error_with_prefix('ReplaceFileContentsAtomic', 'Writing to file ' + filepath + ' Exception is ' + str(e))
         return None
     finally:
         os.close(handle)
@@ -107,17 +107,17 @@ def replace_file_with_contents_atomic(filepath, contents):
         os.rename(temp, filepath)
         return None
     except OSError as e:
-        logger.ErrorWithPrefix(
+        logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Renaming ' + temp + ' to ' + filepath + ' Exception is ' + str(e)
         )
     try:
         os.remove(filepath)
     except OSError as e:
-        logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
+        logger.error_with_prefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
     try:
         os.rename(temp, filepath)
     except OSError as e:
-        logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
+        logger.error_with_prefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
         return 1
     return 0
 
@@ -128,13 +128,13 @@ def run_command_and_write_stdout_to_file(command, output_file):
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         stdout, stderr = p.communicate()
     except OSError as e:
-        logger.Error('CalledProcessError.  Error message is ' + str(e))
+        logger.error('CalledProcessError.  Error message is ' + str(e))
         # bash returns 127 for file not found error
         return e.errno
     if p.returncode != 0:
-        logger.Error('CalledProcessError.  Error Code is ' + str(p.returncode))
-        logger.Error('CalledProcessError.  Command string was ' + ' '.join(command))
-        logger.Error('CalledProcessError.  Command result was stdout: ' + str(stdout) + ' stderr: ' + str(stderr))
+        logger.error('CalledProcessError.  Error Code is ' + str(p.returncode))
+        logger.error('CalledProcessError.  Command string was ' + ' '.join(command))
+        logger.error('CalledProcessError.  Command result was stdout: ' + str(stdout) + ' stderr: ' + str(stderr))
         return p.returncode
     set_file_contents(output_file, stdout)
     return 0
@@ -147,18 +147,18 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
     Reports exceptions to Error if chk_err parameter is True
     """
     if log_cmd:
-        logger.LogIfVerbose(cmd)
+        logger.log_if_verbose(cmd)
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=False)
     except subprocess.CalledProcessError as e:
         if chk_err and log_cmd:
-            logger.Error('CalledProcessError.  Error Code is ' + str(e.returncode))
-            logger.Error('CalledProcessError.  Command string was ' + e.cmd)
-            logger.Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            logger.error('CalledProcessError.  Error Code is ' + str(e.returncode))
+            logger.error('CalledProcessError.  Command string was ' + e.cmd)
+            logger.error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
     except OSError as e:
         if chk_err and log_cmd:
-            logger.Error('CalledProcessError.  Error message is ' + str(e))
+            logger.error('CalledProcessError.  Error message is ' + str(e))
             # bash returns 127 for file not found error
             return e.errno, str(e)
     # noinspection PyUnboundLocalVariable
@@ -246,7 +246,7 @@ class WALAEvent(object):
                 str_events_data += str_record_format.format(attName, att_value, str_mt_float)
                 continue
 
-            logger.Log("Warning: property " + attName + ":" + str(type(att_value)) + ":type" + str(
+            logger.log("Warning: property " + attName + ":" + str(type(att_value)) + ":type" + str(
                 type(att_value)) + "Can't convert to events data:" + ":type not supported")
 
         return u"<Data>{0}{1}{2}</Data>".format(str_provider_id, str_event_id, str_events_data)
@@ -301,7 +301,7 @@ class ConfigurationProvider(object):
                     else:
                         self.values[parts[0]] = None
         except Exception:
-            logger.Error("Unable to parse {0}".format(wala_config_file))
+            logger.error("Unable to parse {0}".format(wala_config_file))
             raise
         return
 
@@ -337,4 +337,4 @@ def add_extension_event(name, op, is_success, duration=0, version="1.0", message
     try:
         event.save()
     except OSError:
-        logger.Error("Error " + traceback.format_exc())
+        logger.error("Error " + traceback.format_exc())

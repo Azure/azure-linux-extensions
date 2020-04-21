@@ -45,7 +45,7 @@ MyDistro = dist_utils.AbstractDistro()  # TODO: set up other distros
 
 
 def main():
-    Logger.Log("%s started to handle." % ExtensionShortName)
+    Logger.log("%s started to handle." % ExtensionShortName)
 
     try:
         for a in sys.argv[1:]:
@@ -61,17 +61,17 @@ def main():
                 update()
     except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
-        Logger.Error(err_msg)
+        Logger.error(err_msg)
 
 
 def install():
-    hutil = Util.HandlerUtility(Logger.Log, Logger.Error)
+    hutil = Util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
-    hutil = Util.HandlerUtility(Logger.Log, Logger.Error)
+    hutil = Util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Enable')
     try:
         hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
@@ -142,19 +142,19 @@ def _is_sshd_config_modified(protected_settings):
 
 
 def uninstall():
-    hutil = Util.HandlerUtility(Logger.Log, Logger.Error)
+    hutil = Util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Uninstall')
     hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall succeeded')
 
 
 def disable():
-    hutil = Util.HandlerUtility(Logger.Log, Logger.Error)
+    hutil = Util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Disable')
     hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
 
 
 def update():
-    hutil = Util.HandlerUtility(Logger.Log, Logger.Error)
+    hutil = Util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Update')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
@@ -187,7 +187,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     except Exception as e:
         # default ovf_env with empty data
         ovf_env = ovf_utils.OvfEnv()
-        Logger.Warn("could not load ovf-env.xml %s" % str(e))
+        Logger.warning("could not load ovf-env.xml %s" % str(e))
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
