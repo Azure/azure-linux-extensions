@@ -147,6 +147,10 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.Error('CalledProcessError.  Command string was ' + e.cmd)
             logger.Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
+    except Exception as e:
+        if chk_err and log_cmd:
+            logger.Error('CalledProcessError.  Error message is ' + str(e))
+            return -1, str(e)
     return 0, output.decode('latin-1')
 
 
