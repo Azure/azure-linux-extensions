@@ -22,7 +22,7 @@ def change_owner(file_path, user):
     p = None
     try:
         p = pwd.getpwnam(user)
-    except:
+    except OSError:
         pass
     if p is not None:
         os.chown(file_path, p[2], p[3])
@@ -35,7 +35,7 @@ def create_dir(dir_path, user, mode):
     """
     try:
         os.makedirs(dir_path, mode)
-    except:
+    except OSError:
         pass
     change_owner(dir_path, user)
 
@@ -49,7 +49,7 @@ def set_file_contents(file_path, contents):
     try:
         with open(file_path, "wb+") as F:
             F.write(contents)
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('SetFileContents', 'Writing to file ' + file_path + ' Exception is ' + str(e))
         return None
     return 0
@@ -67,7 +67,7 @@ def append_file_contents(file_path, contents):
     try:
         with open(file_path, "a+") as F:
             F.write(contents)
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('AppendFileContents', 'Appending to file ' + file_path + ' Exception is ' + str(e))
         return None
     return 0
@@ -84,7 +84,7 @@ def get_file_contents(file_path, as_bin=False):
         with open(file_path, mode) as F:
             contents = F.read()
             return contents
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('GetFileContents', 'Reading from file ' + file_path + ' Exception is ' + str(e))
         return None
 
@@ -98,7 +98,7 @@ def replace_file_with_contents_atomic(filepath, contents):
         contents = contents.encode('latin-1')
     try:
         os.write(handle, contents)
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Writing to file ' + filepath + ' Exception is ' + str(e))
         return None
     finally:
@@ -106,17 +106,17 @@ def replace_file_with_contents_atomic(filepath, contents):
     try:
         os.rename(temp, filepath)
         return None
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix(
             'ReplaceFileContentsAtomic', 'Renaming ' + temp + ' to ' + filepath + ' Exception is ' + str(e)
         )
     try:
         os.remove(filepath)
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
     try:
         os.rename(temp, filepath)
-    except IOError as e:
+    except OSError as e:
         logger.ErrorWithPrefix('ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
         return 1
     return 0
@@ -127,10 +127,10 @@ def run_command_and_write_stdout_to_file(command, output_file):
     try:
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         stdout, stderr = p.communicate()
-    except FileNotFoundError as e:
+    except OSError as e:
         logger.Error('CalledProcessError.  Error message is ' + str(e))
         # bash returns 127 for file not found error
-        return 127
+        return e.errno
     if p.returncode != 0:
         logger.Error('CalledProcessError.  Error Code is ' + str(p.returncode))
         logger.Error('CalledProcessError.  Command string was ' + ' '.join(command))
@@ -138,7 +138,6 @@ def run_command_and_write_stdout_to_file(command, output_file):
         return p.returncode
     set_file_contents(output_file, stdout)
     return 0
-
 
 
 def run_command_get_output(cmd, chk_err=True, log_cmd=True):
@@ -157,11 +156,12 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.Error('CalledProcessError.  Command string was ' + e.cmd)
             logger.Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
-    except FileNotFoundError as e:
+    except OSError as e:
         if chk_err and log_cmd:
             logger.Error('CalledProcessError.  Error message is ' + str(e))
             # bash returns 127 for file not found error
-            return 127, str(e)
+            return e.errno, str(e)
+    # noinspection PyUnboundLocalVariable
     return 0, output.decode('latin-1')
 
 
@@ -336,5 +336,5 @@ def add_extension_event(name, op, is_success, duration=0, version="1.0", message
     event.ExtensionType = extension_type
     try:
         event.save()
-    except IOError:
+    except OSError:
         logger.Error("Error " + traceback.format_exc())
