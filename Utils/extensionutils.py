@@ -125,7 +125,7 @@ def replace_file_with_contents_atomic(filepath, contents):
 def run_command_and_write_stdout_to_file(command, output_file):
     # meant to replace commands of the nature command > output_file
     try:
-        p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         stdout, stderr = p.communicate()
     except FileNotFoundError as e:
         logger.Error('CalledProcessError.  Error message is ' + str(e))
