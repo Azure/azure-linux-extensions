@@ -160,6 +160,7 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
     except FileNotFoundError as e:
         if chk_err and log_cmd:
             logger.Error('CalledProcessError.  Error message is ' + str(e))
+            # bash returns 127 for file not found error
             return 127, str(e)
     return 0, output.decode('latin-1')
 
