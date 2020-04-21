@@ -81,7 +81,7 @@ class LadConfigAll:
         self._logger_log = logger_log
         self._logger_error = logger_error
         self._telegraf_me_url = "/var/run/me_out.sock"
-        self._telegraf_mdsd_url = "/var/run/mdsd_out.sock"
+        self._telegraf_mdsd_url = "unix:///var/run/mdsd/default_influx.socket"
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
