@@ -114,6 +114,7 @@ class LadLoggingConfig:
             self._rsyslog_config = None
             self._syslog_ng_config = None
             self._mdsd_syslog_config = None
+            self._mdsd_telegraf_config = None
             self._mdsd_filelog_config = None
         except KeyError as e:
             raise LadLoggingConfigException("Invalid setting name provided (KeyError). Exception msg: {0}".format(e))
@@ -240,6 +241,38 @@ class LadLoggingConfig:
 
         return mxt.top_level_tmpl_for_logging_only.format(
             sources=mxt.per_source_tmpl.format(name=syslog_src_name), events=mdsd_event_source, eh_urls=syslog_eh_urls)
+
+    def get_mdsd_telegraf_config(self, namespaces):
+        """
+        Get mdsd XML config string for telegraf use with mdsd in LAD 3.0.
+        :rtype: str
+        :return: XML string that should be added to the mdsd config XML tree for telegraf use with mdsd in LAD 3.0.
+        """
+        if not self._mdsd_telegraf_config:
+            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces)
+        return self._mdsd_telegraf_config
+
+    def __generate_mdsd_telegraf_config(self, namespaces):
+        """
+        Helper method to generate mdsd_telegraf_config
+        """
+        if len(namespaces) == 0:
+            return ''
+
+        telegraf_sources = ""
+        telegraf_routeevents = ""
+        mdsd_event_source = ""
+        telegraf_routeevents = mxt.telegraf_RouteEvent_tmpl.format(event_name='PerfTelegraf')
+
+        for plugin in namespaces:
+            # # For telegraf conf we create a Source for each of the measurements(plugins) sent from telegraf
+            # # dest table (eventName) is 'PerfTelegraf'. 
+            telegraf_sources += mxt.per_source_tmpl.format(name=plugin)
+            mdsd_event_source += mxt.per_MdsdEventSource_tmpl.format(source=plugin,
+                                                                        routeevents=telegraf_routeevents)
+
+        return mxt.top_level_tmpl_for_logging_only.format(sources=telegraf_sources, events=mdsd_event_source, eh_urls="")
+
 
     def __generate_routeevent_and_eh_url_for_extra_sink(self, sink_name, src_name):
         """

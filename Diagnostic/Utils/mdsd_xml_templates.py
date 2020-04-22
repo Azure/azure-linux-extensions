@@ -51,6 +51,9 @@ per_MdsdEventSource_tmpl = """      <MdsdEventSource source="{source}">
       </MdsdEventSource>
 """
 
+telegraf_RouteEvent_tmpl = """
+    <RouteEvent eventName="{event_name}"  duration="PT10S" priority="High" storeType="Central" /> 
+"""
 
 per_RouteEvent_tmpl = """
     <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />

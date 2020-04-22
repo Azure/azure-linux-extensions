@@ -90,6 +90,7 @@ class LadConfigAll:
         self._rsyslog_config = None
         self._syslog_ng_config = None
         self._telegraf_config = None
+        self._telegraf_namespaces = None
 
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
@@ -448,7 +449,9 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
-            self._telegraf_config = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)          
+            self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)      
+            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces)
+            copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
 
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "

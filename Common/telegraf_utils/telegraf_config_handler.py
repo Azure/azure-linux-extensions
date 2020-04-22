@@ -30,7 +30,8 @@ def parse_config(data, me_url, mdsd_url, is_lad):
         # "kernel_vmstat" : "kernel_vmstat"
     }
 
-    lad_storage_namepass_list = ""
+    lad_storage_namepass_list = []
+    lad_storage_namepass_str = ""
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -112,9 +113,11 @@ def parse_config(data, me_url, mdsd_url, is_lad):
             if is_lad:
                 if plugin in lad_total_map:
                     rename_str += ", \"" + lad_total_map[plugin] + "\""
-                    lad_storage_namepass_list += "\"" + lad_total_map[plugin] + "\", "
+                    if lad_total_map[plugin] not in lad_storage_namepass_list:
+                        lad_storage_namepass_list.append(lad_total_map[plugin])
                 else:
-                    lad_storage_namepass_list += "\"" + plugin + "\", "           
+                    if plugin not in lad_storage_namepass_list:
+                        lad_storage_namepass_list.append(plugin)           
             rename_str += "]\n"
             fields = ""
             ops_fields = ""
@@ -200,6 +203,9 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     """
     ## Get the log folder directory from HandlerEnvironment.json and use that for the telegraf default logging
     logFolder, _ = get_handler_vars()
+
+    for measurement in lad_storage_namepass_list:
+        lad_storage_namepass_str += "\"" + measurement + "\", "
     
     # Telegraf basic agent and output config 
     agentconf = "[agent]\n"
@@ -220,7 +226,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     agentconf += "\n# Configuration for sending metrics to AMA\n"
     agentconf += "[[outputs.influxdb]]\n"
     if is_lad:
-        agentconf += "  namepass = [" + lad_storage_namepass_list[:-2] + "]\n\n"
+        agentconf += "  namepass = [" + lad_storage_namepass_str[:-2] + "]\n\n"
     agentconf += "  urls = [\"" + str(mdsd_url) + "\"]\n\n"
     agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
     agentconf += "#[[outputs.file]]\n"
@@ -230,7 +236,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     output.append(agent_file)
 
 
-    return output
+    return output, lad_storage_namepass_list
 
 
 def write_configs(configs):
@@ -301,7 +307,7 @@ def handle_config(data, me_url, mdsd_url, is_lad=False):
     #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
 
     #call the method to first parse the configs
-    output = parse_config(data, me_url, mdsd_url, is_lad)
+    output, namespaces = parse_config(data, me_url, mdsd_url, is_lad)
 
     #call the method to write the configs
     write_configs(output)
@@ -318,6 +324,6 @@ def handle_config(data, me_url, mdsd_url, is_lad=False):
         daemon_start = os.system("sudo systemctl start metrics-sourcer")
     
     if daemon_start != 0 or daemon_reload_status != 0:
-        return False 
+        return False , []
     
-    return True
+    return True, namespaces
