@@ -51,7 +51,7 @@ class BlobUtil(object):
 
     def GetMetadataSize(self, metadataDict):
     # max size of blob metadata 
-            return sys.getsizeof(json.dumps(headers))
+            return sys.getsizeof(json.dumps(metadataDict))
 
 
     def httpresponse_parse_metadata(self, httpResp):
@@ -82,7 +82,7 @@ class BlobUtil(object):
                 value = meta['Value']
                 blobMetadataDict["x-ms-meta-" + key] = value
         
-        level1BlobMetadataSize = self.GetMetadataSize(blobMetadataDict)hutil
+        level1BlobMetadataSize = self.GetMetadataSize(blobMetadataDict)
         
         if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
             if sasuri_index not in blobMetadataTelemetryMessage :
