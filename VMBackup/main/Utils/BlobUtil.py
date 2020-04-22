@@ -22,6 +22,8 @@ try:
 except ImportError:
     import urllib.parse as urlparser
 import json
+import traceback
+from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import HandlerUtil
 import ExtensionErrorCodeHelper
@@ -47,7 +49,7 @@ class BlobUtil(object):
                 self.logger.log("FS : GetBlobMetadata: Failed to get blob properties with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         return blobProperties
 
-    def GetHeaderSize(self, headers):
+    def GetMetadataSize(self, metadataDict):
     # max size of blob metadata 
             return sys.getsizeof(json.dumps(headers))
 
@@ -55,7 +57,7 @@ class BlobUtil(object):
     def httpresponse_parse_metadata(self, httpResp):
         blobMetadata = {}
         if(httpResp != None):
-            self.hutil.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
+            self.logger.log("httpresponse_get_blob_properties: Blob-properties response status:"+str(httpResp.status))
             if(httpResp.status == 200):
                 resp_headers = httpResp.getheaders()
                 blobMetadata = resp_headers
@@ -80,7 +82,7 @@ class BlobUtil(object):
                 value = meta['Value']
                 blobMetadataDict["x-ms-meta-" + key] = value
         
-        level1BlobMetadataSize = self.GetHeaderSize(headers)
+        level1BlobMetadataSize = self.GetMetadataSize(blobMetadataDict)hutil
         
         if level1BlobMetadataSize > blobMetdataMaxSizeBytes:
             if sasuri_index not in blobMetadataTelemetryMessage :
@@ -103,7 +105,7 @@ class BlobUtil(object):
                     value = meta['Value']
                     blobMetadataDict["x-ms-meta-" + key] = value
 
-            level2BlobMetadataSize = self.GetHeaderSize(headers)
+            level2BlobMetadataSize = self.GetMetadataSize(blobMetadataDict)
             
             if level2BlobMetadataSize > blobMetdataMaxSizeBytes :
                 blobMetadataTelemetryMessage[sasuri_index]+= str(level2BlobMetadataSize) + ", ";
@@ -135,7 +137,7 @@ class BlobUtil(object):
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
-                    blob_metadata[blob_index] = self.populate_snapshotreq_headers_perblob(blob,blob_index,paras.backup_metadata, blobMetadataTelemetryMessage)
+                    blob_metadata[blob_index] = self.populate_blobMetadata_perblob(blob,blob_index,paras.backup_metadata, blobMetadataTelemetryMessage)
                     self.logger.log("Metadata retreived : " + str(blob_metadata[blob_index]))
 
                     # log if the metadata size was found to be greater than the max limit allowed
