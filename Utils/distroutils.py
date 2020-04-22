@@ -4,15 +4,22 @@ import pwd
 import random
 import crypt
 import string
+import Utils.logger
 import Utils.constants as constants
 import Utils.extensionutils as ext_utils
 import Utils.openssutils as openssl_utils
-from Utils.logger import default_logger as logger
+
+
+global logger
+logger = Utils.logger.default_logger
+# propagate the logger
+ext_utils.logger = logger
 
 
 config = ext_utils.ConfigurationProvider(None)
 
 
+# noinspection PyMethodMayBeStatic
 class AbstractDistro(object):
     """
     AbstractDistro defines a skeleton neccesary for a concrete Distro class.
@@ -72,19 +79,25 @@ class AbstractDistro(object):
         home = None
         try:
             home = ext_utils.get_line_starting_with("HOME", "/etc/default/useradd").split('=')[1].strip()
-        except:
+        except ValueError:
+            pass
+        except KeyError:
+            pass
+        except AttributeError:
+            pass
+        except OSError:
             pass
         if (home is None) or (not home.startswith("/")):
             home = "/home"
         return home
 
-    def set_selinux_context(self, path, cn):
+    def set_se_linux_context(self, path, cn):
         """
         Calls shell 'chcon' with 'path' and 'cn' context.
         Returns exit result.
         """
         if self.is_se_linux_system():
-            return ext_utils.run(['chcon', 'cn', 'path'])
+            return ext_utils.run(['chcon', cn, path])
 
     def restart_ssh_service(self):
         """
@@ -98,7 +111,8 @@ class AbstractDistro(object):
 
     def ssh_deploy_public_key(self, fprint, path):
         """
-        Generic sshDeployPublicKey - over-ridden in some concrete Distro classes due to minor differences in openssl packages deployed
+        Generic sshDeployPublicKey - over-ridden in some concrete Distro classes due to minor differences
+        in openssl packages deployed
         """
         error = 0
         ssh_pub_key = openssl_utils.openssl_publickey_to_ssh(fprint)
@@ -139,7 +153,6 @@ class AbstractDistro(object):
         salt = "${0}${1}".format(crypt_id, salt)
         return crypt.crypt(password, salt)
 
-
     def create_account(self, user, password, expiration, thumbprint):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
@@ -149,12 +162,20 @@ class AbstractDistro(object):
         user_entry = None
         try:
             user_entry = pwd.getpwnam(user)
-        except:
+        except KeyError:
+            pass
+        except OSError:
             pass
         uid_min = None
         try:
             uid_min = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except:
+        except ValueError:
+            pass
+        except KeyError:
+            pass
+        except AttributeError:
+            pass
+        except OSError:
             pass
         if uid_min is None:
             uid_min = 100
@@ -178,13 +199,14 @@ class AbstractDistro(object):
                 # create the /etc/sudoers.d/ directory
                 os.mkdir('/etc/sudoers.d/')
                 # add the include of sudoers.d to the /etc/sudoers
-                ext_utils.set_file_contents('/etc/sudoers', ext_utils.get_file_contents('/etc/sudoers') + '\n#includedir /etc/sudoers.d\n')
+                ext_utils.set_file_contents(
+                    '/etc/sudoers', ext_utils.get_file_contents('/etc/sudoers') + '\n#includedir /etc/sudoers.d\n')
             if password is None:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
             os.chmod("/etc/sudoers.d/waagent", 0o440)
-        except:
+        except OSError:
             logger.error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = self.get_home()
@@ -211,7 +233,9 @@ class AbstractDistro(object):
         user_entry = None
         try:
             user_entry = pwd.getpwnam(user)
-        except:
+        except KeyError:
+            pass
+        except OSError:
             pass
         if user_entry is None:
             logger.error("DeleteAccount: " + user + " not found.")
@@ -219,7 +243,13 @@ class AbstractDistro(object):
         uid_min = None
         try:
             uid_min = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except:
+        except ValueError:
+            pass
+        except KeyError:
+            pass
+        except AttributeError:
+            pass
+        except OSError:
             pass
         if uid_min is None:
             uid_min = 100
@@ -230,6 +260,6 @@ class AbstractDistro(object):
         ext_utils.run(['userdel', '-f', '-r', user])
         try:
             os.remove("/etc/sudoers.d/waagent")
-        except IOError:
+        except OSError:
             pass
         return

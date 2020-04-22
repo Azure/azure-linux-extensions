@@ -22,10 +22,12 @@ def change_owner(file_path, user):
     p = None
     try:
         p = pwd.getpwnam(user)
+    except KeyError:
+        pass
     except OSError:
         pass
     if p is not None:
-        os.chown(file_path, p[2], p[3])
+        os.chown(file_path, uid=p[2], gid=p[3])
 
 
 def create_dir(dir_path, user, mode):
@@ -129,7 +131,6 @@ def run_command_and_write_stdout_to_file(command, output_file):
         stdout, stderr = p.communicate()
     except OSError as e:
         logger.error('CalledProcessError.  Error message is ' + str(e))
-        # bash returns 127 for file not found error
         return e.errno
     if p.returncode != 0:
         logger.error('CalledProcessError.  Error Code is ' + str(p.returncode))
@@ -159,8 +160,8 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
     except OSError as e:
         if chk_err and log_cmd:
             logger.error('CalledProcessError.  Error message is ' + str(e))
-            # bash returns 127 for file not found error
             return e.errno, str(e)
+
     # noinspection PyUnboundLocalVariable
     return 0, output.decode('latin-1')
 
@@ -290,7 +291,7 @@ class ConfigurationProvider(object):
         if wala_config_file is None:
             wala_config_file = constants.waagent_config_path
         if not os.path.isfile(wala_config_file):
-            raise Exception("Missing configuration in {0}".format(wala_config_file))
+            raise ValueError("Missing configuration in {0}".format(wala_config_file))
         try:
             for line in get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
@@ -300,7 +301,8 @@ class ConfigurationProvider(object):
                         self.values[parts[0]] = value
                     else:
                         self.values[parts[0]] = None
-        except Exception:
+        # when get_file_contents returns none
+        except AttributeError:
             logger.error("Unable to parse {0}".format(wala_config_file))
             raise
         return

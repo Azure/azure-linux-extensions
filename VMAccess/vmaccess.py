@@ -180,14 +180,23 @@ def _remove_user_account(user_name, hutil):
 
 
 def _set_user_account_pub_key(protect_settings, hutil):
-    # TODO: Figure out what do do with ovf-env.xml
+    ovf_xml = None
+    ovf_env = None
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
-    except Exception as e:
+    except OSError:
+        pass
+    except ValueError:
+        pass
+    except KeyError:
+        pass
+    except AttributeError:
+        pass
+    if ovf_xml is None or ovf_env is None:
         # default ovf_env with empty data
         ovf_env = ovf_utils.OvfEnv()
-        Logger.warning("could not load ovf-env.xml %s" % str(e))
+        Logger.log("could not load ovf-env.xml")
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
@@ -241,8 +250,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
                     if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
                     ext_utils.append_file_contents(pub_path, final_cert_txt)
-                    MyDistro.set_selinux_context(pub_path,
-                                                 'unconfined_u:object_r:ssh_home_t:s0')
+                    MyDistro.set_se_linux_context(
+                        pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
                     ext_utils.change_owner(pub_path, user_name)
                     ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                                   message="create-user")
@@ -269,8 +278,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
                 MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
-                MyDistro.set_selinux_context(pub_path,
-                                             'unconfined_u:object_r:ssh_home_t:s0')
+                MyDistro.set_se_linux_context(
+                    pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
                 ext_utils.change_owner(pub_path, user_name)
                 os.remove('temp.pub')
                 os.remove('temp.crt')
