@@ -1,15 +1,15 @@
 <ExtensionInfo>
     <Namespace>Microsoft.Azure.Security.Edp</Namespace>
     <Type>AzureDiskEncryptionForLinuxTest2</Type>
-    <ExtensionShortName>AdeLinuxTest2</ExtensionShortName>
+    <ExtensionShortName>AzureDiskEncryptionForLinuxTest2</ExtensionShortName>
     <Version>TO BE SET AT BUILDTIME</Version>
     <SupportedOS>Linux</SupportedOS>
-    <ExtensionLabel>Windows Azure VMEncryption Extension for Linux IaaS</ExtensionLabel>
+    <ExtensionLabel>Azure Disk Encryption For Linux</ExtensionLabel>
     <ExtensionZipFileName>TO BE SET AT BUILDTIME</ExtensionZipFileName>
     <ExtensionIsAlwaysInternal>False</ExtensionIsAlwaysInternal>
     <CloudTypes>
         <Public>
-            <SubscriptionId>e212dea4-8522-4baa-a5c4-aebc56450d8b</SubscriptionId>
+            <SubscriptionId>TO BE SET AT BUILDTIME</SubscriptionId>
             <KVPathForCertSecret>https://ade-extensionpublishing.vault.azure.net/secrets/Extension-Publishing</KVPathForCertSecret>
             <ClassicStorageAccountName>edpazuresecurity</ClassicStorageAccountName>
             <ClassicContainerName>extensions</ClassicContainerName>

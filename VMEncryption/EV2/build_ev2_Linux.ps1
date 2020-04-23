@@ -39,6 +39,18 @@ $common_parameters = Get-Content $common_parameters_path | ConvertFrom-Json
 # this is needed for the python setup call
 $common_parameters.extension_name = $extension_info.ExtensionInfo.Type
 $common_parameters.extension_provider_namespace = $extension_info.ExtensionInfo.Namespace
+
+# version from the common paramters if not set in ExtensionInfo.xml file
+if($extension_info.ExtensionInfo.Version -eq 'TO BE SET AT BUILDTIME')
+{
+    $extension_info.ExtensionInfo.Version = $common_parameters.extension_version
+}
+else
+{
+    $common_parameters.extension_version = $extension_info.ExtensionInfo.Version
+}
+
+# saving updated common paramters to be picked up by 'setup.py sdist'
 $common_parameters | ConvertTo-Json | Set-Content $common_parameters_path -Force
 
 # invoking Python packaging
