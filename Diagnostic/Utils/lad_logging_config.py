@@ -267,8 +267,9 @@ class LadLoggingConfig:
         for plugin in namespaces:
             # # For telegraf conf we create a Source for each of the measurements(plugins) sent from telegraf
             # # dest table (eventName) is 'PerfTelegraf'. 
-            telegraf_sources += mxt.per_source_tmpl.format(name=plugin)
-            mdsd_event_source += mxt.per_MdsdEventSource_tmpl.format(source=plugin,
+            lad_specific_storage_plugin = "lad_" + plugin
+            telegraf_sources += mxt.per_source_tmpl.format(name=lad_specific_storage_plugin)
+            mdsd_event_source += mxt.per_MdsdEventSource_tmpl.format(source=lad_specific_storage_plugin,
                                                                         routeevents=telegraf_routeevents)
 
         return mxt.top_level_tmpl_for_logging_only.format(sources=telegraf_sources, events=mdsd_event_source, eh_urls="")
