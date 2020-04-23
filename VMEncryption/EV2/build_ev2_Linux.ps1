@@ -24,8 +24,13 @@ cd $srcRoot
 
 # getting common parameters from the source
 $common_parameters_path = "$srcRoot\main\common_parameters.json"
-$common_parameters_original_content = Get-Content $common_parameters_path
-$common_parameters = $common_parameters_original_content | ConvertFrom-Json 
+
+# saving the original common parameters file
+$temp_common_parameters_path = [io.path]::GetTempFileName()
+Copy-Item $common_parameters_path $temp_common_parameters_path
+
+# getting common parameters
+$common_parameters = Get-Content $common_parameters_path | ConvertFrom-Json 
 
 # getting the specific ExtensionInfo file
 [xml]$extension_info = Get-Content -Path $ExtensionInfoFile
@@ -46,7 +51,8 @@ Remove-Item "$srcRoot\manifest.xml" -ErrorAction SilentlyContinue
 Remove-Item -Recurse "$srcRoot\dist\$($common_parameters.extension_name)-$($common_parameters.extension_version)" -ErrorAction SilentlyContinue
 
 # restoring the original common parameters content
-$common_parameters_original_content | Set-Content $common_parameters_path -Force
+Copy-Item $temp_common_parameters_path $common_parameters_path
+Remove-Item $temp_common_parameters_path 
 
 # preparing the output folder
 Remove-Item  -Path $outputDir -Recurse -Force -ErrorAction SilentlyContinue
