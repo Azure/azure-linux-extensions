@@ -20,6 +20,6 @@ build:
       command: 'VMEncryption/cdpx_build.sh'
       fail_on_stderr: true
       artifacts:
-        - from: 'VMEncryption/dist'
+        - from: 'VMEncryption/dist/EV2'
           include:
-            - 'EV2/**/*'
+            - '**/*'
