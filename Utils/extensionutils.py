@@ -161,7 +161,6 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
         if chk_err and log_cmd:
             logger.error('CalledProcessError.  Error message is ' + str(e))
             return e.errno, str(e)
-
     # noinspection PyUnboundLocalVariable
     return 0, output.decode('latin-1')
 
@@ -174,6 +173,34 @@ def run(cmd, chk_err=True):
     """
     return_code, _ = run_command_get_output(cmd, chk_err)
     return return_code
+
+
+# noinspection PyUnboundLocalVariable
+def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
+    """
+    Wrapper for subprocess.Popen.
+    Execute 'cmd', sending 'input' to STDIN of 'cmd'.
+    Returns return code and STDOUT, trapping expected exceptions.
+    Reports exceptions to Error if chk_err parameter is True
+    """
+    if log_cmd:
+        logger.log_if_verbose(str(cmd) + cmd_input)
+    subprocess_executed = False
+    try:
+        me = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        output = me.communicate(cmd_input)
+        subprocess_executed = True
+    except OSError as e:
+        if chk_err and log_cmd:
+            logger.error('CalledProcessError.  Error Code is ' + str(e.errno))
+            logger.error('CalledProcessError.  Command string was ' + cmd)
+            logger.error('CalledProcessError.  Command result was ' + str(e))
+            return 1, str(e)
+    if subprocess_executed and me.returncode != 0 and chk_err and log_cmd:
+        logger.error('CalledProcessError.  Error Code is ' + str(me.returncode))
+        logger.error('CalledProcessError.  Command string was ' + cmd)
+        logger.error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
+    return me.returncode, output[0].decode('latin-1')
 
 
 def get_line_starting_with(prefix, filepath):

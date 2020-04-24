@@ -41,7 +41,7 @@ SshdConfigPath = '/etc/ssh/sshd_config'
 
 Logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 Configuration = ext_utils.ConfigurationProvider(None)
-MyDistro = dist_utils.AbstractDistro()  # TODO: set up other distros
+MyDistro = dist_utils.get_my_distro()
 
 
 def main():
