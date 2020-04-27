@@ -66,6 +66,8 @@ class CommonVariables:
     status_success = 'success'
     status_error = 'error'
 
+    blobMetdataMaxSizeBytes = 8000
+
     unable_to_open_err_string= 'file open failed for some mount'
 
     """
