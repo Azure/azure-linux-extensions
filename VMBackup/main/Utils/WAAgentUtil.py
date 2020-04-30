@@ -17,7 +17,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
+try:
+    import imp
+except ImportError:
+    import importlib
 import os
 import os.path
 

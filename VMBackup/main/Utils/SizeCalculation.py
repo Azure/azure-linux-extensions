@@ -1,7 +1,10 @@
 import os
 import os.path
 import sys
-import imp
+try:
+    import imp
+except ImportError:
+    import importlib
 import base64
 import json
 import tempfile
