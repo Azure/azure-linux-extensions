@@ -22,6 +22,12 @@ version:
   minor: 1                                                              
   tag: 'official'
   system: 'buildrevision'
+
+restore:
+  commands:
+    - !!defaultcommand
+      name: 'Restoring artifacts'
+      command: 'VMEncryption\cdpx_windows_restore.cmd'
   
 build:
   commands:
