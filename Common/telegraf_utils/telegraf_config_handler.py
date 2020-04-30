@@ -93,6 +93,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
         input_str = ""
         rename_str = ""
         lad_specific_rename_str = ""
+        rate_specific_aggregator_str = ""
         aggregator_str = ""
         for plugin in telegraf_json[omiclass]:
             config_file = {"filename" : omiclass+".conf"}
@@ -112,9 +113,11 @@ def parse_config(data, me_url, mdsd_url, is_lad):
            
             fields = ""
             ops_fields = ""
+            non_ops_fields = ""
+            non_rate_aggregate = False
             ops = ""
             twiceminperiod = ""
-            aggregate = False
+            rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
                 
@@ -125,21 +128,24 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                 
                 #compute values for aggregator options
                 if "op" in telegraf_json[omiclass][plugin][field]:
-                    aggregate = True
-                    if telegraf_json[omiclass][plugin][field]["op"] not in ops:
-                        ops += "\"" +  telegraf_json[omiclass][plugin][field]["op"] + "\", "
-                    ops_fields += "\"" +  field + "\", "
-                    twiceminperiod = str(int(min_interval[:-1])*2)
-
+                    if telegraf_json[omiclass][plugin][field]["op"] == "rate":
+                        rate_aggregate = True
+                        ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
+                    ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                else:
+                    non_rate_aggregate = True 
+                    non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                
+                twiceminperiod = str(int(min_interval[:-1])*2)
                 #Add respective rename processor plugin based on the displayname
                 rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
                 if is_lad:
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
                 if "op" in telegraf_json[omiclass][plugin][field]:
-                    rename_str += " "*4 + "field = \"" + field + "_" + telegraf_json[omiclass][plugin][field]["op"] + "\"\n"
+                    rename_str += " "*4 + "field = \"" + field + "\"\n"
                     rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
                     if is_lad:
-                        lad_specific_rename_str += " "*4 + "field = \"" + field + "_" + telegraf_json[omiclass][plugin][field]["op"] + "\"\n"
+                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
                 else:
                     rename_str += " "*4 + "field = \"" + field + "\"\n"
@@ -150,13 +156,24 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                         
 
             #Add respective operations for aggregators
-            if aggregate:
-                aggregator_str += "[[aggregators.basicstats]]\n"
-                aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
-                aggregator_str += " "*2 + "drop_original = false\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [" + ops[:-2] + "]\n"  #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "rate_period = \"" + twiceminperiod + "s\"\n\n"
+            if is_lad:
+                if rate_aggregate:
+                    aggregator_str += "[[aggregators.basicstats]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [" + ops + "]\n"
+                    aggregator_str += " "*2 + "rate_period = \"" + twiceminperiod + "s\"\n\n"
+                
+                if non_rate_aggregate:
+                    aggregator_str += "[[aggregators.basicstats]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
+            
 
 
 
@@ -221,7 +238,10 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     agentconf += "  logtarget = \"file\"\n"
     agentconf += "  logfile = \"" + logFolder + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
-    agentconf += "  logfile_rotation_max_archives = 5\n"                
+    agentconf += "  logfile_rotation_max_archives = 5\n" 
+    agentconf += "\n# Configuration for adding gloabl tags\n"
+    agentconf += "[global_tags]\n"
+    agentconf += "  DeploymentId= \"$\{DeploymentId\}\"\n"          
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
