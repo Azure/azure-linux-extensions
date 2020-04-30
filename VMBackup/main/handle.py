@@ -25,7 +25,6 @@ import json
 import string
 import subprocess
 import sys
-import imp
 import time
 import shlex
 import traceback
