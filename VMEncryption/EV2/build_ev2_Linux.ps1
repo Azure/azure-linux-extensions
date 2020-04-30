@@ -73,6 +73,14 @@ New-Item -Path $outputDir -ItemType Directory -Force
 # setting ExtensionInfo values
 $extension_info.ExtensionInfo.Version = $common_parameters.extension_version
 
+# setting subscription IDs for each cloud type (Public, Fairfax, etc.)
+$publishing_subs_path = Join-Path (Split-Path $ExtensionInfoFile -Parent) 'PublishingSubs.json'
+$publishing_subs = Get-Content -Path $publishing_subs_path | ConvertFrom-Json
+$extension_info.ExtensionInfo.CloudTypes.ChildNodes | %{
+    $cloud_name = $_.Name
+    $_.SubscriptionId = $publishing_subs.($cloud_name)
+}
+
 # zip file format "<Namespace><Type>-<Version>.zip"
 $extension_info.ExtensionInfo.ExtensionZipFileName = "$($extension_info.ExtensionInfo.Namespace).$($extension_info.ExtensionInfo.Type)-$($extension_info.ExtensionInfo.Version).zip"
 
