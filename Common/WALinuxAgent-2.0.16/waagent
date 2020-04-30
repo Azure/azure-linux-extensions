@@ -741,6 +741,29 @@ class AbstractDistro(object):
         pass
 
 
+class DefaultDistro(AbstractDistro):
+    """
+    Default Distro concrete class: This class serves as a default OS behavior class.
+    """
+
+    def startDHCP(self):
+        """
+        Following the pattern used in WALinuxAgent for Default distro: This method is not implemented in the default
+        case.
+        """
+        pass
+
+    def stopDHCP(self):
+        """
+        Following the pattern used in WALinuxAgent for Default distro: This method is not implemented in the default
+        case.
+        """
+        pass
+
+    def __init__(self):
+        super(DefaultDistro, self).__init__()
+
+
 ############################################################
 #   GentooDistro
 ############################################################
@@ -6493,9 +6516,14 @@ def GetMyDistro(dist_class_name=''):
     else:
         Distro = dist_class_name
     if dist_class_name not in globals():
-        print(Distro + ' is not a supported distribution.')
-        return None
-    return globals()[dist_class_name]()  # the distro class inside this module.
+        msg = Distro + ' is not a supported distribution. Reverting to DefaultDistro to support scenarios in ' \
+                       'unknown/unsupported distribution.'
+        print(msg)
+        Log(msg)
+        return DefaultDistro()
+
+    # the distro class inside this module. Check the implementations of AbstractDistro
+    return globals()[dist_class_name]()
 
 
 def DistInfo(fullname=0):
