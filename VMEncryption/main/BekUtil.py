@@ -19,6 +19,7 @@
 from Common import TestHooks
 import base64
 import os.path
+import shutil
 
 """
 add retry-logic to the network api call.
@@ -82,6 +83,8 @@ class BekUtil(object):
 
             for file in os.listdir(self.bek_filesystem_mount_point):
                 if bek_filename in file:
+                    # Make sure LinuxPassPhraseFileName exist for Resource and Nvme disks 
+                    shutil.copy2(os.path.join(self.bek_filesystem_mount_point, file), os.path.join(self.bek_filesystem_mount_point, bek_filename))
                     return os.path.join(self.bek_filesystem_mount_point, file)
 
         except Exception as e:

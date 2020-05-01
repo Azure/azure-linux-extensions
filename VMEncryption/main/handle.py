@@ -102,10 +102,19 @@ def disable_encryption():
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file)
         crypt_items = crypt_mount_config_util.get_crypt_items()
+        temp_disk_found = False
 
         logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
 
         for crypt_item in crypt_items:
+            if crypt_item.mapper_name == 'resourceencrypt':
+                logger.log("Encrypted resource disk will be skipped for decryption.")
+                temp_disk_found = True
+                continue
+            if crypt_item.mapper_name.startswith(CommonVariables.nvme_disk_identifier):
+                logger.log("Encrypted nvme disk will be skipped for decryption.")
+                temp_disk_found = True
+                continue
             disk_util.create_cleartext_key(crypt_item.mapper_name)
 
             add_result = disk_util.luks_add_cleartext_key(bek_passphrase_file,
@@ -142,18 +151,23 @@ def disable_encryption():
                                status_code=str(CommonVariables.success),
                                message='Encryption settings cleared')
 
-        bek_util.store_bek_passphrase(encryption_config, '')
-
-        bek_util.delete_bek_passphrase_file(encryption_config)
+        if not temp_disk_found:
+            bek_util.store_bek_passphrase(encryption_config, '')
+            bek_util.delete_bek_passphrase_file(encryption_config)
 
         if decryption_marker.config_file_exists():
             logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
+            msg = None
+            if temp_disk_found:
+                msg = 'Decryption started' + CommonVariables.temp_disk_decrypt_msg
+            else:
+                msg = 'Decryption started'
             start_daemon('DisableEncryption')
             hutil.do_exit(exit_code=0,
                           operation='DisableEncryption',
                           status=CommonVariables.extension_success_status,
                           code=str(CommonVariables.success),
-                          message='Decryption started')
+                          message=msg)
 
     except Exception as e:
         message = "Failed to disable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -190,7 +204,8 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
         disk_util=disk_util,
         crypt_mount_config_util=crypt_mount_config_util)
 
-    settings.post_to_wireserver(data)
+    if len(data.get('Disks')) > 0:
+        settings.post_to_wireserver(data)
 
     # exit transitioning state by issuing a status report indicating
     # that the necessary encryption settings are stamped successfully
@@ -533,6 +548,8 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
         se_linux_status = encryption_environment.get_se_linux()
         if se_linux_status.lower() == 'enforcing':
             encryption_environment.disable_se_linux()
+
+    crypt_mount_config_util.clear_stale_nvme_disks()
 
     # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in crypt_mount_config_util.get_crypt_items():
@@ -936,6 +953,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
     query_dev_paths_to_encrypt = []
 
     for encryption_item in encryption_format_items:
+        logger.log("Encryption ITEM: {0}".format(encryption_item))
         dev_path_in_query = None
 
         if "scsi" in encryption_item and encryption_item["scsi"] != '':
@@ -969,7 +987,11 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
         if device_item.mount_point:
             disk_util.swapoff()
             disk_util.umount(device_item.mount_point)
-        mapper_name = str(uuid.uuid4())
+        mapper_name = None
+        if CommonVariables.nvme_disk_identifier in dev_path_in_query:
+            mapper_name = CommonVariables.nvme_disk_identifier + '-' + str(uuid.uuid4())
+        else:
+            mapper_name = str(uuid.uuid4())
         logger.log("encrypting " + str(device_item))
         encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
         try:
@@ -998,7 +1020,10 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
                 return device_item
             crypt_item_to_update = CryptItem()
             crypt_item_to_update.mapper_name = mapper_name
-            crypt_item_to_update.dev_path = dev_path_in_query
+            if CommonVariables.nvme_disk_identifier in dev_path_in_query:
+                crypt_item_to_update.dev_path = disk_util.get_persistent_path_by_uuid(dev_path_in_query)
+            else:
+                crypt_item_to_update.dev_path = dev_path_in_query
             crypt_item_to_update.luks_header_path = None
             crypt_item_to_update.file_system = file_system
             crypt_item_to_update.uses_cleartext_key = False
@@ -1596,9 +1621,14 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_t
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
-            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table:
+            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table and not device_item.name.startswith(CommonVariables.nvme_disk_identifier):
                 # Only format device_items that have an azure udev name
                 continue
+        else:
+            if device_item.name.startswith(CommonVariables.nvme_disk_identifier):
+                logger.log('NVME disks are only supported with encrypt format all')
+                continue
+
         device_items_to_encrypt.append(device_item)
 
     return device_items_to_encrypt
@@ -1678,6 +1708,10 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
     for crypt_item_num, crypt_item in enumerate(crypt_items):
         logger.log("processing crypt_item: " + str(crypt_item))
+
+        if crypt_item.mapper_name == 'resourceencrypt' or crypt_item.mapper_name.startswith(CommonVariables.nvme_disk_identifier):
+            logger.log('Skipping temp/Nvme disk.')
+            continue
 
         def raw_device_item_match(device_item):
             sdx_device_name = os.path.join("/dev/", device_item.name)
@@ -2065,6 +2099,9 @@ def daemon_decrypt():
                           encryption_config=encryption_config,
                           passphrase_file=None)
     for crypt_item in crypt_mount_config_util.get_crypt_items():
+        if crypt_item.mapper_name == 'resourceencrypt' or crypt_item.mapper_name.startswith(CommonVariables.nvme_disk_identifier):
+            logger.log("Skipping temp/Nvme disk.")
+            continue
         logger.log("Unmounting {0}".format(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name)))
         disk_util.umount(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
 

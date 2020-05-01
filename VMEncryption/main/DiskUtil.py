@@ -483,6 +483,17 @@ class DiskUtil(object):
 
         return sdx_path
 
+    def get_persistent_path_by_uuid(self, dev_path):
+        dev_realpath = os.path.realpath(dev_path)
+
+        for disk_by_uuid in os.listdir(CommonVariables.disk_by_uuid_root):
+            disk_by_uuid_path = os.path.join(CommonVariables.disk_by_uuid_root, disk_by_uuid)
+
+            if os.path.realpath(disk_by_uuid_path) == dev_realpath:
+                return disk_by_uuid_path
+
+        return dev_path
+        
     def get_device_path(self, dev_name):
         device_path = None
 

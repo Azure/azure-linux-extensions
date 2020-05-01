@@ -79,6 +79,7 @@ class CommonVariables:
     azure_symlinks_dir = '/dev/disk/azure'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
+    nvme_disk_identifier = 'nvme'
 
     """
     parameter key names
@@ -208,6 +209,8 @@ class CommonVariables:
                     VolumeTypeOS.lower(): 'Encryption succeeded for OS volume',
                     VolumeTypeAll.lower(): 'Encryption succeeded for all volumes'
                 }
+
+    temp_disk_decrypt_msg = 'Resource and NVMe disks will not be decrypted at this time. It will be decrypted at next deallocate/start.'
 
 class TestHooks:
     search_not_only_ide = False

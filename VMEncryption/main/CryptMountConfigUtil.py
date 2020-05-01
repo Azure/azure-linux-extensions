@@ -199,6 +199,38 @@ class CryptMountConfigUtil(object):
                 self.disk_util.umount(temp_mount_point)
                 self.disk_util.luks_close(crypt_item.mapper_name)
 
+    def clear_stale_nvme_disks(self):
+        fstab_items = []
+        for crypt_item in self.get_crypt_items():
+            if crypt_item.mapper_name.startswith(CommonVariables.nvme_disk_identifier):
+                if not os.path.exists(crypt_item.dev_path):
+                    fstab_items.append(CommonVariables.dev_mapper_root+crypt_item.mapper_name)
+                    self.remove_crypt_item(crypt_item)
+        
+        if len(fstab_items) == 0:
+            self.logger.log("No stale nvme disk to clear")
+            return
+        
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(str(uuid.uuid4())))
+
+        filtered_contents = []
+        removed_lines = []
+
+        with open('/etc/fstab', 'r') as f:
+            for line in f.readlines():
+                device, mount_point, fs, opt = self.parse_fstab_line(line)
+                if device in fstab_items:
+                    self.logger.log('Removing device {0} from fstab'.format(device))
+                    removed_lines.append(line)
+                else:
+                    filtered_contents.append(line)
+
+        with open('/etc/fstab', 'w') as f:
+            f.writelines(filtered_contents)
+
+        self.logger.log("fstab updated successfully")
+
+
     def get_crypt_items(self):
         """
         Reads the central azure_crypt_mount file and parses it into an array of CryptItem()s
@@ -234,7 +266,6 @@ class CryptMountConfigUtil(object):
                     fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
                     if fstab_device is not None:
                         fstab_items.append((fstab_device, fstab_mount_point, fstab_fs))
-
             if not os.path.exists(crypttab_path):
                 self.logger.log("{0} does not exist".format(crypttab_path))
             else:
