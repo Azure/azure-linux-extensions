@@ -99,3 +99,18 @@ class Test_Disk_Util(unittest.TestCase):
     def test_mount_all(self, cmd_exc_mock):
         self.disk_util.mount_all()
         self.assertEquals(cmd_exc_mock.call_count, 2)
+
+    @mock.patch("os.path.realpath")
+    @mock.patch("os.listdir")
+    def test_get_persistent_path_by_uuid(self, listdir_mock, realpath_mock):
+        listdir_mock.return_value = ['uuid1', 'uuid2']
+        realpath_mock.side_effect = ['/dev/disk1', '/dev/disk2', '/dev/disk1']
+        uuid_path = self.disk_util.get_persistent_path_by_uuid('/dev/disk1')
+        self.assertEquals('/dev/disk/by-uuid/uuid2', uuid_path)
+
+        listdir_mock.reset_mock()
+        realpath_mock.reset_mock()
+        listdir_mock.return_value = ['uuid1', 'uuid2']
+        realpath_mock.side_effect = ['/dev/disk3', '/dev/disk2', '/dev/disk1']
+        uuid_path = self.disk_util.get_persistent_path_by_uuid('/dev/disk3')
+        self.assertEquals('/dev/disk3', uuid_path)

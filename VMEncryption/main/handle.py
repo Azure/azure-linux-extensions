@@ -190,7 +190,8 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
         disk_util=disk_util,
         crypt_mount_config_util=crypt_mount_config_util)
 
-    settings.post_to_wireserver(data)
+    if len(data.get('Disks')) > 0:
+        settings.post_to_wireserver(data)
 
     # exit transitioning state by issuing a status report indicating
     # that the necessary encryption settings are stamped successfully
@@ -533,6 +534,8 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
         se_linux_status = encryption_environment.get_se_linux()
         if se_linux_status.lower() == 'enforcing':
             encryption_environment.disable_se_linux()
+
+    crypt_mount_config_util.clear_stale_nvme_disks()
 
     # mount any data disks - make sure the azure disk config path exists.
     for crypt_item in crypt_mount_config_util.get_crypt_items():
@@ -936,6 +939,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
     query_dev_paths_to_encrypt = []
 
     for encryption_item in encryption_format_items:
+        logger.log("Encryption ITEM: {0}".format(encryption_item))
         dev_path_in_query = None
 
         if "scsi" in encryption_item and encryption_item["scsi"] != '':
@@ -969,7 +973,11 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
         if device_item.mount_point:
             disk_util.swapoff()
             disk_util.umount(device_item.mount_point)
-        mapper_name = str(uuid.uuid4())
+        mapper_name = None
+        if CommonVariables.nvme_disk_identifier in dev_path_in_query:
+            mapper_name = CommonVariables.nvme_disk_identifier + '-' + str(uuid.uuid4())
+        else:
+            mapper_name = str(uuid.uuid4())
         logger.log("encrypting " + str(device_item))
         encrypted_device_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
         try:
@@ -998,7 +1006,10 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
                 return device_item
             crypt_item_to_update = CryptItem()
             crypt_item_to_update.mapper_name = mapper_name
-            crypt_item_to_update.dev_path = dev_path_in_query
+            if CommonVariables.nvme_disk_identifier in dev_path_in_query:
+                crypt_item_to_update.dev_path = disk_util.get_persistent_path_by_uuid(dev_path_in_query)
+            else:
+                crypt_item_to_update.dev_path = dev_path_in_query
             crypt_item_to_update.luks_header_path = None
             crypt_item_to_update.file_system = file_system
             crypt_item_to_update.uses_cleartext_key = False
@@ -1596,9 +1607,14 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_t
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
-            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table:
+            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table and not device_item.name.startswith(CommonVariables.nvme_disk_identifier):
                 # Only format device_items that have an azure udev name
                 continue
+        else:
+            if device_item.name.startswith(CommonVariables.nvme_disk_identifier):
+                logger.log('NVME disks are only supported with encrypt format all')
+                continue
+
         device_items_to_encrypt.append(device_item)
 
     return device_items_to_encrypt

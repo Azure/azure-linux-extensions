@@ -371,3 +371,63 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
 
+    @mock.patch('shutil.copy2', return_value=True)
+    @mock.patch('os.path.exists')
+    @mock.patch('__builtin__.open')
+    @mock.patch('main.DiskUtil.DiskUtil', autospec=True)
+    @mock.patch('main.CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount', return_value=False)
+    def test_clear_stale_nvme_disks(self, use_acm_mock, disk_util_mock, open_mock, exists_mock, copy2_mock):
+        self.crypt_mount_config_util.disk_util = disk_util_mock
+        disk_util_mock.get_encryption_status.return_value = "{\"os\" : \"NotEncrypted\"}"
+        crypttab_contents="""nvme-mapper /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        nvme-mapper1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail"""
+        fstab_contents="""/dev/mapper/nvme-mapper /mnt/point auto defaults,nofail 0 0
+        /dev/mapper/nvme-mapper1 /mnt/point1 auto defaults,nofail 0 0"""
+
+        crypttab_contents_extra="""nvme-mapper /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail 
+        nvme-mapper1 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name1 /dev/dev_path3 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_1 luks,nofail"""
+        fstab_contents_extra="""/dev/mapper/nvme-mapper /mnt/point auto defaults,nofail 0 0
+        /dev/mapper/mapper-name /mnt/point1 auto defaults,nofail 0 0
+        /dev/mapper/nvme-mapper1 /mnt/point2 auto defaults,nofail 0 0
+        /dev/mapper/mapper-name1 /mnt/point3 auto defaults,nofail 0 0"""
+
+        # Test 1: All nvme disks are active
+        exists_mock.side_effect = [True, True, True]
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/crypttab": crypttab_contents,
+                                                        "/etc/fstab": fstab_contents})
+        self.crypt_mount_config_util.clear_stale_nvme_disks()
+        self.assertEqual(open_mock.call_count, 2)
+        self.assertEquals(open_mock.content_dict["/etc/fstab"], fstab_contents)
+        self.assertEquals(open_mock.content_dict["/etc/crypttab"], crypttab_contents)
+
+        # Test 2: No nvme disks are active
+        open_mock.reset_mock()
+        exists_mock.reset_mock()
+        exists_mock.side_effect = [True, False, True, False, True]
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/crypttab": crypttab_contents,
+                                                       "/etc/fstab": fstab_contents})
+        self.crypt_mount_config_util.clear_stale_nvme_disks()
+        self.assertEqual(open_mock.call_count, 8)
+        self.assertEquals(open_mock.content_dict["/etc/fstab"], '')
+        self.assertEquals(open_mock.content_dict["/etc/crypttab"], '')
+
+        # Test 3; No nvme disks are active and more entries in fstab/cryptttab
+        open_mock.reset_mock()
+        exists_mock.reset_mock()
+        exists_mock.side_effect = [True, False, True, False, True]
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/crypttab": crypttab_contents_extra,
+                                                       "/etc/fstab": fstab_contents_extra})
+        self.crypt_mount_config_util.clear_stale_nvme_disks()
+        self.assertEqual(open_mock.call_count, 8)
+        self.assertTrue("/dev/mapper/mapper-name /mnt/point1 auto defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("/dev/mapper/mapper-name1 /mnt/point3 auto defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("/dev/mapper/nvme-mapper /mnt/point auto defaults,nofail 0 0" not in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("/dev/mapper/nvme-mapper1 /mnt/point2 auto defaults,nofail 0 0" not in open_mock.content_dict["/etc/fstab"])
+        self.assertTrue("mapper_name /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("mapper_name1 /dev/dev_path3 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_1 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("nvme-mapper /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail" not in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("nvme-mapper1 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail" not in open_mock.content_dict["/etc/crypttab"])
+
+

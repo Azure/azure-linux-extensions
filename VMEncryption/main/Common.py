@@ -79,6 +79,7 @@ class CommonVariables:
     azure_symlinks_dir = '/dev/disk/azure'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
+    nvme_disk_identifier = 'nvme'
 
     """
     parameter key names
