@@ -30,7 +30,10 @@ import traceback
 import datetime
 import subprocess
 from AbstractPatching import AbstractPatching
-from Common import *
+try:
+    from Common import *
+except Exception:
+    from ..Common import * # Added for unit test
 
 
 class debianPatching(AbstractPatching):
