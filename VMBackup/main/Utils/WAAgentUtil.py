@@ -18,9 +18,9 @@
 # limitations under the License.
 
 try:
-    import imp
+    import imp as imp
 except ImportError:
-    import importlib
+    import importlib as imp
 import os
 import os.path
 
