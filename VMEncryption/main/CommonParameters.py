@@ -37,6 +37,12 @@ class CommonParameters:
     def set_extension_version(self, value):
         self.json_object["extension_version"] = value
 
+    def get_extension_provider_namespace(self):
+        return self.json_object["extension_provider_namespace"]
+
+    def set_extension_provider_namespace(self, value):
+        self.json_object["extension_provider_namespace"] = value
+
     def save(self):
         with open(self.file_path, 'w') as outfile:
             json.dump(self.json_object, outfile)
