@@ -4544,6 +4544,7 @@ def DistInfo(fullname=0):
             distinfo[0] = distinfo[0].strip()
             return distinfo
         if 'Linux' in platform.system():
+            distinfo = ["Default"]
             if "ubuntu" in platform.version().lower():
                 distinfo[0] = "Ubuntu"
             elif 'suse' in platform.version().lower():
@@ -4558,8 +4559,6 @@ def DistInfo(fullname=0):
                 distinfo[0] = "redhat"
             elif 'kali' in platform.version().lower():
                 distinfo[0] = "Kali"
-            else:
-                distinfo[0] = "Default"
             return distinfo
         else:
             return platform.dist()
