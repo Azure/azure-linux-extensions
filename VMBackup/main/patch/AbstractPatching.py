@@ -21,7 +21,6 @@
 
 import os
 import sys
-import imp
 import base64
 import re
 import json
