@@ -22,9 +22,7 @@ def change_owner(file_path, user):
     p = None
     try:
         p = pwd.getpwnam(user)
-    except KeyError:
-        pass
-    except OSError:
+    except (KeyError, OSError):
         pass
     if p is not None:
         os.chown(file_path, uid=p[2], gid=p[3])

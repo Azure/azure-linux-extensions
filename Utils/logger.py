@@ -154,7 +154,7 @@ class Logger(object):
 # noinspection PyMethodMayBeStatic
 class TestLogger(Logger):
     def __init__(self):
-        super().__init__(None, None)
+        super(Logger, self).__init__()
         self.verbose = True
         self.con_path = None
         self.file_path = None
