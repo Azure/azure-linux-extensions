@@ -8,6 +8,7 @@ import re
 import Utils.logger
 import Utils.extensionutils as ext_utils
 import Utils.openssutils as openssl_utils
+import Utils.constants as constants
 
 
 global logger
@@ -17,20 +18,25 @@ ext_utils.logger = logger
 
 
 config = ext_utils.ConfigurationProvider(None)
-os_release = "/etc/os-release"
 
 
-def get_my_distro(dist_class_name=''):
+def get_my_distro():
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro()
-    os_name = ext_utils.get_line_starting_with("NAME", os_release)
+    os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
     if os_name is not None:
         if re.match("fedora", os_name, re.IGNORECASE):
             # Fedora
             return FedoraDistro()
+        if re.match("red\s?hat", os_name, re.IGNORECASE):
+            # Red Hat
+            return RedhatDistro()
         if re.match("coreos", os_name, re.IGNORECASE):
             # CoreOs
             return CoreOSDistro()
+        if re.match("freebsd", os_name, re.IGNORECASE):
+            # FreeBSD
+            return FreeBSDDistro()
     return GenericDistro()
 
 
@@ -54,6 +60,7 @@ class GenericDistro(object):
         self.service_cmd = '/usr/sbin/service'
         self.ssh_service_restart_option = 'restart'
         self.ssh_service_name = 'ssh'
+        self.disro_name = 'default'
 
     def is_se_linux_system(self):
         """
@@ -251,6 +258,7 @@ class FreeBSDDistro(GenericDistro):
         self.selinux = False
         self.ssh_service_name = 'sshd'
         self.sudoers_dir_base = '/usr/local/etc'
+        self.disro_name = 'FreeBSD'
 
     def ssh_deploy_public_key(self, fprint, path):
         """
@@ -390,6 +398,7 @@ class CoreOSDistro(GenericDistro):
         super(CoreOSDistro, self).__init__()
         self.waagent_path = '/usr/share/oem/bin'
         self.python_path = '/usr/share/oem/python/bin'
+        self.disro_name = 'CoreOS'
         if 'PATH' in os.environ:
             os.environ['PATH'] = "{0}:{1}".format(os.environ['PATH'], self.python_path)
         else:
@@ -483,6 +492,7 @@ class RedhatDistro(GenericDistro):
         self.service_cmd = '/sbin/service'
         self.ssh_service_restart_option = 'condrestart'
         self.ssh_service_name = 'sshd'
+        self.disro_name = 'Red Hat'
 
 
 class FedoraDistro(RedhatDistro):
@@ -494,6 +504,7 @@ class FedoraDistro(RedhatDistro):
         super(FedoraDistro, self).__init__()
         self.service_cmd = '/usr/bin/systemctl'
         self.hostname_file_path = '/etc/hostname'
+        self.disro_name = 'Fedora'
 
     def restart_ssh_service(self):
         """

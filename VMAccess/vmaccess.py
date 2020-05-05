@@ -335,21 +335,38 @@ def _set_sshd_config(config, name, val):
     return config
 
 
-def _reset_sshd_config(sshd_file_path):
-    distro = platform.dist()
-    distro_name = distro[0]
-    version = distro[1]
-    config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' % (distro_name, version))
-    if not (os.path.exists(config_file_path)):
-        config_file_path = os.path.join(os.getcwd(), 'resources', '%s_%s' % (distro_name, 'default'))
-        if not (os.path.exists(config_file_path)):
-            config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
+def _get_default_ssh_config_filename():
+    os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+    if os_name is not None:
+        # the default ssh config files are present
+        # /var/lib/waagent/Microsoft.OSTCExtensions.VMAccessForLinux-<version>/resources/
+        if re.match("centos", os_name, re.IGNORECASE):
+            return "centos_default"
+        if re.match("debian", os_name, re.IGNORECASE):
+            return "debian_default"
+        if re.match("fedora", os_name, re.IGNORECASE):
+            return "fedora_default"
+        if re.match("red\s?hat", os_name, re.IGNORECASE):
+            return "redhat_default"
+        if re.match("suse", os_name, re.IGNORECASE):
+            return "SuSE_default"
+        if re.match("ubuntu", os_name, re.IGNORECASE):
+            return "ubuntu_default"
+        return "default"
 
-    if distro_name == "CoreOS":
-        # Parse sshd port from config_file_path
+
+def _reset_sshd_config(sshd_file_path):
+    ssh_default_config_filename = _get_default_ssh_config_filename()
+    ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', ssh_default_config_filename)
+    if not (os.path.exists(ssh_default_config_file_path)):
+        ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
+
+    # handle CoreOS differently
+    if isinstance(MyDistro, dist_utils.CoreOSDistro):
+        # Parse sshd port from ssh_default_config_file_path
         sshd_port = 22
         regex = re.compile(r"^Port\s+(\d+)", re.VERBOSE)
-        with open(config_file_path) as f:
+        with open(ssh_default_config_file_path) as f:
             for line in f:
                 match = regex.match(line)
                 if match:
@@ -368,7 +385,7 @@ def _reset_sshd_config(sshd_file_path):
         cfg_content += "    permissions: 0600\n"
         cfg_content += "    owner: root:root\n"
         cfg_content += "    content: |\n"
-        for line in ext_utils.get_file_contents(config_file_path).split('\n'):
+        for line in ext_utils.get_file_contents(ssh_default_config_file_path).split('\n'):
             cfg_content += "      {0}\n".format(line)
 
         # Change the sshd port in /etc/systemd/system/sshd.socket
@@ -386,7 +403,7 @@ def _reset_sshd_config(sshd_file_path):
         ext_utils.run(['coreos-cloudinit', '-from-file', cfg_tempfile], chk_err=False)
         os.remove(cfg_tempfile)
     else:
-        shutil.copyfile(config_file_path, sshd_file_path)
+        shutil.copyfile(ssh_default_config_file_path, sshd_file_path)
         MyDistro.restart_ssh_service()
 
 
