@@ -101,7 +101,7 @@ class GenericDistro(object):
         """
         ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
         ret_code = ext_utils.run(ssh_restart_cmd)
-        if ret_code > 0:
+        if ret_code != 0:
             logger.error("Failed to restart SSH service with return code:" + str(ret_code))
         return ret_code
 
