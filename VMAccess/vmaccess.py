@@ -420,30 +420,32 @@ def _save_cert_str_as_file(cert_txt, file_name):
 
 
 def _open_ssh_port():
-    _del_rule_if_exists('INPUT -p tcp -m tcp --dport 22 -j DROP')
-    _del_rule_if_exists('INPUT -p tcp -m tcp --dport 22 -j REJECT')
-    _del_rule_if_exists('INPUT -p -j DROP')
-    _del_rule_if_exists('INPUT -p -j REJECT')
-    _insert_rule_if_not_exists('INPUT -p tcp -m tcp --dport 22 -j ACCEPT')
+    _del_rule_if_exists(['INPUT', '-p', 'tcp', '-m', 'tcp', '--dport', '22', '-j', 'DROP'])
+    _del_rule_if_exists(['INPUT', '-p', 'tcp', '-m', 'tcp', '--dport', '22', '-j', 'REJECT'])
+    _del_rule_if_exists(['INPUT', '-p', '-j', 'DROP'])
+    _del_rule_if_exists(['INPUT', '-p', '-j', 'REJECT'])
+    _insert_rule_if_not_exists(['INPUT', '-p', 'tcp', '-m', 'tcp', '--dport', '22', '-j', 'ACCEPT'])
 
-    _del_rule_if_exists('OUTPUT -p tcp -m tcp --sport 22 -j DROP')
-    _del_rule_if_exists('OUTPUT -p tcp -m tcp --sport 22 -j REJECT')
-    _del_rule_if_exists('OUTPUT -p -j DROP')
-    _del_rule_if_exists('OUTPUT -p -j REJECT')
-    _insert_rule_if_not_exists('OUTPUT -p tcp -m tcp --dport 22 -j ACCEPT')
+    _del_rule_if_exists(['OUTPUT', '-p', 'tcp', '-m', 'tcp', '--sport', '22', '-j', 'DROP'])
+    _del_rule_if_exists(['OUTPUT', '-p', 'tcp', '-m', 'tcp', '--sport', '22', '-j', 'REJECT'])
+    _del_rule_if_exists(['OUTPUT', '-p', '-j', 'DROP'])
+    _del_rule_if_exists(['OUTPUT', '-p', '-j', 'REJECT'])
+    _insert_rule_if_not_exists(['OUTPUT', '-p', 'tcp', '-m', 'tcp', '--dport', '22', '-j', 'ACCEPT'])
 
 
 def _del_rule_if_exists(rule_string):
+    rule_string_for_cmp = " ".join(rule_string)
     cmd_result = ext_utils.run_command_get_output(['iptables-save'])
-    while cmd_result[0] == 0 and (rule_string in cmd_result[1]):
-        ext_utils.run(['iptables', '-D', rule_string])
+    while cmd_result[0] == 0 and (rule_string_for_cmp in cmd_result[1]):
+        ext_utils.run(['iptables', '-D'] + rule_string)
         cmd_result = ext_utils.run_command_get_output(['iptables-save'])
 
 
 def _insert_rule_if_not_exists(rule_string):
+    rule_string_for_cmp = " ".join(rule_string)
     cmd_result = ext_utils.run_command_get_output(['iptables-save'])
-    if cmd_result[0] == 0 and (rule_string not in cmd_result[1]):
-        ext_utils.run_command_get_output(['iptables', '-I', rule_string])
+    if cmd_result[0] == 0 and (rule_string_for_cmp not in cmd_result[1]):
+        ext_utils.run_command_get_output(['iptables', '-I'] + rule_string)
 
 
 def check_and_repair_disk(hutil):

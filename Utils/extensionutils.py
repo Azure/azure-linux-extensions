@@ -152,7 +152,7 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
     except subprocess.CalledProcessError as e:
         if chk_err and log_cmd:
             logger.error('CalledProcessError.  Error Code is ' + str(e.returncode))
-            logger.error('CalledProcessError.  Command string was ' + e.cmd)
+            logger.error('CalledProcessError.  Command string was ' + str(cmd))
             logger.error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
     except OSError as e:
