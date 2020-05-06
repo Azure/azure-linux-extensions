@@ -191,12 +191,12 @@ def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
     except OSError as e:
         if chk_err and log_cmd:
             logger.error('CalledProcessError.  Error Code is ' + str(e.errno))
-            logger.error('CalledProcessError.  Command string was ' + cmd)
+            logger.error('CalledProcessError.  Command was ' + str(cmd))
             logger.error('CalledProcessError.  Command result was ' + str(e))
             return 1, str(e)
     if subprocess_executed and me.returncode != 0 and chk_err and log_cmd:
         logger.error('CalledProcessError.  Error Code is ' + str(me.returncode))
-        logger.error('CalledProcessError.  Command string was ' + cmd)
+        logger.error('CalledProcessError.  Command was ' + str(cmd))
         logger.error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
     return me.returncode, output[0].decode('latin-1')
 
