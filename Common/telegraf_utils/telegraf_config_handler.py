@@ -293,6 +293,22 @@ def get_handler_vars():
     
     return logFolder, configFolder
 
+def stop_telegraf_service():
+
+    _, configFolder = get_handler_vars()
+    telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+     
+    code = 1
+    if os.path.isfile(telegraf_service_path):
+        code = os.system("sudo systemctl stop metrics-sourcer")
+    else:
+        raise Exception("Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service .")
+        return code
+    
+    if code != 0:
+        raise Exception("Unable to stop telegraf service: metrics-sourcer.service .")
+
+    return code
 
 def setup_telegraf_service():
 
@@ -337,7 +353,7 @@ def handle_config(data, me_url, mdsd_url, is_lad=False):
     # call the method to setup the telegraf service file
     telegraf_setup = setup_telegraf_service()
 
-    print telegraf_setup
+    # print telegraf_setup
     #start telegraf service if it was set up correctly
     daemon_start = 1
     daemon_reload_status = 1
