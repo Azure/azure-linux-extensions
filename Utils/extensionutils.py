@@ -182,7 +182,7 @@ def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
     Reports exceptions to Error if chk_err parameter is True
     """
     if log_cmd:
-        logger.log_if_verbose(str(cmd) + cmd_input)
+        logger.log_if_verbose(str(cmd) + str(cmd_input))
     subprocess_executed = False
     try:
         me = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)

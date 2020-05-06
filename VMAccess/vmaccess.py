@@ -24,7 +24,7 @@ import tempfile
 import time
 import traceback
 
-import Utils.HandlerUtil as Util
+import Utils.handlerutil2 as handler_util
 import Utils.logger as logger
 import Utils.extensionutils as ext_utils
 import Utils.distroutils as dist_utils
@@ -64,13 +64,13 @@ def main():
 
 
 def install():
-    hutil = Util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
-    hutil = Util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Enable')
     try:
         hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
@@ -141,19 +141,19 @@ def _is_sshd_config_modified(protected_settings):
 
 
 def uninstall():
-    hutil = Util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Uninstall')
     hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall succeeded')
 
 
 def disable():
-    hutil = Util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Disable')
     hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
 
 
 def update():
-    hutil = Util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
     hutil.do_parse_context('Update')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
