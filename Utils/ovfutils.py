@@ -84,10 +84,10 @@ class OvfEnv(object):
         Return self.
         """
         ofv_env = OvfEnv()
-        logger.LogIfVerbose(re.sub("<UserPassword>.*?<", "<UserPassword>*<", xml_text))
+        logger.log_if_verbose(re.sub("<UserPassword>.*?<", "<UserPassword>*<", xml_text))
         dom = xml.dom.minidom.parseString(xml_text)
         if len(dom.getElementsByTagNameNS(ofv_env.OvfNs, "Environment")) != 1:
-            logger.Error("Unable to parse OVF XML.")
+            logger.error("Unable to parse OVF XML.")
         section = None
         newer = False
         for p in dom.getElementsByTagNameNS(ofv_env.WaNs, "ProvisioningSection"):
@@ -104,9 +104,9 @@ class OvfEnv(object):
                         newer = True
                     section = p
         if newer:
-            logger.Warn("Newer provisioning configuration detected. Please consider updating waagent.")
+            logger.warning("Newer provisioning configuration detected. Please consider updating waagent.")
         if section is None:
-            logger.Error("Could not find ProvisioningSection with major version=" + str(ofv_env.MajorVersion))
+            logger.error("Could not find ProvisioningSection with major version=" + str(ofv_env.MajorVersion))
             return None
         ofv_env.ComputerName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "HostName")[0])
         ofv_env.UserName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "UserName")[0])
@@ -114,11 +114,7 @@ class OvfEnv(object):
             return ofv_env
         try:
             ofv_env.UserPassword = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "UserPassword")[0])
-        except KeyError:
-            pass
-        except ValueError:
-            pass
-        except AttributeError:
+        except (KeyError, ValueError, AttributeError, IndexError):
             pass
 
         try:
@@ -128,37 +124,37 @@ class OvfEnv(object):
                 if len(ofv_env.CustomData) > 0:
                     ext_utils.set_file_contents(constants.LibDir + '/CustomData', bytearray(
                         ext_utils.translate_custom_data(ofv_env.CustomData, configuration)))
-                    logger.Log('Wrote ' + constants.LibDir + '/CustomData')
+                    logger.log('Wrote ' + constants.LibDir + '/CustomData')
                 else:
-                    logger.Error('<CustomData> contains no data!')
+                    logger.error('<CustomData> contains no data!')
         except Exception as e:
-            logger.Error(str(e) + ' occured creating ' + constants.LibDir + '/CustomData')
+            logger.error(str(e) + ' occured creating ' + constants.LibDir + '/CustomData')
         disable_ssh_passwd = section.getElementsByTagNameNS(ofv_env.WaNs, "DisableSshPasswordAuthentication")
         if len(disable_ssh_passwd) != 0:
             ofv_env.DisableSshPasswordAuthentication = (get_node_text_data(disable_ssh_passwd[0]).lower() == "true")
         for pkey in section.getElementsByTagNameNS(ofv_env.WaNs, "PublicKey"):
-            logger.LogIfVerbose(repr(pkey))
+            logger.log_if_verbose(repr(pkey))
             fp = None
             path = None
             for c in pkey.childNodes:
                 if c.localName == "Fingerprint":
                     fp = get_node_text_data(c).upper()
-                    logger.LogIfVerbose(fp)
+                    logger.log_if_verbose(fp)
                 if c.localName == "Path":
                     path = get_node_text_data(c)
-                    logger.LogIfVerbose(path)
+                    logger.log_if_verbose(path)
             ofv_env.SshPublicKeys += [[fp, path]]
         for keyp in section.getElementsByTagNameNS(ofv_env.WaNs, "KeyPair"):
             fp = None
             path = None
-            logger.LogIfVerbose(repr(keyp))
+            logger.log_if_verbose(repr(keyp))
             for c in keyp.childNodes:
                 if c.localName == "Fingerprint":
                     fp = get_node_text_data(c).upper()
-                    logger.LogIfVerbose(fp)
+                    logger.log_if_verbose(fp)
                 if c.localName == "Path":
                     path = get_node_text_data(c)
-                    logger.LogIfVerbose(path)
+                    logger.log_if_verbose(path)
             ofv_env.SshKeyPairs += [[fp, path]]
         return ofv_env
 
