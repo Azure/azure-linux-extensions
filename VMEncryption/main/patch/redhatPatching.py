@@ -33,8 +33,14 @@ import subprocess
 import inspect
 
 from AbstractPatching import AbstractPatching
-from Common import *
-from CommandExecutor import *
+try:
+    from Common import *
+except Exception:
+    from ..Common import * # Added for unit test
+try:
+    from CommandExecutor import *
+except Exception:
+    from ..CommandExecutor import * # Added for unit test
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
