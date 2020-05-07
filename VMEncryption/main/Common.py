@@ -22,6 +22,7 @@ class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = CommonParameters.inst.get_extension_name()
     extension_version = CommonParameters.inst.get_extension_version()
+    extension_provider_namespace = CommonParameters.inst.get_extension_provider_namespace()    
     extension_type = CommonParameters.inst.get_extension_name()
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
@@ -39,6 +40,7 @@ class CommonVariables:
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
+    osencrypt_crypttab_line_ubuntu = 'osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n'
     encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
     default_encryption_algorithm = 'RSA-OAEP'
     encryption_settings_file_name_pattern = 'settings_{0}.json'
@@ -89,6 +91,8 @@ class CommonVariables:
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
+    MigrateKey = 'MigrateFlag'
+    MigrateValue = 'Migrate'
 
     """
     value for VolumeType could be Data
