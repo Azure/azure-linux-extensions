@@ -7,7 +7,7 @@ import platform
 import re
 import Utils.logger as logger
 import Utils.extensionutils as ext_utils
-import Utils.openssutils as openssl_utils
+import Utils.opensslutils as openssl_utils
 import Utils.constants as constants
 
 config = ext_utils.ConfigurationProvider(None)

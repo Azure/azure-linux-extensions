@@ -223,7 +223,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                       is_success=False,
                                       message="(02101)" + err_msg)
         raise Exception(err_msg + " with " + error_string)
-    hutil.log("Succeeded in create the account or set the password.")
+    hutil.log("Succeeded in creating the account or setting the password.")
 
     # Allow password authentication if user_pass is provided
     if user_pass is not None:
@@ -273,10 +273,23 @@ def _set_user_account_pub_key(protect_settings, hutil):
                     [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
-                MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
-                MyDistro.set_se_linux_context(
-                    pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
-                ext_utils.change_owner(pub_path, user_name)
+                deploy_key_failed_as_expected = False
+                try:
+                    MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
+                except ImportError as e:
+                    # we expect the following import statement
+                    # from pyasn1.codec.der import decoder as der_decoder
+                    # to fail in opensslutils.py, module is not shipped by default with python2.7
+                    if not cert_txt:
+                        # user didn't pass a public key, so we shouldn't fail
+                        deploy_key_failed_as_expected = True
+                        logger.warning(str(e))
+                    else:
+                        raise e
+                if not deploy_key_failed_as_expected:
+                    MyDistro.set_se_linux_context(
+                        pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
+                    ext_utils.change_owner(pub_path, user_name)
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
