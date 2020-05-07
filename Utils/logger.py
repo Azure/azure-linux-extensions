@@ -211,7 +211,7 @@ except NameError:
 
 
 def log(message):
-    global_shared_context_logger.log_if_verbose(message)
+    global_shared_context_logger.log(message)
 
 
 def error(message):
