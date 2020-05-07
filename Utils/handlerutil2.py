@@ -87,12 +87,12 @@ class HandlerContext:
 
 
 class HandlerUtility:
-    def __init__(self, log, error, s_name=None, l_name=None, extension_version=None, logFileName='extension.log',
+    def __init__(self, s_name=None, l_name=None, extension_version=None, logFileName='extension.log',
                  console_logger=None, file_logger=None):
-        self._log = log
+        self._log = logger.log
         self._log_to_con = console_logger
         self._log_to_file = file_logger
-        self._error = error
+        self._error = logger.error
         self._logFileName = logFileName
         if s_name is None or l_name is None or extension_version is None:
             (l_name, s_name, extension_version) = self._get_extension_info()
@@ -267,9 +267,8 @@ class HandlerUtility:
 
     def _change_log_file(self):
         self.log("Change log file to " + self._context._log_file)
-        l = logger.Logger(self._context._log_file, '/dev/stdout')
-        self._log = l.log
-        self._error = l.error
+        # this will change the logging file for all python files that share the same process
+        logger.global_shared_context_logger = logger.Logger(self._context._log_file, '/dev/stdout')
 
     def is_seq_smaller(self):
         return int(self._context._seq_no) <= self._get_most_recent_seq()

@@ -6,10 +6,10 @@ import shutil
 import tempfile
 import unittest
 import Utils.extensionutils as ext_utils
-import Utils.logger
+import Utils.logger as logger
 
 
-ext_utils.logger = Utils.logger.TestLogger()
+logger.global_shared_context_logger = logger.TestLogger()
 
 
 class TestCodeInjection(unittest.TestCase):

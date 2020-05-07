@@ -14,3 +14,4 @@ vmaccessSource="$currentDir/../../VMAccess/vmaccess.py"
 
 cp -r -f $utilsSource $utilsDest
 cp -f $vmaccessSource $vmaccessDest
+find $destdir -name '*.pyc' | xargs rm

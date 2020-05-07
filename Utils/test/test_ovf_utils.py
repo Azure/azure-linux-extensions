@@ -4,13 +4,12 @@ import os.path as path
 import unittest
 import Utils.extensionutils as ext_utils
 import Utils.ovfutils as ovf_utils
-import Utils.logger
+import Utils.logger as logger
 
 
 Configuration = ext_utils.ConfigurationProvider(None)
 
-ext_utils.logger = Utils.logger.TestLogger()
-ovf_utils.logger = ext_utils.logger
+logger.global_shared_context_logger = logger.TestLogger()
 
 
 class TestTestOvfUtils(unittest.TestCase):

@@ -5,17 +5,10 @@ import crypt
 import string
 import platform
 import re
-import Utils.logger
+import Utils.logger as logger
 import Utils.extensionutils as ext_utils
 import Utils.openssutils as openssl_utils
 import Utils.constants as constants
-
-
-global logger
-logger = Utils.logger.default_logger
-# propagate the logger
-ext_utils.logger = logger
-
 
 config = ext_utils.ConfigurationProvider(None)
 
@@ -168,7 +161,8 @@ class GenericDistro(object):
         if uid_min is None:
             uid_min = 100
         if user_entry is not None and user_entry[2] < uid_min:
-            logger.error("CreateAccount: " + user + " is a system user. Will not set password.")
+            logger.error(
+                "CreateAccount: " + user + " is a system user. Will not set password.")
             return "Failed to set password for system user: " + user + " (0x06)."
         if user_entry is None:
             command = ['useradd', '-m', user]
@@ -234,7 +228,8 @@ class GenericDistro(object):
         if uid_min is None:
             uid_min = 100
         if user_entry[2] < uid_min:
-            logger.error("DeleteAccount: " + user + " is a system user. Will not delete account.")
+            logger.error(
+                "DeleteAccount: " + user + " is a system user. Will not delete account.")
             return
         ext_utils.run(['rm', '-f', '/var/run/utmp'])  # Delete utmp to prevent error if we are the 'user' deleted
         ext_utils.run(['userdel', '-f', '-r', user])
@@ -296,7 +291,8 @@ class FreeBSDDistro(GenericDistro):
         if uidmin is None:
             uidmin = 100
         if userentry is not None and userentry[2] < uidmin:
-            logger.error("CreateAccount: " + user + " is a system user. Will not set password.")
+            logger.error(
+                "CreateAccount: " + user + " is a system user. Will not set password.")
             return "Failed to set password for system user: " + user + " (0x06)."
         if userentry is None:
             command = ['pw', 'useradd', user, '-m']
@@ -306,7 +302,8 @@ class FreeBSDDistro(GenericDistro):
                 logger.error("Failed to create user account: " + user)
                 return "Failed to create user account: " + user + " (0x07)."
             else:
-                logger.log("CreateAccount: " + user + " already exists. Will update password.")
+                logger.log(
+                    "CreateAccount: " + user + " already exists. Will update password.")
 
         if password is not None:
             self.change_password(user, password)
@@ -372,7 +369,8 @@ class FreeBSDDistro(GenericDistro):
         if uidmin is None:
             uidmin = 100
         if userentry[2] < uidmin:
-            logger.error("DeleteAccount: " + user + " is a system user. Will not delete account.")
+            logger.error(
+                "DeleteAccount: " + user + " is a system user. Will not delete account.")
             return
         # empty contents of utmp to prevent error if we are the 'user' deleted
         ext_utils.run_command_and_write_stdout_to_file(['echo'], '/var/run/utmp')
@@ -443,7 +441,8 @@ class CoreOSDistro(GenericDistro):
         if uidmin is None:
             uidmin = 100
         if userentry is not None and userentry[2] < uidmin and userentry[2] != self.CORE_UID:
-            logger.error("CreateAccount: " + user + " is a system user. Will not set password.")
+            logger.error(
+                "CreateAccount: " + user + " is a system user. Will not set password.")
             return "Failed to set password for system user: " + user + " (0x06)."
         if userentry is None:
             command = ['useradd', '--create-home',  '--password', '*',  user]

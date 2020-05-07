@@ -134,7 +134,7 @@ class Logger(object):
         self.log_with_prefix("WARNING:", message)
 
     def error_with_prefix(self, prefix, message):
-        self.log_with_prefix("ERROR:", message)
+        self.log_with_prefix("ERROR: " + str(prefix), message)
 
     def error(self, message):
         """
@@ -150,7 +150,7 @@ class Logger(object):
         t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
         return t + prefix
 
-
+# meant to be used with tests
 # noinspection PyMethodMayBeStatic
 class TestLogger(Logger):
     def __init__(self):
@@ -200,5 +200,31 @@ class TestLogger(Logger):
         self.error_with_prefix("", message)
 
 
-global default_logger
-default_logger = Logger('/var/log/waagent.log', '/dev/console')
+global global_shared_context_logger
+try:
+    # test whether global_shared_context_logger has been assigned previously
+    _ = global_shared_context_logger
+except NameError:
+    # previously not assigned, assign default value
+    # will assign global_shared_context_logger only once
+    global_shared_context_logger = Logger('/var/log/waagent.log', '/dev/console')
+
+
+def log(message):
+    global_shared_context_logger.log_if_verbose(message)
+
+
+def error(message):
+    global_shared_context_logger.error(message)
+
+
+def warning(message):
+    global_shared_context_logger.warning(message)
+
+
+def error_with_prefix(prefix, message):
+    global_shared_context_logger.error_with_prefix(prefix, message)
+
+
+def log_if_verbose(message):
+    global_shared_context_logger.log_if_verbose(message)

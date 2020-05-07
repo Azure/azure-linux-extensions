@@ -2,15 +2,9 @@ import re
 import os
 import xml.dom.minidom
 import xml.sax.saxutils
-import Utils.logger
 import Utils.extensionutils as ext_utils
 import Utils.constants as constants
-
-
-global logger
-logger = Utils.logger.default_logger
-# propagate the logger
-ext_utils.logger = logger
+import Utils.logger as logger
 
 
 def get_node_text_data(a):
@@ -104,9 +98,11 @@ class OvfEnv(object):
                         newer = True
                     section = p
         if newer:
-            logger.warning("Newer provisioning configuration detected. Please consider updating waagent.")
+            logger.warning(
+                "Newer provisioning configuration detected. Please consider updating waagent.")
         if section is None:
-            logger.error("Could not find ProvisioningSection with major version=" + str(ofv_env.MajorVersion))
+            logger.error(
+                "Could not find ProvisioningSection with major version=" + str(ofv_env.MajorVersion))
             return None
         ofv_env.ComputerName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "HostName")[0])
         ofv_env.UserName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "UserName")[0])

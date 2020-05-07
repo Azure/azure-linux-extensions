@@ -38,13 +38,16 @@ EndCertificateTag = '-----END CERTIFICATE-----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
 
-Logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
+# overwrite the default logger
+logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
+
+
 Configuration = ext_utils.ConfigurationProvider(None)
 MyDistro = dist_utils.get_my_distro()
 
 
 def main():
-    Logger.log("%s started to handle." % ExtensionShortName)
+    logger.log("%s started to handle." % ExtensionShortName)
 
     try:
         for a in sys.argv[1:]:
@@ -60,17 +63,17 @@ def main():
                 update()
     except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
-        Logger.error(err_msg)
+        logger.error(err_msg)
 
 
 def install():
-    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
-    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Enable')
     try:
         hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
@@ -141,19 +144,19 @@ def _is_sshd_config_modified(protected_settings):
 
 
 def uninstall():
-    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Uninstall')
     hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall succeeded')
 
 
 def disable():
-    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Disable')
     hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
 
 
 def update():
-    hutil = handler_util.HandlerUtility(Logger.log, Logger.error)
+    hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Update')
     hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
@@ -189,7 +192,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if ovf_xml is None or ovf_env is None:
         # default ovf_env with empty data
         ovf_env = ovf_utils.OvfEnv()
-        Logger.log("could not load ovf-env.xml")
+        logger.log("could not load ovf-env.xml")
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
@@ -285,6 +288,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                           op=constants.WALAEventOperation.Enable,
                                           is_success=False,
                                           message="(02100)Failed to reset ssh key.")
+            raise e
 
 
 def _get_other_sudoers(user_name):
