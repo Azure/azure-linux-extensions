@@ -270,7 +270,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                             break
                 pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
                 retcode = ext_utils.run_command_and_write_stdout_to_file(
-                    [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout' '-pubkey'], "temp.pub")
+                    [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
                 MyDistro.ssh_deploy_public_key('temp.pub', pub_path)

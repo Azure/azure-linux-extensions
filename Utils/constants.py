@@ -38,7 +38,7 @@ class WALAEventOperation:
     HeartBeat = "HeartBeat"
     Provision = "Provision"
     Install = "Install"
-    UnIsntall = "UnInstall"
+    UnInstall = "UnInstall"
     Disable = "Disable"
     Enable = "Enable"
     Download = "Download"
