@@ -1,5 +1,6 @@
 import re
 import os
+import base64
 import xml.dom.minidom
 import xml.sax.saxutils
 import Utils.extensionutils as ext_utils
@@ -14,6 +15,16 @@ def get_node_text_data(a):
     for b in a.childNodes:
         if b.nodeType == b.TEXT_NODE:
             return b.data
+
+
+def translate_custom_data(data, configuration):
+    """
+    Translate the custom data from a Base64 encoding. Default to no-op.
+    """
+    data_to_decode = configuration.get("Provisioning.DecodeCustomData")
+    if data_to_decode is not None and data_to_decode.lower().startswith("y"):
+        return base64.b64decode(data)
+    return data
 
 
 class OvfEnv(object):
@@ -119,7 +130,7 @@ class OvfEnv(object):
                 ofv_env.CustomData = get_node_text_data(cd_section[0])
                 if len(ofv_env.CustomData) > 0:
                     ext_utils.set_file_contents(constants.LibDir + '/CustomData', bytearray(
-                        ext_utils.translate_custom_data(ofv_env.CustomData, configuration)))
+                        translate_custom_data(ofv_env.CustomData, configuration)))
                     logger.log('Wrote ' + constants.LibDir + '/CustomData')
                 else:
                     logger.error('<CustomData> contains no data!')

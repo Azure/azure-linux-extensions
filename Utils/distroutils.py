@@ -10,27 +10,25 @@ import Utils.extensionutils as ext_utils
 import Utils.opensslutils as openssl_utils
 import Utils.constants as constants
 
-config = ext_utils.ConfigurationProvider(None)
 
-
-def get_my_distro():
+def get_my_distro(config):
     if 'FreeBSD' in platform.system():
-        return FreeBSDDistro()
+        return FreeBSDDistro(config)
     os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
     if os_name is not None:
         if re.match("fedora", os_name, re.IGNORECASE):
             # Fedora
-            return FedoraDistro()
+            return FedoraDistro(config)
         if re.match("red\s?hat", os_name, re.IGNORECASE):
             # Red Hat
-            return RedhatDistro()
+            return RedhatDistro(config)
         if re.match("coreos", os_name, re.IGNORECASE):
             # CoreOs
-            return CoreOSDistro()
+            return CoreOSDistro(config)
         if re.match("freebsd", os_name, re.IGNORECASE):
             # FreeBSD
-            return FreeBSDDistro()
-    return GenericDistro()
+            return FreeBSDDistro(config)
+    return GenericDistro(config)
 
 
 # noinspection PyMethodMayBeStatic
@@ -44,7 +42,7 @@ class GenericDistro(object):
     So for CentOS the derived class is called 'centosDistro'.
     """
 
-    def __init__(self):
+    def __init__(self, config):
         """
         Generic Attributes go here.  These are based on 'majority rules'.
         This __init__() may be called or overriden by the child.
@@ -54,6 +52,7 @@ class GenericDistro(object):
         self.ssh_service_restart_option = 'restart'
         self.ssh_service_name = 'ssh'
         self.disro_name = 'default'
+        self.config = config
 
     def is_se_linux_system(self):
         """
@@ -114,11 +113,11 @@ class GenericDistro(object):
 
     def change_password(self, user, password):
         logger.log("Change user password")
-        crypt_id = config.get("Provisioning.PasswordCryptId")
+        crypt_id = self.config.get("Provisioning.PasswordCryptId")
         if crypt_id is None:
             crypt_id = "6"
 
-        salt_len = config.get("Provisioning.PasswordCryptSaltLength")
+        salt_len = self.config.get("Provisioning.PasswordCryptSaltLength")
         try:
             salt_len = int(salt_len)
             if salt_len < 0 or salt_len > 10:
@@ -244,12 +243,12 @@ class FreeBSDDistro(GenericDistro):
     """
     """
 
-    def __init__(self):
+    def __init__(self, config):
         """
         Generic Attributes go here.  These are based on 'majority rules'.
         This __init__() may be called or overriden by the child.
         """
-        super(FreeBSDDistro, self).__init__()
+        super(FreeBSDDistro, self).__init__(config)
         self.selinux = False
         self.ssh_service_name = 'sshd'
         self.sudoers_dir_base = '/usr/local/etc'
@@ -392,8 +391,8 @@ class CoreOSDistro(GenericDistro):
     """
     CORE_UID = 500
 
-    def __init__(self):
-        super(CoreOSDistro, self).__init__()
+    def __init__(self, config):
+        super(CoreOSDistro, self).__init__(config)
         self.waagent_path = '/usr/share/oem/bin'
         self.python_path = '/usr/share/oem/python/bin'
         self.disro_name = 'CoreOS'
@@ -486,8 +485,8 @@ class RedhatDistro(GenericDistro):
     Redhat Distro concrete class
     Put Redhat specific behavior here...
     """
-    def __init__(self):
-        super(RedhatDistro, self).__init__()
+    def __init__(self, config):
+        super(RedhatDistro, self).__init__(config)
         self.service_cmd = '/sbin/service'
         self.ssh_service_restart_option = 'condrestart'
         self.ssh_service_name = 'sshd'
@@ -499,8 +498,8 @@ class FedoraDistro(RedhatDistro):
     FedoraDistro concrete class
     Put Fedora specific behavior here...
     """
-    def __init__(self):
-        super(FedoraDistro, self).__init__()
+    def __init__(self, config):
+        super(FedoraDistro, self).__init__(config)
         self.service_cmd = '/usr/bin/systemctl'
         self.hostname_file_path = '/etc/hostname'
         self.disro_name = 'Fedora'

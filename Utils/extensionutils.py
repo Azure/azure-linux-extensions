@@ -5,7 +5,6 @@ import traceback
 import time
 import sys
 import pwd
-import base64
 import Utils.constants as constants
 import xml.sax.saxutils as xml_utils
 import Utils.logger as logger
@@ -217,16 +216,6 @@ def get_line_starting_with(prefix, filepath):
     return None
 
 
-def translate_custom_data(data, configuration):
-    """
-    Translate the custom data from a Base64 encoding. Default to no-op.
-    """
-    data_to_decode = configuration.get("Provisioning.DecodeCustomData")
-    if data_to_decode is not None and data_to_decode.lower().startswith("y"):
-        return base64.b64decode(data)
-    return data
-
-
 class WALAEvent(object):
     def __init__(self):
         self.providerId = ""
@@ -311,50 +300,6 @@ class ExtensionEvent(WALAEvent):
         self.ExtensionType = ""
         self.Message = ""
         self.Duration = 0
-
-
-class ConfigurationProvider(object):
-    """
-    Parse amd store key:values in waagent.conf
-    """
-
-    def __init__(self, wala_config_file):
-        self.values = dict()
-        if wala_config_file is None:
-            wala_config_file = constants.waagent_config_path
-        if not os.path.isfile(wala_config_file):
-            raise ValueError("Missing configuration in {0}".format(wala_config_file))
-        try:
-            for line in get_file_contents(wala_config_file).split('\n'):
-                if not line.startswith("#") and "=" in line:
-                    parts = line.split()[0].split('=')
-                    value = parts[1].strip("\" ")
-                    if value != "None":
-                        self.values[parts[0]] = value
-                    else:
-                        self.values[parts[0]] = None
-        # when get_file_contents returns none
-        except AttributeError:
-            logger.error("Unable to parse {0}".format(wala_config_file))
-            raise
-        return
-
-    def get(self, key):
-        return self.values.get(key)
-
-    def yes(self, key):
-        config_value = self.get(key)
-        if config_value is not None and config_value.lower().startswith("y"):
-            return True
-        else:
-            return False
-
-    def no(self, key):
-        config_value = self.get(key)
-        if config_value is not None and config_value.lower().startswith("n"):
-            return True
-        else:
-            return False
 
 
 def add_extension_event(name, op, is_success, duration=0, version="1.0", message="", extension_type="",

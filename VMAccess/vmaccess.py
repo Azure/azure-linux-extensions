@@ -42,8 +42,50 @@ SshdConfigPath = '/etc/ssh/sshd_config'
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 
 
-Configuration = ext_utils.ConfigurationProvider(None)
-MyDistro = dist_utils.get_my_distro()
+class ConfigurationProvider(object):
+    """
+    Parse amd store key:values in waagent.conf
+    """
+
+    def __init__(self, wala_config_file):
+        self.values = dict()
+        if not os.path.isfile(wala_config_file):
+            raise ValueError("Missing configuration in {0}".format(wala_config_file))
+        try:
+            for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
+                if not line.startswith("#") and "=" in line:
+                    parts = line.split()[0].split('=')
+                    value = parts[1].strip("\" ")
+                    if value != "None":
+                        self.values[parts[0]] = value
+                    else:
+                        self.values[parts[0]] = None
+        # when get_file_contents returns none
+        except AttributeError:
+            logger.error("Unable to parse {0}".format(wala_config_file))
+            raise
+        return
+
+    def get(self, key):
+        return self.values.get(key)
+
+    def yes(self, key):
+        config_value = self.get(key)
+        if config_value is not None and config_value.lower().startswith("y"):
+            return True
+        else:
+            return False
+
+    def no(self, key):
+        config_value = self.get(key)
+        if config_value is not None and config_value.lower().startswith("n"):
+            return True
+        else:
+            return False
+
+
+Configuration = ConfigurationProvider("/etc/waagent.conf")
+MyDistro = dist_utils.get_my_distro(Configuration)
 
 
 def main():
