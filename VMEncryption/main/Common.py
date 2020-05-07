@@ -50,6 +50,7 @@ class CommonVariables:
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
+    osencrypt_crypttab_line_ubuntu = 'osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n'
 
     """
     wire protocol message format
