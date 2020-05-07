@@ -328,14 +328,14 @@ def _set_sshd_config(config, name, val):
     if notfound:
         if i is None:
             i = 0
-            config.insert(i, "{0} {1}".format(name, val))
+        config.insert(i, "{0} {1}".format(name, val))
     return config
 
 
 def _get_default_ssh_config_filename():
     os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
     if os_name is not None:
-        # the default ssh config files are present
+        # the default ssh config files are present in
         # /var/lib/waagent/Microsoft.OSTCExtensions.VMAccessForLinux-<version>/resources/
         if re.match("centos", os_name, re.IGNORECASE):
             return "centos_default"
