@@ -242,7 +242,7 @@ class LadLoggingConfig:
         return mxt.top_level_tmpl_for_logging_only.format(
             sources=mxt.per_source_tmpl.format(name=syslog_src_name), events=mdsd_event_source, eh_urls=syslog_eh_urls)
 
-    def get_mdsd_telegraf_config(self, namespaces):
+    def get_mdsd_telegraf_config(self, namespaces, eventname):
         """
         Get mdsd XML config string for telegraf use with mdsd in LAD 3.0.
         :rtype: str
@@ -252,7 +252,7 @@ class LadLoggingConfig:
             self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces)
         return self._mdsd_telegraf_config
 
-    def __generate_mdsd_telegraf_config(self, namespaces):
+    def __generate_mdsd_telegraf_config(self, namespaces, eventname):
         """
         Helper method to generate mdsd_telegraf_config
         """
@@ -262,11 +262,11 @@ class LadLoggingConfig:
         telegraf_sources = ""
         telegraf_routeevents = ""
         mdsd_event_source = ""
-        telegraf_routeevents = mxt.telegraf_RouteEvent_tmpl.format(event_name='PerfTelegraf')
+        telegraf_routeevents = mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname)
 
         for plugin in namespaces:
             # # For telegraf conf we create a Source for each of the measurements(plugins) sent from telegraf
-            # # dest table (eventName) is 'PerfTelegraf'. 
+            # # dest table (eventName) template is WADMetrics{0}P10DV2S. 
             lad_specific_storage_plugin = "storage-" + plugin
             telegraf_sources += mxt.per_source_tmpl.format(name=lad_specific_storage_plugin)
             mdsd_event_source += mxt.per_MdsdEventSource_tmpl.format(source=lad_specific_storage_plugin,

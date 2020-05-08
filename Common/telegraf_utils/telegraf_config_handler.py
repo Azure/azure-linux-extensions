@@ -241,7 +241,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     agentconf += "  logfile_rotation_max_archives = 5\n" 
     agentconf += "\n# Configuration for adding gloabl tags\n"
     agentconf += "[global_tags]\n"
-    agentconf += "  DeploymentId= \"$\{DeploymentId\}\"\n"          
+    agentconf += "  DeploymentId= \"${DeploymentId}\"\n"          
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"

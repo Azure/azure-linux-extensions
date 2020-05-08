@@ -80,7 +80,7 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_me_url = "unix:///var/etw/mdm_influxdb.socket"
+        self._telegraf_me_url = "udp://127.0.0.1:8089"
         self._telegraf_mdsd_url = "unix:///var/run/mdsd/default_influx.socket"
 
         # Generated logging configs place holders
@@ -200,7 +200,7 @@ class LadConfigAll:
                     self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
                 else:
                     self._add_derived_event(aggregation_interval, table_name,
-                                            LadConfigAll._wad_table_name(aggregation_interval),
+                                            "omi"+LadConfigAll._wad_table_name(aggregation_interval),
                                             'Central', add_lad_query=True)
 
     def _handle_alternate_sinks(self, interval, sinks, source):
@@ -212,7 +212,7 @@ class LadConfigAll:
         :param str source: Name of local table from which data is to be pumped
         :return: 
         """
-        self._add_derived_event(interval, source, LadConfigAll._wad_table_name(interval), 'Central')
+        self._add_derived_event(interval, source, "omi"+LadConfigAll._wad_table_name(interval), 'Central')
         for name in sinks:
             sink = self._sink_configs.get_sink_by_name(name)
             if sink is None:
@@ -450,7 +450,7 @@ class LadConfigAll:
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
             self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)      
-            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces)
+            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces, LadConfigAll._wad_table_name("PT1H"))
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
 
         except Exception as e:
