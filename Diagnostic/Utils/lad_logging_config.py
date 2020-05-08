@@ -249,7 +249,7 @@ class LadLoggingConfig:
         :return: XML string that should be added to the mdsd config XML tree for telegraf use with mdsd in LAD 3.0.
         """
         if not self._mdsd_telegraf_config:
-            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces)
+            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces, eventname)
         return self._mdsd_telegraf_config
 
     def __generate_mdsd_telegraf_config(self, namespaces, eventname):
