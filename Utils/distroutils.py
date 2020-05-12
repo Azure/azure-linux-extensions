@@ -51,7 +51,7 @@ class GenericDistro(object):
         self.service_cmd = '/usr/sbin/service'
         self.ssh_service_restart_option = 'restart'
         self.ssh_service_name = 'ssh'
-        self.disro_name = 'default'
+        self.distro_name = 'default'
         self.config = config
 
     def is_se_linux_system(self):
@@ -252,7 +252,7 @@ class FreeBSDDistro(GenericDistro):
         self.selinux = False
         self.ssh_service_name = 'sshd'
         self.sudoers_dir_base = '/usr/local/etc'
-        self.disro_name = 'FreeBSD'
+        self.distro_name = 'FreeBSD'
 
     def ssh_deploy_public_key(self, fprint, path):
         """
@@ -395,7 +395,7 @@ class CoreOSDistro(GenericDistro):
         super(CoreOSDistro, self).__init__(config)
         self.waagent_path = '/usr/share/oem/bin'
         self.python_path = '/usr/share/oem/python/bin'
-        self.disro_name = 'CoreOS'
+        self.distro_name = 'CoreOS'
         if 'PATH' in os.environ:
             os.environ['PATH'] = "{0}:{1}".format(os.environ['PATH'], self.python_path)
         else:
@@ -490,7 +490,7 @@ class RedhatDistro(GenericDistro):
         self.service_cmd = '/sbin/service'
         self.ssh_service_restart_option = 'condrestart'
         self.ssh_service_name = 'sshd'
-        self.disro_name = 'Red Hat'
+        self.distro_name = 'Red Hat'
 
 
 class FedoraDistro(RedhatDistro):
@@ -502,7 +502,7 @@ class FedoraDistro(RedhatDistro):
         super(FedoraDistro, self).__init__(config)
         self.service_cmd = '/usr/bin/systemctl'
         self.hostname_file_path = '/etc/hostname'
-        self.disro_name = 'Fedora'
+        self.distro_name = 'Fedora'
 
     def restart_ssh_service(self):
         """
