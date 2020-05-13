@@ -232,8 +232,11 @@ def install():
         #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
 
-    # decide the mode
-    if protected_settings is None or len(protected_settings) is 0:
+    # Decide the mode
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+        hutil_log_info("Detecting Auto-Config mode.")
+        return 0, ""
+    elif protected_settings is None or len(protected_settings) is 0:
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
@@ -398,6 +401,14 @@ def enable():
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
         OneAgentEnableCommand = "/etc/init.d/mdsd start"
     
+    public_settings, protected_settings = get_settings()
+
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
+            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
+
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
