@@ -32,8 +32,14 @@ import datetime
 import subprocess
 
 from redhatPatching import redhatPatching
-from Common import *
-from CommandExecutor import *
+try:
+    from Common import *
+except Exception:
+    from ..Common import * # Added for unit test
+try:
+    from CommandExecutor import *
+except Exception:
+    from ..CommandExecutor import * # Added for unit test
 
 class centosPatching(redhatPatching):
     def __init__(self, logger, distro_info):

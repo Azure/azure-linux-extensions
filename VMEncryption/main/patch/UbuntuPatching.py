@@ -31,8 +31,14 @@ import datetime
 import subprocess
 
 from AbstractPatching import AbstractPatching
-from Common import *
-from CommandExecutor import *
+try:
+    from Common import *
+except Exception:
+    from ..Common import * # Added for unit test
+try:
+    from CommandExecutor import *
+except Exception:
+    from ..CommandExecutor import * # Added for unit test
 
 
 class UbuntuPatching(AbstractPatching):
@@ -99,4 +105,38 @@ class UbuntuPatching(AbstractPatching):
             self.command_executor.Execute(cmd)
         
     def update_prereq(self):
-        pass
+        self.logger.log("Trying to update Ubuntu osencrypt entry.")
+        filtered_crypttab_lines = []
+        initramfs_repack_needed = False
+        if not os.path.exists('/etc/crypttab'):
+            return
+        with open('/etc/crypttab', 'r') as f:
+            for line in f.readlines():
+                crypttab_parts = line.strip().split()
+
+                if len(crypttab_parts) < 3:
+                    filtered_crypttab_lines.append(line)
+                    continue
+
+                if crypttab_parts[0].startswith("#"):
+                    filtered_crypttab_lines.append(line)
+                    continue
+
+                if crypttab_parts[0] == 'osencrypt' and crypttab_parts[1] == '/dev/sda1' and 'keyscript=/usr/sbin/azure_crypt_key.sh' in line:
+                    self.logger.log("Found osencrypt entry to update.")
+                    if os.path.exists('/dev/disk/azure/root-part1'):
+                        filtered_crypttab_lines.append(CommonVariables.osencrypt_crypttab_line_ubuntu)
+                        initramfs_repack_needed = True
+                        continue
+                    else:
+                        self.logger.log("Cannot find expected link to root partition.")
+
+                filtered_crypttab_lines.append(line)
+
+        if initramfs_repack_needed:
+            with open('/etc/crypttab', 'w') as f:
+                f.writelines(filtered_crypttab_lines)
+            self.command_executor.Execute('update-initramfs -u -k all', True)
+            self.logger.log("Successfully updated osencrypt entry.")
+        else:
+            self.logger.log('osencrypt entry not present or already updated or expected root partition link does not exists.')

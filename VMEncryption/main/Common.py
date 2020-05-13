@@ -22,6 +22,7 @@ class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = CommonParameters.inst.get_extension_name()
     extension_version = CommonParameters.inst.get_extension_version()
+    extension_provider_namespace = CommonParameters.inst.get_extension_provider_namespace()
     extension_type = extension_name
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Windows Azure VMEncryption Extension for Linux IaaS'
@@ -35,7 +36,7 @@ class CommonVariables:
     luks_header_size = 4096 * 512
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
-    #TODO for the sles 11, we should use the ext3
+    # TODO for the sles 11, we should use the ext3
     default_file_system = 'ext4'
     format_supported_file_systems = ['ext4', 'ext3', 'ext2', 'xfs', 'btrfs']
     inplace_supported_file_systems = ['ext4', 'ext3', 'ext2']
@@ -49,6 +50,23 @@ class CommonVariables:
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
+    osencrypt_crypttab_line_ubuntu = 'osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n'
+
+    """
+    wire protocol message format
+    """
+    encryption_key_file_name = 'LinuxPassPhraseFileName'
+
+    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    wireprotocol_msg_headers = {
+        "Content-Type": "text/xml",
+        "x-ms-version": "2015-04-05"
+    }
+    wireprotocol_msg_template_v3 = """<?xml version="1.0"?>
+    <DiskEncryptionData version="3.0">
+        <DiskEncryptionDetailsAsJson>{settings_json_blob}</DiskEncryptionDetailsAsJson>
+    </DiskEncryptionData>
+    """
 
     """
     parameter key names
@@ -63,6 +81,10 @@ class CommonVariables:
     default_encryption_algorithm = 'RSA-OAEP'
     DiskFormatQuerykey = "DiskFormatQuery"
     PassphraseKey = 'Passphrase'
+    KeyVaultResourceIdKey = 'KeyVaultResourceId'
+    KekVaultResourceIdKey = 'KekVaultResourceId'
+    MigrateKey = 'MigrateFlag'
+    MigrateValue = 'Migrate'
 
     """
     value for VolumeType could be OS or Data
@@ -171,6 +193,13 @@ class CommonVariables:
     unmount_oldroot_error = 22
     operation_lookback_failed = 23
     unknown_error = 100
+
+    """
+    error messages
+    """
+    migration_detached_header = "One or more data disk use detached LUKS header. Migration is not supported."
+    migration_detached_header_xfs = "One or more data disk use detached LUKS header with xfs filesystem. Migration is not supported."
+    migration_wrong_passphrase = "Passphrase validation failed. Please check your passphrase and try again."
 
 class TestHooks:
     search_not_only_ide = False
