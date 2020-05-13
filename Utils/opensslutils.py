@@ -4,22 +4,22 @@ import base64
 
 def number_to_bytes(i):
     """
-    Pack number into bytes. Retun as string.
+    Pack number into bytes.
     """
-    result = []
+    result = bytearray()
     while i:
-        result.append(chr(i & 0xFF))
+        result += chr(i & 0xFF).encode()
         i >>= 8
     result.reverse()
-    return ''.join(result)
+    return result
 
 
 def bits_to_string(a):
     """
-    Return string representation of bits in a.
+    Return a representation of bits in a.
     """
     index = 7
-    s = ""
+    s = bytearray()
     c = 0
     for bit in a:
         c = c | (bit << index)
@@ -42,15 +42,15 @@ def openssl_publickey_to_ssh(file):
         k = der_decoder.decode(bits_to_string(der_decoder.decode(base64.b64decode(f))[0][1]))[0]
         n = k[0]
         e = k[1]
-        key_data = ""
+        key_data = bytearray()
         key_data += struct.pack('>I', len("ssh-rsa"))
-        key_data += "ssh-rsa"
+        key_data += "ssh-rsa".encode()
         key_data += struct.pack('>I', len(number_to_bytes(e)))
         key_data += number_to_bytes(e)
         key_data += struct.pack('>I', len(number_to_bytes(n)) + 1)
-        key_data += "\0"
+        key_data += "\0".encode()
         key_data += number_to_bytes(n)
     except Exception as e:
         print("OpensslToSsh: Exception " + str(e))
         return None
-    return "ssh-rsa " + base64.b64encode(key_data) + "\n"
+    return "ssh-rsa " + base64.b64encode(key_data).decode("utf-8") + "\n"
