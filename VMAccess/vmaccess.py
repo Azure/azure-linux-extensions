@@ -301,25 +301,31 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                                   is_success=False,
                                                   message="(02100)" + err_msg)
             else:
+                skip = False
                 if cert_txt:
                     _save_cert_str_as_file(cert_txt, 'temp.crt')
                 else:
                     for pkey in ovf_env.SshPublicKeys:
                         if pkey[1]:
-                            shutil.copy(
-                                os.path.join(constants.LibDir, pkey[0] + '.crt'),
-                                os.path.join(os.getcwd(), 'temp.crt'))
+                            default_cert_path = os.path.join(constants.LibDir, pkey[0] + '.crt')
+                            if os.path.isfile(default_cert_path):
+                                shutil.copy(default_cert_path, os.path.join(os.getcwd(), 'temp.crt'))
+                            else:
+                                logger.warning("Adding public key information from ovf-env.xml skipped")
+                                skip = True
                             break
-                pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
-                retcode = ext_utils.run_command_and_write_stdout_to_file(
-                    [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
-                if retcode > 0:
-                    raise Exception("Failed to generate public key file.")
+                if not skip:
+                    pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                    retcode = ext_utils.run_command_and_write_stdout_to_file(
+                        [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
+                    if retcode > 0:
+                        raise Exception("Failed to generate public key file.")
 
-                MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
+                    MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
 
-                os.remove('temp.pub')
-                os.remove('temp.crt')
+                    os.remove('temp.pub')
+                    os.remove('temp.crt')
+
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                               message="create-user")
                 hutil.log("Succeeded in resetting ssh_key.")
