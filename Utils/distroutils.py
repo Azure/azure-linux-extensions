@@ -7,7 +7,6 @@ import platform
 import re
 import Utils.logger as logger
 import Utils.extensionutils as ext_utils
-import Utils.opensslutils as openssl_utils
 import Utils.constants as constants
 
 
@@ -102,14 +101,12 @@ class GenericDistro(object):
         Generic sshDeployPublicKey - over-ridden in some concrete Distro classes due to minor differences
         in openssl packages deployed
         """
-        error = 0
-        ssh_pub_key = openssl_utils.openssl_publickey_to_ssh(fprint)
-        if ssh_pub_key is not None:
-            ext_utils.append_file_contents(path, ssh_pub_key)
+        keygen_retcode = ext_utils.run_command_and_write_stdout_to_file(
+            ['ssh-keygen', '-i', '-m', 'PKCS8', '-f', fprint], path)
+        if keygen_retcode:
+            return 1
         else:
-            logger.error("Failed: " + fprint + ".crt -> " + path)
-            error = 1
-        return error
+            return 0
 
     def change_password(self, user, password):
         logger.log("Change user password")
@@ -254,16 +251,6 @@ class FreeBSDDistro(GenericDistro):
         self.sudoers_dir_base = '/usr/local/etc'
         self.distro_name = 'FreeBSD'
 
-    def ssh_deploy_public_key(self, fprint, path):
-        """
-        We support PKCS8.
-        """
-        keygen_retcode = ext_utils.run_command_and_write_stdout_to_file(
-            ['ssh-keygen', '-i', '-m', 'PKCS8', '-f', fprint], path)
-        if keygen_retcode:
-            return 1
-        else:
-            return 0
 
     # noinspection PyMethodOverriding
     def chpasswd(self, user, password):
@@ -411,15 +398,6 @@ class CoreOSDistro(GenericDistro):
         SSH is socket activated on CoreOS. No need to restart it.
         """
         return 0
-
-    def ssh_deploy_public_key(self, fprint, path):
-        """
-        We support PKCS8.
-        """
-        if ext_utils.run_command_and_write_stdout_to_file(['ssh-keygen', '-i', '-m', 'PKCS8', '-f', fprint], path):
-            return 1
-        else:
-            return 0
 
     def create_account(self, user, password, expiration, thumbprint):
         """
