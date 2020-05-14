@@ -104,7 +104,7 @@ def create_custom_metrics_conf(mds_gig_endpoint_region):
         "version": 17, 
         "maxMetricAgeInSeconds": 0, 
         "endpointsForClientForking": [], 
-        "homeStampGslbHostname": "''' + mds_gig_endpoint_region + '''.monitoring.azure.com ", 
+        "homeStampGslbHostname": "''' + mds_gig_endpoint_region + '''.monitoring.azure.com", 
         "endpointsForClientPublication": [ 
             "https://''' + mds_gig_endpoint_region + '''.monitoring.azure.com/api/v1/ingestion/ingest" 
         ] 

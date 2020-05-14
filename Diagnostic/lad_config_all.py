@@ -27,6 +27,7 @@ import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
 import telegraf_utils.telegraf_config_handler as telhandler
+import metrics_ext_utils.metrics_ext_handler as me_handler 
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
 from Utils.misc_helpers import get_storage_endpoints_with_account, escape_nonalphanumerics
@@ -449,9 +450,10 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
-            self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)      
+            self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True) 
             mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces, LadConfigAll._wad_table_name("PT1H"))
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
+            me_handler.setup_me(True)
 
         except Exception as e:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
