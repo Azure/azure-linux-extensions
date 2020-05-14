@@ -2,16 +2,28 @@ import urllib2
 import json
 import os
 
-def start_me():
-    pass
+def stop_metrics_service():
+    metricsext_service_path = "/lib/systemd/system/metrics-extension.service"
+     
+    code = 1
+    if os.path.isfile(metricsext_service_path):
+        code = os.system("sudo systemctl stop metrics-extension")
+    else:
+        raise Exception("Metrics Extension service file does not exist. Failed to stop ME service: metrics-extension.service .")
+        return code
+    
+    if code != 0:
+        raise Exception("Unable to stop Metrics Extension service: metrics-extension.service .")
 
-def stop_me():
-    pass
+    return code
+
 
 def setup_me_service(configFolder):
 
     me_service_path = "/lib/systemd/system/metrics-extension.service"
     metrics_ext_bin = "/usr/sbin/MetricsExtension"
+    daemon_reload_status = 1
+    service_restart_status = 1
 
     if not os.path.exists(configFolder):
         raise Exception("Metrics extension config directory does not exist. Failed to setup ME service.")
@@ -24,6 +36,13 @@ def setup_me_service(configFolder):
     if os.path.isfile(me_service_path):
         os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
         daemon_reload_status = os.system("sudo systemctl daemon-reload")
+        if daemon_reload_status != 0:
+            raise Exception("Unable to reload systemd after ME service file change. Failed to setup ME service.")
+            return False
+        service_restart_status = os.system("sudo systemctl start metrics-extension")
+        if service_restart_status != 0:
+            raise Exception("Unable to start Metrics Extension service. Failed to setup ME service.")
+            return False
     else:
         raise Exception("Metrics extension service file does not exist. Failed to setup ME service.")
         return False
@@ -207,5 +226,3 @@ def setup_me(is_lad):
     #setup metrics extension service
     setup_me_service(me_config_dir)
     
-    #start metrics extension
-    # start_me()

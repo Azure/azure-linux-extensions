@@ -51,6 +51,8 @@ try:
     from Utils.imds_util import ImdsLogger
     import Utils.omsagent_util as oms
     import telegraf_utils.telegraf_config_handler as telhandler
+    import metrics_ext_utils.metrics_ext_handler as me_handler 
+
 
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
@@ -280,6 +282,8 @@ def main(command):
                 stop_mdsd()
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
             telhandler.stop_telegraf_service()
+            me_handler.stop_metrics_service()
+
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Uninstall:
@@ -295,6 +299,8 @@ def main(command):
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
             telhandler.stop_telegraf_service()
+            me_handler.stop_metrics_service()
+
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
