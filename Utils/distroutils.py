@@ -33,7 +33,7 @@ def get_my_distro(config):
 # noinspection PyMethodMayBeStatic
 class GenericDistro(object):
     """
-    GenericiDstro defines a skeleton neccesary for a concrete Distro class.
+    GenericiDstro defines a skeleton necessary for a concrete Distro class.
 
     Generic methods and attributes are kept here, distribution specific attributes
     and behavior are to be placed in the concrete child named distroDistro, where

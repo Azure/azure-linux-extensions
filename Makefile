@@ -33,7 +33,7 @@ $(EXTENSIONS):
 
 
 buildVMAccess:
-	$(eval NAME  = $(shell echo "VMAccess"))
+	$(eval NAME  = $(shell grep -Pom1 "(?<=<Type>)[^<]+" VMAccess/manifest.xml))
 	$(eval VERSION = $(shell grep -Pom1 "(?<=<Version>)[^<]+" VMAccess/manifest.xml))
 	@echo "Building '$(NAME)-$(VERSION).zip' ..."
 	@cd VMAccess && find . -type f | grep -v "/test/" | grep -v "./references" | zip -9 -@ ../build/$(NAME)-$(VERSION).zip > /dev/null
