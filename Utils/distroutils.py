@@ -13,7 +13,13 @@ import Utils.constants as constants
 def get_my_distro(config):
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro(config)
-    os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+    if os.path.isfile(constants.os_release):
+        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+    elif os.path.isfile(constants.system_release):
+        # /etc/os-release may not always be preset in older distro try reading /etc/system-release
+        os_name = ext_utils.get_file_contents(constants.system_release).split(' ')[0]
+    else:
+        return GenericDistro(config)
     if os_name is not None:
         if re.match("fedora", os_name, re.IGNORECASE):
             # Fedora
@@ -27,6 +33,7 @@ def get_my_distro(config):
         if re.match("freebsd", os_name, re.IGNORECASE):
             # FreeBSD
             return FreeBSDDistro(config)
+
     return GenericDistro(config)
 
 
