@@ -21,16 +21,16 @@ def get_my_distro(config):
     else:
         return GenericDistro(config)
     if os_name is not None:
-        if re.match("fedora", os_name, re.IGNORECASE):
+        if re.search("fedora", os_name, re.IGNORECASE):
             # Fedora
             return FedoraDistro(config)
-        if re.match("red\s?hat", os_name, re.IGNORECASE):
+        if re.search("red\s?hat", os_name, re.IGNORECASE):
             # Red Hat
             return RedhatDistro(config)
-        if re.match("coreos", os_name, re.IGNORECASE):
+        if re.search("coreos", os_name, re.IGNORECASE):
             # CoreOs
             return CoreOSDistro(config)
-        if re.match("freebsd", os_name, re.IGNORECASE):
+        if re.search("freebsd", os_name, re.IGNORECASE):
             # FreeBSD
             return FreeBSDDistro(config)
 
