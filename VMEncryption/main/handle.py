@@ -822,18 +822,33 @@ def enable_encryption():
 
     existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     if existing_passphrase_file is None and encryption_config.config_file_exists():
-        logger.log(msg="EncryptionConfig is present, but could not get the key file.",
-                       level=CommonVariables.WarningLevel)
-        hutil.redo_last_status()
-        exit_without_status_report()
+        msg="EncryptionConfig is present, but could not get the key file."
+        try:
+            hutil.redo_last_status()
+            logger.log(msg=msg, level=CommonVariables.WarningLevel)
+            exit_without_status_report()
+        except Exception:
+            logger.log(msg=msg, level=CommonVariables.ErrorLevel)
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                          operation='EnableEncyption',
+                          status=CommonVariables.extension_error_status,
+                          code=str(CommonVariables.configuration_error),
+                          message=msg)
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
     if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
-        hutil.redo_last_status()
-        exit_without_status_report()
+        try:
+            hutil.redo_last_status()
+            exit_without_status_report()
+        except Exception:
+            hutil.do_exit(exit_code=CommonVariables.success,
+                          operation='EnableEncyption',
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message="OS disk encryption already in progress")
 
     # handle the re-call scenario.  the re-call would resume?
     # if there's one tag for the next reboot.
@@ -1829,7 +1844,8 @@ def daemon_encrypt():
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
              (distro_name == 'redhat' and distro_version == '7.6') or
-             (distro_name == 'redhat' and distro_version == '7.7')) and
+             (distro_name == 'redhat' and distro_version == '7.7') or
+             (distro_name == 'redhat' and distro_version == '7.8')) and
                 (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1840,7 +1856,8 @@ def daemon_encrypt():
                (distro_name == 'centos' and distro_version.startswith('7.4')) or
                (distro_name == 'centos' and distro_version.startswith('7.5')) or
                (distro_name == 'centos' and distro_version.startswith('7.6')) or
-               (distro_name == 'centos' and distro_version.startswith('7.7'))) and
+               (distro_name == 'centos' and distro_version.startswith('7.7')) or
+               (distro_name == 'centos' and distro_version.startswith('7.8'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1853,6 +1870,8 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
               (distro_name == 'redhat' and distro_version == '7.7') or
+              (distro_name == 'redhat' and distro_version == '7.8') or
+              (distro_name == 'centos' and distro_version.startswith('7.8')) or
               (distro_name == 'centos' and distro_version.startswith('7.7')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
