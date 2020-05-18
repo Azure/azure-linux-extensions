@@ -2,6 +2,7 @@ LibDir = "/var/lib/waagent"
 
 Openssl = "openssl"
 os_release = "/etc/os-release"
+system_release = "/etc/system-release"
 
 
 class WALAEventOperation:
