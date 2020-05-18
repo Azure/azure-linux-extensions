@@ -25,7 +25,6 @@ import json
 import string
 import subprocess
 import sys
-import imp
 import time
 import shlex
 import traceback
@@ -109,7 +108,7 @@ def status_report_to_file(file_report_msg):
 
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
+    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
             if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -192,10 +191,6 @@ def convert_time(utcTicks):
 def freeze_snapshot(timeout):
     try:
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('seqsnapshot') == None):
-            hutil.set_value_to_configfile('seqsnapshot', '0')
-        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
-        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
@@ -338,10 +333,18 @@ def daemon():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
             timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 150 * 60 # in seconds
+            MAX_TIMESPAN = 140 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+
+            if total_span_in_seconds > MAX_TIMESPAN :
+                error_msg = "CRP timeout limit has reached, will not take snapshot."
+                errMsg = error_msg
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+                temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
+                temp_status= 'error'
+                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)

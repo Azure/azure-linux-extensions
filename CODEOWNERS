@@ -8,13 +8,13 @@
 # the repo. Unless a later match takes precedence,
 # the following owners will be requested for
 # review when someone opens a pull request.
-* @nkuchta
+* @nkuchta @Azure/azure-agent-extensions
 
 # Azure Monitor Agent Extension
 /AzureMonitorAgent/ @Azure/geneva-linux-agents
 
 # CustomScript Extension
-/CustomScript/ @D1v38om83r @nkuchta @vrdmr
+/CustomScript/ @D1v38om83r @nkuchta @Azure/azure-agent-extensions
 
 # Diagnostics (LAD) Extension
 /Diagnostic/ @Azure/geneva-linux-agents
@@ -29,7 +29,7 @@
 /opencensus-service/ @Azure/geneva-linux-agents
 
 # VMAccess Extension
-/VMAccess/ @D1v38om83r @nkuchta @vrdmr
+/VMAccess/ @D1v38om83r @nkuchta @Azure/azure-agent-extensions
 
 # VMBackup Extension
 /VMBackup/ @bpramod @soumyapattnaik @vityagi
@@ -38,8 +38,8 @@
 /VMEncryption/ @vimish @ejarvi @vermashi
 
 # WALinuxAgent
-/Common/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
-/Utils/ @D1v38om83r @nkuchta @vrdmr @Azure/walinuxagent
+/Common/ @D1v38om83r @nkuchta @Azure/walinuxagent @Azure/azure-agent-extensions
+/Utils/ @D1v38om83r @nkuchta @Azure/walinuxagent @Azure/azure-agent-extensions
 
 # Abandoned?
 # /AzureEnhancedMonitor/ 

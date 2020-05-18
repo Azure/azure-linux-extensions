@@ -39,6 +39,8 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
+from Utils.BlobUtil import BlobUtil
+
 # need to be implemented in next release
 #from dhcpHandler import DhcpHandler
 
@@ -81,7 +83,7 @@ class FreezeSnapshotter(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
+                snapshotMethodConfigValue = self.hutil.get_strvalue_from_configfile(CommonVariables.SnapshotMethod,customSettings['takeSnapshotFrom'])
                 self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
                 if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
                     self.takeSnapshotFrom = snapshotMethodConfigValue
@@ -114,6 +116,9 @@ class FreezeSnapshotter(object):
         all_failed = False
         unable_to_sleep = False
 
+        """ Do Not remove below HttpUtil object creation. This is to ensure HttpUtil singleton object is created before freeze."""
+        http_util = HttpUtil(self.logger)
+
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromGuest()
         elif(self.takeSnapshotFrom == CommonVariables.firstGuestThenHost):
@@ -122,6 +127,9 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
+        else :
+            self.logger.log('Snapshot method did not match any listed type, taking  firstHostThenGuest as default')
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
 
         self.logger.log('doFreezeSnapshot : run_result - {0} run_status - {1} all_failed - {2} unable_to_sleep - {3} is_inconsistent - {4} values post snapshot'.format(str(run_result), str(run_status), str(all_failed), str(unable_to_sleep), str(is_inconsistent)))
 
@@ -203,17 +211,8 @@ class FreezeSnapshotter(object):
 
     def freeze(self):
         try:
-            timeout = self.hutil.get_value_from_configfile('timeout')
-            if(timeout == None):
-                timeout = str(60)
+            timeout = self.hutil.get_intvalue_from_configfile('timeout',60)
             self.logger.log('T:S freeze, timeout value ' + str(timeout))
-            timeout_int = 60
-            try:
-                timeout_int = int(timeout)
-            except ValueError:
-                self.logger.log('T:S freeze, timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
-                timeout_int = 60
-                timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
             freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()
@@ -253,7 +252,7 @@ class FreezeSnapshotter(object):
             run_status = 'error'
         
         return run_result, run_status
-
+     
     def takeSnapshotFromGuest(self):
         run_result = CommonVariables.success
         run_status = 'success'
@@ -273,6 +272,10 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
+            # populate metadata for all blobs 
+            blob_util = BlobUtil(self.logger)          
+            blob_metadata = blob_util.populate_blobMetadata_allblobs(self.para_parser)
+
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
@@ -281,7 +284,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, blob_metadata)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
                 self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))

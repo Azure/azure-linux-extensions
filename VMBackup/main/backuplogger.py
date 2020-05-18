@@ -32,9 +32,14 @@ class Backuplogger(object):
         self.enforced_local_flag_value = True
         self.hutil = hutil
         self.prev_log = ''
+        self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
-        if (self.enforced_local_flag_value != False and enforced_local == False):
+        if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
+            self.logging_off = True
+        if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):
+            pass
+        elif (self.enforced_local_flag_value != False and enforced_local == False):
             self.msg = self.msg + "================== Logs during Freeze Start ==============" + "\n"
         elif (self.enforced_local_flag_value == False and enforced_local == True):
             self.msg = self.msg + "================== Logs during Freeze End ==============" + "\n"
@@ -43,14 +48,17 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
-        WriteLog = self.hutil.get_value_from_configfile('WriteLog')
+        if(self.enforced_local_flag_value == False and self.logging_off == True):
+            return
+        WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             log_msg = ""
             if sys.version_info > (3,):
                 log_msg = self.log_to_con_py3(msg, level)
             else:
                 log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
-                self.log_to_con(log_msg)
+                if(self.enforced_local_flag_value != False):
+                    self.log_to_con(log_msg)
             if(self.enforced_local_flag_value == False):
                 self.msg += log_msg
             else:
@@ -75,8 +83,9 @@ class Backuplogger(object):
             log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
             log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
                          encoding="ascii")
-            with open(self.con_path, "w") as C :
-                C.write(log_msg)
+            if(self.enforced_local_flag_value != False):
+                with open(self.con_path, "w") as C :
+                    C.write(log_msg)
         except IOError:
             pass
         except Exception as e:
@@ -100,7 +109,7 @@ class Backuplogger(object):
         self.msg = ''
 
     def commit_to_blob(self, logbloburi):
-        UploadStatusAndLog = self.hutil.get_value_from_configfile('UploadStatusAndLog')
+        UploadStatusAndLog = self.hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')
         if (UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
             log_to_blob = ""
             blobWriter = BlobWriter(self.hutil)
