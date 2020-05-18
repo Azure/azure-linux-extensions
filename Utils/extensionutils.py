@@ -10,6 +10,37 @@ import xml.sax.saxutils as xml_utils
 import Utils.logger as logger
 
 
+if not hasattr(subprocess, 'check_output'):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+    
+
 def change_owner(file_path, user):
     """
     Lookup user.  Attempt chown 'filepath' to 'user'.
