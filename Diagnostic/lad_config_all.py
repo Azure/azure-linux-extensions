@@ -414,7 +414,7 @@ class LadConfigAll:
 
             except Exception as e:
                 self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
-                return False, 'Failed to create portal config from ladCfg (see extension error logs for more details)'
+                return False, 'Failed to create portal config from ladCfg; see extension.log for more details.'
 
         # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         #    so check if Application Insights key is present and pass it to the actual helper
@@ -424,7 +424,7 @@ class LadConfigAll:
         except Exception as e:
             self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
                                "Stacktrace: {1}".format(e, traceback.format_exc()))
-            return False, 'Failed to update perf counter config (see extension error logs for more details)'
+            return False, 'Failed to update perf counter config; see extension.log for more details.'
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
@@ -445,8 +445,7 @@ class LadConfigAll:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
                                .format(e, traceback.format_exc()))
-            return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
-                          '(see extension error logs for more details)'
+            return False, 'Failed to generate configs for fluentd, syslog, and mdsd; see extension.log for more details.'
 
         # 5. Before starting to update the storage account settings, log extension's entire settings
         #    with secrets redacted, for diagnostic purpose.
@@ -456,12 +455,16 @@ class LadConfigAll:
         #    protectedSettings).
         account = self._ext_settings.read_protected_config('storageAccountName').strip()
         if not account:
-            return False, "Must specify storageAccountName"
+            return False, "Configuration Error: Must specify storageAccountName in protected settings. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         if self._ext_settings.read_protected_config('storageAccountKey'):
-            return False, "The storageAccountKey protected setting is not supported and must not be used"
+            return False, "Configuration Error: The storageAccountKey protected setting is deprecated in LAD 3.0 and cannot be used. " \
+                          "Instead, use the storageAccountSasToken setting. For documentation of this setting and instructions for generating " \
+                          "a SAS token, visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         token = self._ext_settings.read_protected_config('storageAccountSasToken').strip()
         if not token or token == '?':
-            return False, "Must specify storageAccountSasToken"
+            return False, "Configuration Error: Must specify storageAccountSasToken in the protected settings. For documentation of this setting and instructions " \
+                          "for generating a SAS token, visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         if '?' == token[0]:
             token = token[1:]
         endpoints = get_storage_endpoints_with_account(account,
