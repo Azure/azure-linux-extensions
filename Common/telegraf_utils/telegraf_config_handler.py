@@ -7,11 +7,11 @@ from telegraf_utils.telegraf_name_map import name_map
 Sample input data received by this script
 [
     {
-        "displayName" : "Network/Packets sent",
+        "displayName" : "Network->Packets sent",
         "interval" : "15s"
     },
     {
-        "displayName" : "Network/Packets recieved",
+        "displayName" : "Network->Packets recieved",
         "interval" : "15s"
     }
 ]
@@ -22,6 +22,9 @@ def parse_config(data, me_url, mdsd_url, is_lad):
 
     lad_storage_namepass_list = []
     lad_storage_namepass_str = ""
+
+    ama_storage_namepass_list = []
+    ama_storage_namepass_str = ""
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -91,7 +94,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
 
     for omiclass in telegraf_json:
         input_str = ""
-        rename_str = ""
+        ama_rename_str = ""
         lad_specific_rename_str = ""
         rate_specific_aggregator_str = ""
         aggregator_str = ""
@@ -100,8 +103,6 @@ def parse_config(data, me_url, mdsd_url, is_lad):
             min_interval = "60s"
             input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
-            rename_str += "\n[[processors.rename]]\n"
-            rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
             
             # If it's a lad config then add the namepass fields for sending totals to storage
             if is_lad:
@@ -110,6 +111,10 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                 lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"
                 if lad_plugin_name not in lad_storage_namepass_list:
                     lad_storage_namepass_list.append(lad_plugin_name)
+            else:
+                ama_rename_str += "\n[[processors.rename]]\n"
+                ama_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+
            
             fields = ""
             ops_fields = ""
@@ -138,21 +143,25 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                 
                 twiceminperiod = str(int(min_interval[:-1])*2)
                 #Add respective rename processor plugin based on the displayname
-                rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
                 if is_lad:
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
-                if "op" in telegraf_json[omiclass][plugin][field]:
-                    rename_str += " "*4 + "field = \"" + field + "\"\n"
-                    rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
-                    if is_lad:
-                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                        lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
                 else:
-                    rename_str += " "*4 + "field = \"" + field + "\"\n"
-                    rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
+                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
+
+                if "op" in telegraf_json[omiclass][plugin][field]:
                     if is_lad:
                         lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
+                    else:
+                        ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
+                else:
+                    if is_lad:
+                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
+                    else:
+                        ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
                         
 
             #Add respective operations for aggregators
@@ -177,15 +186,17 @@ def parse_config(data, me_url, mdsd_url, is_lad):
 
 
 
-            rename_str += "\n"
             if is_lad:
                 lad_specific_rename_str += "\n"
+            else:
+                ama_rename_str += "\n"
+
             input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"  #Using fields[: -2] here to get rid of the last ", " at the end of the string
             if plugin == "cpu":
                 input_str += " "*2 + "report_active = true\n"
             input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
         
-            config_file["data"] = input_str + "\n" + rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
+            config_file["data"] = input_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 
             output.append(config_file)
             config_file = {}
@@ -244,6 +255,8 @@ def parse_config(data, me_url, mdsd_url, is_lad):
     agentconf += "  DeploymentId= \"${DeploymentId}\"\n"          
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
+    if is_lad:
+        agentconf += "  namedrop = [" + lad_storage_namepass_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
     agentconf += "\n# Configuration for sending metrics to AMA\n"
     agentconf += "[[outputs.influxdb]]\n"

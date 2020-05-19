@@ -195,7 +195,7 @@ class LadLoggingConfig:
         Sample output after parsing the OMI metric 
         [
             {
-                "displayName" : "Network/Packets sent",
+                "displayName" : "Network->Packets sent",
                 "interval" : "15s"
             },
         ]
