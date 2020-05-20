@@ -17,16 +17,21 @@
 # limitations under the License.
 
 from __future__ import print_function
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
+import sys
+
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import signal
 import pwd
 import grp
 import re
-import sys
 import traceback
 import time
 import platform
