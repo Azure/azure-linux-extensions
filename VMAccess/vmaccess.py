@@ -367,21 +367,26 @@ def _set_sshd_config(config, name, val):
 
 
 def _get_default_ssh_config_filename():
-    os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+    if os.path.isfile(constants.os_release):
+        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+    elif os.path.isfile(constants.system_release):
+        os_name = ext_utils.get_file_contents(constants.system_release)
+    else:
+        return "default"
     if os_name is not None:
         # the default ssh config files are present in
         # /var/lib/waagent/Microsoft.OSTCExtensions.VMAccessForLinux-<version>/resources/
-        if re.match("centos", os_name, re.IGNORECASE):
+        if re.search("centos", os_name, re.IGNORECASE):
             return "centos_default"
-        if re.match("debian", os_name, re.IGNORECASE):
+        if re.search("debian", os_name, re.IGNORECASE):
             return "debian_default"
-        if re.match("fedora", os_name, re.IGNORECASE):
+        if re.search("fedora", os_name, re.IGNORECASE):
             return "fedora_default"
-        if re.match("red\s?hat", os_name, re.IGNORECASE):
+        if re.search("red\s?hat", os_name, re.IGNORECASE):
             return "redhat_default"
-        if re.match("suse", os_name, re.IGNORECASE):
+        if re.search("suse", os_name, re.IGNORECASE):
             return "SuSE_default"
-        if re.match("ubuntu", os_name, re.IGNORECASE):
+        if re.search("ubuntu", os_name, re.IGNORECASE):
             return "ubuntu_default"
         return "default"
 
