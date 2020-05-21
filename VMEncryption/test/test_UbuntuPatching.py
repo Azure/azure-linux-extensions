@@ -6,7 +6,7 @@ from main.patch.UbuntuPatching import UbuntuPatching
 from main.DiskUtil import DiskUtil
 from main.Common import CommonVariables
 from main.CommandExecutor import CommandExecutor
-from console_logger import ConsoleLogger
+from .console_logger import ConsoleLogger
 
 class Test_UbuntuPatching(unittest.TestCase):
     def setUp(self):

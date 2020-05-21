@@ -243,7 +243,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                                dev_path="/dev/disk/azure/scsi1/lun0",
                                                                file_system="auto",
                                                                luks_header_path="/headerfile",
-                                                               mount_point="/mnt/datadisk")],
+                                                               mount_point="/mnt/datadisk")),
                              str(crypt_items[0]))
 
     @mock.patch('shutil.copy2', return_value=True)
