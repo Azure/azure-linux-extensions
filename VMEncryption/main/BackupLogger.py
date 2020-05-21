@@ -25,7 +25,8 @@ class BackupLogger(object):
 
     """description of class"""
     def log(self, msg, level='Info'):
-        log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, msg)
+        escaped_msg = msg.replace('"', "'") # Replace " with ' as agent telemetry cannot process double quotes
+        log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, escaped_msg)
         log_msg = [c for c in log_msg if c in string.printable]
         log_msg = ''.join(log_msg)
 

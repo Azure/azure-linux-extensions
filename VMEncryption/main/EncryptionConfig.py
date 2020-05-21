@@ -20,6 +20,7 @@ import os
 import datetime
 import os.path
 import sys
+import traceback
 
 from Common import CommonVariables
 try:
@@ -113,5 +114,5 @@ class EncryptionConfig(object):
                     self.logger.log(msg=("the parameter file not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level = CommonVariables.InfoLevel)
             return True
         except OSError as e:
-            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(printable(e),traceback.format_exc()))
             return False

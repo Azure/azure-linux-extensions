@@ -31,6 +31,8 @@ except ImportError:
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
 import os.path
+import datetime
+import traceback
 
 # parameter format should be like this:
 #{"command":"enableencryption","query":[{"source_scsi_number":"[5:0:0:0]","target_scsi_number":"[5:0:0:2]"},{"source_scsi_number":"[5:0:0:1]","target_scsi_number":"[5:0:0:3]"}],
@@ -139,16 +141,16 @@ class ExtensionParameter(object):
 
     def clear_config(self):
         try:
-            if os.path.exists(self.encryption_environment.encryption_config_file_path):
-                self.logger.log(msg="archiving the encryption config file: {0}".format(self.encryption_environment.encryption_config_file_path))
+            if os.path.exists(self.encryption_environment.extension_parameter_file_path):
+                self.logger.log(msg="archiving the encryption parameter file: {0}".format(self.encryption_environment.extension_parameter_file_path))
                 time_stamp = datetime.datetime.now()
-                new_name = "{0}_{1}".format(self.encryption_environment.encryption_config_file_path, time_stamp)
-                os.rename(self.encryption_environment.encryption_config_file_path, new_name)
+                new_name = "{0}_{1}".format(self.encryption_environment.extension_parameter_file_path, time_stamp)
+                os.rename(self.encryption_environment.extension_parameter_file_path, new_name)
             else:
-                self.logger.log(msg=("the config file not exist: {0}".format(self.encryption_environment.encryption_config_file_path)), level = CommonVariables.WarningLevel)
+                self.logger.log(msg=("the params file does not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level = CommonVariables.WarningLevel)
             return True
         except OSError as e:
-            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
+            self.logger.log("Failed to archive encryption parameters with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False
 
     def _is_encrypt_command(self, command):

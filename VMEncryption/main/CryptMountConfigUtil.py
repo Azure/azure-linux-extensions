@@ -22,6 +22,7 @@ import os.path
 import re
 import shutil
 import uuid
+from datetime import datetime
 
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CryptItem, CommonVariables
@@ -230,7 +231,7 @@ class CryptMountConfigUtil(object):
 
             with open("/etc/fstab", "r") as f:
                 for line in f.readlines():
-                    fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
+                    fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
                     if fstab_device is not None:
                         fstab_items.append((fstab_device, fstab_mount_point, fstab_fs))
 
@@ -351,9 +352,9 @@ class CryptMountConfigUtil(object):
             if crypt_item.mount_point:
                 # We need to backup the fstab line too
                 fstab_backup_line = None
-                with open("/etc/fstab") as f:
+                with open("/etc/fstab", "r") as f:
                     for line in f.readlines():
-                        device, mountpoint, fs = self.parse_fstab_line(line)
+                        device, mountpoint, fs, opts = self.parse_fstab_line(line)
                         if mountpoint == crypt_item.mount_point and crypt_item.mapper_name in device:
                             fstab_backup_line = line
                 if fstab_backup_line is not None:
@@ -449,26 +450,45 @@ class CryptMountConfigUtil(object):
         with open("/etc/fstab", 'w') as wf:
             wf.write(new_mount_content)
 
+    def append_mount_info_data_disk(self, mapper_path, mount_point):
+        shutil.copy2('/etc/fstab', '/etc/fstab.backup.' + str(uuid.uuid4()))
+        mount_content_item = "\n#This line was added by Azure Disk Encryption\n" + mapper_path + " " + mount_point + " auto defaults,nofail,discard 0 0"
+        with open("/etc/fstab", 'a') as wf:
+            wf.write(mount_content_item)
+
     def is_bek_in_fstab_file(self, lines):
         for line in lines:
-            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
-            if fstab_mount_point == CommonVariables.encryption_key_mount_point:
+            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
+            if fstab_mount_point and os.path.normpath(fstab_mount_point) == os.path.normpath(CommonVariables.encryption_key_mount_point):
                 return True
         return False
 
     def parse_fstab_line(self, line):
         fstab_parts = line.strip().split()
 
-        if len(fstab_parts) < 3:  # Line should have enough content
-            return None, None, None
+        if len(fstab_parts) < 4:  # Line should have enough content
+            return None, None, None, None
 
         if fstab_parts[0].startswith("#"):  # Line should not be a comment
-            return None, None, None
+            return None, None, None, None
 
         fstab_device = fstab_parts[0]
         fstab_mount_point = fstab_parts[1]
         fstab_file_system = fstab_parts[2]
-        return fstab_device, fstab_mount_point, fstab_file_system
+        fstab_options = fstab_parts[3]
+        fstab_options = fstab_options.strip().split(",")
+        return fstab_device, fstab_mount_point, fstab_file_system, fstab_options
+
+    def add_nofail_if_absent_to_fstab_line(self, line):
+        fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
+        if fstab_opts is None or "nofail" in fstab_opts:
+            return line
+
+        old_opts_string = ",".join(fstab_opts)
+        new_opts_string = ",".join(["nofail"] + fstab_opts)
+
+        return line.replace(old_opts_string, new_opts_string)
+
 
     def modify_fstab_entry_encrypt(self, mount_point, mapper_path):
         self.logger.log("modify_fstab_entry_encrypt called with mount_point={0}, mapper_path={1}".format(mount_point, mapper_path))
@@ -485,7 +505,7 @@ class CryptMountConfigUtil(object):
         relevant_line = None
         for i in range(len(lines)):
             line = lines[i]
-            fstab_device, fstab_mount_point, fstab_fs = self.parse_fstab_line(line)
+            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
 
             if fstab_mount_point != mount_point:  # Not the line we are looking for
                 continue
@@ -499,6 +519,7 @@ class CryptMountConfigUtil(object):
                 break
             else:
                 new_line = relevant_line.replace(fstab_device, mapper_path)
+                new_line = self.add_nofail_if_absent_to_fstab_line(new_line)
                 self.logger.log("Replacing that line with: " + new_line)
                 lines[i] = new_line
                 break
@@ -610,3 +631,50 @@ class CryptMountConfigUtil(object):
             f.write('\n')
 
         self.logger.log("fstab updated successfully")
+
+    # All encrypted devices are unlocked before this function is called
+    def migrate_crypt_items(self):
+        with open('/etc/fstab', 'r') as f:
+            lines = f.readlines()
+        
+        if not self.is_bek_in_fstab_file(lines):
+            self.logger.log("BEK volume not detected in fstab. Adding it now.")
+            lines.append(self.get_fstab_bek_line())
+            self.add_bek_to_default_cryptdisks()
+            with open('/etc/fstab', 'w') as f:
+                f.writelines(lines)
+
+        crypt_items = self.get_crypt_items()
+
+        for crypt_item in crypt_items:
+            self.logger.log("Migrating crypt item: {0}".format(crypt_item))
+            if crypt_item.mount_point == "/" or CommonVariables.osmapper_name == crypt_item.mapper_name:
+                self.logger.log("Skipping OS disk")
+                continue
+
+            if crypt_item.mapper_name and crypt_item.mount_point and crypt_item.mount_point != "None":
+                self.logger.log(msg="Checking if device for mapper name: {0} has valid filesystem".format(crypt_item.mapper_name), level=CommonVariables.InfoLevel)
+                try:
+                    fstype = self.disk_util.get_device_items_property(crypt_item.mapper_name, 'FSTYPE')
+                    if fstype not in CommonVariables.format_supported_file_systems:
+                        self.logger.log("mapper name: {0} does not have a supported filesystem. Skipping device".format(crypt_item.mapper_name))
+                        continue
+                except Exception:
+                    self.logger.log("Exception occured while querying filesystem for mapper name {0}. Skipping device.".format(crypt_item.mapper_name))
+                    continue
+                self.logger.log(msg="Adding entry for {0} drive in fstab with mount point {1}".format(crypt_item.mapper_name, crypt_item.mount_point), level=CommonVariables.InfoLevel)
+                self.append_mount_info_data_disk(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point)
+                backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+                self.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
+            else:
+                self.logger.log("Mapper name or mount point not available. Cannot migrate it to crypttab")
+        
+        if os.path.exists(self.encryption_environment.azure_crypt_mount_config_path):
+            self.logger.log(msg="archiving azure crypt mount file: {0}".format(self.encryption_environment.azure_crypt_mount_config_path))
+            time_stamp = datetime.now()
+            new_name = "{0}_{1}".format(self.encryption_environment.azure_crypt_mount_config_path, time_stamp)
+            os.rename(self.encryption_environment.azure_crypt_mount_config_path, new_name)
+        else:
+            self.logger.log(msg=("the azure crypt mount file not exist: {0}".format(self.encryption_environment.azure_crypt_mount_config_path)), level=CommonVariables.InfoLevel)
+
+

@@ -90,6 +90,12 @@ class DiskUtil(object):
         self.logger.log("touching file, executing: {0}".format(mkdir_cmd))
         return self.command_executor.Execute(mkdir_cmd)
 
+    def is_luks_device(self, device_path, device_header_path):
+        """ checks if the device is set up with a luks header """
+        path_var = device_header_path if device_header_path else device_path
+        cmd = 'cryptsetup isLuks ' + path_var
+        return (int)(self.command_executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if not os.path.exists(luks_header_file_path):
@@ -244,6 +250,9 @@ class DiskUtil(object):
 
         self.hutil.log("keyfile: " + (passphrase_file))
 
+        if not passphrase_file:
+            return CommonVariables.passphrase_too_long_or_none
+
         if header_file:
             cryptsetup_cmd = "{0} luksOpen {1} {2} --header {3} -d {4} -q".format(self.distro_patcher.cryptsetup_path, dev_path, mapper_name, header_file, passphrase_file)
         else:
@@ -310,6 +319,11 @@ class DiskUtil(object):
         return self.command_executor.Execute(umount_cmd)
 
     def mount_all(self):
+        # Reload systemd daemon to get lastest changes from fstab
+        # pidof systemd seems unreliable on Ubuntu hence directly invoking systemctl
+        # This command will just fail without side effects on system without systemd
+        self.logger.log("Trying to reload fstab dependencies before mount all.")
+        self.command_executor.Execute('systemctl daemon-reload', suppress_logging=True)
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 

@@ -112,7 +112,11 @@ def disable_encryption():
                                                           crypt_item.mapper_name,
                                                           crypt_item.luks_header_path)
             if add_result != CommonVariables.process_success:
-                raise Exception("luksAdd failed with return code {0}".format(add_result))
+                if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
+                    raise Exception("luksAdd failed with return code {0}".format(add_result))
+                else:
+                    logger.log("luksAdd failed with return code {0}".format(add_result))
+                    logger.log("Ignoring for now, as device ({0}) does not seem to be a luks device".format(crypt_item.dev_path))
 
             if crypt_item.dev_path.startswith("/dev/sd"):
                 logger.log('Updating crypt item entry to use mapper name')
@@ -245,6 +249,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
     try:
         DistroPatcher.install_cryptsetup()
     except Exception as e:
+        hutil.save_seq()
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         hutil.do_exit(exit_code=CommonVariables.missing_dependency,
                       operation='UpdateEncryptionSettings',
@@ -278,12 +283,21 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
         bek_util = BekUtil(disk_util, logger)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+        if not existing_passphrase_file:
+            hutil.save_seq()
+            message = "Cannot find current passphrase file. This could happen if BEK volume is not mounted or LinuxPassPhrase file is missing from BEK volume."
+            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                      operation='UpdateEncryptionSettings',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.configuration_error),
+                      message=message)
+
         with open(existing_passphrase_file, 'r') as f:
             old_passphrase = f.read()
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                extension_parameter.passphrase = bek_util.generate_passphrase()
 
             logger.log('Recreating secret to store in the KeyVault')
 
@@ -395,6 +409,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
                           code=str(CommonVariables.success),
                           message='Encryption settings updated')
     except Exception as e:
+        hutil.save_seq()
         if not settings_stamped:
             clear_new_luks_keys(disk_util, old_passphrase, extension_parameter.passphrase, bek_util, encryption_config, updated_crypt_items)
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
@@ -509,11 +524,11 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
             resource_disk_util.automount()
-            logger.log("mounted encrypted resource disk")
+            logger.log("mounted resource disk")
     else:
         # Probably a re-image scenario: Just do a best effort
         if resource_disk_util.try_remount():
-            logger.log("mounted encrypted resource disk")
+            logger.log("mounted resource disk")
 
     # add walkaround for the centos 7.0
     se_linux_status = None
@@ -618,6 +633,11 @@ def enable():
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
         if encryption_config.config_file_exists():
             existing_volume_type = encryption_config.get_volume_type()
+        
+        is_migrate_operation = False
+        if CommonVariables.MigrateKey in public_settings:
+            if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
+                is_migrate_operation = True
 
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if existing_passphrase_file is not None:
@@ -627,14 +647,33 @@ def enable():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
+            # Migrate to early unlock if using crypt mount
+            if crypt_mount_config_util.should_use_azure_crypt_mount():
+                crypt_mount_config_util.migrate_crypt_items()
+        elif ResourceDiskUtil.RD_MAPPER_NAME in [ci.mapper_name for ci in crypt_mount_config_util.get_crypt_items()]:
+            # If there are crypt items but no passphrase file. This might be a RD-Only scenario
+            # Generate password but don't push it
+            # Do a mount_all_disks
+
+            generated_passphrase = bek_util.generate_passphrase()
+            bek_util.store_bek_passphrase(encryption_config, generated_passphrase)
+            generated_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+            mount_encrypted_disks(disk_util=disk_util,
+                                  crypt_mount_config_util=crypt_mount_config_util,
+                                  bek_util=bek_util,
+                                  encryption_config=encryption_config,
+                                  passphrase_file=generated_passphrase_file)
 
         encryption_status = json.loads(disk_util.get_encryption_status())
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
+        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+
         # run fatal prechecks, report error if exceptions are caught
         try:
-            cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+            if not is_migrate_operation:
+                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc(e))
@@ -660,9 +699,10 @@ def enable():
             logger.log("PRECHECK: Exception thrown during precheck")
             logger.log(traceback.format_exc(e))
 
-        encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            if is_migrate_operation:
+                perform_migration(encryption_config, crypt_mount_config_util)
+                return #Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
 
             handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
@@ -728,6 +768,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
+        hutil.exit_if_same_seq()
         # If a daemon is already running reject and exit an update encryption settings request
         if is_daemon_running():
             logger.log("An operation already running. Cannot accept an update settings request.")
@@ -839,7 +880,7 @@ def enable_encryption():
                 # generate passphrase and passphrase file if needed
                 if existing_passphrase_file is None:
                     if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                        extension_parameter.passphrase = bek_util.generate_passphrase(extension_parameter.KeyEncryptionAlgorithm)
+                        extension_parameter.passphrase = bek_util.generate_passphrase()
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
@@ -858,6 +899,36 @@ def enable_encryption():
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
                       message=message)
+
+def perform_migration(encryption_config, crypt_mount_config_util):
+    logger.log("Migrate operation found. Starting migration flow.")
+    hutil.exit_if_same_seq()
+
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
+    extension_parameter.VolumeType = encryption_config.get_volume_type() # After migration config file has current volume type
+
+    encryption_config.volume_type = encryption_config.get_volume_type()
+    encryption_config.passphrase_file_name = encryption_config.get_bek_filename()
+    encryption_config.secret_seq_num = encryption_config.get_secret_seq_num()
+
+    # Clear 2 pass params and save a new 1 pass config
+    encryption_config.clear_config()
+    extension_parameter.clear_config()
+    encryption_config.commit()
+    extension_parameter.commit()
+
+    for crypt_item in crypt_mount_config_util.get_crypt_items():
+        if crypt_item.mount_point == "/":
+            continue
+        backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+        crypt_mount_config_util.update_crypt_item(crypt_item, backup_folder=backup_folder)
+
+    hutil.save_seq()
+    hutil.do_exit(exit_code=CommonVariables.success,
+                  operation='Migrate',
+                  status=CommonVariables.extension_success_status,
+                  code=(CommonVariables.success),
+                  message="Migration Succeeded")
 
 
 def enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[]):
@@ -1623,12 +1694,18 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
         mapper_device_item = next((d for d in device_items if mapped_device_item_match(d)), None)
 
         if not raw_device_item:
-            logger.log("raw device not found for crypt_item {0}".format(crypt_item))
-            return crypt_item
+            logger.log("raw device not found for crypt_item {0}".format(crypt_item), level='Warn')
+            logger.log("Skipping device", level='Warn')
+            continue
 
         if not mapper_device_item:
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
-            return crypt_item
+            if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
+                logger.log("Found a luks device for this device item, yet couldn't open mapper: {0}".format(crypt_item))
+                logger.log("Failing".format(crypt_item))
+                return crypt_item
+            else:
+                continue
 
         decryption_result_phase = None
 

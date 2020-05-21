@@ -36,7 +36,7 @@ class BekUtil(object):
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
         self.bek_label = 'BEK VOLUME'
 
-    def generate_passphrase(self, algorithm):
+    def generate_passphrase(self):
         if TestHooks.use_hard_code_passphrase:
             return TestHooks.hard_code_passphrase
         else:

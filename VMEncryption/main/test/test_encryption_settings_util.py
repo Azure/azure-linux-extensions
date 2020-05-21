@@ -26,21 +26,26 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         get_http_util.return_value.Call.return_value.status = 500 # make it so that the http call returns a 500
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)
         self.assertEqual(get_http_util.return_value.Call.call_count, 3)
+        self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
 
         get_http_util.return_value.Call.return_value.status = 400 # make it so that the http call returns a 400
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)
         self.assertEqual(get_http_util.return_value.Call.call_count, 3)
+        self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
 
         get_http_util.return_value.Call.return_value.status = 200 # make it so that the http call returns a 200
         self.es_util.post_to_wireserver(data)
         self.assertEqual(get_http_util.return_value.Call.call_count, 1)
+        self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
 
         get_http_util.return_value.Call.return_value = None # Make it so that the HTTP call returns nothing
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)
         self.assertEqual(get_http_util.return_value.Call.call_count, 3)
+        self.assertEqual(write_settings_file.call_count, 0)
+

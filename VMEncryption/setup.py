@@ -102,7 +102,7 @@ manifest_file.close()
 generate the extension xml file
 """
 extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
-<ProviderNameSpace>Microsoft.Azure.Security</ProviderNameSpace>
+<ProviderNameSpace>%s</ProviderNameSpace>
 <Type>%s</Type>
 <Version>%s</Version>
 <Label>%s</Label>
@@ -117,7 +117,7 @@ extension_xml_file_content = """<ExtensionImage xmlns="http://schemas.microsoft.
 <SupportedOS>Linux</SupportedOS>
 <CompanyName>Microsoft</CompanyName>
 <!--%%REGIONS%%-->
-</ExtensionImage>""" % (CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_description)
+</ExtensionImage>""" % (CommonVariables.extension_provider_namespace, CommonVariables.extension_type, CommonVariables.extension_version, CommonVariables.extension_label, CommonVariables.extension_description)
 
 extension_xml_file = open('manifest.xml', 'w')
 extension_xml_file.write(extension_xml_file_content)
@@ -192,6 +192,8 @@ def zip(src, dst):
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
-# Manually add SupportedOS.json file as setup seems to only copy py file
+# manually copy .json files since setup will only copy .py files by default
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
+copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 zip(final_folder_path, target_zip_file_path)
+

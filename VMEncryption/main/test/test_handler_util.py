@@ -22,6 +22,7 @@ import unittest
 import os
 from . import console_logger
 import glob
+import main.CommonParameters
 from Utils import HandlerUtil
 from tempfile import mkstemp
 try:
@@ -33,7 +34,7 @@ class TestHandlerUtil(unittest.TestCase):
     def setUp(self):
         self.logger = console_logger.ConsoleLogger()
         self.distro_patcher = patch.GetDistroPatcher(self.logger)
-        self.hutil = HandlerUtil.HandlerUtility(self.logger.log, self.logger.error, "AzureDiskEncryptionForLinux")
+        self.hutil = HandlerUtil.HandlerUtility(self.logger.log, self.logger.error, main.CommonParameters.get_extension_name())
         self.hutil.patching = self.distro_patcher
         # invoke unit test from within main for setup (to avoid having to change dependencies)
         # handler path is three levels above current location ( ../main/test/test_handler.util )
