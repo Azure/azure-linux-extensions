@@ -2,11 +2,17 @@ import unittest
 import mock
 import os.path
 
-from main.patch.UbuntuPatching import UbuntuPatching
-from main.DiskUtil import DiskUtil
-from main.Common import CommonVariables
-from main.CommandExecutor import CommandExecutor
+from patch.UbuntuPatching import UbuntuPatching
+from DiskUtil import DiskUtil
+from Common import CommonVariables
+from CommandExecutor import CommandExecutor
 from .console_logger import ConsoleLogger
+try:
+    builtins_open = "builtins.open"
+    import unittest.mock as mock # python3+
+except ImportError:
+    builtins_open = "__builtin__.open"
+    import mock # python2
 
 class Test_UbuntuPatching(unittest.TestCase):
     def setUp(self):
@@ -38,9 +44,9 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         open_mock.side_effect = _open_side_effect
 
-    @mock.patch('__builtin__.open')
+    @mock.patch(builtins_open)
     @mock.patch('os.path.exists')
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute')
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
     def test_update_prereq(self, ce_mock, exists_mock, open_mock):
         # Test 1: Only osencrypt entry with /dev/sda1
         crypttab_contents="""osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh"""
