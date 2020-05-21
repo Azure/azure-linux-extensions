@@ -55,6 +55,7 @@ import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
 from PluginHost import PluginHostResult
 import platform
+from workloadPatch import *
 
 #Main function is the only entrence to this extension handler
 
@@ -190,7 +191,7 @@ def convert_time(utcTicks):
 
 def freeze_snapshot(timeout):
     try:
-        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on, workload_patch
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
@@ -244,7 +245,7 @@ def can_take_crash_consistent_snapshot(para_parser):
     return takeCrashConsistentSnapshot
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
 
@@ -273,6 +274,8 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
+    workload_name = None
+    snapshot_type = "appAndFileSystem"
 
     #Adding python version to the telemetry
     try:
@@ -299,10 +302,16 @@ def daemon():
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
+        if config.has_option('SnapshotThread','workload_name'):
+            workload_name = config.get('SnapshotThread','workload_name') #values like mysql, postgres
+        if config.has_option('SnapshotThread','snapshot_type'):
+           snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem
+            
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
+    backup_logger.log("workload backup enabled for workload" + workload_name, True)
     
     snapshot_info_array = None
 
@@ -387,97 +396,120 @@ def daemon():
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
-
-                PluginHostObj = PluginHost(logger=backup_logger)
-                PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
-                doFsConsistentbackup = False
-                appconsistentBackup = False
-
-                if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
-                    backup_logger.log('App Consistent Consistent Backup Enabled', True)
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
-                    appconsistentBackup = True
-
-                if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
-                    backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
-                    doFsConsistentbackup = True
-
-                preResult = PluginHostResult()
-                postResult = PluginHostResult()
-
-                if not doFsConsistentbackup:
-                    preResult = PluginHostObj.pre_script()
-                    dobackup = preResult.continueBackup
-
-                    if(g_fsfreeze_on == False and preResult.anyScriptFailed):
-                        dobackup = False
-
-                if dobackup:
-                    freeze_snapshot(thread_timeout)
-
-                if not doFsConsistentbackup:
-                    postResult = PluginHostObj.post_script()
-                    if not postResult.continueBackup:
-                        dobackup = False
                 
-                    if(g_fsfreeze_on == False and postResult.anyScriptFailed):
-                        dobackup = False
+                if workload_name is not None:
+                    workload_patch = WorkloadPatch(workload_name, backup_logger)
+                    workload_patch.pre()
+                    if len(workload_patch.error_details) > 0:
+                        backup_logger.log("file system consistent backup only")
+                    #todo error handling
+                    if snapshot_type == "appAndFileSystem":
+                        g_fsfreeze_on = True
+                    else:
+                        g_fsfreeze_on = False
+                    freeze_snapshot(thread_timeout)
+                    workload_patch.post()
+                    workload_errors = workload_patch.getErrors()
+                    while error in workload_errors:
+                        if error.errorCode != CommonVariables.Success:
+                            run_status = 'error'
+                            run_result = error.errorCode
+                            hutil.SetExtErrorCode(error.errorCode)
+                            error_msg = 'PreScript failed for the plugin ' +  error.pluginName
+                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                            backup_logger.log(error_msg, True)
+                            break
+                else:
+                    PluginHostObj = PluginHost(logger=backup_logger)
+                    PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
+                    doFsConsistentbackup = False
+                    appconsistentBackup = False
 
-                if not dobackup:
-                    if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
-                        run_status = 'error'
-                        run_result = PluginHostErrorCode
-                        hutil.SetExtErrorCode(PluginHostErrorCode)
-                        error_msg = 'Plugin Host Precheck Failed'
-                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                        backup_logger.log(error_msg, True)
+                    if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
+                        backup_logger.log('App Consistent Consistent Backup Enabled', True)
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                        appconsistentBackup = True
 
-                    if run_result == CommonVariables.success:
+                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                        backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
+                        doFsConsistentbackup = True
+
+                    preResult = PluginHostResult()
+                    postResult = PluginHostResult()
+
+                    if not doFsConsistentbackup:
+                        preResult = PluginHostObj.pre_script()
+                        dobackup = preResult.continueBackup
+
+                        if(g_fsfreeze_on == False and preResult.anyScriptFailed):
+                            dobackup = False
+
+                    if dobackup:
+                        freeze_snapshot(thread_timeout)
+
+                    if not doFsConsistentbackup:
+                        postResult = PluginHostObj.post_script()
+                        if not postResult.continueBackup:
+                            dobackup = False
+                
+                        if(g_fsfreeze_on == False and postResult.anyScriptFailed):
+                            dobackup = False
+
+                    if not dobackup:
+                        if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            run_status = 'error'
+                            run_result = PluginHostErrorCode
+                            hutil.SetExtErrorCode(PluginHostErrorCode)
+                            error_msg = 'Plugin Host Precheck Failed'
+                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                            backup_logger.log(error_msg, True)
+
+                        if run_result == CommonVariables.success:
+                            pre_plugin_errors = preResult.errors
+                            for error in pre_plugin_errors:
+                                if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                                    run_status = 'error'
+                                    run_result = error.errorCode
+                                    hutil.SetExtErrorCode(error.errorCode)
+                                    error_msg = 'PreScript failed for the plugin ' +  error.pluginName
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                    backup_logger.log(error_msg, True)
+                                    break
+
+                        if run_result == CommonVariables.success:
+                            post_plugin_errors = postResult.errors
+                            for error in post_plugin_errors:
+                                if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                                    run_status = 'error'
+                                    run_result = error.errorCode
+                                    hutil.SetExtErrorCode(error.errorCode)
+                                    error_msg = 'PostScript failed for the plugin ' +  error.pluginName
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                    backup_logger.log(error_msg, True)
+                                    break
+
+                    if appconsistentBackup:
+                        if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                            hutil.SetExtErrorCode(PluginHostErrorCode)
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
                             if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                                run_status = 'error'
-                                run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
-                                error_msg = 'PreScript failed for the plugin ' +  error.pluginName
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                                backup_logger.log(error_msg, True)
-                                break
-
-                    if run_result == CommonVariables.success:
                         post_plugin_errors = postResult.errors
                         for error in post_plugin_errors:
                             if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                                run_status = 'error'
-                                run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
-                                error_msg = 'PostScript failed for the plugin ' +  error.pluginName
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                                backup_logger.log(error_msg, True)
-                                break
 
-                if appconsistentBackup:
-                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
-                        hutil.SetExtErrorCode(PluginHostErrorCode)
-                    pre_plugin_errors = preResult.errors
-                    for error in pre_plugin_errors:
-                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                            hutil.SetExtErrorCode(error.errorCode)
-                    post_plugin_errors = postResult.errors
-                    for error in post_plugin_errors:
-                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                            hutil.SetExtErrorCode(error.errorCode)
-
-                if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
-                    run_status = 'success'
-                    run_result = CommonVariables.success_appconsistent
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
-                    error_msg = 'Enable Succeeded with App Consistent Snapshot'
-                    backup_logger.log(error_msg, True)
+                    if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
+                        run_status = 'success'
+                        run_result = CommonVariables.success_appconsistent
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                        error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                        backup_logger.log(error_msg, True)
 
         else:
             run_status = 'error'

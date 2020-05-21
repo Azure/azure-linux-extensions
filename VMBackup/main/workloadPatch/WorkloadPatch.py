@@ -55,9 +55,6 @@ class WorkloadPatch(object):
         else:
             self.error_details.append("invalid role name in config")
 
-        if len(self.child) > 0 :
-            poll()
-
     def post(self):
         if self.role == "master":
             if len(self.dbnames) == 0 :
@@ -73,27 +70,37 @@ class WorkloadPatch(object):
                     #post at db level to turn on slave
         else:
             self.error_details.append("invalid role name in config") 
+            
+        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+            os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        else:
+            self.logger.log("The file does not exist")
 
     def preMaster(self):
+        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+            os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        else:
+            self.logger.log("The file does not exist")
+            
         if 'mysql' in self.name.lower():
-            args = [self.command+self.name, '-login-path = ',self.login_path, '<' , preMySqlMaster.sql]
-            binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+            args = [self.command+self.name, ' --login-path =',self.login_path, '<' , "scripts/preMySqlMaster.sql"]
+            binary_thread = threading.Thread(target=thread_for_sql, args=[self, args])
             binary_thread.start()
-        
-        if len(self.child > 0):
-            #poll
-
-    def thread_for_binary(self,args):
+            while os.path.exists("/var/lib/mysql-files/azbackupserver.txt") == False:
+                sleep(2)
+            self.logger.log("pre at server level completed")
+            
+    def thread_for_sql(self,args):
         time.sleep(1)
         self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE))
-        self.logger.log("Binary subprocess Created",True)
+        self.logger.log("sql subprocess Created",True)
 
 
     def preMasterDB(self):
         for dbname in dbnames:
-            if 'mysql' in self.name.lower():
-                args = [self.command, '-login-path = ',self.login_path, '<' , preMySqlMasterDB.sql]
-                binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+            if 'mysql' in self.name.lower():#TODO DB level
+                args = [self.command+self.name, '-login-path = ',self.login_path, '<' , preMySqlMaster.sql]
+                binary_thread = threading.Thread(target=thread_for_sql, args=[self, args])
                 binary_thread.start()
         
 
@@ -114,8 +121,10 @@ class WorkloadPatch(object):
                         self.command = config.get(workload_name, command)
                     if config.has_option(workload_name, loginPath):
                         self.login_path = config.get(workload_name, loginPath)
-                    if config.has_option(workload_name, password):
-                        self.password = config.get(workload_name, password)
+                    if config.has_option(workload_name, role):
+                        self.role = config.get(workload_name, role)
+                    if config.has_option(workload_name, enforceSlaveOnly):
+                        self.enforce_slave_only = config.get(workload_name, enforceSlaveOnly)
                     if config.has_option(workload_name, workload_cnf_folder):
                         self.workload_cnf_folder = config.get(workload_name, workload_cnf_folder)
                     if config.has_option(workload_name, dbnames):
@@ -124,7 +133,8 @@ class WorkloadPatch(object):
                 else:
                     error_details.append("no matching workload config found")
             
-            if self.name
-        
+    def populateErrors(self)
+        error_list = []#TODO error list from error details
+        return error_list  
 
     
