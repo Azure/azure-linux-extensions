@@ -52,6 +52,37 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+
 # Global Variables
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
@@ -1121,7 +1152,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
@@ -1603,7 +1634,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    return exit_code, output.encode('utf-8').strip()
+    output = output.encode('utf-8')
+
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode()
+
+    return exit_code, output.strip()
 
 
 def get_tenant_id_from_metadata_api(vm_resource_id):
