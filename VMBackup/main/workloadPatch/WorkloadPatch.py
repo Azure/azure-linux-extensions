@@ -86,7 +86,7 @@ class WorkloadPatch:
             self.error_details.append("exception in processing of postscript")
 
     def preMaster(self):
-        self.logger.log("WorkloadPatch: Entering pre mode for master")
+        self.logger.log("WorkloadPatch: Entering post mode for master")
         if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
             os.remove("/var/lib/mysql-files/azbackupserver.txt")
         else:
