@@ -99,7 +99,7 @@ class Test_Disk_Util(unittest.TestCase):
         status = self.disk_util.get_encryption_status()
         self.assertDictEqual({u"os": u"Encrypted", u"data": u"Encrypted"}, json.loads(status))
 
-    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", return_value=0)
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
     def test_mount_all(self, cmd_exc_mock):
         self.disk_util.mount_all()
-        self.assertEquals(cmd_exc_mock.call_count, 2)
+        self.assertEqual(cmd_exc_mock.call_count, 2)

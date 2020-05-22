@@ -15,10 +15,11 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
     @mock.patch('time.sleep') # To speed up this test.
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.write_settings_file')
     @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
     @mock.patch('os.path.isfile', return_value=True)
     @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
-    def test_post_to_wire_server(self, get_http_util, os_path_isfile, get_index, time_sleep):
+    def test_post_to_wire_server(self, get_http_util, os_path_isfile, get_index, write_settings_file, time_sleep):
         get_http_util.return_value = mock.MagicMock() # Return a mock object
         get_index.return_value = 0
         data = {"Protectors" : "mock data"}
