@@ -55,7 +55,7 @@ import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
 from PluginHost import PluginHostResult
 import platform
-from workloadPatch import *
+from workloadPatch import WorkloadPatch
 
 #Main function is the only entrence to this extension handler
 
@@ -311,7 +311,7 @@ def daemon():
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
-    backup_logger.log("workload backup enabled for workload" + workload_name, True)
+    backup_logger.log("workload backup enabled for workload: " + workload_name, True)
     
     snapshot_info_array = None
 
@@ -347,13 +347,13 @@ def daemon():
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
 
-            if total_span_in_seconds > MAX_TIMESPAN :
-                error_msg = "CRP timeout limit has reached, will not take snapshot."
-                errMsg = error_msg
-                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
-                temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
-                temp_status= 'error'
-                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+#            if total_span_in_seconds > MAX_TIMESPAN :
+ #               error_msg = "CRP timeout limit has reached, will not take snapshot."
+  #              errMsg = error_msg
+   #             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+    #            temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
+     #           temp_status= 'error'
+      #          exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
@@ -398,7 +398,8 @@ def daemon():
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 
                 if workload_name is not None:
-                    workload_patch = WorkloadPatch(workload_name, backup_logger)
+                    workload_patch = WorkloadPatch.WorkloadPatch(workload_name, backup_logger)
+                    
                     workload_patch.pre()
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("file system consistent backup only")
@@ -409,8 +410,8 @@ def daemon():
                         g_fsfreeze_on = False
                     freeze_snapshot(thread_timeout)
                     workload_patch.post()
-                    workload_errors = workload_patch.getErrors()
-                    while error in workload_errors:
+                    workload_errors = workload_patch.populateErrors()
+                    for error in workload_errors:
                         if error.errorCode != CommonVariables.Success:
                             run_status = 'error'
                             run_result = error.errorCode
