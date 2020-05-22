@@ -3,10 +3,10 @@ import json
 import os
 
 def stop_metrics_service():
-    metricsext_service_path = "/lib/systemd/system/metrics-extension.service"
+    metrics_service_path = "/lib/systemd/system/metrics-extension.service"
      
     code = 1
-    if os.path.isfile(metricsext_service_path):
+    if os.path.isfile(metrics_service_path):
         code = os.system("sudo systemctl stop metrics-extension")
     else:
         raise Exception("Metrics Extension service file does not exist. Failed to stop ME service: metrics-extension.service .")
@@ -17,11 +17,28 @@ def stop_metrics_service():
 
     return code
 
+def remove_metrics_service():
 
-def setup_me_service(configFolder):
+    _, configFolder = get_handler_vars()
+    metrics_service_path = "/lib/systemd/system/metrics-extension.service"
+     
+    code = 1
+    if os.path.isfile(metrics_service_path):
+        code = os.remove(metrics_service_path)
+    else:
+        #Service file doesnt exist or is already removed, exit the method with exit code 0
+        return 0
+    
+    if code != 0:
+        raise Exception("Unable to remove metrics service: metrics-extension.service .")
+
+    return code
+
+
+def setup_me_service(configFolder, monitoringAccount):
 
     me_service_path = "/lib/systemd/system/metrics-extension.service"
-    metrics_ext_bin = "/usr/sbin/MetricsExtension"
+    metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
     daemon_reload_status = 1
     service_restart_status = 1
 
@@ -34,7 +51,9 @@ def setup_me_service(configFolder):
         return False       
 
     if os.path.isfile(me_service_path):
+        os.system(r"sed -i 's+%ME_BIN%+{1}+' {0}".format(me_service_path, metrics_ext_bin)) 
         os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
+        os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
         daemon_reload_status = os.system("sudo systemctl daemon-reload")
         if daemon_reload_status != 0:
             raise Exception("Unable to reload systemd after ME service file change. Failed to setup ME service.")
@@ -219,10 +238,11 @@ def setup_me(is_lad):
         f.write(me_conf)
 
 
+    me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
     custom_conf_path = me_config_dir + "CUSTOMMETRIC_"+ subscription_id +"_MonitoringAccount_Configuration.json"
     with open(custom_conf_path, "w") as f:
         f.write(custom_conf)
 
     #setup metrics extension service
-    setup_me_service(me_config_dir)
+    setup_me_service(me_config_dir, me_monitoring_account)
     

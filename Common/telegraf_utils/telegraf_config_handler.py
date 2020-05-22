@@ -100,7 +100,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
         aggregator_str = ""
         for plugin in telegraf_json[omiclass]:
             config_file = {"filename" : omiclass+".conf"}
-            min_interval = "60s"
+            min_interval = "999999999s" #arbitrary max value for finding min
             input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
             
@@ -121,7 +121,7 @@ def parse_config(data, me_url, mdsd_url, is_lad):
             non_ops_fields = ""
             non_rate_aggregate = False
             ops = ""
-            twiceminperiod = ""
+            min_agg_period = ""
             rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
@@ -141,7 +141,12 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                     non_rate_aggregate = True 
                     non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
                 
-                twiceminperiod = str(int(min_interval[:-1])*2)
+                #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
+                if int(min_interval[:-1]) > 30:
+                    min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
+                else:
+                    min_agg_period = "60"   #else use 60 as mininum so that we can maintain 1 event per minute
+
                 #Add respective rename processor plugin based on the displayname
                 if is_lad:
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
@@ -169,16 +174,16 @@ def parse_config(data, me_url, mdsd_url, is_lad):
                 if rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
                     aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                    aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
+                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [" + ops + "]\n"
-                    aggregator_str += " "*2 + "rate_period = \"" + twiceminperiod + "s\"\n\n"
+                    aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
                 
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
                     aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                    aggregator_str += " "*2 + "period = \"" + twiceminperiod + "s\"\n"
+                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
@@ -278,11 +283,18 @@ def write_configs(configs):
 
     _, configFolder = get_handler_vars()
     telegraf_conf_dir = configFolder + "/telegraf_configs/"
+    telegraf_d_conf_dir = telegraf_conf_dir + "telegraf.d/"
     if not os.path.exists(telegraf_conf_dir):
         os.mkdir(telegraf_conf_dir)
 
+    if not os.path.exists(telegraf_d_conf_dir):
+        os.mkdir(telegraf_d_conf_dir)
+
     for configfile in configs:
-        path = telegraf_conf_dir + configfile["filename"]
+        if configfile["filename"] == "telegraf.conf" or configfile["filename"] == "intermediate.json":
+            path = telegraf_conf_dir + configfile["filename"]
+        else:
+            path = telegraf_d_conf_dir + configfile["filename"]
         with open(path, "w") as f:
             f.write(configfile["data"])
 
@@ -323,11 +335,28 @@ def stop_telegraf_service():
 
     return code
 
+def remove_telegraf_service():
+
+    _, configFolder = get_handler_vars()
+    telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+     
+    code = 1
+    if os.path.isfile(telegraf_service_path):
+        code = os.remove(telegraf_service_path)
+    else:
+        #Service file doesnt exist or is already removed, exit the method with exit code 0
+        return 0
+    
+    if code != 0:
+        raise Exception("Unable to remove telegraf service: metrics-sourcer.service .")
+
+    return code
+
 def setup_telegraf_service():
 
     _, configFolder = get_handler_vars()
     telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
-    telegraf_bin = "/usr/sbin/telegraf"
+    telegraf_bin = "/usr/local/lad/bin/telegraf"
     telegraf_conf_dir = configFolder + "/telegraf_configs/"
     telegraf_agent_conf = telegraf_conf_dir + "telegraf.conf"
 
