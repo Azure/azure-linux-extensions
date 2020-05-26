@@ -20,7 +20,7 @@ Please refer to [this document](https://docs.microsoft.com/azure/virtual-machine
 
 ## Supported Linux Distributions
 
-List of supported Linux distributions is on https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux
+List of supported Linux distributions is on https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#supported-linux-distributions
 
 ## Debug
 
