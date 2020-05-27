@@ -172,10 +172,9 @@ def setup_me(is_lad):
 
     imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
     #query imds to get the required information 
-    # req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-    # res = urllib2.urlopen(req)
-    # data = json.loads(res.read())
-    data = json.loads('''{"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus2","name":"ub16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ub16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004070","vmId":"00d58ed6-f5ae-462f-afd3-5c34a2f9a183","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.43.6","publicIpAddress":"52.179.248.28"}],"subnet":[{"address":"172.16.43.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3AE39155"}]}}''')
+    req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
+    res = urllib2.urlopen(req)
+    data = json.loads(res.read())
     if "compute" not in data:
         raise Exception("Unable to find 'compute' key in imds query response. Failed to setup ME.")
         return False
@@ -207,13 +206,11 @@ def setup_me(is_lad):
         req = urllib2.Request(amrurl, headers={'Content-Type':'application/json'})
         res = urllib2.urlopen(req)
     except Exception as e:
-        print e
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
                         data = line.split("=")
                         aad_auth_url = data[1][1:-1] #Removing the quotes from the front and back
-                        print aad_auth_url
                         break
     
     if aad_auth_url == "":

@@ -242,17 +242,17 @@ class LadLoggingConfig:
         return mxt.top_level_tmpl_for_logging_only.format(
             sources=mxt.per_source_tmpl.format(name=syslog_src_name), events=mdsd_event_source, eh_urls=syslog_eh_urls)
 
-    def get_mdsd_telegraf_config(self, namespaces, eventname):
+    def get_mdsd_telegraf_config(self, namespaces, eventname1H, eventname1M):
         """
         Get mdsd XML config string for telegraf use with mdsd in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for telegraf use with mdsd in LAD 3.0.
         """
         if not self._mdsd_telegraf_config:
-            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces, eventname)
+            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces, eventname1H, eventname1M)
         return self._mdsd_telegraf_config
 
-    def __generate_mdsd_telegraf_config(self, namespaces, eventname):
+    def __generate_mdsd_telegraf_config(self, namespaces, eventname1H, eventname1M):
         """
         Helper method to generate mdsd_telegraf_config
         """
@@ -262,7 +262,8 @@ class LadLoggingConfig:
         telegraf_sources = ""
         telegraf_routeevents = ""
         mdsd_event_source = ""
-        telegraf_routeevents = mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname)
+        telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname1H)
+        telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname1M)
 
         for plugin in namespaces:
             # # For telegraf conf we create a Source for each of the measurements(plugins) sent from telegraf

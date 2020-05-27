@@ -81,8 +81,8 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_me_url = "udp://127.0.0.1:8089"
-        self._telegraf_mdsd_url = "unix:///var/run/mdsd/default_influx.socket"
+        self._telegraf_me_url = "udp://127.0.0.1:8139"
+        self._telegraf_mdsd_url = "unix:///var/run/mdsd/lad_mdsd_influx.socket"
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
@@ -400,37 +400,37 @@ class LadConfigAll:
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
-        # 2. Use ladCfg to generate OMIQuery and LADQuery elements
+        # # 2. Use ladCfg to generate OMIQuery and LADQuery elements
         lad_cfg = self._ladCfg()
-        if lad_cfg:
-            try:
-                self._update_metric_collection_settings(lad_cfg)
-                resource_id = self._ext_settings.get_resource_id()
-                if resource_id:
-                    XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
-                                        'partitionKey', escape_nonalphanumerics(resource_id))
-                    lad_query_instance_id = ""
-                    uuid_for_instance_id = self._fetch_uuid()
-                    if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-                        lad_query_instance_id = uuid_for_instance_id
-                    self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
-                    # Set JsonBlob sink-related elements
-                    self._add_obo_field(name='resourceId', value=resource_id)
-                    self._add_obo_field(name='agentIdentityHash', value=uuid_for_instance_id)
+        # if lad_cfg:
+        #     try:
+        #         self._update_metric_collection_settings(lad_cfg)
+        #         resource_id = self._ext_settings.get_resource_id()
+        #         if resource_id:
+        #             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
+        #                                 'partitionKey', escape_nonalphanumerics(resource_id))
+        #             lad_query_instance_id = ""
+        #             uuid_for_instance_id = self._fetch_uuid()
+        #             if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
+        #                 lad_query_instance_id = uuid_for_instance_id
+        #             self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
+        #             # Set JsonBlob sink-related elements
+        #             self._add_obo_field(name='resourceId', value=resource_id)
+        #             self._add_obo_field(name='agentIdentityHash', value=uuid_for_instance_id)
 
-            except Exception as e:
-                self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
-                return False, 'Failed to create portal config from ladCfg (see extension error logs for more details)'
+        #     except Exception as e:
+        #         self._logger_error("Failed to create portal config  error:{0} {1}".format(e, traceback.format_exc()))
+        #         return False, 'Failed to create portal config from ladCfg (see extension error logs for more details)'
 
-        # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
-        #    so check if Application Insights key is present and pass it to the actual helper
-        #    function (self._apply_perf_cfg()).
-        try:
-            self._apply_perf_cfg()
-        except Exception as e:
-            self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
-                               "Stacktrace: {1}".format(e, traceback.format_exc()))
-            return False, 'Failed to update perf counter config (see extension error logs for more details)'
+        # # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
+        # #    so check if Application Insights key is present and pass it to the actual helper
+        # #    function (self._apply_perf_cfg()).
+        # try:
+        #     self._apply_perf_cfg()
+        # except Exception as e:
+        #     self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
+        #                        "Stacktrace: {1}".format(e, traceback.format_exc()))
+        #     return False, 'Failed to update perf counter config (see extension error logs for more details)'
 
         # 4. Generate omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
@@ -451,7 +451,7 @@ class LadConfigAll:
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(perf_settings)
             self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True) 
-            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces, LadConfigAll._wad_table_name("PT1H"))
+            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces, LadConfigAll._wad_table_name("PT1H"), LadConfigAll._wad_table_name("PT1M"))
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
             me_handler.setup_me(True)
 

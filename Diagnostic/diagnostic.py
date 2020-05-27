@@ -281,6 +281,8 @@ def main(command):
             else:
                 stop_mdsd()
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
+            
+            #Stop the telegraf and ME services
             telhandler.stop_telegraf_service()
             me_handler.stop_metrics_service()
 
@@ -298,8 +300,14 @@ def main(command):
                 hutil.error('lad-mdsd remove failed. Still proceeding to uninstall. '
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
+            
+            #Stop the telegraf and ME services
             telhandler.stop_telegraf_service()
             me_handler.stop_metrics_service()
+
+            #Delete the telegraf and ME services
+            telhandler.remove_telegraf_service()
+            me_handler.remove_metrics_service()
 
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
