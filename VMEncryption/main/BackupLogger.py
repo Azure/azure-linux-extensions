@@ -15,11 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-import datetime
-import traceback
-import urlparse
-import httplib
 import os
 import string
 
@@ -32,8 +27,8 @@ class BackupLogger(object):
     def log(self, msg, level='Info'):
         escaped_msg = msg.replace('"', "'") # Replace " with ' as agent telemetry cannot process double quotes
         log_msg = "{0}: [{1}] {2}".format(self.current_process_id, level, escaped_msg)
-        log_msg = filter(lambda c: c in string.printable, log_msg)
-        log_msg = log_msg.encode('ascii', 'ignore')
+        log_msg = [c for c in log_msg if c in string.printable]
+        log_msg = ''.join(log_msg)
 
         self.hutil.log(log_msg)
         self.log_to_console(log_msg)
@@ -41,7 +36,8 @@ class BackupLogger(object):
     def log_to_console(self, msg):
         try:
             with open('/dev/console', 'w') as f:
-                msg = filter(lambda c: c in string.printable, msg)
+                msg = [c for c in msg if c in string.printable]
+                msg = ''.join(msg)
                 f.write('[AzureDiskEncryption] ' + msg + '\n')
-        except IOError as e:
+        except IOError:
             pass

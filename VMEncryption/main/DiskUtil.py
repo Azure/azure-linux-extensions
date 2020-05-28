@@ -31,7 +31,7 @@ from EncryptionMarkConfig import EncryptionMarkConfig
 from TransactionalCopyTask import TransactionalCopyTask
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
-
+from io import open
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -234,8 +234,8 @@ class DiskUtil(object):
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = filter(lambda l: "key slot" in l.lower(), proc_comm.stdout.split("\n"))
-        keyslots = map(lambda l: "enabled" in l.lower(), lines)
+        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
+        keyslots = ["enabled" in l.lower() for l in lines]
 
         return keyslots
 
@@ -327,24 +327,35 @@ class DiskUtil(object):
         mount_all_cmd = self.distro_patcher.mount_path + ' -a'
         return self.command_executor.Execute(mount_all_cmd)
 
+    def unescape(self, s):
+        # python2 and python3+ compatible function for converting escaped unicode bytes to unicode string
+        if s is None:
+            return None
+        else: 
+            # decode unicode escape sequences, encode back to latin1, then decode all as 
+            return s.decode('unicode-escape').encode('latin1').decode('utf-8')
+
     def get_mount_items(self):
         items = []
-
-        for line in file('/proc/mounts'):
-            line = [s.decode('string_escape') for s in line.split()]
-            item = {
-                "src": line[0],
-                "dest": line[1],
-                "fs": line[2]
+        # open as binary in both python2 and python3+ prior to unescape
+        for line in open('/proc/mounts','rb'):
+            mp_line = self.unescape(line)
+            mp_list = [s for s in mp_line.split()]
+            mp_item = {
+                "src": mp_list[0],
+                "dest": mp_list[1],
+                "fs": mp_list[2]
             }
-            items.append(item)
-
+            items.append(mp_item)
         return items
 
     def is_in_memfs_root(self):
         # TODO: make this more robust. This could fail due to mount paths with spaces and tmpfs (e.g. '/mnt/ tmpfs')
-        mounts = file('/proc/mounts', 'r').read()
-        return bool(re.search(r'/\s+tmpfs', mounts))
+        mounts_file = open('/proc/mounts', 'rb')
+        mounts_data = mounts_file.read()
+        mounts_text = self.unescape(mounts_data)
+
+        return bool(re.search(r'/\s+tmpfs', mounts_text))
 
     def get_encryption_status(self):
         encryption_status = {
@@ -485,6 +496,8 @@ class DiskUtil(object):
 
     def get_device_path(self, dev_name):
         device_path = None
+        # ensure the use of a string representation for python2 + python3 compat
+        dev_name = str(dev_name)
 
         if os.path.exists("/dev/" + dev_name):
             device_path = "/dev/" + dev_name
@@ -610,8 +623,8 @@ class DiskUtil(object):
         lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
-        self.logger.log('\n' + str(proc_comm.stdout) + '\n')
-
+        output = proc_comm.stdout
+        self.logger.log('\n' + output + '\n')
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
@@ -696,7 +709,7 @@ class DiskUtil(object):
                 if line:
                     device_item = DeviceItem()
 
-                    for disk_info_property in line.split():
+                    for disk_info_property in str(line).split():
                         property_item_pair = disk_info_property.split('=')
                         if property_item_pair[0] == 'SIZE':
                             device_item.size = int(property_item_pair[1].strip('"'))
@@ -756,7 +769,7 @@ class DiskUtil(object):
 
             lvm_item = LvmItem()
 
-            for pair in line.strip().split():
+            for pair in str(line).strip().split():
                 if len(pair.split('=')) != 2:
                     continue
 
@@ -788,7 +801,7 @@ class DiskUtil(object):
             DiskUtil.os_disk_lvm = False
             return False
 
-        lvm_items = filter(lambda item: item.vg_name == "rootvg", self.get_lvm_items())
+        lvm_items = [item for item in self.get_lvm_items() if item.vg_name == "rootvg"]
 
         current_lv_names = set([item.lv_name for item in lvm_items])
 
@@ -822,7 +835,8 @@ class DiskUtil(object):
         # IDE devices (in Gen 1) include Resource disk and BEK VOLUME. This check works pretty wel in Gen 1, but not in Gen 2.
         for azure_blk_item in special_azure_devices_to_skip:
             if azure_blk_item.name == device_item.name:
-                self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
+                if device_item.name:
+                    self.logger.log(msg="{0} is one of special azure devices that should be not considered data disks.".format(device_item.name))
                 return False
 
         return True
@@ -857,7 +871,7 @@ class DiskUtil(object):
             if device_item.uuid is None or device_item.uuid == "":
                 self.logger.log(msg="the device do not have the related uuid, so skip it.", level=CommonVariables.WarningLevel)
                 return True
-            sub_items = self.get_device_items("/dev/" + device_item.name)
+            sub_items = self.get_device_items(self.get_device_path(device_item.name))
             if len(sub_items) > 1:
                 self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)), level=CommonVariables.WarningLevel)
                 return True

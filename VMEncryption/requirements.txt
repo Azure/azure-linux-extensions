@@ -1,5 +1,4 @@
 autopep8==1.4.4
-configparser==3.5.0
 enum34==1.1.6
 flake8==3.6.0
 funcsigs==1.0.2
@@ -9,3 +8,6 @@ pbr==4.3.0
 pycodestyle==2.4.0
 pyflakes==2.0.0
 six==1.11.0
+configparser==3.5.0
+transitions==0.7.2
+pytest

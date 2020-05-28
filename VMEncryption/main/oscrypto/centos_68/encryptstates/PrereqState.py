@@ -21,6 +21,8 @@
 
 from OSEncryptionState import *
 from pprint import pprint
+from io import open
+import re
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
@@ -73,7 +75,9 @@ class PrereqState(OSEncryptionState):
 
         contents = re.sub(r'ResourceDisk.EnableSwap=.', 'ResourceDisk.EnableSwap=n', contents)
 
-        with open('/etc/waagent.conf', 'w') as f:
-            f.write(contents)
+        # convert to utf-8 and then write out in 'wb' mode 
+        # for file format consistency across python2 + python3 
+        with open('/etc/waagent.conf', 'wb') as f:
+            f.write(contents.encode('utf-8'))
 
         self.context.logger.log("waagent patched successfully")

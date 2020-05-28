@@ -1,21 +1,24 @@
 import unittest
-import mock
-from main import EncryptionSettingsUtil
-from main import Common
-from StringIO import StringIO
-import console_logger
+import EncryptionSettingsUtil
+import Common
+from io import StringIO
+from .console_logger import ConsoleLogger
+try:
+    import unittest.mock as mock # python 3+ 
+except ImportError:
+    import mock # python2
 
 class TestEncryptionSettingsUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
     def setUp(self):
-        self.logger = console_logger.ConsoleLogger()
+        self.logger = ConsoleLogger()
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
     @mock.patch('time.sleep') # To speed up this test.
-    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.write_settings_file')
-    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.write_settings_file')
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_index')
     @mock.patch('os.path.isfile', return_value=True)
-    @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
+    @mock.patch('EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
     def test_post_to_wire_server(self, get_http_util, os_path_isfile, get_index, write_settings_file, time_sleep):
         get_http_util.return_value = mock.MagicMock() # Return a mock object
         get_index.return_value = 0
@@ -27,7 +30,6 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
-        write_settings_file.reset_mock()
 
         get_http_util.return_value.Call.return_value.status = 400 # make it so that the http call returns a 400
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)
@@ -35,7 +37,6 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
-        write_settings_file.reset_mock()
 
         get_http_util.return_value.Call.return_value.status = 200 # make it so that the http call returns a 200
         self.es_util.post_to_wireserver(data)
@@ -43,7 +44,6 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.assertEqual(write_settings_file.call_count, 0)
 
         get_http_util.return_value.Call.reset_mock()
-        write_settings_file.reset_mock()
 
         get_http_util.return_value.Call.return_value = None # Make it so that the HTTP call returns nothing
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)

@@ -20,13 +20,16 @@
 
 import os
 import os.path
-import urlparse
 import re
 import json
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
+try:
+    from urllib.parse import urlparse #python3+
+except ImportError:
+    from urlparse import urlparse #python2
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -85,7 +88,7 @@ class CheckUtil(object):
             raise Exception(message + '\nNo URL supplied')
 
         try:
-            parse_result = urlparse.urlparse(test_url)
+            parse_result = urlparse(test_url)
         except:
             raise Exception(message + '\nMalformed URL: ' + test_url)
 
@@ -187,7 +190,7 @@ class CheckUtil(object):
         else:
             supported_volume_types = CommonVariables.SupportedVolumeTypes
 
-        if not volume_type.lower() in map(lambda x: x.lower(), supported_volume_types) :
+        if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
     def validate_lvm_os(self, public_settings):
@@ -260,7 +263,7 @@ class CheckUtil(object):
             return
         distro_name = DistroPatcher.distro_info[0]
         distro_version = DistroPatcher.distro_info[1]
-        supported_os_file = os.path.join(os.getcwd(), 'main/SupportedOS.json')
+        supported_os_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SupportedOS.json')
         with open(supported_os_file) as json_file:
             data = json.load(json_file)
             if distro_name in data:

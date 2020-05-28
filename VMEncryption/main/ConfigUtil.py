@@ -18,7 +18,11 @@
 
 import os.path
 from Common import *
-from ConfigParser import *
+try:
+    import configparser #python3+
+except ImportError:
+    import ConfigParser as configparser #python2
+from io import open
 
 class ConfigKeyValuePair(object):
     def __init__(self, prop_name, prop_value):
@@ -39,7 +43,7 @@ class ConfigUtil(object):
 
     def save_config(self, prop_name, prop_value):
         #TODO make the operation an transaction.
-        config = ConfigParser()
+        config = configparser.ConfigParser()
         if os.path.exists(self.config_file_path):
             config.read(self.config_file_path)
         # read values from a section
@@ -50,7 +54,7 @@ class ConfigUtil(object):
             config.write(configfile)
 
     def save_configs(self, key_value_pairs):
-        config = ConfigParser()
+        config = configparser.ConfigParser()
         if os.path.exists(self.config_file_path):
             config.read(self.config_file_path)
         # read values from a section
@@ -58,22 +62,24 @@ class ConfigUtil(object):
             config.add_section(self.azure_crypt_config_section)
         for key_value_pair in key_value_pairs:
             if key_value_pair.prop_value is not None:
-                config.set(self.azure_crypt_config_section, key_value_pair.prop_name, key_value_pair.prop_value)
-        with open(self.config_file_path, 'wb') as configfile:
+                config.set(self.azure_crypt_config_section, str(key_value_pair.prop_name), str(key_value_pair.prop_value))
+        #the configparser module write method reads and writes as text, not binary
+        #open the file in text mode using 'w' for python2 and python3+ compat
+        with open(self.config_file_path, 'w') as configfile:
             config.write(configfile)
 
     def get_config(self, prop_name):
         # write the configs, the bek file name and so on.
         if os.path.exists(self.config_file_path):
             try:
-                config = ConfigParser()
+                config = configparser.ConfigParser()
                 config.read(self.config_file_path)
                 # read values from a section
                 prop_value = config.get(self.azure_crypt_config_section, prop_name)
                 return prop_value
-            except (NoSectionError, NoOptionError) as e:
+            except (configparser.NoSectionError, configparser.NoOptionError) as e:
                 self.logger.log(msg="value of prop_name:{0} not found.".format(prop_name))
                 return None
         else:
-            self.logger.log("the config file {0} not exists.".format(self.config_file_path))
+            self.logger.log("the config file {0} does not exist".format(self.config_file_path))
             return None

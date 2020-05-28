@@ -22,10 +22,12 @@ import uuid
 import time
 import datetime
 from Common import CommonVariables
-from ConfigParser import ConfigParser
+try:
+    from configparser import ConfigParser #python3+
+except ImportError:
+    import ConfigParser #python2
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
-
 
 class OnGoingItemConfig(object):
     def __init__(self, encryption_environment, logger):
@@ -80,14 +82,14 @@ class OnGoingItemConfig(object):
         if device_size_value is None or device_size_value == "":
             return None
         else:
-            return long(device_size_value)
+            return int(device_size_value)
 
     def get_current_slice_index(self):
         current_slice_index_value = self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentSliceIndexKey)
         if current_slice_index_value is None or current_slice_index_value == "":
             return None
         else:
-            return long(current_slice_index_value)
+            return int(current_slice_index_value)
 
     def get_from_end(self):
         return self.ongoing_item_config.get_config(CommonVariables.OngoingItemFromEndKey)
@@ -97,7 +99,7 @@ class OnGoingItemConfig(object):
         if block_size_value is None or block_size_value == "":
             return None
         else:
-            return long(block_size_value)
+            return int(block_size_value)
 
     def get_current_source_path(self):
         return self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentSourcePathKey)
@@ -110,7 +112,7 @@ class OnGoingItemConfig(object):
         if total_copy_size_value is None or total_copy_size_value == "":
             return None
         else:
-            return long(total_copy_size_value)
+            return int(total_copy_size_value)
 
     def get_luks_header_file_path(self):
         return self.ongoing_item_config.get_config(CommonVariables.OngoingItemCurrentLuksHeaderFilePathKey)

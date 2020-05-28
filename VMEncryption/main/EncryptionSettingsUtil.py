@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import httplib
 import json
 import os
 import os.path
@@ -26,8 +25,12 @@ import base64
 from shutil import copyfile
 import uuid
 from Common import CommonVariables
-
-
+from io import open
+try:
+    import http.client as httpclient #python3+
+except ImportError:
+    import httplib as httpclient #python2
+    
 class EncryptionSettingsUtil(object):
     """ Provides capability to update encryption settings via wire server """
 
@@ -55,8 +58,10 @@ class EncryptionSettingsUtil(object):
         # specify buffering = 0 and then use os.fsync to flush
         # https://docs.python.org/2/library/functions.html#open
         # https://linux.die.net/man/2/fsync
-        with open(CommonVariables.encryption_settings_counter_path, "w", 0) as outfile:
-            outfile.write(str(index + 1) + "\n")
+        # use mode = "w" and encoding = "ascii" since writing text only
+        with open(CommonVariables.encryption_settings_counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
+            output = str(index + 1) + "\n"  # str allows for a python2 + python3 compatible integer to string conversion
+            outfile.write(output)
             outfile.flush()
             os.fsync(outfile.fileno())
         return
@@ -181,9 +186,10 @@ class EncryptionSettingsUtil(object):
                 })
 
         full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
-        with open(full_protector_path) as protector_file:
-            protector_content = protector_file.read()
-            protector_base64 = base64.standard_b64encode(protector_content)
+        # b64encode takes a bytes like object, so read as binary data
+        with open(full_protector_path, "rb") as protector_file:
+            protector_data = protector_file.read()
+            protector_base64 = base64.standard_b64encode(protector_data).decode('utf_8')
             protectors = [{"Name": protector_name, "Base64Key": protector_base64}]
 
         protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors]
@@ -210,8 +216,10 @@ class EncryptionSettingsUtil(object):
     def write_settings_file(self, data):
         """ Dump encryption settings data to JSON formatted file on key volume """
         self.increment_index()
-        with open(self.get_settings_file_path(), 'w', 0) as outfile:
-            json.dump(data, outfile)
+        output = json.dumps(data)
+        # encode as utf-8 and write as binary data for consistency across python2 + python3
+        with open(self.get_settings_file_path(), 'wb', 0) as outfile:
+            outfile.write(output.encode('utf-8')) 
             outfile.flush()
             os.fsync(outfile.fileno())
 
@@ -246,7 +254,8 @@ class EncryptionSettingsUtil(object):
                     self.logger.log("result_content is {0}".format(result_content))
 
                     http_util.connection.close()
-                    if result.status != httplib.OK and result.status != httplib.ACCEPTED:
+                    # cast to httpclient constants to int for python2 + python3 compatibility
+                    if result.status != int(httpclient.OK) and result.status != int(httpclient.ACCEPTED):
                         raise Exception("Encryption settings post request was not accepted")
                     return
                 else:
@@ -265,21 +274,7 @@ class EncryptionSettingsUtil(object):
 
         # V3 message content
         msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
-        try:
-            self._post_to_wireserver_helper(msg_data, http_util)
-        except Exception:
-            self.logger.log("Falling back on old Wire Server protocol")
-            data_copy = data.copy()
-            data_copy.pop("Protectors")
-            data_copy["DiskEncryptionDataVersion"] = self._DISK_ENCRYPTION_DATA_VERSION_V3
-
-            self.write_settings_file(data_copy)
-            if not os.path.isfile(self.get_settings_file_path()):
-                raise Exception(
-                    'Disk encryption settings file not found: ' + self.get_settings_file_path())
-
-            msg_data = CommonVariables.wireprotocol_msg_template_v2.format(settings_file_name=self.get_settings_file_name())
-            self._post_to_wireserver_helper(msg_data, http_util)
+        self._post_to_wireserver_helper(msg_data, http_util)
 
     def clear_encryption_settings(self, disk_util):
         """

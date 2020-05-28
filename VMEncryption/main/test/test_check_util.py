@@ -1,13 +1,17 @@
 import unittest
-import mock
+import os
 
-from main.check_util import CheckUtil
-from main.Common import CommonVariables
-from StringIO import StringIO
-
-from test_utils import MockDistroPatcher
-from console_logger import ConsoleLogger
-
+from check_util import CheckUtil
+from Common import CommonVariables
+from io import StringIO
+from .console_logger import ConsoleLogger
+from .test_utils import MockDistroPatcher
+try:
+    builtins_open = "builtins.open"
+    import unittest.mock as mock # python3+
+except ImportError:
+    builtins_open = "__builtin__.open"
+    import mock # python2
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -29,13 +33,13 @@ class TestCheckUtil(unittest.TestCase):
 
     @mock.patch('os.popen')
     def test_memory(self, os_popen):
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertFalse(self.cutil.is_insufficient_memory())
 
     @mock.patch('os.popen')
     def test_memory_low_memory(self, os_popen):
-        output = "6000000"
+        output = u'6000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertTrue(self.cutil.is_insufficient_memory())
 
@@ -61,8 +65,8 @@ class TestCheckUtil(unittest.TestCase):
         # self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.vault.azure.com/", "")
         self.assertRaises(Exception, self.cutil.check_kv_url, "https://", "")
 
-    @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
-    def test_validate_volume_type(self, mock_is_vmss):
+    @mock.patch('MetadataUtil.MetadataUtil.is_vmss')
+    def test_validate_volume_type_single_vm(self, mock_is_vmss):
         # First test for normal VMs
         mock_is_vmss.return_value = False
         self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "DATA"})
@@ -81,6 +85,8 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "123"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
+    @mock.patch('MetadataUtil.MetadataUtil.is_vmss')
+    def test_validate_volume_type_vmss(self, mock_is_vmss):
         # Then test for VMSS
         mock_is_vmss.return_value = True
         self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "DATA"})
@@ -96,9 +102,9 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
-    @mock.patch('main.check_util.CheckUtil.validate_memory_os_encryption')
-    @mock.patch('main.CommandExecutor.CommandExecutor.Execute', return_value=0)
-    @mock.patch('main.MetadataUtil.MetadataUtil.is_vmss')
+    @mock.patch('check_util.CheckUtil.validate_memory_os_encryption')
+    @mock.patch('CommandExecutor.CommandExecutor.Execute', return_value=0)
+    @mock.patch('MetadataUtil.MetadataUtil.is_vmss')
     def test_fatal_checks(self, mock_is_vmss, mock_exec, mock_validate_memory):
         mock_is_vmss.return_value = False
         mock_distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
@@ -146,28 +152,26 @@ class TestCheckUtil(unittest.TestCase):
             }, { "os": "NotEncrypted" }, mock_distro_patcher, None)
 
     def test_mount_scheme(self):
-        proc_mounts_output = """
-        sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
-        proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
-        udev /dev devtmpfs rw,relatime,size=4070564k,nr_inodes=1017641,mode=755 0 0
-        devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
-        tmpfs /run tmpfs rw,nosuid,noexec,relatime,size=815720k,mode=755 0 0
-        /dev/sda1 / ext4 rw,relatime,discard,data=ordered 0 0
-        none /sys/fs/cgroup tmpfs rw,relatime,size=4k,mode=755 0 0
-        none /sys/fs/fuse/connections fusectl rw,relatime 0 0
-        none /sys/kernel/debug debugfs rw,relatime 0 0
-        none /sys/kernel/security securityfs rw,relatime 0 0
-        none /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k 0 0
-        none /run/shm tmpfs rw,nosuid,nodev,relatime 0 0
-        none /run/user tmpfs rw,nosuid,nodev,noexec,relatime,size=102400k,mode=755 0 0
-        none /sys/fs/pstore pstore rw,relatime 0 0
-        systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=systemd 0 0
-        /dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
-        /dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0
-        """
-        with mock.patch("__builtin__.open", mock.mock_open(read_data=proc_mounts_output)) as mock_open:
+        proc_mounts_output = """sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+udev /dev devtmpfs rw,relatime,size=4070564k,nr_inodes=1017641,mode=755 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,noexec,relatime,size=815720k,mode=755 0 0
+/dev/sda1 / ext4 rw,relatime,discard,data=ordered 0 0
+none /sys/fs/cgroup tmpfs rw,relatime,size=4k,mode=755 0 0
+none /sys/fs/fuse/connections fusectl rw,relatime 0 0
+none /sys/kernel/debug debugfs rw,relatime 0 0
+none /sys/kernel/security securityfs rw,relatime 0 0
+none /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k 0 0
+none /run/shm tmpfs rw,nosuid,nodev,relatime 0 0
+none /run/user tmpfs rw,nosuid,nodev,noexec,relatime,size=102400k,mode=755 0 0
+none /sys/fs/pstore pstore rw,relatime 0 0
+systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=systemd 0 0
+/dev/mapper/fee16d98-9c18-4e7d-af70-afd7f3dfb2d9 /mnt/resource ext4 rw,relatime,data=ordered 0 0
+/dev/mapper/vg0-lv0 /data ext4 rw,relatime,discard,data=ordered 0 0"""
+        with mock.patch(builtins_open, mock.mock_open(read_data=proc_mounts_output)) as mock_open:
             self.assertFalse(self.cutil.is_unsupported_mount_scheme())
-            mock_open.assert_called_once()
+            self.assertEqual(mock_open.call_count,1)
 
     # Skip LVM OS validation when OS volume is not being targeted
     def test_skip_lvm_os_check_if_data_only_enable(self):
@@ -228,19 +232,19 @@ class TestCheckUtil(unittest.TestCase):
         # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
         self.assertRaises(Exception, self.cutil.validate_lvm_os, {CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
     
-    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", return_value=0)
-    def test_vfat(self, os_system):
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_vfat(self, mocked_exec):
         # simulate call to modprobe vfat that succeeds and returns cleanly from execute 
         self.cutil.validate_vfat()
 
-    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", side_effect = Exception("Test"))
-    def test_no_vfat(self, os_system):
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", side_effect=Exception())
+    def test_no_vfat(self, mocked_exec):
         # simulate call to modprobe vfat that fails and raises exception from execute 
         self.assertRaises(Exception, self.cutil.validate_vfat) 
       
     @mock.patch('os.popen')
     def test_minimum_memory(self, os_popen):
-        output = "6000000"
+        output = u'6000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.assertRaises(Exception, self.cutil.validate_memory_os_encryption, {
             CommonVariables.VolumeTypeKey: "ALL",
@@ -262,7 +266,7 @@ class TestCheckUtil(unittest.TestCase):
         CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
         }, { "os": "Encrypted" })
 
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.cutil.validate_memory_os_encryption( {
         CommonVariables.VolumeTypeKey: "ALL",
@@ -274,7 +278,7 @@ class TestCheckUtil(unittest.TestCase):
         CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
         }, { "os": "Encrypted" })
 
-        output = "8000000"
+        output = u'8000000'
         os_popen.return_value = self.get_mock_filestream(output)
         self.cutil.validate_memory_os_encryption( {
         CommonVariables.VolumeTypeKey: "ALL",

@@ -20,8 +20,11 @@ from Common import *
 
 import re
 import traceback
-import urllib2
 import json
+try:
+    from urllib.request import Request, urlopen #python3+
+except ImportError:
+    from urllib2 import Request, urlopen #python2
 
 
 class MetadataUtil(object):
@@ -59,10 +62,10 @@ class MetadataUtil(object):
             # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
             try:
                 all_info = "http://169.254.169.254/metadata/instance?api-version=2017-08-01"
-                request = urllib2.Request(all_info)
+                request = Request(all_info)
                 request.add_header('Metadata', 'true')
-                response = urllib2.urlopen(request)
-                self.metadata = json.load(response)
+                response = urlopen(request).read().decode('UTF-8')
+                self.metadata = json.loads(response)
             except:
                 message = "Metadata request failed: {0}".format(
                     traceback.format_exc())

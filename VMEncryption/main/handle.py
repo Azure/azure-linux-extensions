@@ -47,8 +47,7 @@ from EncryptionEnvironment import EncryptionEnvironment
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
-from __builtin__ import int
-
+from io import open 
 
 def install():
     hutil.do_parse_context('Install')
@@ -228,7 +227,7 @@ def are_disks_stamped_with_current_config(encryption_config):
 
 def get_public_settings():
     public_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
-    if isinstance(public_settings_str, basestring):
+    if isinstance(public_settings_str, str):
         return json.loads(public_settings_str)
     else:
         return public_settings_str
@@ -236,7 +235,7 @@ def get_public_settings():
 
 def get_protected_settings():
     protected_settings_str = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings')
-    if isinstance(protected_settings_str, basestring):
+    if isinstance(protected_settings_str, str):
         return json.loads(protected_settings_str)
     else:
         return protected_settings_str
@@ -260,7 +259,11 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
-    current_secret_seq_num = int(config_secret_seq if config_secret_seq else -1)
+    if config_secret_seq is None:
+        current_secret_seq_num = -1
+    else:
+        current_secret_seq_num = int(config_secret_seq)
+
     update_call_seq_num = hutil.get_current_seq()
 
     logger.log("Current secret was created in operation #{0}".format(current_secret_seq_num))
@@ -325,7 +328,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
                 logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
-                new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+                new_keyslot = list([x[0] != x[1] for x in zip(before_keyslots, after_keyslots)]).index(True)
 
                 logger.log("New key was added in keyslot {0}".format(new_keyslot))
 
@@ -556,7 +559,6 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
 
 def main():
     global hutil, DistroPatcher, logger, encryption_environment
-    HandlerUtil.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -674,11 +676,11 @@ def enable():
                 cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
-            logger.log(traceback.format_exc())
+            logger.log(traceback.format_exc(e))
             # Reject settings if fatal exception occurs while a daemon is running
             if is_daemon_running():
                 hutil.reject_settings()
-            msg = str(e)
+            msg = str(traceback.format_exc(e))
             hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
@@ -693,9 +695,9 @@ def enable():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
-        except Exception:
+        except Exception as e:
             logger.log("PRECHECK: Exception thrown during precheck")
-            logger.log(traceback.format_exc())
+            logger.log(traceback.format_exc(e))
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             if is_migrate_operation:
@@ -719,7 +721,7 @@ def enable():
                           message=msg)
 
     except Exception as e:
-        msg = "Unexpected Error during enable. Error message {0}\n Stacktrace: {1}".format(str(e), traceback.format_exc())
+        msg = "Unexpected Error during enable: {0}".format(traceback.format_exc(e))
         logger.log(msg)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='Enable',
@@ -829,7 +831,9 @@ def enable_encryption():
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
-    if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout):
+
+    # ps_stdout is data, so decode to string prior to regex for python2 and python3 compat
+    if re.search(r"dd.*of={0}".format(disk_util.get_osmapper_path()), ps_stdout.decode("utf-8")):
         logger.log(msg="OS disk encryption already in progress, exiting",
                    level=CommonVariables.WarningLevel)
         hutil.redo_last_status()
@@ -988,7 +992,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             #TODO: let customer specify the default file system in the
             #parameter
             file_system = None
-            if encryption_item.has_key("file_system") and encryption_item["file_system"] != "":
+            if "file_system" in encryption_item and encryption_item["file_system"] != "":
                 file_system = encryption_item["file_system"]
             else:
                 file_system = CommonVariables.default_file_system
@@ -1004,13 +1008,13 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             crypt_item_to_update.uses_cleartext_key = False
             crypt_item_to_update.current_luks_slot = 0
 
-            if encryption_item.has_key("name") and encryption_item["name"] != "":
+            if "name" in encryption_item and encryption_item["name"] != "":
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
             else:
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
 
             #allow override through the new full_mount_point field
-            if encryption_item.has_key("full_mount_point") and encryption_item["full_mount_point"] != "":
+            if "full_mount_point" in encryption_item and encryption_item["full_mount_point"] != "":
                 crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
             disk_util.make_sure_path_exists(crypt_item_to_update.mount_point)
@@ -1561,7 +1565,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, crypt_mount
         encryption_format_item["file_system"] = str(device_item.file_system)
         return encryption_format_item
 
-    encryption_format_items = map(device_item_to_encryption_format_item, device_items)
+    encryption_format_items = list(map(device_item_to_encryption_format_item, device_items))
 
     return enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force, os_items_to_stamp=os_items_to_stamp)
 
@@ -1829,8 +1833,10 @@ def daemon_encrypt():
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
              (distro_name == 'redhat' and distro_version == '7.6') or
-             (distro_name == 'redhat' and distro_version == '7.7')) and
-                (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
+             (distro_name == 'redhat' and distro_version == '7.7') or
+             (distro_name == 'redhat' and distro_version == '8.0') or
+             (distro_name == 'redhat' and distro_version == '8.1')) and
+            (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
                                                             distro_patcher=DistroPatcher,
@@ -1840,7 +1846,10 @@ def daemon_encrypt():
                (distro_name == 'centos' and distro_version.startswith('7.4')) or
                (distro_name == 'centos' and distro_version.startswith('7.5')) or
                (distro_name == 'centos' and distro_version.startswith('7.6')) or
-               (distro_name == 'centos' and distro_version.startswith('7.7'))) and
+               (distro_name == 'centos' and distro_version.startswith('7.6')) or
+               (distro_name == 'centos' and distro_version.startswith('7.7')) or
+               (distro_name == 'centos' and distro_version.startswith('8.0')) or
+               (distro_name == 'centos' and distro_version.startswith('8.1'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1853,6 +1862,10 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
               (distro_name == 'redhat' and distro_version == '7.7') or
+              (distro_name == 'redhat' and distro_version == '8.0') or
+              (distro_name == 'redhat' and distro_version == '8.1') or
+              (distro_name == 'centos' and distro_version.startswith('8.1')) or
+              (distro_name == 'centos' and distro_version.startswith('8.0')) or
               (distro_name == 'centos' and distro_version.startswith('7.7')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
@@ -2180,7 +2193,8 @@ def start_daemon(operation):
 
     #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
     #throw broken pipe exception when parent process exit.
-    devnull = open(os.devnull, 'w')
+    #use 'wb' for python3 compat since stdout and stderr are bytes not strings
+    devnull = open(os.devnull, 'wb')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
