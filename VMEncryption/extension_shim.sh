@@ -35,8 +35,12 @@ python hello.py --install
 function find_python(){
     local python_exec_command=$1
 
-    # Check if there is python defined.
-    if command -v python >/dev/null 2>&1 ; then
+    # Find python3, python2, or default python in that order
+    if command -v python3 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python3"
+    elif command -v python2 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python2"
+    elif command -v python >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python"
     fi
 }
@@ -107,10 +111,11 @@ if [ -z "$PYTHON" ]; then
    exit 51 # Not Supported
 else
     PYTHON_VER=`${PYTHON} --version 2>&1`
-    if [[ "$PYTHON_VER" =~ "Python 2.6" ]] || [[ "$PYTHON_VER" =~ "Python 2.7" ]]; then
+    
+    if [[ "$PYTHON_VER" =~ "Python 2.6" ]] || [[ "$PYTHON_VER" =~ "Python 2.7" ]] || [[ "$PYTHON_VER" =~ "Python 3" ]]; then
         echo $PYTHON_VER
     else
-        echo "Expected Python 2.7, found $PYTHON_VER" >&2
+        echo "Expected Python 2.6, 2.7, or 3.x, found $PYTHON_VER" >&2
         exit 51 # Not Supported
     fi
 fi

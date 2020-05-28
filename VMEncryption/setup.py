@@ -131,11 +131,12 @@ setup(name = CommonVariables.extension_name,
       description=CommonVariables.extension_description,
       license='Apache License 2.0',
       author='Microsoft Corporation',
-      author_email='andliu@microsoft.com',
+      author_email='opensource@microsoft.com',
       url='https://github.com/Azure/azure-linux-extensions',
       classifiers = ['Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
@@ -191,7 +192,7 @@ def zip(src, dst):
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
-# Manually add SupportedOS.json file as setup seems to only copy py file
+# manually copy .json files since setup will only copy .py files by default
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 zip(final_folder_path, target_zip_file_path)

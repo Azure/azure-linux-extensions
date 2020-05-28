@@ -20,12 +20,12 @@ import os
 import re
 import platform
 
-from UbuntuPatching import UbuntuPatching
-from debianPatching import debianPatching
-from redhatPatching import redhatPatching
-from centosPatching import centosPatching
-from SuSEPatching import SuSEPatching
-from oraclePatching import oraclePatching
+from .UbuntuPatching import UbuntuPatching
+from .debianPatching import debianPatching
+from .redhatPatching import redhatPatching
+from .centosPatching import centosPatching
+from .SuSEPatching import SuSEPatching
+from .oraclePatching import oraclePatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
@@ -56,7 +56,7 @@ def GetDistroPatcher(logger):
     Distro = Distro.strip(' ')
     patching_class_name = Distro + 'Patching'
 
-    if not globals().has_key(patching_class_name):
+    if patching_class_name not in globals():
         logger.log('{0} is not a supported distribution.'.format(Distro))
         return None
     patchingInstance = globals()[patching_class_name](logger, dist_info)

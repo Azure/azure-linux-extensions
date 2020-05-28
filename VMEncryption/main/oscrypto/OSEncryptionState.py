@@ -149,19 +149,20 @@ class OSEncryptionState(object):
         result = None
         dev = os.lstat(fs).st_dev
 
-        for line in file('/proc/mounts'):
-            line = [s.decode('string_escape') for s in line.split()[:3]]
+        for line in open('/proc/mounts'):
+            # python2 and python3 compatible conversion to unicode (consider replacing with call to DiskUtil.get_mount_items)
+            line = [bytes(s,'utf-8').decode('unicode-escape').encode('latin1').decode('utf-8') for s in line.split()[:3]]
             if dev == os.lstat(line[1]).st_dev:
                 result = tuple(line)
 
         return result
 
     def _is_in_memfs_root(self):
-        mounts = file('/proc/mounts', 'r').read()
+        mounts = open('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
 
     def _parse_uuid_from_fstab(self, mountpoint):
-        contents = file('/etc/fstab', 'r').read()
+        contents = open('/etc/fstab', 'r').read()
         matches = re.findall(r'UUID=(.*?)\s+{0}\s+'.format(mountpoint), contents)
         if matches:
             return matches[0]

@@ -31,15 +31,9 @@ import traceback
 import datetime
 import subprocess
 
-from redhatPatching import redhatPatching
-try:
-    from Common import *
-except Exception:
-    from ..Common import * # Added for unit test
-try:
-    from CommandExecutor import *
-except Exception:
-    from ..CommandExecutor import * # Added for unit test
+from .redhatPatching import redhatPatching
+from Common import *
+from CommandExecutor import *
 
 class centosPatching(redhatPatching):
     def __init__(self, logger, distro_info):

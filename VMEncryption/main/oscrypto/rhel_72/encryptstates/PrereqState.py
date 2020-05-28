@@ -86,7 +86,7 @@ class PrereqState(OSEncryptionState):
 
         contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
 
-        with open('/usr/lib/systemd/system/waagent.service', 'w') as f:
+        with open('/usr/lib/systemd/system/waagent.service', 'wb') as f:
             f.write(contents)
 
         self.context.logger.log("waagent patched successfully")

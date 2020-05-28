@@ -192,7 +192,8 @@ class SplitRootPartitionState(OSEncryptionState):
             "YiB":  1024**8  # yobibyte
         }
 
-        if unit not in exponents.keys():
+        # list() syntax provides python2 + python3 compat and avoids lazy iterable
+        if unit not in list(exponents.keys()):
             raise SyntaxError("{:} is not a valid SI or IEC byte unit".format(unit))
         else:
             return bytes_ * exponents[unit] // sector_size
@@ -216,7 +217,7 @@ class SplitRootPartitionState(OSEncryptionState):
         contents += 'UUID={0}\t/boot\text2\tdefaults\t0 0'.format(boot_partition_uuid)
         contents += '\n'
 
-        with open('/etc/fstab', 'w') as f:
+        with open('/etc/fstab', 'wb') as f:
             f.write(contents)
 
         self.context.logger.log("fstab updated successfully")

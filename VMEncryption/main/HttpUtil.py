@@ -19,18 +19,26 @@
 import time
 import datetime
 import traceback
-import urlparse
-import httplib
 import shlex
 import subprocess
 from Common import CommonVariables
 from subprocess import *
-from Utils.WAAgentUtil import waagent
+# waagentloader is a python3+ compatible loader embedded in this extension, cloned from VMAccess
+from Utils.waagentloader import load_waagent  
+try:
+    from urllib.parse import urlparse #python3+
+except ImportError:
+    from urlparse import urlparse #python2
+try:
+    import http.client as httpclient #python3+
+except ImportError:
+    import httplib as httpclient #python2
 
 class HttpUtil(object):
     """description of class"""
     def __init__(self, logger):
         self.logger = logger
+        waagent = load_waagent()
         try:
             waagent.MyDistro = waagent.GetMyDistro()
             Config = waagent.ConfigurationProvider(None)
@@ -48,13 +56,13 @@ class HttpUtil(object):
 
     def Call(self, method, http_uri, data, headers, use_https=True):
         try:
-            uri_obj = urlparse.urlparse(http_uri)
+            uri_obj = urlparse(http_uri)
             #parse the uri str here
             if self.proxyHost is None or self.proxyPort is None:
                 if use_https:
-                    self.connection = httplib.HTTPSConnection(uri_obj.hostname, timeout=60)
+                    self.connection = httpclient.HTTPSConnection(uri_obj.hostname, timeout=60)
                 else:
-                    self.connection = httplib.HTTPConnection(uri_obj.hostname, timeout=60)
+                    self.connection = httpclient.HTTPConnection(uri_obj.hostname, timeout=60)
                 if uri_obj.query is not None:
                     self.connection.request(method=method, url=(uri_obj.path +'?'+ uri_obj.query), body=data, headers=headers)
                 else:
@@ -63,9 +71,9 @@ class HttpUtil(object):
             else:
                 self.logger.log("proxyHost is not empty, so use the proxy to call the http.")
                 if use_https:
-                    self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
+                    self.connection = httpclient.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
                 else:
-                    self.connection = httplib.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
+                    self.connection = httpclient.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
                 if uri_obj.scheme.lower() == "https":
                     self.connection.set_tunnel(uri_obj.hostname, 443)
                 else:
