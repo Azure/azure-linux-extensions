@@ -280,3 +280,33 @@ class TestDiskUtil(unittest.TestCase):
         self.assertTrue("\n/dev/mapper/mapper_name2 /mnt/point2 ext4 defaults,nofail 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("\nmapper_name /dev/dev_path /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
         self.assertTrue("\nmapper_name2 /dev/dev_path2 /test_passphrase_path" in open_mock.content_dict["/etc/crypttab"])
+
+    @mock.patch("main.DiskUtil.DiskUtil.get_device_items_property")
+    def test_is_device_mounted(self, dev_item_prop_mock):
+        dev_item_prop_mock.return_value = "/mount"
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEquals(device_mounted, True)
+
+        dev_item_prop_mock.reset_mock()
+        dev_item_prop_mock.return_value = ""
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEquals(device_mounted, False)
+
+        dev_item_prop_mock.reset_mock()
+        dev_item_prop_mock.side_effect = Exception("Dummy Exception")
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEquals(device_mounted, False)
+
+    @mock.patch("os.path.exists")
+    @mock.patch("main.CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_make_sure_path_exists(self, cmd_exc_mock, exists_mock):
+        exists_mock.return_value = True
+        path_exists = self.disk_util.make_sure_path_exists('/test/path')
+        self.assertEquals(path_exists, 0)
+        self.assertEquals(cmd_exc_mock.call_count, 0)
+
+        cmd_exc_mock.reset_mock()
+        exists_mock.return_value = False
+        path_exists = self.disk_util.make_sure_path_exists('/test/path')
+        self.assertEquals(path_exists, 0)
+        self.assertEquals(cmd_exc_mock.call_count, 1)

@@ -80,6 +80,9 @@ class DiskUtil(object):
         return self.command_executor.Execute(mkfs_cmd)
 
     def make_sure_path_exists(self, path):
+        if os.path.exists(path):
+            self.logger.log("Path {0} already exists.".format(path))
+            return 0
         mkdir_cmd = self.distro_patcher.mkdir_path + ' -p ' + path
         self.logger.log("make sure path exists, executing: {0}".format(mkdir_cmd))
         return self.command_executor.Execute(mkdir_cmd)
@@ -752,12 +755,27 @@ class DiskUtil(object):
 
     def mount_crypt_item(self, crypt_item, passphrase):
         self.logger.log("trying to mount the crypt item:" + str(crypt_item))
+        if crypt_item.mapper_name == CommonVariables.osmapper_name:
+            self.logger.log("Skipping OS disk.")
+            return
+        if self.is_device_mounted(crypt_item.mapper_name):
+            self.logger.log("Device {0} is already mounted".format(crypt_item.mapper_name))
+            return
         self.logger.log(msg=('First trying to auto mount for the item'))
         mount_filesystem_result = self.mount_auto(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name))
         if str(crypt_item.mount_point) != 'None' and mount_filesystem_result != CommonVariables.process_success:
             self.logger.log(msg=('mount_point is not None and auto mount failed. Trying manual mount.'), level=CommonVariables.WarningLevel)
             mount_filesystem_result = self.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point, crypt_item.file_system)
             self.logger.log("mount file system result:{0}".format(mount_filesystem_result))
+
+    def is_device_mounted(self, device_name):
+        try:
+            mount_point = self.get_device_items_property(device_name, "MOUNTPOINT")
+            if len(mount_point) > 0:
+                return True
+            return False
+        except Exception:
+            return False
 
     def swapoff(self):
         return self.command_executor.Execute('swapoff -a')
