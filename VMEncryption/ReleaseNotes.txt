@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 1.1.0.51
 - Add support for RHEL 7.8
 - Make Resource Disk Encryption synchronus
@@ -22,6 +23,10 @@
 - Handle no passphrase file in update encryption settings
 - ADE SinglePass EV2 VSRM Artifacts
 - ADE SinglePass CDPx: Migrating Windows agent to image 1809
+=======
+(1.1.0.51) 
+-Support Python3 only environments
+>>>>>>> update 1.1.0.51 release notes  (#1120)
 
 (1.1.0.48)
 -Fix disable after EFA encryption and stop-start
