@@ -8,4 +8,4 @@ recursive-include main/oscrypto/ubuntu_1604/encryptscripts *.sh
 recursive-include main/oscrypto/ubuntu_1404/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1404/encryptscripts *.sh
 recursive-include main/Utils waagent
-prune test
+prune main/test
