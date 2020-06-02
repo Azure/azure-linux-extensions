@@ -29,4 +29,5 @@ else
 fi
 
 # invoking Python packaging
-python setup.py sdist --formats=zip
+# redirect stderr to satisfy publishing pipeline
+python setup.py sdist --formats=zip 2>/dev/null
