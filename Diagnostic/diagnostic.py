@@ -283,8 +283,12 @@ def main(command):
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
             
             #Stop the telegraf and ME services
-            telhandler.stop_telegraf_service()
-            me_handler.stop_metrics_service()
+            tel_out, tel_msg = telhandler.stop_telegraf_service()
+            if tel_msg:
+                hutil.log(tel_msg)
+            me_out, me_msg = me_handler.stop_metrics_service()
+            if me_msg:
+                hutil.log(me_msg)
 
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
@@ -302,12 +306,20 @@ def main(command):
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
             
             #Stop the telegraf and ME services
-            telhandler.stop_telegraf_service()
-            me_handler.stop_metrics_service()
+            tel_out, tel_msg = telhandler.stop_telegraf_service()
+            if tel_msg:
+                hutil.log(tel_msg)
+            me_out, me_msg = me_handler.stop_metrics_service()
+            if me_msg:
+                hutil.log(me_msg)
 
             #Delete the telegraf and ME services
-            telhandler.remove_telegraf_service()
-            me_handler.remove_metrics_service()
+            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+            if tel_rm_msg:
+                hutil.log(tel_rm_msg)
+            me_rm_out, me_rm_msg = me_handler.remove_metrics_service()
+            if me_rm_msg:
+                hutil.log(me_rm_msg)
 
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
@@ -332,6 +344,10 @@ def main(command):
                     g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
+            else:
+                #If the above configurator doesn't get called, then we manually restart Telegraf and ME services
+                telhandler.start_telegraf()
+                me_handler.start_metrics()
 
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()

@@ -1,0 +1,17 @@
+[Unit]
+Documentation=https://github.com/influxdata/telegraf/blob/master/README.md
+Description=Custom Modified Telegraf service for Linux Agent metrics sourcing
+After=network.target
+
+[Service]
+ExecStart=%TELEGRAF_BIN% --config %TELEGRAF_AGENT_CONFIG% --config-directory %TELEGRAF_CONFIG_DIR%
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartForceExitStatus=SIGPIPE
+KillMode=control-group
+
+
+[Install]
+WantedBy=multi-user.target
+
+

@@ -60,17 +60,6 @@ per_RouteEvent_tmpl = """
 """
 
 
-derived_event = """
-<DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{type}"/>
-"""
-
-
-lad_query = '<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />'
-
-
-obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
-
-
 entire_xml_cfg_tmpl = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
