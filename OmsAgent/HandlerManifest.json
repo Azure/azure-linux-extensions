@@ -1,7 +1,7 @@
 [
   {
     "name":  "OmsAgentForLinux",
-    "version": "1.13.11",
+    "version": "1.13.13",
     "handlerManifest": {
       "installCommand": "omsagent_shim.sh -install",
       "uninstallCommand": "omsagent_shim.sh -uninstall",
