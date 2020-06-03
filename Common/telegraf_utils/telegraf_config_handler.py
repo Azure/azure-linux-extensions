@@ -23,7 +23,7 @@ Sample input data received by this script
 """
 
 
-def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region):
+def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name):
 
     lad_storage_namepass_list = []
     lad_storage_namepass_str = ""
@@ -108,7 +108,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             min_interval = "999999999s" #arbitrary max value for finding min
             input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
-            
+
             # If it's a lad config then add the namepass fields for sending totals to storage
             if is_lad:
                 lad_plugin_name = plugin + "_total"
@@ -120,7 +120,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 ama_rename_str += "\n[[processors.rename]]\n"
                 ama_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
 
-           
+
             fields = ""
             ops_fields = ""
             non_ops_fields = ""
@@ -130,12 +130,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
-                
+
                 #Use the shortest interval time for the whole plugin
                 new_interval = telegraf_json[omiclass][plugin][field]["interval"]
-                if int(new_interval[:-1]) < int(min_interval[:-1]): 
+                if int(new_interval[:-1]) < int(min_interval[:-1]):
                     min_interval = new_interval
-                
+
                 #compute values for aggregator options
                 if "op" in telegraf_json[omiclass][plugin][field]:
                     if telegraf_json[omiclass][plugin][field]["op"] == "rate":
@@ -143,9 +143,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                         ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
                     ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
                 else:
-                    non_rate_aggregate = True 
+                    non_rate_aggregate = True
                     non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
-                
+
                 #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
                 if int(min_interval[:-1]) > 30:
                     min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
@@ -154,9 +154,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
                 #Add respective rename processor plugin based on the displayname
                 if is_lad:
-                    lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
+                    lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                 else:
-                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n" 
+                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
 
                 if "op" in telegraf_json[omiclass][plugin][field]:
                     if is_lad:
@@ -172,7 +172,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     else:
                         ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
-                        
+
 
             #Add respective operations for aggregators
             if is_lad:
@@ -184,7 +184,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [" + ops + "]\n"
                     aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
-                
+
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
                     aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
@@ -192,7 +192,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
-            
+
 
 
 
@@ -205,7 +205,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             if plugin == "cpu":
                 input_str += " "*2 + "report_active = true\n"
             input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
-        
+
             config_file["data"] = input_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 
             output.append(config_file)
@@ -246,8 +246,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
     for measurement in lad_storage_namepass_list:
         lad_storage_namepass_str += "\"" + measurement + "\", "
-    
-    # Telegraf basic agent and output config 
+
+    # Telegraf basic agent and output config
     agentconf = "[agent]\n"
     agentconf += "  interval = \"10s\"\n"
     agentconf += "  round_interval = true\n"
@@ -259,14 +259,16 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  logtarget = \"file\"\n"
     agentconf += "  logfile = \"" + logFolder + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
-    agentconf += "  logfile_rotation_max_archives = 5\n" 
+    agentconf += "  logfile_rotation_max_archives = 5\n"
     agentconf += "\n# Configuration for adding gloabl tags\n"
     agentconf += "[global_tags]\n"
-    agentconf += "  DeploymentId= \"${DeploymentId}\"\n"          
+    agentconf += "  DeploymentId= \"${DeploymentId}\"\n"
     agentconf += "  \"microsoft.subscriptionId\"= \"" + subscription_id + "\"\n"
     agentconf += "  \"microsoft.resourceGroupName\"= \"" + resource_group + "\"\n"
-    agentconf += "  \"microsoft.regionName\"= \"" + region + "\"\n"          
-    agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"          
+    agentconf += "  \"microsoft.regionName\"= \"" + region + "\"\n"
+    agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"
+    if virtual_machine_name != "":
+        agentconf += "  \"virtualMachine\"= \"" + virtual_machine_name + "\"\n"
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
     if is_lad:
@@ -320,24 +322,24 @@ def get_handler_vars():
                 logFolder = handler_env["handlerEnvironment"]["logFolder"]
             if "configFolder" in handler_env["handlerEnvironment"]:
                 configFolder = handler_env["handlerEnvironment"]["configFolder"]
-    
+
     return logFolder, configFolder
 
 
 def stop_telegraf_service():
-    
+
     # If the VM has systemd, then we will use that to stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         code = 1
         telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
-        
+
         if os.path.isfile(telegraf_service_path):
             code = os.system("sudo systemctl stop metrics-sourcer")
         else:
             # raise Exception("Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service .")
             return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service ."
-        
+
         if code != 0:
             # raise Exception("Unable to stop telegraf service: metrics-sourcer.service .")
             return False, "Unable to stop telegraf service: metrics-sourcer.service. Run systemctl status metrics-sourcer.service for more info."
@@ -365,13 +367,13 @@ def remove_telegraf_service():
     _, configFolder = get_handler_vars()
     telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
     code = 1
-    
+
     if os.path.isfile(telegraf_service_path):
         code = os.remove(telegraf_service_path)
     else:
         #Service file doesnt exist or is already removed, exit the method with exit code 0
         return True, "Metrics sourcer service file doesnt exist or is already removed"
-    
+
     if code != 0:
         # raise Exception("Unable to remove telegraf service: metrics-sourcer.service .")
         return False, "Unable to remove telegraf service: metrics-sourcer.service."
@@ -383,7 +385,7 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
 
     telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
-    
+
 
     if not os.path.exists(telegraf_d_conf_dir):
         raise Exception("Telegraf config directory does not exist. Failed to setup telegraf service.")
@@ -392,17 +394,17 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
     if not os.path.isfile(telegraf_agent_conf):
         raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
         return False
-    
+
     if not os.path.isfile(telegraf_bin):
         raise Exception("Telegraf binary does not exist. Failed to setup telegraf service.")
-        return False       
+        return False
 
     if os.path.isfile(telegraf_service_template_path):
 
         copyfile(telegraf_service_template_path, telegraf_service_path)
 
         if os.path.isfile(telegraf_service_path):
-            os.system(r"sed -i 's+%TELEGRAF_BIN%+{1}+' {0}".format(telegraf_service_path, telegraf_bin)) 
+            os.system(r"sed -i 's+%TELEGRAF_BIN%+{1}+' {0}".format(telegraf_service_path, telegraf_bin))
             os.system(r"sed -i 's+%TELEGRAF_AGENT_CONFIG%+{1}+' {0}".format(telegraf_service_path, telegraf_agent_conf))
             os.system(r"sed -i 's+%TELEGRAF_CONFIG_DIR%+{1}+' {0}".format(telegraf_service_path, telegraf_d_conf_dir))
 
@@ -428,7 +430,7 @@ def start_telegraf():
         service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
         if service_restart_status != 0:
             raise Exception("Unable to start Telegraf service. Failed to setup telegraf service.")
-            return False        
+            return False
 
     #Else start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
     else:
@@ -447,7 +449,7 @@ def start_telegraf():
 
         if p is None: #Process is running successfully
             telegraf_pid = proc.pid
-            
+
             #write this pid to a file for future use
             with open(telegraf_pid_path, "w+") as f:
                 f.write(telegraf_pid)
@@ -456,7 +458,7 @@ def start_telegraf():
             raise Exception("Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err))
             return False
     return True
-    
+
 
 def handle_config(config_data, me_url, mdsd_url, is_lad=False):
     #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
@@ -464,7 +466,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
     #Making the imds call to get resource id, sub id, resource group and region for the dimensions for telegraf metrics
 
     # imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-    # #query imds to get the required information 
+    # #query imds to get the required information
     # req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
     # res = urllib2.urlopen(req)
     # data = json.loads(res.read())
@@ -476,10 +478,10 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
 
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
-        return False   
+        return False
 
     az_resource_id = data["compute"]["resourceId"]
-    
+
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
         return False
@@ -491,15 +493,19 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
         return False
 
     resource_group = data["compute"]["resourceGroupName"]
-    
+
     if "location" not in data["compute"]:
         raise Exception("Unable to find 'location' key in imds query response. Failed to setup Telegraf.")
         return False
 
     region = data["compute"]["location"]
 
+    virtual_machine_name = ""
+    if "vmScaleSetName" in data["compute"] and data["compute"]["vmScaleSetName"] != "":
+        virtual_machine_name = data["compute"]["name"]
+
     #call the method to first parse the configs
-    output, namespaces = parse_config(config_data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region)
+    output, namespaces = parse_config(config_data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name)
 
     _, configFolder = get_handler_vars()
     telegraf_bin = "/usr/local/lad/bin/telegraf"
@@ -518,10 +524,10 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
         if not telegraf_service_setup:
             return False, []
 
-    #Setup and start telegraf 
+    #Setup and start telegraf
     result = start_telegraf()
     if not result:
         return False, []
 
-    
+
     return True, namespaces
