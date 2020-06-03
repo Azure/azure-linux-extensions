@@ -406,15 +406,7 @@ def prepare_update():
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
-
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId) 
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
@@ -453,11 +445,11 @@ def install():
     # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
+    # In the case where a SCOM connection is already present, we should not
+    # create conflicts by installing the OMSAgent packages
     stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
+            and stopOnMultipleConnections is True):
         detect_multiple_connections(workspaceId)
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
@@ -573,13 +565,6 @@ def enable():
         workspaceId = public_settings.get('workspaceId')
         workspaceKey = protected_settings.get('workspaceKey')
         check_workspace_id_and_key(workspaceId, workspaceKey)
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
 
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
