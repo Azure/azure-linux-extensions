@@ -51,7 +51,7 @@ try:
     from Utils.imds_util import ImdsLogger
     import Utils.omsagent_util as oms
     import telegraf_utils.telegraf_config_handler as telhandler
-    import metrics_ext_utils.metrics_ext_handler as me_handler 
+    import metrics_ext_utils.metrics_ext_handler as me_handler
 
 
 except Exception as e:
@@ -281,7 +281,7 @@ def main(command):
             else:
                 stop_mdsd()
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
-            
+
             #Stop the telegraf and ME services
             tel_out, tel_msg = telhandler.stop_telegraf_service()
             if tel_msg:
@@ -304,7 +304,7 @@ def main(command):
                 hutil.error('lad-mdsd remove failed. Still proceeding to uninstall. '
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
-            
+
             #Stop the telegraf and ME services
             tel_out, tel_msg = telhandler.stop_telegraf_service()
             if tel_msg:
@@ -344,10 +344,15 @@ def main(command):
                     g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
-            else:
-                #If the above configurator doesn't get called, then we manually restart Telegraf and ME services
-                telhandler.start_telegraf()
-                me_handler.start_metrics()
+
+            #Start the Telegraf and ME services on Enable after installation is complete
+            hutil.log("Starting metrics sourcer and metrics extension services.")
+            start_telegraf = telhandler.start_telegraf()
+            if start_telegraf:
+                hutil.log("Successfully started metrics-sourcer.")
+            start_metrics = me_handler.start_metrics()
+            if start_metrics:
+                hutil.log("Successfully started metrics-extension.")
 
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()

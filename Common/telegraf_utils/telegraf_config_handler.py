@@ -395,10 +395,6 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
         raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
         return False
 
-    if not os.path.isfile(telegraf_bin):
-        raise Exception("Telegraf binary does not exist. Failed to setup telegraf service.")
-        return False
-
     if os.path.isfile(telegraf_service_template_path):
 
         copyfile(telegraf_service_template_path, telegraf_service_path)
@@ -423,20 +419,24 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
 
 
 def start_telegraf():
+    #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+
+    telegraf_bin = "/usr/local/lad/bin/telegraf"
+    if not os.path.isfile(telegraf_bin):
+        raise Exception("Telegraf binary does not exist. Failed to start telegraf service.")
+        return False
 
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
         if service_restart_status != 0:
-            raise Exception("Unable to start Telegraf service. Failed to setup telegraf service.")
+            raise Exception("Unable to start Telegraf service. Failed to start telegraf service.")
             return False
 
     #Else start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
     else:
-        #Reusing the code to create these variables inside this function because start_telegraf can also be called durint Enable process outisde this script
         _, configFolder = get_handler_vars()
-        telegraf_bin = "/usr/local/lad/bin/telegraf"
         telegraf_conf_dir = configFolder + "/telegraf_configs/"
         telegraf_agent_conf = telegraf_conf_dir + "telegraf.conf"
         telegraf_d_conf_dir = telegraf_conf_dir + "telegraf.d/"
@@ -517,17 +517,12 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
     #call the method to write the configs
     write_configs(output, telegraf_conf_dir, telegraf_d_conf_dir)
 
+    # Setup Telegraf service.
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
         if not telegraf_service_setup:
             return False, []
-
-    #Setup and start telegraf
-    result = start_telegraf()
-    if not result:
-        return False, []
-
 
     return True, namespaces
