@@ -52,7 +52,7 @@ per_MdsdEventSource_tmpl = """      <MdsdEventSource source="{source}">
 """
 
 telegraf_RouteEvent_tmpl = """
-    <RouteEvent eventName="{event_name}"  duration="PT10S" priority="High" storeType="Central" isFullName="true" /> 
+    <RouteEvent eventName="{event_name}"  duration="{interval}" priority="High" storeType="{type}" isFullName="true" />
 """
 
 per_RouteEvent_tmpl = """

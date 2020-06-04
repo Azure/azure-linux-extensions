@@ -76,6 +76,8 @@ g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnos
 # Only 2 globals not following 'g_...' naming convention, for legacy readability...
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
+enable_metrics_ext = False #Flag to enable/disable MetricsExtension
+
 
 
 def init_distro_specific_actions():
@@ -229,6 +231,15 @@ def create_core_components_configs():
             g_ext_settings.redacted_handler_settings())
         return None
 
+    global enable_metrics_ext
+    ladconfig = configurator._ladCfg()
+    sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladconfig, 'performanceCounters')
+    for name in sinks:
+        sink = configurator._sink_configs.get_sink_by_name(name)
+        if sink is not None:
+            if sink['name'] == 'AzMonSink':
+                enable_metrics_ext = True
+
     return configurator
 
 
@@ -332,6 +343,16 @@ def main(command):
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
                 return
 
+            #Start the Telegraf and ME services on Enable after installation is complete
+            start_telegraf = telhandler.start_telegraf()
+            if start_telegraf:
+                hutil.log("Successfully started metrics-sourcer.")
+
+            if enable_metrics_ext:
+                start_metrics = me_handler.start_metrics()
+                if start_metrics:
+                    hutil.log("Successfully started metrics-extension.")
+
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
@@ -345,14 +366,15 @@ def main(command):
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
 
-            #Start the Telegraf and ME services on Enable after installation is complete
-            hutil.log("Starting metrics sourcer and metrics extension services.")
-            start_telegraf = telhandler.start_telegraf()
-            if start_telegraf:
-                hutil.log("Successfully started metrics-sourcer.")
-            start_metrics = me_handler.start_metrics()
-            if start_metrics:
-                hutil.log("Successfully started metrics-extension.")
+                #Start the Telegraf and ME services on Enable after installation is complete
+                start_telegraf = telhandler.start_telegraf()
+                if start_telegraf:
+                    hutil.log("Successfully started metrics-sourcer.")
+
+                if enable_metrics_ext:
+                    start_metrics = me_handler.start_metrics()
+                    if start_metrics:
+                        hutil.log("Successfully started metrics-extension.")
 
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()

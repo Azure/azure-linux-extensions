@@ -161,45 +161,76 @@ class LadLoggingConfig:
                                                                    syslog_name_to_rsyslog_name(sev))
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._syslog_ng_config
-    
-    def parse_lad_perf_settings(self, data): 
+
+    def parse_lad_perf_settings(self, ladconfig):
         """
-        Sample OMI metric json config taken from .settings file
+        Sample OMI metric json config can be of two types, taken from .settings file
+        It can have sampleRate key, if not then it defaults to sampleRateInSeconds key in the larger lad_cfg element
+
         {
-            u'counterSpecifier': u'/builtin/network/packetstransmitted', 
-            u'counter': u'packetstransmitted', 
-            u'class': u'network', 
-            u'sampleRate': u'PT15S', 
-            u'type': u'builtin', 
+            u'counterSpecifier': u'/builtin/network/packetstransmitted',
+            u'counter': u'packetstransmitted',
+            u'class': u'network',
+            u'sampleRate': u'PT15S',
+            u'type': u'builtin',
             u'annotation': [{
-                    u'locale': u'en-us', 
+                    u'locale': u'en-us',
                     u'displayName': u'Packets sent'
                 }],
             u'unit': u'Count'
         }
+
+
+        "annotation": [
+            {
+            "displayName": "Disk write guest OS",
+            "locale": "en-us"
+            }
+        ],
+        "class": "disk",
+        "condition": "IsAggregate=TRUE",
+        "counter": "writebytespersecond",
+        "counterSpecifier": "/builtin/disk/writebytespersecond",
+        "type": "builtin",
+        "unit": "BytesPerSecond"
+          },
         """
+        if not ladconfig:
+            return []
+        data = []
+        default_sample_rate = "15s"  #Lowest supported time interval
+        if "sampleRateInSeconds" in ladconfig and ladconfig["sampleRateInSeconds"] != "":
+            default_sample_rate = str(ladconfig["sampleRateInSeconds"]) + "s" #Example, converting 15 to 15s
+
+        if 'diagnosticMonitorConfiguration' in ladconfig and "performanceCounters" in ladconfig['diagnosticMonitorConfiguration']:
+            data =  ladconfig['diagnosticMonitorConfiguration']["performanceCounters"]
+        else:
+            return []
 
         if "performanceCounterConfiguration" not in data or len(data["performanceCounterConfiguration"]) == 0:
             return []
-        
+
         parsed_settings = []
         perfconf = data["performanceCounterConfiguration"]
 
         for item in perfconf:
             counter = {}
             counter["displayName"] = item["class"] + "->" + item["annotation"][0]["displayName"]
-            counter["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S tp 15s
+            if "sampleRate" in item:
+                counter["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S to 15s
+            else:
+                counter["interval"] = default_sample_rate
             parsed_settings.append(counter)
 
         """
-        Sample output after parsing the OMI metric 
+        Sample output after parsing the OMI metric
         [
             {
                 "displayName" : "Network->Packets sent",
                 "interval" : "15s"
             },
         ]
-        """    
+        """
         return parsed_settings
 
     def get_mdsd_syslog_config(self):
@@ -242,17 +273,17 @@ class LadLoggingConfig:
         return mxt.top_level_tmpl_for_logging_only.format(
             sources=mxt.per_source_tmpl.format(name=syslog_src_name), events=mdsd_event_source, eh_urls=syslog_eh_urls)
 
-    def get_mdsd_telegraf_config(self, namespaces, eventname1H, eventname1M):
+    def get_mdsd_telegraf_config(self, namespaces, eventnames, intervals, json_sinks):
         """
         Get mdsd XML config string for telegraf use with mdsd in LAD 3.0.
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for telegraf use with mdsd in LAD 3.0.
         """
         if not self._mdsd_telegraf_config:
-            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces, eventname1H, eventname1M)
+            self._mdsd_telegraf_config = self.__generate_mdsd_telegraf_config(namespaces, eventnames, intervals, json_sinks)
         return self._mdsd_telegraf_config
 
-    def __generate_mdsd_telegraf_config(self, namespaces, eventname1H, eventname1M):
+    def __generate_mdsd_telegraf_config(self, namespaces, eventnames, intervals, json_sinks):
         """
         Helper method to generate mdsd_telegraf_config
         """
@@ -262,12 +293,15 @@ class LadLoggingConfig:
         telegraf_sources = ""
         telegraf_routeevents = ""
         mdsd_event_source = ""
-        telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname1H)
-        telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=eventname1M)
+        for i in range(len(eventnames)):
+            telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=eventnames[i], interval=intervals[i], type="Central")
+            for sink in json_sinks:
+                telegraf_routeevents += mxt.telegraf_RouteEvent_tmpl.format(event_name=sink["name"], interval=intervals[i], type="JsonBlob")
+
 
         for plugin in namespaces:
             # # For telegraf conf we create a Source for each of the measurements(plugins) sent from telegraf
-            # # dest table (eventName) template is WADMetrics{0}P10DV2S. 
+            # # dest table (eventName) template is WADMetrics{0}P10DV2S.
             lad_specific_storage_plugin = "storage-" + plugin
             telegraf_sources += mxt.per_source_tmpl.format(name=lad_specific_storage_plugin)
             mdsd_event_source += mxt.per_MdsdEventSource_tmpl.format(source=lad_specific_storage_plugin,

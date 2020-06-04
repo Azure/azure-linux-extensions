@@ -2,6 +2,7 @@ import urllib2
 import json
 import os
 from shutil import copyfile
+import stat
 
 def stop_metrics_service():
 
@@ -314,8 +315,21 @@ def setup_me(is_lad):
     with open(custom_conf_path, "w") as f:
         f.write(custom_conf)
 
+    #Copy MetricsExtension Binary to the bin location
+    me_bin_local_path = os.getcwd() + "/MetricsExtensionBin/MetricsExtension"
+    metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    if os.path.isfile(me_bin_local_path):
+        copyfile(me_bin_local_path, metrics_ext_bin)
+        os.chmod(metrics_ext_bin,stat.S_IXOTH)
+    else:
+        raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to setup ME.".format(me_bin_local_path))
+        return False
+
+
     #setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         setup_me_service(me_config_dir, me_monitoring_account)
+
+    return True
