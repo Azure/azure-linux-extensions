@@ -1,4 +1,4 @@
-name_map = { 
+name_map = {
 
 ######These are the counter keys and telegraf plugins for LAD
 
@@ -22,11 +22,11 @@ name_map = {
 "memory->Memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
 "memory->Mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
 "memory->Memory used" : {"plugin":"mem", "field":"used", "ladtablekey":"/builtin/memory/usedmemory"},
-"memory->Memory percentage" : {"plugin":"mem", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedmemory"}, 
+"memory->Memory percentage" : {"plugin":"mem", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedmemory"},
 
 "memory->Swap available" : {"plugin":"swap", "field":"free", "ladtablekey":"/builtin/memory/availableswap"},
 "memory->Swap percent available" : {"plugin":"swap", "field":"free_percent", "ladtablekey":"/builtin/memory/percentavailableswap"}, #Need to calculate percentage
-"memory->Swap used" : {"plugin":"swap", "field":"used", "ladtablekey":"/builtin/memory/usedswap"}, 
+"memory->Swap used" : {"plugin":"swap", "field":"used", "ladtablekey":"/builtin/memory/usedswap"},
 "memory->Swap percent used" : {"plugin":"swap", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedswap"},
 
 "memory->Page reads": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"rate", "ladtablekey":"/builtin/memory/pagesreadpersec"},
@@ -34,9 +34,9 @@ name_map = {
 "memory->Pages" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate", "ladtablekey":"/builtin/memory/pagespersec"},
 
 #OMI Filesystem plugin
-"filesystem->Filesystem used space" : {"plugin":"disk", "field":"used_mb", "ladtablekey":"/builtin/filesystem/usedspace"},
+"filesystem->Filesystem used space" : {"plugin":"disk", "field":"used", "ladtablekey":"/builtin/filesystem/usedspace"},
 "filesystem->Filesystem % used space" : {"plugin":"disk", "field":"used_percent", "ladtablekey":"/builtin/filesystem/percentusedspace"},
-"filesystem->Filesystem free space" : {"plugin":"disk", "field":"free_mb", "ladtablekey":"/builtin/filesystem/freespace"},
+"filesystem->Filesystem free space" : {"plugin":"disk", "field":"free", "ladtablekey":"/builtin/filesystem/freespace"},
 "filesystem->Filesystem % free space" : {"plugin":"disk", "field":"free_percent", "ladtablekey":"/builtin/filesystem/percentfreespace"}, #Need to calculate percentage
 "filesystem->Filesystem % free inodes" : {"plugin":"disk", "field":"inodes_free_percent", "ladtablekey":"/builtin/filesystem/percentfreeinodes"}, #Need to calculate percentage
 "filesystem->Filesystem % used inodes" : {"plugin":"disk", "field":"inodes_used_percent", "ladtablekey":"/builtin/filesystem/percentusedinodes"}, #Need to calculate percentage
@@ -48,7 +48,7 @@ name_map = {
 "filesystem->Filesystem reads/sec" : {"plugin":"diskio", "field":"reads_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/readspersecond"}, #Need to calculate rate (but each second not each interval)
 "filesystem->Filesystem writes/sec" : {"plugin":"diskio", "field":"writes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/writespersecond"}, #Need to calculate rate (but each second not each interval)
 
-# #OMI Disk plugin 
+# #OMI Disk plugin
 "disk->Disk read guest OS" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
 "disk->Disk write guest OS" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},
 "disk->Disk total bytes" : {"plugin":"diskio", "field":"total_bytes", "op":"rate", "ladtablekey":"/builtin/disk/bytespersecond"},

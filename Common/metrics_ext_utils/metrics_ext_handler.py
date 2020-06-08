@@ -3,6 +3,7 @@ import json
 import os
 from shutil import copyfile
 import stat
+import filecmp
 
 def stop_metrics_service():
 
@@ -43,23 +44,67 @@ def remove_metrics_service():
     _, configFolder = get_handler_vars()
     metrics_service_path = "/lib/systemd/system/metrics-extension.service"
 
-    code = 1
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
+
+    if is_lad:
+        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
     else:
-        #Service file doesnt exist or is already removed, exit the method with exit code 0
-        return True, "Metrics Extension service file doesnt exist or is already removed"
+        metrics_ext_bin = "/usr/sbin/MetricsExtension"
 
-    if code != 0:
-        return False, "Unable to remove metrics-extension service: metrics-extension.service."
+    # Checking To see if the files were successfully removed, since os.remove doesn't return an error code
+    if os.path.isfile(metrics_ext_bin):
+        remove_code = os.remove(metrics_ext_bin)
 
-    return True, "Successfully removed metrics-extensions service"
+    if os.path.isfile(metrics_ext_bin):
+        return False, "Unable to remove MetricsExtension binary at {0}".format(metrics_ext_bin)
+
+    if os.path.isfile(metrics_service_path):
+        return False, "Unable to remove MetricsExtension service file at {0}.".format(metrics_service_path)
+
+    return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
 
-def setup_me_service(configFolder, monitoringAccount):
+def generate_MSI_token():
+    _, configFolder = get_handler_vars()
+    me_config_dir = configFolder + "/metrics_configs/"
+    me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
+    expiry_epoch_time = ""
+
+
+    if not os.path.exists(me_config_dir):
+        raise Exception("Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token for ME.".format(me_config_dir))
+        return False, expiry_epoch_time
+    try:
+        msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+        req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+        res = urllib2.urlopen(req)
+        data = json.loads(res.read())
+
+
+        if not data or "access_token" not in data:
+            raise Exception("Invalid MSI auth token generation at {0}. Please check the file contents.".format(me_auth_file_path))
+            return False, expiry_epoch_time
+
+        with open(me_auth_file_path, "w") as f:
+            f.write(json.dumps(data))
+
+        if "expires_on" in data:
+            expiry_epoch_time  = data["expires_on"]
+        else:
+            raise Exception("Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token".format(me_auth_file_path))
+
+    except Exception as e:
+        raise Exception("Failed to get msi auth token. Please check if VM's system assigned Identity is enabled. Failed with error {0}".format(e))
+
+    return True, expiry_epoch_time
+
+
+
+
+def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
 
     me_service_path = "/lib/systemd/system/metrics-extension.service"
-    metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
@@ -72,6 +117,7 @@ def setup_me_service(configFolder, monitoringAccount):
 
         if os.path.isfile(me_service_path):
             os.system(r"sed -i 's+%ME_BIN%+{1}+' {0}".format(me_service_path, metrics_ext_bin))
+            os.system(r"sed -i 's+%ME_INFLUX_PORT%+{1}+' {0}".format(me_service_path, me_influx_port))
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
@@ -88,13 +134,17 @@ def setup_me_service(configFolder, monitoringAccount):
 
 
 
-def start_metrics():
+def start_metrics(is_lad):
     #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
 
-    metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    if is_lad:
+        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    else:
+        metrics_ext_bin = "/usr/sbin/MetricsExtension"
     if not os.path.isfile(metrics_ext_bin):
         raise Exception("Metrics Extension binary does not exist. Failed to start ME service.")
         return False
+    me_influx_port = "8139"
 
 
     # If the VM has systemd, then we use that to start/stop
@@ -114,7 +164,7 @@ def start_metrics():
         monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource HOBO -Input influxdb_udp -InfluxDbUdpPort 8139 -DataDirectory {1} -LocalControlChannel -MonitoringAccount {2}".format(metrics_ext_bin, me_config_dir, monitoringAccount)
+        binary_exec_command = "{0} -TokenSource HOBO -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3}".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
@@ -235,12 +285,12 @@ def get_handler_vars():
 
 def get_imds_values():
 
-    # imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-    # #query imds to get the required information
-    # req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-    # res = urllib2.urlopen(req)
-    # data = json.loads(res.read())
-    data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
+    imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    #query imds to get the required information
+    req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
+    res = urllib2.urlopen(req)
+    data = json.loads(res.read())
+    # data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
 
     if "compute" not in data:
         raise Exception("Unable to find 'compute' key in imds query response. Failed to setup ME.")
@@ -268,7 +318,6 @@ def get_imds_values():
 
 
 def setup_me(is_lad):
-
 
     #query imds to get the required information
     az_resource_id, subscription_id, location, data = get_imds_values()
@@ -315,21 +364,38 @@ def setup_me(is_lad):
     with open(custom_conf_path, "w") as f:
         f.write(custom_conf)
 
-    #Copy MetricsExtension Binary to the bin location
+    # Copy MetricsExtension Binary to the bin location
     me_bin_local_path = os.getcwd() + "/MetricsExtensionBin/MetricsExtension"
-    metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    if is_lad:
+        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    else:
+        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+
+    # Check if previous file exist at the location, compare the two binaries,
+    # If the files are not same, remove the older file, and copy the new one
+    # If they are the same, then we ignore it and don't copy
     if os.path.isfile(me_bin_local_path):
-        copyfile(me_bin_local_path, metrics_ext_bin)
-        os.chmod(metrics_ext_bin,stat.S_IXOTH)
+        if os.path.isfile(metrics_ext_bin):
+            if not filecmp.cmp(me_bin_local_path, metrics_ext_bin):
+                # Removing the file in case it is already being run in a process,
+                # in which case we can get an error "text file busy" while copying
+                os.remove(metrics_ext_bin)
+                copyfile(me_bin_local_path, metrics_ext_bin)
+                os.chmod(metrics_ext_bin,stat.S_IXOTH)
+
+        else:
+            # No previous binary exist, simply copy it and make it executable
+            copyfile(me_bin_local_path, metrics_ext_bin)
+            os.chmod(metrics_ext_bin,stat.S_IXOTH)
     else:
         raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to setup ME.".format(me_bin_local_path))
         return False
 
-
-    #setup metrics extension service
+    me_influx_port = "8139"
+    # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
-        setup_me_service(me_config_dir, me_monitoring_account)
+        setup_me_service(me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
 
     return True

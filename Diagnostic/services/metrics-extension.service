@@ -3,7 +3,7 @@ Description=Metrics Extension service for Linux Agent metrics sourcing
 After=network.target
 
 [Service]
-ExecStart=%ME_BIN% -TokenSource HOBO -Input influxdb_udp -InfluxDbUdpPort 8139 -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT%
+ExecStart=%ME_BIN% -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort %ME_INFLUX_PORT% -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT%
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartForceExitStatus=SIGPIPE

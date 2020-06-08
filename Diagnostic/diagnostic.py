@@ -28,6 +28,7 @@ import threading
 import time
 import traceback
 import xml.etree.ElementTree as ET
+import json
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
@@ -77,6 +78,7 @@ g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnos
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
 enable_metrics_ext = False #Flag to enable/disable MetricsExtension
+me_msi_token_expiry_epoch = None
 
 
 
@@ -344,13 +346,19 @@ def main(command):
                 return
 
             #Start the Telegraf and ME services on Enable after installation is complete
-            start_telegraf = telhandler.start_telegraf()
-            if start_telegraf:
+            start_telegraf_out = telhandler.start_telegraf(True)
+            if start_telegraf_out:
                 hutil.log("Successfully started metrics-sourcer.")
 
             if enable_metrics_ext:
-                start_metrics = me_handler.start_metrics()
-                if start_metrics:
+                # Generate/regenerate MSI Token required by ME
+                global me_msi_token_expiry_epoch
+                msi_token_generated, me_msi_token_expiry_epoch = me_handler.generate_MSI_token()
+                if msi_token_generated:
+                    hutil.log("Successfully generated metrics-extension MSI Auth token.")
+
+                start_metrics_out = me_handler.start_metrics(True)
+                if start_metrics_out:
                     hutil.log("Successfully started metrics-extension.")
 
             if g_dist_config.use_systemd():
@@ -367,13 +375,42 @@ def main(command):
                     return
 
                 #Start the Telegraf and ME services on Enable after installation is complete
-                start_telegraf = telhandler.start_telegraf()
-                if start_telegraf:
+                start_telegraf_out = telhandler.start_telegraf(True)
+                if start_telegraf_out:
                     hutil.log("Successfully started metrics-sourcer.")
 
                 if enable_metrics_ext:
-                    start_metrics = me_handler.start_metrics()
-                    if start_metrics:
+                    # Generate/regenerate MSI Token required by ME
+                    global me_msi_token_expiry_epoch
+                    generate_token = False
+                    me_token_path = g_ext_dir + "/metrics_configs/AuthToken-MSI.json"
+
+                    if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
+                        if os.path.isfile(me_token_path):
+                            with open(me_token_path, "r") as f:
+                                authtoken_content = f.read()
+                                if authtoken_content and "expires_on" in authtoken_content:
+                                    me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                else:
+                                    generate_token = True
+                        else:
+                            generate_token = True
+
+                    if me_msi_token_expiry_epoch:
+                        currentTime = datetime.datetime.now()
+                        token_expiry_time = datetime.datetime.fromtimestamp(me_msi_token_expiry_epoch)
+                        if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                            # The MSI Token will expire within 30 minutes. We need to refresh the token
+                            generate_token = True
+
+                    if generate_token:
+                        generate_token = False
+                        msi_token_generated, me_msi_token_expiry_epoch = me_handler.generate_MSI_token()
+                        if msi_token_generated:
+                            hutil.log("Successfully refreshed metrics-extension MSI Auth token.")
+
+                    start_metrics_out = me_handler.start_metrics(True)
+                    if start_metrics_out:
                         hutil.log("Successfully started metrics-extension.")
 
             if g_dist_config.use_systemd():
@@ -545,6 +582,36 @@ def start_mdsd(configurator):
                 omi_installed = restart_omi_if_crashed(omi_installed, mdsd)
                 # 3. Check if there's any new logs in mdsd.err and report
                 last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
+                # 4. Regenerate the MSI auth token required for ME if it is nearing expiration
+                if enable_metrics_ext:
+                    # Generate/regenerate MSI Token required by ME
+                    global me_msi_token_expiry_epoch
+                    generate_token = False
+                    me_token_path = g_ext_dir + "/config/metrics_configs/AuthToken-MSI.json"
+
+                    if me_msi_token_expiry_epoch is None  or me_msi_token_expiry_epoch == "":
+                        if os.path.isfile(me_token_path):
+                            with open(me_token_path, "r") as f:
+                                authtoken_content = json.loads(f.read())
+                                if authtoken_content and "expires_on" in authtoken_content:
+                                    me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                else:
+                                    generate_token = True
+                        else:
+                            generate_token = True
+
+                    if me_msi_token_expiry_epoch:
+                        currentTime = datetime.datetime.now()
+                        token_expiry_time = datetime.datetime.fromtimestamp(float(me_msi_token_expiry_epoch))
+                        if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                            # The MSI Token will expire within 30 minutes. We need to refresh the token
+                            generate_token = True
+
+                    if generate_token:
+                        generate_token = False
+                        msi_token_generated, me_msi_token_expiry_epoch = me_handler.generate_MSI_token()
+                        if msi_token_generated:
+                            hutil.log("Successfully refreshed metrics-extension MSI Auth token.")
 
             # Out of the inner while loop: mdsd terminated.
             if mdsd_stdout_stream:

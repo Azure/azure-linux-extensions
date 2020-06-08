@@ -30,6 +30,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
     ama_storage_namepass_list = []
     ama_storage_namepass_str = ""
+    MetricsExtensionNamepsace = "Azure.Linux.VM.Metrics"
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -100,12 +101,14 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     for omiclass in telegraf_json:
         input_str = ""
         ama_rename_str = ""
+        metricsext_rename_str = ""
         lad_specific_rename_str = ""
         rate_specific_aggregator_str = ""
         aggregator_str = ""
         for plugin in telegraf_json[omiclass]:
             config_file = {"filename" : omiclass+".conf"}
-            min_interval = "999999999s" #arbitrary max value for finding min
+            # Arbitrary max value for finding min
+            min_interval = "999999999s"
             input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
 
@@ -119,6 +122,13 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             else:
                 ama_rename_str += "\n[[processors.rename]]\n"
                 ama_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+
+            metricsext_rename_str += "\n[[processors.rename]]\n"
+            metricsext_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+            metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+            metricsext_rename_str += " "*4 + "measurement = \"" + plugin + "\"\n"
+            metricsext_rename_str += " "*4 + "dest = \"" + MetricsExtensionNamepsace + "\"\n"
+
 
 
             fields = ""
@@ -158,21 +168,17 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 else:
                     ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
 
-                if "op" in telegraf_json[omiclass][plugin][field]:
-                    if is_lad:
-                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                        lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
-                    else:
-                        ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                        ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
-                else:
-                    if is_lad:
-                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                        lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
-                    else:
-                        ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                        ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
+                metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
 
+                if is_lad:
+                    lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                    lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
+                else:
+                    ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                    ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
+
+                metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
 
             #Add respective operations for aggregators
             if is_lad:
@@ -201,12 +207,13 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             else:
                 ama_rename_str += "\n"
 
-            input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"  #Using fields[: -2] here to get rid of the last ", " at the end of the string
+            # Using fields[: -2] here to get rid of the last ", " at the end of the string
+            input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"
             if plugin == "cpu":
                 input_str += " "*2 + "report_active = true\n"
             input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
 
-            config_file["data"] = input_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
+            config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 
             output.append(config_file)
             config_file = {}
@@ -337,11 +344,9 @@ def stop_telegraf_service():
         if os.path.isfile(telegraf_service_path):
             code = os.system("sudo systemctl stop metrics-sourcer")
         else:
-            # raise Exception("Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service .")
             return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service ."
 
         if code != 0:
-            # raise Exception("Unable to stop telegraf service: metrics-sourcer.service .")
             return False, "Unable to stop telegraf service: metrics-sourcer.service. Run systemctl status metrics-sourcer.service for more info."
     else:
         #This VM does not have systemd, So we will use the pid from the last ran telegraf process and terminate it
@@ -371,12 +376,11 @@ def remove_telegraf_service():
     if os.path.isfile(telegraf_service_path):
         code = os.remove(telegraf_service_path)
     else:
-        #Service file doesnt exist or is already removed, exit the method with exit code 0
-        return True, "Metrics sourcer service file doesnt exist or is already removed"
+        return True, "Unable to remove the Telegraf service as the file doesn't exist."
 
-    if code != 0:
-        # raise Exception("Unable to remove telegraf service: metrics-sourcer.service .")
-        return False, "Unable to remove telegraf service: metrics-sourcer.service."
+    # Checking To see if the file was successfully removed, since os.remove doesn't return an error code
+    if os.path.isfile(telegraf_service_path):
+        return False, "Unable to remove telegraf service: metrics-sourcer.service at {0}.".format(telegraf_service_path)
 
     return True, "Successfully removed metrics-sourcer service"
 
@@ -418,10 +422,14 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
     return True
 
 
-def start_telegraf():
+def start_telegraf(is_lad):
     #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
 
-    telegraf_bin = "/usr/local/lad/bin/telegraf"
+    if is_lad:
+        telegraf_bin = "/usr/local/lad/bin/telegraf"
+    else:
+        telegraf_bin = "/usr/sbin/telegraf"
+
     if not os.path.isfile(telegraf_bin):
         raise Exception("Telegraf binary does not exist. Failed to start telegraf service.")
         return False
@@ -444,13 +452,15 @@ def start_telegraf():
 
         binary_exec_command = "{0} --config {1} --config-directory {2}".format(telegraf_bin, telegraf_agent_conf, telegraf_d_conf_dir)
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
+        # Sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
+        time.sleep(3)
         p = proc.poll()
 
-        if p is None: #Process is running successfully
+        # Process is running successfully
+        if p is None:
             telegraf_pid = proc.pid
 
-            #write this pid to a file for future use
+            # Write this pid to a file for future use
             with open(telegraf_pid_path, "w+") as f:
                 f.write(telegraf_pid)
         else:
@@ -460,18 +470,18 @@ def start_telegraf():
     return True
 
 
-def handle_config(config_data, me_url, mdsd_url, is_lad=False):
+def handle_config(config_data, me_url, mdsd_url, is_lad):
     #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
 
     #Making the imds call to get resource id, sub id, resource group and region for the dimensions for telegraf metrics
 
-    # imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-    # #query imds to get the required information
-    # req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-    # res = urllib2.urlopen(req)
-    # data = json.loads(res.read())
+    imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    #query imds to get the required information
+    req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
+    res = urllib2.urlopen(req)
+    data = json.loads(res.read())
 
-    data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
+    # data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
     if "compute" not in data:
         raise Exception("Unable to find 'compute' key in imds query response. Failed to setup Telegraf.")
         return False
@@ -508,7 +518,11 @@ def handle_config(config_data, me_url, mdsd_url, is_lad=False):
     output, namespaces = parse_config(config_data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name)
 
     _, configFolder = get_handler_vars()
-    telegraf_bin = "/usr/local/lad/bin/telegraf"
+    if is_lad:
+        telegraf_bin = "/usr/local/lad/bin/telegraf"
+    else:
+        telegraf_bin = "/usr/sbin/telegraf"
+
     telegraf_conf_dir = configFolder + "/telegraf_configs/"
     telegraf_agent_conf = telegraf_conf_dir + "telegraf.conf"
     telegraf_d_conf_dir = telegraf_conf_dir + "telegraf.d/"
