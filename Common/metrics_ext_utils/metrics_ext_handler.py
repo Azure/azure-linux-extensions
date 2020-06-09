@@ -7,6 +7,11 @@ import filecmp
 
 def stop_metrics_service():
 
+    if is_lad:
+        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+    else:
+        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+
     # If the VM has systemd, then we will use that to stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
@@ -31,8 +36,13 @@ def stop_metrics_service():
             with open(metrics_pid_path, "r") as f:
                 pid = f.read()
             if pid != "":
-                os.kill(pid, signal.SIGKILL)
-            else:
+                # Check if the process running is indeed MetricsExtension, ignore if the process output doesn't contain MetricsExtension
+                proc = subprocess.Popen(["ps -o cmd= {}".format(pid)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if metrics_ext_bin in output:
+                    os.kill(pid, signal.SIGKILL)
+                else:
+                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)            else:
                 return False, "No pid found for a currently running Metrics Extension process in {0}. Failed to stop Metrics Extension.".format(metrics_pid_path)
         else:
             return False, "File containing the pid for the running Metrics Extension process at {0} does not exit. Failed to stop Metrics Extension".format(metrics_pid_path)

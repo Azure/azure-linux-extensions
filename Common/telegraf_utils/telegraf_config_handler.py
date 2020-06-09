@@ -335,6 +335,11 @@ def get_handler_vars():
 
 def stop_telegraf_service():
 
+    if is_lad:
+        telegraf_bin = "/usr/local/lad/bin/telegraf"
+    else:
+        telegraf_bin = "/usr/sbin/telegraf"
+
     # If the VM has systemd, then we will use that to stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
@@ -358,7 +363,13 @@ def stop_telegraf_service():
             with open(telegraf_pid_path, "r") as f:
                 pid = f.read()
             if pid != "":
-                os.kill(pid, signal.SIGKILL)
+                # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
+                proc = subprocess.Popen(["ps -o cmd= {}".format(pid)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if telegraf_bin in output:
+                    os.kill(pid, signal.SIGKILL)
+                else:
+                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
             else:
                 return False, "No pid found for an currently running telegraf process in {0}. Failed to stop telegraf.".format(telegraf_pid_path)
         else:
@@ -371,10 +382,9 @@ def remove_telegraf_service():
 
     _, configFolder = get_handler_vars()
     telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
-    code = 1
 
     if os.path.isfile(telegraf_service_path):
-        code = os.remove(telegraf_service_path)
+        os.remove(telegraf_service_path)
     else:
         return True, "Unable to remove the Telegraf service as the file doesn't exist."
 
