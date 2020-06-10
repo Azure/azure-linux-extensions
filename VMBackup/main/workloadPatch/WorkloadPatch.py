@@ -41,6 +41,7 @@ class WorkloadPatch:
         self.child = []
         self.timeout = 90
         self.confParser()
+        self.oracleUser="AzureBackup"
 
     def pre(self):
         try:
@@ -88,10 +89,10 @@ class WorkloadPatch:
 
     def preMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-            os.remove("/var/lib/mysql-files/azbackupserver.txt")
-        else:
-            self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+        #if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+        #    os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        #else:
+        #    self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
             
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
@@ -103,6 +104,31 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: Waiting for sql to complete")
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
+        
+        if 'oracle' in self.name.lower():
+            self.logger.log("Shrid: Pre- Entering pre mode for master")
+            preOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
+            args = ["su", "-", self.oracleUser, "-c", preOracle]
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            while process.poll()==None:
+                sleep(1)
+            self.timeoutDaemon()
+            self.logger.log("Shrid: Pre- Exiting pre mode for master")
+    
+    def timeoutDaemon(self):
+        global preDaemonThread
+        if 'oracle' in self.name.lower():
+            preDaemonOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/preDaemon.sql " + str(self.timeout)
+            argsDaemon = ["su", "-", self.oracleUser, "-c", preDaemonOracle]
+            preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
+            preDaemonThread.start()
+        self.logger.log("Shrid: timeoutDaemon started")
+
+    def threadForPreDaemon(self, args): 
+            global daemonProcess
+            daemonProcess = subprocess.Popen(args, stdout=subprocess.PIPE)
+            while daemonProcess.poll()==None:
+                sleep(1)
             
     def thread_for_sql(self,args):
         self.logger.log("command to execute: "+str(args))
@@ -116,7 +142,7 @@ class WorkloadPatch:
 
 
     def preMasterDB(self):
-        for dbname in dbnames:
+        for dbname in self.dbnames:
             if 'mysql' in self.name.lower():#TODO DB level
                 args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/preMysqlMaster.sql"
                 binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
@@ -131,20 +157,36 @@ class WorkloadPatch:
     
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-            os.remove("/var/lib/mysql-files/azbackupserver.txt")
-        else:
-            self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-        if len(self.child) == 0:
-            self.logger.log("WorkloadPatch: Not app consistent backup")
-            self.error_details.append("not app consistent")
-        elif self.child[0].poll() is None:
-            self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-            self.child[0].kill()
+        #if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+        #    os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        #else:
+        #    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+        
         if 'mysql' in self.name.lower():
+            if len(self.child) == 0:
+                self.logger.log("WorkloadPatch: Not app consistent backup")
+                self.error_details.append("not app consistent")
+            elif self.child[0].poll() is None:
+                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                self.child[0].kill()
             self.logger.log("WorkloadPatch: Create connection string for post master")
             args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
+
+        if 'oracle' in self.name.lower():
+            if preDaemonThread.isAlive():
+                self.logger.log("Shird: Post- Backup successful")
+                self.logger.log("Shrid: Post- Initiating Post Script")
+                daemonProcess.terminate()
+            else:
+                self.logger.log("Shrid: Post- Backup unsuccessful")
+                return
+            postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
+            args = ["su", "-", self.oracleUser, "-c", postOracle]
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            while process.poll()==None:
+                sleep(1)
+            self.logger.log("Shrid: Post- Completed")
 
     def postMasterDB(self):
         pass
