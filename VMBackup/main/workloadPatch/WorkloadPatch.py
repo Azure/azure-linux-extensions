@@ -30,7 +30,7 @@ import subprocess
 class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
-        self.name = "oracle"
+        self.name = 'oracle'
         self.command = "/usr/bin/"
         self.dbnames = []
         self.login_path = "oracle"
@@ -48,6 +48,7 @@ class WorkloadPatch:
             if self.role == "master" and int(self.enforce_slave_only) == 0:
                 if len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
+                    self.logger.log("WorkloadPatch: Entered if conditions inside pre")
                     self.preMaster()
                 else:
                     self.preMasterDB()
@@ -67,9 +68,10 @@ class WorkloadPatch:
 
     def post(self):
         try:
-            self.logger.log("WorkloadPatch: Entering workload pre call")
+            self.logger.log("WorkloadPatch: Entering workload post call")
             if self.role == "master":
-                if len(self.dbnames) == 0 :
+                if len(self.dbnames) == 0:
+                    self.logger.log("WorkloadPatch: Entered if conditions inside post")
                     #post at server level to turn off readonly mode
                     self.postMaster()
                 else:
@@ -87,7 +89,7 @@ class WorkloadPatch:
             self.error_details.append("exception in processing of postscript")
 
     def preMaster(self):
-        self.logger.log("WorkloadPatch: Entering post mode for master")
+        self.logger.log("WorkloadPatch: Entering pre mode for master")
         #if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
         #    os.remove("/var/lib/mysql-files/azbackupserver.txt")
         #else:
@@ -104,7 +106,7 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
         
-        if 'oracle' in self.name.lower():
+        if self.name=='oracle':
             self.logger.log("Shrid: Pre- Entering pre mode for master")
             preOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
@@ -116,7 +118,8 @@ class WorkloadPatch:
     
     def timeoutDaemon(self):
         global preDaemonThread
-        if 'oracle' in self.name.lower():
+        if self.name=='oracle':
+            self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             preDaemonOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/preDaemon.sql " + str(self.timeout)
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
@@ -171,20 +174,39 @@ class WorkloadPatch:
             args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
-        if 'oracle' in self.name.lower():
-            if preDaemonThread.isAlive():
-                self.logger.log("Shird: Post- Backup successful")
-                self.logger.log("Shrid: Post- Initiating Post Script")
-                daemonProcess.terminate()
-            else:
-                self.logger.log("Shrid: Post- Backup unsuccessful")
-                return
-            postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
-            args = ["su", "-", self.login_path, "-c", postOracle]
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
-            while process.poll()==None:
-                sleep(1)
-            self.logger.log("Shrid: Post- Completed")
+        try:
+            if 'oracle' in self.name.lower():
+                self.logger.log("Shird: Post- Inside try")
+                if preDaemonThread.isAlive():
+                    self.logger.log("Shird: Post- Backup successful")
+                    self.logger.log("Shrid: Post- Initiating Post Script")
+                    daemonProcess.terminate()
+                else:
+                    self.logger.log("Shrid: Post- Backup unsuccessful")
+                    return
+                postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
+                args = ["su", "-", self.login_path, "-c", postOracle]
+                process = subprocess.Popen(args, stdout=subprocess.PIPE)
+                while process.poll()==None:
+                    sleep(1)
+                self.logger.log("Shrid: Post- Completed")
+        except Exception as e:
+            if self.name=='oracle':
+                self.logger.log("Shird: Post- Inside except")
+                if preDaemonThread.isAlive():
+                    self.logger.log("Shird: Post- Backup successful")
+                    self.logger.log("Shrid: Post- Initiating Post Script")
+                    daemonProcess.terminate()
+                else:
+                    self.logger.log("Shrid: Post- Backup unsuccessful")
+                    return
+                postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
+                args = ["su", "-", self.login_path, "-c", postOracle]
+                process = subprocess.Popen(args, stdout=subprocess.PIPE)
+                while process.poll()==None:
+                    sleep(1)
+                self.logger.log("Shrid: Post- Completed")
+
 
     def postMasterDB(self):
         pass
