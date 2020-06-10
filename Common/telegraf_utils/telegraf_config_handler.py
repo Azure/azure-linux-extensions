@@ -46,13 +46,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
-            omiclass = counter.split("->")[0]
+            omiclass = ""
+            if is_lad:
+                omiclass = counter.split("->")[0]
+            else:
+                omiclass = name_map[counter]["module"]
+                
             if omiclass not in telegraf_json:
                 telegraf_json[omiclass] = {}
             if plugin not in telegraf_json[omiclass]:
                 telegraf_json[omiclass][plugin] = {}
             telegraf_json[omiclass][plugin][name_map[counter]["field"]] = {}
-            telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter.split("->")[1]
+            
+            if is_lad:
+                telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter.split("->")[1]
+            else:
+                telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter
+                
             telegraf_json[omiclass][plugin][name_map[counter]["field"]]["interval"] = item["interval"]
             if is_lad:
                 telegraf_json[omiclass][plugin][name_map[counter]["field"]]["ladtablekey"] = name_map[counter]["ladtablekey"]
@@ -151,11 +161,17 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     if telegraf_json[omiclass][plugin][field]["op"] == "rate":
                         rate_aggregate = True
                         ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
-                    ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    if is_lad:
+                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    else:
+                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "                        
                 else:
                     non_rate_aggregate = True
-                    non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
-
+                    if is_lad:
+                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    else:
+                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+                        
                 #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
                 if int(min_interval[:-1]) > 30:
                     min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
