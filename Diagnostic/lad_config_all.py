@@ -107,17 +107,15 @@ class LadConfigAll:
     def _ladCfg(self):
         return self._ext_settings.read_public_config('ladCfg')
 
-
-    def _wad_table_names(self, intervals):
+    @staticmethod
+    def _wad_table_name(interval):
         """
-        Build the name and storetype of a metrics table based on the aggregation intervals and presence/absence of sinks
-        :return: list of table names
+        Build the name and storetype of a metrics table based on the aggregation interval and presence/absence of sinks
+        :param str interval: String representation of aggregation interval
+        :return: table name
         :rtype: str
         """
-        table_names = []
-        for aggregation_interval in intervals:
-            table_names.append('WADMetrics{0}P10DV2S'.format(aggregation_interval))
-        return table_names
+        return 'WADMetrics{0}P10DV2S'.format(interval)
 
     def _add_element_from_string(self, path, xml_string, add_only_once=True):
         """
@@ -161,77 +159,58 @@ class LadConfigAll:
         """
         self._add_element_from_string('Management', mxt.obo_field.format(name=name, value=value))
 
-    # def _update_metric_collection_settings(self, ladCfg):
+    def _update_metric_collection_settings(self, ladCfg, namespaces):
     #     """
-    #     Update mdsd_config_xml_tree for Azure Portal metric collection. The mdsdCfg performanceCounters element contains
-    #     an array of metric definitions; this method passes each definition to its provider's AddMetric method, which is
-    #     responsible for configuring the provider to deliver the metric to mdsd and for updating the mdsd config as
-    #     required to expect the metric to arrive. This method also builds the necessary aggregation queries (from the
-    #     metrics.metricAggregation array) that grind the ingested data and push it to the WADmetric table.
+    #     Update mdsd_config_xml_tree for Azure Portal metric collection. This method builds the necessary aggregation queries
+    #     that grind the ingested data and push it to the WADmetric table.
     #     :param ladCfg: ladCfg object from extension config
+    #     :param namespaces: list of telegraf plugins sources obtained after parsing lad metrics config
     #     :return: None
     #     """
-    #     # metrics = LadUtil.getPerformanceCounterCfgFromLadCfg(ladCfg)
-    #     # if not metrics:
-    #     #     return
+        # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
+        # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
+        # output to a new local table, then arrange for additional derived queries to pull from that.
+        intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
+        sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
+        for plugin in namespaces:
+            lad_specific_storage_plugin = "storage-" + plugin
+            for aggregation_interval in intervals:
+                if sinks:
+                    local_table_name = ProvUtil.MakeUniqueEventName('aggregationLocal')
+                    self._add_derived_event(aggregation_interval, lad_specific_storage_plugin,
+                                            local_table_name,
+                                            'Local', add_lad_query=True)
+                    self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
+                else:
+                    self._add_derived_event(aggregation_interval, lad_specific_storage_plugin,
+                                            LadConfigAll._wad_table_name(aggregation_interval),
+                                            'Central', add_lad_query=True)
 
-    #     # counter_to_table = {}
-    #     # local_tables = set()
-
-    #     # # Add each metric
-    #     # for metric in metrics:
-    #     #     if metric['type'] == 'builtin':
-    #     #         local_table_name = BuiltIn.AddMetric(metric)
-    #     #         if local_table_name:
-    #     #             local_tables.add(local_table_name)
-    #     #             counter_to_table[metric['counterSpecifier']] = local_table_name
-
-    #     # # Finalize; update the mdsd config to be prepared to receive the metrics
-    #     # BuiltIn.UpdateXML(self._mdsd_config_xml_tree)
-
-    #     # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
-    #     # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
-    #     # output to a new local table, then arrange for additional derived queries to pull from that.
-    #     intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
-    #     sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
-    #     for table_name in local_tables:
-    #         for aggregation_interval in intervals:
-    #             if sinks:
-    #                 local_table_name = ProvUtil.MakeUniqueEventName('aggregationLocal')
-    #                 self._add_derived_event(aggregation_interval, table_name,
-    #                                         local_table_name,
-    #                                         'Local', add_lad_query=True)
-    #                 self._handle_alternate_sinks(aggregation_interval, sinks, local_table_name)
-    #             else:
-    #                 self._add_derived_event(aggregation_interval, table_name,
-    #                                         "omi"+LadConfigAll._wad_table_name(aggregation_interval),
-    #                                         'Central', add_lad_query=True)
-
-    # def _handle_alternate_sinks(self, interval, sinks, source):
-    #     """
-    #     Update the XML config to accommodate alternate data sinks. Start by pumping the data from the local source to
-    #     the actual wad table; then run through the sinks and add annotations or additional DerivedEvents as needed.
-    #     :param str interval: Aggregation interval
-    #     :param [str] sinks: List of alternate destinations
-    #     :param str source: Name of local table from which data is to be pumped
-    #     :return:
-    #     """
-    #     self._add_derived_event(interval, source, "omi"+LadConfigAll._wad_table_name(interval), 'Central')
-    #     for name in sinks:
-    #         sink = self._sink_configs.get_sink_by_name(name)
-    #         if sink is None:
-    #             self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
-    #         elif sink['name'] == 'AzMonSink':
-    #             self._enable_metrics_extension = True
-    #         elif sink['type'] == 'EventHub':
-    #             if 'sasURL' in sink:
-    #                 self._add_streaming_annotation(source, sink['sasURL'])
-    #             else:
-    #                 self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
-    #         elif sink['type'] == 'JsonBlob':
-    #             self._add_derived_event(interval, source, name, 'JsonBlob')
-    #         else:
-    #             self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
+    def _handle_alternate_sinks(self, interval, sinks, source):
+        """
+        Update the XML config to accommodate alternate data sinks. Start by pumping the data from the local source to
+        the actual wad table; then run through the sinks and add annotations or additional DerivedEvents as needed.
+        :param str interval: Aggregation interval
+        :param [str] sinks: List of alternate destinations
+        :param str source: Name of local table from which data is to be pumped
+        :return:
+        """
+        self._add_derived_event(interval, source, LadConfigAll._wad_table_name(interval), 'Central')
+        for name in sinks:
+            sink = self._sink_configs.get_sink_by_name(name)
+            if sink is None:
+                self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
+            elif sink['name'] == 'AzMonSink':
+                self._enable_metrics_extension = True
+            elif sink['type'] == 'EventHub':
+                if 'sasURL' in sink:
+                    self._add_streaming_annotation(source, sink['sasURL'])
+                else:
+                    self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
+            elif sink['type'] == 'JsonBlob':
+                self._add_derived_event(interval, source, name, 'JsonBlob')
+            else:
+                self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
 
     # def _update_raw_omi_events_settings(self, omi_queries):
     #     """
@@ -346,21 +325,21 @@ class LadConfigAll:
                             "blobEndpoint", endpoints[1], ['isDefault', 'true'])
         XmlUtil.removeElement(self._mdsd_config_xml_tree, 'Accounts', 'Account')
 
-    # def _set_xml_attr(self, key, value, xml_path, selector=[]):
-    #     """
-    #     Set XML attribute on the element specified with xml_path.
-    #     :param key: The attribute name to set on the XML element.
-    #     :param value: The default value to be set, if there's no public config for that attribute.
-    #     :param xml_path: The path of the XML element(s) to which the attribute is applied.
-    #     :param selector: Selector for finding the actual XML element (see XmlUtil.setXmlValue)
-    #     :return: None. Change is directly applied to mdsd_config_xml_tree XML member object.
-    #     """
-    #     assert self._mdsd_config_xml_tree is not None
+    def _set_xml_attr(self, key, value, xml_path, selector=[]):
+        """
+        Set XML attribute on the element specified with xml_path.
+        :param key: The attribute name to set on the XML element.
+        :param value: The default value to be set, if there's no public config for that attribute.
+        :param xml_path: The path of the XML element(s) to which the attribute is applied.
+        :param selector: Selector for finding the actual XML element (see XmlUtil.setXmlValue)
+        :return: None. Change is directly applied to mdsd_config_xml_tree XML member object.
+        """
+        assert self._mdsd_config_xml_tree is not None
 
-    #     v = self._ext_settings.read_public_config(key)
-    #     if not v:
-    #         v = value
-    #     XmlUtil.setXmlValue(self._mdsd_config_xml_tree, xml_path, key, v, selector)
+        v = self._ext_settings.read_public_config(key)
+        if not v:
+            v = value
+        XmlUtil.setXmlValue(self._mdsd_config_xml_tree, xml_path, key, v, selector)
 
     def _set_event_volume(self, lad_cfg):
         """
@@ -406,26 +385,6 @@ class LadConfigAll:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
         # # 2. Use ladCfg to go over the sinks and handle AzMonSink, JsonBlob and EH elements
-        lad_cfg = self._ladCfg()
-        if lad_cfg:
-            try:
-                # self._update_metric_collection_settings(lad_cfg)
-                resource_id = self._ext_settings.get_resource_id()
-                if resource_id:
-        #             # Set JsonBlob sink-related elements
-                    uuid_for_instance_id = self._fetch_uuid()
-                    self._add_obo_field(name='resourceId', value=resource_id)
-                    self._add_obo_field(name='agentIdentityHash', value=uuid_for_instance_id)
-
-        #             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
-        #                                 'partitionKey', escape_nonalphanumerics(resource_id))
-        #             lad_query_instance_id = ""
-        #             if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
-        #                 lad_query_instance_id = uuid_for_instance_id
-        #             self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
-            except Exception as e:
-                self._logger_error("Failed to add obo field config  error:{0} {1}".format(e, traceback.format_exc()))
-                return False, 'Failed to add obo config from ladCfg (see extension error logs for more details)'
 
         # # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
         # #    so check if Application Insights key is present and pass it to the actual helper
@@ -439,6 +398,11 @@ class LadConfigAll:
 
         # 4. Generate telegraf, MetricsExtension, omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
+            lad_cfg = self._ladCfg()
+            if not lad_cfg:
+                return False, 'Unable to find Ladcfg element. Failed to generate configs for fluentd, syslog, and mdsd ' \
+                          '(see extension error logs for more details)'
+
             syslogEvents_setting = self._ext_settings.get_syslogEvents_setting()
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
@@ -456,29 +420,26 @@ class LadConfigAll:
             self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)
 
             #Handle the EH, JsonBlob and AzMonSink logic
-            intervals = LadUtil.getAggregationPeriodsFromLadCfg(lad_cfg)
-            sinks = LadUtil.getFeatureWideSinksFromLadCfg(lad_cfg, 'performanceCounters')
-            json_sinks = []
-            for name in sinks:
-                sink = self._sink_configs.get_sink_by_name(name)
-                if sink is None:
-                    self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
-                elif sink['name'] == 'AzMonSink':
-                    self._enable_metrics_extension = True
-                elif sink['type'] == 'EventHub':
-                    if 'sasURL' in sink:
-                        for plugin in self._telegraf_namespaces:
-                            lad_specific_storage_plugin = "storage-" + plugin
-                            self._add_streaming_annotation(lad_specific_storage_plugin, sink['sasURL'])
-                    else:
-                        self._logger_error("Ignoring EventHub sink '{0}': no 'sasURL' was supplied".format(name))
-                elif sink['type'] == 'JsonBlob':
-                    json_sinks.append(sink)
-                else:
-                    self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
-
-            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces, self._wad_table_names(intervals), intervals, json_sinks)
+            self._update_metric_collection_settings(lad_cfg, self._telegraf_namespaces)
+            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces)
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
+
+            resource_id = self._ext_settings.get_resource_id()
+            if resource_id:
+                # Set JsonBlob sink-related elements
+                uuid_for_instance_id = self._fetch_uuid()
+                self._add_obo_field(name='resourceId', value=resource_id)
+                self._add_obo_field(name='agentIdentityHash', value=uuid_for_instance_id)
+
+                XmlUtil.setXmlValue(self._mdsd_config_xml_tree, 'Events/DerivedEvents/DerivedEvent/LADQuery',
+                                    'partitionKey', escape_nonalphanumerics(resource_id))
+                lad_query_instance_id = ""
+                if resource_id.find("providers/Microsoft.Compute/virtualMachineScaleSets") >= 0:
+                    lad_query_instance_id = uuid_for_instance_id
+                self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
+            else:
+                return False, 'Unable to find resource id in the config. Failed to generate configs for Metrics in mdsd ' \
+                        '(see extension error logs for more details)'
 
             #Only enable Metrics if AzMonSink is in the config
             if self._enable_metrics_extension:

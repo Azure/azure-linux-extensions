@@ -62,10 +62,11 @@ per_RouteEvent_tmpl = """
 
 derived_event = """
 <DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{type}"/>
+
 """
 
 
-lad_query = '<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />'
+lad_query = '<LADQuery columnName="CounterName" columnValue="Average" partitionKey="" />'
 
 
 obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
@@ -96,6 +97,8 @@ entire_xml_cfg_tmpl = """
     <MdsdEvents>
     </MdsdEvents>
 
+    <DerivedEvents>
+    </DerivedEvents>
   </Events>
 
   <EventStreamingAnnotations>
