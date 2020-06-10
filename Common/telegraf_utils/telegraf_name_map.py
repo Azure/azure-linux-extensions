@@ -1,6 +1,6 @@
 name_map = {
 
-######These are the counter keys and telegraf plugins for LAD
+######These are the counter keys and telegraf plugins for LAD/AMA
 
 "processor->CPU IO wait time" : {"plugin":"cpu", "field":"usage_iowait", "ladtablekey":"/builtin/processor/percentiowaittime"},
 "processor->CPU user time" : {"plugin":"cpu", "field":"usage_user", "ladtablekey":"/builtin/processor/percentusertime"},
@@ -10,6 +10,15 @@ name_map = {
 "processor->CPU idle time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"/builtin/processor/percentidletime"},
 "processor->CPU privileged time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"/builtin/processor/percentprivilegedtime"},
 
+"% IO Wait Time" : {"plugin":"cpu", "field":"usage_iowait", "ladtablekey":"% IO Wait Time", "module":"processor"},
+"% User Time" : {"plugin":"cpu", "field":"usage_user", "ladtablekey":"% User Time", "module":"processor"},
+"% Nice Time" : {"plugin":"cpu", "field":"usage_nice", "ladtablekey":"% Nice Time", "module":"processor"},
+"% Processor Time" : {"plugin":"cpu", "field":"usage_active", "ladtablekey":"% Processor Time", "module":"processor"},
+"% Interrupt Time" : {"plugin":"cpu", "field":"usage_irq", "ladtablekey":"% Interrupt Time", "module":"processor"},
+"% Idle Time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"% Idle Time", "module":"processor"},
+"% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"% Privileged Time", "module":"processor"},
+
+  
 "network->Network in guest OS" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
 "network->Network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
 "network->Network out guest OS" : {"plugin":"net", "field":"bytes_sent", "ladtablekey":"/builtin/network/bytestransmitted"},
