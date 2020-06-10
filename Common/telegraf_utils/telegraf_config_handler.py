@@ -161,11 +161,17 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     if telegraf_json[omiclass][plugin][field]["op"] == "rate":
                         rate_aggregate = True
                         ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
-                    ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    if is_lad:
+                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    else:
+                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "                        
                 else:
                     non_rate_aggregate = True
-                    non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
-
+                    if is_lad:
+                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                    else:
+                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+                        
                 #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
                 if int(min_interval[:-1]) > 30:
                     min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
