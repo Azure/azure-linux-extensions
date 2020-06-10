@@ -46,13 +46,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
-            omiclass = counter.split("->")[0]
+            omiclass = ""
+            if is_lad:
+                omiclass = counter.split("->")[0]
+            else:
+                omiclass = name_map[counter]["module"]
+                
             if omiclass not in telegraf_json:
                 telegraf_json[omiclass] = {}
             if plugin not in telegraf_json[omiclass]:
                 telegraf_json[omiclass][plugin] = {}
             telegraf_json[omiclass][plugin][name_map[counter]["field"]] = {}
-            telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter.split("->")[1]
+            
+            if is_lad:
+                telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter.split("->")[1]
+            else:
+                telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter
+                
             telegraf_json[omiclass][plugin][name_map[counter]["field"]]["interval"] = item["interval"]
             if is_lad:
                 telegraf_json[omiclass][plugin][name_map[counter]["field"]]["ladtablekey"] = name_map[counter]["ladtablekey"]
