@@ -10,13 +10,13 @@ name_map = {
 "processor->CPU idle time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"/builtin/processor/percentidletime"},
 "processor->CPU privileged time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"/builtin/processor/percentprivilegedtime"},
 
-"% IO Wait Time" : {"plugin":"cpu", "field":"usage_iowait", "ladtablekey":"% IO Wait Time", "module":"processor"},
-"% User Time" : {"plugin":"cpu", "field":"usage_user", "ladtablekey":"% User Time", "module":"processor"},
-"% Nice Time" : {"plugin":"cpu", "field":"usage_nice", "ladtablekey":"% Nice Time", "module":"processor"},
-"% Processor Time" : {"plugin":"cpu", "field":"usage_active", "ladtablekey":"% Processor Time", "module":"processor"},
-"% Interrupt Time" : {"plugin":"cpu", "field":"usage_irq", "ladtablekey":"% Interrupt Time", "module":"processor"},
-"% Idle Time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"% Idle Time", "module":"processor"},
-"% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"% Privileged Time", "module":"processor"},
+"% IO Wait Time" : {"plugin":"cpu", "field":"usage_iowait", "module":"processor"},
+"% User Time" : {"plugin":"cpu", "field":"usage_user", "module":"processor"},
+"% Nice Time" : {"plugin":"cpu", "field":"usage_nice", "module":"processor"},
+"% Processor Time" : {"plugin":"cpu", "field":"usage_active", "module":"processor"},
+"% Interrupt Time" : {"plugin":"cpu", "field":"usage_irq", "module":"processor"},
+"% Idle Time" : {"plugin":"cpu", "field":"usage_idle", "module":"processor"},
+"% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "module":"processor"},
 
   
 "network->Network in guest OS" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
