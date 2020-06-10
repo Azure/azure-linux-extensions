@@ -49,7 +49,7 @@ def incremental():
     backupPath=setLocation()
 
     backupOracle = "sqlplus -s / as sysdba @/hdd/python/IncrementalBackup/backup.sql " + backupPath
-    argsForControlFile = ["su", "-", oracleUser, "-c", backupOracle]
+    argsForControlFile = ["su", "-", login_path, "-c", backupOracle]
     snapshotControlFile = subprocess.Popen(argsForControlFile)
     while snapshotControlFile.poll()==None:
         sleep(2)
@@ -79,7 +79,7 @@ def restore():
     print("Incremental: Restoring")
     backupPath = BaseLocation + BackupSource
     scriptLocation = "/hdd/python/IncrementalBackup/recover.sh"
-    args = [scriptLocation, BackupSource, oracleUser]
+    args = [scriptLocation, BackupSource, login_path]
     restoreProcess = subprocess.Popen(args)
     while restoreProcess.poll()==None:
         sleep(2)
@@ -90,7 +90,7 @@ def restore():
 BackupSource = ""
 BaseLocation = "/hdd/AutoIncrement/"
 archiveLogLocation = "/hdd/CoreFiles/flash_recovery_area/CDB1/archivelog"
-oracleUser = "oracle"
+login_path = "oracle"
 database = "oracle"
 #Action = 'b'
 #----End----#

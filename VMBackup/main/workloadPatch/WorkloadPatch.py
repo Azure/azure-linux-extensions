@@ -33,7 +33,7 @@ class WorkloadPatch:
         self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
-        self.login_path = ""
+        self.login_path = "oracle"
         self.ipc_folder = None
         self.error_details = []
         self.enforce_slave_only = True
@@ -41,7 +41,6 @@ class WorkloadPatch:
         self.child = []
         self.timeout = 90
         self.confParser()
-        self.oracleUser="AzureBackup"
 
     def pre(self):
         try:
@@ -108,7 +107,7 @@ class WorkloadPatch:
         if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Pre- Entering pre mode for master")
             preOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
-            args = ["su", "-", self.oracleUser, "-c", preOracle]
+            args = ["su", "-", self.login_path, "-c", preOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll() == None:
                 sleep(1)
@@ -119,7 +118,7 @@ class WorkloadPatch:
         global preDaemonThread
         if 'oracle' in self.name.lower():
             preDaemonOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/preDaemon.sql " + str(self.timeout)
-            argsDaemon = ["su", "-", self.oracleUser, "-c", preDaemonOracle]
+            argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
             preDaemonThread.start()
         self.logger.log("Shrid: timeoutDaemon started")
@@ -181,7 +180,7 @@ class WorkloadPatch:
                 self.logger.log("Shrid: Post- Backup unsuccessful")
                 return
             postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
-            args = ["su", "-", self.oracleUser, "-c", postOracle]
+            args = ["su", "-", self.login_path, "-c", postOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
                 sleep(1)

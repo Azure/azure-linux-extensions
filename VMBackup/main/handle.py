@@ -274,7 +274,7 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    workload_name = None
+    workload_name = "oracle"
     snapshot_type = "appAndFileSystem"
 
     #Adding python version to the telemetry
@@ -398,7 +398,7 @@ def daemon():
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 
                 if workload_name is not None:
-                    workload_patch = WorkloadPatch.WorkloadPatch(workload_name, backup_logger)
+                    workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
                     
                     workload_patch.pre()
                     if len(workload_patch.error_details) > 0:
