@@ -30,7 +30,7 @@ import subprocess
 class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
-        self.name = ""
+        self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
         self.login_path = ""
@@ -107,10 +107,10 @@ class WorkloadPatch:
         
         if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Pre- Entering pre mode for master")
-            preOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
+            preOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
             args = ["su", "-", self.oracleUser, "-c", preOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
-            while process.poll()==None:
+            while process.poll() == None:
                 sleep(1)
             self.timeoutDaemon()
             self.logger.log("Shrid: Pre- Exiting pre mode for master")
@@ -127,7 +127,7 @@ class WorkloadPatch:
     def threadForPreDaemon(self, args): 
             global daemonProcess
             daemonProcess = subprocess.Popen(args, stdout=subprocess.PIPE)
-            while daemonProcess.poll()==None:
+            while daemonProcess.poll() == None:
                 sleep(1)
             
     def thread_for_sql(self,args):
@@ -148,7 +148,6 @@ class WorkloadPatch:
                 binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
                 binary_thread.start()
         
-
     def preSlave(self):
         pass
 
