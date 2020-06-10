@@ -75,7 +75,7 @@ def snapshot():
 
 #----Start Config File----# 
 oracleUser="AzureBackup" 
-maxTime=60 
+maxTime=300
 #----End Config File----# 
 
 preMaster() 
