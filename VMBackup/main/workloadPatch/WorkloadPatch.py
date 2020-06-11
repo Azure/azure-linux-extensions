@@ -48,21 +48,19 @@ class WorkloadPatch:
             if self.role == "master" and int(self.enforce_slave_only) == 0:
                 if len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
-                    self.logger.log("WorkloadPatch: Entered if conditions inside pre")
-                    print("WorkloadPatch: Entered if conditions inside pre")
                     self.preMaster()
-                #else:
-                #    self.preMasterDB()
+                else:
+                    self.preMasterDB()
                     # create fork process for child                  
-            #elif self.role == "slave":
-            #    if len(self.dbnames) == 0 :
-            #        #pre at server level create fork process for child and append
-            #        self.preSlave()
-            #    else:
-            #        self.preSlaveDB()
-            #    # create fork process for child
-            #else:
-            #    self.error_details.append("invalid role name in config")
+            elif self.role == "slave":
+                if len(self.dbnames) == 0 :
+                    #pre at server level create fork process for child and append
+                    self.preSlave()
+                else:
+                    self.preSlaveDB()
+                # create fork process for child
+            else:
+                self.error_details.append("invalid role name in config")
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in pre" + str(e))
             self.error_details.append("exception in processing of prescript")
@@ -110,10 +108,10 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
         
-        if self.name=='oracle':
-            self.logger.log("Shrid: Pre- Entering pre mode for master")
-            print("Shrid: Pre- Entering pre mode for master")
-            preOracle = "sqlplus -s / as sysdba @scripts/preOracleMaster.sql"
+        if 'oracle' in self.name.lower():
+            self.logger.log("Shrid: Pre- Inside oracle pre")
+            print("Shrid: Pre- Inside oracle pre")
+            preOracle = "sqlplus -s / as sysdba @/hdd/preOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
             process = subprocess.Popen(args)
             while process.poll() == None:
@@ -121,13 +119,13 @@ class WorkloadPatch:
             self.timeoutDaemon()
             self.logger.log("Shrid: Pre- Exiting pre mode for master")
             print("Shrid: Pre- Exiting pre mode for master")
-    
+
     def timeoutDaemon(self):
         global preDaemonThread
-        if self.name=='oracle':
+        if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             print("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @scripts/preOracleDaemon.sql " + self.timeout
+            preDaemonOracle = "sqlplus -s / as sysdba @/hdd/preOracleDaemon.sql " + self.timeout
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
             preDaemonThread.start()
@@ -188,8 +186,8 @@ class WorkloadPatch:
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
         if 'oracle' in self.name.lower():
-            self.logger.log("Shird: Post- Inside try")
-            print("Shird: Post- Inside try")
+            self.logger.log("Shird: Post- Inside oracle post")
+            print("Shird: Post- Inside oracle post")
             if preDaemonThread.isAlive():
                 self.logger.log("Shird: Post- Backup successful")
                 print("Shird: Post- Backup successful")
@@ -200,7 +198,7 @@ class WorkloadPatch:
                 self.logger.log("Shrid: Post- Backup unsuccessful")
                 print("Shrid: Post- Backup unsuccessful")
                 return
-            postOracle="sqlplus -s / as sysdba @scripts/postOracleMaster.sql"
+            postOracle="sqlplus -s / as sysdba @/hdd/postOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
