@@ -326,7 +326,7 @@ def daemon():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -519,7 +519,7 @@ def daemon():
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
@@ -595,7 +595,7 @@ def enable():
         start_daemon()
         sys.exit(0)
     except Exception as e:
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         global_error_result = e
         temp_status= 'error'
