@@ -36,20 +36,20 @@ class WorkloadPatch:
         self.login_path = "oracle"
         self.ipc_folder = None
         self.error_details = []
-        self.enforce_slave_only = True
+        self.enforce_slave_only = False
         self.role = "master"
         self.child = []
-        self.timeout = 300
+        self.timeout = 800
         self.confParser()
 
     def pre(self):
         try:
             self.logger.log("WorkloadPatch: Entering workload pre call")
-            #if self.role == "master" and int(self.enforce_slave_only) == 0:
-            #    if len(self.dbnames) == 0 :
+            if self.role == "master" and int(self.enforce_slave_only) == 0:
+                if len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
-            #        self.logger.log("WorkloadPatch: Entered if conditions inside pre")
-            self.preMaster()
+                    self.logger.log("WorkloadPatch: Entered if conditions inside pre")
+                    self.preMaster()
                 #else:
                 #    self.preMasterDB()
                     # create fork process for child                  
@@ -108,7 +108,7 @@ class WorkloadPatch:
         
         if self.name=='oracle':
             self.logger.log("Shrid: Pre- Entering pre mode for master")
-            preOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/pre.sql"
+            preOracle = "sqlplus -s / as sysdba @scripts/preOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll() == None:
@@ -120,7 +120,7 @@ class WorkloadPatch:
         global preDaemonThread
         if self.name=='oracle':
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @/hdd/python/sqlScripts/preDaemon.sql " + str(self.timeout)
+            preDaemonOracle = "sqlplus -s / as sysdba @scripts/preOracleDaemon.sql " + str(self.timeout)
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
             preDaemonThread.start()
@@ -129,9 +129,11 @@ class WorkloadPatch:
     def threadForPreDaemon(self, args): 
             global daemonProcess
             daemonProcess = subprocess.Popen(args, stdout=subprocess.PIPE)
+            self.logger.log(("Shrid: darmonProcess started"))
             while daemonProcess.poll() == None:
                 sleep(1)
-            
+            self.logger.log("Shrid: daemonProcess completed")
+
     def thread_for_sql(self,args):
         self.logger.log("command to execute: "+str(args))
         self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE))
@@ -182,8 +184,8 @@ class WorkloadPatch:
                 daemonProcess.terminate()
             else:
                 self.logger.log("Shrid: Post- Backup unsuccessful")
-                return
-            postOracle="sqlplus -s / as sysdba @/hdd/python/sqlScripts/post.sql"
+                #return
+            postOracle="sqlplus -s / as sysdba @scripts/postOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", postOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
