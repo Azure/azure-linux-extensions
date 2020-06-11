@@ -44,6 +44,7 @@ class WorkloadPatch:
 
     def pre(self):
         try:
+            self.logger.log("WorkloadPatch: Entering workload pre call")
             print("WorkloadPatch: Entering workload pre call")
             if self.role == "master" and int(self.enforce_slave_only) == 0:
                 if len(self.dbnames) == 0 :
@@ -92,8 +93,9 @@ class WorkloadPatch:
     def preMaster(self):
         self.logger.log("WorkloadPatch: Entering pre mode for master")
         print("WorkloadPatch: Entering pre mode for master")
-        #if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-        #    os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        
+        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+            os.remove("/var/lib/mysql-files/azbackupserver.txt")
         #else:
         #    self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
             
@@ -189,14 +191,14 @@ class WorkloadPatch:
             self.logger.log("Shird: Post- Inside oracle post")
             print("Shird: Post- Inside oracle post")
             if preDaemonThread.isAlive():
-                self.logger.log("Shird: Post- Backup successful")
-                print("Shird: Post- Backup successful")
+                self.logger.log("Shird: Post- Timeout daemon still in sleep")
+                print("Shird: Post- Timeout daemon still in sleep)
                 self.logger.log("Shrid: Post- Initiating Post Script")
                 print("Shrid: Post- Initiating Post Script")
                 daemonProcess.terminate()
             else:
-                self.logger.log("Shrid: Post- Backup unsuccessful")
-                print("Shrid: Post- Backup unsuccessful")
+                self.logger.log("Shrid: Post error- Timeout daemon executed before post")
+                print("Shrid: Post error- Timeout daemon executed before post")
                 return
             postOracle="sqlplus -s / as sysdba @/hdd/postOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", postOracle]
