@@ -897,12 +897,40 @@ def enable_encryption():
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
+                if extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                    current_volume_type = extension_parameter.VolumeType.lower()
+                    if current_volume_type == CommonVariables.VolumeTypeData.lower() or current_volume_type == CommonVariables.VolumeTypeAll.lower():
+                        try:
+                            DistroPatcher.install_cryptsetup()
+                        except Exception as e:
+                            hutil.save_seq()
+                            message = "Failed to install cryptsetup package(s) with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+                            hutil.do_exit(exit_code=CommonVariables.missing_dependency,
+                                          operation='EnableEncryption',
+                                          status=CommonVariables.extension_error_status,
+                                          code=str(CommonVariables.missing_dependency),
+                                          message=message)
+                        passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+                        crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
+                        resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+                        rd_encrypted = resource_disk_util.encrypt_resource_disk()
+                        if not rd_encrypted:
+                            hutil.save_seq()
+                            hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                                          operation='EnableEncryption',
+                                          status=CommonVariables.extension_error_status,
+                                          code=str(CommonVariables.configuration_error),
+                                          message='Failed to encrypt resource disk. Please make sure no process is using it.')
+                        else:
+                            logger.log("Resource disk encrypted successfully.")
+
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
                 start_daemon('EnableEncryption')
 
     except Exception as e:
+        hutil.save_seq()
         message = "Failed to enable the extension with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,

@@ -211,3 +211,24 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_encrypt_format_mount.return_value = False
         self.assertEqual(self.resource_disk.automount(), False)
         mock_encrypt_format_mount.assert_called_once()
+
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
+    def test_encrypt_resource_disk(self, mock_efm, mock_icm):
+        # Case 1: RD is not crypt mounted and encrypt_format_mount succeeds
+        mock_efm.return_value = True
+        mock_icm.return_value = False
+        rd_mounted = self.resource_disk.encrypt_resource_disk()
+        self.assertTrue(rd_mounted)
+
+         # Case 2: RD is crypt mounted
+        mock_efm.return_value = False
+        mock_icm.return_value = True
+        rd_mounted = self.resource_disk.encrypt_resource_disk()
+        self.assertTrue(rd_mounted)
+
+        # Case 3: RD is not crypt mounted and encrypt_format_mount fails
+        mock_efm.return_value = False
+        mock_icm.return_value = False
+        rd_mounted = self.resource_disk.encrypt_resource_disk()
+        self.assertFalse(rd_mounted)
