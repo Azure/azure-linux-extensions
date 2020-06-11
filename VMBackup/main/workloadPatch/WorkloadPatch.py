@@ -30,7 +30,7 @@ import subprocess
 class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
-        self.name = 'oracle'
+        self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
         self.login_path = "oracle"
@@ -72,8 +72,6 @@ class WorkloadPatch:
             print("WorkloadPatch: Entering workload post call")
             if self.role == "master":
                 if len(self.dbnames) == 0:
-                    self.logger.log("WorkloadPatch: Entered if conditions inside post")
-                    print("WorkloadPatch: Entered if conditions inside post")
                     #post at server level to turn off readonly mode
                     self.postMaster()
                 else:
@@ -111,8 +109,8 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: pre at server level completed")
         
         if 'oracle' in self.name.lower():
-            self.logger.log("Shrid: Pre- Inside oracle pre")
             print("Shrid: Pre- Inside oracle pre")
+            self.logger.log("Shrid: Pre- Inside oracle pre")
             preOracle = "sqlplus -s / as sysdba @/hdd/preOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
             process = subprocess.Popen(args)
@@ -129,12 +127,12 @@ class WorkloadPatch:
             print("Shrid: Inside oracle condition in timeout daemon")
             preDaemonOracle = "sqlplus -s / as sysdba @/hdd/preOracleDaemon.sql " + self.timeout
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
-            preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
+            preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
         self.logger.log("Shrid: timeoutDaemon started for: " + self.timeout + " seconds")
         print("Shrid: timeoutDaemon started for: ", self.timeout, " seconds")
 
-    def threadForPreDaemon(self, args): 
+    def threadForTimeoutDaemon(self, args): 
             global daemonProcess
             daemonProcess = subprocess.Popen(args)
             self.logger.log("Shrid: daemonProcess started")
@@ -171,8 +169,8 @@ class WorkloadPatch:
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
         print("WorkloadPatch: Entering post mode for master")
-        #if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-        #    os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
+            os.remove("/var/lib/mysql-files/azbackupserver.txt")
         #else:
         #    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
         
@@ -192,7 +190,7 @@ class WorkloadPatch:
             print("Shird: Post- Inside oracle post")
             if preDaemonThread.isAlive():
                 self.logger.log("Shird: Post- Timeout daemon still in sleep")
-                print("Shird: Post- Timeout daemon still in sleep)
+                print("Shird: Post- Timeout daemon still in sleep")
                 self.logger.log("Shrid: Post- Initiating Post Script")
                 print("Shrid: Post- Initiating Post Script")
                 daemonProcess.terminate()
