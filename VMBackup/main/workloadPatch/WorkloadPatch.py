@@ -39,7 +39,7 @@ class WorkloadPatch:
         self.enforce_slave_only = False
         self.role = "master"
         self.child = []
-        self.timeout = 800
+        self.timeout = "800"
         self.confParser()
 
     def pre(self):
@@ -110,7 +110,7 @@ class WorkloadPatch:
             self.logger.log("Shrid: Pre- Entering pre mode for master")
             preOracle = "sqlplus -s / as sysdba @scripts/preOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            process = subprocess.Popen(args)
             while process.poll() == None:
                 sleep(1)
             self.timeoutDaemon()
@@ -120,21 +120,21 @@ class WorkloadPatch:
         global preDaemonThread
         if self.name=='oracle':
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @scripts/preOracleDaemon.sql " + str(self.timeout)
+            preDaemonOracle = "sqlplus -s / as sysdba @scripts/preOracleDaemon.sql " + self.timeout
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForPreDaemon, args=[argsDaemon])
             preDaemonThread.start()
-        self.logger.log("Shrid: timeoutDaemon started")
+        self.logger.log("Shrid: timeoutDaemon started for: "+self.timeout+" seconds")
 
     def threadForPreDaemon(self, args): 
             global daemonProcess
-            daemonProcess = subprocess.Popen(args, stdout=subprocess.PIPE)
+            daemonProcess = subprocess.Popen(args)
             self.logger.log(("Shrid: darmonProcess started"))
             while daemonProcess.poll() == None:
                 sleep(1)
             self.logger.log("Shrid: daemonProcess completed")
 
-    def thread_for_sql(self,args):
+    def thread_for_sql(self,args):s
         self.logger.log("command to execute: "+str(args))
         self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE))
         while len(self.child) == 0:
@@ -184,10 +184,10 @@ class WorkloadPatch:
                 daemonProcess.terminate()
             else:
                 self.logger.log("Shrid: Post- Backup unsuccessful")
-                #return
+                return
             postOracle="sqlplus -s / as sysdba @scripts/postOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", postOracle]
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            process = subprocess.Popen(args)
             while process.poll()==None:
                 sleep(1)
             self.logger.log("Shrid: Post- Completed")
