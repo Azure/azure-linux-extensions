@@ -101,7 +101,7 @@ def generate_MSI_token():
 
         if "expires_on" in data:
             expiry_epoch_time  = data["expires_on"]
-        else:
+        else: #Fix these exceptions. instead of throwing them, return an error log and retry for a fixed number
             raise Exception("Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token".format(me_auth_file_path))
 
     except Exception as e:

@@ -606,7 +606,7 @@ def start_mdsd(configurator):
                         if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
                             # The MSI Token will expire within 30 minutes. We need to refresh the token
                             generate_token = True
-
+                    #Handle the failures with retries instead of crashing
                     if generate_token:
                         generate_token = False
                         msi_token_generated, me_msi_token_expiry_epoch = me_handler.generate_MSI_token()

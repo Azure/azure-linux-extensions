@@ -17,7 +17,7 @@ name_map = {
 "% Interrupt Time" : {"plugin":"cpu", "field":"usage_irq", "module":"processor"},
 "% Idle Time" : {"plugin":"cpu", "field":"usage_idle", "module":"processor"},
 "% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "module":"processor"},
-  
+
 "network->Network in guest OS" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
 "network->Network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
 "network->Network out guest OS" : {"plugin":"net", "field":"bytes_sent", "ladtablekey":"/builtin/network/bytestransmitted"},
@@ -35,7 +35,7 @@ name_map = {
 "Total Packets Transmitted" : {"plugin":"net", "field":"packets_sent", "module":"network"},
 "Total Packets Received" : {"plugin":"net", "field":"packets_recv", "module":"network"},
 "Total Tx Errors" : {"plugin":"net", "field":"err_out", "module":"network"},
-  
+
 "memory->Memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
 "memory->Mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
 "memory->Memory used" : {"plugin":"mem", "field":"used", "ladtablekey":"/builtin/memory/usedmemory"},
@@ -100,9 +100,9 @@ name_map = {
 "disk->Disk reads" : {"plugin":"diskio", "field":"reads", "op":"rate", "ladtablekey":"/builtin/disk/readspersecond"}, #Need to calculate rate (but each second not each interval)
 "disk->Disk writes" : {"plugin":"diskio", "field":"writes", "op":"rate", "ladtablekey":"/builtin/disk/writespersecond"},
 "disk->Disk transfers" : {"plugin":"diskio", "field":"total_transfers", "op":"rate", "ladtablekey":"/builtin/disk/transferspersecond"},
-"disk->Disk read time" : {"plugin":"diskio", "field":"read_time", "ladtablekey":"/builtin/disk/averagereadtime"},
-"disk->Disk write time" : {"plugin":"diskio", "field":"write_time", "ladtablekey":"/builtin/disk/averagewritetime"},
-"disk->Disk transfer time" : {"plugin":"diskio", "field":"io_time", "ladtablekey":"/builtin/disk/averagetransfertime"},
+"disk->Disk read time" : {"plugin":"diskio", "field":"read_time", "op":"rate", "ladtablekey":"/builtin/disk/averagereadtime"},
+"disk->Disk write time" : {"plugin":"diskio", "field":"write_time", "op":"rate", "ladtablekey":"/builtin/disk/averagewritetime"},
+"disk->Disk transfer time" : {"plugin":"diskio", "field":"io_time", "op":"rate", "ladtablekey":"/builtin/disk/averagetransfertime"},
 "disk->Disk queue length" : {"plugin":"diskio", "field":"iops_in_progress", "ladtablekey":"/builtin/disk/averagediskqueuelength"}
 
   ##### These are the counter keys and telegraf plugins for Azure Monitor Agent

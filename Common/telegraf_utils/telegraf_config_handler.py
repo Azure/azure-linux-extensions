@@ -25,12 +25,10 @@ Sample input data received by this script
 
 def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name):
 
-    lad_storage_namepass_list = []
-    lad_storage_namepass_str = ""
+    storage_namepass_list = []
+    storage_namepass_str = ""
 
-    ama_storage_namepass_list = []
-    ama_storage_namepass_str = ""
-    MetricsExtensionNamepsace = "Azure.Linux.VM.Metrics"
+    MetricsExtensionNamepsace = "Azure.VM.Linux.GuestMetrics"
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -51,18 +49,18 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 omiclass = counter.split("->")[0]
             else:
                 omiclass = name_map[counter]["module"]
-                
+
             if omiclass not in telegraf_json:
                 telegraf_json[omiclass] = {}
             if plugin not in telegraf_json[omiclass]:
                 telegraf_json[omiclass][plugin] = {}
             telegraf_json[omiclass][plugin][name_map[counter]["field"]] = {}
-            
+
             if is_lad:
                 telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter.split("->")[1]
             else:
                 telegraf_json[omiclass][plugin][name_map[counter]["field"]]["displayName"] = counter
-                
+
             telegraf_json[omiclass][plugin][name_map[counter]["field"]]["interval"] = item["interval"]
             if is_lad:
                 telegraf_json[omiclass][plugin][name_map[counter]["field"]]["ladtablekey"] = name_map[counter]["ladtablekey"]
@@ -127,11 +125,14 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 lad_plugin_name = plugin + "_total"
                 lad_specific_rename_str += "\n[[processors.rename]]\n"
                 lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"
-                if lad_plugin_name not in lad_storage_namepass_list:
-                    lad_storage_namepass_list.append(lad_plugin_name)
+                if lad_plugin_name not in storage_namepass_list:
+                    storage_namepass_list.append(lad_plugin_name)
             else:
+                ama_plugin_name = plugin + "_total"
                 ama_rename_str += "\n[[processors.rename]]\n"
-                ama_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+                ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
+                if ama_plugin_name not in storage_namepass_list:
+                    storage_namepass_list.append(ama_plugin_name)
 
             metricsext_rename_str += "\n[[processors.rename]]\n"
             metricsext_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
@@ -164,14 +165,14 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     if is_lad:
                         ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
                     else:
-                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "                        
+                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
                 else:
                     non_rate_aggregate = True
                     if is_lad:
                         non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
                     else:
                         non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
-                        
+
                 #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
                 if int(min_interval[:-1]) > 30:
                     min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
@@ -197,23 +198,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
 
             #Add respective operations for aggregators
-            if is_lad:
-                if rate_aggregate:
-                    aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
-                    aggregator_str += " "*2 + "drop_original = true\n"
-                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                    aggregator_str += " "*2 + "stats = [" + ops + "]\n"
-                    aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
+            # if is_lad:
+            if rate_aggregate:
+                aggregator_str += "[[aggregators.basicstats]]\n"
+                aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                aggregator_str += " "*2 + "drop_original = true\n"
+                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "stats = [" + ops + "]\n"
+                aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
 
-                if non_rate_aggregate:
-                    aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
-                    aggregator_str += " "*2 + "drop_original = true\n"
-                    aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                    aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
+            if non_rate_aggregate:
+                aggregator_str += "[[aggregators.basicstats]]\n"
+                aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                aggregator_str += " "*2 + "drop_original = true\n"
+                aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
 
 
 
@@ -264,11 +265,13 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     stats = ["rate"]
 
     """
+
+    excess_diskio_field_drop_list = "\"total_transfers_filesystem\", \"read_bytes_filesystem\", \"total_bytes_filesystem\", \"write_bytes_filesystem\", \"reads_filesystem\", \"writes_filesystem\""
+
     ## Get the log folder directory from HandlerEnvironment.json and use that for the telegraf default logging
     logFolder, _ = get_handler_vars()
-
-    for measurement in lad_storage_namepass_list:
-        lad_storage_namepass_str += "\"" + measurement + "\", "
+    for measurement in storage_namepass_list:
+        storage_namepass_str += "\"" + measurement + "\", "
 
     # Telegraf basic agent and output config
     agentconf = "[agent]\n"
@@ -280,6 +283,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  flush_interval = \"10s\"\n"
     agentconf += "  flush_jitter = \"0s\"\n"
     agentconf += "  logtarget = \"file\"\n"
+    agentconf += "  quiet = true\n"
     agentconf += "  logfile = \"" + logFolder + "/telegraf.log\"\n"
     agentconf += "  logfile_rotation_max_size = \"100MB\"\n"
     agentconf += "  logfile_rotation_max_archives = 5\n"
@@ -294,13 +298,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         agentconf += "  \"virtualMachine\"= \"" + virtual_machine_name + "\"\n"
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
-    if is_lad:
-        agentconf += "  namedrop = [" + lad_storage_namepass_str[:-2] + "]\n"
+    agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
+    # agentconf += "  fielddrop = [" + storage_namepass_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
     agentconf += "\n# Configuration for sending metrics to AMA\n"
     agentconf += "[[outputs.influxdb]]\n"
-    if is_lad:
-        agentconf += "  namepass = [" + lad_storage_namepass_str[:-2] + "]\n"
+    agentconf += "  namepass = [" + storage_namepass_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(mdsd_url) + "\"]\n\n"
     agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
     agentconf += "#[[outputs.file]]\n"
@@ -309,7 +312,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agent_file = {"filename":"telegraf.conf", "data": agentconf}
     output.append(agent_file)
 
-    return output, lad_storage_namepass_list
+    print output
+
+    return output, storage_namepass_list
 
 
 def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
@@ -325,6 +330,7 @@ def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
             path = telegraf_conf_dir + configfile["filename"]
         else:
             path = telegraf_d_conf_dir + configfile["filename"]
+        print "writing to, ", path
         with open(path, "w") as f:
             f.write(configfile["data"])
 
@@ -558,7 +564,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     write_configs(output, telegraf_conf_dir, telegraf_d_conf_dir)
 
     # Setup Telegraf service.
-    # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
+    If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
