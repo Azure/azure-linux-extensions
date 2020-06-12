@@ -109,6 +109,18 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: pre at server level completed")
         
         if 'oracle' in self.name.lower():
+            statusArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            oracleStatus = subprocess.check_output(statusArgs, shell=True)
+            self.logger.log("Shrid: Pre- " + oracleStatus)
+            print("Shrid: Pre- ", oracleStatus)
+            if "OPEN" in str(oracleStatus):
+                self.logger.log("Shrid: Database is open")
+                print("Shrid: Database is open")
+            else:
+                self.logger.log("Shrid: Database not open. Backup may proceed without pre and post")
+                print("Shrid: Database not open. Backup may proceed without pre and post")
+                return False     
+
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
             preOracle = "sqlplus -s / as sysdba @/hdd/preOracleMaster.sql"
