@@ -109,17 +109,15 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: pre at server level completed")
         
         if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
-            oracleStatus = subprocess.check_output(statusArgs, shell=True)
-            self.logger.log("Shrid: Pre- " + oracleStatus)
-            print("Shrid: Pre- ", oracleStatus)
-            if "OPEN" in str(oracleStatus):
-                self.logger.log("Shrid: Database is open")
-                print("Shrid: Database is open")
+            global preOracleStatus
+            preOracleStatus = self.databaseStatus()
+            if "OPEN" in str(preOracleStatus):
+                self.logger.log("Shrid: Pre- Database is open")
+                print("Shrid: Pre- Database is open")
             else:
-                self.logger.log("Shrid: Database not open. Backup may proceed without pre and post")
-                print("Shrid: Database not open. Backup may proceed without pre and post")
-                return False     
+                self.logger.log("Shrid: Pre- Database not open. Backup may proceed without pre and post")
+                print("Shrid: Pre- Database not open. Backup may proceed without pre and post")
+                return
 
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
@@ -153,6 +151,13 @@ class WorkloadPatch:
                 sleep(1)
             self.logger.log("Shrid: daemonProcess completed")
             print("Shrid: daemonProcess completed")
+
+    def databaseStatus(self):
+        statusArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+        oracleStatus = subprocess.check_output(statusArgs, shell=True)
+        self.logger.log("Shrid: Pre- " + str(oracleStatus))
+        print("Shrid: Pre- ", str(oracleStatus))
+        return oracleStatus
 
     def thread_for_sql(self,args):
         self.logger.log("command to execute: "+str(args))
@@ -198,6 +203,19 @@ class WorkloadPatch:
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
         if 'oracle' in self.name.lower():
+            postOracleStatus = self.databaseStatus()
+            if postOracleStatus != preOracleStatus:
+                self.logger.log("Shrid: Error. Pre and post database status different.")
+                print("Shrid: Error. Pre and post database status different.")
+            if "OPEN" in str(postOracleStatus):
+                self.logger.log("Shrid: Post- Database is open")
+                print("Shrid: Post- Database is open")
+            else:
+                self.logger.log("Shrid: Post- Database not open. Backup may proceed without pre and post")
+                print("Shrid: Post- Database not open. Backup may proceed without pre and post")
+                return
+            
+
             self.logger.log("Shird: Post- Inside oracle post")
             print("Shird: Post- Inside oracle post")
             if preDaemonThread.isAlive():
