@@ -51,11 +51,13 @@ class PrereqState(OSEncryptionState):
              (distro_info[0] == 'centos' and distro_info[1].startswith('7.5')) or
              (distro_info[0] == 'centos' and distro_info[1].startswith('7.6')) or
              (distro_info[0] == 'centos' and distro_info[1].startswith('7.7')) or
+             (distro_info[0] == 'centos' and distro_info[1].startswith('7.8')) or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.3') or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.4') or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.5') or
              (distro_info[0] == 'redhat' and distro_info[1] == '7.6') or
-             (distro_info[0] == 'redhat' and distro_info[1] == '7.7')) and self.disk_util.is_os_disk_lvm()):
+             (distro_info[0] == 'redhat' and distro_info[1] == '7.7') or
+             (distro_info[0] == 'redhat' and distro_info[1] == '7.8')) and self.disk_util.is_os_disk_lvm()):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:
