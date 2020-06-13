@@ -95,7 +95,11 @@ class redhatPatching(AbstractPatching):
             packages.remove('cryptsetup')
             
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
-            self.command_executor.Execute("yum install -y " + " ".join(packages))
+            return_code = self.command_executor.Execute("yum install -y " + " ".join(packages), timeout=30)
+            if return_code == -9:
+                msg = "Command: yum install timed out. Make sure yum is configured correctly and there are no network problems."
+                raise Exception(msg)
+            return return_code
 
     def install_extras(self):
         packages = ['cryptsetup',
