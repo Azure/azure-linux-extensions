@@ -63,17 +63,19 @@ def incremental():
 #----End Incremental Backup----#
 
 #----Start Incremental Restore----#
-def switchControlFiles():
+def switchControlFiles(backupPath):
     parsedControlFile = parameterFileParser("controlfile")
     #controlFileNames = []
     for location in parsedControlFile:
         os.system('rm -f '+location)
-        os.system('cp -f '+ backupPath + '/control.ctl ' +location)
+        os.system('cp -f '+ backupPath + '/control.ctl ' + location)
         #controlFileNames.append(re.findall('[\w\.-]+.ctl', location))
 
-def switchArchiveLogFiles():
+def switchArchiveLogFiles(backupPath):
     parsedArchiveLog = parameterFileParser("archivelog")
-    print(parsedArchiveLog)
+    for location in parsedArchiveLog:
+        os.system('rm -f '+ location + '/archivelog')
+        os.system('cp -f ' + backupPath + '/archivelog ' + location + '/archivelog')
 
 def restore():
     print("Incremental: Restoring")
@@ -83,6 +85,8 @@ def restore():
     restoreProcess = subprocess.Popen(args)
     while restoreProcess.poll()==None:
         sleep(2)
+    switchControlFiles(backupPath)
+    switchArchiveLogFiles(backupPath)
     print("Incremental: Restore Complete")
 #----End Incremental Restore----#
 
@@ -95,24 +99,22 @@ database = "oracle"
 #Action = 'b'
 #----End----#
 
-switchArchiveLogFiles()
-
 #----Prompt----#
-#Action = input("Enter l for list, b for incremental backup and r for restore: ")
+Action = input("Enter l for list, b for incremental backup and r for restore: ")
 #----End Prompt----#
 
 
-#if Action=='b':
-#    incremental()
-#elif Action=='r':
-#    #----Restore----#
-#    os.system('ls -lrt '+BaseLocation)
-#    BackupSource=input("Enter the filename: ")
-#    restore()
-#    #----End Restore----#
-#elif Action=='l':
-#    os.system('ls -lrt '+BaseLocation)
-#else:
-#    print("Invalid input")
+if Action=='b':
+    incremental()
+elif Action=='r':
+    #----Restore----#
+    os.system('ls -lrt '+BaseLocation)
+    BackupSource=input("Enter the filename: ")
+    restore()
+    #----End Restore----#
+elif Action=='l':
+    os.system('ls -lrt '+BaseLocation)
+else:
+    print("Invalid input")
 
 print("Incremental Workload: DONE")
