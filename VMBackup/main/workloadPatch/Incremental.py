@@ -71,12 +71,8 @@ def incremental():
     
     parsedArchiveLog = parameterFileParser("archivelog")
     parsedDBName = parameterFileParser("db_name")
-    archiveLogLocation = parsedArchiveLog + '/' + parsedDBName + '/archivelog'
 
-    argsForArchiveLog = ["cp", "-R", "-f", archiveLogLocation, backupPath]
-    snapshotArchiveLog = subprocess.Popen(argsForArchiveLog)
-    while snapshotArchiveLog.poll()==None:
-        sleep(2)
+    os.system('cp -R -f ' + parsedArchiveLog[0] + '/' + parsedDBName[0] + '/archivelog ' + backupPath)
 
     print("Incremental: Backup Complete")
 #----End Incremental Backup----#
@@ -94,10 +90,11 @@ def switchControlFiles(backupPath):
 
 def switchArchiveLogFiles(backupPath):
     parsedArchiveLog = parameterFileParser("archivelog")
+    parsedDBName = parameterFileParser("db_name")
     for location in parsedArchiveLog:
-        os.system('rm -R -f '+ location + '/CDB1/archivelog')
-        os.system('cp -R -f ' + backupPath + '/archivelog ' + location + '/CDB1/archivelog')
-        os.system('chmod -R a+wrx '+location+'/CDB1/archivelog')
+        os.system('rm -R -f '+ location + '/' + parsedDBName[0] +'/archivelog')
+        os.system('cp -R -f ' + backupPath + '/archivelog ' + location + '/' + parsedDBName[0] + '/archivelog')
+        os.system('chmod -R a+wrx '+ location +'/' + parsedDBName[0] + '/archivelog')
     print("Switched Archive Log Files")
 
 def restore():
