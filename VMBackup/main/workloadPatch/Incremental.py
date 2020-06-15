@@ -13,7 +13,6 @@ name = "oracle"
 login_path = "oracle"
 BackupSource = ""
 BaseLocation = "/hdd/AutoIncrement/"
-#archiveLogLocation = "/hdd/CoreFiles/flash_recovery_area/CDB1/archivelog"
 filepath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
 #Action = 'b'
 #----End----#
@@ -23,32 +22,30 @@ def parserLine(unparsedLine):
     return parsedLine
 
 def parameterFileParser(toFind):
-    unparsedControlFile = ""
-    unparsedArchiveLog = ""
 
-    with open(filepath, 'r') as parameterFile:
-        line = parameterFile.readline()
-        while line:
-            if "*.control_files=" in line:
-                unparsedControlFile = line
-            if "*.db_recovery_file_dest=" in line:
-                unparsedArchiveLog = line
-            if "*.db_name=" in line:
-                unparsedDBName = line
+    if 'oracle' in name.lower():
+        with open(filepath, 'r') as parameterFile:
             line = parameterFile.readline()
-    parameterFile.close()
-
-    if toFind == "archivelog":
-        parsedArchiveLog = parserLine(unparsedArchiveLog)
-        return parsedArchiveLog
-    elif toFind == "controlfile":
-        parsedControlFile = parserLine(unparsedControlFile)
-        return parsedControlFile
-    elif toFind == "db_name":
-        parsedDBName = parserLine(unparsedDBName)
-        return parsedDBName
-    else:
-        return None
+            while line:
+                if "*.control_files=" in line:
+                    unparsedControlFile = line
+                if "*.db_recovery_file_dest=" in line:
+                    unparsedArchiveLog = line
+                if "*.db_name=" in line:
+                    unparsedDBName = line
+                line = parameterFile.readline()
+        parameterFile.close()
+        if toFind == "archivelog":
+            parsedArchiveLog = parserLine(unparsedArchiveLog)
+            return parsedArchiveLog
+        elif toFind == "controlfile":
+            parsedControlFile = parserLine(unparsedControlFile)
+            return parsedControlFile
+        elif toFind == "db_name":
+            parsedDBName = parserLine(unparsedDBName)
+            return parsedDBName
+        else:
+            return None
 
 def setLocation():
     nowTimestamp = datetime.now()
@@ -63,16 +60,17 @@ def incremental():
 
     backupPath = setLocation()
 
-    backupOracle = "sqlplus -s / as sysdba @/hdd/python/IncrementalBackup/backup.sql " + backupPath
-    argsForControlFile = ["su", "-", login_path, "-c", backupOracle]
-    snapshotControlFile = subprocess.Popen(argsForControlFile)
-    while snapshotControlFile.poll()==None:
-        sleep(2)
-    
-    parsedArchiveLog = parameterFileParser("archivelog")
-    parsedDBName = parameterFileParser("db_name")
-
-    os.system('cp -R -f ' + parsedArchiveLog[0] + '/' + parsedDBName[0] + '/archivelog ' + backupPath)
+    if 'oracle' in name.lower():
+        backupOracle = "sqlplus -s / as sysdba @/hdd/python/IncrementalBackup/backup.sql " + backupPath
+        argsForControlFile = ["su", "-", login_path, "-c", backupOracle]
+        snapshotControlFile = subprocess.Popen(argsForControlFile)
+        while snapshotControlFile.poll()==None:
+            sleep(2)        
+        parsedArchiveLog = parameterFileParser("archivelog")
+        parsedDBName = parameterFileParser("db_name")
+        print('Archive log started: ', datetime.now().strftime("%Y%m%d%H%M%S"))
+        os.system('cp -R -f ' + parsedArchiveLog[0] + '/' + parsedDBName[0] + '/archivelog ' + backupPath)
+        print('Archive log copied: ', datetime.now().strftime("%Y%m%d%H%M%S"))
 
     print("Incremental: Backup Complete")
 #----End Incremental Backup----#
@@ -109,8 +107,6 @@ def restore():
     switchArchiveLogFiles(backupPath)
     print("Incremental: Restore Complete")
 #----End Incremental Restore----#
-
-
 
 #----Prompt----#
 Action = input("Enter l for list, b for incremental backup and r for restore: ")
