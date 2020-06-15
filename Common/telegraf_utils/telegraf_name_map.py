@@ -86,12 +86,12 @@ name_map = {
 "% Free Inodes" : {"plugin":"disk", "field":"inodes_free_percent", "module":"filesystem"}, #Need to calculate percentage
 "% Used Inodes" : {"plugin":"disk", "field":"inodes_used_percent", "module":"filesystem"}, #Need to calculate percentage
 
-"Disk Transfers/sec" : {"plugin":"diskio", "field":"total_transfers_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate sum
-"Disk Read Bytes/sec" : {"plugin":"diskio", "field":"read_bytes_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
-"Logical Disk Bytes/sec" : {"plugin":"diskio", "field":"total_bytes_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate rate and then sum
-"Disk Write Bytes/sec" : {"plugin":"diskio", "field":"write_bytes_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
-"Disk Reads/sec" : {"plugin":"diskio", "field":"reads_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
-"Disk Writes/sec" : {"plugin":"diskio", "field":"writes_filesystem", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
+"Disk Transfers/sec" : {"plugin":"diskio", "field":"total_transfers", "op":"rate", "module":"filesystem"}, #Need to calculate sum
+"Disk Read Bytes/sec" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
+"Logical Disk Bytes/sec" : {"plugin":"diskio", "field":"total_bytes", "op":"rate", "module":"filesystem"}, #Need to calculate rate and then sum
+"Disk Write Bytes/sec" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
+"Disk Reads/sec" : {"plugin":"diskio", "field":"reads", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
+"Disk Writes/sec" : {"plugin":"diskio", "field":"writes", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
 # #OMI Disk plugin
 "disk->Disk read guest OS" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},

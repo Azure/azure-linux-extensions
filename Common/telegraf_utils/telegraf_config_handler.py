@@ -70,36 +70,35 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     """
     Sample converted telegraf conf dict -
 
-    u'network': {
-        'net': {
-            'err_in': {  'interval': u'15s',  'displayName': u'Packets received errors'},
-            'packets_sent': {  'interval': u'15s',  'displayName': u'Packets sent'},
-            'bytes_recv': {  'interval': u'5s',  'displayName': u'Network in guest OS'},
-            'packets_recv': {  'interval': u'5s',  'displayName': u'Packets received'},
-            'err_out': {  'interval': u'15s',  'displayName': u'Packets sent errors'},
-            'bytes_sent': {  'interval': u'15s',  'displayName': u'Network out guest OS'}
+    "network": {
+        "net": {
+            "bytes_total": {"interval": "15s","displayName": "Network total bytes","ladtablekey": "/builtin/network/bytestotal"},
+            "drop_total": {"interval": "15s","displayName": "Network collisions","ladtablekey": "/builtin/network/totalcollisions"},
+            "err_in": {"interval": "15s","displayName": "Packets received errors","ladtablekey": "/builtin/network/totalrxerrors"},
+            "packets_sent": {"interval": "15s","displayName": "Packets sent","ladtablekey": "/builtin/network/packetstransmitted"},
         }
     },
-    u'filesystem': {
-        'disk': {
-            'used_percent': {  'interval': u'15s',  'displayName': u'Filesystem % used space'},
-            'used': {  'interval': u'15s',
-                'displayName': u'Filesystem used space'},
-            'free': {  'interval': u'15s',  'displayName': u'Filesystem free space'}
+    "filesystem": {
+        "disk": {
+            "used_percent": {"interval": "15s","displayName": "Filesystem % used space","ladtablekey": "/builtin/filesystem/percentusedspace"},
+            "used": {"interval": "15s","displayName": "Filesystem used space","ladtablekey": "/builtin/filesystem/usedspace"},
+            "free": {"interval": "15s","displayName": "Filesystem free space","ladtablekey": "/builtin/filesystem/freespace"},
+            "inodes_free_percent": {"interval": "15s","displayName": "Filesystem % free inodes","ladtablekey": "/builtin/filesystem/percentfreeinodes"},
         },
-        'diskio': {
-            'write_bytes': {  'interval': u'15s',  'displayName': u'Filesystem write bytes/sec',  'op': 'rate'},
-            'read_bytes': {  'interval': u'15s',  'displayName': u'Filesystem read bytes/sec',  'op': 'rate'},
-            'writes': {  'interval': u'15s',  'displayName': u'Filesystem writes/sec',  'op': 'rate'},
-            'reads': {  'interval': u'15s',  'displayName': u'Filesystem reads/sec',  'op': 'rate'}
+        "diskio": {
+            "writes_filesystem": {"interval": "15s","displayName": "Filesystem writes/sec","ladtablekey": "/builtin/filesystem/writespersecond","op": "rate"},
+            "total_transfers_filesystem": {"interval": "15s","displayName": "Filesystem transfers/sec","ladtablekey": "/builtin/filesystem/transferspersecond","op": "rate"},
+            "reads_filesystem": {"interval": "15s","displayName": "Filesystem reads/sec","ladtablekey": "/builtin/filesystem/readspersecond","op": "rate"},
         }
     },
-    """
+        """
 
     if len(telegraf_json) == 0:
         raise Exception("Unable to parse telegraf config into intermediate dictionary.")
         return []
 
+    excess_diskio_plugin_list_lad = ["total_transfers_filesystem", "read_bytes_filesystem", "total_bytes_filesystem", "write_bytes_filesystem", "reads_filesystem", "writes_filesystem"]
+    excess_diskio_field_drop_list_str = ""
 
 
     int_file = {"filename":"intermediate.json", "data": json.dumps(telegraf_json)}
@@ -182,20 +181,27 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 #Add respective rename processor plugin based on the displayname
                 if is_lad:
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-                else:
-                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-
-                metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-
-                if is_lad:
                     lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
                 else:
+                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
 
-                metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
+                # Avoid adding the rename logic for the redundant *_filesystem fields for diskio which were added specifically for OMI parity in LAD
+                # Had to re-use these six fields to avoid renaming issues since both Filesystem and Disk in OMI-LAD use them
+                # AMA only uses them once so only need this for LAD
+                if is_lad:
+                    if field in excess_diskio_plugin_list_lad:
+                        excess_diskio_field_drop_list_str += "\"" + field + "\", "
+                    else:
+                        metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                        metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
+                else:
+                    metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                    metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                    metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
 
             #Add respective operations for aggregators
             # if is_lad:
@@ -266,12 +272,11 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
     """
 
-    excess_diskio_field_drop_list = "\"total_transfers_filesystem\", \"read_bytes_filesystem\", \"total_bytes_filesystem\", \"write_bytes_filesystem\", \"reads_filesystem\", \"writes_filesystem\""
-
     ## Get the log folder directory from HandlerEnvironment.json and use that for the telegraf default logging
     logFolder, _ = get_handler_vars()
     for measurement in storage_namepass_list:
         storage_namepass_str += "\"" + measurement + "\", "
+
 
     # Telegraf basic agent and output config
     agentconf = "[agent]\n"
@@ -299,7 +304,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "\n# Configuration for sending metrics to ME\n"
     agentconf += "[[outputs.influxdb]]\n"
     agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
-    # agentconf += "  fielddrop = [" + storage_namepass_str[:-2] + "]\n"
+    if is_lad:
+        agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
     agentconf += "\n# Configuration for sending metrics to AMA\n"
     agentconf += "[[outputs.influxdb]]\n"
@@ -312,7 +318,6 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agent_file = {"filename":"telegraf.conf", "data": agentconf}
     output.append(agent_file)
 
-    print output
 
     return output, storage_namepass_list
 
@@ -330,7 +335,6 @@ def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
             path = telegraf_conf_dir + configfile["filename"]
         else:
             path = telegraf_d_conf_dir + configfile["filename"]
-        print "writing to, ", path
         with open(path, "w") as f:
             f.write(configfile["data"])
 
@@ -355,7 +359,7 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
-def stop_telegraf_service():
+def stop_telegraf_service(is_lad):
 
     if is_lad:
         telegraf_bin = "/usr/local/lad/bin/telegraf"
@@ -402,7 +406,6 @@ def stop_telegraf_service():
 
 def remove_telegraf_service():
 
-    _, configFolder = get_handler_vars()
     telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
 
     if os.path.isfile(telegraf_service_path):
@@ -456,6 +459,7 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
 
 def start_telegraf(is_lad):
     #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    log_messages = ""
 
     if is_lad:
         telegraf_bin = "/usr/local/lad/bin/telegraf"
@@ -463,16 +467,16 @@ def start_telegraf(is_lad):
         telegraf_bin = "/usr/sbin/telegraf"
 
     if not os.path.isfile(telegraf_bin):
-        raise Exception("Telegraf binary does not exist. Failed to start telegraf service.")
-        return False
+        log_messages += "Telegraf binary does not exist. Failed to start telegraf service."
+        return False, log_messages
 
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
         if service_restart_status != 0:
-            raise Exception("Unable to start Telegraf service. Failed to start telegraf service.")
-            return False
+            log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
+            return False, log_messages
 
     #Else start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
     else:
@@ -497,9 +501,9 @@ def start_telegraf(is_lad):
                 f.write(telegraf_pid)
         else:
             out, err = proc.communicate()
-            raise Exception("Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err))
-            return False
-    return True
+            log_messages += "Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err)
+            return False, log_messages
+    return True, log_messages
 
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
@@ -564,7 +568,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     write_configs(output, telegraf_conf_dir, telegraf_d_conf_dir)
 
     # Setup Telegraf service.
-    If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
+    # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     if check_systemd == 0:
         telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)

@@ -5,7 +5,7 @@ from shutil import copyfile
 import stat
 import filecmp
 
-def stop_metrics_service():
+def stop_metrics_service(is_lad):
 
     if is_lad:
         metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
@@ -42,16 +42,16 @@ def stop_metrics_service():
                 if metrics_ext_bin in output:
                     os.kill(pid, signal.SIGKILL)
                 else:
-                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)            else:
+                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
+            else:
                 return False, "No pid found for a currently running Metrics Extension process in {0}. Failed to stop Metrics Extension.".format(metrics_pid_path)
         else:
             return False, "File containing the pid for the running Metrics Extension process at {0} does not exit. Failed to stop Metrics Extension".format(metrics_pid_path)
 
     return True, "Successfully stopped metrics-extension service"
 
-def remove_metrics_service():
+def remove_metrics_service(is_lad):
 
-    _, configFolder = get_handler_vars()
     metrics_service_path = "/lib/systemd/system/metrics-extension.service"
 
     if os.path.isfile(metrics_service_path):
@@ -80,11 +80,12 @@ def generate_MSI_token():
     me_config_dir = configFolder + "/metrics_configs/"
     me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
     expiry_epoch_time = ""
+    log_messages = ""
 
 
     if not os.path.exists(me_config_dir):
-        raise Exception("Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token for ME.".format(me_config_dir))
-        return False, expiry_epoch_time
+        log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+        return False, expiry_epoch_time, log_messages
     try:
         msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
         req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
@@ -93,23 +94,23 @@ def generate_MSI_token():
 
 
         if not data or "access_token" not in data:
-            raise Exception("Invalid MSI auth token generation at {0}. Please check the file contents.".format(me_auth_file_path))
-            return False, expiry_epoch_time
+            log_messages += "Invalid MSI auth token generation at {0}. Please check the file contents.\n".format(me_auth_file_path)
+            return False, expiry_epoch_time, log_messages
 
         with open(me_auth_file_path, "w") as f:
             f.write(json.dumps(data))
 
         if "expires_on" in data:
             expiry_epoch_time  = data["expires_on"]
-        else: #Fix these exceptions. instead of throwing them, return an error log and retry for a fixed number
-            raise Exception("Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token".format(me_auth_file_path))
+        else:
+            log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+            return False, expiry_epoch_time, log_messages
 
     except Exception as e:
-        raise Exception("Failed to get msi auth token. Please check if VM's system assigned Identity is enabled. Failed with error {0}".format(e))
+        log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+        return False, expiry_epoch_time, log_messages
 
-    return True, expiry_epoch_time
-
-
+    return True, expiry_epoch_time, log_messages
 
 
 def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
@@ -146,14 +147,15 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
 
 def start_metrics(is_lad):
     #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    log_messages = ""
 
     if is_lad:
         metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
     else:
         metrics_ext_bin = "/usr/sbin/MetricsExtension"
     if not os.path.isfile(metrics_ext_bin):
-        raise Exception("Metrics Extension binary does not exist. Failed to start ME service.")
-        return False
+        log_messages += "Metrics Extension binary does not exist. Failed to start ME service."
+        return False, log_messages
     me_influx_port = "8139"
 
 
@@ -162,8 +164,8 @@ def start_metrics(is_lad):
     if check_systemd == 0:
         service_restart_status = os.system("sudo systemctl restart metrics-extension")
         if service_restart_status != 0:
-            raise Exception("Unable to start metrics-extension.service. Failed to start ME service.")
-            return False
+            log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
+            return False, log_messages
 
     #Else start ME as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
     else:
@@ -187,9 +189,9 @@ def start_metrics(is_lad):
                 f.write(metrics_pid)
         else:
             out, err = proc.communicate()
-            raise Exception("Unable to run MetricsExtension binary as a process due to error - {0}. Failed to start MetricsExtension.".format(err))
-            return False
-    return True
+            log_messages += "Unable to run MetricsExtension binary as a process due to error - {0}. Failed to start MetricsExtension.".format(err)
+            return False, log_messages
+    return True, log_messages
 
 
 def create_metrics_extension_conf(az_resource_id, aad_url):
