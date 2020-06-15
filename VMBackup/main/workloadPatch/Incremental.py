@@ -7,12 +7,22 @@ import string
 from time import sleep
 from datetime import datetime
 
+
+#----Config----#
+name = "oracle"
+login_path = "oracle"
+BackupSource = ""
+BaseLocation = "/hdd/AutoIncrement/"
+#archiveLogLocation = "/hdd/CoreFiles/flash_recovery_area/CDB1/archivelog"
+filepath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+#Action = 'b'
+#----End----#
+
 def parserLine(unparsedLine):
     parsedLine = [name.strip() for name in unparsedLine.split('=')[1].split(',')]
     return parsedLine
 
 def parameterFileParser(toFind):
-    filepath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
     unparsedControlFile = ""
     unparsedArchiveLog = ""
 
@@ -23,6 +33,8 @@ def parameterFileParser(toFind):
                 unparsedControlFile = line
             if "*.db_recovery_file_dest=" in line:
                 unparsedArchiveLog = line
+            if "*.db_name=" in line:
+                unparsedDBName = line
             line = parameterFile.readline()
     parameterFile.close()
 
@@ -32,6 +44,9 @@ def parameterFileParser(toFind):
     elif toFind == "controlfile":
         parsedControlFile = parserLine(unparsedControlFile)
         return parsedControlFile
+    elif toFind == "db_name":
+        parsedDBName = parserLine(unparsedDBName)
+        return parsedDBName
     else:
         return None
 
@@ -53,6 +68,10 @@ def incremental():
     snapshotControlFile = subprocess.Popen(argsForControlFile)
     while snapshotControlFile.poll()==None:
         sleep(2)
+    
+    parsedArchiveLog = parameterFileParser("archivelog")
+    parsedDBName = parameterFileParser("db_name")
+    archiveLogLocation = parsedArchiveLog + '/' + parsedDBName + '/archivelog'
 
     argsForArchiveLog = ["cp", "-R", "-f", archiveLogLocation, backupPath]
     snapshotArchiveLog = subprocess.Popen(argsForArchiveLog)
@@ -69,13 +88,17 @@ def switchControlFiles(backupPath):
     for location in parsedControlFile:
         os.system('rm -f '+location)
         os.system('cp -f '+ backupPath + '/control.ctl ' + location)
+        os.system('chmod a+wrx '+location)
+    print("Switched Control Files")
         #controlFileNames.append(re.findall('[\w\.-]+.ctl', location))
 
 def switchArchiveLogFiles(backupPath):
     parsedArchiveLog = parameterFileParser("archivelog")
     for location in parsedArchiveLog:
-        os.system('rm -f '+ location + '/archivelog')
-        os.system('cp -f ' + backupPath + '/archivelog ' + location + '/archivelog')
+        os.system('rm -R -f '+ location + '/CDB1/archivelog')
+        os.system('cp -R -f ' + backupPath + '/archivelog ' + location + '/CDB1/archivelog')
+        os.system('chmod -R a+wrx '+location+'/CDB1/archivelog')
+    print("Switched Archive Log Files")
 
 def restore():
     print("Incremental: Restoring")
@@ -90,19 +113,11 @@ def restore():
     print("Incremental: Restore Complete")
 #----End Incremental Restore----#
 
-#----Config----#
-BackupSource = ""
-BaseLocation = "/hdd/AutoIncrement/"
-archiveLogLocation = "/hdd/CoreFiles/flash_recovery_area/CDB1/archivelog"
-login_path = "oracle"
-database = "oracle"
-#Action = 'b'
-#----End----#
+
 
 #----Prompt----#
 Action = input("Enter l for list, b for incremental backup and r for restore: ")
 #----End Prompt----#
-
 
 if Action=='b':
     incremental()
