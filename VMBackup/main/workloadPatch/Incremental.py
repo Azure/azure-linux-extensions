@@ -46,7 +46,7 @@ def setLocation():
 def incremental():
     print("Incremental: Taking a backup")
 
-    backupPath=setLocation()
+    backupPath = setLocation()
 
     backupOracle = "sqlplus -s / as sysdba @/hdd/python/IncrementalBackup/backup.sql " + backupPath
     argsForControlFile = ["su", "-", login_path, "-c", backupOracle]

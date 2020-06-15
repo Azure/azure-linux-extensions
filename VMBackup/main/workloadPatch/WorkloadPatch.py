@@ -94,8 +94,8 @@ class WorkloadPatch:
         
         if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
             os.remove("/var/lib/mysql-files/azbackupserver.txt")
-        #else:
-        #    self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+        else:
+            self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
             
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
