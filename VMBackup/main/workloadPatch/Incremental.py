@@ -17,7 +17,7 @@ parameterFilePath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
 #Action = 'b'
 #----End----#
 
-def parserLine(unparsedLine):
+def parseLine(unparsedLine):
     parsedLine = [name.strip() for name in unparsedLine.split('=')[1].split(',')]
     return parsedLine
 
@@ -36,13 +36,13 @@ def parameterFileParser(toFind):
                 line = parameterFile.readline()
         parameterFile.close()
         if toFind == "archivelog":
-            parsedArchiveLog = parserLine(unparsedArchiveLog)
+            parsedArchiveLog = parseLine(unparsedArchiveLog)
             return parsedArchiveLog
         elif toFind == "controlfile":
-            parsedControlFile = parserLine(unparsedControlFile)
+            parsedControlFile = parseLine(unparsedControlFile)
             return parsedControlFile
         elif toFind == "db_name":
-            parsedDBName = parserLine(unparsedDBName)
+            parsedDBName = parseLine(unparsedDBName)
             return parsedDBName
         else:
             return None
@@ -116,12 +116,12 @@ if Action=='b':
     incremental()
 elif Action=='r':
     #----Restore----#
-    os.system('ls -lrt '+BaseLocation)
-    BackupSource=input("Enter the filename: ")
+    os.system('ls -lrt '+ BaseLocation)
+    BackupSource = input("Enter the filename: ")
     restore()
     #----End Restore----#
 elif Action=='l':
-    os.system('ls -lrt '+BaseLocation)
+    os.system('ls -lrt '+ BaseLocation)
 else:
     print("Invalid input")
 
