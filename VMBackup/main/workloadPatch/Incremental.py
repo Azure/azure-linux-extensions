@@ -13,7 +13,7 @@ name = "oracle"
 login_path = "oracle"
 BackupSource = ""
 BaseLocation = "/hdd/AutoIncrement/"
-filepath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+parameterFilePath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
 #Action = 'b'
 #----End----#
 
@@ -24,7 +24,7 @@ def parserLine(unparsedLine):
 def parameterFileParser(toFind):
 
     if 'oracle' in name.lower():
-        with open(filepath, 'r') as parameterFile:
+        with open(parameterFilePath, 'r') as parameterFile:
             line = parameterFile.readline()
             while line:
                 if "*.control_files=" in line:
