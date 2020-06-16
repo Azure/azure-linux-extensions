@@ -51,7 +51,7 @@ def setLocation():
     nowTimestamp = datetime.now()
     nowTimestamp = nowTimestamp.strftime("%Y%m%d%H%M%S")
     fullPath = BaseLocation + nowTimestamp
-    os.system('mkdir -m777 '+fullPath)
+    os.system('mkdir -m777 '+ fullPath)
     return fullPath
 
 #----Start Incremental Backup----#
@@ -65,7 +65,7 @@ def incremental():
         argsForControlFile = ["su", "-", login_path, "-c", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
-            sleep(2)        
+            sleep(1)        
         parsedArchiveLog = parameterFileParser("archivelog")
         parsedDBName = parameterFileParser("db_name")
         print('Archive log started: ', datetime.now().strftime("%Y%m%d%H%M%S"))
