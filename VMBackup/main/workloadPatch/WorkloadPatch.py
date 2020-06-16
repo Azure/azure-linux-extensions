@@ -118,6 +118,8 @@ class WorkloadPatch:
                 self.logger.log("Shrid: Pre- Database not open. Backup may proceed without pre and post")
                 print("Shrid: Pre- Database not open. Backup may proceed without pre and post")
                 return
+            preOracleContainerName = self.containerName()
+            print("Shrid: Pre- Result from containerName: ", preOracleContainerName)
 
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
@@ -161,6 +163,32 @@ class WorkloadPatch:
             print("Shrid: databaseStatus- ", str(oracleStatus))
             return oracleStatus
 
+        return False
+
+    def containerName(self):
+
+        if 'oracle' in self.name.lower():
+            containerNameArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSHOW CON_NAME;\nEOF'"
+            oracleContainerName = subprocess.check_output(containerNameArgs, shell=True)
+            self.logger.log("Shrid: containerName- " + str(oracleContainerName))
+            print("Shrid: containerName- ", str(oracleContainerName))
+            
+            if "CDB$ROOT" in str(oracleContainerName):
+                self.logger.log("Shrid: containerName- In CDB$ROOT")
+                print("Shrid: containerName- In CDB$ROOT")
+                return True
+            else:
+                self.logger.log("Shrid: Pre- Error. Not in CDB$ROOT")
+                print("Shrid: Pre- Error. Not in CDB$ROOT")
+                changeContainerArgs = "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nALTER SESSION SET CONTAINER=CDB$ROOT;\nEOF'"
+                oracleChangeContainer = subprocess.check_output(changeContainerArgs, shell=True)
+                self.logger.log("Shrid: containerName- " + str(oracleChangeContainer))
+                print("Shrid: containerName- ", str(oracleChangeContainer))
+                if "Session altered." in str(oracleChangeContainer):
+                    return True
+                else:
+                    return False
+        
         return False
 
     def thread_for_sql(self,args):
