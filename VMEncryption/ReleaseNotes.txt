@@ -1,3 +1,24 @@
+1.1.0.50
+- adds yaml pipeline files to support cdpx test extension build
+- parameterizes version and extension name to support cdpx
+- removes unused parameter in bekutil
+- fixes fstab parsing
+- adds nofail to fstab if absent
+- adds resource disk to crypttab if crypt mount is used
+- fixes newline issue in telemetry for improved debugging
+- migrates to early unlock if using crypt mount
+- changes sparse mode from 64K to 16M to address LVM with xfs
+- tries mounting /boot/efi for UEFI image support if applicable
+- fixes lvm reliability issue caused by hardcoded sda2 device name
+- adds python-six module for transitions module reliability
+- adds to and updates existing unit tests
+- Fix hardcoded root partition in Ubuntu
+- Fix data disk not getting mounted after disabling encryption.
+- ADE Linux DualPass to SinglePass migration
+- Handle no passphrase file in update encryption settings
+- ADE SinglePass EV2 VSRM Artifacts
+- ADE SinglePass CDPx: Migrating Windows agent to image 1809
+
 (1.1.0.48)
 -Fix disable after EFA encryption and stop-start
 -Fix missing Python-six module for CentOS 6.8
