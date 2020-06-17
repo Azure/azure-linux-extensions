@@ -26,7 +26,7 @@ def setLocation():
     os.system('mkdir -m777 '+ fullPath)
     return fullPath
 
-def incremental(self):
+def incremental():
     print("Logbackup: Taking a backup")
 
     backupPath = setLocation()
@@ -44,3 +44,6 @@ def incremental(self):
         print('Archive log copied: ', datetime.now().strftime("%Y%m%d%H%M%S"))
 
     print("Logbackup: Backup Complete")
+
+parameterFileParser()
+incremental()
