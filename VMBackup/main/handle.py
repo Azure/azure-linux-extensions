@@ -274,7 +274,6 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    workload_name = None
     snapshot_type = "appAndFileSystem"
 
     #Adding python version to the telemetry
@@ -302,8 +301,6 @@ def daemon():
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
-        if config.has_option('SnapshotThread','workload_name'):
-            workload_name = config.get('SnapshotThread','workload_name') #values like mysql, postgres
         if config.has_option('SnapshotThread','snapshot_type'):
            snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem
             
@@ -311,7 +308,6 @@ def daemon():
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
-    backup_logger.log("workload backup enabled for workload: " + workload_name, True)
     
     snapshot_info_array = None
 
@@ -397,9 +393,10 @@ def daemon():
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 
-                if workload_name is not None:
-                    workload_patch = WorkloadPatch.WorkloadPatch(workload_name, backup_logger)
-                    
+                workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
+                
+                if workload_patch.name != "":
+                    backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
                     workload_patch.pre()
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("file system consistent backup only")
