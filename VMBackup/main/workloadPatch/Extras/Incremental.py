@@ -94,7 +94,7 @@ class Incremental:
 
     def confParser(self):
         print("WorkloadPatch: Entering workload config parsing")
-        configfile = 'increment.conf'
+        configfile = '/etc/azure/workload.conf' 
         if os.path.exists(configfile):
             config = ConfigParsers.ConfigParser()
             config.read(configfile)

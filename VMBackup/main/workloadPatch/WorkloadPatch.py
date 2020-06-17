@@ -108,6 +108,7 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
         
+        #----SHRID CODE START----#
         if 'oracle' in self.name.lower():
             global preOracleStatus
             preOracleStatus = self.databaseStatus()
@@ -129,7 +130,9 @@ class WorkloadPatch:
             self.timeoutDaemon()
             self.logger.log("Shrid: Pre- Exiting pre mode for master")
             print("Shrid: Pre- Exiting pre mode for master")
+        #----SHRID CODE END----#
 
+    #----SHRID CODE START----#
     def timeoutDaemon(self):
         global preDaemonThread
         if 'oracle' in self.name.lower():
@@ -141,7 +144,9 @@ class WorkloadPatch:
             preDaemonThread.start()
         self.logger.log("Shrid: timeoutDaemon started for: " + self.timeout + " seconds")
         print("Shrid: timeoutDaemon started for: ", self.timeout, " seconds")
+    #----SHRID CODE END----#
 
+    #----SHRID CODE START----#
     def threadForTimeoutDaemon(self, args): 
             global daemonProcess
             daemonProcess = subprocess.Popen(args)
@@ -151,7 +156,9 @@ class WorkloadPatch:
                 sleep(1)
             self.logger.log("Shrid: daemonProcess completed")
             print("Shrid: daemonProcess completed")
+    #----SHRID CODE END----#
 
+    #---- SHRID CODE START----#
     def databaseStatus(self):
 
         if 'oracle' in self.name.lower():
@@ -162,6 +169,7 @@ class WorkloadPatch:
             return oracleStatus
 
         return False
+    #----SHRID CODE END----#
 
     def thread_for_sql(self,args):
         self.logger.log("command to execute: "+str(args))
@@ -206,6 +214,7 @@ class WorkloadPatch:
             args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
+        #----SHRID CODE START----#
         if 'oracle' in self.name.lower():
             postOracleStatus = self.databaseStatus()
             if postOracleStatus != preOracleStatus:
@@ -238,7 +247,7 @@ class WorkloadPatch:
                 sleep(1)
             self.logger.log("Shrid: Post- Completed")
             print("Shrid: Post- Completed")
-
+        #----SHRID CODE END----#
 
     def postMasterDB(self):
         pass
@@ -296,4 +305,56 @@ class WorkloadPatch:
         error_list = []#TODO error list from error details
         return error_list  
 
+#----SHRID CODE START----#
+class Incremental:
+    def __init__(self):
+        self.name = "oracle"
+        self.login_path = "oracle"
+        self.baseLocation = "/hdd/AutoIncrement/"
+        self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+        self.oracleParameter = {}
+        self.backupSource = ""
+        self.confParser()
+        self.crontabEntry()
+
+    def crontabEntry(self):
+        crontabCheckArgs = "crontab - l"
+        crontabCheck = subprocess.check_output(crontabCheckArgs, shell=True)
+
+        if 'oracle' in self.name.lower():
+            if 'logbackup' in crontabCheck:
+                print("Incremental: Crontab Entry- ", str(crontabCheck))
+            else:
+                crontabEntryArgs = "echo \"*/5 * * * * python /hdd/Downloads/logbackup.py\" | crontab -"
+                subprocess.check_output(crontabEntryArgs, shell=True)
+                print("Incremental: New Crontab Entry")
     
+    def confParser(self):
+        print("WorkloadPatch: Entering workload config parsing")
+        configfile = '/etc/azure/workload.conf' 
+        if os.path.exists(configfile):
+            config = ConfigParsers.ConfigParser()
+            config.read(configfile)
+            if config.has_section("incremental"):
+                print("Incremental: config section present for incremental ")
+                if config.has_option("incremental", 'workload_name'):                        
+                    name = config.get("incremental", 'workload_name')
+                    print("Incremental: config incremental command ", name)
+                else:
+                    return None
+                if config.has_option("incremental", 'loginPath'):
+                    login_path = config.get("incremental", 'loginPath')
+                    print("Incremental: config incremental login_path ", login_path)
+                if config.has_option("incremental", 'parameterFilePath'):
+                    parameterFilePath = config.get("incremental", 'parameterFilePath')
+                    print("Incremental: config incremental parameterFilePath ", parameterFilePath)
+                if config.has_option("incremental", 'baseLocation'):
+                    baseLocation = config.get("incremental", 'baseLocation')
+                    print("Incremental: config incremental baseLocation ", baseLocation)
+                if config.has_option("incremental", 'backupSource'):
+                    backupSource = config.get("incremental", 'backupSource')
+                    print("Incremental: config incremental backupSource ", backupSource)
+        else:
+            print("No matching workload config found")
+
+#----SHRID CODE END----#
