@@ -319,14 +319,14 @@ class Incremental:
 
     def crontabEntry(self):
         crontabCheckArgs = "crontab - l"
-        crontabCheck = subprocess.check_output(crontabCheckArgs, shell=True)
+        crontabCheck = subprocess.Popen(crontabCheckArgs, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
         if 'oracle' in self.name.lower():
-            if 'logbackup' in crontabCheck:
+            if 'logbackup' in str(crontabCheck):
                 print("Incremental: Crontab Entry- ", str(crontabCheck))
             else:
                 crontabEntryArgs = "echo \"*/5 * * * * python /hdd/Downloads/logbackup.py\" | crontab -"
-                subprocess.check_output(crontabEntryArgs, shell=True)
+                subprocess.Popen(crontabEntryArgs, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 print("Incremental: New Crontab Entry")
     
     def confParser(self):
