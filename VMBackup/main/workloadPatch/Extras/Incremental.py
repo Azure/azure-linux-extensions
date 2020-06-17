@@ -19,6 +19,8 @@ class Incremental:
         self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
         self.oracleParameter = {}
         self.backupSource = ""
+        self.confParser()
+        self.parameterFileParser()
         #Action = 'b' #To always perform backup by default
 
     def parameterFileParser(self):
@@ -119,9 +121,6 @@ class Incremental:
             print("No matching workload config found")
 
 oracleIncremental = Incremental()
-#----Parse the parameter file----#
-oracleIncremental.parameterFileParser()
-#----End----#
 
 #----Prompt----#
 Action = input("Enter l for list, b for incremental backup and r for restore: ")
