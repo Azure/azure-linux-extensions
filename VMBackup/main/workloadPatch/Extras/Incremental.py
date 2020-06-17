@@ -1,56 +1,69 @@
 import sys
-import os
-import subprocess
+import Utils.HandlerUtil
 import threading
-import re
-import string
+import os
 from time import sleep
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
+import subprocess
 from datetime import datetime
-
+import re
 
 #----Config----#
 name = "oracle"
 login_path = "oracle"
-BackupSource = ""
-BaseLocation = "/hdd/AutoIncrement/"
-parameterFilePath="/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+backupSource = ""
+baseLocation = "/hdd/AutoIncrement/"
+parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+oracleParameter = {}
+parameterFileParser()
 #Action = 'b'
 #----End----#
 
-def parseLine(unparsedLine):
-    parsedLine = [name.strip() for name in unparsedLine.split('=')[1].split(',')]
-    return parsedLine
+def confParser():
+    print("WorkloadPatch: Entering workload config parsing")
+    configfile = 'increment.conf'
+    if os.path.exists(configfile):
+        config = ConfigParsers.ConfigParser()
+        config.read(configfile)
+        if config.has_section("incremental"):
+            print("Incremental: config section present for incremental ")
+            if config.has_option("incremental", 'workload_name'):                        
+                name = config.get("incremental", 'workload_name')
+                print("Incremental: config incremental command ", name)
+            else:
+                return None
+            if config.has_option("incremental", 'loginPath'):
+                login_path = config.get("incremental", 'loginPath')
+                print("Incremental: config incremental login_path ", login_path)
+            if config.has_option("incremental", 'parameterFilePath'):
+                parameterFilePath = config.get("incremental", 'parameterFilePath')
+                print("Incremental: config incremental parameterFilePath ", parameterFilePath)
+            if config.has_option("incremental", 'baseLocation'):
+                baseLocation = config.get("incremental", 'baseLocation')
+                print("Incremental: config incremental baseLocation ", baseLocation)
+            if config.has_option("incremental", 'backupSource'):
+                backupSource = config.get("incremental", 'backupSource')
+                print("Incremental: config incremental backupSource ", backupSource)
+    else:
+        print("No matching workload config found")
 
-def parameterFileParser(toFind):
-
-    if 'oracle' in name.lower():
-        with open(parameterFilePath, 'r') as parameterFile:
-            line = parameterFile.readline()
-            while line:
-                if "*.control_files=" in line:
-                    unparsedControlFile = line
-                if "*.db_recovery_file_dest=" in line:
-                    unparsedArchiveLog = line
-                if "*.db_name=" in line:
-                    unparsedDBName = line
-                line = parameterFile.readline()
-        parameterFile.close()
-        if toFind == "archivelog":
-            parsedArchiveLog = parseLine(unparsedArchiveLog)
-            return parsedArchiveLog
-        elif toFind == "controlfile":
-            parsedControlFile = parseLine(unparsedControlFile)
-            return parsedControlFile
-        elif toFind == "db_name":
-            parsedDBName = parseLine(unparsedDBName)
-            return parsedDBName
-        else:
-            return None
+def parameterFileParser():
+    regX = re.compile(r"\*\..+=.+")
+    parameterFile = open(parameterFilePath, 'r')
+    contents = parameterFile.read()
+    for match in regX.finditer(contents):
+        keyParameter = match.group().split('=')[0].lstrip('*\.')
+        valueParameter = [name.strip('\'') for name in match.group().split('=')[1].split(',')]
+        oracleParameter[keyParameter] = valueParameter
+    #print(oracleParameter)
 
 def setLocation():
     nowTimestamp = datetime.now()
     nowTimestamp = nowTimestamp.strftime("%Y%m%d%H%M%S")
-    fullPath = BaseLocation + nowTimestamp
+    fullPath = baseLocation + nowTimestamp
     os.system('mkdir -m777 '+ fullPath)
     return fullPath
 
@@ -66,10 +79,10 @@ def incremental():
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
             sleep(1)        
-        parsedArchiveLog = parameterFileParser("archivelog")
-        parsedDBName = parameterFileParser("db_name")
+        recoveryFileDest = oracleParameter['db_recovery_file_dest']
+        dbName = oracleParameter['db_name']
         print('Archive log started: ', datetime.now().strftime("%Y%m%d%H%M%S"))
-        os.system('cp -R -f ' + parsedArchiveLog[0] + '/' + parsedDBName[0] + '/archivelog ' + backupPath)
+        os.system('cp -R -f ' + recoveryFileDest[0] + '/' + dbName[0] + '/archivelog ' + backupPath)
         print('Archive log copied: ', datetime.now().strftime("%Y%m%d%H%M%S"))
 
     print("Incremental: Backup Complete")
@@ -77,29 +90,27 @@ def incremental():
 
 #----Start Incremental Restore----#
 def switchControlFiles(backupPath):
-    parsedControlFile = parameterFileParser("controlfile")
-    #controlFileNames = []
+    parsedControlFile = oracleParameter['control_files']
     for location in parsedControlFile:
         os.system('rm -f '+location)
         os.system('cp -f '+ backupPath + '/control.ctl ' + location)
         os.system('chmod a+wrx '+location)
     print("Switched Control Files")
-        #controlFileNames.append(re.findall('[\w\.-]+.ctl', location))
 
 def switchArchiveLogFiles(backupPath):
-    parsedArchiveLog = parameterFileParser("archivelog")
-    parsedDBName = parameterFileParser("db_name")
-    for location in parsedArchiveLog:
-        os.system('rm -R -f '+ location + '/' + parsedDBName[0] +'/archivelog')
-        os.system('cp -R -f ' + backupPath + '/archivelog ' + location + '/' + parsedDBName[0] + '/archivelog')
-        os.system('chmod -R a+wrx '+ location +'/' + parsedDBName[0] + '/archivelog')
+    recoveryFileDest = oracleParameter['db_recovery_file_dest']
+    dbName = oracleParameter['db_name']
+    for location in recoveryFileDest:
+        os.system('rm -R -f '+ location + '/' + dbName[0] +'/archivelog')
+        os.system('cp -R -f ' + backupPath + '/archivelog ' + location + '/' + dbName[0] + '/archivelog')
+        os.system('chmod -R a+wrx '+ location +'/' + dbName[0] + '/archivelog')
     print("Switched Archive Log Files")
 
 def restore():
     print("Incremental: Restoring")
-    backupPath = BaseLocation + BackupSource
+    backupPath = baseLocation + backupSource
     scriptLocation = "/hdd/python/IncrementalBackup/recover.sh"
-    args = [scriptLocation, BackupSource, login_path]
+    args = [scriptLocation, backupSource, login_path]
     restoreProcess = subprocess.Popen(args)
     while restoreProcess.poll()==None:
         sleep(2)
@@ -116,12 +127,12 @@ if Action=='b':
     incremental()
 elif Action=='r':
     #----Restore----#
-    os.system('ls -lrt '+ BaseLocation)
-    BackupSource = input("Enter the filename: ")
+    os.system('ls -lrt '+ baseLocation)
+    backupSource = input("Enter the filename: ")
     restore()
     #----End Restore----#
 elif Action=='l':
-    os.system('ls -lrt '+ BaseLocation)
+    os.system('ls -lrt '+ baseLocation)
 else:
     print("Invalid input")
 
