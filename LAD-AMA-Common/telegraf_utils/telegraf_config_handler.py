@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+#
+# Azure Linux extension
+#
+# Copyright (c) Microsoft Corporation
+# All rights reserved.
+# MIT License
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+# persons to whom the Software is furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+# Software.
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+# WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 import json
 import os
 from telegraf_utils.telegraf_name_map import name_map
@@ -5,6 +23,7 @@ import subprocess
 import signal
 import urllib2
 from shutil import copyfile
+import metrics_ext_utils.metrics_constants as metrics_constants
 
 
 
@@ -21,14 +40,31 @@ Sample input data received by this script
     }
 ]
 """
+def is_systemd():
+    """
+    Check if the system is using systemd
+    """
 
+    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
+    return check_systemd == 0
 
 def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name):
-
+    """
+    Main parser method to convert Metrics config from extension configuration to telegraf configuration
+    :param data: Parsed Metrics Configuration from which telegraf config is created
+    :param me_url: The url to which telegraf will send metrics to for MetricsExtension
+    :param mdsd_url: The url to which telegraf will send metrics to for MDSD
+    :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
+    :param az_resource_id: Azure Resource ID value for the VM
+    :param subscription_id: Azure Subscription ID value for the VM
+    :param resource_group: Azure Resource Group value for the VM
+    :param region: Azure Region value for the VM
+    :param virtual_machine_name: Azure Virtual Machine Name value (Only in the case for VMSS) for the VM
+    """
     storage_namepass_list = []
     storage_namepass_str = ""
 
-    MetricsExtensionNamepsace = "Azure.VM.Linux.GuestMetrics"
+    MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
 
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -283,7 +319,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  interval = \"10s\"\n"
     agentconf += "  round_interval = true\n"
     agentconf += "  metric_batch_size = 1000\n"
-    agentconf += "  metric_buffer_limit = 10000\n"
+    agentconf += "  metric_buffer_limit = 1000000\n"
     agentconf += "  collection_jitter = \"0s\"\n"
     agentconf += "  flush_interval = \"10s\"\n"
     agentconf += "  flush_jitter = \"0s\"\n"
@@ -323,6 +359,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
 
 def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
+    """
+    Write the telegraf config created by config parser method to disk at the telegraf config location
+    :param configs: Telegraf config data parsed by the parse_config method above
+    :param telegraf_conf_dir: Path where the telegraf.conf is written to on the disk
+    :param telegraf_d_conf_dir: Path where the individual module telegraf configs are written to on the disk
+    """
 
     if not os.path.exists(telegraf_conf_dir):
         os.mkdir(telegraf_conf_dir)
@@ -341,8 +383,11 @@ def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
 
 
 def get_handler_vars():
-    logFolder = "./LADtelegraf/"
-    configFolder = "./telegraf_configs/"
+    """
+    This method is taken from the Waagent code. This is used to grab the log and config file location from the json public setting for the Extension
+    """
+    logFolder = ""
+    configFolder = ""
     handler_env_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'HandlerEnvironment.json'))
     if os.path.exists(handler_env_path):
         with open(handler_env_path, 'r') as handler_env_file:
@@ -360,17 +405,22 @@ def get_handler_vars():
 
 
 def stop_telegraf_service(is_lad):
+    """
+    Stop the telegraf service if VM is using is systemd, otherwise check if the pid_file exists,
+    and if the pid belongs to the Telegraf process, if yes, then kill the process
+    This method is called before remove_telegraf_service by the main extension code
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
 
     if is_lad:
-        telegraf_bin = "/usr/local/lad/bin/telegraf"
+        telegraf_bin = metrics_constants.lad_telegraf_bin
     else:
-        telegraf_bin = "/usr/sbin/telegraf"
+        telegraf_bin = metrics_constants.ama_telegraf_bin
 
     # If the VM has systemd, then we will use that to stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if is_systemd():
         code = 1
-        telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+        telegraf_service_path = metrics_constants.telegraf_service_path
 
         if os.path.isfile(telegraf_service_path):
             code = os.system("sudo systemctl stop metrics-sourcer")
@@ -405,8 +455,13 @@ def stop_telegraf_service(is_lad):
 
 
 def remove_telegraf_service():
+    """
+    Remove the telegraf service if the VM is using systemd as well as the telegraf Binary
+    This method is called after stop_telegraf_service by the main extension code during Extension uninstall
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
 
-    telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+    telegraf_service_path = metrics_constants.telegraf_service_path
 
     if os.path.isfile(telegraf_service_path):
         os.remove(telegraf_service_path)
@@ -421,8 +476,12 @@ def remove_telegraf_service():
 
 
 def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
-
-    telegraf_service_path = "/lib/systemd/system/metrics-sourcer.service"
+    """
+    Remove the metrics-sourcer service if the VM is using systemd
+    This method is called after stop_telegraf_service by the main extension code during Extension uninstall
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
+    telegraf_service_path = metrics_constants.telegraf_service_path
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
 
 
@@ -458,21 +517,27 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
 
 
 def start_telegraf(is_lad):
-    #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    """
+    Start the telegraf service if VM is using is systemd, otherwise start the binary as a process and store the pid,
+    to a file in the telegraf config directory,
+    This method is called after config setup is completed by the main extension code
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
+
+    # Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
     log_messages = ""
 
     if is_lad:
-        telegraf_bin = "/usr/local/lad/bin/telegraf"
+        telegraf_bin = metrics_constants.lad_telegraf_bin
     else:
-        telegraf_bin = "/usr/sbin/telegraf"
+        telegraf_bin = metrics_constants.ama_telegraf_bin
 
     if not os.path.isfile(telegraf_bin):
         log_messages += "Telegraf binary does not exist. Failed to start telegraf service."
         return False, log_messages
 
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if is_systemd():
         service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
         if service_restart_status != 0:
             log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
@@ -507,19 +572,36 @@ def start_telegraf(is_lad):
 
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
-    #main method to perfom the task of parsing the config , writing them to disk, setting up and starting telegraf service
+    """
+    The main method to perfom the task of parsing the config , writing them to disk, setting up, stopping, removing and starting telegraf
+    :param config_data: Parsed Metrics Configuration from which telegraf config is created
+    :param me_url: The url to which telegraf will send metrics to for MetricsExtension
+    :param mdsd_url: The url to which telegraf will send metrics to for MDSD
+    :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
+    """
 
-    #Making the imds call to get resource id, sub id, resource group and region for the dimensions for telegraf metrics
+    # Making the imds call to get resource id, sub id, resource group and region for the dimensions for telegraf metrics
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
 
-    imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-    #query imds to get the required information
-    req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-    res = urllib2.urlopen(req)
-    data = json.loads(res.read())
+    data = None
+    while retries <= max_retries:
 
-    # data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
-    if "compute" not in data:
-        raise Exception("Unable to find 'compute' key in imds query response. Failed to setup Telegraf.")
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+        req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib2.urlopen(req)
+        data = json.loads(res.read())
+
+        if "compute" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup Telegraf.".format(max_retries))
         return False
 
     if "resourceId" not in data["compute"]:
@@ -555,9 +637,9 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     _, configFolder = get_handler_vars()
     if is_lad:
-        telegraf_bin = "/usr/local/lad/bin/telegraf"
+        telegraf_bin = metrics_constants.lad_telegraf_bin
     else:
-        telegraf_bin = "/usr/sbin/telegraf"
+        telegraf_bin = metrics_constants.ama_telegraf_bin
 
     telegraf_conf_dir = configFolder + "/telegraf_configs/"
     telegraf_agent_conf = telegraf_conf_dir + "telegraf.conf"
@@ -569,8 +651,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     # Setup Telegraf service.
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if is_systemd():
         telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
         if not telegraf_service_setup:
             return False, []

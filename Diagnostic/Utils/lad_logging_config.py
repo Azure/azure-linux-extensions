@@ -164,6 +164,10 @@ class LadLoggingConfig:
 
     def parse_lad_perf_settings(self, ladconfig):
         """
+        Parses the LAD json config to create a list of entries per metric along with it's configuration
+        as required by telegraf config parser. See example below -
+        :param ladconfig: The lad json config element
+
         Sample OMI metric json config can be of two types, taken from .settings file
         It can have sampleRate key, if not then it defaults to sampleRateInSeconds key in the larger lad_cfg element
 
@@ -215,7 +219,7 @@ class LadLoggingConfig:
 
         for item in perfconf:
             counter = {}
-            counter["displayName"] = item["class"] + "->" + item["annotation"][0]["displayName"]
+            counter["displayName"] = item["class"].strip().lower() + "->" + item["annotation"][0]["displayName"].strip().lower()
             if "sampleRate" in item:
                 counter["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S to 15s
             else:
@@ -276,6 +280,8 @@ class LadLoggingConfig:
     def get_mdsd_telegraf_config(self, namespaces):
         """
         Get mdsd XML config string for telegraf use with mdsd in LAD 3.0.
+        This method is called during config generation to create source tags for mdsd xml
+        :param namespaces: The list of telegraf plugins being used to source the metrics requested by the user
         :rtype: str
         :return: XML string that should be added to the mdsd config XML tree for telegraf use with mdsd in LAD 3.0.
         """

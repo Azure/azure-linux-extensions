@@ -1,22 +1,55 @@
+#!/usr/bin/env python
+#
+# Azure Linux extension
+#
+# Copyright (c) Microsoft Corporation
+# All rights reserved.
+# MIT License
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+# documentation files (the ""Software""), to deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+# persons to whom the Software is furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+# Software.
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+# WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 import urllib2
 import json
 import os
 from shutil import copyfile
 import stat
 import filecmp
+import metrics_ext_utils.metrics_constants as metrics_constants
+import time
+
+def is_systemd():
+    """
+    Check if the system is using systemd
+    """
+
+    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
+    return check_systemd == 0
 
 def stop_metrics_service(is_lad):
+    """
+    Stop the metrics service if VM is using is systemd, otherwise check if the pid_file exists,
+    and if the pid belongs to the MetricsExtension process, if yes, then kill the process
+    This method is called before remove_metrics_service by the main extension code
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
 
     if is_lad:
-        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.lad_metrics_extension_bin
     else:
-        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
 
     # If the VM has systemd, then we will use that to stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if is_systemd():
         code = 1
-        metrics_service_path = "/lib/systemd/system/metrics-extension.service"
+        metrics_service_path = metrics_constants.metrics_extension_service_path
 
         if os.path.isfile(metrics_service_path):
             code = os.system("sudo systemctl stop metrics-extension")
@@ -24,7 +57,7 @@ def stop_metrics_service(is_lad):
             return False, "Metrics Extension service file does not exist. Failed to stop ME service: metrics-extension.service ."
 
         if code != 0:
-            return False, "Unable to stop Metrics Extension service: metrics-extension.service ."
+            return False, "Unable to stop Metrics Extension service: metrics-extension.service. Failed with code {0}".format(code)
     else:
         #This VM does not have systemd, So we will use the pid from the last ran metrics process and terminate it
         _, configFolder = get_handler_vars()
@@ -42,7 +75,7 @@ def stop_metrics_service(is_lad):
                 if metrics_ext_bin in output:
                     os.kill(pid, signal.SIGKILL)
                 else:
-                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
+                    return False, "Found a different process running with PID {0}. Failed to stop MetricsExtension.".format(pid)
             else:
                 return False, "No pid found for a currently running Metrics Extension process in {0}. Failed to stop Metrics Extension.".format(metrics_pid_path)
         else:
@@ -51,50 +84,66 @@ def stop_metrics_service(is_lad):
     return True, "Successfully stopped metrics-extension service"
 
 def remove_metrics_service(is_lad):
+    """
+    Remove the metrics service if the VM is using systemd as well as the MetricsExtension Binary
+    This method is called after stop_metrics_service by the main extension code during Extension uninstall
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
 
-    metrics_service_path = "/lib/systemd/system/metrics-extension.service"
+    metrics_service_path = metrics_constants.metrics_extension_service_path
 
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
 
     if is_lad:
-        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.lad_metrics_extension_bin
     else:
-        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
 
     # Checking To see if the files were successfully removed, since os.remove doesn't return an error code
     if os.path.isfile(metrics_ext_bin):
         remove_code = os.remove(metrics_ext_bin)
 
-    if os.path.isfile(metrics_ext_bin):
-        return False, "Unable to remove MetricsExtension binary at {0}".format(metrics_ext_bin)
-
-    if os.path.isfile(metrics_service_path):
-        return False, "Unable to remove MetricsExtension service file at {0}.".format(metrics_service_path)
-
     return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
 
 def generate_MSI_token():
+    """
+    This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
+    This is called from the main extension code after config setup is complete
+    """
+
     _, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
     me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
     expiry_epoch_time = ""
     log_messages = ""
-
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
 
     if not os.path.exists(me_config_dir):
         log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
         return False, expiry_epoch_time, log_messages
     try:
-        msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
-        req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-        res = urllib2.urlopen(req)
-        data = json.loads(res.read())
+        data = None
+        while retries <= max_retries:
+            msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+            req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+            res = urllib2.urlopen(req)
+            data = json.loads(res.read())
+
+            if not data or "access_token" not in data:
+                retries += 1
+            else:
+                break
+
+            log_messages += "Failed to fetch MSI Auth url. Retrying in {2} seconds. Retry Count - {0} out of Mmax Retries - {1}\n".format(retries, max_retries, sleep_time)
+            time.sleep(sleep_time)
 
 
-        if not data or "access_token" not in data:
-            log_messages += "Invalid MSI auth token generation at {0}. Please check the file contents.\n".format(me_auth_file_path)
+        if retries > max_retries:
+            log_messages += "Unable to generate a valid MSI auth token at {0}.\n".format(me_auth_file_path)
             return False, expiry_epoch_time, log_messages
 
         with open(me_auth_file_path, "w") as f:
@@ -114,8 +163,15 @@ def generate_MSI_token():
 
 
 def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
+    """
+    Setup the metrics service if VM is using systemd
+    :param configFolder: Path for the config folder for metrics extension
+    :param monitoringAccount: Monitoring Account name that ME will upload data to
+    :param metrics_ext_bin: Path for the binary for metrics extension
+    :param me_influx_port: Influxdb port that metrics extension will listen on
+    """
 
-    me_service_path = "/lib/systemd/system/metrics-extension.service"
+    me_service_path = metrics_constants.metrics_extension_service_path
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
@@ -139,29 +195,39 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
             raise Exception("Unable to copy Metrics extension service file to {0}. Failed to setup ME service.".format(me_service_path))
             return False
     else:
-        raise Exception("Metrics extension service file does not exist at {0}. Failed to setup ME service.".format(me_service_template_path))
+        raise Exception("Metrics extension service template file does not exist at {0}. Failed to setup ME service.".format(me_service_template_path))
         return False
     return True
 
 
 
 def start_metrics(is_lad):
-    #Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    """
+    Start the metrics service if VM is using is systemd, otherwise start the binary as a process and store the pid,
+    to a file in the MetricsExtension config directory,
+    This method is called after config setup is completed by the main extension code
+    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    """
+
+    # Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
     log_messages = ""
 
     if is_lad:
-        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.lad_metrics_extension_bin
     else:
-        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
     if not os.path.isfile(metrics_ext_bin):
         log_messages += "Metrics Extension binary does not exist. Failed to start ME service."
         return False, log_messages
-    me_influx_port = "8139"
+
+    if is_lad:
+        me_influx_port = metrics_constant.lad_metrics_extension_udp_port
+    else:
+        me_influx_port = metrics_constant.ama_metrics_extension_udp_port
 
 
     # If the VM has systemd, then we use that to start/stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if is_systemd():
         service_restart_status = os.system("sudo systemctl restart metrics-extension")
         if service_restart_status != 0:
             log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
@@ -176,7 +242,7 @@ def start_metrics(is_lad):
         monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource HOBO -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3}".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3}".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
@@ -195,6 +261,11 @@ def start_metrics(is_lad):
 
 
 def create_metrics_extension_conf(az_resource_id, aad_url):
+    """
+    Create the metrics extension config
+    :param az_resource_id: Azure Resource ID for the VM
+    :param aad_url: AAD auth url for the VM
+    """
     conf_json = '''{
   "timeToTerminateInMs": 4000,
   "configurationExpirationPeriodInMinutes": 1440,
@@ -261,10 +332,16 @@ def create_metrics_extension_conf(az_resource_id, aad_url):
   "azureResourceId": "'''+ az_resource_id +'''",
   "aadAuthority": "'''+ aad_url +'''",
   "aadTokenEnvVariable": "MSIAuthToken"
-} '''   #can ME handle the MSITOKEN?
+} '''
     return conf_json
 
 def create_custom_metrics_conf(mds_gig_endpoint_region):
+    """
+    Create the metrics extension config
+    :param mds_gig_endpoint_region: mds gig endpoint region for the VM
+    """
+    # Note : mds gig endpoint url is only for 3rd party customers. 1st party endpoint is different
+
     conf_json = '''{
         "version": 17,
         "maxMetricAgeInSeconds": 0,
@@ -277,8 +354,12 @@ def create_custom_metrics_conf(mds_gig_endpoint_region):
     return conf_json
 
 def get_handler_vars():
-    logFolder = "./metricsext.log"
-    configFolder = "./me_configs"
+    """
+    This method is taken from the Waagent code. This is used to grab the log and config file location from the json public setting for the Extension
+    """
+
+    logFolder = ""
+    configFolder = ""
     handler_env_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'HandlerEnvironment.json'))
     if os.path.exists(handler_env_path):
         with open(handler_env_path, 'r') as handler_env_file:
@@ -296,16 +377,31 @@ def get_handler_vars():
 
 
 def get_imds_values():
+    """
+    Query imds to get required values for MetricsExtension config for this VM
+    """
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
 
-    imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-    #query imds to get the required information
-    req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-    res = urllib2.urlopen(req)
-    data = json.loads(res.read())
-    # data = {"compute":{"azEnvironment":"AzurePublicCloud","customData":"","location":"eastus","name":"ubtest-16","offer":"UbuntuServer","osType":"Linux","placementGroupId":"","plan":{"name":"","product":"","publisher":""},"platformFaultDomain":"0","platformUpdateDomain":"0","provider":"Microsoft.Compute","publicKeys":[{"keyData":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJmcpHCPcSg+J0S7pbqj5X08iaIMulAc7qq1iLPrcSu04alVWQTFE58f3LbabDwDBhiXIgWO4W4/26l0+arTLOj6TJe9EiaabAYniUglC0ChbgMTjAvXQCbtwLc2yo30Uh4DbdFhEo9UXG/AeYdwvt7TCVYFrd/seGQ+7dENcFdyd4rRs1hZdMxKil+Tx0dBoFE+IEydY6PSm48qgq7XlteLAT6q/Gqpo4wVqboyTcal+QIZftDfSlJ2G+Asem/mjWj9U1nhJeBcRy2JWOSJeKgojCI3WZUMVly6lkxbX6c1UYHkT53w/tFxMehm9TUUiviOTZOAXIE6Yj/7KWlGmosJPTCA6VSRr3b5RS3lgRerOIwwb/FDAlaM7mQs/Qssm51+yHw4WSdDeYQ94n5wH5mUKoX8SqzLl3gAy6wHj9bi3jD1Txoscks0HSpHR9Lrxoy06TMLs8h3CygSdZr7kTkf5PXtKE3Gqbg54cyp+Wa2FGO0ijQ0paLEI2rPWRwxVUOkrs4r7i9YH0sJcEOUaoEiWMiNdeV5Zo9ciGddgCDz1EXdWoO6JPleD5r6W1dFfcsPnsaLl56fU/J/FDvwSj7et7AyKPwQvNQFQwtP6/tHoMksDUmBSadUWM0wA+Dbn0Ve7V6xdCXbqUn+Cs22EFPxqpnX7kl5xeq7XVWW+Mbw== nidhanda@microsoft.com","path":"/home/nidhanda/.ssh/authorized_keys"}],"publisher":"Canonical","resourceGroupName":"nidhanda_test","resourceId":"/subscriptions/13723929-6644-4060-a50a-cc38ebc5e8b1/resourceGroups/nidhanda_test/providers/Microsoft.Compute/virtualMachines/ubtest-16","sku":"16.04-LTS","subscriptionId":"13723929-6644-4060-a50a-cc38ebc5e8b1","tags":"","version":"16.04.202004290","vmId":"4bb331fc-2320-49d5-bb5e-bcdff8ab9e74","vmScaleSetName":"","vmSize":"Basic_A1","zone":""},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"172.16.16.6","publicIpAddress":"13.68.157.2"}],"subnet":[{"address":"172.16.16.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A4DDE5F"}]}}
+    data = None
+    while retries <= max_retries:
 
-    if "compute" not in data:
-        raise Exception("Unable to find 'compute' key in imds query response. Failed to setup ME.")
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+        #query imds to get the required information
+        req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib2.urlopen(req)
+        data = json.loads(res.read())
+
+        if "compute" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
         return False
 
     if "resourceId" not in data["compute"]:
@@ -330,12 +426,17 @@ def get_imds_values():
 
 
 def setup_me(is_lad):
+    """
+    The main method for creating and writing MetricsExtension configuration as well as service setup
+    :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
+    """
 
-    #query imds to get the required information
+    # query imds to get the required information
     az_resource_id, subscription_id, location, data = get_imds_values()
 
-    #get tenantID
-    #The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
+    # get tenantID
+    # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
+    # The armurl is only for Public Cloud. Needs verification in Sovereign clouds
     aad_auth_url = ""
     amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
     try:
@@ -379,9 +480,9 @@ def setup_me(is_lad):
     # Copy MetricsExtension Binary to the bin location
     me_bin_local_path = os.getcwd() + "/MetricsExtensionBin/MetricsExtension"
     if is_lad:
-        metrics_ext_bin = "/usr/local/lad/bin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.lad_metrics_extension_bin
     else:
-        metrics_ext_bin = "/usr/sbin/MetricsExtension"
+        metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
 
     # Check if previous file exist at the location, compare the two binaries,
     # If the files are not same, remove the older file, and copy the new one
@@ -393,17 +494,21 @@ def setup_me(is_lad):
                 # in which case we can get an error "text file busy" while copying
                 os.remove(metrics_ext_bin)
                 copyfile(me_bin_local_path, metrics_ext_bin)
-                os.chmod(metrics_ext_bin,stat.S_IXOTH)
+                os.chmod(metrics_ext_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
         else:
             # No previous binary exist, simply copy it and make it executable
             copyfile(me_bin_local_path, metrics_ext_bin)
-            os.chmod(metrics_ext_bin,stat.S_IXOTH)
+            os.chmod(metrics_ext_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
     else:
         raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to setup ME.".format(me_bin_local_path))
         return False
 
-    me_influx_port = "8139"
+    if is_lad:
+        me_influx_port = metrics_constant.lad_metrics_extension_udp_port
+    else:
+        me_influx_port = metrics_constant.ama_metrics_extension_udp_port
+
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")

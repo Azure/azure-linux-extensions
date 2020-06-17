@@ -296,13 +296,13 @@ def main(command):
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
 
             #Stop the telegraf and ME services
-            tel_out, tel_msg = telhandler.stop_telegraf_service(True)
+            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
             if tel_out:
                 hutil.log(tel_msg)
             else:
                 hutil.error(tel_msg)
 
-            me_out, me_msg = me_handler.stop_metrics_service(True)
+            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
             if me_out:
                 hutil.log(me_msg)
             else:
@@ -324,13 +324,13 @@ def main(command):
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
 
             #Stop the telegraf and ME services
-            tel_out, tel_msg = telhandler.stop_telegraf_service(True)
+            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
             if tel_out:
                 hutil.log(tel_msg)
             else:
                 hutil.error(tel_msg)
 
-            me_out, me_msg = me_handler.stop_metrics_service(True)
+            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
             if me_out:
                 hutil.log(me_msg)
             else:
@@ -343,7 +343,7 @@ def main(command):
             else:
                 hutil.error(tel_rm_msg)
 
-            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(True)
+            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=True)
             if me_rm_out:
                 hutil.log(me_rm_msg)
             else:
@@ -361,7 +361,7 @@ def main(command):
                 return
 
             #Start the Telegraf and ME services on Enable after installation is complete
-            start_telegraf_out, log_messages = telhandler.start_telegraf(True)
+            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
             if start_telegraf_out:
                 hutil.log("Successfully started metrics-sourcer.")
             else:
@@ -376,7 +376,7 @@ def main(command):
                 else:
                     hutil.error(log_messages)
 
-                start_metrics_out, log_messages = me_handler.start_metrics(True)
+                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
                 if start_metrics_out:
                     hutil.log("Successfully started metrics-extension.")
                 else:
@@ -396,7 +396,7 @@ def main(command):
                     return
 
                 #Start the Telegraf and ME services on Enable after installation is complete
-                start_telegraf_out, log_messages = telhandler.start_telegraf(True)
+                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
                 if start_telegraf_out:
                     hutil.log("Successfully started metrics-sourcer.")
                 else:
@@ -434,7 +434,7 @@ def main(command):
                         else:
                             hutil.error(log_messages)
 
-                    start_metrics_out, log_messages = me_handler.start_metrics(True)
+                    start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
                     if start_metrics_out:
                         hutil.log("Successfully started metrics-extension.")
                     else:

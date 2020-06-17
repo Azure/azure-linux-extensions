@@ -51,9 +51,6 @@ per_MdsdEventSource_tmpl = """      <MdsdEventSource source="{source}">
       </MdsdEventSource>
 """
 
-telegraf_RouteEvent_tmpl = """
-    <RouteEvent eventName="{event_name}"  duration="{interval}" priority="High" storeType="{type}" isFullName="true" />
-"""
 
 per_RouteEvent_tmpl = """
     <RouteEvent dontUsePerNDayTable="true" eventName="{event_name}" priority="High" {opt_store_type} />
@@ -71,6 +68,7 @@ lad_query = '<LADQuery columnName="CounterName" columnValue="Average" partitionK
 
 obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
 
+# OMI is not used anymore
 
 entire_xml_cfg_tmpl = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
@@ -100,6 +98,8 @@ entire_xml_cfg_tmpl = """
     <DerivedEvents>
     </DerivedEvents>
   </Events>
+
+  <!--  OMI is not used anymore -->
 
   <EventStreamingAnnotations>
   </EventStreamingAnnotations>

@@ -27,6 +27,7 @@ import Utils.LadDiagnosticUtil as LadUtil
 import Utils.XmlUtil as XmlUtil
 import Utils.mdsd_xml_templates as mxt
 import telegraf_utils.telegraf_config_handler as telhandler
+import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 from Utils.lad_exceptions import LadLoggingConfigException, LadPerfCfgConfigException
 from Utils.lad_logging_config import LadLoggingConfig, copy_source_mdsdevent_eh_url_elems
@@ -81,8 +82,8 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_me_url = "udp://127.0.0.1:8139"
-        self._telegraf_mdsd_url = "unix:///var/run/mdsd/lad_mdsd_influx.socket"
+        self._telegraf_me_url = metrics_constant.lad_metrics_extension_influx_udp_url
+        self._telegraf_mdsd_url = metrics_constant.telegraf_influx_url
         self._enable_metrics_extension = False
 
         # Generated logging configs place holders
@@ -160,16 +161,18 @@ class LadConfigAll:
         self._add_element_from_string('Management', mxt.obo_field.format(name=name, value=value))
 
     def _update_metric_collection_settings(self, ladCfg, namespaces):
-    #     """
-    #     Update mdsd_config_xml_tree for Azure Portal metric collection. This method builds the necessary aggregation queries
-    #     that grind the ingested data and push it to the WADmetric table.
-    #     :param ladCfg: ladCfg object from extension config
-    #     :param namespaces: list of telegraf plugins sources obtained after parsing lad metrics config
-    #     :return: None
-    #     """
+        """
+        Update mdsd_config_xml_tree for Azure Portal metric collection. This method builds the necessary aggregation queries
+        that grind the ingested data and push it to the WADmetric table.
+        :param ladCfg: ladCfg object from extension config
+        :param namespaces: list of telegraf plugins sources obtained after parsing lad metrics config
+        :return: None
+        """
+
         # Aggregation is done by <LADQuery> within a <DerivedEvent>. If there are no alternate sinks, the DerivedQuery
         # can send output directly to the WAD metrics table. If there *are* alternate sinks, have the LADQuery send
         # output to a new local table, then arrange for additional derived queries to pull from that.
+
         intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladCfg)
         sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladCfg, 'performanceCounters')
         for plugin in namespaces:
@@ -212,63 +215,6 @@ class LadConfigAll:
             else:
                 self._logger_log("Ignoring sink '{0}': unknown type '{1}'".format(name, sink['type']))
 
-    # def _update_raw_omi_events_settings(self, omi_queries):
-    #     """
-    #     Update the mdsd XML tree with the OMI queries provided.
-    #     :param omi_queries: List of dictionaries specifying OMI queries and destination tables. E.g.:
-    #      [
-    #          {"query":"SELECT PercentAvailableMemory, AvailableMemory, UsedMemory, PercentUsedSwap FROM SCX_MemoryStatisticalInformation","table":"LinuxMemory"},
-    #          {"query":"SELECT PercentProcessorTime, PercentIOWaitTime, PercentIdleTime FROM SCX_ProcessorStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxCpu"},
-    #          {"query":"SELECT AverageWriteTime,AverageReadTime,ReadBytesPerSecond,WriteBytesPerSecond FROM  SCX_DiskDriveStatisticalInformation WHERE Name='_TOTAL'","table":"LinuxDisk"}
-    #      ]
-    #     :return: None. The mdsd XML tree member is updated accordingly.
-    #     """
-    #     if not omi_queries:
-    #         return
-
-    #     def generate_omi_query_xml_elem(omi_query, sink=()):
-    #         """
-    #         Helper for generating OMI event XML element
-    #         :param omi_query: Python dictionary object for the raw OMI query specified as a LAD 3.0 perfCfg array item
-    #         :param sink: (name, type) tuple for this OMI query. Not specified implies default XTable sink
-    #         :return: An XML element object for this OMI event that should be added to the mdsd XML cfg tree
-    #         """
-    #         omi_xml_schema = """
-    #         <OMIQuery cqlQuery="" dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" storeType="" />
-    #         """ if sink else """
-    #         <OMIQuery cqlQuery="" dontUsePerNDayTable="true" eventName="" omiNamespace="" priority="High" sampleRateInSeconds="" />
-    #         """
-    #         xml_elem = XmlUtil.createElement(omi_xml_schema)
-    #         xml_elem.set('cqlQuery', omi_query['query'])
-    #         xml_elem.set('eventName', sink[0] if sink else omi_query['table'])
-    #         # Default OMI namespace is 'root/scx'
-    #         xml_elem.set('omiNamespace', omi_query['namespace'] if 'namespace' in omi_query else 'root/scx')
-    #         # Default query frequency is 300 seconds
-    #         xml_elem.set('sampleRateInSeconds', str(omi_query['frequency']) if 'frequency' in omi_query else '300')
-    #         if sink:
-    #             xml_elem.set('storeType', 'local' if sink[1] == 'EventHub' else sink[1])
-    #         return xml_elem
-
-    #     for omi_query in omi_queries:
-    #         if ('query' not in omi_query) or ('table' not in omi_query and 'sinks' not in omi_query):
-    #             self._logger_log("Ignoring perfCfg array element missing required elements: '{0}'".format(omi_query))
-    #             continue
-    #         if 'table' in omi_query:
-    #             self._add_element_from_element('Events/OMI', generate_omi_query_xml_elem(omi_query))
-    #         for sink_name in LadUtil.getSinkList(omi_query):
-    #             sink = self._sink_configs.get_sink_by_name(sink_name)
-    #             if not sink:
-    #                 raise LadPerfCfgConfigException('Sink name "{0}" is not defined in sinksConfig'.format(sink_name))
-    #             sink_type = sink['type']
-    #             if sink_type != 'JsonBlob' and sink_type != 'EventHub':
-    #                 raise LadPerfCfgConfigException('Sink type "{0}" (for sink name="{1}") is not supported'
-    #                                                 .format(sink_type, sink_name))
-    #             self._add_element_from_element('Events/OMI', generate_omi_query_xml_elem(omi_query, (sink_name, sink_type)))
-    #             if sink_type == 'EventHub':
-    #                 if 'sasURL' not in sink:
-    #                     raise LadPerfCfgConfigException('No sasURL specified for an EventHub sink (name="{0}")'
-    #                                                     .format(sink_name))
-    #                 self._add_streaming_annotation(sink_name, sink['sasURL'])
 
     def _add_streaming_annotation(self, sink_name, sas_url):
         """
@@ -281,16 +227,6 @@ class LadConfigAll:
                                                                  key_path=self._pkey_path,
                                                                  enc_eh_url=self._encrypt_secret_with_cert(sas_url)))
 
-    # def _apply_perf_cfg(self):
-    #     """
-    #     Extract the 'perfCfg' settings from ext_settings and apply them to mdsd config XML root. These are *not* the
-    #     ladcfg{performanceCounters{...}} settings; the perfCfg block is found at the top level of the public configs.
-    #     :return: None. Changes are applied directly to the mdsd config XML tree member.
-    #     """
-    #     assert self._mdsd_config_xml_tree is not None
-
-    #     perf_cfg = self._ext_settings.read_public_config('perfCfg')
-    #     self._update_raw_omi_events_settings(perf_cfg)
 
     def _encrypt_secret_with_cert(self, secret):
         """
@@ -384,19 +320,8 @@ class LadConfigAll:
         if self._deployment_id:
             XmlUtil.setXmlValue(self._mdsd_config_xml_tree, "Management/Identity/IdentityComponent", "",
                                 self._deployment_id, ["name", "DeploymentId"])
-        # # 2. Use ladCfg to go over the sinks and handle AzMonSink, JsonBlob and EH elements
 
-        # # 3. Generate config for perfCfg. Need to distinguish between non-AppInsights scenario and AppInsights scenario,
-        # #    so check if Application Insights key is present and pass it to the actual helper
-        # #    function (self._apply_perf_cfg()).
-        # try:
-        #     self._apply_perf_cfg()
-        # except Exception as e:
-        #     self._logger_error("Failed check for Application Insights key in LAD configuration with exception:{0}\n"
-        #                        "Stacktrace: {1}".format(e, traceback.format_exc()))
-        #     return False, 'Failed to update perf counter config (see extension error logs for more details)'
-
-        # 4. Generate telegraf, MetricsExtension, omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
+        # 2. Generate telegraf, MetricsExtension, omsagent (fluentd) configs, rsyslog/syslog-ng config, and update corresponding mdsd config XML
         try:
             lad_cfg = self._ladCfg()
             if not lad_cfg:
@@ -452,11 +377,11 @@ class LadConfigAll:
             return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
                           '(see extension error logs for more details)'
 
-        # 5. Before starting to update the storage account settings, log extension's entire settings
+        # 3. Before starting to update the storage account settings, log extension's entire settings
         #    with secrets redacted, for diagnostic purpose.
         self._ext_settings.log_ext_settings_with_secrets_redacted(self._logger_log, self._logger_error)
 
-        # 6. Actually update the storage account settings on mdsd config XML tree (based on extension's
+        # 4. Actually update the storage account settings on mdsd config XML tree (based on extension's
         #    protectedSettings).
         account = self._ext_settings.read_protected_config('storageAccountName').strip()
         if not account:
@@ -472,10 +397,10 @@ class LadConfigAll:
                                                      self._ext_settings.read_protected_config('storageAccountEndPoint'))
         self._update_account_settings(account, token, endpoints)
 
-        # 7. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
+        # 5. Update mdsd config XML's eventVolume attribute based on the logic specified in the helper.
         self._set_event_volume(lad_cfg)
 
-        # 8. Finally generate mdsd config XML file out of the constructed XML tree object.
+        # 6. Finally generate mdsd config XML file out of the constructed XML tree object.
         self._mdsd_config_xml_tree.write(os.path.join(self._ext_dir, 'xmlCfg.xml'))
 
         return True, ""
