@@ -1929,6 +1929,12 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+       elif distro_name == 'debian' and distro_version in ['10.2', '10.3', '10.4']:
+           from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
+           os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
+                                                            distro_patcher=DistroPatcher,
+                                                            logger=logger,
+                                                            encryption_environment=encryption_environment)
         elif distro_name == 'Ubuntu' and distro_version == '14.04':
             from oscrypto.ubuntu_1404 import Ubuntu1404EncryptionStateMachine
             os_encryption = Ubuntu1404EncryptionStateMachine(hutil=hutil,
