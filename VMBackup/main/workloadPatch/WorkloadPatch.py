@@ -138,7 +138,7 @@ class WorkloadPatch:
         if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             print("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql "), + self.timeout
+            preDaemonOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()

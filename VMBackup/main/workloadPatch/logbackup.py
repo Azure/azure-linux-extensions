@@ -32,7 +32,7 @@ def incremental():
     backupPath = setLocation()
 
     if 'oracle' in logbackup.name.lower():
-        backupOracle = "sqlplus -s / as sysdba @/hdd/python/IncrementalBackup/backup.sql " + backupPath
+        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql " + backupPath
         argsForControlFile = ["su", "-", logbackup.login_path, "-c", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
