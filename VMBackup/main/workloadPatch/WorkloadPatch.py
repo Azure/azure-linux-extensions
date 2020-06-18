@@ -330,7 +330,7 @@ class Incremental:
                 print("Incremental: Crontab Entry- ", str(crontabCheck))
                 return
             else:
-                os.system("echo \"\n*/15 * * * * python /hdd/Downloads/workloadPatch/logbackup.py\" >> /var/spool/cron/root")
+                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/workloadPatch/logbackup.py ") + " >> /var/spool/cron/root")
                 print("Incremental: New Crontab Entry")
                 return
     
