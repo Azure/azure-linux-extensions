@@ -7,8 +7,6 @@ from .WorkloadPatch import Incremental
 from time import sleep
 from datetime import datetime
 
-logbackup = Incremental()
-
 def parameterFileParser():
     regX = re.compile(r"\*\..+=.+")
     parameterFile = open(logbackup.parameterFilePath, 'r')
@@ -32,8 +30,8 @@ def incremental():
     backupPath = setLocation()
 
     if 'oracle' in logbackup.name.lower():
-        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql " + backupPath
-        argsForControlFile = ["su", "-", logbackup.login_path, "-c", backupOracle]
+        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql ") + backupPath
+        argsForControlFile = ["su", "-", logbackup.login_path, " -c ", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
             sleep(1)        
@@ -45,5 +43,6 @@ def incremental():
 
     print("Logbackup: Backup Complete")
 
+logbackup = Incremental()
 parameterFileParser()
 incremental()
