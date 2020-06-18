@@ -33,7 +33,7 @@ class WorkloadPatch:
         self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
-        self.login_path = "DBADMIN"
+        self.login_path = "AzureBackup"
         self.ipc_folder = None
         self.error_details = []
         self.enforce_slave_only = False
@@ -309,7 +309,7 @@ class WorkloadPatch:
 class Incremental:
     def __init__(self):
         self.name = "oracle"
-        self.login_path = "oracle"
+        self.login_path = "AzureBackup"
         self.baseLocation = "/hdd/AutoIncrement/"
         self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
         self.oracleParameter = {}
@@ -330,7 +330,7 @@ class Incremental:
                 print("Incremental: Crontab Entry- ", str(crontabCheck))
                 return
             else:
-                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/workloadPatch/logbackup.py ") + " >> /var/spool/cron/root")
+                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "logbackup.py\"") + " >> /var/spool/cron/root")
                 print("Incremental: New Crontab Entry")
                 return
     
