@@ -129,7 +129,7 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     file_report_msg = None
     try:
         if total_used_size == -1 :
-            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
+            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger , para_parser = para_parser)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
             number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
