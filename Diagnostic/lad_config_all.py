@@ -93,7 +93,22 @@ class LadConfigAll:
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
 
         # Get encryption settings
-        thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
+        handlerSettings = ext_settings.get_handler_settings()
+
+        if handlerSettings['protectedSettings'] is None:
+            errorMsg = "Settings did not contain protectedSettings. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
+            self._logger_error(errorMsg)
+            raise LadLoggingConfigException(errorMsg)
+
+        if handlerSettings['protectedSettingsCertThumbprint'] is None:
+            errorMsg = "Settings did not contain protectedSettingsCertThumbprint. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
+            self._logger_error(errorMsg)
+            raise LadLoggingConfigException(errorMsg)
+
+        thumbprint = handlerSettings['protectedSettingsCertThumbprint']
+
         self._cert_path = os.path.join(waagent_dir, thumbprint + '.crt')
         self._pkey_path = os.path.join(waagent_dir, thumbprint + '.prv')
 
