@@ -33,7 +33,7 @@ class WorkloadPatch:
         self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
-        self.login_path = "oracle"
+        self.login_path = "DBADMIN"
         self.ipc_folder = None
         self.error_details = []
         self.enforce_slave_only = False
@@ -122,7 +122,7 @@ class WorkloadPatch:
 
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
-            preOracle = "sqlplus -s / as sysdba @/hdd/preOracleMaster.sql"
+            preOracle = "sqlplus -s / as sysdba @scripts/preOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", preOracle]
             process = subprocess.Popen(args)
             while process.poll() == None:
@@ -138,7 +138,7 @@ class WorkloadPatch:
         if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             print("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @/hdd/preOracleDaemon.sql " + self.timeout
+            preDaemonOracle = "sqlplus -s / as sysdba @scripts/preOracleDaemon.sql " + self.timeout
             argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
@@ -240,7 +240,7 @@ class WorkloadPatch:
                 self.logger.log("Shrid: Post error- Timeout daemon executed before post")
                 print("Shrid: Post error- Timeout daemon executed before post")
                 return
-            postOracle="sqlplus -s / as sysdba @/hdd/postOracleMaster.sql"
+            postOracle="sqlplus -s / as sysdba @scripts/postOracleMaster.sql"
             args = ["su", "-", self.login_path, "-c", postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
@@ -319,7 +319,7 @@ class Incremental:
         self.crontabEntry()
 
     def crontabEntry(self):
-        if os.path.exists(self.crontabEntry):
+        if os.path.exists(self.crontabLocation):
             crontabFile = open(self.crontabLocation, 'r')
             crontabCheck = crontabFile.read()
         else:
@@ -330,7 +330,7 @@ class Incremental:
                 print("Incremental: Crontab Entry- ", str(crontabCheck))
                 return
             else:
-                os.system("echo \"*/5 * * * * python /hdd/Downloads/workloadPatch/logbackup.py\" >> /var/spool/cron/root")
+                os.system("echo \"\n*/5 * * * * python /hdd/Downloads/workloadPatch/logbackup.py\" >> /var/spool/cron/root")
                 print("Incremental: New Crontab Entry")
                 return
     
