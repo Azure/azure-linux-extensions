@@ -17,7 +17,7 @@
 # Requires Python 2.4+
 
 import sys
-import Utils.HandlerUtil
+#import Utils.HandlerUtil
 import threading
 import os
 from time import sleep
@@ -314,20 +314,25 @@ class Incremental:
         self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
         self.oracleParameter = {}
         self.backupSource = ""
+        self.crontabLocation = "/var/spool/cron/root"
         self.confParser()
         self.crontabEntry()
 
     def crontabEntry(self):
-        crontabCheckArgs = "crontab - l"
-        crontabCheck = subprocess.Popen(crontabCheckArgs, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        if os.path.exists(self.crontabEntry):
+            crontabFile = open(self.crontabLocation, 'r')
+            crontabCheck = crontabFile.read()
+        else:
+            crontabCheck = "NO CRONTAB"
 
         if 'oracle' in self.name.lower():
             if 'logbackup' in str(crontabCheck):
                 print("Incremental: Crontab Entry- ", str(crontabCheck))
+                return
             else:
-                crontabEntryArgs = "echo \"*/5 * * * * python /hdd/Downloads/logbackup.py\" | crontab -"
-                subprocess.Popen(crontabEntryArgs, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                os.system("echo \"*/5 * * * * python /hdd/Downloads/workloadPatch/logbackup.py\" >> /var/spool/cron/root")
                 print("Incremental: New Crontab Entry")
+                return
     
     def confParser(self):
         print("WorkloadPatch: Entering workload config parsing")
