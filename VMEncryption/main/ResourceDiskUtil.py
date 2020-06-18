@@ -325,3 +325,9 @@ class ResourceDiskUtil(object):
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
         
         return self._is_crypt_mounted() or self._is_plain_mounted()
+
+    def encrypt_resource_disk(self):
+        if self._is_crypt_mounted():
+            return True
+        else:
+            return self.encrypt_format_mount()
