@@ -471,9 +471,12 @@ def setup_me(is_lad):
     with open(me_conf_path, "w") as f:
         f.write(me_conf)
 
+    if is_lad:
+        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
+    else:
+        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + location
 
-    me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
-    custom_conf_path = me_config_dir + "CUSTOMMETRIC_"+ subscription_id +"_MonitoringAccount_Configuration.json"
+    custom_conf_path = me_config_dir + me_monitoring_account +"_MonitoringAccount_Configuration.json"
     with open(custom_conf_path, "w") as f:
         f.write(custom_conf)
 

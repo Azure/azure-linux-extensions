@@ -162,6 +162,31 @@ class LadLoggingConfig:
                               for fac, sev in self._fac_sev_map.iteritems()) + '\n'
         return self._syslog_ng_config
 
+
+    def parse_pt_duration(self, duration):
+        """
+        Convert the ISO8601 Time Duration into seconds.
+        for ex PT2H3M20S will be 7400 seconds
+        :param duration: The ISO8601 duration string to be converted into seconds
+        """
+        total_seconds = 0
+        count = ""
+        for ch in duration:
+            if ch.lower() == 'h':
+                total_seconds += int(count)*3600
+                count = ""
+            elif ch.lower() == 'm':
+                total_seconds += int(count)*60
+                count = ""
+            elif ch.lower() == 's':
+                total_seconds += int(count)
+                count = ""
+            elif ch in ["0","1","2","3","4","5","6","7","8","9"]:
+                count += ch
+        return str(total_seconds)+"s"
+
+
+
     def parse_lad_perf_settings(self, ladconfig):
         """
         Parses the LAD json config to create a list of entries per metric along with it's configuration
@@ -221,7 +246,7 @@ class LadLoggingConfig:
             counter = {}
             counter["displayName"] = item["class"].strip().lower() + "->" + item["annotation"][0]["displayName"].strip().lower()
             if "sampleRate" in item:
-                counter["interval"] = item["sampleRate"][2:].lower() #Example, converting PT15S to 15s
+                counter["interval"] = self.parse_pt_duration(item["sampleRate"])  #Converting ISO8601 to seconds string
             else:
                 counter["interval"] = default_sample_rate
             parsed_settings.append(counter)
