@@ -82,8 +82,8 @@ class LadConfigAll:
         self._encrypt_secret = encrypt_string
         self._logger_log = logger_log
         self._logger_error = logger_error
-        self._telegraf_me_url = metrics_constant.lad_metrics_extension_influx_udp_url
-        self._telegraf_mdsd_url = metrics_constant.telegraf_influx_url
+        self._telegraf_me_url = metrics_constants.lad_metrics_extension_influx_udp_url
+        self._telegraf_mdsd_url = metrics_constants.telegraf_influx_url
         self._enable_metrics_extension = False
 
         # Generated logging configs place holders

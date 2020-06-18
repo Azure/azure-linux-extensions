@@ -53,6 +53,8 @@ try:
     import Utils.omsagent_util as oms
     import telegraf_utils.telegraf_config_handler as telhandler
     import metrics_ext_utils.metrics_ext_handler as me_handler
+    import metrics_ext_utils.metrics_constants as metrics_constants
+
 
 
 except Exception as e:

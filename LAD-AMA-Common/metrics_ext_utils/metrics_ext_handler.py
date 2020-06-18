@@ -221,9 +221,9 @@ def start_metrics(is_lad):
         return False, log_messages
 
     if is_lad:
-        me_influx_port = metrics_constant.lad_metrics_extension_udp_port
+        me_influx_port = metrics_constants.lad_metrics_extension_udp_port
     else:
-        me_influx_port = metrics_constant.ama_metrics_extension_udp_port
+        me_influx_port = metrics_constants.ama_metrics_extension_udp_port
 
 
     # If the VM has systemd, then we use that to start/stop
@@ -508,9 +508,9 @@ def setup_me(is_lad):
         return False
 
     if is_lad:
-        me_influx_port = metrics_constant.lad_metrics_extension_udp_port
+        me_influx_port = metrics_constants.lad_metrics_extension_udp_port
     else:
-        me_influx_port = metrics_constant.ama_metrics_extension_udp_port
+        me_influx_port = metrics_constants.ama_metrics_extension_udp_port
 
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
