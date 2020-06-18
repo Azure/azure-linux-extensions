@@ -96,12 +96,14 @@ class LadConfigAll:
         handlerSettings = ext_settings.get_handler_settings()
 
         if handlerSettings['protectedSettings'] is None:
-            errorMsg = 'Settings did not contain protectedSettings.'
+            errorMsg = "Settings did not contain protectedSettings. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
             self._logger_error(errorMsg)
             raise LadLoggingConfigException(errorMsg)
 
         if handlerSettings['protectedSettingsCertThumbprint'] is None:
-            errorMsg = 'Settings did not contain protectedSettingsCertThumbprint.'
+            errorMsg = "Settings did not contain protectedSettingsCertThumbprint. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
             self._logger_error(errorMsg)
             raise LadLoggingConfigException(errorMsg)
 
