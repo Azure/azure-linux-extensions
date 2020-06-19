@@ -343,21 +343,21 @@ class logbackup:
             if config.has_section("logbackup"):
                 print("logbackup: config section present for logbackup ")
                 if config.has_option("logbackup", 'workload_name'):                        
-                    name = config.get("logbackup", 'workload_name')
+                    self.name = config.get("logbackup", 'workload_name')
                     print("logbackup: config logbackup command ", name)
                 else:
                     return None
                 if config.has_option("logbackup", 'loginPath'):
-                    login_path = config.get("logbackup", 'loginPath')
+                    self.login_path = config.get("logbackup", 'loginPath')
                     print("logbackup: config logbackup login_path ", login_path)
                 if config.has_option("logbackup", 'parameterFilePath'):
-                    parameterFilePath = config.get("logbackup", 'parameterFilePath')
+                    self.parameterFilePath = config.get("logbackup", 'parameterFilePath')
                     print("logbackup: config logbackup parameterFilePath ", parameterFilePath)
                 if config.has_option("logbackup", 'baseLocation'):
-                    baseLocation = config.get("logbackup", 'baseLocation')
+                    self.baseLocation = config.get("logbackup", 'baseLocation')
                     print("logbackup: config logbackup baseLocation ", baseLocation)
                 if config.has_option("logbackup", 'backupSource'):
-                    backupSource = config.get("logbackup", 'backupSource')
+                    self.backupSource = config.get("logbackup", 'backupSource')
                     print("logbackup: config logbackup backupSource ", backupSource)
         else:
             print("No matching workload config found")
