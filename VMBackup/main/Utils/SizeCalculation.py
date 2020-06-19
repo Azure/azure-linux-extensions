@@ -29,7 +29,7 @@ class SizeCalculation(object):
                 customSettings = json.loads(para_parser.customSettings)
                 if("isOnlyOSDiskBackupEnabled" in customSettings.keys()):
                     self.isOnlyOSDiskBackupEnabled = customSettings["isOnlyOSDiskBackupEnabled"]
-                self.logger.log("isOnlyOSDiskBackupEnabled : ",self.isOnlyOSDiskBackupEnabled)
+                self.logger.log("isOnlyOSDiskBackupEnabled : ",str(self.isOnlyOSDiskBackupEnabled))
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
