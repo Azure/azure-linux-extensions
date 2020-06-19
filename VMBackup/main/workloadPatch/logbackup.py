@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import threading
-from .WorkloadPatch import Incremental
+from .WorkloadPatch import logbackup
 from time import sleep
 from datetime import datetime
 
@@ -24,7 +24,7 @@ def setLocation():
     os.system('mkdir -m777 '+ fullPath)
     return fullPath
 
-def incremental():
+def takeBackup():
     print("Logbackup: Taking a backup")
 
     backupPath = setLocation()
@@ -43,6 +43,6 @@ def incremental():
 
     print("Logbackup: Backup Complete")
 
-logbackup = Incremental()
+logbackup = logbackup()
 parameterFileParser()
-incremental()
+takeBackup()

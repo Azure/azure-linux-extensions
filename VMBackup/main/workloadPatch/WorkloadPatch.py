@@ -17,7 +17,7 @@
 # Requires Python 2.4+
 
 import sys
-#import Utils.HandlerUtil
+import Utils.HandlerUtil
 import threading
 import os
 from time import sleep
@@ -269,7 +269,7 @@ class WorkloadPatch:
                     self.logger.log("WorkloadPatch: config section present for workloads ")
                     if config.has_option("workload", 'workload_name'):                        
                         self.name = config.get("workload", 'workload_name')
-                        self.logger.log("WorkloadPatch: config workload command "+ self.workload_name)
+                        self.logger.log("WorkloadPatch: config workload command "+ self.name)
                     else:
                         return None
                     if config.has_option("workload", 'command'):                        
@@ -306,7 +306,7 @@ class WorkloadPatch:
         return error_list  
 
 #----SHRID CODE START----#
-class Incremental:
+class logbackup:
     def __init__(self):
         self.name = "oracle"
         self.login_path = "AzureBackup"
@@ -327,11 +327,11 @@ class Incremental:
 
         if 'oracle' in self.name.lower():
             if 'logbackup' in str(crontabCheck):
-                print("Incremental: Crontab Entry- ", str(crontabCheck))
+                print("logbackup: Crontab Entry- ", str(crontabCheck))
                 return
             else:
                 os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "logbackup.py\"") + " >> /var/spool/cron/root")
-                print("Incremental: New Crontab Entry")
+                print("logbackup: New Crontab Entry")
                 return
     
     def confParser(self):
@@ -340,25 +340,25 @@ class Incremental:
         if os.path.exists(configfile):
             config = ConfigParsers.ConfigParser()
             config.read(configfile)
-            if config.has_section("incremental"):
-                print("Incremental: config section present for incremental ")
-                if config.has_option("incremental", 'workload_name'):                        
-                    name = config.get("incremental", 'workload_name')
-                    print("Incremental: config incremental command ", name)
+            if config.has_section("logbackup"):
+                print("logbackup: config section present for logbackup ")
+                if config.has_option("logbackup", 'workload_name'):                        
+                    name = config.get("logbackup", 'workload_name')
+                    print("logbackup: config logbackup command ", name)
                 else:
                     return None
-                if config.has_option("incremental", 'loginPath'):
-                    login_path = config.get("incremental", 'loginPath')
-                    print("Incremental: config incremental login_path ", login_path)
-                if config.has_option("incremental", 'parameterFilePath'):
-                    parameterFilePath = config.get("incremental", 'parameterFilePath')
-                    print("Incremental: config incremental parameterFilePath ", parameterFilePath)
-                if config.has_option("incremental", 'baseLocation'):
-                    baseLocation = config.get("incremental", 'baseLocation')
-                    print("Incremental: config incremental baseLocation ", baseLocation)
-                if config.has_option("incremental", 'backupSource'):
-                    backupSource = config.get("incremental", 'backupSource')
-                    print("Incremental: config incremental backupSource ", backupSource)
+                if config.has_option("logbackup", 'loginPath'):
+                    login_path = config.get("logbackup", 'loginPath')
+                    print("logbackup: config logbackup login_path ", login_path)
+                if config.has_option("logbackup", 'parameterFilePath'):
+                    parameterFilePath = config.get("logbackup", 'parameterFilePath')
+                    print("logbackup: config logbackup parameterFilePath ", parameterFilePath)
+                if config.has_option("logbackup", 'baseLocation'):
+                    baseLocation = config.get("logbackup", 'baseLocation')
+                    print("logbackup: config logbackup baseLocation ", baseLocation)
+                if config.has_option("logbackup", 'backupSource'):
+                    backupSource = config.get("logbackup", 'backupSource')
+                    print("logbackup: config logbackup backupSource ", backupSource)
         else:
             print("No matching workload config found")
 
