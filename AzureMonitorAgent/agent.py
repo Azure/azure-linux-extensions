@@ -36,8 +36,9 @@ import shutil
 import crypt
 import xml.dom.minidom
 import re
+import hashlib
 from distutils.version import LooseVersion
-
+from hashlib import sha256
 
 from threading import Thread
 
@@ -56,6 +57,7 @@ BundleFileNameRpm = 'azure-mdsd_1.5.122-build.develop.1015_x86_64.rpm'
 BundleFileName = ''
 InitialRetrySleepSeconds = 30
 PackageManager = ''
+MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
 OneAgentInstallCommand = ''
@@ -106,6 +108,8 @@ def main():
             operation = 'Enable'
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
+        elif re.match('^([-/]*)(metrics)', option):
+            operation = 'Metrics'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -373,6 +377,11 @@ def enable():
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
+
+    if exit_code is 0:
+        #start metrics process if enable is successful
+        start_metrics_process()
+        
     return exit_code, output
 
 def disable():
@@ -380,6 +389,9 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+    #stop the metrics process
+    stop_metrics_process()
+
     #stop the Azure Monitor Linux Agent service
     DisableOneAgentServiceCommand = "systemctl stop mdsd"
 
@@ -395,7 +407,86 @@ def update():
     
     return 0, ""
 
+def stop_metrics_process():
+    pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                kill_cmd = "kill " + pids
+                run_command_and_log(kill_cmd)
+                run_command_and_log("rm "+pids_filepath)
+
+def start_metrics_process():
+    """
+    Start telemetry process that performs periodic monitoring activities
+    :return: None
+
+    """
+    stop_metrics_process()
+
+    #start telemetry watcher
+    omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', omsagent_filepath, '-metrics']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def metrics_watcher(hutil_error, hutil_log):
+    """
+    Watcher thread to monitor metric configuration changes and to take action on them
+    """    
+    
+    # check every 30 seconds
+    sleepTime =  30
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
+    last_crc = ''
+
+    while True:
+        try:
+            if os.path.isfile(MdsdCounterJsonPath):
+                f = open(MdsdCounterJsonPath, "r")
+                data = f.read()
+                
+                if (data != ''):
+                    crc = hashlib.sha256(data).hexdigest()
+                    if(crc != last_crc):
+                        hutil_log("Start processing metric configuration")
+                        hutil_log(data)
+
+                        json_data = json.loads(data)  
+                        
+                        hutil_log(json_data[0]['displayName'])                        
+                        hutil_log(json_data[0]['interval'])
+
+                        last_crc = crc
+
+        except IOError as e:
+            hutil_error('I/O error in monitoring metrics. Exception={0}'.format(e))
+
+        except Exception as e:
+            hutil_error('Error in monitoring metrics. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
+
+def metrics():
+    """
+    Take care of setting up telegraf and ME for metrics if configuration is present
+    """    
+    pids_filepath = os.path.join(os.getcwd(), 'amametrics.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = metrics_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
@@ -403,6 +494,7 @@ operations = {'Disable' : disable,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
+              'Metrics' : metrics,
 }
 
 
