@@ -18,10 +18,13 @@
 
 import os
 import os.path
+import datetime
 import signal
 import pwd
 import grp
 import re
+import filecmp
+import stat
 import sys
 import traceback
 import time
@@ -39,8 +42,12 @@ import re
 import hashlib
 from distutils.version import LooseVersion
 from hashlib import sha256
+from shutil import copyfile
 
 from threading import Thread
+import telegraf_utils.telegraf_config_handler as telhandler
+import metrics_ext_utils.metrics_constants as metrics_constants
+import metrics_ext_utils.metrics_ext_handler as me_handler
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -55,6 +62,7 @@ PackagesDirectory = 'packages'
 BundleFileNameDeb = 'azure-mdsd_1.5.122-build.develop.1015_x86_64.deb'
 BundleFileNameRpm = 'azure-mdsd_1.5.122-build.develop.1015_x86_64.rpm'
 BundleFileName = ''
+TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
@@ -204,14 +212,14 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print (PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)
+    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
-                                         final_check = final_check_if_dpkg_locked)
-
+                                         final_check = final_check_if_dpkg_locked)    
+    
     default_configs = {        
         "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
@@ -408,6 +416,33 @@ def update():
     return 0, ""
 
 def stop_metrics_process():
+
+    #Stop the telegraf and ME services
+    tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+    if tel_out:
+        HUtilObject.log(tel_msg)
+    else:
+        HUtilObject.error(tel_msg)
+
+    me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+    if me_out:
+        HUtilObject.log(me_msg)
+    else:
+        HUtilObject.error(me_msg)
+
+    #Delete the telegraf and ME services
+    tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+    if tel_rm_out:
+        HUtilObject.log(tel_rm_msg)
+    else:
+        HUtilObject.error(tel_rm_msg)
+
+    me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+    if me_rm_out:
+        HUtilObject.log(me_rm_msg)
+    else:
+        HUtilObject.error(me_rm_msg)
+
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
     # kill existing telemetry watcher
@@ -426,6 +461,29 @@ def start_metrics_process():
     """
     stop_metrics_process()
 
+    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    telegraf_path = os.path.join(package_directory, TelegrafBinName)
+
+    # Check if previous file exist at the location, compare the two binaries,
+    # If the files are not same, remove the older file, and copy the new one
+    # If they are the same, then we ignore it and don't copy
+    if os.path.isfile(telegraf_path):
+        if os.path.isfile(metrics_constants.ama_telegraf_bin):
+            if not filecmp.cmp(telegraf_path, metrics_constants.ama_telegraf_bin):
+                # Removing the file in case it is already being run in a process,
+                # in which case we can get an error "text file busy" while copying
+                os.remove(metrics_constants.ama_telegraf_bin)
+                copyfile(telegraf_path, metrics_constants.ama_telegraf_bin)
+                os.chmod(metrics_constants.ama_telegraf_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
+
+        else:
+            # No previous binary exist, simply copy it and make it executable
+            copyfile(telegraf_path, metrics_constants.ama_telegraf_bin)
+            os.chmod(metrics_constants.ama_telegraf_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
+    else:
+        raise Exception("Unable to copy Telegraf Binary, could not find file at the location {0} . Failed to setup Telegraf.".format(telegraf_path))
+        return False
+
     #start telemetry watcher
     omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
     args = ['python', omsagent_filepath, '-metrics']
@@ -443,10 +501,40 @@ def metrics_watcher(hutil_error, hutil_log):
 
     # sleep before starting the monitoring.
     time.sleep(sleepTime)
-    last_crc = ''
+    last_crc = None
+    me_msi_token_expiry_epoch = None
 
     while True:
         try:
+            generate_token = False
+            me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
+
+            if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
+                if os.path.isfile(me_token_path):
+                    with open(me_token_path, "r") as f:
+                        authtoken_content = f.read()
+                        if authtoken_content and "expires_on" in authtoken_content:
+                            me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                        else:
+                            generate_token = True
+                else:
+                    generate_token = True
+            
+            if me_msi_token_expiry_epoch:                
+                currentTime = datetime.datetime.now()
+                token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
+                if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                    # The MSI Token will expire within 30 minutes. We need to refresh the token
+                    generate_token = True
+
+            if generate_token:
+                generate_token = False
+                msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                if msi_token_generated:
+                    hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
+                else:
+                    hutil_error(log_messages)
+
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
@@ -459,8 +547,26 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         json_data = json.loads(data)  
                         
-                        hutil_log(json_data[0]['displayName'])                        
-                        hutil_log(json_data[0]['interval'])
+                        telegraf_config, telegraf_namespaces = telhandler.handle_config(
+                            json_data, 
+                            "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
+                            "unix:///var/run/mdsd/default_influx.socket",
+                            False)
+                        
+                        me_handler.setup_me(False)
+
+                        start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
+                        if start_telegraf_out:
+                            hutil_log("Successfully started metrics-sourcer.")
+                        else:
+                            hutil_error(log_messages)
+
+
+                        start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                        if start_metrics_out:
+                            hutil_log("Successfully started metrics-extension.")
+                        else:
+                            hutil_error(log_messages)
 
                         last_crc = crc
 
