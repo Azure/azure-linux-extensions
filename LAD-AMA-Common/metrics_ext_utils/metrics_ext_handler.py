@@ -239,7 +239,12 @@ def start_metrics(is_lad):
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
         az_resource_id, subscription_id, location, data = get_imds_values()
-        monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
+    
+        if is_lad:
+            monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
+    	else:
+            monitoringAccount = "CUSTOMMETRIC_"+ subscription_id + "_" + location
+
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
         binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3}".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
@@ -474,7 +479,7 @@ def setup_me(is_lad):
     if is_lad:
         me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
     else:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + location
+        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
 
     custom_conf_path = me_config_dir + me_monitoring_account +"_MonitoringAccount_Configuration.json"
     with open(custom_conf_path, "w") as f:
