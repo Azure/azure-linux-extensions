@@ -242,7 +242,7 @@ def start_metrics(is_lad):
     
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
-    	else:
+        else:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id + "_" + location
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
