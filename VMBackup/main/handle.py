@@ -322,7 +322,7 @@ def daemon():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -407,16 +407,20 @@ def daemon():
                         g_fsfreeze_on = False
                     freeze_snapshot(thread_timeout)
                     workload_patch.post()
-                    workload_errors = workload_patch.populateErrors()
-                    for error in workload_errors:
-                        if error.errorCode != CommonVariables.Success:
-                            run_status = 'error'
-                            run_result = error.errorCode
-                            hutil.SetExtErrorCode(error.errorCode)
-                            error_msg = 'PreScript failed for the plugin ' +  error.pluginName
-                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                            backup_logger.log(error_msg, True)
-                            break
+                    workload_error = workload_patch.populateErrors()
+                    if workload_error != None and g_fsfreeze_on == False:
+                        run_status = 'error'
+                        run_result = workload_error.errorcode
+                        hutil.SetExtErrorCode(workload_error.errorCode)
+                        error_msg = 'Workload Patch failed with error message: ' +  workload_error.errorMsg
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)
+                    else:
+                        run_status = 'success'
+                        run_result = CommonVariables.success_appconsistent
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                        error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                        backup_logger.log(error_msg, True)
                 else:
                     PluginHostObj = PluginHost(logger=backup_logger)
                     PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
@@ -516,7 +520,7 @@ def daemon():
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
@@ -592,7 +596,7 @@ def enable():
         start_daemon()
         sys.exit(0)
     except Exception as e:
-        hutil.update_settings_file()
+        #hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         global_error_result = e
         temp_status= 'error'
