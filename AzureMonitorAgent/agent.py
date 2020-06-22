@@ -551,9 +551,9 @@ def metrics_watcher(hutil_error, hutil_log):
                             json_data, 
                             "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
                             "unix:///var/run/mdsd/default_influx.socket",
-                            False)
+                            is_lad=False)
                         
-                        me_handler.setup_me(False)
+                        me_handler.setup_me(is_lad=False)
 
                         start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
                         if start_telegraf_out:
