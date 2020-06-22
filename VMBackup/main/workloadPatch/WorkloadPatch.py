@@ -96,13 +96,13 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in processing of postscript"))
 
     def preMaster(self):
-        self.logger.log("WorkloadPatch: Entering post mode for master")
-        self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
-        if os.path.exists(self.outfile):
-            os.remove(self.outfile)
-        else:
-            self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
-            
+        self.logger.log("WorkloadPatch: Entering pre mode for master")
+        #self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
+        #if os.path.exists(self.outfile):
+        #    os.remove(self.outfile)
+        #else:
+        #    self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+        
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
             prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")

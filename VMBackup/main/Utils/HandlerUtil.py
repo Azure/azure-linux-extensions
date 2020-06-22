@@ -792,7 +792,7 @@ class HandlerUtility:
     def get_workload_running(self):
         workloads = []
         try:
-            dblist= ["mysql -daemon" = "mysql","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            dblist= ["mysql -daemon", "mysql","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
             
             if os.path.isdir("/proc"):
                 pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
