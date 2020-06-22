@@ -330,7 +330,7 @@ class logbackup:
                 print("logbackup: Crontab Entry- ", str(crontabCheck))
                 return
             else:
-                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "logbackup.py\"") + " >> /var/spool/cron/root")
+                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/workloadPatch/logbackup.py\"") + " >> /var/spool/cron/root")
                 print("logbackup: New Crontab Entry")
                 return
     

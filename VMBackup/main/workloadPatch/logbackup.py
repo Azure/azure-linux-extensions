@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import threading
-from .WorkloadPatch import logbackup
+from WorkloadPatch import logbackup
 from time import sleep
 from datetime import datetime
 
@@ -30,7 +30,7 @@ def takeBackup():
     backupPath = setLocation()
 
     if 'oracle' in logbackup.name.lower():
-        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "scripts/logbackup.sql ") + backupPath
+        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql ") + backupPath
         argsForControlFile = ["su", "-", logbackup.login_path, "-c", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
