@@ -127,6 +127,7 @@ class CommonVariables:
     FailedWorkloadPatchConfParsingError = 501
     FailedWorkloadPatchInvalidRole = 502
     FailedWorkloadPatchInvalidWorkloadName = 503
+    FailedPreWorkloadPatch = 504
     
 
     """

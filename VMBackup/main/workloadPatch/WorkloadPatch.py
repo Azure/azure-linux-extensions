@@ -26,7 +26,7 @@ try:
 except ImportError:
     import configparser as ConfigParsers
 import subprocess
-import common
+from common import CommonVariables
 
 class ErrorDetail:
     def __init__(self, errorCode, errorMsg):
@@ -103,7 +103,8 @@ class WorkloadPatch:
             
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
-            arg = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
+            prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
+            arg = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
         
@@ -112,6 +113,7 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
         else:
+            pass
             
             
     def thread_for_sql(self,args):
@@ -128,13 +130,27 @@ class WorkloadPatch:
     def preMasterDB(self):
         for dbname in dbnames:
             if 'mysql' in self.name.lower():#TODO DB level
-                args = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
+                args = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
                 binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
                 binary_thread.start()
         
 
     def preSlave(self):
-        pass
+        self.logger.log("WorkloadPatch: Entering post mode for master")
+        if os.path.exists(self.outfile):
+            os.remove(self.outfile)
+        else:
+            self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+        if len(self.child) == 0:
+            self.logger.log("WorkloadPatch: Not app consistent backup")
+            self.error_details.append("not app consistent")
+        elif self.child[0].poll() is None:
+            self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+            self.child[0].kill()
+        if 'mysql' in self.name.lower():
+            self.logger.log("WorkloadPatch: Create connection string for post master")
+            args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlSlave.sql"
+            post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
     def preSlaveDB(self):
         pass
@@ -176,7 +192,7 @@ class WorkloadPatch:
                     self.logger.log("WorkloadPatch: config section present for workloads ")
                     if config.has_option("workload", 'workload_name'):                        
                         self.name = config.get("workload", 'workload_name')
-                        self.logger.log("WorkloadPatch: config workload command "+ self.workload_name)
+                        self.logger.log("WorkloadPatch: config workload command "+ self.name)
                     else:
                         return None
                     if config.has_option("workload", 'command'):                        
@@ -206,10 +222,17 @@ class WorkloadPatch:
                 self.logger.log("workload config missing",True)
                 self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "workload config missing"))
         except Exception as e:
+            self.logger.log
             self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in workloadconfig parsing"))
     
     def populateErrors(self):
-        ErrorDetail errdetail = self.error_details[0]
-        return errdetail.errorCode, errordetail.errorMsg
+        if len(self.error_details) > 0:
+            errdetail = self.error_details[0]
+            return errdetail.errorCode, errordetail.errorMsg
+        else:
+            return None
+    
+    def getRole(self):
+        return "master"
 
     
