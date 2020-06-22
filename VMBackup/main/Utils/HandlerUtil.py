@@ -141,7 +141,7 @@ class HandlerUtility:
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
-            self.update_settings_file()
+            #self.update_settings_file()
             sys.exit(0)
 
     def log(self, message,level='Info'):
@@ -792,15 +792,16 @@ class HandlerUtility:
     def get_workload_running(self):
         workloads = []
         try:
-            dblist= ["mysqld","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            dblist= ["mysql -daemon" = "mysql","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            
             if os.path.isdir("/proc"):
                 pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
                 for pid in pids:
                     pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
-                    for db in dblist :
-                        if db in pname.lower() and db not in workloads :
+                    for p in plist :
+                        if p in pname.lower() and db not in workloads :
                             self.log("workload running found with command : " + str(pname))
-                            workloads.append(db)
+                            workloads.append(value)
             return workloads
         except Exception as e:
             self.log("Unable to fetch running workloads" + str(e))

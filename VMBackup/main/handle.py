@@ -274,7 +274,6 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    workload_name = "oracle"
     snapshot_type = "appAndFileSystem"
 
     #Adding python version to the telemetry
@@ -302,8 +301,6 @@ def daemon():
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
-        if config.has_option('SnapshotThread','workload_name'):
-            workload_name = config.get('SnapshotThread','workload_name') #values like mysql, postgres
         if config.has_option('SnapshotThread','snapshot_type'):
            snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem
             
@@ -311,7 +308,6 @@ def daemon():
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
-    backup_logger.log("workload backup enabled for workload: " + workload_name, True)
     
     snapshot_info_array = None
 
@@ -397,9 +393,10 @@ def daemon():
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 
-                if workload_name is not None:
-                    workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
-                    
+                workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
+                
+                if workload_patch.name != "":
+                    backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
                     workload_patch.pre()
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("file system consistent backup only")
@@ -410,16 +407,20 @@ def daemon():
                         g_fsfreeze_on = False
                     freeze_snapshot(thread_timeout)
                     workload_patch.post()
-                    workload_errors = workload_patch.populateErrors()
-                    for error in workload_errors:
-                        if error.errorCode != CommonVariables.Success:
-                            run_status = 'error'
-                            run_result = error.errorCode
-                            hutil.SetExtErrorCode(error.errorCode)
-                            error_msg = 'PreScript failed for the plugin ' +  error.pluginName
-                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                            backup_logger.log(error_msg, True)
-                            break
+                    workload_error = workload_patch.populateErrors()
+                    if workload_error != None and g_fsfreeze_on == False:
+                        run_status = 'error'
+                        run_result = workload_error.errorcode
+                        hutil.SetExtErrorCode(workload_error.errorCode)
+                        error_msg = 'Workload Patch failed with error message: ' +  workload_error.errorMsg
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)
+                    else:
+                        run_status = 'success'
+                        run_result = CommonVariables.success_appconsistent
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                        error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                        backup_logger.log(error_msg, True)
                 else:
                     PluginHostObj = PluginHost(logger=backup_logger)
                     PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()

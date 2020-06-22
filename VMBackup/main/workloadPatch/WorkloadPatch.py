@@ -26,20 +26,27 @@ try:
 except ImportError:
     import configparser as ConfigParsers
 import subprocess
+from common import CommonVariables
 
+class ErrorDetail:
+    def __init__(self, errorCode, errorMsg):
+        self.errorCode = errorCode
+        self.errorMsg = errorMsg
+    
 class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = "oracle"
         self.command = "/usr/bin/"
         self.dbnames = []
-        self.login_path = "AzureBackup"
+        self.cred_string = ""
         self.ipc_folder = None
         self.error_details = []
         self.enforce_slave_only = False
         self.role = "master"
         self.child = []
         self.timeout = 90
+        self.outfile = ""
         self.confParser()
 
     def pre(self):
@@ -61,10 +68,10 @@ class WorkloadPatch:
                     self.preSlaveDB()
                 # create fork process for child
             else:
-                self.error_details.append("invalid role name in config")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPatchInvalidRole, "invalid role name in config"))
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in pre" + str(e))
-            self.error_details.append("exception in processing of prescript")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "Exception in pre"))
 
     def post(self):
         try:
@@ -83,27 +90,27 @@ class WorkloadPatch:
                 else:
                     self.postSlaveDB()
             else:
-                self.error_details.append("invalid role name in config") 
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPatchInvalidRole, "invalid role name in config"))
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in post" + str(e))
-            self.error_details.append("exception in processing of postscript")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in processing of postscript"))
 
     def preMaster(self):
-        self.logger.log("WorkloadPatch: Entering pre mode for master")
-        print("WorkloadPatch: Entering pre mode for master")
-        
-        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-            os.remove("/var/lib/mysql-files/azbackupserver.txt")
+        self.logger.log("WorkloadPatch: Entering post mode for master")
+        self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
+        if os.path.exists(self.outfile):
+            os.remove(self.outfile)
         else:
             self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
             
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
-            arg = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/preMysqlMaster.sql"
+            prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
+            arg = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
         
-            while os.path.exists("/var/lib/mysql-files/azbackupserver.txt") == False:
+            while os.path.exists(self.outfile) == False:
                 self.logger.log("WorkloadPatch: Waiting for sql to complete")
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
@@ -185,24 +192,42 @@ class WorkloadPatch:
     def preMasterDB(self):
         for dbname in self.dbnames:
             if 'mysql' in self.name.lower():#TODO DB level
-                args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/preMysqlMaster.sql"
+                args = self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
                 binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
                 binary_thread.start()
         
     def preSlave(self):
-        pass
+        self.logger.log("WorkloadPatch: Entering post mode for master")
+        if os.path.exists(self.outfile):
+            os.remove(self.outfile)
+        else:
+            self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+        if len(self.child) == 0:
+            self.logger.log("WorkloadPatch: Not app consistent backup")
+            self.error_details.append("not app consistent")
+        elif self.child[0].poll() is None:
+            self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+            self.child[0].kill()
+        if 'mysql' in self.name.lower():
+            self.logger.log("WorkloadPatch: Create connection string for post master")
+            args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlSlave.sql"
+            post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
     def preSlaveDB(self):
         pass
     
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        print("WorkloadPatch: Entering post mode for master")
-        if os.path.exists("/var/lib/mysql-files/azbackupserver.txt"):
-            os.remove("/var/lib/mysql-files/azbackupserver.txt")
-        #else:
-        #    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-        
+        if os.path.exists(self.outfile):
+            os.remove(self.outfile)
+        else:
+            self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+        if len(self.child) == 0:
+            self.logger.log("WorkloadPatch: Not app consistent backup")
+            self.error_details.append("not app consistent")
+        elif self.child[0].poll() is None:
+            self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+            self.child[0].kill()
         if 'mysql' in self.name.lower():
             if len(self.child) == 0:
                 self.logger.log("WorkloadPatch: Not app consistent backup")
@@ -211,7 +236,7 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                 self.child[0].kill()
             self.logger.log("WorkloadPatch: Create connection string for post master")
-            args = self.command+self.name+" --login-path="+self.login_path+" < main/workloadPatch/scripts/postMysqlMaster.sql"
+            args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
 
         #----SHRID CODE START----#
@@ -275,9 +300,9 @@ class WorkloadPatch:
                     if config.has_option("workload", 'command'):                        
                         self.command = config.get("workload", 'command')
                         self.logger.log("WorkloadPatch: config workload command "+ self.command)
-                    if config.has_option("workload", 'loginPath'):
-                        self.login_path = config.get("workload", 'loginPath')
-                        self.logger.log("WorkloadPatch: config workload login_path "+ self.login_path)
+                    if config.has_option("workload", 'credString'):
+                        self.cred_string = config.get("workload", 'credString')
+                        self.logger.log("WorkloadPatch: config workload cred_string "+ self.cred_string)
                     if config.has_option("workload", 'role'):
                         self.role = config.get("workload", 'role')
                         self.logger.log("WorkloadPatch: config workload role "+ self.role)
@@ -294,16 +319,23 @@ class WorkloadPatch:
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
                 else:
-                    self.error_details.append("no matching workload config found")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "no matching workload config found"))
             else:
                 self.logger.log("workload config missing",True)
-                error_details.append("workload config missing")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "workload config missing"))
         except Exception as e:
-            self.error_details.append("exception in workloadconfig parsing")
+            self.logger.log
+            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in workloadconfig parsing"))
     
     def populateErrors(self):
-        error_list = []#TODO error list from error details
-        return error_list  
+        if len(self.error_details) > 0:
+            errdetail = self.error_details[0]
+            return errdetail.errorCode, errordetail.errorMsg
+        else:
+            return None
+    
+    def getRole(self):
+        return "master"
 
 #----SHRID CODE START----#
 class logbackup:

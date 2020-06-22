@@ -1,3 +1,5 @@
 FLUSH TABLES WITH READ LOCK; SET GLOBAL read_only = ON;
-SELECT "serverlevel" INTO OUTFILE "/var/lib/mysql-files/azbackupserver.txt";
-SELECT SLEEP(900);
+set @query = concat("SELECT \"serverlevel\" INTO OUTFILE ",@outfile);
+prepare stmt from @query;
+execute stmt;deallocate prepare stmt;
+SELECT SLEEP(@timeout);
