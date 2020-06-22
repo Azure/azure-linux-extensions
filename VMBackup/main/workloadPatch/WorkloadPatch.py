@@ -39,7 +39,7 @@ class WorkloadPatch:
         self.enforce_slave_only = False
         self.role = "master"
         self.child = []
-        self.timeout = "60"
+        self.timeout = 90
         self.confParser()
 
     def pre(self):
