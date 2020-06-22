@@ -130,7 +130,7 @@ class WorkloadPatch:
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
             preOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
-            args = ["su", "-", self.login_path, "-c", preOracle]
+            args = ["su", "-", self.cred_string, "-c", preOracle]
             process = subprocess.Popen(args)
             while process.poll() == None:
                 sleep(1)
@@ -146,7 +146,7 @@ class WorkloadPatch:
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             print("Shrid: Inside oracle condition in timeout daemon")
             preDaemonOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
-            argsDaemon = ["su", "-", self.login_path, "-c", preDaemonOracle]
+            argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
         self.logger.log("Shrid: timeoutDaemon started for: " + self.timeout + " seconds")
@@ -169,7 +169,7 @@ class WorkloadPatch:
     def databaseStatus(self):
 
         if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            statusArgs =  "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
             oracleStatus = subprocess.check_output(statusArgs, shell=True)
             self.logger.log("Shrid: databaseStatus- " + str(oracleStatus))
             print("Shrid: databaseStatus- ", str(oracleStatus))
@@ -266,7 +266,7 @@ class WorkloadPatch:
                 print("Shrid: Post error- Timeout daemon executed before post")
                 return
             postOracle="sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
-            args = ["su", "-", self.login_path, "-c", postOracle]
+            args = ["su", "-", self.cred_string, "-c", postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
                 sleep(1)
@@ -341,7 +341,7 @@ class WorkloadPatch:
 class logbackup:
     def __init__(self):
         self.name = "oracle"
-        self.login_path = "AzureBackup"
+        self.cred_string = "AzureBackup"
         self.baseLocation = "/hdd/AutoIncrement/"
         self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
         self.oracleParameter = {}
@@ -380,8 +380,8 @@ class logbackup:
                 else:
                     return None
                 if config.has_option("logbackup", 'loginPath'):
-                    self.login_path = config.get("logbackup", 'loginPath')
-                    print("logbackup: config logbackup login_path ", self.login_path)
+                    self.cred_string = config.get("logbackup", 'loginPath')
+                    print("logbackup: config logbackup cred_string ", self.cred_string)
                 if config.has_option("logbackup", 'parameterFilePath'):
                     self.parameterFilePath = config.get("logbackup", 'parameterFilePath')
                     print("logbackup: config logbackup parameterFilePath ", self.parameterFilePath)

@@ -31,7 +31,7 @@ def takeBackup():
 
     if 'oracle' in logbackup.name.lower():
         backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql ") + backupPath
-        argsForControlFile = ["su", "-", logbackup.login_path, "-c", backupOracle]
+        argsForControlFile = ["su", "-", logbackup.cred_string, "-c", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
             sleep(1)        

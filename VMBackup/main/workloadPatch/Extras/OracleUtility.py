@@ -31,10 +31,10 @@ class OracleUtility:
     def __init__(self, logger):
         self.logger = logger
         self.dbnames = []
-        self.login_path = "oracle"
+        self.cred_string = "oracle"
 
     def containerName(self):
-        containerNameArgs =  "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSHOW CON_NAME;\nEOF'"
+        containerNameArgs =  "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSHOW CON_NAME;\nEOF'"
         oracleContainerName = subprocess.check_output(containerNameArgs, shell=True)
         self.logger.log("Shrid: containerName- " + str(oracleContainerName))
         print("Shrid: containerName- ", str(oracleContainerName))
@@ -46,7 +46,7 @@ class OracleUtility:
         else:
             self.logger.log("Shrid: Pre- Error. Not in CDB$ROOT")
             print("Shrid: Pre- Error. Not in CDB$ROOT")
-            changeContainerArgs = "su - " + self.login_path + " -c " + "'sqlplus -s / as sysdba<<-EOF\nALTER SESSION SET CONTAINER=CDB$ROOT;\nEOF'"
+            changeContainerArgs = "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nALTER SESSION SET CONTAINER=CDB$ROOT;\nEOF'"
             oracleChangeContainer = subprocess.check_output(changeContainerArgs, shell=True)
             self.logger.log("Shrid: containerName- " + str(oracleChangeContainer))
             print("Shrid: containerName- ", str(oracleChangeContainer))
