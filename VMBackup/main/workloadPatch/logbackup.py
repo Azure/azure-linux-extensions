@@ -15,7 +15,7 @@ def parameterFileParser():
         keyParameter = match.group().split('=')[0].lstrip('*\.')
         valueParameter = [name.strip('\'') for name in match.group().split('=')[1].split(',')]
         logbackup.oracleParameter[keyParameter] = valueParameter
-    print(logbackup.oracleParameter)
+    #print(logbackup.oracleParameter)
 
 def setLocation():
     nowTimestamp = datetime.now()
@@ -25,7 +25,7 @@ def setLocation():
     return fullPath
 
 def takeBackup():
-    print("Logbackup: Taking a backup")
+    print("logbackup: Taking a backup")
 
     backupPath = setLocation()
 
@@ -37,11 +37,11 @@ def takeBackup():
             sleep(1)        
         recoveryFileDest = logbackup.oracleParameter['db_recovery_file_dest']
         dbName = logbackup.oracleParameter['db_name']
-        print('Archive log started: ', datetime.now().strftime("%Y%m%d%H%M%S"))
+        print('    logbackup: Archive log backup started at ', datetime.now().strftime("%Y%m%d%H%M%S"))
         os.system('cp -R -f ' + recoveryFileDest[0] + '/' + dbName[0] + '/archivelog ' + backupPath)
-        print('Archive log copied: ', datetime.now().strftime("%Y%m%d%H%M%S"))
+        print('    logbackup: Archive log backup complete at ', datetime.now().strftime("%Y%m%d%H%M%S"))
 
-    print("Logbackup: Backup Complete")
+    print("logbackup: Backup Complete")
 
 logbackup = logbackup()
 parameterFileParser()
