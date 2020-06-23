@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import threading
-from WorkloadPatch import logbackup
+from workloadPatch.WorkloadPatch import logbackup
 from time import sleep
 from datetime import datetime
 

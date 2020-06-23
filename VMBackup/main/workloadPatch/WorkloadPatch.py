@@ -125,7 +125,7 @@ class WorkloadPatch:
             else:
                 self.logger.log("Shrid: Pre- Database not open. Backup may proceed without pre and post")
                 print("Shrid: Pre- Database not open. Backup may proceed without pre and post")
-                return
+                return None
 
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
