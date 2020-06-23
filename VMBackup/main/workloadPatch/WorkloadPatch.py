@@ -97,11 +97,12 @@ class WorkloadPatch:
 
     def preMaster(self):
         self.logger.log("WorkloadPatch: Entering pre mode for master")
-        #self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
-        #if os.path.exists(self.outfile):
-        #    os.remove(self.outfile)
-        #else:
-        #    self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+        if self.ipc_folder != None:
+            self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
+            if os.path.exists(self.outfile):
+                os.remove(self.outfile)
+            else:
+                self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
         
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
