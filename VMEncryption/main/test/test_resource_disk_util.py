@@ -210,10 +210,10 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_encrypt_format_mount.reset_mock()
         mock_encrypt_format_mount.return_value = False
         self.assertEqual(self.resource_disk.automount(), False)
-        mock_encrypt_format_mount.assert_called_once()
+        self.assertEqual(mock_encrypt_format_mount.call_count, 1)
 
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
-    @mock.patch('main.ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted')
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
     def test_encrypt_resource_disk(self, mock_efm, mock_icm):
         # Case 1: RD is not crypt mounted and encrypt_format_mount succeeds
         mock_efm.return_value = True
