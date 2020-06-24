@@ -27,7 +27,7 @@ class SizeCalculation(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                if("isOnlyOSDiskBackupEnabled" in customSettings.keys()):
+                if("isOnlyOSDiskBackupEnabled" in customSettings):
                     self.isOnlyOSDiskBackupEnabled = customSettings["isOnlyOSDiskBackupEnabled"]
                     if(self.isOnlyOSDiskBackupEnabled == True):
                         Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("billingType","os disk")
