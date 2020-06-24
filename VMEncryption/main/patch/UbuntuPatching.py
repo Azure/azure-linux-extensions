@@ -59,8 +59,11 @@ class UbuntuPatching(AbstractPatching):
 
     def install_cryptsetup(self):
         packages = ['cryptsetup-bin']
-        cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-        return_code = self.command_executor.Execute(cmd)
+        cmd = " ".join(['apt-get', 'install', '-y' , '--no-upgrade'] + packages)
+        return_code = self.command_executor.Execute(cmd, timeout=30)
+        if return_code == -9:
+            msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
+            raise Exception(msg)
         
         # If install fails, try running apt-get update and then try install again
         if return_code != 0:
@@ -71,7 +74,11 @@ class UbuntuPatching(AbstractPatching):
                 msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
                 raise Exception(msg)
             cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-            self.command_executor.Execute(cmd)
+            return_code = self.command_executor.Execute(cmd, timeout=30)
+            if return_code == -9:
+                msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
+                raise Exception(msg)
+            return return_code
 
 
     def install_extras(self):

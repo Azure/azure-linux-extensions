@@ -103,3 +103,33 @@ class Test_Disk_Util(unittest.TestCase):
     def test_mount_all(self, cmd_exc_mock):
         self.disk_util.mount_all()
         self.assertEqual(cmd_exc_mock.call_count, 2)
+
+    @mock.patch("DiskUtil.DiskUtil.get_device_items_property")
+    def test_is_device_mounted(self, dev_item_prop_mock):
+        dev_item_prop_mock.return_value = "/mount"
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEqual(device_mounted, True)
+
+        dev_item_prop_mock.reset_mock()
+        dev_item_prop_mock.return_value = ""
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEqual(device_mounted, False)
+
+        dev_item_prop_mock.reset_mock()
+        dev_item_prop_mock.side_effect = Exception("Dummy Exception")
+        device_mounted = self.disk_util.is_device_mounted("deviceName")
+        self.assertEqual(device_mounted, False)
+
+    @mock.patch("os.path.exists")
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_make_sure_path_exists(self, cmd_exc_mock, exists_mock):
+        exists_mock.return_value = True
+        path_exists = self.disk_util.make_sure_path_exists('/test/path')
+        self.assertEqual(path_exists, 0)
+        self.assertEqual(cmd_exc_mock.call_count, 0)
+
+        cmd_exc_mock.reset_mock()
+        exists_mock.return_value = False
+        path_exists = self.disk_util.make_sure_path_exists('/test/path')
+        self.assertEqual(path_exists, 0)
+        self.assertEqual(cmd_exc_mock.call_count, 1)
