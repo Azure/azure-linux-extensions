@@ -122,49 +122,49 @@ class WorkloadPatch:
             global preOracleStatus
             preOracleStatus = self.databaseStatus()
             if "OPEN" in str(preOracleStatus):
-                self.logger.log("Shrid: Pre- Database is open")
-                print("Shrid: Pre- Database is open")
+                self.logger.log("WorkloadPatch: Pre- Database is open")
+                print("WorkloadPatch: Pre- Database is open")
             else:
-                self.logger.log("Shrid: Pre- Database not open. Backup may proceed without pre and post")
-                print("Shrid: Pre- Database not open. Backup may proceed without pre and post")
+                self.logger.log("WorkloadPatch: Pre- Database not open. Backup may proceed without pre and post")
+                print("WorkloadPatch: Pre- Database not open. Backup may proceed without pre and post")
                 return None
 
-            print("Shrid: Pre- Inside oracle pre")
-            self.logger.log("Shrid: Pre- Inside oracle pre")
+            print("WorkloadPatch: Pre- Inside oracle pre")
+            self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", preOracle]
             process = subprocess.Popen(args)
             while process.poll() == None:
                 sleep(1)
             self.timeoutDaemon()
-            self.logger.log("Shrid: Pre- Exiting pre mode for master")
-            print("Shrid: Pre- Exiting pre mode for master")
+            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
+            print("WorkloadPatch: Pre- Exiting pre mode for master")
         #----SHRID CODE END----#
 
     #----SHRID CODE START----#
     def timeoutDaemon(self):
         global preDaemonThread
         if 'oracle' in self.name.lower():
-            self.logger.log("Shrid: Inside oracle condition in timeout daemon")
-            print("Shrid: Inside oracle condition in timeout daemon")
+            self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
+            print("WorkloadPatch: Inside oracle condition in timeout daemon")
             preDaemonOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
-        self.logger.log("Shrid: timeoutDaemon started for: " + self.timeout + " seconds")
-        print("Shrid: timeoutDaemon started for: ", self.timeout, " seconds")
+        self.logger.log("WorkloadPatch: timeoutDaemon started for: " + self.timeout + " seconds")
+        print("WorkloadPatch: timeoutDaemon started for: ", self.timeout, " seconds")
     #----SHRID CODE END----#
 
     #----SHRID CODE START----#
     def threadForTimeoutDaemon(self, args): 
             global daemonProcess
             daemonProcess = subprocess.Popen(args)
-            self.logger.log("Shrid: daemonProcess started")
-            print("Shrid: daemonProcess started")
+            self.logger.log("WorkloadPatch: daemonProcess started")
+            print("WorkloadPatch: daemonProcess started")
             while daemonProcess.poll() == None:
                 sleep(1)
-            self.logger.log("Shrid: daemonProcess completed")
-            print("Shrid: daemonProcess completed")
+            self.logger.log("WorkloadPatch: daemonProcess completed")
+            print("WorkloadPatch: daemonProcess completed")
     #----SHRID CODE END----#
 
     #---- SHRID CODE START----#
@@ -173,8 +173,8 @@ class WorkloadPatch:
         if 'oracle' in self.name.lower():
             statusArgs =  "su - " + self.cred_string + " -c " + "'" + self.command +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
             oracleStatus = subprocess.check_output(statusArgs, shell=True)
-            self.logger.log("Shrid: databaseStatus- " + str(oracleStatus))
-            print("Shrid: databaseStatus- ", str(oracleStatus))
+            self.logger.log("WorkloadPatch: databaseStatus- " + str(oracleStatus))
+            print("WorkloadPatch: databaseStatus- ", str(oracleStatus))
             return oracleStatus
 
         return False
@@ -247,14 +247,14 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             postOracleStatus = self.databaseStatus()
             if postOracleStatus != preOracleStatus:
-                self.logger.log("Shrid: Error. Pre and post database status different.")
-                print("Shrid: Error. Pre and post database status different.")
+                self.logger.log("WorkloadPatch: Error. Pre and post database status different.")
+                print("WorkloadPatch: Error. Pre and post database status different.")
             if "OPEN" in str(postOracleStatus):
-                self.logger.log("Shrid: Post- Database is open")
-                print("Shrid: Post- Database is open")
+                self.logger.log("WorkloadPatch: Post- Database is open")
+                print("WorkloadPatch: Post- Database is open")
             else:
-                self.logger.log("Shrid: Post- Database not open. Backup may proceed without pre and post")
-                print("Shrid: Post- Database not open. Backup may proceed without pre and post")
+                self.logger.log("WorkloadPatch: Post- Database not open. Backup may proceed without pre and post")
+                print("WorkloadPatch: Post- Database not open. Backup may proceed without pre and post")
                 return
 
             self.logger.log("Shird: Post- Inside oracle post")
@@ -262,20 +262,21 @@ class WorkloadPatch:
             if preDaemonThread.isAlive():
                 self.logger.log("Shird: Post- Timeout daemon still in sleep")
                 print("Shird: Post- Timeout daemon still in sleep")
-                self.logger.log("Shrid: Post- Initiating Post Script")
-                print("Shrid: Post- Initiating Post Script")
+                self.logger.log("WorkloadPatch: Post- Initiating Post Script")
+                print("WorkloadPatch: Post- Initiating Post Script")
                 daemonProcess.terminate()
             else:
-                self.logger.log("Shrid: Post error- Timeout daemon executed before post")
-                print("Shrid: Post error- Timeout daemon executed before post")
+                self.logger.log("WorkloadPatch: Post error- Timeout daemon executed before post")
+                print("WorkloadPatch: Post error- Timeout daemon executed before post")
                 return
-            postOracle="sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
+            postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
                 sleep(1)
-            self.logger.log("Shrid: Post- Completed")
-            print("Shrid: Post- Completed")
+            self.logger.log("WorkloadPatch: Post- Completed")
+            print("WorkloadPatch: Post- Completed")
+            self.callLogbackup()
         #----SHRID CODE END----#
 
     def postMasterDB(self):
@@ -346,4 +347,8 @@ class WorkloadPatch:
     
     def callLogbackup(self):
         if 'enable' in self.logbackup.lower():
+            self.logger.log("WorkloadPatch: Initializing logbackup")
+            print("WorkloadPatch: Initializing logbackup")
             logbackupObject = logbackup()
+        else:
+            return
