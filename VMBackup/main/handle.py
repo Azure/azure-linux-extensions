@@ -410,11 +410,16 @@ def daemon():
                     workload_error = workload_patch.populateErrors()
                     if workload_error != None and g_fsfreeze_on == False:
                         run_status = 'error'
-                        run_result = workload_error.errorcode
+                        run_result = workload_error.errorCode
                         hutil.SetExtErrorCode(workload_error.errorCode)
                         error_msg = 'Workload Patch failed with error message: ' +  workload_error.errorMsg
                         error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                         backup_logger.log(error_msg, True)
+                    elif workload_error != None and g_fsfreeze_on == True:
+                        hutil.SetExtErrorCode(workload_error.errorCode)
+                        error_msg = 'Workload Patch failed with warning message: ' +  workload_error.errorMsg
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)                        
                     else:
                         run_status = 'success'
                         run_result = CommonVariables.success_appconsistent

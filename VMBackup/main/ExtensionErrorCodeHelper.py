@@ -42,6 +42,12 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
     FailedGuestAgentInvokedCommandTooLate = 402
+    
+    FailedWorkloadPatchPreError = 500
+    FailedWorkloadPatchConfParsingError = 501
+    FailedWorkloadPatchInvalidRole = 502
+    FailedWorkloadPatchInvalidWorkloadName = 503
+    FailedPreWorkloadPatch = 504
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -84,7 +90,13 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red,
-            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : Status.ExtVmHealthStateEnum.red
+            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : Status.ExtVmHealthStateEnum.red,
+            
+            ExtensionErrorCodeEnum.FailedWorkloadPatchPreError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadPatchConfParsingError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadPatchInvalidRole : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadPatchInvalidWorkloadName : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedPreWorkloadPatch : Status.ExtVmHealthStateEnum.yellow
             }
 
     ExtensionErrorCodeNameDict = {
@@ -125,7 +137,13 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork",
             ExtensionErrorCodeEnum.FailedSnapshotLimitReached : "FailedSnapshotLimitReached",
-            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : "FailedGuestAgentInvokedCommandTooLate"
+            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : "FailedGuestAgentInvokedCommandTooLate",
+            
+            ExtensionErrorCodeEnum.FailedWorkloadPatchPreError : "FailedWorkloadPatchPreError",
+            ExtensionErrorCodeEnum.FailedWorkloadPatchConfParsingError : "FailedWorkloadPatchConfParsingError",
+            ExtensionErrorCodeEnum.FailedWorkloadPatchInvalidRole : "FailedWorkloadPatchInvalidRole",
+            ExtensionErrorCodeEnum.FailedWorkloadPatchInvalidWorkloadName : "FailedWorkloadPatchInvalidWorkloadName",
+            ExtensionErrorCodeEnum.FailedPreWorkloadPatch : "FailedPreWorkloadPatch"
             }
     
     @staticmethod
