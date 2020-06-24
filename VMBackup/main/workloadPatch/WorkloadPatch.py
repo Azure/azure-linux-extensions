@@ -27,6 +27,7 @@ except ImportError:
     import configparser as ConfigParsers
 import subprocess
 from common import CommonVariables
+from logbackupPatch import logbackup
 
 class ErrorDetail:
     def __init__(self, errorCode, errorMsg):
@@ -37,7 +38,7 @@ class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = "oracle"
-        self.command = "/usr/bin/"
+        self.command = "sqlplus"
         self.dbnames = []
         self.cred_string = ""
         self.ipc_folder = None
@@ -47,6 +48,7 @@ class WorkloadPatch:
         self.child = []
         self.timeout = 90
         self.outfile = ""
+        self.logbackup = ""
         self.confParser()
 
     def pre(self):
@@ -129,7 +131,7 @@ class WorkloadPatch:
 
             print("Shrid: Pre- Inside oracle pre")
             self.logger.log("Shrid: Pre- Inside oracle pre")
-            preOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", preOracle]
             process = subprocess.Popen(args)
             while process.poll() == None:
@@ -145,7 +147,7 @@ class WorkloadPatch:
         if 'oracle' in self.name.lower():
             self.logger.log("Shrid: Inside oracle condition in timeout daemon")
             print("Shrid: Inside oracle condition in timeout daemon")
-            preDaemonOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
+            preDaemonOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
@@ -169,7 +171,7 @@ class WorkloadPatch:
     def databaseStatus(self):
 
         if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            statusArgs =  "su - " + self.cred_string + " -c " + "'" + self.command +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
             oracleStatus = subprocess.check_output(statusArgs, shell=True)
             self.logger.log("Shrid: databaseStatus- " + str(oracleStatus))
             print("Shrid: databaseStatus- ", str(oracleStatus))
@@ -320,6 +322,9 @@ class WorkloadPatch:
                     if config.has_option("workload", 'dbnames'):
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
+                    if config.has_option("workload", 'logbackup'):
+                        self.logbackup = config.get("workload", 'logbackup')
+                        self.logger.log("WorkloadPatch: config logbackup " + self.logbackup)
                 else:
                     self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "no matching workload config found"))
             else:
@@ -338,66 +343,7 @@ class WorkloadPatch:
     
     def getRole(self):
         return "master"
-
-#----SHRID CODE START----#
-class logbackup:
-    def __init__(self):
-        self.name = "oracle"
-        self.cred_string = "AzureBackup"
-        self.baseLocation = "/hdd/AutoIncrement/"
-        self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
-        self.oracleParameter = {}
-        self.backupSource = ""
-        self.crontabLocation = "/var/spool/cron/root"
-        self.confParser()
-        self.crontabEntry()
-
-    def crontabEntry(self):
-        if os.path.exists(self.crontabLocation):
-            crontabFile = open(self.crontabLocation, 'r')
-            crontabCheck = crontabFile.read()
-        else:
-            crontabCheck = "NO CRONTAB"
-
-        if 'oracle' in self.name.lower():
-            if 'logbackup' in str(crontabCheck):
-                print("logbackup: Existing Crontab Entry: ", str(crontabCheck))
-                return
-            else:
-                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/logbackup.py\"") + " >> /var/spool/cron/root")
-                print("logbackup: New Crontab Entry Made")
-                return
     
-    def confParser(self):
-        print("#---- WorkloadPatch: Entering workload config parsing ----#")
-        configfile = '/etc/azure/workload.conf' 
-        if os.path.exists(configfile):
-            config = ConfigParsers.ConfigParser()
-            config.read(configfile)
-            if config.has_section("logbackup"):
-                print("    logbackup: config section present for logbackup ")
-                if config.has_option("logbackup", 'workload_name'):                        
-                    self.name = config.get("logbackup", 'workload_name')
-                    print("    logbackup: config logbackup workload name: ", self.name)
-                else:
-                    return None
-                if config.has_option("logbackup", 'loginPath'):
-                    self.cred_string = config.get("logbackup", 'loginPath')
-                    print("    logbackup: config logbackup credential string: ", self.cred_string)
-                if config.has_option("logbackup", 'parameterFilePath'):
-                    self.parameterFilePath = config.get("logbackup", 'parameterFilePath')
-                    print("    logbackup: config logbackup parameter file path: ", self.parameterFilePath)
-                if config.has_option("logbackup", 'baseLocation'):
-                    self.baseLocation = config.get("logbackup", 'baseLocation')
-                    print("    logbackup: config logbackup base location: ", self.baseLocation)
-                if config.has_option("logbackup", 'backupSource'):
-                    self.backupSource = config.get("logbackup", 'backupSource')
-                    print("    logbackup: config logbackup backup source: ", self.backupSource)
-                if config.has_option("logbackup", 'crontabLocation'):
-                    self.crontabLocation = config.get("logbackup", 'crontabLocation')
-                    print("    logbackup: config logbackup crontab location: ", self.crontabLocation)
-                print("#----End of Config Parser ----#")
-        else:
-            print("No matching workload config found")
-
-#----SHRID CODE END----#
+    def callLogbackup(self):
+        if 'enable' in self.logbackup.lower():
+            logbackupObject = logbackup()
