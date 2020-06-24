@@ -221,16 +221,18 @@ class WorkloadPatch:
     
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        if os.path.exists(self.outfile):
-            os.remove(self.outfile)
-        else:
-            self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-        if len(self.child) == 0:
-            self.logger.log("WorkloadPatch: Not app consistent backup")
-            self.error_details.append("not app consistent")
-        elif self.child[0].poll() is None:
-            self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-            self.child[0].kill()
+        if self.ipc_folder != None:
+            if os.path.exists(self.outfile):
+                os.remove(self.outfile)
+            else:
+                self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+            if len(self.child) == 0:
+                self.logger.log("WorkloadPatch: Not app consistent backup")
+                self.error_details.append("not app consistent")
+            elif self.child[0].poll() is None:
+                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                self.child[0].kill()
+        
         if 'mysql' in self.name.lower():
             if len(self.child) == 0:
                 self.logger.log("WorkloadPatch: Not app consistent backup")
