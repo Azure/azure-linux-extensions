@@ -29,6 +29,10 @@ class SizeCalculation(object):
                 customSettings = json.loads(para_parser.customSettings)
                 if("isOnlyOSDiskBackupEnabled" in customSettings.keys()):
                     self.isOnlyOSDiskBackupEnabled = customSettings["isOnlyOSDiskBackupEnabled"]
+                    if(self.isOnlyOSDiskBackupEnabled == True):
+                        Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("billingType","os disk")
+                    else:
+                        Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("billingType","none")
                 self.logger.log("isOnlyOSDiskBackupEnabled : {0}".format(str(self.isOnlyOSDiskBackupEnabled)))
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
