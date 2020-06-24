@@ -107,7 +107,7 @@ class WorkloadPatch:
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster")
             prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
-            arg = "sudo "+self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
         
@@ -115,9 +115,8 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: Waiting for sql to complete")
                 sleep(2)
             self.logger.log("WorkloadPatch: pre at server level completed")
-        
         #----SHRID CODE START----#
-        if 'oracle' in self.name.lower():
+        elif 'oracle' in self.name.lower():
             global preOracleStatus
             preOracleStatus = self.databaseStatus()
             if "OPEN" in str(preOracleStatus):
@@ -239,9 +238,7 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Create connection string for post master")
             args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
-
-        #----SHRID CODE START----#
-        if 'oracle' in self.name.lower():
+        elif 'oracle' in self.name.lower():
             postOracleStatus = self.databaseStatus()
             if postOracleStatus != preOracleStatus:
                 self.logger.log("Shrid: Error. Pre and post database status different.")
@@ -331,7 +328,7 @@ class WorkloadPatch:
     def populateErrors(self):
         if len(self.error_details) > 0:
             errdetail = self.error_details[0]
-            return errdetail.errorCode, errordetail.errorMsg
+            return errdetail
         else:
             return None
     
