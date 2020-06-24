@@ -51,6 +51,8 @@ class PatchBootSystemState(OSEncryptionState):
         self.context.logger.log("Entering patch_boot_system state")
 
         self.command_executor.Execute('mount /boot', False)
+        # Try mounting /boot/efi for UEFI image support
+        self.command_executor.Execute('mount /boot/efi', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('mkdir /oldroot/memroot', True)

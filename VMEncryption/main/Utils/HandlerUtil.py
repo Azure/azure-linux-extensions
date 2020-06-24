@@ -575,7 +575,8 @@ class HandlerUtility:
             self.log("Can't update status: " + str(e))
         if message:
             # Remove newline character so that msg is printed in one line
-            strip_msg = message.replace('\n', ' ')
+            # Replace double quotes with single quotes so that guest agent telemetry can parse it
+            strip_msg = message.replace('\n', ' ').replace('"', "'")
             self.log("Exited with message {0}".format(strip_msg))
         sys.exit(exit_code)
 

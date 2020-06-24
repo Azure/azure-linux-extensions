@@ -8,6 +8,7 @@ class MockDistroPatcher:
         self.distro_info[1] = version
         self.kernel_version = kernel
         self.mount_path = 'mount'
+        self.mkdir_path = 'mkdir'
 
 
 def mock_dir_structure(artificial_dir_structure, isdir_mock, listdir_mock, exists_mock):
