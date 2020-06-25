@@ -1,5 +1,4 @@
 import sys
-import Utils.HandlerUtil
 import threading
 import os
 from time import sleep
@@ -18,6 +17,7 @@ class logbackup:
         self.oracleParameter = {}
         self.backupSource = ""
         self.crontabLocation = "/var/spool/cron/root"
+        self.command = "/u01/app/oracle/product/19.3.0/dbhome_1/bin/sqlplus/"
         self.confParser()
         self.crontabEntry()
 
@@ -55,6 +55,9 @@ class logbackup:
                 if config.has_option("workload", 'credString'):
                     self.cred_string = config.get("workload", 'credString')
                     print("    logbackup: config workload cred_string "+ self.cred_string)
+                if config.has_option("workload", 'command'):                        
+                        self.command = config.get("workload", 'command')
+                        print("   logbackup: config workload command "+ self.command)
                 if config.has_option("workload", 'parameterFilePath'):
                     self.parameterFilePath = config.get("workload", 'parameterFilePath')
                     print("    logbackup: config logbackup parameter file path: ", self.parameterFilePath)
