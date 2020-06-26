@@ -16,12 +16,28 @@ import subprocess
 
 class SizeCalculation(object):
 
-    def __init__(self,patching,logger):
+    def __init__(self,patching,logger,para_parser):
         self.patching=patching
         self.logger=logger
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
+        self.isOnlyOSDiskBackupEnabled = False
+        try:
+            if(para_parser.customSettings != None and para_parser.customSettings != ''):
+                self.logger.log('customSettings : ' + str(para_parser.customSettings))
+                customSettings = json.loads(para_parser.customSettings)
+                if("isOnlyOSDiskBackupEnabled" in customSettings):
+                    self.isOnlyOSDiskBackupEnabled = customSettings["isOnlyOSDiskBackupEnabled"]
+                    if(self.isOnlyOSDiskBackupEnabled == True):
+                        Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("billingType","os disk")
+                    else:
+                        Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("billingType","none")
+                self.logger.log("isOnlyOSDiskBackupEnabled : {0}".format(str(self.isOnlyOSDiskBackupEnabled)))
+        except Exception as e:
+            errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
+            self.isOnlyOSDiskBackupEnabled = False
 
     def get_loop_devices(self):
         global disk_util
@@ -151,8 +167,14 @@ class SizeCalculation(object):
                     total_used_network_shares = total_used_network_shares + int(used)
 
                 else:
-                    self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                    total_used = total_used + int(used) #return in KB
+                    if(self.isOnlyOSDiskBackupEnabled == True):
+                        if(mountpoint == '/'):
+                            total_used = total_used + int(used)
+                            self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            self.logger.log("Total Used Space: {0}".format(total_used),True)
+                    else:
+                        self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                        total_used = total_used + int(used) #return in KB
                     if not (isKnownFs or fstype == '' or fstype == None):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
