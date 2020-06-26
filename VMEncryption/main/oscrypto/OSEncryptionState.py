@@ -63,7 +63,7 @@ class OSEncryptionState(object):
         if self._is_in_memfs_root():
             rootfs_mountpoint = '/oldroot'
 
-        self.rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)[0]
+        self.rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)
 
         if self.rootfs_sdx_path == "none":
             self.context.logger.log("self.rootfs_sdx_path is none, parsing UUID from fstab")
@@ -149,11 +149,10 @@ class OSEncryptionState(object):
         result = None
         dev = os.lstat(fs).st_dev
 
-        for line in open('/proc/mounts'):
-            # python2 and python3 compatible conversion to unicode (consider replacing with call to DiskUtil.get_mount_items)
-            line = [bytes(s,'utf-8').decode('unicode-escape').encode('latin1').decode('utf-8') for s in line.split()[:3]]
-            if dev == os.lstat(line[1]).st_dev:
-                result = tuple(line)
+        # search for matching mount point item
+        for mp_item in self.disk_util.get_mount_items():
+            if dev == os.lstat(mp_item["dest"]).st_dev:
+                result = mp_item["src"]
 
         return result
 
