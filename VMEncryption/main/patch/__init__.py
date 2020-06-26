@@ -19,6 +19,7 @@
 import os
 import re
 import platform
+import distro
 
 from .UbuntuPatching import UbuntuPatching
 from .debianPatching import debianPatching
@@ -34,12 +35,12 @@ def DistInfo():
         distinfo = ['FreeBSD', release]
         return distinfo
     if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=0))
+        distinfo = list(distro.linux_distribution(full_distribution_name=0))
         # remove trailing whitespace in distro name
         distinfo[0] = distinfo[0].strip()
         return distinfo
     else:
-        return platform.dist()
+        return distro.linux_distribution()
 
 def GetDistroPatcher(logger):
     """

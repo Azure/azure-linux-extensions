@@ -27,6 +27,7 @@ import base64
 import os
 import os.path
 import platform
+import distro
 import pwd
 import re
 import shutil
@@ -168,7 +169,7 @@ class AbstractDistro(object):
 
     Generic methods and attributes are kept here, distribution specific attributes
     and behavior are to be placed in the concrete child named distroDistro, where
-    distro is the string returned by calling python platform.linux_distribution()[0].
+    distro is the string returned by calling python distro.linux_distribution()[0].
     So for CentOS the derived class is called 'centosDistro'.
     """
 
@@ -2553,7 +2554,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True, use_shell=True):
             Error('CalledProcessError.  Command string was ' + cmd)
             Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
             return 1, output[0].decode('latin-1')
-    if me.returncode is not 0 and chk_err is True and log_cmd:
+    if me.returncode != 0 and chk_err is True and log_cmd:
         Error('CalledProcessError.  Error Code is ' + str(me.returncode))
         Error('CalledProcessError.  Command string was ' + cmd)
         Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
@@ -6499,7 +6500,6 @@ def GetMyDistro(dist_class_name=''):
         return None
     return globals()[dist_class_name]()  # the distro class inside this module.
 
-
 def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
         release = re.sub('\-.*\Z', '', str(platform.release()))
@@ -6507,7 +6507,7 @@ def DistInfo(fullname=0):
         return distinfo
 
     if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=fullname))
+        distinfo = list(distro.linux_distribution())
         distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
         if not distinfo[0]:
             distinfo = dist_info_SLES15()
@@ -6515,8 +6515,7 @@ def DistInfo(fullname=0):
             distinfo = dist_info_opensuse15()
         return distinfo
     else:
-        return platform.dist()
-
+        return distro.linux_distribution()
 
 def dist_info_SLES15():
     os_release_filepath = "/etc/os-release"
