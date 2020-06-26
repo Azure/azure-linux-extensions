@@ -17,6 +17,8 @@
 # limitations under the License.
 
 import os.path
+import codecs
+
 from Common import *
 try:
     import configparser #python3+
@@ -65,7 +67,8 @@ class ConfigUtil(object):
                 config.set(self.azure_crypt_config_section, str(key_value_pair.prop_name), str(key_value_pair.prop_value))
         #the configparser module write method reads and writes as text, not binary
         #open the file in text mode using 'w' for python2 and python3+ compat
-        with open(self.config_file_path, 'w') as configfile:
+        #workaround python 2 bug in configparser by using utf-8 codecs - https://bugs.python.org/issue11597
+        with codecs.open(self.config_file_path, 'w','utf-8') as configfile:
             config.write(configfile)
 
     def get_config(self, prop_name):
