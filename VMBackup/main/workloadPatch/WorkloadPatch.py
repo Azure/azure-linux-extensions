@@ -323,9 +323,9 @@ class WorkloadPatch:
                     if config.has_option("workload", 'dbnames'):
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
-                    if config.has_option("workload", 'logbackup'):
-                        self.logbackup = config.get("workload", 'logbackup')
-                        self.logger.log("WorkloadPatch: config logbackup " + self.logbackup)
+                    if config.has_section("logbackup"):
+                        self.logbackup = "enable"
+                        self.logger.log("WorkloadPatch: Logbackup Enabled")
                 else:
                     self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "no matching workload config found"))
             else:

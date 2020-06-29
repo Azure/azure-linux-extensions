@@ -10,14 +10,14 @@ import subprocess
 
 class logbackup:
     def __init__(self):
-        self.name = "oracle"
-        self.cred_string = "AzureBackup"
-        self.baseLocation = "/logbackup/"
-        self.parameterFilePath = "/u01/app/oracle/product/19.3.0/dbhome_1/dbs/initCDB1.ora"
+        self.name = ""
+        self.cred_string = ""
+        self.baseLocation = ""
+        self.parameterFilePath = ""
         self.oracleParameter = {}
         self.backupSource = ""
-        self.crontabLocation = "/var/spool/cron/root"
-        self.command = "/u01/app/oracle/product/19.3.0/dbhome_1/bin/sqlplus/"
+        self.crontabLocation = ""
+        self.command = ""
         self.confParser()
         self.crontabEntry()
 
@@ -42,11 +42,11 @@ class logbackup:
         if os.path.exists(configfile):
             config = ConfigParsers.ConfigParser()
             config.read(configfile)
-            if config.has_section("workload"):
+            if config.has_section("logbackup"):
                 print("logbackup: config section present for workload ")
                 if config.has_option("workload", 'workload_name'):                        
                     self.name = config.get("workload", 'workload_name')
-                    print("    logbackup: config workload command "+ self.name)
+                    print("    logbackup: config workload name "+ self.name)
                 else:
                     return None
                 if config.has_option("workload", 'command'):                        
@@ -55,24 +55,18 @@ class logbackup:
                 if config.has_option("workload", 'credString'):
                     self.cred_string = config.get("workload", 'credString')
                     print("    logbackup: config workload cred_string "+ self.cred_string)
-                if config.has_option("workload", 'command'):                        
-                        self.command = config.get("workload", 'command')
-                        print("   logbackup: config workload command "+ self.command)
-                if config.has_option("workload", 'parameterFilePath'):
-                    self.parameterFilePath = config.get("workload", 'parameterFilePath')
+                if config.has_option("logbackup", 'parameterFilePath'):
+                    self.parameterFilePath = config.get("logbackup", 'parameterFilePath')
                     print("    logbackup: config logbackup parameter file path: ", self.parameterFilePath)
                 else:
                     return None
-                if config.has_option("workload", 'baseLocation'):
-                    self.baseLocation = config.get("workload", 'baseLocation')
+                if config.has_option("logbackup", 'baseLocation'):
+                    self.baseLocation = config.get("logbackup", 'baseLocation')
                     print("    logbackup: config logbackup base location: ", self.baseLocation)
                 else:
                     return None
-                if config.has_option("workload", 'backupSource'):
-                    self.backupSource = config.get("workload", 'backupSource')
-                    print("    logbackup: config logbackup backup source: ", self.backupSource)
-                if config.has_option("workload", 'crontabLocation'):
-                    self.crontabLocation = config.get("workload", 'crontabLocation')
+                if config.has_option("logbackup", 'crontabLocation'):
+                    self.crontabLocation = config.get("logbackup", 'crontabLocation')
                     print("    logbackup: config logbackup crontab location: ", self.crontabLocation)
         else:
             print("No matching workload config found")
