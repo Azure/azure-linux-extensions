@@ -35,6 +35,24 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
+def is_running(is_lad):
+    """
+    This method is used to check if metrics binary is currently running on the system or not.
+    In order to check whether it needs to be restarted from the watcher daemon
+    """
+    if is_lad:
+        metrics_bin = metrics_constants.lad_metrics_extension_bin
+    else:
+        metrics_bin = metrics_constants.ama_metrics_extension_bin
+
+    proc = subprocess.Popen(["ps  aux | grep MetricsExtension | grep -v grep"], stdout=subprocess.PIPE, shell=True)
+    output = proc.communicate()[0]
+    if metrics_bin in output:
+        return True
+    else:
+        return False
+
+
 def stop_metrics_service(is_lad):
     """
     Stop the metrics service if VM is using is systemd, otherwise check if the pid_file exists,
@@ -241,7 +259,7 @@ def start_metrics(is_lad):
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
         az_resource_id, subscription_id, location, data = get_imds_values()
-    
+
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
         else:

@@ -406,6 +406,23 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
+def is_running(is_lad):
+    """
+    This method is used to check if telegraf binary is currently running on the system or not.
+    In order to check whether it needs to be restarted from the watcher daemon
+    """
+    if is_lad:
+        telegraf_bin = metrics_constants.lad_telegraf_bin
+    else:
+        telegraf_bin = metrics_constants.ama_telegraf_bin
+
+    proc = subprocess.Popen(["ps  aux | grep telegraf | grep -v grep"], stdout=subprocess.PIPE, shell=True)
+    output = proc.communicate()[0]
+    if telegraf_bin in output:
+        return True
+    else:
+        return False
+
 def stop_telegraf_service(is_lad):
     """
     Stop the telegraf service if VM is using is systemd, otherwise check if the pid_file exists,

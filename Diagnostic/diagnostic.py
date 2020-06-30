@@ -596,6 +596,9 @@ def start_mdsd(configurator):
             last_mdsd_start_time = datetime.datetime.now()
             last_error_time = last_mdsd_start_time
             omi_installed = True  # Remembers if OMI is installed at each iteration
+            telegraf_restart_retries = 0
+            me_restart_retries = 0
+            max_restart_retries = 10
             # Continuously monitors mdsd process
             while True:
                 time.sleep(30)
@@ -619,8 +622,46 @@ def start_mdsd(configurator):
                 omi_installed = restart_omi_if_crashed(omi_installed, mdsd)
                 # 3. Check if there's any new logs in mdsd.err and report
                 last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
-                # 4. Regenerate the MSI auth token required for ME if it is nearing expiration
+                # 4. Check if telegraf is running, if not, then restart
+                if not telhandler.is_running(is_lad=True):
+                    if telegraf_restart_retries < max_restart_retries:
+                        telegraf_restart_retries += 1
+                        hutil.log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
+                        if tel_out:
+                            hutil.log(tel_msg)
+                        else:
+                            hutil.error(tel_msg)
+                        start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
+                        if start_telegraf_out:
+                            hutil.log("Successfully started metrics-sourcer.")
+                        else:
+                            hutil.error(log_messages)
+                    else:
+                        hutil.error("Telegraf binary process is not running. Failed to restart after {0] retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                else:
+                    telegraf_restart_retries = 0
+                # 5. Check if ME is running, if not, then restart
                 if enable_metrics_ext:
+                    if not me_handler.is_running(is_lad=True):
+                        if me_restart_retries < max_restart_retries:
+                            me_restart_retries += 1
+                            hutil.log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
+                            if me_out:
+                                hutil.log(me_msg)
+                            else:
+                                hutil.error(me_msg)
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
+                            if start_metrics_out:
+                                hutil.log("Successfully started metrics-extension.")
+                            else:
+                                hutil.error(log_messages)
+                        else:
+                            hutil.error("MetricsExtension binary process is not running. Failed to restart after {0] retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                    else:
+                        me_restart_retries = 0
+                    # 6. Regenerate the MSI auth token required for ME if it is nearing expiration
                     # Generate/regenerate MSI Token required by ME
                     global me_msi_token_expiry_epoch
                     generate_token = False
