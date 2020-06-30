@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import threading
-from workloadPatch.WorkloadPatch import logbackup
+from workloadPatch.logbackupPatch import logbackup
 from time import sleep
 from datetime import datetime
 
@@ -30,7 +30,7 @@ def takeBackup():
     backupPath = setLocation()
 
     if 'oracle' in logbackup.name.lower():
-        backupOracle = "sqlplus -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/logbackup.sql ") + backupPath
+        backupOracle = logbackup.command + " -s / as sysdba @" +  "/var/lib/waagent/Microsoft.Azure.RecoveryServices.VMSnapshotLinux-1.0.9164.0/main/workloadPatch/scripts/logbackup.sql " + backupPath
         argsForControlFile = ["su", "-", logbackup.cred_string, "-c", backupOracle]
         snapshotControlFile = subprocess.Popen(argsForControlFile)
         while snapshotControlFile.poll()==None:
