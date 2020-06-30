@@ -146,7 +146,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif device == '/dev/sdb1' and self.isOnlyOSDiskBackupEnabled == False :
+                elif device == '/dev/sdb1' and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used)
 
