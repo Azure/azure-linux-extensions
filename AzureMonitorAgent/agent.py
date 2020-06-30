@@ -221,7 +221,7 @@ def install():
                                          final_check = final_check_if_dpkg_locked)    
     
     default_configs = {        
-        "MCS_ENDPOINT" : "amcs.control.monitor.azure.com",
+        "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
