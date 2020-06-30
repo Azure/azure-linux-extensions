@@ -23,6 +23,7 @@ import subprocess
 import signal
 import urllib2
 from shutil import copyfile
+import time
 import metrics_ext_utils.metrics_constants as metrics_constants
 
 
@@ -441,10 +442,10 @@ def stop_telegraf_service(is_lad):
                 pid = f.read()
             if pid != "":
                 # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
-                proc = subprocess.Popen(["ps -o cmd= {}".format(pid)], stdout=subprocess.PIPE, shell=True)
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
                 if telegraf_bin in output:
-                    os.kill(pid, signal.SIGKILL)
+                    os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
             else:
@@ -564,7 +565,7 @@ def start_telegraf(is_lad):
 
             # Write this pid to a file for future use
             with open(telegraf_pid_path, "w+") as f:
-                f.write(telegraf_pid)
+                f.write(str(telegraf_pid))
         else:
             out, err = proc.communicate()
             log_messages += "Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err)

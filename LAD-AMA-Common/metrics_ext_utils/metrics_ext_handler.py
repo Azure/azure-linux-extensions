@@ -23,7 +23,9 @@ from shutil import copyfile
 import stat
 import filecmp
 import metrics_ext_utils.metrics_constants as metrics_constants
+import subprocess
 import time
+import signal
 
 def is_systemd():
     """
@@ -62,7 +64,7 @@ def stop_metrics_service(is_lad):
         #This VM does not have systemd, So we will use the pid from the last ran metrics process and terminate it
         _, configFolder = get_handler_vars()
         metrics_conf_dir = configFolder + "/metrics_configs/"
-        metrics_pid_path = me_config_dir + "metrics_pid.txt"
+        metrics_pid_path = metrics_conf_dir + "metrics_pid.txt"
 
         if os.path.isfile(metrics_pid_path):
             pid = ""
@@ -70,10 +72,10 @@ def stop_metrics_service(is_lad):
                 pid = f.read()
             if pid != "":
                 # Check if the process running is indeed MetricsExtension, ignore if the process output doesn't contain MetricsExtension
-                proc = subprocess.Popen(["ps -o cmd= {}".format(pid)], stdout=subprocess.PIPE, shell=True)
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
                 if metrics_ext_bin in output:
-                    os.kill(pid, signal.SIGKILL)
+                    os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop MetricsExtension.".format(pid)
             else:
@@ -242,7 +244,7 @@ def start_metrics(is_lad):
         monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3}".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
@@ -252,7 +254,7 @@ def start_metrics(is_lad):
 
             #write this pid to a file for future use
             with open(metrics_pid_path, "w+") as f:
-                f.write(metrics_pid)
+                f.write(str(metrics_pid))
         else:
             out, err = proc.communicate()
             log_messages += "Unable to run MetricsExtension binary as a process due to error - {0}. Failed to start MetricsExtension.".format(err)
@@ -486,6 +488,12 @@ def setup_me(is_lad):
         metrics_ext_bin = metrics_constants.lad_metrics_extension_bin
     else:
         metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
+
+    if is_lad:
+        lad_bin_path = "/usr/local/lad/bin/"
+        # Checking if directory exists before copying ME bin over to /usr/local/lad/bin/
+        if not os.path.exists(lad_bin_path):
+            os.makedirs(lad_bin_path)
 
     # Check if previous file exist at the location, compare the two binaries,
     # If the files are not same, remove the older file, and copy the new one
