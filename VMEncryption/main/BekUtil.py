@@ -46,10 +46,7 @@ class BekUtil(object):
             return passphrase_generated
 
     def store_bek_passphrase(self, encryption_config, passphrase):
-
-        # convert filename to string for consistency across python2 python3+
-        bek_filename = str(encryption_config.get_bek_filename().encode('utf-8'))
-
+        bek_filename = encryption_config.get_bek_filename()
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()
@@ -74,9 +71,7 @@ class BekUtil(object):
         """
         Returns the LinuxPassPhraseFileName path
         """
-
         bek_filename = encryption_config.get_bek_filename()
-
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()

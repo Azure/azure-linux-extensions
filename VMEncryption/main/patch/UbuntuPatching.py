@@ -82,17 +82,20 @@ class UbuntuPatching(AbstractPatching):
 
 
     def install_extras(self):
-        """
-        install the sg_dd because the default dd does not support sparse write
-        """
         cmd = " ".join(['apt-get', 'update'])
         self.command_executor.Execute(cmd)
 
+        # select the appropriate version specific parted package
+        if (sys.version_info >= (3,)):
+            parted = 'python3-parted'
+        else:
+            parted = 'python-parted'
+
+        # construct package installation list
         packages = ['at',
                     'cryptsetup-bin',
                     'lsscsi',
-                    'python3-parted',
-                    'python-parted',
+                    parted,
                     'python-six',
                     'procps',
                     'psmisc']
