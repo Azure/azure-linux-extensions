@@ -638,7 +638,7 @@ def start_mdsd(configurator):
                         else:
                             hutil.error(log_messages)
                     else:
-                        hutil.error("Telegraf binary process is not running. Failed to restart after {0] retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                        hutil.error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
                 else:
                     telegraf_restart_retries = 0
                 # 5. Check if ME is running, if not, then restart
@@ -658,7 +658,7 @@ def start_mdsd(configurator):
                             else:
                                 hutil.error(log_messages)
                         else:
-                            hutil.error("MetricsExtension binary process is not running. Failed to restart after {0] retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                            hutil.error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
                     else:
                         me_restart_retries = 0
                     # 6. Regenerate the MSI auth token required for ME if it is nearing expiration
