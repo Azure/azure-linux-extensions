@@ -416,32 +416,34 @@ def update():
     return 0, ""
 
 def stop_metrics_process():
+    
+    if telhandler.is_running(is_lad=False):
+        #Stop the telegraf and ME services
+        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+        if tel_out:
+            HUtilObject.log(tel_msg)
+        else:
+            HUtilObject.error(tel_msg)
+        
+        #Delete the telegraf and ME services
+        tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+        if tel_rm_out:
+            HUtilObject.log(tel_rm_msg)
+        else:
+            HUtilObject.error(tel_rm_msg)
+    
+    if me_handler.is_running(is_lad=False):
+        me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+        if me_out:
+            HUtilObject.log(me_msg)
+        else:
+            HUtilObject.error(me_msg)
 
-    #Stop the telegraf and ME services
-    tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
-    if tel_out:
-        HUtilObject.log(tel_msg)
-    else:
-        HUtilObject.error(tel_msg)
-
-    me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-    if me_out:
-        HUtilObject.log(me_msg)
-    else:
-        HUtilObject.error(me_msg)
-
-    #Delete the telegraf and ME services
-    tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
-    if tel_rm_out:
-        HUtilObject.log(tel_rm_msg)
-    else:
-        HUtilObject.error(tel_rm_msg)
-
-    me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
-    if me_rm_out:
-        HUtilObject.log(me_rm_msg)
-    else:
-        HUtilObject.error(me_rm_msg)
+        me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+        if me_rm_out:
+            HUtilObject.log(me_rm_msg)
+        else:
+            HUtilObject.error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
@@ -570,6 +572,51 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         last_crc = crc
 
+                    telegraf_restart_retries = 0
+                    me_restart_retries = 0
+                    max_restart_retries = 10
+
+                    # Check if telegraf is running, if not, then restart
+                    if not telhandler.is_running(is_lad=False):
+                        if telegraf_restart_retries < max_restart_retries:
+                            telegraf_restart_retries += 1
+                            hutil_log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+                            if tel_out:
+                                hutil_log(tel_msg)
+                            else:
+                                hutil_error(tel_msg)
+                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_out:
+                                hutil_log("Successfully started metrics-sourcer.")
+                            else:
+                                hutil_error(log_messages)
+                        else:
+                            hutil_error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log".format(max_restart_retries))
+                    else:
+                        telegraf_restart_retries = 0
+
+                    # Check if ME is running, if not, then restart
+                    if not me_handler.is_running(is_lad=False):
+                        if me_restart_retries < max_restart_retries:
+                            me_restart_retries += 1
+                            hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                            me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                            if me_out:
+                                hutil_log(me_msg)
+                            else:
+                                hutil_error(me_msg)                  
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+
+                            if start_metrics_out:
+                                hutil_log("Successfully started metrics-extension.")
+                            else:
+                                hutil_error(log_messages)
+                        else:
+                            hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                    else:
+                        me_restart_retries = 0   
+        
         except IOError as e:
             hutil_error('I/O error in monitoring metrics. Exception={0}'.format(e))
 
