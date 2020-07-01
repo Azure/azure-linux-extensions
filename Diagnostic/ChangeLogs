@@ -1,3 +1,17 @@
+2020-07-01: LAD-3.0.129
+    - Fix issue #499 : Need a better error message if LAD protectedSettings is missing
+    - Fix issue #944 : Allow installing LAD without storage account sink
+
+2020-01-30: LAD-3.0.127
+    - Fix issue #996: Remove fluent-gem-plugin from LAD
+    - Fix issue #994: Move LAD's out_mdsd buffer path to own directory
+    - Fix issue #948: Failed to launch mdsd with error: cannot concatenate 'str' and 'int' objects
+    - Fix issue #978: LAD is limited to upload 2 events per second to EventHubs
+
+2019-10-24: LAD-3.0.125
+    - Reinstall OMI if it is failing to start as recovery action
+    - VM extension config update needs to regenerate the config artifacts
+
 2019-08-14: LAD-3.0.123
     - Fix a race condition in install. The dependencies were installed during "enable" step; which is not idempotent.
 
