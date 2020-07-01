@@ -613,7 +613,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(log_messages)
                         else:
-                            hutil_error("MetricsExtension binary process is not running. Failed to restart after {0] retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                            hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
                     else:
                         me_restart_retries = 0   
         
