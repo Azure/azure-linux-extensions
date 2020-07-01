@@ -592,7 +592,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(log_messages)
                         else:
-                            hutil_error("Telegraf binary process is not running. Failed to restart after {0] retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                            hutil_error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log".format(max_restart_retries))
                     else:
                         telegraf_restart_retries = 0
 
