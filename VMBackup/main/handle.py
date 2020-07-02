@@ -395,7 +395,7 @@ def daemon():
                 
                 workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
                 
-                if workload_patch.name != "":
+                if workload_patch.name != None:
                     backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
                     workload_patch.pre()
                     if len(workload_patch.error_details) > 0:

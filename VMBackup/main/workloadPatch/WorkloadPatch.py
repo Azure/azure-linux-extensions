@@ -37,13 +37,13 @@ class ErrorDetail:
 class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
-        self.name = "oracle"
-        self.command = "sqlplus"
+        self.name = None
+        self.command = ""
         self.dbnames = []
         self.cred_string = ""
         self.ipc_folder = None
         self.error_details = []
-        self.enforce_slave_only = False
+        self.enforce_slave_only = 0
         self.role = "master"
         self.child = []
         self.timeout = 90
@@ -54,7 +54,6 @@ class WorkloadPatch:
     def pre(self):
         try:
             self.logger.log("WorkloadPatch: Entering workload pre call")
-            print("WorkloadPatch: Entering workload pre call")
             if self.role == "master" and int(self.enforce_slave_only) == 0:
                 if len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
@@ -70,15 +69,14 @@ class WorkloadPatch:
                     self.preSlaveDB()
                 # create fork process for child
             else:
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPatchInvalidRole, "invalid role name in config"))
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidRole, "invalid role name in config"))
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in pre" + str(e))
-            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "Exception in pre"))
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Exception in pre"))
 
     def post(self):
         try:
             self.logger.log("WorkloadPatch: Entering workload post call")
-            print("WorkloadPatch: Entering workload post call")
             if self.role == "master":
                 if len(self.dbnames) == 0:
                     #post at server level to turn off readonly mode
@@ -92,44 +90,40 @@ class WorkloadPatch:
                 else:
                     self.postSlaveDB()
             else:
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPatchInvalidRole, "invalid role name in config"))
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidRole, "invalid role name in config"))
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in post" + str(e))
-            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in processing of postscript"))
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "exception in processing of postscript"))
 
     def preMaster(self):
         self.logger.log("WorkloadPatch: Entering pre mode for master")
         if self.ipc_folder != None:
-            self.outfile = os.path.join(self.ipc_folder, "azbackupserver.txt")
+            self.outfile = os.path.join(self.ipc_folder, "azbackupIPC.txt")
             if os.path.exists(self.outfile):
                 os.remove(self.outfile)
             else:
                 self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
         
         if 'mysql' in self.name.lower():
-            self.logger.log("WorkloadPatch: Create connection string for premaster")
+            self.logger.log("WorkloadPatch: Create connection string for premaster mysql")
+            if self.outfile == "":
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
+                return None
             prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
             arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
-        
-            while os.path.exists(self.outfile) == False:
-                self.logger.log("WorkloadPatch: Waiting for sql to complete")
-                sleep(2)
-            self.logger.log("WorkloadPatch: pre at server level completed")
-        #----SHRID CODE START----#
+            WaitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             global preOracleStatus
             preOracleStatus = self.databaseStatus()
             if "OPEN" in str(preOracleStatus):
                 self.logger.log("WorkloadPatch: Pre- Database is open")
-                print("WorkloadPatch: Pre- Database is open")
             else:
-                self.logger.log("WorkloadPatch: Pre- Database not open. Backup may proceed without pre and post")
-                print("WorkloadPatch: Pre- Database not open. Backup may proceed without pre and post")
+                self.logger.log("WorkloadPatch: Pre- Database not open.")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Database not open"))
                 return None
 
-            print("WorkloadPatch: Pre- Inside oracle pre")
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", preOracle]
@@ -138,88 +132,10 @@ class WorkloadPatch:
                 sleep(1)
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
-            print("WorkloadPatch: Pre- Exiting pre mode for master")
-        #----SHRID CODE END----#
-
-    #----SHRID CODE START----#
-    def timeoutDaemon(self):
-        global preDaemonThread
-        if 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
-            print("WorkloadPatch: Inside oracle condition in timeout daemon")
-            preDaemonOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
-            argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
-            preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
-            preDaemonThread.start()
-        self.logger.log("WorkloadPatch: timeoutDaemon started for: " + self.timeout + " seconds")
-        print("WorkloadPatch: timeoutDaemon started for: ", self.timeout, " seconds")
-    #----SHRID CODE END----#
-
-    #----SHRID CODE START----#
-    def threadForTimeoutDaemon(self, args): 
-            global daemonProcess
-            daemonProcess = subprocess.Popen(args)
-            self.logger.log("WorkloadPatch: daemonProcess started")
-            print("WorkloadPatch: daemonProcess started")
-            while daemonProcess.poll() == None:
-                sleep(1)
-            self.logger.log("WorkloadPatch: daemonProcess completed")
-            print("WorkloadPatch: daemonProcess completed")
-    #----SHRID CODE END----#
-
-    #---- SHRID CODE START----#
-    def databaseStatus(self):
-
-        if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.cred_string + " -c " + "'" + self.command +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
-            oracleStatus = subprocess.check_output(statusArgs, shell=True)
-            self.logger.log("WorkloadPatch: databaseStatus- " + str(oracleStatus))
-            print("WorkloadPatch: databaseStatus- ", str(oracleStatus))
-            return oracleStatus
-
-        return False
-    #----SHRID CODE END----#
-
-    def thread_for_sql(self,args):
-        self.logger.log("command to execute: "+str(args))
-        self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE))
-        while len(self.child) == 0:
-            self.logger.log("child not created yet", True)
-            sleep(1)
-        self.logger.log("sql subprocess Created",True)
-        self.logger.log("sql subprocess Created "+str(self.child[0].pid)) 
-        sleep(1)
-
-
-    def preMasterDB(self):
-        for dbname in self.dbnames:
-            if 'mysql' in self.name.lower():#TODO DB level
-                args = "sudo "+self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
-                binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
-                binary_thread.start()
-        
-    def preSlave(self):
-        self.logger.log("WorkloadPatch: Entering post mode for master")
-        if self.ipc_folder != None:
-            if os.path.exists(self.outfile):
-                os.remove(self.outfile)
-            else:
-                self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-            if len(self.child) == 0:
-                self.logger.log("WorkloadPatch: Not app consistent backup")
-                self.error_details.append("not app consistent")
-            elif self.child[0].poll() is None:
-                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                self.child[0].kill()
-        
-        if 'mysql' in self.name.lower():
-            self.logger.log("WorkloadPatch: Create connection string for post master")
-            args = "sudo "+self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlSlave.sql"
-            post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
-
-    def preSlaveDB(self):
-        pass
-    
+        else:
+            self.logger.log("WorkloadPatch: Unsupported workload name")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
+            
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
         if self.ipc_folder != None:
@@ -248,26 +164,18 @@ class WorkloadPatch:
             postOracleStatus = self.databaseStatus()
             if postOracleStatus != preOracleStatus:
                 self.logger.log("WorkloadPatch: Error. Pre and post database status different.")
-                print("WorkloadPatch: Error. Pre and post database status different.")
             if "OPEN" in str(postOracleStatus):
                 self.logger.log("WorkloadPatch: Post- Database is open")
-                print("WorkloadPatch: Post- Database is open")
             else:
                 self.logger.log("WorkloadPatch: Post- Database not open. Backup may proceed without pre and post")
-                print("WorkloadPatch: Post- Database not open. Backup may proceed without pre and post")
                 return
-
-            self.logger.log("Shird: Post- Inside oracle post")
-            print("Shird: Post- Inside oracle post")
+            self.logger.log("WorkloadPatch: Post- Inside oracle post")
             if preDaemonThread.isAlive():
-                self.logger.log("Shird: Post- Timeout daemon still in sleep")
-                print("Shird: Post- Timeout daemon still in sleep")
+                self.logger.log("WorkloadPatch: Post- Timeout daemon still in sleep")
                 self.logger.log("WorkloadPatch: Post- Initiating Post Script")
-                print("WorkloadPatch: Post- Initiating Post Script")
                 daemonProcess.terminate()
             else:
                 self.logger.log("WorkloadPatch: Post error- Timeout daemon executed before post")
-                print("WorkloadPatch: Post error- Timeout daemon executed before post")
                 return
             postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", postOracle]
@@ -275,9 +183,120 @@ class WorkloadPatch:
             while process.poll()==None:
                 sleep(1)
             self.logger.log("WorkloadPatch: Post- Completed")
-            print("WorkloadPatch: Post- Completed")
             self.callLogbackup()
-        #----SHRID CODE END----#
+        else:
+            self.logger.log("WorkloadPatch: Unsupported workload name")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
+
+
+    def WaitForPreScriptCompletion(self):
+        if self.ipc_folder != None:
+            wait_counter = 5 
+            while len(self.child) == 0 and wait_counter > 0:
+                self.logger.log("child not created yet", True)
+                wait_counter--
+                sleep(2)
+            if wait_counter > 0:
+                self.logger.log("sql subprocess Created",True)
+                self.logger.log("sql subprocess Created "+str(self.child[0].pid))
+            else:
+                self.logger.log("sql connection failed")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
+                return None
+            wait_counter = 60
+            while os.path.exists(self.outfile) == False and wait_counter > 0:
+                self.logger.log("WorkloadPatch: Waiting for sql to complete")
+                wait_counter--
+                sleep(2)
+            if wait_counter > 0:
+                self.logger.log("WorkloadPatch: pre at server level completed")
+            else:
+                self.logger.log("WorkloadPatch: pre failed to quiesce")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingError, "pre failed to quiesce"))
+                return None
+        
+    def timeoutDaemon(self):
+        global preDaemonThread
+        if 'oracle' in self.name.lower():
+            self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
+            preDaemonOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
+            argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
+            preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
+            preDaemonThread.start()
+        self.logger.log("WorkloadPatch: timeoutDaemon started for: " + self.timeout + " seconds")
+
+    def threadForTimeoutDaemon(self, args): 
+            global daemonProcess
+            daemonProcess = subprocess.Popen(args)
+            self.logger.log("WorkloadPatch: daemonProcess started")
+            while daemonProcess.poll() == None:
+                sleep(1)
+            self.logger.log("WorkloadPatch: daemonProcess completed")
+
+    def databaseStatus(self):
+        if 'oracle' in self.name.lower():
+            statusArgs =  "su - " + self.cred_string + " -c " + "'" + self.command +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            oracleStatus = subprocess.check_output(statusArgs, shell=True)
+            self.logger.log("WorkloadPatch: databaseStatus- " + str(oracleStatus))
+            return oracleStatus
+        return ""
+
+    def thread_for_sql(self,args):
+        self.logger.log("command to execute: "+str(args))
+        self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE))
+        sleep(1)
+
+
+    def preMasterDB(self):
+        for dbname in self.dbnames:
+            if 'mysql' in self.name.lower():#TODO DB level
+                args = "sudo "+self.command+self.name+" --login-path="+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile="+self.outfile+";source main/workloadPatch/scripts/preMysqlMaster.sql;\""
+                binary_thread = threading.Thread(target=self.thread_for_sql, args=[args])
+                binary_thread.start()
+        
+    def preSlave(self):
+        self.logger.log("WorkloadPatch: Entering pre mode for sloave")
+        if self.ipc_folder != None:
+            self.outfile = os.path.join(self.ipc_folder, "azbackupIPC.txt")
+            if os.path.exists(self.outfile):
+                os.remove(self.outfile)
+            else:
+                self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+        
+        if 'mysql' in self.name.lower():
+            self.logger.log("WorkloadPatch: Create connection string for preslave mysql")
+            if self.outfile == "":
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
+                return None
+            prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlSlave.sql")
+            arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
+            binary_thread.start()
+            WaitForPreScriptCompletion()
+        elif 'oracle' in self.name.lower():
+            global preOracleStatus
+            preOracleStatus = self.databaseStatus()
+            if "OPEN" in str(preOracleStatus):
+                self.logger.log("WorkloadPatch: Pre- Database is open")
+            else:
+                self.logger.log("WorkloadPatch: Pre- Database not open.")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Database not open"))
+                return None
+
+            self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
+            preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            args = ["su", "-", self.cred_string, "-c", preOracle]
+            process = subprocess.Popen(args)
+            while process.poll() == None:
+                sleep(1)
+            self.timeoutDaemon()
+            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for slave")
+        else:
+            self.logger.log("WorkloadPatch: Unsupported workload name")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
+       
+    def preSlaveDB(self):
+        pass
 
     def postMasterDB(self):
         pass
@@ -302,12 +321,14 @@ class WorkloadPatch:
                         self.logger.log("WorkloadPatch: config workload command "+ self.name)
                     else:
                         return None
-                    if config.has_option("workload", 'command'):                        
-                        self.command = config.get("workload", 'command')
+                    if config.has_option("workload", 'command_path'):                        
+                        self.command = config.get("workload", 'command_path')
                         self.logger.log("WorkloadPatch: config workload command "+ self.command)
                     if config.has_option("workload", 'credString'):
                         self.cred_string = config.get("workload", 'credString')
                         self.logger.log("WorkloadPatch: config workload cred_string "+ self.cred_string)
+                    else:
+                        self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadAuthorizationMissing, "Cred string missing"))
                     if config.has_option("workload", 'role'):
                         self.role = config.get("workload", 'role')
                         self.logger.log("WorkloadPatch: config workload role "+ self.role)
@@ -327,13 +348,13 @@ class WorkloadPatch:
                         self.logbackup = "enable"
                         self.logger.log("WorkloadPatch: Logbackup Enabled")
                 else:
-                    self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "no matching workload config found"))
+                    self.logger.log("workload config section missing. File system consistent backup")
             else:
-                self.logger.log("workload config missing",True)
-                self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "workload config missing"))
+                self.logger.log("workload config file missing. File system consistent backup")
         except Exception as e:
-            self.logger.log
-            self.error_details.append(ErrorDetail(CommonVariables.FailedPreWorkloadPatch, "exception in workloadconfig parsing"))
+            self.logger.log("exception in workload conf file parsing")
+            if(self.name != None):
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConfParsingError, "exception in workloadconfig parsing"))
     
     def populateErrors(self):
         if len(self.error_details) > 0:
@@ -348,7 +369,6 @@ class WorkloadPatch:
     def callLogbackup(self):
         if 'enable' in self.logbackup.lower():
             self.logger.log("WorkloadPatch: Initializing logbackup")
-            print("WorkloadPatch: Initializing logbackup")
             logbackupObject = logbackup()
         else:
             return
