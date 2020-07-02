@@ -416,34 +416,34 @@ def update():
     return 0, ""
 
 def stop_metrics_process():
-    
-    if telhandler.is_running(is_lad=False):
-        #Stop the telegraf and ME services
-        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
-        if tel_out:
-            HUtilObject.log(tel_msg)
-        else:
-            HUtilObject.error(tel_msg)
-        
-        #Delete the telegraf and ME services
-        tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
-        if tel_rm_out:
-            HUtilObject.log(tel_rm_msg)
-        else:
-            HUtilObject.error(tel_rm_msg)
-    
-    if me_handler.is_running(is_lad=False):
-        me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-        if me_out:
-            HUtilObject.log(me_msg)
-        else:
-            HUtilObject.error(me_msg)
+    if os.path.isfile(MdsdCounterJsonPath):
+        if telhandler.is_running(is_lad=False):
+            #Stop the telegraf and ME services
+            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+            if tel_out:
+                HUtilObject.log(tel_msg)
+            else:
+                HUtilObject.error(tel_msg)
 
-        me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
-        if me_rm_out:
-            HUtilObject.log(me_rm_msg)
-        else:
-            HUtilObject.error(me_rm_msg)
+            #Delete the telegraf and ME services
+            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+            if tel_rm_out:
+                HUtilObject.log(tel_rm_msg)
+            else:
+                HUtilObject.error(tel_rm_msg)
+
+        if me_handler.is_running(is_lad=False):
+            me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+            if me_out:
+                HUtilObject.log(me_msg)
+            else:
+                HUtilObject.error(me_msg)
+
+            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+            if me_rm_out:
+                HUtilObject.log(me_rm_msg)
+            else:
+                HUtilObject.error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
