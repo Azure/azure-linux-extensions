@@ -27,7 +27,6 @@ import base64
 import os
 import os.path
 import platform
-import distro
 import pwd
 import re
 import shutil
@@ -54,6 +53,11 @@ try:
     from urllib.parse import urlparse #python3+
 except ImportError:
     from urlparse import urlparse #python2
+
+try:
+    import distro # python3.8+
+except:
+    pass
 
 try:
     import http.client as httpclient #python3+
@@ -6500,6 +6504,17 @@ def GetMyDistro(dist_class_name=''):
         return None
     return globals()[dist_class_name]()  # the distro class inside this module.
 
+def get_linux_distribution():
+    """Abstract platform.linux_distribution() call which is deprecated as of
+       Python 3.5 and removed in Python 3.7"""
+
+    try:
+        osinfo = list(platform.linux_distribution())
+    except AttributeError:
+        osinfo = list(distro.linux_distribution())
+
+    return osinfo
+
 def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
         release = re.sub('\-.*\Z', '', str(platform.release()))
@@ -6507,7 +6522,7 @@ def DistInfo(fullname=0):
         return distinfo
 
     if 'linux_distribution' in dir(platform):
-        distinfo = list(distro.linux_distribution())
+        distinfo = list(get_linux_distribution())
         distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
         if not distinfo[0]:
             distinfo = dist_info_SLES15()
@@ -6515,7 +6530,7 @@ def DistInfo(fullname=0):
             distinfo = dist_info_opensuse15()
         return distinfo
     else:
-        return distro.linux_distribution()
+        return get_linux_distribution()
 
 def dist_info_SLES15():
     os_release_filepath = "/etc/os-release"
