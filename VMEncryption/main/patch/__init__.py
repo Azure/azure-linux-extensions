@@ -19,6 +19,7 @@
 import os
 import re
 import platform
+import distro
 
 from .UbuntuPatching import UbuntuPatching
 from .debianPatching import debianPatching
