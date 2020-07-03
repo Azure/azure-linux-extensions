@@ -508,41 +508,41 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            generate_token = False
-            me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
-
-            if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
-                if os.path.isfile(me_token_path):
-                    with open(me_token_path, "r") as f:
-                        authtoken_content = f.read()
-                        if authtoken_content and "expires_on" in authtoken_content:
-                            me_msi_token_expiry_epoch = authtoken_content["expires_on"]
-                        else:
-                            generate_token = True
-                else:
-                    generate_token = True
-            
-            if me_msi_token_expiry_epoch:                
-                currentTime = datetime.datetime.now()
-                token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
-                if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
-                    # The MSI Token will expire within 30 minutes. We need to refresh the token
-                    generate_token = True
-
-            if generate_token:
-                generate_token = False
-                msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
-                if msi_token_generated:
-                    hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
-                else:
-                    hutil_error(log_messages)
-
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
                 
-                if (data != ''):
-                    crc = hashlib.sha256(data).hexdigest()
+                if (data != ''):                    
+                    crc = hashlib.sha256(data).hexdigest()                    
+                    generate_token = False
+                    me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
+
+                    if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
+                        if os.path.isfile(me_token_path):
+                            with open(me_token_path, "r") as f:
+                                authtoken_content = f.read()
+                                if authtoken_content and "expires_on" in authtoken_content:
+                                    me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                else:
+                                    generate_token = True
+                        else:
+                            generate_token = True
+
+                    if me_msi_token_expiry_epoch:                
+                        currentTime = datetime.datetime.now()
+                        token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
+                        if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                            # The MSI Token will expire within 30 minutes. We need to refresh the token
+                            generate_token = True
+
+                    if generate_token:
+                        generate_token = False
+                        msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                        if msi_token_generated:
+                            hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
+                        else:
+                            hutil_error(log_messages)
+                    
                     if(crc != last_crc):
                         hutil_log("Start processing metric configuration")
                         hutil_log(data)
