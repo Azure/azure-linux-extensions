@@ -27,7 +27,7 @@ except ImportError:
     import configparser as ConfigParsers
 import subprocess
 from common import CommonVariables
-from workloadPatch.logbackupPatch import logbackup
+from workloadPatch.LogBackupPatch import LogBackupPatch
 
 class ErrorDetail:
     def __init__(self, errorCode, errorMsg):
@@ -183,7 +183,7 @@ class WorkloadPatch:
             while process.poll()==None:
                 sleep(1)
             self.logger.log("WorkloadPatch: Post- Completed")
-            self.callLogbackup()
+            self.callLogBackup()
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
@@ -194,7 +194,7 @@ class WorkloadPatch:
             wait_counter = 5 
             while len(self.child) == 0 and wait_counter > 0:
                 self.logger.log("child not created yet", True)
-                wait_counter--
+                wait_counter -= 1
                 sleep(2)
             if wait_counter > 0:
                 self.logger.log("sql subprocess Created",True)
@@ -206,7 +206,7 @@ class WorkloadPatch:
             wait_counter = 60
             while os.path.exists(self.outfile) == False and wait_counter > 0:
                 self.logger.log("WorkloadPatch: Waiting for sql to complete")
-                wait_counter--
+                wait_counter -= 1
                 sleep(2)
             if wait_counter > 0:
                 self.logger.log("WorkloadPatch: pre at server level completed")
@@ -366,9 +366,9 @@ class WorkloadPatch:
     def getRole(self):
         return "master"
     
-    def callLogbackup(self):
+    def callLogBackup(self):
         if 'enable' in self.logbackup.lower():
             self.logger.log("WorkloadPatch: Initializing logbackup")
-            logbackupObject = logbackup()
+            logbackupObject = LogBackupPatch()
         else:
             return

@@ -3,10 +3,12 @@ import re
 import sys
 import subprocess
 import threading
-from workloadPatch.logbackupPatch import logbackup
+from workloadPatch.LogbackupPatch import LogBackupPatch
 from time import sleep
 from datetime import datetime
 
+# Example of Parameter File Content:
+# *.db_name='CDB1'
 def parameterFileParser():
     regX = re.compile(r"\*\..+=.+")
     parameterFile = open(logbackup.parameterFilePath, 'r')
@@ -43,6 +45,11 @@ def takeBackup():
 
     print("logbackup: Backup Complete")
 
-logbackup = logbackup()
-parameterFileParser()
-takeBackup()
+def main():
+    global logbackup
+    logbackup = LogBackupPatch()
+    parameterFileParser()
+    takeBackup()
+
+if __name__ == "__main__":
+    main()
