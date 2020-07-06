@@ -19,6 +19,9 @@
 # Diagnostics (LAD) Extension
 /Diagnostic/ @Azure/geneva-linux-agents
 
+# Utils for LAD/AMA metrics
+/LAD-AMA-Common/ @Azure/geneva-linux-agents
+
 # DSCForLinux Extension
 /DSC/ @nitinbps @kwirkykat
 
