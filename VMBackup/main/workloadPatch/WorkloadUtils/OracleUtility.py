@@ -36,20 +36,16 @@ class OracleUtility:
     def containerName(self):
         containerNameArgs =  "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nSHOW CON_NAME;\nEOF'"
         oracleContainerName = subprocess.check_output(containerNameArgs, shell=True)
-        self.logger.log("Shrid: containerName- " + str(oracleContainerName))
-        print("Shrid: containerName- ", str(oracleContainerName))
+        self.logger.log("OracleUtility: containerName- " + str(oracleContainerName))
         
         if "CDB$ROOT" in str(oracleContainerName):
-            self.logger.log("Shrid: containerName- In CDB$ROOT")
-            print("Shrid: containerName- In CDB$ROOT")
+            self.logger.log("OracleUtility: containerName- In CDB$ROOT")
             return True
         else:
-            self.logger.log("Shrid: Pre- Error. Not in CDB$ROOT")
-            print("Shrid: Pre- Error. Not in CDB$ROOT")
+            self.logger.log("OracleUtility: Pre- Error. Not in CDB$ROOT")
             changeContainerArgs = "su - " + self.cred_string + " -c " + "'sqlplus -s / as sysdba<<-EOF\nALTER SESSION SET CONTAINER=CDB$ROOT;\nEOF'"
             oracleChangeContainer = subprocess.check_output(changeContainerArgs, shell=True)
-            self.logger.log("Shrid: containerName- " + str(oracleChangeContainer))
-            print("Shrid: containerName- ", str(oracleChangeContainer))
+            self.logger.log("OracleUtility: containerName- " + str(oracleChangeContainer))
             if "Session altered." in str(oracleChangeContainer):
                 return True
             else:

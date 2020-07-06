@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+#
+# VM Backup extension
+#
+# Copyright 2014 Microsoft Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 import threading
 import os
@@ -8,7 +26,7 @@ except ImportError:
     import configparser as ConfigParsers
 import subprocess
 
-class logbackup:
+class LogBackupPatch:
     def __init__(self):
         self.name = ""
         self.cred_string = ""
@@ -29,12 +47,10 @@ class logbackup:
             crontabCheck = "NO CRONTAB"
 
         if 'oracle' in self.name.lower():
-            if 'logbackup' in str(crontabCheck):
-                print("logbackup: Existing Crontab Entry: ", str(crontabCheck))
+            if 'OracleLogBackup' in str(crontabCheck):
                 return
             else:
-                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/logbackup.py\"") + " >> /var/spool/cron/root")
-                print("logbackup: New Crontab Entry Made")
+                os.system("echo \"*/15 * * * * python " + os.path.join(os.getcwd(), "main/workloadPatch/WorkloadUtils/OracleLogBackup.py\"") + " >> /var/spool/cron/root")
                 return
     
     def confParser(self):
@@ -43,30 +59,23 @@ class logbackup:
             config = ConfigParsers.ConfigParser()
             config.read(configfile)
             if config.has_section("logbackup"):
-                print("logbackup: config section present for workload ")
                 if config.has_option("workload", 'workload_name'):                        
                     self.name = config.get("workload", 'workload_name')
-                    print("    logbackup: config workload name "+ self.name)
                 else:
                     return None
                 if config.has_option("workload", 'command'):                        
                     self.command = config.get("workload", 'command')
-                    print("    logbackup: config workload command "+ self.command)
                 if config.has_option("workload", 'credString'):
                     self.cred_string = config.get("workload", 'credString')
-                    print("    logbackup: config workload cred_string "+ self.cred_string)
                 if config.has_option("logbackup", 'parameterFilePath'):
                     self.parameterFilePath = config.get("logbackup", 'parameterFilePath')
-                    print("    logbackup: config logbackup parameter file path: ", self.parameterFilePath)
                 else:
                     return None
                 if config.has_option("logbackup", 'baseLocation'):
                     self.baseLocation = config.get("logbackup", 'baseLocation')
-                    print("    logbackup: config logbackup base location: ", self.baseLocation)
                 else:
                     return None
                 if config.has_option("logbackup", 'crontabLocation'):
                     self.crontabLocation = config.get("logbackup", 'crontabLocation')
-                    print("    logbackup: config logbackup crontab location: ", self.crontabLocation)
         else:
-            print("No matching workload config found")
+            return
