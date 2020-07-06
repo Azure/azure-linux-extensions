@@ -114,7 +114,6 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Pre- WorkloadStatus not open.")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
             return None
-
         
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster mysql")
@@ -196,8 +195,8 @@ class WorkloadPatch:
             self.callLogBackup()
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
-            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported")
-                                      
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
+
     def preSlave(self):
         self.logger.log("WorkloadPatch: Entering pre mode for sloave")
         if self.ipc_folder != None:
@@ -218,7 +217,6 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
             return None
 
-
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for preslave mysql")
             if self.outfile == "":
@@ -228,7 +226,7 @@ class WorkloadPatch:
             arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
-            WaitForPreScriptCompletion()
+            waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
@@ -369,7 +367,7 @@ class WorkloadPatch:
             wait_counter = 5 
             while len(self.child) == 0 and wait_counter > 0:
                 self.logger.log("child not created yet", True)
-                wait_counter--
+                wait_counter -= 1
                 sleep(2)
             if wait_counter > 0:
                 self.logger.log("sql subprocess Created",True)
@@ -381,7 +379,7 @@ class WorkloadPatch:
             wait_counter = 60
             while os.path.exists(self.outfile) == False and wait_counter > 0:
                 self.logger.log("WorkloadPatch: Waiting for sql to complete")
-                wait_counter--
+                wait_counter -= 1
                 sleep(2)
             if wait_counter > 0:
                 self.logger.log("WorkloadPatch: pre at server level completed")
