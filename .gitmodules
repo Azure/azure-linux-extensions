@@ -7,3 +7,6 @@
 [submodule "VMEncryption/transitions"]
 	path = VMEncryption/transitions
 	url = https://github.com/tyarkoni/transitions.git
+[submodule "OmsAgent/ext/python-future"]
+	path = OmsAgent/ext/python-future
+	url = https://github.com/PythonCharmers/python-future

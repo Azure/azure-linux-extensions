@@ -17,16 +17,21 @@
 # limitations under the License.
 
 from __future__ import print_function
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
+import sys
+
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import signal
 import pwd
 import grp
 import re
-import sys
 import traceback
 import time
 import platform
@@ -47,11 +52,42 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+
 # Global Variables
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
 keysDirectory = 'keys'
-BundleFileName = 'omsagent-1.12.25-0.universal.x64.sh'
+BundleFileName = 'omsagent-1.13.1-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -80,6 +116,7 @@ WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.eaglex.ic.gov -w {1} -s {2} {3}' #EX
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
@@ -150,7 +187,7 @@ def verifyShellBundleSigningAndChecksum():
         raise Exception("Unable to find the dscgpgkey.asc file at " + dscGPGKeyFilePath)
 
     importGPGKeyCommand = "sh ImportGPGkey.sh " + dscGPGKeyFilePath
-    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip, check_error = False)
 
     # Check that we can find the keyring file
     keyringFilePath = os.path.join(keys_directory, 'keyring.gpg')
@@ -170,13 +207,14 @@ def verifyShellBundleSigningAndChecksum():
 
     # Verify the SHA256 sums file with the keyring and asc files
     verifySha256SumsCommand = "HOME=" + keysDirectory + " gpg --no-default-keyring --keyring " + keyringFilePath + " --verify " + ascFilePath  + " " + sha256SumsFilePath
-    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
     if exit_code != 0:
         raise Exception("Failed to verify SHA256 sums file at " + sha256SumsFilePath)
 
     # Perform SHA256 sums to verify shell bundle
+    hutil_log_info("Perform SHA256 sums to verify shell bundle")
     performSha256SumsCommand = "cd %s; sha256sum -c %s" % (cert_directory, sha256SumsFilePath)
-    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip)
+    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
     if exit_code != 0:
         raise Exception("Failed to verify shell bundle with the SHA256 sums file at " + sha256SumsFilePath)
 
@@ -237,19 +275,24 @@ def main():
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
 
-    # Verify shell bundle signing
-    try:
-        verifyShellBundleSigningAndChecksum()
-    except Exception as ex:
-        if ProceedOnSigningVerificationFailure:
-            hutil_log_error(ex.message)
-        else:
-            log_and_exit(operation, ex.message)
-
     # Invoke operation
     try:
         global HUtilObject
         HUtilObject = parse_context(operation)
+
+        # Verify shell bundle signing
+        try:
+            hutil_log_info("Start signing verification")
+            verifyShellBundleSigningAndChecksum()
+            hutil_log_info("ShellBundle signing verification succeeded")
+        except Exception as ex:
+            errmsg = "ShellBundle signing verification failed with '%s'" % ex.message
+            if ProceedOnSigningVerificationFailure:
+                hutil_log_error(errmsg)
+            else:
+                log_and_exit(operation, errmsg)
+        
+        # invoke operation
         exit_code, output = operations[operation]()
 
         # Exit code 1 indicates a general problem that doesn't have a more
@@ -363,15 +406,7 @@ def prepare_update():
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
-
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId) 
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
@@ -410,11 +445,11 @@ def install():
     # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
+    # In the case where a SCOM connection is already present, we should not
+    # create conflicts by installing the OMSAgent packages
     stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
+            and stopOnMultipleConnections is True):
         detect_multiple_connections(workspaceId)
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
@@ -530,13 +565,6 @@ def enable():
         workspaceId = public_settings.get('workspaceId')
         workspaceKey = protected_settings.get('workspaceKey')
         check_workspace_id_and_key(workspaceId, workspaceKey)
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
 
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
@@ -760,9 +788,9 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
+    supported_dists = {'redhat' : ['6', '7', '8'], # RHEL
                        'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
@@ -1109,7 +1137,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
@@ -1591,7 +1619,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    return exit_code, output.encode('utf-8').strip()
+    output = output.encode('utf-8')
+
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode()
+
+    return exit_code, output.strip()
 
 
 def get_tenant_id_from_metadata_api(vm_resource_id):

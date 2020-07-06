@@ -55,7 +55,10 @@ import os
 import os.path
 import sys
 import re
-import imp
+try:
+    import imp as imp
+except ImportError:
+    import importlib as imp
 import base64
 import json
 import tempfile
@@ -154,7 +157,7 @@ class HandlerUtility:
                 pass
 
     def log_with_no_try_except(self, message, level='Info'):
-        WriteLog = self.get_value_from_configfile('WriteLog')
+        WriteLog = self.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
             if sys.version_info > (3,):
                 if self.logging_file is not None:
@@ -318,6 +321,7 @@ class HandlerUtility:
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
+
     def get_value_from_configfile(self, key):
         global backup_logger
         value = None
@@ -332,6 +336,35 @@ class HandlerUtility:
             pass
 
         return value
+
+    def get_strvalue_from_configfile(self, key, default):
+        value = self.get_value_from_configfile(key)
+        
+        if value == None or value == '':
+            value = default
+
+        try :
+            value_str = str(value)
+        except ValueError :
+            self.log('Not able to parse the read value as string, falling back to default value', 'Warning')
+            value = default
+
+        return value
+
+    def get_intvalue_from_configfile(self, key, default):
+        value = default
+        value = self.get_value_from_configfile(key)
+        
+        if value == None or value == '':
+            value = default
+
+        try :
+            value_int = int(value)
+        except ValueError :
+            self.log('Not able to parse the read value as int, falling back to default value', 'Warning')
+            value = default
+
+        return int(value)
  
     def set_value_to_configfile(self, key, value):
         configfile = '/etc/azure/vmbackup.conf'
@@ -571,10 +604,12 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
+        workloads = self.get_workload_running()
         HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("workloads",str(workloads))
     
     def convert_telemetery_data_to_bcm_serializable_format(self):
         HandlerUtility.serializable_telemetry_data = []
@@ -753,6 +788,23 @@ class HandlerUtility:
                     uriHasSpecialCharacters = True
 
         return uriHasSpecialCharacters
+
+    def get_workload_running(self):
+        workloads = []
+        try:
+            dblist= ["mysqld","postgres","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            if os.path.isdir("/proc"):
+                pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+                for pid in pids:
+                    pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
+                    for db in dblist :
+                        if db in pname.lower() and db not in workloads :
+                            self.log("workload running found with command : " + str(pname))
+                            workloads.append(db)
+            return workloads
+        except Exception as e:
+            self.log("Unable to fetch running workloads" + str(e))
+            return workloads
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):

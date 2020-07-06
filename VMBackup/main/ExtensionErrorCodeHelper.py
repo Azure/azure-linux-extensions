@@ -41,6 +41,7 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigNotFound = 316
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
+    FailedGuestAgentInvokedCommandTooLate = 402
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -82,7 +83,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error_http_failure : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red,
-            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red
+            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red,
+            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : Status.ExtVmHealthStateEnum.red
             }
 
     ExtensionErrorCodeNameDict = {
@@ -122,7 +124,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error_http_failure : "error_http_failure",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork",
-            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : "FailedSnapshotLimitReached"
+            ExtensionErrorCodeEnum.FailedSnapshotLimitReached : "FailedSnapshotLimitReached",
+            ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : "FailedGuestAgentInvokedCommandTooLate"
             }
     
     @staticmethod

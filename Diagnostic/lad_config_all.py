@@ -101,7 +101,22 @@ class LadConfigAll:
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
 
         # Get encryption settings
-        thumbprint = ext_settings.get_handler_settings()['protectedSettingsCertThumbprint']
+        handlerSettings = ext_settings.get_handler_settings()
+
+        if handlerSettings['protectedSettings'] is None:
+            errorMsg = "Settings did not contain protectedSettings. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
+            self._logger_error(errorMsg)
+            raise LadLoggingConfigException(errorMsg)
+
+        if handlerSettings['protectedSettingsCertThumbprint'] is None:
+            errorMsg = "Settings did not contain protectedSettingsCertThumbprint. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
+            self._logger_error(errorMsg)
+            raise LadLoggingConfigException(errorMsg)
+
+        thumbprint = handlerSettings['protectedSettingsCertThumbprint']
+
         self._cert_path = os.path.join(waagent_dir, thumbprint + '.crt')
         self._pkey_path = os.path.join(waagent_dir, thumbprint + '.prv')
 
@@ -332,7 +347,7 @@ class LadConfigAll:
             fileLogs_setting = self._ext_settings.get_fileLogs_setting()
             lad_logging_config_helper = LadLoggingConfig(syslogEvents_setting, fileLogs_setting, self._sink_configs,
                                                          self._pkey_path, self._cert_path, self._encrypt_secret)
-            mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config()
+            mdsd_syslog_config = lad_logging_config_helper.get_mdsd_syslog_config(self._ext_settings.read_protected_config('disableStorageAccount') == True)
             mdsd_filelog_config = lad_logging_config_helper.get_mdsd_filelog_config()
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_syslog_config)
             copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_filelog_config)
@@ -374,8 +389,7 @@ class LadConfigAll:
             self._logger_error("Failed to create omsagent (fluentd), rsyslog/syslog-ng configs, telegraf config or to update "
                                "corresponding mdsd config XML. Error: {0}\nStacktrace: {1}"
                                .format(e, traceback.format_exc()))
-            return False, 'Failed to generate configs for fluentd, syslog, and mdsd ' \
-                          '(see extension error logs for more details)'
+            return False, 'Failed to generate configs for fluentd, syslog, and mdsd; see extension.log for more details.'
 
         # 3. Before starting to update the storage account settings, log extension's entire settings
         #    with secrets redacted, for diagnostic purpose.
@@ -385,12 +399,16 @@ class LadConfigAll:
         #    protectedSettings).
         account = self._ext_settings.read_protected_config('storageAccountName').strip()
         if not account:
-            return False, "Must specify storageAccountName"
+            return False, "Configuration Error: Must specify storageAccountName in protected settings. For information on protected settings, " \
+                          "visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         if self._ext_settings.read_protected_config('storageAccountKey'):
-            return False, "The storageAccountKey protected setting is not supported and must not be used"
+            return False, "Configuration Error: The storageAccountKey protected setting is deprecated in LAD 3.0 and cannot be used. " \
+                          "Instead, use the storageAccountSasToken setting. For documentation of this setting and instructions for generating " \
+                          "a SAS token, visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         token = self._ext_settings.read_protected_config('storageAccountSasToken').strip()
         if not token or token == '?':
-            return False, "Must specify storageAccountSasToken"
+            return False, "Configuration Error: Must specify storageAccountSasToken in the protected settings. For documentation of this setting and instructions " \
+                          "for generating a SAS token, visit https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/diagnostics-linux#protected-settings."
         if '?' == token[0]:
             token = token[1:]
         endpoints = get_storage_endpoints_with_account(account,

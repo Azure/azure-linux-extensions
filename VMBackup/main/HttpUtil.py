@@ -33,23 +33,31 @@ import sys
 
 class HttpUtil(object):
     """description of class"""
-    def __init__(self, hutil):
-        Config = None
-        self.proxyHost = None
-        self.proxyPort = None
-        try:
-            waagent.MyDistro = waagent.GetMyDistro()
-            Config = waagent.ConfigurationProvider(None)
-        except Exception as e:
-            errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            hutil.log(errorMsg)
+    __instance = None
+    """Singleton class initialization"""
+    def __new__(cls, hutil):
+        if(cls.__instance is None):
+            hutil.log("Creating HttpUtil")
+            cls.__instance = super(HttpUtil, cls).__new__(cls)
             Config = None
-        self.logger = hutil
-        if Config != None:
-            self.proxyHost = Config.get("HttpProxy.Host")
-            self.proxyPort = Config.get("HttpProxy.Port")
-
-        self.tmpFile = './tmp_file_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
+            cls.__instance.proxyHost = None
+            cls.__instance.proxyPort = None
+            try:
+                waagent.MyDistro = waagent.GetMyDistro()
+                Config = waagent.ConfigurationProvider(None)
+            except Exception as e:
+                errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+                hutil.log(errorMsg)
+                Config = None
+            cls.__instance.logger = hutil
+            if Config != None:
+                cls.__instance.proxyHost = Config.get("HttpProxy.Host")
+                cls.__instance.proxyPort = Config.get("HttpProxy.Port")
+            cls.__instance.tmpFile = './tmp_file_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
+        else:
+            cls.__instance.logger = hutil
+            cls.__instance.logger.log("Returning HttpUtil")
+        return cls.__instance
 
     """
     snapshot also called this. so we should not write the file/read the file in this method.
@@ -112,6 +120,7 @@ class HttpUtil(object):
         responseBody = None
         try:
             resp = None
+            self.logger.log("Entered HttpCallGetResponse, isHostCall: " + str(isHostCall))
 
             if(isHostCall or self.proxyHost == None or self.proxyPort != None):
                 if(isHostCall):

@@ -28,11 +28,13 @@ fi
 cp -r ../Utils .
 cp ../Common/WALinuxAgent-2.0.16/waagent .
 
-# cleanup packages
-rm -rf packages
-mkdir -p packages
+# cleanup packages, ext
+rm -rf packages ext/future
+mkdir -p packages ext/future
 # copy shell bundle to packages/
 cp $bundle_path packages/
+# copy just the source of python-future
+cp -r ext/python-future/src/* ext/future
 # sync the file copy
 sync
 
@@ -43,7 +45,7 @@ fi
 
 echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="omsagent.version packaging.sh apply_version.sh update_version.sh"
-zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./Fairfax/*" "./Mooncake/*" "./test/*" "./extension-test/*" "./references"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./ext/python-future/*"
 
 # cleanup newly added dir or files
 rm -rf Utils/ waagent
