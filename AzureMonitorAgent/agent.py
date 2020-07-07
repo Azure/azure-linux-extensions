@@ -59,8 +59,9 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.124-build.develop.1255_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.124-build.develop.1255_x86_64.rpm'
+# TODO: Installer should automatically figure this out from the folder instead of requiring this update
+BundleFileNameDeb = 'azure-mdsd_1.5.124-build.master.89_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.124-build.master.89_x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
