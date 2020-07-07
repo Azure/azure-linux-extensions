@@ -87,10 +87,14 @@ class GuestSnapshotter(object):
                 snapshot_error.sasuri = sasuri
             else:
                 start_time = datetime.datetime.utcnow()
-                
                 body_content = ''
-                
-                headers = meta_data
+                headers = {}
+                headers["Content-Length"] = '0'
+                if(meta_data is not None): 
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
@@ -137,13 +141,20 @@ class GuestSnapshotter(object):
                 snapshot_error.errorcode = CommonVariables.error
                 snapshot_error.sasuri = sasuri
             else:
-                body_content = ''                
-                
+                body_content = ''
+                headers = {}
+                headers["Content-Length"] = '0'
+                if(meta_data is not None):
+                    for meta in meta_data:
+                        key = meta['Key']
+                        value = meta['Value']
+                        headers["x-ms-meta-" + key] = value
+                self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
-                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = meta_data, responseBodyRequired = True)
+                result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
                 self.logger.log("responseBody: " + responseBody)
                 if(result == CommonVariables.success and httpResp != None):
                     # retrieve snapshot information from http response
@@ -162,7 +173,7 @@ class GuestSnapshotter(object):
             snapshot_error.sasuri = sasuri
         return snapshot_error, snapshot_info_indexer
 
-    def snapshotall_parallel(self, paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata):
+    def snapshotall_parallel(self, paras, freezer, thaw_done, g_fsfreeze_on):
         self.logger.log("doing snapshotall now in parallel...")
         snapshot_result = SnapshotResult()
         blob_snapshot_info_array = []
@@ -183,7 +194,7 @@ class GuestSnapshotter(object):
             snapshot_info_indexer_queue = mp.Queue()
             time_before_snapshot_start = datetime.datetime.now()
             blobs = paras.blobs
-            
+
             if blobs is not None:
                 # initialize blob_snapshot_info_array
                 mp_jobs = []
@@ -194,7 +205,7 @@ class GuestSnapshotter(object):
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
                     try:
-                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, blob_metadata[blob_index], snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
                         self.logger.log("multiprocess queue creation failed")
                         all_snapshots_failed = True
@@ -217,7 +228,6 @@ class GuestSnapshotter(object):
                     job.join()
                 self.logger.log('****** 6. Snaphotting (Guest-parallel) Completed')
                 thaw_result = None
-                
                 if g_fsfreeze_on and thaw_done_local == False:
                     time_before_thaw = datetime.datetime.now()
                     thaw_result, unable_to_sleep = freezer.thaw_safe()
@@ -264,7 +274,8 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
-    def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata):
+
+    def snapshotall_seq(self, paras, freezer, thaw_done, g_fsfreeze_on):
         exceptOccurred = False
         self.logger.log("doing snapshotall now in sequence...")
         snapshot_result = SnapshotResult()
@@ -279,12 +290,11 @@ class GuestSnapshotter(object):
             if blobs is not None:
                 blob_index = 0
                 self.logger.log('****** 5. Snaphotting (Guest-seq) Started')
-                
                 for blob in blobs:
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, blob_metadata[blob_index])
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update blob_snapshot_info_array element properties from snapshot_info_indexer object
@@ -296,6 +306,7 @@ class GuestSnapshotter(object):
                 self.logger.log('****** 6. Snaphotting (Guest-seq) Completed')
                 all_snapshots_failed = all_failed
                 self.logger.log("Setting all_snapshots_failed to " + str(all_snapshots_failed))
+
                 thaw_result= None
                 if g_fsfreeze_on and thaw_done_local== False:
                     time_before_thaw = datetime.datetime.now()
@@ -317,18 +328,16 @@ class GuestSnapshotter(object):
             exceptOccurred = True
             return snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done_local, unable_to_sleep, all_snapshots_failed
 
-    def snapshotall(self, paras, freezer, g_fsfreeze_on, blob_metadata):
+    def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
-       
         if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
-            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
+            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
-            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
+            snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_parallel(paras, freezer, thaw_done, g_fsfreeze_on)
             self.logger.log("exceptOccurred : " + str(exceptOccurred) + " thaw_done : " + str(thaw_done) + " all_snapshots_failed : " + str(all_snapshots_failed))
             if exceptOccurred and thaw_done == False and all_snapshots_failed:
                 self.logger.log("Trying sequential snapshotting as parallel snapshotting failed")
-                snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on, blob_metadata)
-        
+                snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent,thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         return snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed
 
     def httpresponse_get_snapshot_info(self, resp, sasuri_index, sasuri, responseBody):

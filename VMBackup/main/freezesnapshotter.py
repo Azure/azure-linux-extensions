@@ -39,8 +39,6 @@ from guestsnapshotter import GuestSnapshotter
 from hostsnapshotter import HostSnapshotter
 from Utils import HostSnapshotObjects
 import ExtensionErrorCodeHelper
-from Utils.BlobUtil import BlobUtil
-
 # need to be implemented in next release
 #from dhcpHandler import DhcpHandler
 
@@ -252,7 +250,7 @@ class FreezeSnapshotter(object):
             run_status = 'error'
         
         return run_result, run_status
-     
+
     def takeSnapshotFromGuest(self):
         run_result = CommonVariables.success
         run_status = 'success'
@@ -272,10 +270,6 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
-            # populate metadata for all blobs 
-            blob_util = BlobUtil(self.logger)          
-            blob_metadata = blob_util.populate_blobMetadata_allblobs(self.para_parser)
-
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
@@ -284,7 +278,7 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, blob_metadata)
+                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
                 self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))

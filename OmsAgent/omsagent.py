@@ -17,16 +17,21 @@
 # limitations under the License.
 
 from __future__ import print_function
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
+import sys
+
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import signal
 import pwd
 import grp
 import re
-import sys
 import traceback
 import time
 import platform
@@ -46,6 +51,37 @@ try:
 except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
+
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
 
 # Global Variables
 ProceedOnSigningVerificationFailure = True
@@ -80,6 +116,7 @@ WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.eaglex.ic.gov -w {1} -s {2} {3}' #EX
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
@@ -369,15 +406,7 @@ def prepare_update():
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
-
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId) 
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
@@ -416,11 +445,11 @@ def install():
     # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
+    # In the case where a SCOM connection is already present, we should not
+    # create conflicts by installing the OMSAgent packages
     stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
+            and stopOnMultipleConnections is True):
         detect_multiple_connections(workspaceId)
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
@@ -536,13 +565,6 @@ def enable():
         workspaceId = public_settings.get('workspaceId')
         workspaceKey = protected_settings.get('workspaceKey')
         check_workspace_id_and_key(workspaceId, workspaceKey)
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
 
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
@@ -1115,7 +1137,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
@@ -1597,7 +1619,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    return exit_code, output.encode('utf-8').strip()
+    output = output.encode('utf-8')
+
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode()
+
+    return exit_code, output.strip()
 
 
 def get_tenant_id_from_metadata_api(vm_resource_id):
