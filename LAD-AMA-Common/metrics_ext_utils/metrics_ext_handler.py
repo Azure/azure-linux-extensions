@@ -171,7 +171,7 @@ def generate_Arc_MSI_token():
             arc_endpoint = get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
                 res = urllib2.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path - 
@@ -180,7 +180,7 @@ def generate_Arc_MSI_token():
                     log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
                     return False, expiry_epoch_time, log_messages
                 keys_dir = []
-                for filename in os.listdir(directory):
+                for filename in os.listdir(authkey_dir):
                     keys_dir.append(filename)
 
                 authkey_path = authkey_dir + keys_dir[-1]
@@ -188,7 +188,7 @@ def generate_Arc_MSI_token():
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json', 'Authorization':auth})
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
                 res = urllib2.urlopen(req)
                 data = json.loads(res.read())
 
@@ -355,7 +355,7 @@ def start_metrics(is_lad):
         _, configFolder = get_handler_vars()
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
-        az_resource_id, subscription_id, location, data = get_imds_values()
+        az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
@@ -498,7 +498,7 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
-def get_imds_values():
+def get_imds_values(is_lad):
     """
     Query imds to get required values for MetricsExtension config for this VM
     """
@@ -574,7 +574,7 @@ def setup_me(is_lad):
     """
 
     # query imds to get the required information
-    az_resource_id, subscription_id, location, data = get_imds_values()
+    az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
     # get tenantID
     # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
