@@ -35,6 +35,28 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
+
+def is_arc_installed():
+    """
+    Check if the system is an on prem machine running Arc
+    """
+    # Using systemctl to check this since Arc only supports VM that have systemd
+    check_arc = os.system("systemctl status himdsd 1>/dev/null 2>&1")
+    return check_arc == 0
+
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for arc Hybrid IMDS
+    """
+    endpoint_filepath = "/lib/systemd/system.conf.d/azcmagent.conf"
+    with open(endpoint_filepath, "r") as f:
+        data = f.read()
+    endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+
+    return endpoint
+
+
 def is_running(is_lad):
     """
     This method is used to check if metrics binary is currently running on the system or not.
@@ -126,13 +148,11 @@ def remove_metrics_service(is_lad):
 
     return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
-
-def generate_MSI_token():
+def generate_Arc_MSI_token():
     """
-    This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
+    This method is used to query the Hyrbid metdadata service of Arc to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
     """
-
     _, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
     me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
@@ -148,10 +168,29 @@ def generate_MSI_token():
     try:
         data = None
         while retries <= max_retries:
-            msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
-            req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-            res = urllib2.urlopen(req)
-            data = json.loads(res.read())
+            arc_endpoint = get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib2.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
+                    return False, expiry_epoch_time, log_messages
+                keys_dir = []
+                for filename in os.listdir(directory):
+                    keys_dir.append(filename)
+
+                authkey_path = authkey_dir + keys_dir[-1]
+                auth = "basic "
+                with open(authkey_path, "r") as f:
+                    key = f.read()
+                auth += key
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json', 'Authorization':auth})
+                res = urllib2.urlopen(req)
+                data = json.loads(res.read())
 
             if not data or "access_token" not in data:
                 retries += 1
@@ -180,6 +219,64 @@ def generate_MSI_token():
         return False, expiry_epoch_time, log_messages
 
     return True, expiry_epoch_time, log_messages
+
+
+def generate_MSI_token():
+    """
+    This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
+    This is called from the main extension code after config setup is complete
+    """
+
+    if is_arc_installed():
+        return generate_Arc_MSI_token()
+    else:
+        _, configFolder = get_handler_vars()
+        me_config_dir = configFolder + "/metrics_configs/"
+        me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
+        expiry_epoch_time = ""
+        log_messages = ""
+        retries = 1
+        max_retries = 3
+        sleep_time = 5
+
+        if not os.path.exists(me_config_dir):
+            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+            return False, expiry_epoch_time, log_messages
+        try:
+            data = None
+            while retries <= max_retries:
+                msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib2.urlopen(req)
+                data = json.loads(res.read())
+
+                if not data or "access_token" not in data:
+                    retries += 1
+                else:
+                    break
+
+                log_messages += "Failed to fetch MSI Auth url. Retrying in {2} seconds. Retry Count - {0} out of Mmax Retries - {1}\n".format(retries, max_retries, sleep_time)
+                time.sleep(sleep_time)
+
+
+            if retries > max_retries:
+                log_messages += "Unable to generate a valid MSI auth token at {0}.\n".format(me_auth_file_path)
+                return False, expiry_epoch_time, log_messages
+
+            with open(me_auth_file_path, "w") as f:
+                f.write(json.dumps(data))
+
+            if "expires_on" in data:
+                expiry_epoch_time  = data["expires_on"]
+            else:
+                log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+                return False, expiry_epoch_time, log_messages
+
+        except Exception as e:
+            log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+            return False, expiry_epoch_time, log_messages
+
+        return True, expiry_epoch_time, log_messages
 
 
 def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
@@ -408,11 +505,23 @@ def get_imds_values():
     retries = 1
     max_retries = 3
     sleep_time = 5
+    imdsurl = ""
+    is_arc = False
+
+    if is_lad:
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    else:
+        if is_arc_installed():
+            imdsurl = get_arc_endpoint()
+            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            is_arc = True
+        else:
+            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+
 
     data = None
     while retries <= max_retries:
 
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
         #query imds to get the required information
         req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib2.urlopen(req)
@@ -429,11 +538,19 @@ def get_imds_values():
         raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
         return False
 
-    if "resourceId" not in data["compute"]:
-        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
-        return False
+    if is_arc:
+        if "resourceID" not in data["compute"]:
+            raise Exception("Unable to find 'resourceID' key in imds query response. Failed to setup ME.")
+            return False
+    else:
+        if "resourceId" not in data["compute"]:
+            raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
+            return False
 
-    az_resource_id = data["compute"]["resourceId"]
+    if is_arc:
+        az_resource_id = data["compute"]["resourceID"]
+    else:
+        az_resource_id = data["compute"]["resourceId"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup ME.")

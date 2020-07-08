@@ -49,6 +49,27 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
+def is_arc_installed():
+    """
+    Check if the system is an on prem machine running Arc
+    """
+    # Using systemctl to check this since Arc only supports VM that have systemd
+    check_arc = os.system("systemctl status himdsd 1>/dev/null 2>&1")
+    return check_arc == 0
+
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for arc Hybrid IMDS
+    """
+    endpoint_filepath = "/lib/systemd/system.conf.d/azcmagent.conf"
+    with open(endpoint_filepath, "r") as f:
+        data = f.read()
+    endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+
+    return endpoint
+
+
 def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name):
     """
     Main parser method to convert Metrics config from extension configuration to telegraf configuration
@@ -603,11 +624,23 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     retries = 1
     max_retries = 3
     sleep_time = 5
+    imdsurl = ""
+    is_arc = False
+
+    if is_lad:
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    else:
+        if is_arc_installed():
+            imdsurl = get_arc_endpoint()
+            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            is_arc = True
+        else:
+            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+
 
     data = None
     while retries <= max_retries:
 
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
         req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib2.urlopen(req)
         data = json.loads(res.read())
@@ -623,11 +656,19 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
         raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup Telegraf.".format(max_retries))
         return False
 
-    if "resourceId" not in data["compute"]:
-        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
-        return False
+    if is_arc:
+        if "resourceID" not in data["compute"]:
+            raise Exception("Unable to find 'resourceID' key in hyrbid imds query response. Failed to setup Telegraf.")
+            return False
+    else:
+        if "resourceId" not in data["compute"]:
+            raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
+            return False
 
-    az_resource_id = data["compute"]["resourceId"]
+    if is_arc:
+        az_resource_id = data["compute"]["resourceID"]
+    else:
+        az_resource_id = data["compute"]["resourceId"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
