@@ -538,19 +538,12 @@ def get_imds_values(is_lad):
         raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
         return False
 
-    if is_arc:
-        if "resourceID" not in data["compute"]:
-            raise Exception("Unable to find 'resourceID' key in imds query response. Failed to setup ME.")
-            return False
-    else:
-        if "resourceId" not in data["compute"]:
-            raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
-            return False
 
-    if is_arc:
-        az_resource_id = data["compute"]["resourceID"]
-    else:
-        az_resource_id = data["compute"]["resourceId"]
+    if "resourceId" not in data["compute"]:
+        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
+        return False
+
+    az_resource_id = data["compute"]["resourceId"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup ME.")
