@@ -394,19 +394,25 @@ def daemon():
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
                 
                 workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
-                
+                #new flow only if workload name is present in workload.conf
                 if workload_patch.name != None:
                     backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
-                    workload_patch.pre()
+                    pre_skipped = False
+                    if len(workload_patch.error_details) > 0:
+                        backup_logger.log("skip pre and post")
+                        pre_skipped = True
+                    else:
+                        workload_patch.pre()
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("file system consistent backup only")
                     #todo error handling
-                    if snapshot_type == "appAndFileSystem":
-                        g_fsfreeze_on = True
-                    else:
+                    if snapshot_type == "appOnly":
                         g_fsfreeze_on = False
+                    else:
+                        g_fsfreeze_on = True
                     freeze_snapshot(thread_timeout)
-                    workload_patch.post()
+                    if pre_skipped == False:
+                        workload_patch.post()
                     workload_error = workload_patch.populateErrors()
                     if workload_error != None and g_fsfreeze_on == False:
                         run_status = 'error'

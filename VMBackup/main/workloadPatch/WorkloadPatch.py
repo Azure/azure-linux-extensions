@@ -137,6 +137,7 @@ class WorkloadPatch:
                 sleep(2)
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
+        #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
@@ -193,6 +194,7 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogBackup()
+        #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
@@ -238,6 +240,7 @@ class WorkloadPatch:
                 sleep(2)
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for slave")
+        #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
@@ -292,6 +295,7 @@ class WorkloadPatch:
                 sleep(1)
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogbackup()
+        #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
@@ -328,8 +332,8 @@ class WorkloadPatch:
                     if config.has_option("workload", 'credString'):
                         self.cred_string = config.get("workload", 'credString')
                         self.logger.log("WorkloadPatch: config workload cred_string "+ self.cred_string)
-                    else:
-                        self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadAuthorizationMissing, "Cred string missing"))
+                    elif not config.has_option("workload", 'linux_user'):
+                        self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadAuthorizationMissing, "Cred and linux user string missing"))
                     if config.has_option("workload", 'role'):
                         self.role = config.get("workload", 'role')
                         self.logger.log("WorkloadPatch: config workload role "+ self.role)
