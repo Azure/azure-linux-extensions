@@ -141,7 +141,7 @@ class HandlerUtility:
         last_seq = self.get_last_seq()
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
-            #self.update_settings_file()
+            self.update_settings_file()
             sys.exit(0)
 
     def log(self, message,level='Info'):

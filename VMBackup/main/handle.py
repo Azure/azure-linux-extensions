@@ -322,7 +322,7 @@ def daemon():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
-        #hutil.update_settings_file()
+        hutil.update_settings_file()
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -343,13 +343,13 @@ def daemon():
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
 
-#            if total_span_in_seconds > MAX_TIMESPAN :
- #               error_msg = "CRP timeout limit has reached, will not take snapshot."
-  #              errMsg = error_msg
-   #             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
-    #            temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
-     #           temp_status= 'error'
-      #          exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+            if total_span_in_seconds > MAX_TIMESPAN :
+                error_msg = "CRP timeout limit has reached, will not take snapshot."
+                errMsg = error_msg
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+                temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
+                temp_status= 'error'
+                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
@@ -535,7 +535,7 @@ def daemon():
             error_msg = 'command is not correct'
             backup_logger.log(error_msg, True, 'Error')
     except Exception as e:
-        #hutil.update_settings_file()
+        hutil.update_settings_file()
         errMsg = 'Failed to enable the extension with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
@@ -611,7 +611,7 @@ def enable():
         start_daemon()
         sys.exit(0)
     except Exception as e:
-        #hutil.update_settings_file()
+        hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         global_error_result = e
         temp_status= 'error'
