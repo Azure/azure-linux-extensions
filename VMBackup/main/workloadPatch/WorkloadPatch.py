@@ -47,6 +47,7 @@ class WorkloadPatch:
         self.role = "master"
         self.child = []
         self.timeout = 90
+        self.sudo_user = "sudo"
         self.outfile = ""
         self.logbackup = ""
         self.confParser()
@@ -121,14 +122,14 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
             prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
-            arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
-            args = ["su", "-", self.cred_string, "-c", preOracle]
+            args = [self.sudo_user, preOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
@@ -177,12 +178,14 @@ class WorkloadPatch:
         
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post master")
-            args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlMaster.sql"
+            postscript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/postMysqlMaster.sql")
+            args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
+            self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
-            args = ["su", "-", self.cred_string, "-c", postOracle]
+            args = [self.sudo_user, postOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
             while process.poll()==None and wait_counter>0:
@@ -220,14 +223,14 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
             prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlSlave.sql")
-            arg = "sudo "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
-            args = ["su", "-", self.cred_string, "-c", preOracle]
+            args = [self.sudo_user, preOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
@@ -261,7 +264,9 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                 self.child[0].kill()
             self.logger.log("WorkloadPatch: Create connection string for post master")
-            args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlSlave.sql"
+            postscript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/postMysqlSlave.sql")
+            args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
+            self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             postOracleStatus = self.databaseStatus()
@@ -281,7 +286,7 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: Post error- Timeout daemon executed before post")
                 return
             postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
-            args = ["su", "-", self.cred_string, "-c", postOracle]
+            args = [self.sudo_user, postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
                 sleep(1)
@@ -337,6 +342,10 @@ class WorkloadPatch:
                     if config.has_option("workload", 'timeout'):
                         self.timeout = config.get("workload", 'timeout')
                         self.logger.log("WorkloadPatch: config timeout of pre script "+ self.timeout)
+                    if config.has_option("workload", 'linux_user'):
+                        linux_user = config.get("workload", 'linux_user')
+                        self.logger.log("WorkloadPatch: config linux user of pre script "+ linux_user)
+                        self.sudo_user = "sudo -u "+linux_user
                     if config.has_option("workload", 'dbnames'):
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
@@ -344,11 +353,11 @@ class WorkloadPatch:
                         self.logbackup = "enable"
                         self.logger.log("WorkloadPatch: Logbackup Enabled")
                 else:
-                    self.logger.log("workload config section missing. File system consistent backup")
+                    self.logger.log("WorkloadPatch: workload config section missing. File system consistent backup")
             else:
-                self.logger.log("workload config file missing. File system consistent backup")
+                self.logger.log("WorkloadPatch: workload config file missing. File system consistent backup")
         except Exception as e:
-            self.logger.log("exception in workload conf file parsing")
+            self.logger.log("WorkloadPatch: exception in workload conf file parsing")
             if(self.name != None):
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConfParsingError, "exception in workloadconfig parsing"))
     
@@ -363,14 +372,13 @@ class WorkloadPatch:
         if self.ipc_folder != None:
             wait_counter = 5 
             while len(self.child) == 0 and wait_counter > 0:
-                self.logger.log("child not created yet", True)
+                self.logger.log("WorkloadPatch: child not created yet", True)
                 wait_counter -= 1
                 sleep(2)
             if wait_counter > 0:
-                self.logger.log("sql subprocess Created",True)
-                self.logger.log("sql subprocess Created "+str(self.child[0].pid))
+                self.logger.log("WorkloadPatch: sql subprocess Created "+str(self.child[0].pid))
             else:
-                self.logger.log("sql connection failed")
+                self.logger.log("WorkloadPatch: sql connection failed")
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
                 return None
             wait_counter = 60
@@ -414,7 +422,7 @@ class WorkloadPatch:
         return "NOT APPLY"
 
     def thread_for_sql(self,args):
-        self.logger.log("command to execute: "+str(args))
+        self.logger.log("WorkloadPatch: command to execute: "+str(args))
         self.child.append(subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE))
         sleep(1)
     
