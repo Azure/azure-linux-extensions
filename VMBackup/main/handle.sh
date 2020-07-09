@@ -15,9 +15,15 @@ arc=0
 
 if [ "$1" = "install" ]
 then
-    cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
-    echo "`date`- The command is $1, exiting" >> $logfile
-    exit $arc
+    if [ -f "/etc/azure/workload.conf" ]
+    then
+        echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+        exit $arc
+    else
+        cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
+        echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
+        exit $arc
+    fi
 elif [ $1 != "enable"  ] && [ $1 != "daemon" ]
 then
     echo "`date`- The command is $1, exiting" >> $logfile

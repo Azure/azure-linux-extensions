@@ -302,8 +302,7 @@ def daemon():
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
         if config.has_option('SnapshotThread','snapshot_type'):
-           snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem
-            
+           snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem        
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
