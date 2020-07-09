@@ -421,11 +421,15 @@ def daemon():
                         error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                         backup_logger.log(error_msg, True)                        
                     else:
-                        run_status = 'success'
-                        run_result = CommonVariables.success_appconsistent
-                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
-                        error_msg = 'Enable Succeeded with App Consistent Snapshot'
-                        backup_logger.log(error_msg, True)
+                        if(run_status == CommonVariables.status_success):
+                            run_status = 'success'
+                            run_result = CommonVariables.success_appconsistent
+                            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                            error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                            backup_logger.log(error_msg, True)
+                        else:
+                            error_msg = 'Enable failed in fsfreeze snapshot flow'
+                            backup_logger.log(error_msg, True)
                 else:
                     PluginHostObj = PluginHost(logger=backup_logger)
                     PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()

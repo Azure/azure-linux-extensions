@@ -142,17 +142,26 @@ class WorkloadPatch:
             
     def postMaster(self):
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        if self.ipc_folder != None:
+        if self.ipc_folder != None: #IPCm based workloads
             if os.path.exists(self.outfile):
                 os.remove(self.outfile)
             else:
                 self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-            if len(self.child) == 0:
+            if len(self.child) == 0 or self.child[0].poll() is not None:
                 self.logger.log("WorkloadPatch: Not app consistent backup")
-                self.error_details.append("not app consistent")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                return
             elif self.child[0].poll() is None:
                 self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                 self.child[0].kill()
+        else: #non IPC based workloads
+            if preDaemonThread.isAlive():
+                self.logger.log("WorkloadPatch: Post- Timeout daemon still in sleep. Terminating ...")
+                daemonProcess.terminate()
+            else:
+                self.logger.log("WorkloadPatch: Post Error- Timeout daemon executed before post")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                return
 
         postWorkloadStatus = self.workloadStatus()
         if postWorkloadStatus != preWorkloadStatus:
@@ -167,23 +176,11 @@ class WorkloadPatch:
             return None
         
         if 'mysql' in self.name.lower():
-            if len(self.child) == 0:
-                self.logger.log("WorkloadPatch: Not app consistent backup")
-                self.error_details.append("not app consistent")
-            elif self.child[0].poll() is None:
-                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                self.child[0].kill()
             self.logger.log("WorkloadPatch: Create connection string for post master")
             args = self.command+self.name+" --login-path="+self.cred_string+" < main/workloadPatch/scripts/postMysqlMaster.sql"
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            if preDaemonThread.isAlive():
-                self.logger.log("WorkloadPatch: Post- Timeout daemon still in sleep. Terminating ...")
-                daemonProcess.terminate()
-            else:
-                self.logger.log("WorkloadPatch: Post Error- Timeout daemon executed before post")
-                return
             postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
             args = ["su", "-", self.cred_string, "-c", postOracle]
             process = subprocess.Popen(args)

@@ -48,12 +48,12 @@ class ExtensionErrorCodeEnum():
     FailedWorkloadInvalidRole = 502
     FailedWorkloadInvalidWorkloadName = 503
     FailedWorkloadPostError = 504
-    FailedWorkloadBackupNotSupported = 505
-    FailedWorkloadAuthorizationMissing = 506
-    FailedWorkloadConnectionError = 507
-    FailedWorkloadIPCDirectoryMissing = 508
-    FailedWorkloadDatabaseNotOpen = 509
-    FailedWorkloadQuiescingError = 510
+    FailedWorkloadAuthorizationMissing = 505
+    FailedWorkloadConnectionError = 506
+    FailedWorkloadIPCDirectoryMissing = 507
+    FailedWorkloadDatabaseNotOpen = 508
+    FailedWorkloadQuiescingError = 509
+    FailedWorkloadQuiescingTimeout = 510
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -103,12 +103,12 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadInvalidRole : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadInvalidWorkloadName : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadPostError : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedWorkloadBackupNotSupported : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadAuthorizationMissing : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadConnectionError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : Status.ExtVmHealthStateEnum.yellow
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : Status.ExtVmHealthStateEnum.yellow
             }
 
     ExtensionErrorCodeNameDict = {
@@ -156,12 +156,12 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadInvalidRole : "FailedWorkloadInvalidRole",
             ExtensionErrorCodeEnum.FailedWorkloadInvalidWorkloadName : "FailedWorkloadInvalidWorkloadName",
             ExtensionErrorCodeEnum.FailedWorkloadPostError : "FailedWorkloadPostError",
-            ExtensionErrorCodeEnum.FailedWorkloadBackupNotSupported : "FailedWorkloadBackupNotSupported",
             ExtensionErrorCodeEnum.FailedWorkloadAuthorizationMissing : "FailedWorkloadAuthorizationMissing",
             ExtensionErrorCodeEnum.FailedWorkloadConnectionError : "FailedWorkloadConnectionError",
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : "FailedWorkloadIPCDirectoryMissing",
             ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : "FailedWorkloadDatabaseNotOpen",
-            ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : "FailedWorkloadQuiescingError"
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : "FailedWorkloadQuiescingError",
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : "FailedWorkloadQuiescingTimeout"
             }
     
     @staticmethod

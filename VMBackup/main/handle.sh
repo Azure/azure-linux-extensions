@@ -13,7 +13,12 @@ logfile=$logfolder'/shell.log'
 rc=3
 arc=0
 
-if [ $1 != "enable"  ] && [ $1 != "daemon" ]
+if [ "$1" = "install" ]
+then
+    cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
+    echo "`date`- The command is $1, exiting" >> $logfile
+    exit $arc
+elif [ $1 != "enable"  ] && [ $1 != "daemon" ]
 then
     echo "`date`- The command is $1, exiting" >> $logfile
     exit $arc

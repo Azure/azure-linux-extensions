@@ -133,6 +133,7 @@ class CommonVariables:
     FailedWorkloadIPCDirectoryMissing = 507
     FailedWorkloadDatabaseNotOpen = 508
     FailedWorkloadQuiescingError = 509
+    FailedWorkloadQuiescingTimeout = 510
 
     """
     Consistency-Types
