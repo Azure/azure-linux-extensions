@@ -26,35 +26,7 @@ import metrics_ext_utils.metrics_constants as metrics_constants
 import subprocess
 import time
 import signal
-
-def is_systemd():
-    """
-    Check if the system is using systemd
-    """
-
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    return check_systemd == 0
-
-
-def is_arc_installed():
-    """
-    Check if the system is an on prem machine running Arc
-    """
-    # Using systemctl to check this since Arc only supports VM that have systemd
-    check_arc = os.system("systemctl status himdsd 1>/dev/null 2>&1")
-    return check_arc == 0
-
-
-def get_arc_endpoint():
-    """
-    Find the endpoint for arc Hybrid IMDS
-    """
-    endpoint_filepath = "/lib/systemd/system.conf.d/azcmagent.conf"
-    with open(endpoint_filepath, "r") as f:
-        data = f.read()
-    endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
-
-    return endpoint
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 
 def is_running(is_lad):
@@ -89,7 +61,7 @@ def stop_metrics_service(is_lad):
         metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
 
     # If the VM has systemd, then we will use that to stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         code = 1
         metrics_service_path = metrics_constants.metrics_extension_service_path
 
@@ -168,7 +140,7 @@ def generate_Arc_MSI_token():
     try:
         data = None
         while retries <= max_retries:
-            arc_endpoint = get_arc_endpoint()
+            arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
                 req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
@@ -227,7 +199,7 @@ def generate_MSI_token():
     This is called from the main extension code after config setup is complete
     """
 
-    if is_arc_installed():
+    if metrics_utils.is_arc_installed():
         return generate_Arc_MSI_token()
     else:
         _, configFolder = get_handler_vars()
@@ -344,7 +316,7 @@ def start_metrics(is_lad):
 
 
     # If the VM has systemd, then we use that to start/stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         service_restart_status = os.system("sudo systemctl restart metrics-extension")
         if service_restart_status != 0:
             log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
@@ -511,8 +483,8 @@ def get_imds_values(is_lad):
     if is_lad:
         imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
     else:
-        if is_arc_installed():
-            imdsurl = get_arc_endpoint()
+        if metrics_utils.is_arc_installed():
+            imdsurl = metrics_utils.get_arc_endpoint()
             imdsurl += "/metadata/instance?api-version=2019-11-01"
             is_arc = True
         else:
@@ -655,8 +627,7 @@ def setup_me(is_lad):
 
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if metrics_utils.is_systemd():
         setup_me_service(me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
 
     return True
