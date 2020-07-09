@@ -120,6 +120,18 @@ class CommonVariables:
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
     FailedGuestAgentInvokedCommandTooLate = 402
+    
+    FailedWorkloadPreError = 500
+    FailedWorkloadConfParsingError = 501
+    FailedWorkloadInvalidRole = 502
+    FailedWorkloadInvalidWorkloadName = 503
+    FailedWorkloadPostError = 504
+    FailedWorkloadAuthorizationMissing = 505
+    FailedWorkloadConnectionError = 506
+    FailedWorkloadIPCDirectoryMissing = 507
+    FailedWorkloadDatabaseNotOpen = 508
+    FailedWorkloadQuiescingError = 509
+    FailedWorkloadQuiescingTimeout = 510
 
     """
     Consistency-Types
