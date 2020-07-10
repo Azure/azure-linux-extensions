@@ -37,9 +37,9 @@ def get_linux_distribution():
        Python 3.5 and removed in Python 3.7"""
 
     try:
-        osinfo = list(platform.linux_distribution())
+        osinfo = list(platform.linux_distribution(full_distribution_name=False))
     except AttributeError:
-        osinfo = list(distro.linux_distribution())
+        osinfo = list(distro.linux_distribution(full_distribution_name=False))
 
     return osinfo
 
