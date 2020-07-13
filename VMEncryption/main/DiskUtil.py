@@ -227,6 +227,19 @@ class DiskUtil(object):
 
         return self.luks_add_key(passphrase_file, dev_path, mapper_name, header_file, cleartext_key_file_path)
 
+    def luks_get_uuid(self, header_or_dev_path):
+        cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_or_dev_path)
+
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
+
+        lines = filter(lambda l: "uuid" in l.lower(), proc_comm.stdout.split("\n"))
+        for line in lines:
+            splits = line.split()
+            if len(splits) == 2 and len(splits[1]) == 36:
+                return splits[1]
+        return None
+
     def luks_dump_keyslots(self, dev_path, header_file):
         cryptsetup_cmd = ""
         if header_file:
