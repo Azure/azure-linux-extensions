@@ -54,6 +54,9 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+workloadpatch_folder = main_folder + '/workloadPatch'
+packages_array.append(workloadpatch_folder)
+
 manifest = "manifest.xml"
 prod_manifest = "prodmanifest.xml"
 
