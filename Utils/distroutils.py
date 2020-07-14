@@ -27,6 +27,9 @@ def get_my_distro(config):
         if re.search("red\s?hat", os_name, re.IGNORECASE):
             # Red Hat
             return RedhatDistro(config)
+        if re.search("centos", os_name, re.IGNORECASE):
+            # CentOS
+            return CentOSDistro(config)
         if re.search("coreos", os_name, re.IGNORECASE):
             # CoreOs
             return CoreOSDistro(config)
@@ -475,6 +478,12 @@ class RedhatDistro(GenericDistro):
         self.ssh_service_restart_option = 'condrestart'
         self.ssh_service_name = 'sshd'
         self.distro_name = 'Red Hat'
+
+
+class CentOSDistro(RedhatDistro):
+    def __init__(self, config):
+        super(CentOSDistro, self).__init__(config)
+        self.distro_name = "CentOS"
 
 
 class FedoraDistro(RedhatDistro):
