@@ -28,6 +28,7 @@ import threading
 import time
 import traceback
 import xml.etree.ElementTree as ET
+import json
 
 # Just wanted to be able to run 'python diagnostic.py ...' from a local dev box where there's no waagent.
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
@@ -50,6 +51,12 @@ try:
     import lad_config_all as lad_cfg
     from Utils.imds_util import ImdsLogger
     import Utils.omsagent_util as oms
+    import telegraf_utils.telegraf_config_handler as telhandler
+    import metrics_ext_utils.metrics_ext_handler as me_handler
+    import metrics_ext_utils.metrics_constants as metrics_constants
+
+
+
 except Exception as e:
     print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
           'Stacktrace: {1}'.format(e, traceback.format_exc())
@@ -72,6 +79,9 @@ g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnos
 # Only 2 globals not following 'g_...' naming convention, for legacy readability...
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
+enable_metrics_ext = False #Flag to enable/disable MetricsExtension
+me_msi_token_expiry_epoch = None
+
 
 
 def init_distro_specific_actions():
@@ -225,6 +235,15 @@ def create_core_components_configs():
             g_ext_settings.redacted_handler_settings())
         return None
 
+    global enable_metrics_ext
+    ladconfig = configurator._ladCfg()
+    sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladconfig, 'performanceCounters')
+    for name in sinks:
+        sink = configurator._sink_configs.get_sink_by_name(name)
+        if sink is not None:
+            if sink['name'] == 'AzMonSink':
+                enable_metrics_ext = True
+
     return configurator
 
 
@@ -261,6 +280,7 @@ def main(command):
     init_globals()
 
     global g_ext_op_type
+    global me_msi_token_expiry_epoch
 
     g_ext_op_type = get_extension_operation_type(command)
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
@@ -277,6 +297,20 @@ def main(command):
             else:
                 stop_mdsd()
             oms.tear_down_omsagent_for_lad(RunGetOutput, False)
+
+            #Stop the telegraf and ME services
+            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
+            if tel_out:
+                hutil.log(tel_msg)
+            else:
+                hutil.error(tel_msg)
+
+            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
+            if me_out:
+                hutil.log(me_msg)
+            else:
+                hutil.error(me_msg)
+
             hutil.do_status_report(g_ext_op_type, "success", '0', "Disable succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Uninstall:
@@ -291,6 +325,33 @@ def main(command):
                 hutil.error('lad-mdsd remove failed. Still proceeding to uninstall. '
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
+
+            #Stop the telegraf and ME services
+            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
+            if tel_out:
+                hutil.log(tel_msg)
+            else:
+                hutil.error(tel_msg)
+
+            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
+            if me_out:
+                hutil.log(me_msg)
+            else:
+                hutil.error(me_msg)
+
+            #Delete the telegraf and ME services
+            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+            if tel_rm_out:
+                hutil.log(tel_rm_msg)
+            else:
+                hutil.error(tel_rm_msg)
+
+            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=True)
+            if me_rm_out:
+                hutil.log(me_rm_msg)
+            else:
+                hutil.error(me_rm_msg)
+
             hutil.do_status_report(g_ext_op_type, "success", '0', "Uninstall succeeded")
 
         elif g_ext_op_type is waagent.WALAEventOperation.Install:
@@ -301,6 +362,27 @@ def main(command):
                 g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
                 return
+
+            #Start the Telegraf and ME services on Enable after installation is complete
+            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
+            if start_telegraf_out:
+                hutil.log("Successfully started metrics-sourcer.")
+            else:
+                hutil.error(log_messages)
+
+            if enable_metrics_ext:
+                # Generate/regenerate MSI Token required by ME
+                msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                if msi_token_generated:
+                    hutil.log("Successfully generated metrics-extension MSI Auth token.")
+                else:
+                    hutil.error(log_messages)
+
+                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
+                if start_metrics_out:
+                    hutil.log("Successfully started metrics-extension.")
+                else:
+                    hutil.error(log_messages)
 
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
@@ -314,6 +396,50 @@ def main(command):
                     g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
+
+                #Start the Telegraf and ME services on Enable after installation is complete
+                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
+                if start_telegraf_out:
+                    hutil.log("Successfully started metrics-sourcer.")
+                else:
+                    hutil.error(log_messages)
+
+                if enable_metrics_ext:
+                    # Generate/regenerate MSI Token required by ME
+                    generate_token = False
+                    me_token_path = g_ext_dir + "/metrics_configs/AuthToken-MSI.json"
+
+                    if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
+                        if os.path.isfile(me_token_path):
+                            with open(me_token_path, "r") as f:
+                                authtoken_content = f.read()
+                                if authtoken_content and "expires_on" in authtoken_content:
+                                    me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                else:
+                                    generate_token = True
+                        else:
+                            generate_token = True
+
+                    if me_msi_token_expiry_epoch:
+                        currentTime = datetime.datetime.now()
+                        token_expiry_time = datetime.datetime.fromtimestamp(me_msi_token_expiry_epoch)
+                        if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                            # The MSI Token will expire within 30 minutes. We need to refresh the token
+                            generate_token = True
+
+                    if generate_token:
+                        generate_token = False
+                        msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                        if msi_token_generated:
+                            hutil.log("Successfully refreshed metrics-extension MSI Auth token.")
+                        else:
+                            hutil.error(log_messages)
+
+                    start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
+                    if start_metrics_out:
+                        hutil.log("Successfully started metrics-extension.")
+                    else:
+                        hutil.error(log_messages)
 
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
@@ -390,6 +516,12 @@ def start_mdsd(configurator):
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
+    copy_env = os.environ
+    # Add MDSD_CONFIG_DIR  as an env variable since new mdsd master branch LAD doesnt create this dir
+    mdsd_config_cache_dir = os.path.join(g_ext_dir, "config")
+    copy_env["MDSD_CONFIG_DIR"] = mdsd_config_cache_dir
+
+
     # We then validate the mdsd config and proceed only when it succeeds.
     xml_file = os.path.join(g_ext_dir, 'xmlCfg.xml')
     tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
@@ -416,12 +548,14 @@ def start_mdsd(configurator):
     err_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
+    # Need to provide EH events and Rsyslog spool path since the new mdsd master branch LAD doesnt create the directory needed
+    eh_spool_path = os.path.join(log_dir, 'eh')
 
     update_selinux_settings_for_rsyslogomazuremds(RunGetOutput, g_ext_dir)
 
     mdsd_stdout_redirect_path = os.path.join(g_ext_dir, "mdsd.log")
     mdsd_stdout_stream = None
-    copy_env = os.environ
+
     g_dist_config.extend_environment(copy_env)
 
     # mdsd http proxy setting
@@ -430,14 +564,15 @@ def start_mdsd(configurator):
         copy_env['MDSD_http_proxy'] = proxy_config
 
     # Now prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -o {5}{6}'.format(
+    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -S {7} -o {5}{6}'.format(
         g_mdsd_bin_path,
         xml_file,
         g_mdsd_role_name,
         err_file_path,
         warn_file_path,
         info_file_path,
-        g_ext_settings.get_mdsd_trace_option()).split(" ")
+        g_ext_settings.get_mdsd_trace_option(),
+        eh_spool_path).split(" ")
 
     try:
         start_watcher_thread()
@@ -461,6 +596,9 @@ def start_mdsd(configurator):
             last_mdsd_start_time = datetime.datetime.now()
             last_error_time = last_mdsd_start_time
             omi_installed = True  # Remembers if OMI is installed at each iteration
+            telegraf_restart_retries = 0
+            me_restart_retries = 0
+            max_restart_retries = 10
             # Continuously monitors mdsd process
             while True:
                 time.sleep(30)
@@ -484,6 +622,76 @@ def start_mdsd(configurator):
                 omi_installed = restart_omi_if_crashed(omi_installed, mdsd)
                 # 3. Check if there's any new logs in mdsd.err and report
                 last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
+                # 4. Check if telegraf is running, if not, then restart
+                if not telhandler.is_running(is_lad=True):
+                    if telegraf_restart_retries < max_restart_retries:
+                        telegraf_restart_retries += 1
+                        hutil.log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
+                        if tel_out:
+                            hutil.log(tel_msg)
+                        else:
+                            hutil.error(tel_msg)
+                        start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
+                        if start_telegraf_out:
+                            hutil.log("Successfully started metrics-sourcer.")
+                        else:
+                            hutil.error(log_messages)
+                    else:
+                        hutil.error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                else:
+                    telegraf_restart_retries = 0
+                # 5. Check if ME is running, if not, then restart
+                if enable_metrics_ext:
+                    if not me_handler.is_running(is_lad=True):
+                        if me_restart_retries < max_restart_retries:
+                            me_restart_retries += 1
+                            hutil.log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
+                            if me_out:
+                                hutil.log(me_msg)
+                            else:
+                                hutil.error(me_msg)
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
+                            if start_metrics_out:
+                                hutil.log("Successfully started metrics-extension.")
+                            else:
+                                hutil.error(log_messages)
+                        else:
+                            hutil.error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                    else:
+                        me_restart_retries = 0
+                    # 6. Regenerate the MSI auth token required for ME if it is nearing expiration
+                    # Generate/regenerate MSI Token required by ME
+                    global me_msi_token_expiry_epoch
+                    generate_token = False
+                    me_token_path = g_ext_dir + "/config/metrics_configs/AuthToken-MSI.json"
+
+                    if me_msi_token_expiry_epoch is None  or me_msi_token_expiry_epoch == "":
+                        if os.path.isfile(me_token_path):
+                            with open(me_token_path, "r") as f:
+                                authtoken_content = json.loads(f.read())
+                                if authtoken_content and "expires_on" in authtoken_content:
+                                    me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                else:
+                                    generate_token = True
+                        else:
+                            generate_token = True
+
+                    if me_msi_token_expiry_epoch:
+                        currentTime = datetime.datetime.now()
+                        token_expiry_time = datetime.datetime.fromtimestamp(float(me_msi_token_expiry_epoch))
+                        if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                            # The MSI Token will expire within 30 minutes. We need to refresh the token
+                            generate_token = True
+
+                    if generate_token:
+                        generate_token = False
+                        msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                        if msi_token_generated:
+                            hutil.log("Successfully refreshed metrics-extension MSI Auth token.")
+                        else:
+                            hutil.error(log_messages)
 
             # Out of the inner while loop: mdsd terminated.
             if mdsd_stdout_stream:

@@ -1,0 +1,1 @@
+SET GLOBAL read_only = OFF; UNLOCK TABLES;
