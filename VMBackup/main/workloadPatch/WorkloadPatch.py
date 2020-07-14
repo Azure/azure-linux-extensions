@@ -27,7 +27,7 @@ except ImportError:
     import configparser as ConfigParsers
 import subprocess
 from common import CommonVariables
-from workloadPatch.LogBackupPatch import LogBackupPatch
+from workloadPatch.logbackupPatch import LogBackupPatch
 
 class ErrorDetail:
     def __init__(self, errorCode, errorMsg):
