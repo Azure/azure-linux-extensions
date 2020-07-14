@@ -61,6 +61,7 @@ class FreezeSnapshotter(object):
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
         self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
         self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
+        self.waDiskLunList= []
 
         #implement in next release
         '''
@@ -97,6 +98,16 @@ class FreezeSnapshotter(object):
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
                     self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
+                
+                if customSettings['waDiskLunList'] != None :
+                    self.waDiskLunList = customSettings['waDiskLunList']
+                
+                if self.waDiskLunList.count != 0 and para_parser.includeLunList.count!=0 : 
+                    for crpLunNo in para_parser.includeLunList :
+                        if crpLunNo in self.waDiskLunList :
+                            self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
+                            self.takeSnapshotFrom = CommonVariables.onlyHost
+                            break
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
