@@ -206,7 +206,7 @@ def encrypt_secret_with_cert(run_command, logger, cert_path, secret):
     # Have openssl write to our temporary file (on Linux we don't have an exclusive lock on the temp file).
     # openssl smime, when asked to put output in a file, simply overwrites the file; it does not unlink/creat or
     # creat/rename.
-    cmd = "echo -n '{0}' | openssl smime -encrypt -outform DER -out {1} {2}"
+    cmd = "echo -n '{0}' | openssl smime -aes256 -encrypt -outform DER -out {1} {2}"
     cmd_to_run = cmd.format(secret, f.name, cert_path)
     ret_status, ret_msg = run_command(cmd_to_run, should_log=False)
     if ret_status is not 0:
