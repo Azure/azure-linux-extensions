@@ -99,9 +99,11 @@ class FreezeSnapshotter(object):
                     self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
                 
-                if customSettings['waDiskLunList'] != None :
+                if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
                     self.waDiskLunList = customSettings['waDiskLunList']
                 
+                self.logger.log('WA Disk Lun List ' + str(self.waDiskLunList))
+
                 if self.waDiskLunList.count != 0 and para_parser.includeLunList.count!=0 : 
                     for crpLunNo in para_parser.includeLunList :
                         if crpLunNo in self.waDiskLunList :
