@@ -103,7 +103,7 @@ class FreezeSnapshotter(object):
                     self.waDiskLunList = customSettings['waDiskLunList']            
                     self.logger.log('WA Disk Lun List ' + str(self.waDiskLunList))
 
-                if self.waDiskLunList.count != 0 and para_parser.includeLunList.count!=0 : 
+                if self.waDiskLunList!=None and self.waDiskLunList.count != 0 and para_parser.includeLunList!=None and para_parser.includeLunList.count!=0 : 
                     for crpLunNo in para_parser.includeLunList :
                         if crpLunNo in self.waDiskLunList :
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
