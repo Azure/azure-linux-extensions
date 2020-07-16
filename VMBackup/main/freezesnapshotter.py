@@ -100,9 +100,8 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
                 
                 if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
-                    self.waDiskLunList = customSettings['waDiskLunList']
-                
-                self.logger.log('WA Disk Lun List ' + str(self.waDiskLunList))
+                    self.waDiskLunList = customSettings['waDiskLunList']            
+                    self.logger.log('WA Disk Lun List ' + str(self.waDiskLunList))
 
                 if self.waDiskLunList.count != 0 and para_parser.includeLunList.count!=0 : 
                     for crpLunNo in para_parser.includeLunList :
