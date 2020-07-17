@@ -215,6 +215,9 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('umount ' + mountpoint, True)
 
     def _append_contents_to_file(self, contents, path):
+        if isinstance(contents, str):
+            contents = contents.decode('utf-8')
+
         with open(path, 'a') as f:
             f.write(contents)
 
