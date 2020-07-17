@@ -128,7 +128,7 @@ class WorkloadPatch:
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = [self.sudo_user, preOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
@@ -185,7 +185,7 @@ class WorkloadPatch:
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
             args = [self.sudo_user, postOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
@@ -231,7 +231,7 @@ class WorkloadPatch:
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = [self.sudo_user, preOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
@@ -288,7 +288,7 @@ class WorkloadPatch:
             else:
                 self.logger.log("WorkloadPatch: Post error- Timeout daemon executed before post")
                 return
-            postOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
             args = [self.sudo_user, postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
@@ -401,8 +401,8 @@ class WorkloadPatch:
         global preDaemonThread
         if 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
-            preDaemonOracle = self.command + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
-            argsDaemon = ["su", "-", self.cred_string, "-c", preDaemonOracle]
+            preDaemonOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
+            argsDaemon = [self.sudo_user, preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
         self.logger.log("WorkloadPatch: timeoutDaemon started for: " + self.timeout + " seconds")
@@ -419,7 +419,7 @@ class WorkloadPatch:
 
     def workloadStatus(self):
         if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.cred_string + " -c " + "'" + self.command +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            statusArgs =  self.sudo_user + " " +"'" + self.command + "sqlplus" +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
             oracleStatus = subprocess.check_output(statusArgs, shell=True)
             self.logger.log("WorkloadPatch: workloadStatus- " + str(oracleStatus))
             return oracleStatus

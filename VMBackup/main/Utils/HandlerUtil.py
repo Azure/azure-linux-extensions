@@ -798,7 +798,7 @@ class HandlerUtility:
                 for pid in pids:
                     pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
                     for db in dblist :
-                        if db in pname.lower() and db not in workloads :
+                        if db in str(pname).lower() and db not in workloads :
                             self.log("workload running found with command : " + str(pname))
                             workloads.append(db)
             return workloads
