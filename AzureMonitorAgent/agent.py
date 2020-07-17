@@ -270,8 +270,8 @@ def install():
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
         MONITORING_GCS_AUTH_ID_TYPE = ""
-        if protected_settings.has_key("monitoringGCSAuthIdType"):
-            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
+        if protected_settings.has_key("MONITORING_GCS_AUTH_ID_TYPE"):
+            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
 
         if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
             waagent_log_error('Not all required GCS parameters are provided')
@@ -289,6 +289,9 @@ def install():
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             
+            if MONITORING_GCS_AUTH_ID_TYPE is not "":
+                default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
+
             if MONITORING_GCS_CERT_CERTFILE is not None:
                 default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
                 fh = open("/etc/mdsd.d/gcscert.pem", "wb")
