@@ -173,7 +173,7 @@ def remove_utf8_bom(src):
         elif bincontents[:3] == '\xef\x00\x00':
             contents = bincontents[3:].decode('utf-8')
         else:
-            contents = bincontents.decode('utf8')
+            contents = bincontents.decode('utf-8')
 
     with open(src, "wb") as fp:
         fp.write(contents.encode('utf-8'))
