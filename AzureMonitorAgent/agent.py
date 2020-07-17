@@ -269,7 +269,11 @@ def install():
         if protected_settings.has_key("configVersion"):
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
-        if MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
+        MONITORING_GCS_AUTH_ID_TYPE = ""
+        if protected_settings.has_key("monitoringGCSAuthIdType"):
+            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
+
+        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
             waagent_log_error('Not all required GCS parameters are provided')
             raise ParameterMissingException
         else:
@@ -280,24 +284,26 @@ def install():
             default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
             default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
             default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
-            default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
-            default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
 
             # write the certificate and key to disk
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             
-            fh = open("/etc/mdsd.d/gcscert.pem", "wb")
-            fh.write(MONITORING_GCS_CERT_CERTFILE)
-            fh.close()
-            os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
-            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
+            if MONITORING_GCS_CERT_CERTFILE is not None:
+                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
+                fh = open("/etc/mdsd.d/gcscert.pem", "wb")
+                fh.write(MONITORING_GCS_CERT_CERTFILE)
+                fh.close()
+                os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
 
-            fh = open("/etc/mdsd.d/gcskey.pem", "wb")
-            fh.write(MONITORING_GCS_CERT_KEYFILE)
-            fh.close()
-            os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
-            os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
+            if MONITORING_GCS_CERT_KEYFILE is not None:
+                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
+                fh = open("/etc/mdsd.d/gcskey.pem", "wb")
+                fh.write(MONITORING_GCS_CERT_KEYFILE)
+                fh.close()
+                os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
 
     config_file = "/etc/default/mdsd"
     config_updated = False
