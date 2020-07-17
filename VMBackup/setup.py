@@ -55,6 +55,9 @@ patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
 workloadpatch_folder = main_folder + '/workloadPatch'
+workloadutils_folder = main_folder + '/workloadPatch/WorkloadUtils'
+workloadscripts_folder = main_folder + '/workloadPatch/scripts'
+sqlfilelists=os.listdir(workloadscripts_folder)
 packages_array.append(workloadpatch_folder)
 
 manifest = "manifest.xml"
@@ -129,8 +132,11 @@ setup(name = CommonVariables.extension_name,
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
-        'License :: OSI Approved :: Apache Software License'],
-      packages = packages_array)
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: SQL',
+        'Programming Language :: PL/SQL'],
+      packages = packages_array
+      )
 
 """
 unzip the package files and re-package it.
@@ -173,6 +179,10 @@ def copy(src, dst):
 final_folder_path = target_zip_file_location + target_folder_name
 final_binary_path= final_folder_path + '/main/safefreeze'
 final_plugin_path = final_folder_path + '/main/tempPlugin'
+final_workloadscripts_path = final_folder_path + '/main/workloadPatch/scripts'
+final_workloadutils_path = final_folder_path + '/main/workloadPatch/WorkloadUtils'
+copybinary(workloadscripts_folder, final_workloadscripts_path) 
+copybinary(workloadutils_folder, final_workloadutils_path)
 final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
