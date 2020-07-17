@@ -218,7 +218,7 @@ class SplitRootPartitionState(OSEncryptionState):
         contents += '\n'
 
         with open('/etc/fstab', 'wb') as f:
-            f.write(contents)
+            f.write(contents.encode("utf-8"))
 
         self.context.logger.log("fstab updated successfully")
 

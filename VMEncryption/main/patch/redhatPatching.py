@@ -153,7 +153,9 @@ class redhatPatching(AbstractPatching):
         return False
 
     @staticmethod
-    def append_contents_to_file(contents, path):
+    def _append_contents_to_file(self, contents, path):
+        if isinstance(contents, str):
+            contents = contents.decode('utf-8')
         with open(path, 'a') as f:
             f.write(contents)
 
