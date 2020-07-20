@@ -81,7 +81,7 @@ class GenericDistro(object):
         home = None
         try:
             home = ext_utils.get_line_starting_with("HOME", "/etc/default/useradd").split('=')[1].strip()
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if (home is None) or (not home.startswith("/")):
             home = "/home"
@@ -156,12 +156,12 @@ class GenericDistro(object):
         user_entry = None
         try:
             user_entry = pwd.getpwnam(user)
-        except (KeyError, OSError):
+        except (KeyError, EnvironmentError):
             pass
         uid_min = None
         try:
             uid_min = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uid_min is None:
             uid_min = 100
@@ -193,7 +193,7 @@ class GenericDistro(object):
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
             os.chmod("/etc/sudoers.d/waagent", 0o440)
-        except OSError:
+        except EnvironmentError:
             logger.error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = self.get_home()
@@ -220,7 +220,7 @@ class GenericDistro(object):
         user_entry = None
         try:
             user_entry = pwd.getpwnam(user)
-        except (KeyError, OSError):
+        except (KeyError, EnvironmentError):
             pass
         if user_entry is None:
             logger.error("DeleteAccount: " + user + " not found.")
@@ -228,7 +228,7 @@ class GenericDistro(object):
         uid_min = None
         try:
             uid_min = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uid_min is None:
             uid_min = 100
@@ -240,7 +240,7 @@ class GenericDistro(object):
         ext_utils.run(['userdel', '-f', '-r', user])
         try:
             os.remove("/etc/sudoers.d/waagent")
-        except OSError:
+        except EnvironmentError:
             pass
         return
 
@@ -274,13 +274,13 @@ class FreeBSDDistro(GenericDistro):
         userentry = None
         try:
             userentry = pwd.getpwnam(user)
-        except (OSError, KeyError):
+        except (EnvironmentError, KeyError):
             pass
         uidmin = None
         try:
             if os.path.isfile("/etc/login.defs"):
                 uidmin = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
             pass
         if uidmin is None:
@@ -318,7 +318,7 @@ class FreeBSDDistro(GenericDistro):
             else:
                 ext_utils.set_file_contents(self.sudoers_dir_base + "/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
             os.chmod(self.sudoers_dir_base + "/sudoers.d/waagent", 0o440)
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             logger.error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = self.get_home()
@@ -349,7 +349,7 @@ class FreeBSDDistro(GenericDistro):
         userentry = None
         try:
             userentry = pwd.getpwnam(user)
-        except (OSError, KeyError):
+        except (EnvironmentError, KeyError):
             pass
         if userentry is None:
             logger.error("DeleteAccount: " + user + " not found.")
@@ -359,7 +359,7 @@ class FreeBSDDistro(GenericDistro):
             if os.path.isfile("/etc/login.defs"):
                 uidmin = int(
                     ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uidmin is None:
             uidmin = 100
@@ -372,7 +372,7 @@ class FreeBSDDistro(GenericDistro):
         ext_utils.run(['rmuser', '-y', user], chk_err=False)
         try:
             os.remove(self.sudoers_dir_base + "/sudoers.d/waagent")
-        except OSError:
+        except EnvironmentError:
             pass
         return
 
@@ -417,12 +417,12 @@ class CoreOSDistro(GenericDistro):
         userentry = None
         try:
             userentry = pwd.getpwnam(user)
-        except (OSError, KeyError):
+        except (EnvironmentError, KeyError):
             pass
         uidmin = None
         try:
             uidmin = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
-        except (ValueError, KeyError, AttributeError, OSError):
+        except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uidmin is None:
             uidmin = 100
@@ -447,7 +447,7 @@ class CoreOSDistro(GenericDistro):
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
             os.chmod("/etc/sudoers.d/waagent", 0o440)
-        except OSError:
+        except EnvironmentError:
             logger.error("CreateAccount: Failed to configure sudo access for user.")
             return "Failed to configure sudo privileges (0x08)."
         home = self.get_home()
