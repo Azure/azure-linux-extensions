@@ -48,7 +48,7 @@ def change_owner(file_path, user):
     p = None
     try:
         p = pwd.getpwnam(user)
-    except (KeyError, OSError):
+    except (KeyError, EnvironmentError):
         pass
     if p is not None:
         os.chown(file_path, p[2], p[3])
@@ -61,7 +61,7 @@ def create_dir(dir_path, user, mode):
     """
     try:
         os.makedirs(dir_path, mode)
-    except OSError:
+    except EnvironmentError:
         pass
     change_owner(dir_path, user)
 
@@ -75,7 +75,7 @@ def set_file_contents(file_path, contents):
     try:
         with open(file_path, "wb+") as F:
             F.write(contents)
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'SetFileContents', 'Writing to file ' + file_path + ' Exception is ' + str(e))
         return None
@@ -94,7 +94,7 @@ def append_file_contents(file_path, contents):
     try:
         with open(file_path, "a+") as F:
             F.write(contents)
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'AppendFileContents', 'Appending to file ' + file_path + ' Exception is ' + str(e))
         return None
@@ -112,7 +112,7 @@ def get_file_contents(file_path, as_bin=False):
         with open(file_path, mode) as F:
             contents = F.read()
             return contents
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'GetFileContents', 'Reading from file ' + file_path + ' Exception is ' + str(e))
         return None
@@ -127,7 +127,7 @@ def replace_file_with_contents_atomic(filepath, contents):
         contents = contents.encode('latin-1')
     try:
         os.write(handle, contents)
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Writing to file ' + filepath + ' Exception is ' + str(e))
         return None
@@ -136,18 +136,18 @@ def replace_file_with_contents_atomic(filepath, contents):
     try:
         os.rename(temp, filepath)
         return None
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Renaming ' + temp + ' to ' + filepath + ' Exception is ' + str(e)
         )
     try:
         os.remove(filepath)
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
     try:
         os.rename(temp, filepath)
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Removing ' + filepath + ' Exception is ' + str(e))
         return 1
@@ -159,7 +159,7 @@ def run_command_and_write_stdout_to_file(command, output_file):
     try:
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         stdout, stderr = p.communicate()
-    except OSError as e:
+    except EnvironmentError as e:
         logger.error('CalledProcessError.  Error message is ' + str(e))
         return e.errno
     if p.returncode != 0:
@@ -189,7 +189,7 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.error(
                 'CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
         return e.returncode, e.output.decode('latin-1')
-    except OSError as e:
+    except EnvironmentError as e:
         if chk_err and log_cmd:
             logger.error(
                 'CalledProcessError.  Error message is ' + str(e))
@@ -223,7 +223,7 @@ def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
         me = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         output = me.communicate(cmd_input)
         subprocess_executed = True
-    except OSError as e:
+    except EnvironmentError as e:
         if chk_err and log_cmd:
             logger.error('CalledProcessError.  Error Code is ' + str(e.errno))
             logger.error('CalledProcessError.  Command was ' + str(cmd))
@@ -346,5 +346,5 @@ def add_extension_event(name, op, is_success, duration=0, version="1.0", message
     event.ExtensionType = extension_type
     try:
         event.save()
-    except OSError:
+    except EnvironmentError:
         logger.error("Error " + traceback.format_exc())
