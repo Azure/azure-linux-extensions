@@ -31,6 +31,7 @@ import traceback
 import datetime
 import subprocess
 import inspect
+import io
 
 from .AbstractPatching import AbstractPatching
 from Common import *
@@ -154,9 +155,12 @@ class redhatPatching(AbstractPatching):
 
     @staticmethod
     def _append_contents_to_file(self, contents, path):
-        if isinstance(contents, str):
-            contents = contents.decode('utf-8')
-        with open(path, 'a') as f:
+        # Python 3.x strings are Unicode by default and do not use decode
+        if sys.version_info[0] < 3:
+            if isinstance(contents, str):
+                contents = contents.decode('utf-8')
+
+        with io.open(path, 'a') as f:
             f.write(contents)
 
     @staticmethod

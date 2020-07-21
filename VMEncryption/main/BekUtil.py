@@ -53,8 +53,9 @@ class BekUtil(object):
 
             # ensure base64 encoded passphrase string is identically encoded in
             # python2 and python3 environments for consistency in output format
-            if isinstance(passphrase, str):
-                passphrase = passphrase.decode('utf-8')
+            if sys.version_info[0] < 3:
+                if isinstance(passphrase, str):
+                    passphrase = passphrase.decode('utf-8')
 
             with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
                 f.write(passphrase)

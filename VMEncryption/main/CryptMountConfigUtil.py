@@ -22,6 +22,7 @@ import os.path
 import re
 import shutil
 import uuid
+import io
 from datetime import datetime
 
 from CommandExecutor import CommandExecutor, ProcessCommunicator
@@ -422,8 +423,13 @@ class CryptMountConfigUtil(object):
 
                     filtered_mount_lines.append(line)
 
-            with open(crypt_file_path, 'w') as wf:
-                wf.write(''.join(filtered_mount_lines))
+            with io.open(crypt_file_path, 'w') as wf:
+                contents = ''.join(filtered_mount_lines)
+                # Python 3.x strings are Unicode by default and do not use decode
+                if sys.version_info[0] < 3:
+                    if isinstance(contents, str):
+                        contents = contents.decode('utf-8')
+                wf.write(contents)
 
             if backup_folder is not None:
                 backup_file = os.path.join(backup_folder, line_file_name)
@@ -573,17 +579,27 @@ class CryptMountConfigUtil(object):
 
                 filtered_contents.append(line)
 
-        with open('/etc/fstab', 'w') as f:
-            f.write('\n')
-            f.write('\n'.join(filtered_contents))
-            f.write('\n')
+        with io.open('/etc/fstab', 'w') as f:
+            f.write(u'\n')
+            contents = '\n'.join(filtered_contents)
+            # Python 3.x strings are Unicode by default and do not use decode
+            if sys.version_info[0] < 3:
+                if isinstance(contents, str):
+                    contents = contents.decode('utf-8')
+            f.write(contents)
+            f.write(u'\n')
 
         self.logger.log("fstab updated successfully")
 
-        with open('/etc/fstab.azure.backup', 'a+') as f:
-            f.write('\n')
-            f.write('\n'.join(removed_lines))
-            f.write('\n')
+        with io.open('/etc/fstab.azure.backup', 'a+') as f:
+            f.write(u'\n')
+            contents = '\n'.join(removed_lines)
+            # Python 3.x strings are Unicode by default and do not use decode
+            if sys.version_info[0] < 3:
+                if isinstance(contents, str):
+                    contents = contents.decode('utf-8')
+            f.write(contents)
+            f.write(u'\n')
 
         self.logger.log("fstab.azure.backup updated successfully")
 
@@ -609,9 +625,14 @@ class CryptMountConfigUtil(object):
 
                 lines_to_keep_in_backup_fstab.append(line)
 
-        with open('/etc/fstab.azure.backup', 'w') as f:
-            f.write('\n'.join(lines_to_keep_in_backup_fstab))
-            f.write('\n')
+        with io.open('/etc/fstab.azure.backup', 'w') as f:
+            contents = '\n'.join(lines_to_keep_in_backup_fstab)
+            # Python 3.x strings are Unicode by default and do not use decode
+            if sys.version_info[0] < 3:
+                if isinstance(contents, str):
+                    contents = contents.decode('utf-8')
+            f.write(contents)
+            f.write(u'\n')
 
         self.logger.log("fstab.azure.backup updated successfully")
 
@@ -626,9 +647,14 @@ class CryptMountConfigUtil(object):
                     continue
                 lines_that_remain_in_fstab.append(line)
 
-        with open('/etc/fstab', 'w') as f:
-            f.write('\n'.join(lines_that_remain_in_fstab + lines_to_put_back_to_fstab))
-            f.write('\n')
+        with io.open('/etc/fstab', 'w') as f:
+            contents = '\n'.join(lines_that_remain_in_fstab + lines_to_put_back_to_fstab)
+            # Python 3.x strings are Unicode by default and do not use decode
+            if sys.version_info[0] < 3:
+                if isinstance(contents, str):
+                    contents = contents.decode('utf-8')
+            f.write(contents)
+            f.write(u'\n')
 
         self.logger.log("fstab updated successfully")
 

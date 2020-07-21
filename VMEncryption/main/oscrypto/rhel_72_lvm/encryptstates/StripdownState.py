@@ -21,6 +21,7 @@
 
 import os
 import sys
+import io
 
 from OSEncryptionState import *
 from time import sleep
@@ -88,8 +89,8 @@ class StripdownState(OSEncryptionState):
             self.command_executor.Execute('systemctl restart atd', True)
 
             os.chdir('/')
-            with open("/restart-wala.sh", "w") as f:
-                f.write("systemctl restart waagent\n")
+            with io.open('/restart-wala.sh', 'w') as f:
+                f.write(u'systemctl restart waagent\n')
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
             self.context.hutil.do_exit(exit_code=0,
