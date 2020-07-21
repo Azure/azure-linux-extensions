@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# VM Backup extension
+# VMEncryption extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 # limitations under the License.
 import os
 import string
+import io
 
 class BackupLogger(object):
     def __init__(self, hutil):
@@ -35,9 +36,15 @@ class BackupLogger(object):
  
     def log_to_console(self, msg):
         try:
-            with open('/dev/console', 'w') as f:
+            with io.open('/dev/console', 'w') as f:
                 msg = [c for c in msg if c in string.printable]
                 msg = ''.join(msg)
-                f.write('[AzureDiskEncryption] ' + msg + '\n')
+
+                # Python 3.x strings are Unicode by default and do not use decode
+                if sys.version_info[0] < 3:
+                    if isinstance(msg, str):
+                        msg = msg.decode('utf-8')
+
+                f.write(u'[AzureDiskEncryption] ' + msg + u'\n')
         except IOError:
             pass
