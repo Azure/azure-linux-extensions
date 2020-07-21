@@ -23,6 +23,7 @@ import inspect
 import re
 import os
 import sys
+import io
 
 from time import sleep
 from OSEncryptionState import *
@@ -110,7 +111,7 @@ class PatchBootSystemState(OSEncryptionState):
             if isinstance(contents, str):
                 contents = contents.decode('utf-8')
 
-        with open(path, 'a') as f:
+        with io.open(path, 'a') as f:
             f.write(contents)
 
     def _modify_pivoted_oldroot(self):

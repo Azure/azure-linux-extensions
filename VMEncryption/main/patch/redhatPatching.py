@@ -31,6 +31,7 @@ import traceback
 import datetime
 import subprocess
 import inspect
+import io
 
 from .AbstractPatching import AbstractPatching
 from Common import *
@@ -159,7 +160,7 @@ class redhatPatching(AbstractPatching):
             if isinstance(contents, str):
                 contents = contents.decode('utf-8')
 
-        with open(path, 'a') as f:
+        with io.open(path, 'a') as f:
             f.write(contents)
 
     @staticmethod
