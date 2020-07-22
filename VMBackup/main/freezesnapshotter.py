@@ -61,7 +61,7 @@ class FreezeSnapshotter(object):
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
         self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
         self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
-
+        
         #implement in next release
         '''
         # fetching wireserver IP from DHCP
@@ -97,6 +97,19 @@ class FreezeSnapshotter(object):
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
                     self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
+                
+                waDiskLunList= []
+
+                if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
+                    waDiskLunList = customSettings['waDiskLunList']            
+                    self.logger.log('WA Disk Lun List ' + str(waDiskLunList))
+
+                if waDiskLunList!=None and waDiskLunList.count != 0 and para_parser.includeLunList!=None and para_parser.includeLunList.count!=0 : 
+                    for crpLunNo in para_parser.includeLunList :
+                        if crpLunNo in waDiskLunList :
+                            self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
+                            self.takeSnapshotFrom = CommonVariables.onlyHost
+                            break
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
