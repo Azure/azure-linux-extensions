@@ -61,8 +61,7 @@ class FreezeSnapshotter(object):
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
         self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
         self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
-        self.waDiskLunList= []
-
+        
         #implement in next release
         '''
         # fetching wireserver IP from DHCP
@@ -99,13 +98,15 @@ class FreezeSnapshotter(object):
                     self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
                 
-                if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
-                    self.waDiskLunList = customSettings['waDiskLunList']            
-                    self.logger.log('WA Disk Lun List ' + str(self.waDiskLunList))
+                waDiskLunList= []
 
-                if self.waDiskLunList!=None and self.waDiskLunList.count != 0 and para_parser.includeLunList!=None and para_parser.includeLunList.count!=0 : 
+                if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
+                    waDiskLunList = customSettings['waDiskLunList']            
+                    self.logger.log('WA Disk Lun List ' + str(waDiskLunList))
+
+                if waDiskLunList!=None and waDiskLunList.count != 0 and para_parser.includeLunList!=None and para_parser.includeLunList.count!=0 : 
                     for crpLunNo in para_parser.includeLunList :
-                        if crpLunNo in self.waDiskLunList :
+                        if crpLunNo in waDiskLunList :
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
                             self.takeSnapshotFrom = CommonVariables.onlyHost
                             break
