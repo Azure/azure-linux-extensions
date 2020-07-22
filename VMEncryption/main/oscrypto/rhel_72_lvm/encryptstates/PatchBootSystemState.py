@@ -59,6 +59,9 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.unmount_lvm_volumes()
         
+        # RHEL 7.8 does not seem to activate VG on close and open. 
+        # Hence, explicitly activating it.
+        self.command_executor.Execute('vgchange -a y rootvg')
         self.command_executor.Execute('mount /dev/rootvg/rootlv /oldroot', True)
         self.command_executor.Execute('mount /dev/rootvg/varlv /oldroot/var', True)
         self.command_executor.Execute('mount /dev/rootvg/usrlv /oldroot/usr', True)

@@ -221,3 +221,51 @@ class EncryptionSettingsUtil(object):
         # V3 message content
         msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
         self._post_to_wireserver_helper(msg_data, http_util)
+
+    def clear_encryption_settings(self, disk_util):
+        """
+        Clear settings by calling DisableEncryption operation via wire server
+
+        finds all azure data disks and clears their encryption settings
+        """
+
+        self.logger.log("Clearing encryption settings for all data drives")
+
+        data_disk_controller_ids_and_luns = disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
+
+        # validate machine name string or use empty string
+        machine_name = socket.gethostname()
+        if re.match('^[\\w-]+$', machine_name) is None:
+            machine_name = ''
+
+        def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
+            return {
+                "ControllerType": "SCSI",
+                "ControllerId": scsi_controller,
+                "SlotId": lun_number,
+                "Volumes": [{
+                    "VolumeType": "DataVolume",
+                    "ProtectorFileName": "nullProtector.bek",
+                    "SecretTags": self._dict_to_name_value_array({
+                        "DiskEncryptionKeyFileName": "nullProtector.bek",
+                        "MachineName": machine_name})
+                    }]
+                }
+
+        protectors_null = []
+
+        data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+                                    for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
+
+        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
+                "DiskEncryptionOperation": "DisableEncryption",
+                "Disks": data_disks_settings_data,
+                "KekAlgorithm": "",
+                "Protectors": protectors_null,
+                "KekUrl": "",
+                "KekVaultResourceId": "",
+                "KeyVaultResourceId": "",
+                "KeyVaultUrl": ""}
+        self.logger.log("Settings to be sent for clear_encryption_settings: " + json.dumps(data, sort_keys=True, indent=4))
+        self.post_to_wireserver(data)
+        return
