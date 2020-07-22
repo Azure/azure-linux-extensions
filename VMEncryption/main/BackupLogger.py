@@ -18,6 +18,7 @@
 import os
 import string
 import io
+import sys
 
 class BackupLogger(object):
     def __init__(self, hutil):
