@@ -24,6 +24,7 @@ import shutil
 import uuid
 import io
 from datetime import datetime
+import sys
 
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CryptItem, CommonVariables
