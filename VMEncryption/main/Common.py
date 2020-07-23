@@ -46,6 +46,7 @@ class CommonVariables:
     azure_symlinks_dir = '/dev/disk/azure'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
+    az_symlink_os_volume = '/dev/disk/azure/root-part1'
     encryption_key_mount_point = '/mnt/azure_bek_disk/'
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
