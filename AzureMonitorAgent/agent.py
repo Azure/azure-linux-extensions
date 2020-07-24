@@ -67,6 +67,7 @@ TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
+NonSystemdPidFileName = "amamdsd.pid"
 
 # Commands
 OneAgentInstallCommand = ''
@@ -189,7 +190,14 @@ def get_free_space_mb(dirname):
     """
     st = os.statvfs(dirname)
     return st.f_bavail * st.f_frsize / 1024 / 1024
-  
+
+
+def is_systemd():
+    """
+    Check if the system is using systemd
+    """
+    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
+    return check_systemd == 0
 
 def install():
     """
@@ -391,7 +399,27 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
-    OneAgentEnableCommand = "systemctl start mdsd"
+    if is_systemd():
+        OneAgentEnableCommand = "systemctl start mdsd"
+    else:
+        mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
+        hutil_log_Tnfo("The VM doesn't have systemctl. Running mdsd as a process and storing the pid in {0}".format(mdsd_pid_file))
+        mdsd_run_command = "/usr/sbin/mdsd -A -c /etc/mdsd.d/mdsd.xml -r /var/run/mdsd/default -S /var/opt/microsoft/linuxmonagent/eh -e /var/log/mdsd.err -w /var/log/mdsd.warn -o /var/log/mdsd.info"
+        proc = subprocess.Popen(mdsd_run_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
+        time.sleep(3)
+        p = proc.poll()
+
+        # Process is running successfully
+        if p is None:
+            mdsd_pid = proc.pid
+            # Write this pid to a file for future use
+            with open(mdsd_pid_file, "w+") as f:
+                f.write(str(mdsd_pid))
+        else:
+            out, err = proc.communicate()
+            hutil_log_error("Unable to run mdsd binary as a process due to error - {0}. Failed to start AMA.".format(err))
+
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
@@ -411,7 +439,25 @@ def disable():
     stop_metrics_process()
 
     #stop the Azure Monitor Linux Agent service
-    DisableOneAgentServiceCommand = "systemctl stop mdsd"
+    if is_systemd():
+        DisableOneAgentServiceCommand = "systemctl stop mdsd"
+    else:
+        mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
+        hutil_log_info("The VM doesn't have systemctl. Reading pid stored in the file {0} and stopping the mdsd process".format(mdsd_pid_file))
+        if os.path.isfile(mdsd_pid_file):
+            pid = ""
+            with open(mdsd_pid_file, "r") as f:
+                pid = f.read()
+            if pid != "":
+                # Check if the process running is indeed mdsd, ignore if the process output doesn't contain mdsd
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if "mdsd" in output:
+                    os.kill(int(pid), signal.SIGKILL)
+                else:
+                    hutil_log_error("Found a different process running with PID {0}. Failed to stop AMA.".format(pid))
+            else:
+                hutil_log_error("No pid found for an currently running mdsd process in {0}. Failed to stop AMA.".format(mdsd_pid_file))
 
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
@@ -691,8 +737,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"debian", "ubuntu"}
-    rpm_set = {"oracle", "redhat", "centos", "red hat", "suse"}
+    dpkg_set = set(["debian", "ubuntu"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
