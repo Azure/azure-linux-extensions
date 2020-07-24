@@ -401,28 +401,32 @@ def enable():
 
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
+        hutil_log_info('Handler initiating onboarding.')
+        exit_code, output = run_command_and_log(OneAgentEnableCommand)
+
     else:
         mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
-        hutil_log_Tnfo("The VM doesn't have systemctl. Running mdsd as a process and storing the pid in {0}".format(mdsd_pid_file))
+        hutil_log_info("The VM doesn't have systemctl. Running mdsd as a process and storing the pid in {0}".format(mdsd_pid_file))
         mdsd_run_command = "/usr/sbin/mdsd -A -c /etc/mdsd.d/mdsd.xml -r /var/run/mdsd/default -S /var/opt/microsoft/linuxmonagent/eh -e /var/log/mdsd.err -w /var/log/mdsd.warn -o /var/log/mdsd.info"
-        proc = subprocess.Popen(mdsd_run_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # Sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
-        time.sleep(3)
-        p = proc.poll()
+        try:
+            output = subprocess.check_output(mdsd_run_command, stderr = subprocess.STDOUT, shell = True)
+            exit_code = 0
+        except subprocess.CalledProcessError as e:
+            exit_code = e.returncode
+            output = e.output
+        # proc = subprocess.Popen(mdsd_run_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # # Sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
+        # time.sleep(3)
+        # p = proc.poll()
 
         # Process is running successfully
-        if p is None:
+        if exit_code is 0:
             mdsd_pid = proc.pid
             # Write this pid to a file for future use
             with open(mdsd_pid_file, "w+") as f:
                 f.write(str(mdsd_pid))
         else:
-            out, err = proc.communicate()
-            hutil_log_error("Unable to run mdsd binary as a process due to error - {0}. Failed to start AMA.".format(err))
-
-
-    hutil_log_info('Handler initiating onboarding.')
-    exit_code, output = run_command_and_log(OneAgentEnableCommand)
+            hutil_log_error("Unable to run mdsd binary as a process due to error - {0}. Failed to start AMA.".format(output))
 
     if exit_code is 0:
         #start metrics process if enable is successful
@@ -441,6 +445,7 @@ def disable():
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
         DisableOneAgentServiceCommand = "systemctl stop mdsd"
+        exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     else:
         mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
         hutil_log_info("The VM doesn't have systemctl. Reading pid stored in the file {0} and stopping the mdsd process".format(mdsd_pid_file))
@@ -454,12 +459,15 @@ def disable():
                 output = proc.communicate()[0]
                 if "mdsd" in output:
                     os.kill(int(pid), signal.SIGKILL)
+                    exit_code = 0
+                    output = "Stopped running mdsd process with pid {0}".format(pid)
+                    
                 else:
                     hutil_log_error("Found a different process running with PID {0}. Failed to stop AMA.".format(pid))
             else:
                 hutil_log_error("No pid found for an currently running mdsd process in {0}. Failed to stop AMA.".format(mdsd_pid_file))
 
-    exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
+    
     return exit_code, output
 
 def update():
