@@ -229,7 +229,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
-    except (OSError, ValueError, KeyError, AttributeError):
+    except (EnvironmentError, ValueError, KeyError, AttributeError):
         pass
     if ovf_xml is None or ovf_env is None:
         # default ovf_env with empty data

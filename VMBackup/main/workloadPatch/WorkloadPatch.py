@@ -132,6 +132,7 @@ class WorkloadPatch:
             preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
+
             process = subprocess.Popen(args)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
