@@ -463,9 +463,17 @@ def disable():
                     output = "Stopped running mdsd process with pid {0}".format(pid)
                     
                 else:
+                    output = "No mdsd process found for pid {0}".format(pid)
+                    exit_code = 1
                     hutil_log_error("Found a different process running with PID {0}. Failed to stop AMA.".format(pid))
             else:
+                output = "Could not find the pid for runnning mdsd process."
+                exit_code = 1
                 hutil_log_error("No pid found for an currently running mdsd process in {0}. Failed to stop AMA.".format(mdsd_pid_file))
+        else:
+            exit_code = 1
+            output = "Could not find the pid file"
+            hutil_log_error("Pid file at {0} doesn't exists.".format(mdsd_pid_file))
 
     
     return exit_code, output
