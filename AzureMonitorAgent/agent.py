@@ -526,6 +526,7 @@ def metrics_watcher(hutil_error, hutil_log):
                     json_data = json.loads(data)  
                     
                     if len(json_data) == 0:
+                        last_crc = hashlib.sha256(data).hexdigest()                    
                         if telhandler.is_running(is_lad=False):
                             #Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
