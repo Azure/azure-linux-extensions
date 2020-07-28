@@ -67,7 +67,6 @@ TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
-NonSystemdPidFileName = "amamdsd.pid"
 
 # Commands
 OneAgentInstallCommand = ''
