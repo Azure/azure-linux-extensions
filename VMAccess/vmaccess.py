@@ -447,7 +447,10 @@ def _backup_sshd_config(sshd_file_path):
     if os.path.exists(sshd_file_path):
         backup_file_name = '%s_%s' % (
             sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
-        shutil.copyfile(sshd_file_path, backup_file_name)
+        # When copying, make sure to preserve permissions and ownership.
+        ownership = os.stat(sshd_file_path)
+        shutil.copy2(sshd_file_path, backup_file_name)
+        os.chown(backup_file_name, ownership.st_uid, ownership.st_gid)
 
 
 def _save_cert_str_as_file(cert_txt, file_name):
